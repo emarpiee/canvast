@@ -6,7 +6,7 @@ import type { StrokeObject } from "../../src/doc/model";
 import { translate } from "../../src/doc/edit-ops";
 import { projectObject } from "../../src/render/projection";
 import { objectLevel } from "../../src/scene/spatial-index";
-import type { Frame, FrameCamera, Placement } from "../../src/spike/frames";
+import type { Frame, FrameCamera, Placement } from "../../src/core/frames";
 import {
   FrameSpace,
   K,
@@ -20,7 +20,7 @@ import {
   localCamera,
   rehome,
   toAbsoluteCamera,
-} from "../../src/spike/frames";
+} from "../../src/core/frames";
 import { rng } from "./rng";
 
 /**

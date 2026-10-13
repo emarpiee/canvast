@@ -1,9 +1,9 @@
-import * as D from "../core/dyadic";
-import type { Camera, ScreenPoint, Viewport, WorldPoint } from "../core/camera";
-import { CENTER_GUARD_BITS, PRECISION_BUDGET, ZOOM_QUANTUM, panBy, zoomAt } from "../core/camera";
+import * as D from "./dyadic";
+import type { Camera, ScreenPoint, Viewport, WorldPoint } from "./camera";
+import { CENTER_GUARD_BITS, PRECISION_BUDGET, ZOOM_QUANTUM, panBy, zoomAt } from "./camera";
 
 /**
- * SPIKE (docs/plans/nested-frames.md, step 1). Nested frames: every number
+ * Nested frames (ADR 0014; reference: docs/reference/nested-frames.md): every number
  * on the per-frame path stays small, whatever the depth.
  *
  * A frame's coordinates relate to its parent's by

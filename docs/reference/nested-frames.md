@@ -2,8 +2,7 @@
 
 - Decision: [ADR 0014](../adr/0014-nested-frames.md) (accepted 2026-10-14)
 - Plan and measurements: [plans/nested-frames.md](../plans/nested-frames.md)
-- Code: `src/spike/frames.ts` (reference implementation, moving into
-  `src/core/` in step 3); tests: `tests/unit/frames.test.ts`; browser gate:
+- Code: `src/core/frames.ts`; spike page: `src/spike/main.ts`; tests: `tests/unit/frames.test.ts`; browser gate:
   `scripts/spike-measure.mjs`
 
 This document is self-contained. It describes how canvast represents

@@ -10,7 +10,7 @@ import { projectObject } from "../render/projection";
 import { drawStroke } from "../render/draw-objects";
 import type { Landmark } from "../scene/landmarks";
 import { LANDMARKS } from "../scene/landmarks";
-import type { Frame, FrameCamera } from "./frames";
+import type { Frame, FrameCamera } from "../core/frames";
 import {
   FrameSpace,
   K,
@@ -25,7 +25,7 @@ import {
   localCamera,
   rehome,
   toAbsoluteCamera,
-} from "./frames";
+} from "../core/frames";
 import { objectLevel } from "../scene/spatial-index";
 
 /**
