@@ -182,8 +182,11 @@ Results with environment and caveats:
 - [Phase 0C scale benchmarks](docs/testing/phase-0c.md)
 - [Phase 1 slice 1 storage](docs/testing/phase-1a.md)
 
-Latest results (Phase 0C): 58/58 unit tests; full E2E suite 67 passed, 2
-skipped by design, 0 failed across 3 projects; scale benchmarks in
+Latest results (Phase 1 slice 1): 58/58 unit tests; full E2E suite 88
+passed, 2 skipped by design, 0 failed across 3 projects
+([docs/testing/phase-1a.md](docs/testing/phase-1a.md)).
+
+Phase 0C: 67 passed, 2 skipped, 0 failed; scale benchmarks in
 [docs/testing/phase-0c.md](docs/testing/phase-0c.md).
 
 Phase 0B results:
@@ -350,3 +353,4 @@ reproduces on any checkout.
 | Phase 0A — endless navigation prototype | 25/25 unit, 22/22 E2E (2 by-design skips), offline + naming checks pass; `dist/canvast.html` v0.0.1 sha256 `1411e6d0…a92` | `1ce2c05` |
 | Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |
 | Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |
+| Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |

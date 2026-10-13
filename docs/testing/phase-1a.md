@@ -52,7 +52,12 @@ it passes, and the build digest matches the pre-mutation build.
 
 ## Regression
 
-REGRESSION_RESULT
+- **Full E2E suite** (navigation, editing, deep-zoom rendering, zoom
+  controls, storage; 3 projects), on the v0.1.0 build `c1fb8b7f…ac4` (built
+  from commit `790c836`): **88 passed, 2 skipped by design** (touch outside
+  the touch project), **0 failed** (29.0 min). Every Phase 0A–0C threshold
+  holds on the new storage layer.
+- **Unit tests:** 58/58. Offline and naming checks pass.
 
 ## Not covered (unverified)
 
