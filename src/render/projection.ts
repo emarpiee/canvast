@@ -3,6 +3,7 @@ import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
 import { localBounds } from "../doc/model";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
+import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
 
 /**
  * Projection of an object's local geometry to screen space, shared by the
@@ -154,8 +155,20 @@ function fastPathError(p: Projection, localMagnitude: number): number {
 
 /**
  * Project an object if any of it can be visible; returns null when it is
- * entirely offscreen or (unless keepTiny) smaller than 1/8 px.
+ * entirely offscreen or (unless keepTiny) too small to draw individually.
  */
+/**
+ * Whether an object is too small to draw individually at this zoom: decided
+ * by its index level, exactly as the index skips levels (MIN_CELL_PX), so
+ * every object is either drawn or in the density preview (render/density.ts),
+ * never both and never neither. (A box-size cutoff cannot do this: objects
+ * are between half and all of their cell's size, which leaves a band where
+ * the two rules disagree.)
+ */
+export function tooSmallToDraw(o: CanvasObject, cam: Camera): boolean {
+  return 2 ** (objectLevel(o) + cam.zi + cam.zf) < MIN_CELL_PX;
+}
+
 export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: { keepTiny?: boolean } = {}): ProjectedObject | null {
   const p = projectionFor(cam, vp, o.anchor, o.unit);
   const b: LocalBounds = localBounds(o);
@@ -164,7 +177,7 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
   if (box.maxX < -CULL_MARGIN || box.maxY < -CULL_MARGIN || box.minX > vp.width + CULL_MARGIN || box.minY > vp.height + CULL_MARGIN) {
     return null;
   }
-  if (!opts.keepTiny && box.maxX - box.minX < 0.125 && box.maxY - box.minY < 0.125) return null;
+  if (!opts.keepTiny && tooSmallToDraw(o, cam)) return null;
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
   if (o.kind === "image") {
@@ -223,7 +236,7 @@ export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: View
   if (box.maxX < -CULL_MARGIN || box.maxY < -CULL_MARGIN || box.minX > vp.width + CULL_MARGIN || box.minY > vp.height + CULL_MARGIN) {
     return null;
   }
-  if (box.maxX - box.minX < 0.125 && box.maxY - box.minY < 0.125) return null;
+  // No size cull here: the index only returns cells of levels drawn individually.
   if (o.kind === "image") {
     return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, null);
   }

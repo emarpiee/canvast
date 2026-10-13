@@ -6,12 +6,13 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 4 — fast dense scenes.** On top of
+> **Status: Phase 1, slice 5 — nothing vanishes when zoomed out.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
 > scales with what is on screen (0C), your work is organized as
 > Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
 > Assets library (1b), export/import of `.canvast` archives (1c), and a raster
-> tile cache that keeps panning and drawing over dense scenes at 60 fps (1d). Text,
+> tile cache that keeps panning and drawing over dense scenes at 60 fps (1d),
+> and a density preview that keeps far-away and tiny content visible (1e). Text,
 > video, groups, asset tags and folders, and settings are **not implemented
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
@@ -290,6 +291,7 @@ src/
   scene/spatial-index.ts    multi-scale spatial index (levels × BigInt cells, coarse summaries)
   render/scene-renderer.ts  objects (with batch runs), draft stroke, selection, lasso/marquee overlays
   render/tile-cache.ts      raster tile cache for committed objects (exact zoom, whole-pixel reuse)
+  render/density.ts         density preview of sub-pixel content (ink summaries from the index)
   render/canvas2d-renderer.ts  grid, axes, landmarks
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
   interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
@@ -334,6 +336,8 @@ docs/status.md              roadmap and current status (single source of truth)
   format, export scopes, verification, validated transactional import.
 - [ADR 0009](docs/adr/0009-raster-tile-cache.md): raster tile cache —
   exactness rules, invalidation, fidelity criterion, measurements.
+- [ADR 0010](docs/adr/0010-density-preview.md): density preview — ink
+  summaries, one draw-or-preview rule, presence floor, cost.
 
 ## Storage, backups, import/export
 
@@ -395,8 +399,13 @@ docs/status.md              roadmap and current status (single source of truth)
     stale or rescaled image is never shown.
 - **Very large documents.** A 1M-object board needs about 940 MB of heap,
   and about 6 s to build the spatial index on load.
-- **Far zoom-out.** Content more than about 3 levels below a pixel is not
-  drawn at all. There is no density preview yet.
+- **Far zoom-out.** Content too small to draw stroke by stroke appears as a
+  soft mark in its own colour (the density preview,
+  [ADR 0010](docs/adr/0010-density-preview.md)). Anything there keeps at
+  least a faint dot, so you can find it and zoom in.
+  - It is a preview: shapes inside a pixel are not resolved, and images
+    show as neutral grey.
+  - Marks cannot be selected; zoom in to edit.
 - **Not implemented:**
   - groups, attach/detach, locking, rotation, and a Layers panel;
   - picking that respects image transparency (images are picked by their
@@ -456,3 +465,4 @@ reproduces on any checkout.
 | Phase 1 slice 3 — portable archives (export/import) | 75/75 unit; quick E2E 121 passed / 2 by-design skips / 3 failed (one stale assertion, fixed and re-run 3/3); 2 mutation checks caught; `dist/canvast.html` v0.3.0 sha256 `2db91b09…9d9a` | see `git log` |
 | Firefox support (v0.3.1) | Firefox 157 added as a 4th E2E project; grid drawing 7.8× faster in Firefox; quick E2E 165 passed / 3 by-design skips / 0 failed (4 projects); tested build `f64a472e…92bf` (same code, pre-bump label); `dist/canvast.html` v0.3.1 sha256 `60ccde68…1a30` | see `git log` |
 | Phase 1 slice 4 — raster tile cache | tiles 24/24 (4 projects); dense 10K pan 89→2.2 ms, still 152→3.3 ms p50 (Chromium), Firefox 98→2 / 172→2 ms; quick E2E 189 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.4.0 sha256 `4528f2b3…f65a` | see `git log` |
+| Phase 1 slice 5 — density preview | 79/79 unit (4 new); density 3 tests × 4 projects; cost ≤ ~1 ms Chromium / ≤ 4 ms Firefox at 1M objects; quick E2E 201 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.5.0 sha256 `5d1504dc…0ede0` | see `git log` |

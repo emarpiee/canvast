@@ -13,6 +13,7 @@ import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
 import { TileCache } from "../render/tile-cache";
+import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
@@ -80,6 +81,8 @@ async function start(): Promise<void> {
   syncIndex(doc, index);
   // Committed objects are drawn through a raster tile cache (ADR 0009).
   const tiles = new TileCache((id) => doc.get(id));
+  // Content too small to draw individually is shown as a density preview (ADR 0010).
+  const density = new DensityLayer();
   doc.subscribe((_source, changed) => tiles.invalidate(changed));
   const editor = new EditorState();
   let theme = readTheme(document.documentElement);
@@ -121,6 +124,7 @@ async function start(): Promise<void> {
     const cam = view.camera;
     const vp = view.viewport;
     renderFrame(ctx, cam, vp, dpr, theme, LANDMARKS);
+    density.draw(ctx, index, cam, vp, doc.revision);
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
     let runs: Map<ProjectedObject, number> | undefined;
@@ -299,7 +303,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

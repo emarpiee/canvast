@@ -24,6 +24,7 @@ import type { ScreenBox } from "../render/projection";
 import type { LassoFilter } from "../render/hit-test";
 import type { AppView } from "../ui/view-switch";
 import type { TileCache, TileFrame } from "../render/tile-cache";
+import type { DensityLayer } from "../render/density";
 import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
 import { done } from "../storage/idb";
 
@@ -82,6 +83,9 @@ export interface DebugHook {
    * oscillation), returning timing percentiles.
    */
   benchRun(frames: number, mode?: BenchMode): BenchRunResult;
+  /** Turn the density preview on or off; and the squares it drew in the last recomputed frame. */
+  setDensity(on: boolean): void;
+  densityCells(): number;
   /** Turn the raster tile cache on or off (to compare against direct rendering). */
   setTileCache(on: boolean): void;
   /** Tile use of the last rendered frame (null: rendered directly), and tiles held. */
@@ -125,15 +129,17 @@ export interface DebugDeps {
   appView: () => AppView;
   setView: (v: AppView) => void;
   tiles: TileCache;
+  density: DensityLayer;
 }
 
 /**
  * Bench trajectories. "panzoom": pan 37 px and zoom ±0.05 every frame (the
  * Phase 0C trajectory: the zoom changes each frame, so no tiles are used).
  * "pan": pan 37 px per frame in a square, fixed zoom. "static": the camera
- * stays put and only an overlay changes (like drawing a stroke).
+ * stays put and only an overlay changes (like drawing a stroke). "zoom":
+ * zoom ±0.05 about the centre every frame, no pan (stays on the content).
  */
-export type BenchMode = "panzoom" | "pan" | "static";
+export type BenchMode = "panzoom" | "pan" | "static" | "zoom";
 
 export interface BenchRunResult {
   frames: number;
@@ -278,6 +284,10 @@ export function installDebugHook(
       const t2 = performance.now();
       return { objects: objects.length, generateMs: t1 - t0, loadMs: t2 - t1, heapMB: heapMB() };
     },
+    setDensity: (on) => {
+      deps.density.enabled = on;
+    },
+    densityCells: () => deps.density.lastCells,
     setTileCache: (on) => {
       deps.tiles.enabled = on;
       deps.tiles.clear();
@@ -295,7 +305,9 @@ export function installDebugHook(
       for (let i = 0; i < frames; i++) {
         const vp = view.viewport;
         const [dx, dy] = legs[Math.floor(i / 10) % 4]!;
-        if (mode !== "static") {
+        if (mode === "zoom") {
+          view.setCamera(zoomAt(view.camera, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05));
+        } else if (mode !== "static") {
           let cam = panBy(view.camera, dx, dy);
           if (mode === "panzoom") cam = zoomAt(cam, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05);
           view.setCamera(cam);

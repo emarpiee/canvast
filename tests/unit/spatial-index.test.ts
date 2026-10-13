@@ -154,3 +154,63 @@ describe("spatial index", () => {
     expect(qb.cellsProbed).toBeLessThan(3 * qa.cellsProbed + 500);
   }, 60_000);
 });
+
+describe("density summaries (ADR 0010)", () => {
+  /** Expected ink of a stroke in world units²: length × width + round caps. */
+  const inkWorld = (s: StrokeObject): number => {
+    let len = 0;
+    for (let i = 2; i < s.points.length; i += 2) len += Math.hypot(s.points[i]! - s.points[i - 2]!, s.points[i + 1]! - s.points[i - 1]!);
+    return (len * s.width + (Math.PI * s.width * s.width) / 4) * s.opacity * 4 ** s.unit;
+  };
+
+  it("conserve ink: the preview's squares carry the objects' covered area, at every zoom-out", () => {
+    const index = new SpatialIndex();
+    const objs: StrokeObject[] = [];
+    const r = rng(7);
+    for (let i = 0; i < 400; i++) {
+      const s = stroke(D.fromNumber(Math.round((r() - 0.5) * 2000)), D.fromNumber(Math.round((r() - 0.5) * 2000)), 0, [0, 0, 10 * r(), 10 * r(), 20 * r(), 5], 1 + 3 * r());
+      objs.push(s);
+      index.insert(s);
+    }
+    const total = objs.reduce((t, s) => t + inkWorld(s), 0);
+    for (const out of [12, 16, 24, 40]) {
+      const cam = lookAt({ x: D.ZERO, y: D.ZERO }, -out);
+      const q = index.density(cam, VP, 0);
+      // Sum of (covered fraction × square area) in px², back to world units².
+      const px2 = q.cells.reduce((t, c) => t + c.cover * c.size * c.size, 0);
+      expect(px2 * 4 ** out).toBeCloseTo(total, 6);
+      for (const c of q.cells) expect(c.size).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("are exact after removals: removing everything leaves no ink and no summary cells", () => {
+    const index = new SpatialIndex();
+    const objs = randomScene(3, 2000);
+    for (const o of objs) index.insert(o);
+    for (const o of objs) index.remove(o.id);
+    expect(index.size).toBe(0);
+    expect(index.density(lookAt({ x: D.ZERO, y: D.ZERO }, -30), VP, 0).cells).toEqual([]);
+  });
+
+  it("report only content too small to draw: nothing from levels that are drawn object by object", () => {
+    const index = new SpatialIndex();
+    index.insert(stroke(D.ZERO, D.ZERO, 0, [0, 0, 300, 200], 4));
+    expect(index.density(lookAt({ x: D.ZERO, y: D.ZERO }, 0), VP, 0).cells).toEqual([]);
+    expect(index.density(lookAt({ x: D.ZERO, y: D.ZERO }, -20), VP, 0).cells.length).toBeGreaterThan(0);
+  });
+
+  it("place content 2^-80 of a pixel in size at its true screen position, far from the origin", () => {
+    const index = new SpatialIndex();
+    const at = { x: D.fromBigInt(1234567891n, 0), y: D.fromBigInt(-987654321n, 0) };
+    index.insert(stroke(at.x, at.y, -80, [0, 0, 3, 2], 1));
+    const cam = lookAt({ x: D.add(at.x, D.fromNumber(300)), y: D.sub(at.y, D.fromNumber(100)) }, 0);
+    const q = index.density(cam, VP, 0);
+    expect(q.cells.length).toBe(1);
+    const c = q.cells[0]!;
+    // The square holds the anchor: 300 px left of and 100 px below the centre.
+    expect(c.x).toBeLessThanOrEqual(640 - 300 + 1e-6);
+    expect(c.x + c.size).toBeGreaterThanOrEqual(640 - 300 - 1e-6);
+    expect(c.y).toBeLessThanOrEqual(400 + 100 + 1e-6);
+    expect(c.y + c.size).toBeGreaterThanOrEqual(400 + 100 - 1e-6);
+  });
+});

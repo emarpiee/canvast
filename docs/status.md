@@ -15,7 +15,8 @@ Unverified / Committed / Next bounded task**.
 | 1b | Assets view and shared catalog, usage and navigation to instances, reference-checked mark-and-sweep GC, safe deletion of boards and canvases | **done** (see below) |
 | 1c | Portable `.canvast` archives: four export scopes, verification, validated transactional import, backup status | **done** (see below) |
 | 1d | Raster tile cache for committed objects (exact zoom, whole-pixel reuse, per-object invalidation) | **done** (see below) |
-| 1+ | Asset organization (tags, folders, collections), zoom preview for dense scenes, density preview, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
+| 1e | Density preview: sub-pixel content stays visible as soft marks; one draw-or-preview rule shared by index and projection | **done** (see below) |
+| 1+ | Asset organization (tags, folders, collections), zoom preview for dense scenes, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -276,6 +277,37 @@ the largest measured performance gap (about 59 ms per frame at 3K–7.7K
 visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
+
+## Phase 1, slice 5 — density preview
+
+**Implemented** ([ADR 0010](adr/0010-density-preview.md))
+- **Ink summaries:** each index cell, mid cell and coarse cell keeps its
+  covered area and mean colour, updated on every insert and remove.
+- **One rule** (`tooSmallToDraw`, by index level) decides whether an object
+  is drawn individually or shown as density. Index and projection now agree
+  exactly.
+- **Drawing:** squares up to 2 px are spread over pixels with opacity
+  `1 − e^(−coverage)`, behind all drawn objects. A presence floor of 35%
+  keeps any sub-pixel content findable. Squares under 2^-10 px are points.
+- **Not part of the document:** never selectable, not in tiles, recomputed
+  when the document or camera changes.
+- **Bench:** a `zoom` mode (zoom in place, no pan).
+
+**Tested:** [testing/phase-1e.md](testing/phase-1e.md).
+- Content stays visible from 10 to 200 levels out, and content drawn 60
+  levels deep is findable from home.
+- Cost: at most about 1 ms (Chromium) and 4 ms (Firefox) per frame with 1M
+  objects.
+
+**Known failures:** none.
+
+**Known limits:**
+- Images use neutral grey.
+- No paint-order interleaving with drawn objects.
+- Cost grows with the occupied summary cells of skipped levels.
+
+**Next bounded task:** asset organization (tags, folders, collections, and
+search in the Assets view). Then the zoom preview for dense scenes.
 
 ## Phase 1, slice 4 — raster tile cache
 

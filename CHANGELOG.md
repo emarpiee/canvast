@@ -4,6 +4,19 @@
 
 (nothing yet)
 
+## 0.5.0 — Phase 1 slice 5: density preview (2026-10-13)
+
+- **Nothing vanishes when you zoom out.** Content too small to draw stroke
+  by stroke now appears as a soft mark in its own colour, darker where there
+  is more ink. Anything there keeps at least a faint dot, so a drawing made
+  60 levels deep is findable from home.
+- **Never selectable, and not part of the document:** zoom in to edit.
+- **Cost:** at most about 1 ms per frame in Chromium and 4 ms in Firefox,
+  even with 1 million objects.
+- **Fix:** whether an object is drawn individually is now decided by the
+  same rule as the spatial index, so no object can fall between "drawn" and
+  "previewed".
+
 ## 0.4.0 — Phase 1 slice 4: raster tile cache (2026-10-13)
 
 - **Fast panning and drawing over dense scenes.**
