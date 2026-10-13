@@ -4,6 +4,23 @@
 
 (nothing yet)
 
+## 0.3.0 — Phase 1 slice 3: portable archives (2026-10-13)
+
+- **Export** a `.canvast` archive (a standard ZIP) for the whole workspace
+  (storage panel), one board or canvas (breadcrumb menu), or one asset
+  (Assets view). Each original is included once. Every archive is checked
+  (directory, checksums, manifest) before it is saved.
+- **Last full backup** is shown in the storage panel.
+- **Import** from the storage panel or by dropping a file.
+  - Everything is validated first (structure, version, checksums, objects,
+    and the SHA-256 of every original), and a summary lists any problems
+    before you confirm.
+  - The import is applied in one transaction; it adds boards and canvases
+    and never replaces anything.
+  - Originals you already have are not stored twice.
+- **Fix:** objects placed at zoom level 0 stored `unit` as `-0`; it is now
+  written canonically as `0`.
+
 ## 0.2.0 — Phase 1 slice 2: Assets view, catalog and safe deletion (2026-10-13)
 
 - **Assets view:** a top-level Canvas | Assets switch and a full-window

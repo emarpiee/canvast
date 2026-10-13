@@ -5,10 +5,12 @@ export interface ConfirmOptions {
   /** Plain-text lines shown as paragraphs. */
   lines: string[];
   confirmLabel: string;
+  /** Style the confirm button as destructive (default true). */
+  danger?: boolean;
 }
 
 /**
- * Modal confirmation for destructive actions. A native modal <dialog> keeps
+ * Modal confirmation for destructive or significant actions. A native modal <dialog> keeps
  * focus inside and closes on Escape (which answers "no"). The default focus
  * is Cancel, so pressing Enter by reflex never deletes anything.
  */
@@ -22,7 +24,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     <div class="confirm-actions">
       <button type="button" data-testid="confirm-cancel" value="cancel">Cancel</button>
-      <button type="button" class="is-danger" data-testid="confirm-ok" value="ok">${esc(opts.confirmLabel)}</button>
+      <button type="button" class="${opts.danger === false ? "is-primary" : "is-danger"}" data-testid="confirm-ok" value="ok">${esc(opts.confirmLabel)}</button>
     </div>`;
   document.body.appendChild(dlg);
   return new Promise((resolve) => {

@@ -138,7 +138,8 @@ export type SerializedObject = Record<string, unknown> & { id: string; kind: str
 
 export function serializeObject(o: CanvasObject): SerializedObject {
   const { anchor, ...rest } = o;
-  return { ...rest, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
+  return { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
 }
 
 export function deserializeObject(s: SerializedObject): CanvasObject {

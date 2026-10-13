@@ -4,6 +4,7 @@ import type { CatalogListing } from "../assets/asset-catalog";
 import { ICONS } from "./icons";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
+import { runExport } from "./archive-ui";
 
 /**
  * Assets view: the full-window library of the workspace's shared originals
@@ -235,6 +236,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${places.length ? `<h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul>` : ""}
       <div class="asset-actions">
         ${e?.present ? `<button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro}>${ICONS.mapPin}<span>Place on ${esc(where)}</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">Export as archive</button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>Delete from library</button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove its ${instances} instance(s) from their canvases first.</p>` : ""}` : ""}
       </div>`;
@@ -280,6 +282,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "place":
         showCanvas();
         void session.placeAsset(hash);
+        break;
+      case "export":
+        void runExport(session, { kind: "assets", hashes: [hash] });
         break;
       case "delete": {
         const e = listing?.entries.find((x) => x.hash === hash);

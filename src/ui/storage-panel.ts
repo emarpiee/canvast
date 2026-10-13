@@ -1,5 +1,6 @@
 import type { Session } from "../app/session";
 import { esc, fmtBytes } from "./format";
+import { ARCHIVE_ACCEPT, runExport, runImport } from "./archive-ui";
 
 /**
  * Storage status popover (opened from the HUD save indicator). It states
@@ -38,6 +39,10 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         // leave unknown
       }
     }
+    const backup = await session.lastBackup();
+    const backupText = backup
+      ? `${new Date(backup.at).toLocaleString()} — ${esc(backup.fileName)}, ${fmtBytes(backup.bytes)} (${backup.canvases} canvas(es), ${backup.objects} object(s), ${backup.assets} original(s)); checked before saving. The browser does not report whether the download finished, so keep the file somewhere safe.`
+      : "none. Browser storage is not a backup: export one and keep the file safe.";
     const mig = session.startup?.kind === "migrated" ? session.startup.migration : null;
     panel.innerHTML = `
       <h2>Storage</h2>
@@ -47,9 +52,14 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         <dt>This tab</dt><dd data-testid="storage-role">${session.readOnly ? "read-only (another tab is editing)" : "editing (writer)"} · lease via ${session.lease.mechanism}</dd>
         <dt>Space</dt><dd>${quota}</dd>
         <dt>Persistence</dt><dd>${persisted}${typeof sm?.persist === "function" ? ` <button type="button" data-action="persist">Request persistent storage</button>` : ""}</dd>
-        <dt>Exported backup</dt><dd>none — export arrives in a later version. Browser storage is not a backup.</dd>
+        <dt>Last full backup</dt><dd data-testid="storage-backup">${backupText}</dd>
         ${mig ? `<dt>Upgrade</dt><dd>Migrated ${mig.copied} of ${mig.sourceObjects} objects from the previous format${mig.verified ? " (verified)" : ` — verification failed: ${esc(mig.verifyError ?? "unknown")}`}. The old data was kept unchanged.</dd>` : ""}
       </dl>
+      <div class="storage-actions">
+        <button type="button" data-action="export" data-testid="export-workspace">Export workspace backup</button>
+        <button type="button" data-action="import" data-testid="import-archive"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>Import archive…</button>
+        <input type="file" accept="${ARCHIVE_ACCEPT}" hidden data-testid="import-archive-input">
+      </div>
       <p class="storage-note">Data lives in this browser profile's storage for local files. Another browser, profile or private window will not see it, and clearing site data deletes it.</p>`;
   };
 
@@ -61,6 +71,12 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
   opener.addEventListener("click", toggle);
   panel.addEventListener("click", async (e) => {
     const b = (e.target as HTMLElement).closest("button");
+    if (b?.dataset["action"] === "export") {
+      await runExport(session, { kind: "workspace" });
+      void render();
+    } else if (b?.dataset["action"] === "import") {
+      panel.querySelector<HTMLInputElement>('[data-testid="import-archive-input"]')!.click();
+    }
     if (b?.dataset["action"] === "persist") {
       const sm = (navigator as Navigator & { storage?: StorageManager }).storage;
       try {
@@ -70,7 +86,14 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
       }
     }
   });
+  panel.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = "";
+    if (f) void runImport(session, f).then(() => render());
+  });
   document.addEventListener("pointerdown", (e) => {
+    if (!panel.hidden && (e.target as Element).closest?.("dialog")) return; // the import confirmation
     if (!panel.hidden && !panel.contains(e.target as Node) && e.target !== opener) toggle();
   });
   session.persistence.subscribe(() => {

@@ -27,6 +27,7 @@ import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
+import { isArchiveFile, runImport } from "../ui/archive-ui";
 
 declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
@@ -222,7 +223,11 @@ async function start(): Promise<void> {
     if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
   });
   // In Assets view, files go into the library only; in Canvas view they are also placed.
-  const receive = (files: File[]): void => {
+  const receive = (all: File[]): void => {
+    // Archives are imported (after confirmation); everything else is a media import.
+    for (const f of all.filter(isArchiveFile)) void runImport(session, f);
+    const files = all.filter((f) => !isArchiveFile(f));
+    if (!files.length) return;
     if (appView === "assets") void assetsView.importFiles(files);
     else importFiles(files);
   };

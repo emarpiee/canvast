@@ -5,6 +5,9 @@ import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { placeImage } from "./actions";
+import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
+import { applyImport, archiveFileName, buildArchive, readArchive } from "../storage/archive";
+import { idbGet } from "../storage/idb";
 import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
 import type { EditorState } from "./editor-state";
@@ -29,6 +32,21 @@ export interface AssetPlace {
   canvasName: string;
   ids: ObjectId[];
 }
+
+/** The last full (workspace) backup, stored in meta["backup"]. */
+export interface BackupRecord {
+  at: number;
+  bytes: number;
+  fileName: string;
+  boards: number;
+  canvases: number;
+  objects: number;
+  assets: number;
+  /** The archive was read back and every checksum matched before it was handed to the browser. */
+  verified: boolean;
+}
+
+declare const __CANVAST_VERSION__: string;
 
 /** Fraction of the viewport that revealed instances fill. */
 const REVEAL_FILL = 0.6;
@@ -371,6 +389,65 @@ export class Session {
     this.post({ kind: "tree" });
     this.emitAssets(); // usage counts changed
     return true;
+  }
+
+  /**
+   * Build a verified archive. Saves are flushed first, so it includes every
+   * edit made so far. Read-only tabs may export (it only reads).
+   */
+  async exportArchive(scope: ExportScope): Promise<ExportResult & { fileName: string }> {
+    if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
+    await this.persistence.flush();
+    await this.persistence.saveCamera();
+    const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
+    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version);
+    const label =
+      scope.kind === "workspace" ? r.manifest.workspaceName
+      : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")
+      : scope.kind === "board" ? r.manifest.boards[0]!.name
+      : `${r.manifest.boards[0]!.name}-${r.manifest.boards[0]!.canvases[0]!.name}`;
+    const fileName = archiveFileName(label, new Date(r.manifest.exportedAt));
+    if (scope.kind === "workspace" && !this.readOnly) {
+      const rec: BackupRecord = {
+        at: r.manifest.exportedAt,
+        bytes: r.blob.size,
+        fileName,
+        boards: r.manifest.boards.length,
+        canvases: r.canvases,
+        objects: r.objects,
+        assets: r.manifest.assets.length,
+        verified: true,
+      };
+      const tx = this.repo.db.transaction("meta", "readwrite");
+      tx.objectStore("meta").put(rec, "backup");
+      await new Promise<void>((res, rej) => {
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    }
+    return { ...r, fileName };
+  }
+
+  async lastBackup(): Promise<BackupRecord | null> {
+    return this.repo ? ((await idbGet<BackupRecord>(this.repo.db, "meta", "backup")) ?? null) : null;
+  }
+
+  /** Validate an archive without writing anything. */
+  readArchive(file: Blob): Promise<ImportPlan> {
+    return readArchive(file);
+  }
+
+  /** Write a validated archive into this workspace, then open its first canvas. */
+  async applyImport(plan: ImportPlan): Promise<ImportResult | null> {
+    if (!this.guardWrite() || !this.current) return null;
+    await this.persistence.flush();
+    const r = await applyImport(this.repo!.db, this.current.workspaceId, this.current.boardId, plan);
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+    this.post({ kind: "assets" });
+    this.emitAssets();
+    if (r.firstCanvasId) await this.openCanvas(r.firstCanvasId);
+    return r;
   }
 
   private tell(message: string): void {

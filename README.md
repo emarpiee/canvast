@@ -6,14 +6,14 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 1 — workspace and storage foundation.** On top of
+> **Status: Phase 1, slice 3 — portable backups.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
-> scales with what is on screen (0C), your work is now organized as
-> Workspace → Boards → Canvases. Saves are incremental and transactional,
-> and opening the app in a second tab can no longer overwrite your work. Workspaces and boards,
-> the Assets view, text, video, groups, export/import and settings are **not
-> implemented yet**; see [Roadmap and status](docs/status.md). This README
-> describes only what exists.
+> scales with what is on screen (0C), your work is organized as
+> Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
+> Assets library (1b), and export/import of `.canvast` archives (1c). Text,
+> video, groups, asset tags and folders, and settings are **not implemented
+> yet**; see [Roadmap and status](docs/status.md). This README describes only
+> what exists.
 
 ## What works today
 
@@ -131,6 +131,28 @@ or network connection.
 - **Missing originals** (for example, cleared storage) are shown with their
   usage. Importing the same file again restores every instance.
 
+### Backups: export and import (Phase 1)
+
+- **Export workspace backup** in the storage panel (click the save
+  indicator) downloads one `.canvast` file. It holds every board, canvas,
+  object and saved view, plus every original in the library, each stored
+  once. The file is checked before it is saved. The panel then shows **Last
+  full backup**. The browser does not report whether the download finished,
+  so keep the file somewhere safe.
+- **Smaller exports:**
+  - **Export** next to a board or canvas in the breadcrumb menu;
+  - **Export as archive** for one asset in the Assets view.
+  Each includes only the originals it uses.
+- **Import archive…** in the storage panel, or drop a `.canvast` file on the
+  page:
+  - the file is checked completely first, and you see what it contains and
+    any problems before anything is written;
+  - imported boards and canvases are added; nothing existing is replaced;
+  - originals you already have are not stored twice.
+- A `.canvast` file is a standard ZIP: you can open it with any unzip tool
+  to inspect it. Do not re-compress it, because canvast only reads its own
+  uncompressed archives.
+
 ### Controls
 
 | Action | Input |
@@ -144,6 +166,7 @@ or network connection.
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
 | Import images | toolbar image button · drag files onto the page · paste (in Assets view these add to the library only) |
+| Export / import | storage panel (click the save indicator): **Export workspace backup**, **Import archive…** · menu **Export** per board or canvas · drop a `.canvast` file on the page |
 | Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
 | Debug + dev panel | open the file with `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
@@ -193,7 +216,7 @@ connection.
 | Command | Time | When |
 | --- | --- | --- |
 | `npm test` | ~10 min | After every ordinary change (quick E2E suite: short stress loops) |
-| `npm run test:full` | ~35 min | Before committing the end of a phase or milestone (full stress loops); log the result |
+| `npm run test:full` | ~35 min | Only when a whole phase is complete (full stress loops); log the result |
 | `npm run test:unit` | ~15 s | While developing |
 | `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
 
@@ -265,7 +288,7 @@ src/
   assets/                   SHA-256 content addressing, decoding, pixel access; asset catalog,
                             usage lookups and mark-and-sweep garbage collection
   storage/                  IndexedDB schema, workspace repository, incremental persistence,
-                            v1 migration, multi-tab writer lease
+                            v1 migration, multi-tab writer lease, ZIP container, archive export/import
   ui/                       toolbar, view switch, workspace navigator, Assets view, confirmation
                             dialog, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
@@ -299,6 +322,8 @@ docs/status.md              roadmap and current status (single source of truth)
 - [ADR 0007](docs/adr/0007-asset-catalog-and-gc.md): asset catalog, Assets
   view, reference-checked garbage collection, safe deletion of boards and
   canvases.
+- [ADR 0008](docs/adr/0008-portable-archives.md): portable archives —
+  format, export scopes, verification, validated transactional import.
 
 ## Storage, backups, import/export
 
@@ -327,9 +352,16 @@ docs/status.md              roadmap and current status (single source of truth)
   and board deletion is confirmed and cannot be undone), and **Delete from
   library**, which erases an unused original once undo can no longer need
   it. Nothing else deletes anything.
+- **Backups:** `.canvast` archives (ZIP-compatible, uncompressed). They
+  contain a versioned `manifest.json`, one JSON file per canvas, and each
+  original once under `assets/<sha256>`, with a CRC on every entry. See
+  [ADR 0008](docs/adr/0008-portable-archives.md).
+  - Import checks every checksum and content hash before writing anything,
+    then writes in one transaction.
+  - Limit: 4 GiB and 65,535 files per archive.
 - **Not yet available:**
-  - export/import (portable backups);
-  - persistent undo history.
+  - persistent undo history;
+  - incremental or multi-part backups.
 
 ## Known limitations (honest list)
 
@@ -359,6 +391,9 @@ docs/status.md              roadmap and current status (single source of truth)
   - asset tags, folders, collections and similar-image review; dragging an
     asset onto the canvas (use Place);
   - collaboration.
+- **Large backups.** One archive holds at most 4 GiB and 65,535 files, and it
+  is built in the browser before download. Export and import speed for large
+  workspaces has not been measured.
 - **Large asset libraries.** Thumbnails are generated in memory each
   session, and the grid draws every card. Very large libraries (many
   thousands of assets) have not been measured.
@@ -403,3 +438,4 @@ reproduces on any checkout.
 | Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |
 | Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |
 | Phase 1 slice 2 — Assets view, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |
+| Phase 1 slice 3 — portable archives (export/import) | 75/75 unit; quick E2E 121 passed / 2 by-design skips / 3 failed (one stale assertion, fixed and re-run 3/3); 2 mutation checks caught; `dist/canvast.html` v0.3.0 sha256 `2db91b09…9d9a` | see `git log` |

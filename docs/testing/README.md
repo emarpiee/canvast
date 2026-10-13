@@ -6,17 +6,21 @@ test runs in both; only the length of the stress loops differs (for example
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (3 browser configs), offline and naming checks | ~10 min (E2E 9.5 min, v0.2.0) | **After every ordinary change**, before pushing a branch |
-| `npm run test:full` | The same, with the **full** E2E stress loops | ~35 min (E2E 34.5 min, v0.2.0) | **Before committing the end of a phase or milestone**; record the result in that phase's test log |
+| `npm test` | Typecheck, unit tests, **quick** E2E suite (3 browser configs), offline and naming checks | ~10 min (E2E 9.5 min, v0.2.0) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
+| `npm run test:full` | The same, with the **full** E2E stress loops | ~35 min (E2E 34.5 min, v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npx playwright test -g "<name>"` | Selected quick E2E tests | seconds | While developing a specific feature |
 | `npm run bench` | Scale benchmarks, 1K–1M objects (not a pass/fail gate) | ~10 min | After rendering or performance changes; compare with `metrics/bench-*.json` and docs/testing/phase-0c.md |
 
 ## Rules
 
-1. **Never skip the full suite before a phase commit.** The quick suite
-   catches almost every defect, but the full one is the record that the spec's
-   "hundreds of successive gestures" requirements hold.
+1. **Run the full suite only when a whole phase is complete, and never skip
+   it then.** A slice or milestone within a phase that can be tested on its
+   own (unit tests, its own E2E spec, and the quick suite) does not need it.
+   The quick suite runs every test with shorter stress loops. The full one
+   is the record that the spec's "hundreds of successive gestures"
+   requirements hold. (Decided with the project owner, 2026-10-13. Slices 1a
+   and 1b ran it as well; from 1c on they do not.)
 2. **Never rebuild `dist/` while any suite is running.** The tests load the
    built `dist/canvast.html` at the start of each test, so a rebuild mid-run
    mixes two versions in one result.

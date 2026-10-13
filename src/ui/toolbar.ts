@@ -45,7 +45,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <input type="file" accept="image/*" multiple hidden data-testid="import-input">
     </div>
-    <div class="toast" role="status" aria-live="polite" hidden></div>
+    <div class="toast" role="status" aria-live="polite" data-testid="toast" hidden></div>
   `;
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
   const toast = root.querySelector<HTMLElement>(".toast")!;

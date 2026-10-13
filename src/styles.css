@@ -341,6 +341,7 @@ html, body {
 .storage-panel dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
 .storage-panel dt { opacity: 0.7; }
 .storage-panel dd { margin: 0; }
+.storage-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .storage-note { margin: 10px 0 0; opacity: 0.7; font-size: 12px; }
 .hud-save[data-state="error"], .hud-save[data-state="unavailable"] { color: var(--canvas-axis); opacity: 1; }
 
@@ -496,7 +497,7 @@ dialog.confirm {
 }
 dialog.confirm::backdrop { background: rgba(0, 0, 0, 0.35); }
 dialog.confirm h2 { margin: 0 0 8px; font-size: 15px; }
-dialog.confirm p { margin: 0 0 8px; }
+dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .confirm-actions button {
   font: 500 13px var(--font-ui);
@@ -507,6 +508,7 @@ dialog.confirm p { margin: 0 0 8px; }
   border-radius: 6px;
   cursor: pointer;
 }
+.confirm-actions button.is-primary { color: #fff; background: var(--hud-accent); border-color: var(--hud-accent); }
 .confirm-actions button.is-danger { color: #fff; background: var(--canvas-axis); border-color: var(--canvas-axis); }
 .confirm-actions button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .nav-mini:disabled { opacity: 0.3; cursor: default; }
@@ -521,3 +523,4 @@ dialog.confirm p { margin: 0 0 8px; }
   #toolbar { top: 8px; }
   .hud-readout { max-width: calc(100vw - 150px); }
 }
+.storage-panel button:disabled { opacity: 0.4; cursor: default; }

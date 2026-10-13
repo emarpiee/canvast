@@ -1,6 +1,7 @@
 import type { Session } from "../app/session";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
+import { runExport } from "./archive-ui";
 
 /**
  * Workspace › Board › Canvas navigator (top-left) and the read-only banner.
@@ -43,6 +44,7 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
             board.name,
             `<span class="nav-board-name">${esc(board.name)}</span>
              <button type="button" class="nav-mini" data-action="rename-board" data-id="${board.id}" aria-label="Rename board ${esc(board.name)}" title="Rename board">Rename</button>
+             <button type="button" class="nav-mini" data-action="export-board" data-id="${board.id}" aria-label="Export board ${esc(board.name)}" title="Export board">Export</button>
              <button type="button" class="nav-mini" data-action="delete-board" data-id="${board.id}" aria-label="Delete board ${esc(board.name)}"
                ${tree.boards.length <= 1 ? 'disabled title="A workspace needs at least one board"' : 'title="Delete board"'}>Delete</button>`,
           );
@@ -55,6 +57,7 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
                 c.name,
                 `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}">${esc(c.name)}<span class="nav-count">${c.objectCount}</span></button>
                  <button type="button" class="nav-mini" data-action="rename-canvas" data-id="${c.id}" aria-label="Rename canvas ${esc(c.name)}" title="Rename canvas">Rename</button>
+                 <button type="button" class="nav-mini" data-action="export-canvas" data-id="${c.id}" aria-label="Export canvas ${esc(c.name)}" title="Export canvas">Export</button>
                  <button type="button" class="nav-mini" data-action="delete-canvas" data-id="${c.id}" aria-label="Delete canvas ${esc(c.name)}"
                    ${canvases.length <= 1 ? 'disabled title="A board needs at least one canvas; delete the board instead"' : 'title="Delete canvas"'}>Delete</button>`,
               )}</li>`;
@@ -125,6 +128,14 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
       case "rename-canvas":
         renaming = { kind: "canvas", id };
         renderMenu();
+        break;
+      case "export-board":
+        setOpen(false);
+        void runExport(session, { kind: "board", boardId: id });
+        break;
+      case "export-canvas":
+        setOpen(false);
+        void runExport(session, { kind: "canvas", canvasId: id });
         break;
       case "delete-canvas":
         void confirmDeleteCanvas(id);

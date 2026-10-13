@@ -169,3 +169,11 @@ describe("asset hashing", () => {
     }
   });
 });
+
+describe("serialization is canonical", () => {
+  it("writes unit -0 (placement at zoom level 0) as 0, so stored and JSON forms agree", () => {
+    const s = serializeObject(stroke({ unit: -0 }));
+    expect(Object.is(s["unit"], 0)).toBe(true);
+    expect(JSON.parse(JSON.stringify(s))).toEqual(s);
+  });
+});

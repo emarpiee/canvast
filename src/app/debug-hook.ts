@@ -105,6 +105,8 @@ export interface DebugHook {
    * itself never erases a referenced original.
    */
   forceCatalogState(hash: string, state: "active" | "deleted"): Promise<void>;
+  /** Stored objects (serialized, sorted by id) and saved view of a canvas. */
+  canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null }>;
   /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
   removeAssetBytes(hash: string): Promise<void>;
 }
@@ -335,6 +337,12 @@ export function installDebugHook(
         if (r.result) store.put({ ...r.result, state, deletedAt: state === "deleted" ? Date.now() : null });
       };
       await done(tx);
+    },
+    canvasDump: async (canvasId) => {
+      await writer.flush();
+      await writer.saveCamera();
+      const loaded = await session.repo!.loadCanvas(canvasId);
+      return { objects: loaded.objects.map(serializeObject).sort((a, b) => (a.id < b.id ? -1 : 1)), view: loaded.camera };
     },
     removeAssetBytes: async (hash) => {
       const tx = session.repo!.db.transaction("assets", "readwrite");

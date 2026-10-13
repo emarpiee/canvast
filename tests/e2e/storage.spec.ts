@@ -290,7 +290,7 @@ test("the storage panel reports save state, tab role, space, persistence and bac
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("storage-save-state")).toHaveText("verified");
   await expect(panel.getByTestId("storage-role")).toContainText("editing (writer)");
-  await expect(panel).toContainText("Exported backup");
+  await expect(panel.getByTestId("storage-backup")).toContainText("none");
   await expect(panel).toContainText("Browser storage is not a backup");
   await expect(panel).toContainText(/used of about|unknown/);
 });

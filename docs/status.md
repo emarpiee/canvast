@@ -13,7 +13,8 @@ Unverified / Committed / Next bounded task**.
 | 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **done** (see below) |
 | 1a | Workspace → Boards → Canvas, per-object transactional storage, v1 migration, multi-tab safety, save states, storage panel | **done** (see below) |
 | 1b | Assets view and shared catalog, usage and navigation to instances, reference-checked mark-and-sweep GC, safe deletion of boards and canvases | **done** (see below) |
-| 1+ | Asset organization (tags, folders, collections), portable export/import, raster tile cache, density preview, text/media content, adjustments, Settings, collaboration | planned |
+| 1c | Portable `.canvast` archives: four export scopes, verification, validated transactional import, backup status | **done** (see below) |
+| 1+ | Asset organization (tags, folders, collections), raster tile cache, density preview, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -229,6 +230,52 @@ exhaustion, and storage eviction.
 The recommended order is export/import first, because there is still no
 backup outside the browser.
 
+## Phase 1, slice 3 — portable archives (export and import)
+
+**Implemented** ([ADR 0008](adr/0008-portable-archives.md))
+- **`.canvast` archive:** a standard ZIP with stored entries and a CRC on
+  each. It contains a versioned manifest, one JSON file per canvas (the
+  canonical object serialization and the saved view), and each original
+  once under `assets/<sha256>`.
+- **Export scopes:** workspace (with unused library assets), board, canvas,
+  and assets, each closing over the originals it references. Saves are
+  flushed first; the export reads one transaction, then the archive is
+  verified (directory, every CRC, the manifest) before download.
+- **Backup status:** a workspace export records **Last full backup** in the
+  storage panel, which states that download completion cannot be observed.
+- **Import:**
+  - full validation first, writing nothing: ZIP bounds, format and version,
+    a CRC on each canvas file, per-object validation, and SHA-256 on each
+    original;
+  - a confirmation summary listing every problem;
+  - one all-or-nothing transaction. Boards and canvases get new ids, object
+    ids are kept, and originals are deduplicated.
+  It is available from the storage panel or by dropping a file; read-only
+  tabs cannot import.
+- **Fix:** `serializeObject` writes `unit: -0` as `0`.
+
+**Tested:** [testing/phase-1c.md](testing/phase-1c.md).
+
+**Known failures:** none.
+
+**Known limits:**
+- No ZIP64: 4 GiB and 65,535 entries per archive.
+- No chunked, multi-part or incremental archives.
+- Compressed (re-zipped) archives are refused.
+
+**Unverified**
+- Transfer to Firefox or Safari.
+- Throughput and peak memory for large workspaces.
+- A tab closed in the middle of an import.
+
+**Committed:** see `git log`.
+
+**Next bounded task:** the raster tile cache (ADR 0005). Dense scenes are
+the largest measured performance gap (about 59 ms per frame at 3K–7.7K
+visible strokes). Alternatives:
+- asset organization (tags, folders, collections);
+- a density preview for sub-pixel content.
+
 ## Decided and implemented: quick vs full test suites (2026-10-13)
 
 The full E2E suite runs thousands of real input events in 3 browser
@@ -239,9 +286,10 @@ project owner:
 - **Quick suite** (target 3–5 min): every test, with short stress loops (for
   example 200 wheel notches instead of 2,400). Run it after ordinary
   changes.
-- **Full suite** (the current one, unchanged): run it only when finishing a
-  phase or milestone, right before that commit, and record its results in
-  the test log.
+- **Full suite** (the current one, unchanged): run it only when a whole
+  phase is complete, and record its results in the test log. Slices and
+  milestones inside a phase are committed on the quick suite (revised
+  2026-10-13, from slice 1c on).
 - **Never skip the full suite before a phase commit.** Never rebuild `dist/`
   while any suite is running, because the tests load the built file.
 
