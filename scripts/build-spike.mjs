@@ -12,9 +12,10 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>canvast spike: nested frames</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;font:13px system-ui,sans-serif}#canvas{display:block;width:100vw;height:100vh;touch-action:none}
 #hud{position:fixed;left:8px;bottom:8px;padding:4px 8px;background:#fffd;border:1px solid #ccc;border-radius:6px;pointer-events:none}
+#jumps{position:fixed;right:8px;top:8px;display:flex;flex-wrap:wrap;gap:4px;max-width:520px;justify-content:flex-end}#jumps button{font:12px system-ui;padding:2px 6px}
 #help{position:fixed;left:8px;top:8px;padding:4px 8px;background:#fffd;border:1px solid #ccc;border-radius:6px;pointer-events:none}</style>
 </head><body><canvas id="canvas"></canvas><div id="hud"></div>
-<div id="help">Spike: nested frames · wheel zoom · drag or arrows pan · P pen, H hand · +/− zoom · J jump by N levels</div>
+<div id="help">Spike: nested frames · wheel zoom · drag or arrows pan · P pen, H hand · +/− zoom · J jump by N levels · F frame overlay</div>
 <script>${script}</script></body></html>`;
 const out = resolve(root, "dist-spike/frames.html");
 await mkdir(dirname(out), { recursive: true });

@@ -11,7 +11,22 @@ import { drawStroke } from "../render/draw-objects";
 import type { Landmark } from "../scene/landmarks";
 import { LANDMARKS } from "../scene/landmarks";
 import type { Frame, FrameCamera } from "./frames";
-import { FrameSpace, K, depthOf, expressIn, fjump, fpanBy, fzoomAt, levelsBetween, localCamera } from "./frames";
+import {
+  FrameSpace,
+  K,
+  depthOf,
+  expressExactIn,
+  expressIn,
+  fjump,
+  fpanBy,
+  fromAbsoluteCamera,
+  fzoomAt,
+  levelsBetween,
+  localCamera,
+  rehome,
+  toAbsoluteCamera,
+} from "./frames";
+import { objectLevel } from "../scene/spatial-index";
 
 /**
  * SPIKE page (dist-spike/frames.html): the camera lives in nested frames and
@@ -36,11 +51,13 @@ const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const hud = document.getElementById("hud")!;
 const ctx = canvas.getContext("2d", { alpha: false })!;
 const space = new FrameSpace();
-let cam: FrameCamera = { f: space.root, x: D.ZERO, y: D.ZERO, z: 0 };
+let cam: FrameCamera = { f: space.root, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
 const strokes: FStroke[] = [];
 let vp: Viewport = { width: 1, height: 1 };
 let dpr = 1;
 let lastMs = 0;
+let rebaseCount = 0;
+let overlay = false;
 
 /**
  * Objects re-expressed in the camera frame. Rebuilt only when the camera
@@ -116,13 +133,61 @@ function render(): number {
     if (po) drawStroke(ctx, po, vp);
   }
   if (draft && draft.points.length >= 2) {
-    const po = projectObject({ ...draftObject(draft) }, local, vp, { keepTiny: true });
+    const d = draftObject(draft);
+    const a = draft.f === cam.f ? d.anchor : expressExactIn(space, draft.f, d.anchor, cam.f);
+    const po = projectObject({ ...d, anchor: a, unit: d.unit + levelsBetween(draft.f, cam.f) }, local, vp, { keepTiny: true });
     if (po) drawStroke(ctx, po, vp);
   }
+  if (overlay) drawFrameOverlay();
   lastMs = performance.now() - t0;
   const dep = depthOf(cam);
-  hud.textContent = `zoom 2^${dep.levels} (+${dep.frac.toFixed(2)}) · frame ${lastMs.toFixed(1)} ms · frames ${space.count}`;
+  hud.textContent =
+    `zoom 2^${dep.levels} (+${dep.frac.toFixed(2)}) · render ${lastMs.toFixed(1)} ms · ` +
+    `frame #${cam.f.id} (level ${cam.f.level}${cam.f.n > 1n ? `, dive of ${cam.f.n} steps` : ""}) · local z ${cam.z.toFixed(2)} · pz ${cam.pz} · ` +
+    `rebases ${rebaseCount} · frames ${space.count} · scene ${scene.strokes.length} strokes, built in ${scene.buildMs.toFixed(1)} ms`;
   return lastMs;
+}
+
+/**
+ * Debug overlay: the camera frame's own cell (local 0..2^K, orange) and its
+ * child cells (integer lines, blue) where they are at least 12 px apart.
+ * Rebasing happens when the view moves into one of the blue cells' scale.
+ */
+function drawFrameOverlay(): void {
+  const s = 2 ** cam.z;
+  const cx = vp.width / 2 - D.toNumber(cam.x) * s;
+  const cy = vp.height / 2 - D.toNumber(cam.y) * s;
+  ctx.save();
+  ctx.lineWidth = 1;
+  if (s >= 12) {
+    ctx.strokeStyle = "rgba(37,99,235,0.35)";
+    ctx.beginPath();
+    const x0 = Math.floor(-cx / s);
+    const y0 = Math.floor(-cy / s);
+    for (let i = x0; cx + i * s <= vp.width; i++) {
+      ctx.moveTo(cx + i * s + 0.5, 0);
+      ctx.lineTo(cx + i * s + 0.5, vp.height);
+    }
+    for (let j = y0; cy + j * s <= vp.height; j++) {
+      ctx.moveTo(0, cy + j * s + 0.5);
+      ctx.lineTo(vp.width, cy + j * s + 0.5);
+    }
+    ctx.stroke();
+  }
+  if (cam.f.parent) {
+    const e = 2 ** K * s;
+    const l = Math.max(-10, Math.min(vp.width + 10, cx));
+    const t = Math.max(-10, Math.min(vp.height + 10, cy));
+    const r = Math.max(-10, Math.min(vp.width + 10, cx + e));
+    const b = Math.max(-10, Math.min(vp.height + 10, cy + e));
+    ctx.strokeStyle = "#ea580c";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(l, t, r - l, b - t);
+  }
+  ctx.fillStyle = "#ea580c";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText(`frame #${cam.f.id} · level ${cam.f.level}`, 8, 52);
+  ctx.restore();
 }
 
 let scheduled = false;
@@ -136,12 +201,15 @@ function invalidate(): void {
 }
 
 function setCam(c: FrameCamera): void {
+  if (c.f !== cam.f) rebaseCount++;
   cam = c;
   invalidate();
 }
 
 // ---- pen ------------------------------------------------------------------
 interface Draft {
+  /** The frame the stroke started in: its points stay there even if the camera rebases mid-stroke. */
+  f: Frame;
   anchor: WorldPoint;
   unit: number;
   points: number[];
@@ -154,18 +222,21 @@ function draftObject(d: Draft): StrokeObject {
 }
 
 function penPoint(s: ScreenPoint): void {
-  const w = screenToWorld(localCamera(cam), vp, s);
+  const here = screenToWorld(localCamera(cam), vp, s);
+  const w = cam.f === draft!.f ? here : expressExactIn(space, cam.f, here, draft!.f);
   draft!.points.push(D.toNumber(D.shift(D.sub(w.x, draft!.anchor.x), -draft!.unit)), D.toNumber(D.shift(D.sub(w.y, draft!.anchor.y), -draft!.unit)));
 }
 
 function beginStroke(s: ScreenPoint): void {
-  draft = { anchor: screenToWorld(localCamera(cam), vp, s), unit: -localCamera(cam).zi, points: [] };
+  draft = { f: cam.f, anchor: screenToWorld(localCamera(cam), vp, s), unit: -localCamera(cam).zi, points: [] };
   penPoint(s);
 }
 
 function endStroke(): void {
   if (draft && draft.points.length >= 2) {
-    strokes.push({ f: cam.f, obj: normalizeUnit(draftObject(draft)) as StrokeObject });
+    const o = normalizeUnit(draftObject(draft)) as StrokeObject;
+    const pl = rehome(space, { f: draft.f, anchor: o.anchor, unit: o.unit }, objectLevel(o) - o.unit);
+    strokes.push({ f: pl.f, obj: { ...o, anchor: pl.anchor, unit: pl.unit } });
     scene = null;
   }
   draft = null;
@@ -205,6 +276,10 @@ window.addEventListener("keydown", (e) => {
   const step = 0.125 * Math.min(vp.width, vp.height);
   const k = e.key;
   if (k === "p") tool = "pen";
+  else if (k === "f") {
+    overlay = !overlay;
+    invalidate();
+  }
   else if (k === "h") tool = "hand";
   else if (k === "+" || k === "=") setCam(fzoomAt(space, cam, vp, { x: vp.width / 2, y: vp.height / 2 }, 0.5));
   else if (k === "-") setCam(fzoomAt(space, cam, vp, { x: vp.width / 2, y: vp.height / 2 }, -0.5));
@@ -218,6 +293,26 @@ window.addEventListener("keydown", (e) => {
   } else return;
   canvas.dataset["tool"] = tool;
   e.preventDefault();
+});
+
+// Jump panel (as the app's dev panel): whole frames and giant jumps.
+const panel = document.createElement("div");
+panel.id = "jumps";
+const JUMPS = [-1e12, -1e9, -1e6, -1000, -K, K, 1000, 1e6, 1e9, 1e12];
+panel.innerHTML =
+  JUMPS.map((j) => `<button type="button" data-jump="${j}">${j > 0 ? "+" : "−"}${Math.abs(j) === K ? "1 frame" : Math.abs(j).toExponential(0).replace("e+", "e")}</button>`).join("") +
+  `<button type="button" data-home>Home</button><button type="button" data-overlay>Frames (F)</button>`;
+document.body.append(panel);
+panel.addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest("button");
+  if (!b) return;
+  if (b.dataset["jump"]) setCam(fjump(space, cam, Number(b.dataset["jump"])));
+  else if ("home" in b.dataset) setCam(fromAbsoluteCamera(space, { x: D.ZERO, y: D.ZERO }, 0));
+  else if ("overlay" in b.dataset) {
+    overlay = !overlay;
+    invalidate();
+  }
+  canvas.focus();
 });
 
 function resize(): void {
@@ -253,6 +348,37 @@ const pct = (xs: number[]): { p50: number; p95: number; max: number } => {
     endStroke();
   },
   render,
+  /** Frame-local camera (all small numbers). */
+  camera: () => ({ frame: cam.f.id, level: String(cam.f.level), n: String(cam.f.n), x: D.toString(cam.x), y: D.toString(cam.y), z: cam.z, pz: cam.pz }),
+  /**
+   * The camera in the old absolute form ("<m>p<e>" strings, zoom levels as in
+   * SerializedCamera), exact. Debug only: its size grows with depth.
+   */
+  absoluteCamera: () => {
+    const a = toAbsoluteCamera(space, cam);
+    return { cx: D.toString(a.center.x), cy: D.toString(a.center.y), zi: a.zi, zf: a.zf, pz: a.pz };
+  },
+  setAbsoluteCamera: (c: { cx: string; cy: string; zi: number; zf: number; pz: number }): void =>
+    setCam(fromAbsoluteCamera(space, { x: D.parse(c.cx), y: D.parse(c.cy) }, c.zi + c.zf, c.pz)),
+  /** Screen position of an absolute world point (null when far off screen): the cheap path, small numbers. */
+  worldToScreen: (x: string, y: string): ScreenPoint | null => {
+    const p = expressIn(space, space.world, { x: D.parse(x), y: D.parse(y) }, cam.f);
+    if (!p) return null;
+    const s = 2 ** cam.z;
+    return { x: vp.width / 2 + D.toNumber(D.sub(p.x, cam.x)) * s, y: vp.height / 2 + D.toNumber(D.sub(p.y, cam.y)) * s };
+  },
+  /** Exact absolute world position under a screen point. Debug only: size grows with depth. */
+  screenToWorld: (x: number, y: number): { x: string; y: string } => {
+    const p = expressExactIn(space, cam.f, screenToWorld(localCamera(cam), vp, { x, y }), space.world);
+    return { x: D.toString(p.x), y: D.toString(p.y) };
+  },
+  rebases: (): number => rebaseCount,
+  setOverlay: (on: boolean): void => {
+    overlay = on;
+    invalidate();
+  },
+  /** Strokes with their frame and frame-local anchor. */
+  objects: () => strokes.map((s) => ({ id: s.obj.id, frame: s.f.id, level: String(s.f.level), ax: D.toString(s.obj.anchor.x), ay: D.toString(s.obj.anchor.y), unit: s.obj.unit })),
   depth: (): string => {
     const d = depthOf(cam);
     return `${d.levels}+${d.frac}`;

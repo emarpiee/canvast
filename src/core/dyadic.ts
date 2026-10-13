@@ -204,17 +204,17 @@ export function diffToNumber(a: Dyadic, b: Dyadic, k: number): number {
 }
 
 /**
- * Round to the nearest multiple of 2^q (ties away from zero). Used to bound
- * mantissa growth of camera state; the error is at most 2^(q-1).
+ * Round to the nearest multiple of 2^q, ties toward +∞ (floor(a/2^q + 1/2)).
+ * The tie rule does not depend on where zero is, so rounding a position
+ * measured from the origin or from any grid-aligned frame corner gives the
+ * same point (nested frames, ADR 0014). Used to bound mantissa growth of
+ * camera state and scaled anchors; the error is at most 2^(q-1).
  */
 export function roundTo(a: Dyadic, q: number): Dyadic {
   if (a.m === 0n || a.e >= q) return a;
   const s = BigInt(q - a.e);
-  const neg = a.m < 0n;
-  const mag = neg ? -a.m : a.m;
-  const half = 1n << (s - 1n);
-  const r = (mag + half) >> s;
-  return make(neg ? -r : r, q);
+  // BigInt >> floors for negatives too.
+  return make((a.m + (1n << (s - 1n))) >> s, q);
 }
 
 /** floor(a / 2^g) as an integer. */
