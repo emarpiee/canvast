@@ -196,3 +196,56 @@ Work happens on `exp/nested-frames`; `main` keeps v0.8.0 until step 6.
   not per frame.
 - **Multi-tab and history:** frames are document data, so they go through
   the same transactions and leases as objects.
+
+## 7. Spike results (step 1, 2026-10-14)
+
+Code: `src/spike/` (frames, camera, rebasing, compressed dives, a page that
+draws grid, landmarks and strokes through the **unchanged** renderer in the
+camera frame's own coordinates). Build: `node scripts/build-spike.mjs` →
+`dist-spike/frames.html` (separate from `dist/`). Measure:
+`node scripts/spike-measure.mjs`. Each row: pan to an ordinary spot, draw a
+stroke at home, jump, draw 3 strokes there; then 240 pan+zoom frames, 400
+zoom-in frames (+0.25 levels each, crossing frames), 100 levels of zoom
+about a stroke vertex, and 100 pans of 37 px.
+
+| Depth | Jump ms (A2) | Pan+zoom frame p50/p95 ms | Zoom-in p50/p95 ms (crossings) | Drift at the zoom point (A3) | Pan error (A3) |
+| --- | --- | --- | --- | --- | --- |
+| Chromium 2^10 | 1.7 | 0.4/0.6 | 0.6/0.9 (3) | 0 px | 0 px |
+| Chromium 2^1,000 | 2.5 | 0.1/0.2 | 0.1/0.2 (3) | 0 | 0 |
+| Chromium 2^1,000,000 | 2.5 | 0.1/0.2 | 0.1/0.2 (2) | 0 | 0 |
+| Chromium 2^10^9 | 7 | 0.1/0.2 | 0.1/0.2 (2) | 0 | 0 |
+| Chromium 2^10^12 | 3.4 | 0.1/0.2 | 0.1/0.2 (2) | 0 | 0 |
+| Firefox 2^10 | 8 | 1/2 | 1/2 (3) | 0 | 0 |
+| Firefox 2^1,000 … 2^10^12 | 3–4 | 1/1–2 | 1/1–2 (2–3) | 0 | 0 |
+
+(Firefox times are whole ms on `file://`.) The deep strokes were drawn and
+inked at every depth. For comparison, v0.8.0 needs 5.9 s per pan at
+2^1,000,000 and never finishes at 2^10^12.
+
+**Gate:**
+- **A2 passes:** a 10^12-level jump takes 3–8 ms (limit 100 ms).
+- **A3 passes:** zooming about a point across frame crossings and panning
+  across rebases move content by exactly 0 px.
+- **A1 passes in substance, not to the letter.** All deep rows are equal
+  (0.2 ms p95 in Chromium, 1–2 ms in Firefox), far under the 8 ms budget.
+  The 2^10 row is slower (0.6 ms) because the home stroke and the home
+  landmarks are on screen there: more content, not more depth. The "within
+  20%" wording should compare equal content; the criterion stays as
+  written, and this is reported rather than adjusted.
+
+**Open risk confirmed: coarse objects seen from far below.** A stroke drawn
+at home, with the view inside it, Δ levels below (Chromium, frame p50/p95):
+
+| Δ | 100 | 1,000 | 10,000 | 100,000 | 1,000,000 | 10,000,000 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ms | 0.9/1.7 | 0.1/0.4 | 0.2/0.3 | 0.4/0.7 | 2.8/4.0 | 26.3/30.2 |
+
+The spike draws such objects by today's exact projection with an anchor of
+Δ bits, so the cost is linear in Δ. That is about 2,000× faster than v0.8.0
+at 2^1,000,000, but **not constant**: it would be ~260 ms at Δ = 10^8. The
+carried near-edge set (§3) is what removes it. Step 3 must implement it
+and add Δ = 10^8 and 10^12 to this table.
+
+Not in the spike: storage, the spatial index (the spike scans all strokes),
+images, text, selection, density preview of finer frames, return paths
+beyond the 4,096-bit budget.
