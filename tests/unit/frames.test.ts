@@ -10,6 +10,7 @@ import type { Frame, FrameCamera, Placement } from "../../src/spike/frames";
 import {
   FrameSpace,
   K,
+  depthOf,
   expressExactIn,
   expressIn,
   fjump,
@@ -192,5 +193,20 @@ describe("nested frames behave exactly like absolute coordinates", () => {
     old = zoomAt(old, VP, { x: 640, y: 400 }, 3000);
     const f3 = fjump(space, fpanBy(space, { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, 123.37, -56.71), 3000);
     sameCamera(toAbsoluteCamera(space, f3), old, "jump 3000");
+  });
+
+  it("climbing part of a long dive is one step, not one per frame", () => {
+    for (const up of [-1e9, -1e6, -1e12 + 1e9]) {
+      const space = new FrameSpace();
+      const start = fpanBy(space, { f: space.root, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, 123.37, -56.71);
+      const t0 = performance.now();
+      let fc = fjump(space, start, 1e12);
+      fc = fjump(space, fpanBy(space, fc, 37, 11), 1000);
+      fc = fjump(space, fc, up);
+      expect(performance.now() - t0).toBeLessThan(50);
+      expect(space.count).toBeLessThan(20);
+      const d = depthOf(fc); // not toAbsoluteCamera: that builds a number with ~depth bits
+      expect(Number(d.levels) + d.frac).toBeCloseTo(1e12 + 1000 + up, 0);
+    }
   });
 });

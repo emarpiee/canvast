@@ -57,8 +57,8 @@ export class FrameSpace {
     return c;
   }
 
-  /** The parent of `f`, creating one above the root, and splitting a compressed dive so the step is one K. */
-  parentOf(f: Frame): Frame {
+  /** The parent of `f`, creating one above the root, and splitting a compressed dive so the step is `k` K-steps. */
+  parentOf(f: Frame, k = 1n): Frame {
     if (!f.parent) {
       const r = frame(null, 1n, D.ZERO, D.ZERO, f.level - 1n);
       f.parent = r;
@@ -67,15 +67,15 @@ export class FrameSpace {
       this.count++;
       return r;
     }
-    if (f.n > 1n) {
+    if (f.n > k) {
       const p = f.parent;
-      const mid = this.child(p, f.n - 1n, f.ox, f.oy);
+      const mid = this.child(p, f.n - k, f.ox, f.oy);
       p.kids.delete(`${f.n}|${D.toString(f.ox)}|${D.toString(f.oy)}`);
       f.parent = mid;
-      f.n = 1n;
+      f.n = k;
       f.ox = D.ZERO;
       f.oy = D.ZERO;
-      mid.kids.set(`1|0p0|0p0`, f);
+      mid.kids.set(`${k}|0p0|0p0`, f);
     }
     return f.parent;
   }
@@ -146,8 +146,8 @@ export function normalize(space: FrameSpace, c: FrameCamera): FrameCamera {
         }
         n = Number(f.n);
       } else if (f.n > 1n && want < Number(f.n)) {
-        p = space.parentOf(f); // splits the dive: one step up
-        n = 1;
+        p = space.parentOf(f, BigInt(want)); // splits the dive once: `want` steps up
+        n = want;
       } else {
         p = f.parent;
         n = Number(f.n);
