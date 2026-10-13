@@ -1,5 +1,6 @@
 import { ViewState } from "./view-state";
 import { FrameStats } from "./frame-stats";
+import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
@@ -13,6 +14,7 @@ import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
+import { SpatialIndex, syncIndex } from "../scene/spatial-index";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
 import { SnapshotWriter, loadSnapshot } from "../storage/snapshot";
@@ -60,6 +62,9 @@ async function start(): Promise<void> {
   const view = new ViewState();
   const stats = new FrameStats();
   const doc = new DocumentStore();
+  // The spatial index mirrors the document incrementally (changed ids only).
+  const index = new SpatialIndex();
+  syncIndex(doc, index);
   const editor = new EditorState();
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
@@ -81,14 +86,25 @@ async function start(): Promise<void> {
   };
   const assets = new AssetLibrary(db, invalidate);
 
-  const draw = (): void => {
-    scheduled = false;
+  /** Render synchronously and return the timing breakdown. */
+  const renderNow = (): FrameBreakdown => {
     const t0 = performance.now();
     const cam = view.camera;
     const vp = view.viewport;
     renderFrame(ctx, cam, vp, dpr, theme, LANDMARKS);
-    drawScene(ctx, visibleObjects(doc, editor, cam, vp), editor, assets, cam, vp, dpr, theme);
-    stats.record(performance.now() - t0);
+    const t1 = performance.now();
+    const visible = visibleObjects(doc, index, editor, cam, vp);
+    const t2 = performance.now();
+    drawScene(ctx, visible, editor, assets, cam, vp, dpr, theme);
+    const t3 = performance.now();
+    const b: FrameBreakdown = { totalMs: t3 - t0, baseMs: t1 - t0, visibleMs: t2 - t1, drawMs: t3 - t2, visibleCount: visible.length };
+    stats.last = b;
+    return b;
+  };
+
+  const draw = (): void => {
+    scheduled = false;
+    stats.record(renderNow().totalMs);
     const waiters = frameWaiters;
     frameWaiters = [];
     for (const w of waiters) w();
@@ -135,7 +151,7 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  attachTools(canvas, view, doc, editor);
+  attachTools(canvas, view, doc, index, editor);
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     undo: () => undo(doc, editor),
@@ -184,7 +200,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, writer },
+      { doc, editor, writer, renderNow, index },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

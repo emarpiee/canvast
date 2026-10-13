@@ -6,6 +6,8 @@ import { scaleAbout, translate } from "../doc/edit-ops";
 
 export type Tool = "select" | "pen" | "lasso" | "hand";
 
+const EMPTY: ReadonlySet<ObjectId> = new Set();
+
 /**
  * Transient interaction state. Nothing here is part of the document: previews
  * are derived views of authoritative objects and are discarded or turned into
@@ -63,6 +65,12 @@ export class EditorState {
     if (!additive) this.selection.clear();
     for (const id of ids) this.selection.add(id);
     this.changed();
+  }
+
+  /** Ids of objects whose displayed state differs from the document (empty when idle). */
+  previewIds(): ReadonlySet<ObjectId> {
+    const p = this.preview;
+    return p.kind === "none" ? EMPTY : new Set(p.ids);
   }
 
   /** Apply the active preview to an object (identity when not affected). */

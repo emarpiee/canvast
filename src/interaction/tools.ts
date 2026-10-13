@@ -8,6 +8,7 @@ import type { CanvasObject, ObjectId, StrokeObject } from "../doc/model";
 import { newObjectId } from "../doc/model";
 import { normalizeUnit, scaleAbout, translate } from "../doc/edit-ops";
 import { visibleObjects } from "../render/scene-view";
+import type { SpatialIndex } from "../scene/spatial-index";
 import { boxSelect, lassoSelect, pickAll } from "../render/hit-test";
 import { HANDLE_SIZE_PX, handlePoints, selectionBox } from "../render/scene-renderer";
 import { PanGesture } from "./navigation";
@@ -53,7 +54,7 @@ type Gesture =
       uniform: boolean;
     };
 
-export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState): () => void {
+export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore, index: SpatialIndex, editor: EditorState): () => void {
   const pan = new PanGesture(view);
   let g: Gesture = { kind: "none" };
   let spaceDown = false;
@@ -66,7 +67,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
   const world = (s: ScreenPoint): WorldPoint => screenToWorld(view.camera, view.viewport, s);
-  const visible = () => visibleObjects(doc, null, view.camera, view.viewport);
+  const visible = () => visibleObjects(doc, index, null, view.camera, view.viewport);
 
   const cancelGesture = (): void => {
     editor.preview = { kind: "none" };

@@ -10,7 +10,7 @@ Unverified / Committed / Next bounded task**.
 | --- | --- | --- |
 | 0A | Endless pan/zoom prototype, exact coordinate model, CPU rendering, navigation regression harness, single-file build | **done** (see below) |
 | 0B | One editable vector type; create/select/hit-test/drag/resize at any reached scale; world↔screen round trips for objects; minimal snapshot save/reload | **done** (see below) |
-| 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **next** |
+| 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **done** (see below) |
 | 1+ | Document/operation model, transactional storage (IndexedDB/OPFS), Workspace → Boards → Canvas, Canvas/Assets views, raster/vector/text/media content, non-destructive adjustments, Settings, portable format, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
@@ -88,6 +88,51 @@ them reported by the user; see the test log.
    10K, 100K and 1M objects (p50/p95/p99 frame and query time, build time,
    heap);
 6. a decision record on WebGL or WASM backed by those numbers.
+
+## Phase 0C — scale and backend proof
+
+**Implemented**
+- Multi-scale spatial index with no world bounds or depth limit, kept in
+  sync incrementally from transaction change sets
+  ([ADR 0004](adr/0004-multi-scale-spatial-index.md)).
+- Cell-relative fast projection: no per-object `BigInt` work in the frame;
+  exact fallback beyond the proven error bound.
+- Sub-pixel level-of-detail cut, consistent with projection culling.
+- Batched drawing of consecutive opaque strokes with the same paint.
+- Benchmark harness (`npm run bench`) with deterministic dense, cluster and
+  mixed scenes from 1K to 1M objects.
+- Acceleration decision: raster tile cache next, WebGL deferred, no WASM
+  ([ADR 0005](adr/0005-dense-scene-acceleration.md)).
+
+**Tested:** [testing/phase-0c.md](testing/phase-0c.md):
+- baseline versus indexed benchmarks in 2 projects;
+- 6 new unit tests (no false negatives, brute-force equality, incremental
+  consistency, extreme distances and scales, bounded query work);
+- the full Phase 0A/0B regression suite.
+
+**Known failures:** none.
+
+**Known limits (measured):**
+- Dense visible scenes are rasterization-bound: 59 ms p50 at 3K–7.7K
+  visible strokes.
+- 1M objects need about 940 MB of heap and about 6 s to build the index.
+- No density preview for sub-pixel content.
+
+**Unverified:** a hardware-GPU rasterization tier, Firefox and Safari, and
+low-memory devices.
+
+**Committed:** see `git log` (Phase 0C commit).
+
+**Next bounded task:** Phase 1 begins with the document and storage
+foundation:
+- the Workspace → Boards → Canvas model;
+- a transactional IndexedDB schema with per-object records instead of a
+  single snapshot, so saves scale with the size of each edit;
+- multi-tab safety;
+- migration from the v1 snapshot.
+
+The raster tile cache (ADR 0005) is scheduled as the first performance slice
+after that, gated by `npm run bench`.
 
 ## Backlog of open questions (not blocking 0B)
 

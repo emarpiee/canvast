@@ -6,10 +6,10 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 0B — editing, precision and recovery prototype.** On top of
-> the Phase 0A navigation foundation, you can now draw freehand strokes,
-> import images, select, move, resize, delete, undo and redo at any depth and
-> distance, and your canvas is saved in the browser. Workspaces and boards,
+> **Status: Phase 0C — scale proof.** On top of endless navigation (0A) and
+> editing at any depth and distance (0B), rendering now scales with what is
+> on screen rather than with document size. A million-object board renders
+> in about 8–10 ms per frame when a few hundred objects are visible. Workspaces and boards,
 > the Assets view, text, video, groups, export/import and settings are **not
 > implemented yet**; see [Roadmap and status](docs/status.md). This README
 > describes only what exists.
@@ -66,6 +66,22 @@ or network connection.
   resizes and undoes objects at depth +1,000 and −1,000 levels, at distances
   of 2^1000. It also draws in two regions 2^1013 units apart and confirms that
   both stay addressable after a reload.
+
+### Scale (Phase 0C)
+
+- **Multi-scale spatial index.** It has no world bounds and no depth limit.
+  Off-screen content costs almost nothing per frame, even when it is 2^5000
+  away or 2^5000 times larger or smaller.
+- **Measured on the CPU-only tier** (frame p50, with about 500 objects
+  visible):
+  - 10K objects: 1.7 ms;
+  - 100K objects: 2.2 ms;
+  - 1M objects: 7.7–9.6 ms, down from 5.8–6.4 s before the index.
+- **Content far below a pixel is skipped** (level of detail).
+- **Identical opaque strokes are drawn in one call.**
+- **Known limit:** scenes with thousands of strokes visible at once are
+  limited by Canvas 2D rasterization (about 59 ms p50 at 3K–7.7K visible
+  strokes). The planned fix is a raster tile cache (ADR 0005).
 
 ### Controls
 
@@ -129,6 +145,7 @@ npm run test:e2e           # builds, then Playwright against file://dist/canvast
 npm run check:offline      # no external references in the built file
 npm run check:names        # naming policy: no external product names in first-party text
 npm test                   # all of the above
+npm run bench              # scale benchmarks: 1K–1M objects, dense vs sparse (not part of npm test)
 ```
 
 The E2E suite runs every test in three Chromium configurations: the default,
@@ -143,8 +160,13 @@ Results with environment and caveats:
 
 - [Phase 0A navigation](docs/testing/phase-0a.md)
 - [Phase 0B editing](docs/testing/phase-0b.md)
+- [Phase 0C scale benchmarks](docs/testing/phase-0c.md)
 
-Latest results (Phase 0B):
+Latest results (Phase 0C): 58/58 unit tests; full E2E suite 67 passed, 2
+skipped by design, 0 failed across 3 projects; scale benchmarks in
+[docs/testing/phase-0c.md](docs/testing/phase-0c.md).
+
+Phase 0B results:
 - 52/52 unit tests.
 - Final full E2E run: 61 passed and 2 skipped (by design). The 6 failures
   were test-harness defects; after fixing them, every failed or related test
@@ -175,7 +197,8 @@ src/
   render/draw-objects.ts    stroke/image drawing; one paint per object (opacity)
   render/stroke-coverage.ts exact stroke coverage and edge distance for deep magnification
   render/hit-test.ts        pick, lasso and box selection policies
-  render/scene-view.ts      visible objects (with previews) for the current camera
+  render/scene-view.ts      visible objects via the spatial index (with previews)
+  scene/spatial-index.ts    multi-scale spatial index (levels × BigInt cells, coarse summaries)
   render/scene-renderer.ts  objects, draft stroke, selection, lasso/marquee overlays
   render/canvas2d-renderer.ts  grid, axes, landmarks
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
@@ -183,7 +206,7 @@ src/
   assets/                   SHA-256 content addressing, decoding, pixel access
   storage/                  IndexedDB wrapper and snapshot persistence
   ui/                       toolbar and Lucide icons
-  app/                      bootstrap, editor state, actions, HUD, debug hook
+  app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
 scripts/                    single-file build, offline check, naming check
 tests/unit/, tests/e2e/     Vitest and Playwright suites
 docs/adr/                   architecture decision records
@@ -201,6 +224,10 @@ snapshot save.
   renderer, language and build.
 - [ADR 0003](docs/adr/0003-objects-selection-and-projection.md): objects,
   projection, selection policy and persistence.
+- [ADR 0004](docs/adr/0004-multi-scale-spatial-index.md): spatial index,
+  cell-relative projection, level of detail and batching.
+- [ADR 0005](docs/adr/0005-dense-scene-acceleration.md): dense-scene
+  acceleration (raster tile cache before WebGL; no WASM yet).
 
 ## Storage, backups, import/export
 
@@ -230,8 +257,13 @@ snapshot save.
   - Each extra level of depth makes the numbers involved larger, so very
     deep views cost more CPU per frame. Measurements are in the Phase 0B
     test log.
-- **Scale.** Every object is checked every frame because there is no spatial
-  index yet (Phase 0C). Large scenes will slow down.
+- **Dense visible scenes.** Thousands of strokes on screen at once render
+  at about 10–17 fps on the CPU-only reference machine, because Canvas 2D
+  rasterization dominates. Fix planned: raster tile cache (ADR 0005).
+- **Very large documents.** A 1M-object board needs about 940 MB of heap,
+  and about 6 s to build the spatial index on load.
+- **Far zoom-out.** Content more than about 3 levels below a pixel is not
+  drawn at all. There is no density preview yet.
 - **Not implemented:**
   - groups, attach/detach, locking, rotation, and a Layers panel;
   - picking that respects image transparency (images are picked by their
@@ -278,3 +310,4 @@ reproduces on any checkout.
 | --- | --- | --- |
 | Phase 0A — endless navigation prototype | 25/25 unit, 22/22 E2E (2 by-design skips), offline + naming checks pass; `dist/canvast.html` v0.0.1 sha256 `1411e6d0…a92` | `1ce2c05` |
 | Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |
+| Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |

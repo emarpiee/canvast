@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.3 — Phase 0C: scale and backend proof (2026-10-13)
+
+- **Spatial index:** multi-scale (levels × `BigInt` cells, with coarse
+  summaries), no world bounds or depth limit, incremental sync from
+  transaction change sets.
+- **Fast projection:** cell-relative, with no per-object `BigInt` work in the
+  frame and exact fallback beyond the error bound.
+- **Level of detail and batching:** sub-pixel content is skipped; opaque
+  strokes with the same paint are drawn in one call.
+- **Benchmark harness:** `npm run bench`.
+  - 1M objects with about 500 visible: 6.4 s → 7.7 ms per frame (p50),
+    CPU-only tier.
+  - 100K objects: 608 → 2.2 ms.
+- **Decision records:** ADR 0004 (index) and ADR 0005 (dense-scene
+  acceleration: raster tile cache next, WebGL deferred, no WASM).
+
 ## 0.0.2 — Phase 0B: editing, precision and recovery (2026-10-13)
 
 - **Objects:** freehand strokes and image instances. Each is independent,

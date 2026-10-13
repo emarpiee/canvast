@@ -3,7 +3,7 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
-import { drawImageObject, drawStroke } from "./draw-objects";
+import { batchable, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
 
 export interface SceneTheme {
@@ -25,10 +25,32 @@ export function drawScene(
   dpr: number,
   theme: SceneTheme,
 ): void {
+  // Paint order is preserved; runs of identical opaque strokes share a call.
+  let run: ProjectedObject[] = [];
+  let runColor = "";
+  let runWidth = 0;
+  const flush = (): void => {
+    if (run.length) strokeBatch(ctx, run, runWidth, vp);
+    run = [];
+  };
   for (const po of visible) {
+    if (batchable(po)) {
+      const w = strokeLineWidth(po);
+      const color = (po.obj as StrokeObject).color;
+      // Widths within 1/64 px share a batch (visually identical).
+      if (run.length && (color !== runColor || Math.abs(w - runWidth) > 1 / 64)) flush();
+      if (!run.length) {
+        runColor = color;
+        runWidth = w;
+      }
+      run.push(po);
+      continue;
+    }
+    flush();
     if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else drawImageObject(ctx, po, vp, dpr, assets.get(po.obj.assetId), theme.imagePlaceholder);
   }
+  flush();
 
   // In-progress stroke, drawn through the same projection as committed ones.
   const d = editor.draft;

@@ -1,5 +1,18 @@
+/** Timing breakdown of one rendered frame (ms). */
+export interface FrameBreakdown {
+  totalMs: number;
+  /** Background, grid, axes, landmarks. */
+  baseMs: number;
+  /** Finding and projecting the visible objects. */
+  visibleMs: number;
+  /** Drawing objects and overlays. */
+  drawMs: number;
+  visibleCount: number;
+}
+
 /** Rolling window of render durations (ms) for diagnostics and benchmarks. */
 export class FrameStats {
+  last: FrameBreakdown | null = null;
   private readonly samples: number[] = [];
   count = 0;
 

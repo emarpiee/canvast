@@ -19,13 +19,16 @@ export interface Transaction {
 
 export type ChangeSource = "do" | "undo" | "redo" | "load";
 
+/** Ids whose state changed, or null when the whole document was replaced. */
+export type ChangedIds = ReadonlySet<ObjectId> | null;
+
 const HISTORY_LIMIT = 500;
 
 export class DocumentStore {
   private readonly objects = new Map<ObjectId, CanvasObject>();
   private readonly undoStack: Transaction[] = [];
   private readonly redoStack: Transaction[] = [];
-  private readonly listeners = new Set<(source: ChangeSource) => void>();
+  private readonly listeners = new Set<(source: ChangeSource, changed: ChangedIds) => void>();
   private sortedCache: CanvasObject[] | null = null;
   revision = 0;
 
@@ -58,7 +61,7 @@ export class DocumentStore {
     return this.redoStack.length > 0;
   }
 
-  subscribe(fn: (source: ChangeSource) => void): () => void {
+  subscribe(fn: (source: ChangeSource, changed: ChangedIds) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
@@ -85,7 +88,7 @@ export class DocumentStore {
     this.undoStack.push(tx);
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack.length = 0;
-    this.emit("do");
+    this.emit("do", new Set(tx.after.keys()));
   }
 
   undo(): Transaction | null {
@@ -93,7 +96,7 @@ export class DocumentStore {
     if (!tx) return null;
     this.applyStates(tx.before, tx.after);
     this.redoStack.push(tx);
-    this.emit("undo");
+    this.emit("undo", new Set(tx.before.keys()));
     return tx;
   }
 
@@ -102,7 +105,7 @@ export class DocumentStore {
     if (!tx) return null;
     this.applyStates(tx.after, tx.before);
     this.undoStack.push(tx);
-    this.emit("redo");
+    this.emit("redo", new Set(tx.after.keys()));
     return tx;
   }
 
@@ -113,7 +116,7 @@ export class DocumentStore {
     for (const o of objects) this.objects.set(o.id, o);
     this.undoStack.length = 0;
     this.redoStack.length = 0;
-    this.emit("load");
+    this.emit("load", null);
   }
 
   private applyStates(
@@ -135,9 +138,14 @@ export class DocumentStore {
     }
   }
 
-  private emit(source: ChangeSource): void {
+  /** All objects, unordered. */
+  all(): IterableIterator<CanvasObject> {
+    return this.objects.values();
+  }
+
+  private emit(source: ChangeSource, changed: ChangedIds): void {
     this.revision++;
     this.sortedCache = null;
-    for (const fn of this.listeners) fn(source);
+    for (const fn of this.listeners) fn(source, changed);
   }
 }

@@ -2,6 +2,7 @@ import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
 import { localBounds } from "../doc/model";
+import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 
 /**
  * Projection of an object's local geometry to screen space, shared by the
@@ -98,6 +99,7 @@ export interface ScreenBox {
 
 export interface ProjectedObject {
   readonly obj: CanvasObject;
+  /** Full projection; computed lazily on the cell-relative fast path. */
   readonly proj: Projection;
   /** Exact screen bounding box (may be far beyond the viewport, or ±Infinity). */
   readonly box: ScreenBox;
@@ -112,6 +114,26 @@ export interface ProjectedObject {
    * use exact arithmetic (stroke-coverage.ts, exact image pixel edges).
    */
   readonly exact: boolean;
+}
+
+class Projected implements ProjectedObject {
+  private p: Projection | null;
+  constructor(
+    readonly obj: CanvasObject,
+    readonly box: ScreenBox,
+    readonly q: Float64Array,
+    readonly radius: number,
+    readonly exact: boolean,
+    private readonly cam: Camera,
+    private readonly vp: Viewport,
+    proj: Projection | null,
+  ) {
+    this.p = proj;
+  }
+
+  get proj(): Projection {
+    return (this.p ??= projectionFor(this.cam, this.vp, this.obj.anchor, this.obj.unit));
+  }
 }
 
 /** Fast path limits: |screen coords| ≤ 2^40 px and stroke radius ≤ 2^14 px. */
@@ -146,7 +168,7 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
   if (o.kind === "image") {
-    return { obj: o, proj: p, box, q: Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), radius: 0, exact: false };
+    return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, p);
   }
   const radius = toPx(p, D.fromNumber(o.width / 2));
   const exact =
@@ -157,5 +179,62 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
     q[i] = exact ? exactX(p, pts[i]!) : projX(p, pts[i]!);
     q[i + 1] = exact ? exactY(p, pts[i + 1]!) : projY(p, pts[i + 1]!);
   }
-  return { obj: o, proj: p, box, q, radius, exact };
+  return new Projected(o, box, q, radius, exact, cam, vp, p);
+}
+
+/**
+ * Screen placement of an index cell, computed exactly once per cell per
+ * frame: the screen position of its origin and its size in px.
+ */
+export interface CellFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly pxPerCell: number;
+}
+
+export function cellFrame(cell: IndexCell, cam: Camera, vp: Viewport): CellFrame {
+  const L = cell.level;
+  const f = 2 ** cam.zf;
+  return {
+    x: vp.width / 2 + D.toNumber(D.shift(D.sub(D.fromBigInt(cell.ix, L), cam.center.x), cam.zi)) * f,
+    y: vp.height / 2 + D.toNumber(D.shift(D.sub(D.fromBigInt(cell.iy, L), cam.center.y), cam.zi)) * f,
+    pxPerCell: 2 ** (L + cam.zi) * f,
+  };
+}
+
+/**
+ * Cell-relative fast projection: screen = cellOrigin + (ax + x·scale)·pxPerCell,
+ * doubles only. The anchor offset `ax` is within ~2 cell units and stored to
+ * 2^-53 relative precision, so the error is below 2^-52·pxPerCell px; this path
+ * is used only while pxPerCell ≤ 2^30 (error < 2^-22 px), the radius is ≤ 2^14 px
+ * and the screen extent is ≤ 2^40 px. Anything else falls back to the exact
+ * projection (projectObject).
+ */
+const FAST_MAX_PX_PER_CELL = 2 ** 30;
+
+export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: Viewport): ProjectedObject | null {
+  const o = e.obj;
+  if (cf.pxPerCell > FAST_MAX_PX_PER_CELL) return projectObject(o, cam, vp);
+  const s = e.scale * cf.pxPerCell; // px per local unit
+  const ox = cf.x + e.ax * cf.pxPerCell;
+  const oy = cf.y + e.ay * cf.pxPerCell;
+  const b = localBounds(o);
+  const box = { minX: ox + b.minX * s, minY: oy + b.minY * s, maxX: ox + b.maxX * s, maxY: oy + b.maxY * s };
+  if (box.maxX < -CULL_MARGIN || box.maxY < -CULL_MARGIN || box.minX > vp.width + CULL_MARGIN || box.minY > vp.height + CULL_MARGIN) {
+    return null;
+  }
+  if (box.maxX - box.minX < 0.125 && box.maxY - box.minY < 0.125) return null;
+  if (o.kind === "image") {
+    return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, null);
+  }
+  const radius = (o.width / 2) * s;
+  const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
+  if (!(radius <= EXACT_RADIUS_THRESHOLD) || !(extent <= EXACT_COORD_THRESHOLD)) return projectObject(o, cam, vp);
+  const pts = o.points;
+  const q = new Float64Array(pts.length);
+  for (let i = 0; i < pts.length; i += 2) {
+    q[i] = ox + pts[i]! * s;
+    q[i + 1] = oy + pts[i + 1]! * s;
+  }
+  return new Projected(o, box, q, radius, false, cam, vp, null);
 }

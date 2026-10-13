@@ -66,16 +66,48 @@ export function drawStroke(ctx: CanvasRenderingContext2D, po: ProjectedObject, v
  * ±(viewport + 2^14) px; breaks only happen outside the visible area.
  */
 function strokeClipped(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
-  const q = po.q;
-  const r = po.radius;
-  ctx.lineWidth = Math.max(2 * r, MIN_VISIBLE_WIDTH);
+  ctx.lineWidth = strokeLineWidth(po);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   ctx.beginPath();
+  addStrokePath(ctx, po, vp);
+  ctx.stroke();
+}
+
+export function strokeLineWidth(po: ProjectedObject): number {
+  return Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
+}
+
+/** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
+export function batchable(po: ProjectedObject): boolean {
+  return po.obj.kind === "stroke" && !po.exact && po.obj.opacity === 1;
+}
+
+/**
+ * Stroke consecutive (in paint order) opaque, same-colour, same-width
+ * fast-path strokes with one `stroke()` call. For opaque paint of a single
+ * colour, painting the union once gives the same pixels as painting each
+ * object in turn, so this is a pure optimization; translucent or exact-path
+ * objects are never batched (they keep one paint per object).
+ */
+export function strokeBatch(ctx: CanvasRenderingContext2D, items: readonly ProjectedObject[], lineWidth: number, vp: Viewport): void {
+  const o = items[0]!.obj as StrokeObject;
+  ctx.strokeStyle = o.color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (const po of items) addStrokePath(ctx, po, vp);
+  ctx.stroke();
+}
+
+/** Append a fast-path stroke's (pre-clipped) polyline to the current path. */
+function addStrokePath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
+  const q = po.q;
+  const r = po.radius;
   if (q.length === 2) {
     ctx.moveTo(q[0]!, q[1]!);
     ctx.lineTo(q[0]! + 1e-3, q[1]!);
-    ctx.stroke();
     return;
   }
   const view = viewRect(vp, r + 2);
@@ -89,7 +121,6 @@ function strokeClipped(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: V
     penX = c[2];
     penY = c[3];
   }
-  ctx.stroke();
 }
 
 function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {

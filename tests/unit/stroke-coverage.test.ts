@@ -133,7 +133,8 @@ describe("exact stroke coverage", () => {
     const o = stroke([0, 0, 100, 0, 50, -50, 50, 50], 8); // self-crossing
     const cam = lookAt(localToWorld(o, 50, 0), 1); // crossing point, mildly magnified
     const po = projectObject(o, cam, VP)!;
-    const polys = exactStrokeCoverage({ ...po, exact: true }, VP);
+    // Force the exact path on a projected object (keeps its lazy `proj` getter).
+    const polys = exactStrokeCoverage(Object.assign(Object.create(Object.getPrototypeOf(po)), po, { exact: true }), VP);
     expect(polys.length).toBeGreaterThan(2);
     for (const p of polys) expect(orientPositive(p)).toBe(p);
   });
