@@ -4,6 +4,22 @@
 
 (nothing yet)
 
+## 0.6.0 — Phase 1 slice 6: organizing the asset library (2026-10-13)
+
+- **Tags, favourites and folders** in the Assets view.
+  - Add tags in an asset's details (comma-separated); star favourites.
+  - File an image in any number of folders, nested as deep as you like,
+    without copying it.
+- **A sidebar** shows All, Favourites, Unfiled, your folder tree and your
+  tags, with counts. Folders can be created, renamed and deleted; deleting
+  a folder never deletes images.
+- **Search** matches names, types and tags; `#tag` matches one tag exactly.
+- **Backups keep the organization.** Importing merges tags, favourites and
+  folders without creating duplicate folders.
+- **Safe edits:** organization changes are applied in storage as changes,
+  so quick successive edits and edits from another tab never undo each
+  other.
+
 ## 0.5.0 — Phase 1 slice 5: density preview (2026-10-13)
 
 - **Nothing vanishes when you zoom out.** Content too small to draw stroke

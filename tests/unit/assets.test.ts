@@ -5,6 +5,7 @@ import { DocumentStore } from "../../src/doc/document-store";
 import type { ImageObject } from "../../src/doc/model";
 import { newObjectId } from "../../src/doc/model";
 import { unionBounds, worldBounds } from "../../src/doc/edit-ops";
+import { folderPath, folderSubtree, meta, normalizeTags } from "../../src/assets/asset-catalog";
 
 /**
  * Pure parts of the asset slice (ADR 0007): exact framing of revealed
@@ -110,5 +111,30 @@ describe("garbage-collection roots", () => {
     // Loading another canvas clears history: only loaded objects remain roots.
     doc.load([]);
     expect(roots()).toEqual([]);
+  });
+});
+
+describe("library organization (ADR 0011)", () => {
+  it("normalizes tags: trims, drops # and empties, dedupes case-insensitively keeping the first spelling", () => {
+    expect(normalizeTags(["  Hands ", "#ref", "hands", "", "a  b", "REF"])).toEqual(["Hands", "ref", "a b"]);
+    expect(() => normalizeTags(["x".repeat(65)])).toThrow(/at most 64/);
+    expect(() => normalizeTags(Array.from({ length: 101 }, (_, i) => `t${i}`))).toThrow(/at most 100/);
+  });
+
+  it("finds folder subtrees and name paths", () => {
+    const folders = [
+      { id: "a", name: "Refs", parentId: null },
+      { id: "b", name: "Hands", parentId: "a" },
+      { id: "c", name: "Palms", parentId: "b" },
+      { id: "d", name: "Other", parentId: null },
+    ];
+    expect([...folderSubtree(folders, "a")].sort()).toEqual(["a", "b", "c"]);
+    expect([...folderSubtree(folders, "d")]).toEqual(["d"]);
+    expect(folderPath(folders, "c")).toEqual(["Refs", "Hands", "Palms"]);
+  });
+
+  it("reads entries written before organization existed with empty defaults", () => {
+    const old = { hash: HASH_A, name: "x", type: "image/png", size: 1, pixelW: 1, pixelH: 1, importedAt: 0, state: "active" as const, deletedAt: null };
+    expect(meta(old)).toEqual({ tags: [], favorite: false, folderIds: [] });
   });
 });

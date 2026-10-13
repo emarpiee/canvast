@@ -5,7 +5,8 @@ import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
 import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
-import { entryFromRecord } from "../assets/asset-catalog";
+import type { AssetFolder } from "../assets/asset-catalog";
+import { entryFromRecord, folderPath, meta, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import { done, req } from "./idb";
 import type { BoardRecord, CanvasRecord, ObjectRecord, WorkspaceRecord } from "./workspace-repo";
@@ -62,6 +63,17 @@ interface ManifestAsset {
   pixelH: number;
   importedAt: number;
   file: string;
+  /** Organization (optional; archives from v0.3–v0.5 have none). Folders travel as name paths. */
+  tags?: string[];
+  favorite?: boolean;
+  folders?: string[][];
+}
+
+/** An asset's organization as carried in an archive. */
+export interface AssetOrganization {
+  tags: string[];
+  favorite: boolean;
+  folders: string[][];
 }
 
 export interface Manifest {
@@ -91,7 +103,7 @@ const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string): Promise<ExportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog"], "readonly");
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
   const boards: ManifestBoard[] = [];
@@ -132,6 +144,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];
+  let folders: AssetFolder[] | undefined;
   for (const hash of [...hashes].sort()) {
     const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     if (!r) {
@@ -139,7 +152,23 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       continue;
     }
     const file = `assets/${hash}`;
-    assets.push({ hash, name: r.name, type: r.type, size: r.blob.size, pixelW: r.pixelW, pixelH: r.pixelH, importedAt: r.importedAt, file });
+    const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
+    const m = entry ? meta(entry) : { tags: [], favorite: false, folderIds: [] };
+    folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    const allFolders = folders;
+    assets.push({
+      hash,
+      name: r.name,
+      type: r.type,
+      size: r.blob.size,
+      pixelW: r.pixelW,
+      pixelH: r.pixelH,
+      importedAt: r.importedAt,
+      file,
+      tags: m.tags,
+      favorite: m.favorite,
+      folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
+    });
     assetBlobs.push({ name: file, data: r.blob });
   }
 
@@ -185,6 +214,8 @@ export interface ImportPlan {
   boards: Array<{ name: string; canvases: PlannedCanvas[] }>;
   /** Originals whose bytes matched their hash. */
   assets: AssetRecord[];
+  /** Tags, favourite flag and folder paths per asset hash (merged into the library on import). */
+  organization: Map<string, AssetOrganization>;
   /** Hashes referenced by instances in the archive with no valid original in it. */
   unresolved: string[];
   /** Everything skipped, with reasons. Nothing is silently repaired. */
@@ -246,6 +277,7 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
     exportedAt: typeof m["exportedAt"] === "number" ? m["exportedAt"] : 0,
     boards: [],
     assets: [],
+    organization: new Map(),
     unresolved: [],
     problems,
     objects: 0,
@@ -321,9 +353,32 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
       blob: new Blob([bytes], { type }),
       importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
     });
+    const org = readOrganization(a, label, problems);
+    if (org) plan.organization.set(hash, org);
   }
   plan.unresolved = [...referenced].filter((h) => !valid.has(h)).sort();
   return plan;
+}
+
+/** Validate an asset's optional organization fields; anything invalid is reported and dropped. */
+function readOrganization(a: Record<string, unknown>, label: string, problems: string[]): AssetOrganization | null {
+  if (a["tags"] === undefined && a["favorite"] === undefined && a["folders"] === undefined) return null;
+  let tags: string[] = [];
+  try {
+    tags = normalizeTags(Array.isArray(a["tags"]) ? a["tags"].filter((t): t is string => typeof t === "string") : []);
+  } catch (e) {
+    problems.push(`The tags of “${label}” were invalid (${(e as Error).message}) and were not imported.`);
+  }
+  const folders: string[][] = [];
+  for (const p of Array.isArray(a["folders"]) ? a["folders"] : []) {
+    const path = Array.isArray(p) ? p.map((n) => (typeof n === "string" ? n.replace(/\s+/g, " ").trim() : "")) : [];
+    if (path.length === 0 || path.length > 64 || path.some((n) => !n || n.length > 120)) {
+      problems.push(`A folder of “${label}” was invalid and was not imported.`);
+      continue;
+    }
+    folders.push(path);
+  }
+  return { tags, favorite: a["favorite"] === true, folders };
 }
 
 /**
@@ -331,13 +386,14 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
  * `targetBoardId`; board and workspace archives become new boards.
  */
 export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog"], "readwrite", { durability: "strict" });
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
   const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null };
   try {
     const now = Date.now();
     const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
     if (!ws) throw new ArchiveError("workspace not found");
+    let folders: AssetFolder[] | undefined;
     const addCanvas = (boardId: string, c: PlannedCanvas): string => {
       const canvas: CanvasRecord = { id: newObjectId(), boardId, name: c.name, revision: 0, objectCount: c.objects.length, updatedAt: now };
       tx.objectStore("canvases").put(canvas);
@@ -370,9 +426,19 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
         result.assetsAdded++;
       }
       const e = await req(tx.objectStore("assetCatalog").get(a.hash) as IDBRequest<CatalogEntry | undefined>);
-      if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(a));
-      else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
+      let entry: CatalogEntry = !e ? entryFromRecord(a) : e.state !== "active" ? { ...e, state: "active", deletedAt: null } : e;
+      const org = plan.organization.get(a.hash);
+      if (org) {
+        // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path.
+        folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+        const m = meta(entry);
+        const ids = new Set(m.folderIds);
+        for (const path of org.folders) ids.add(resolveFolder(folders, path));
+        entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, folderIds: [...ids] };
+      }
+      if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }
+    if (folders) tx.objectStore("meta").put(folders, "assetFolders");
     for (const h of plan.unresolved) if ((await req(tx.objectStore("assets").count(h))) === 0) result.stillMissing++;
     await committed;
     return result;
@@ -385,6 +451,17 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     await committed.catch(() => undefined);
     throw e;
   }
+}
+
+/** Id of the folder at `path` (names from the top), creating missing folders in `folders`. */
+function resolveFolder(folders: AssetFolder[], path: readonly string[]): string {
+  let parent: string | null = null;
+  for (const name of path) {
+    let f = folders.find((x) => x.parentId === parent && x.name.toLowerCase() === name.toLowerCase());
+    if (!f) folders.push((f = { id: newObjectId(), name, parentId: parent }));
+    parent = f.id;
+  }
+  return parent!;
 }
 
 /** A file name for an archive: `<name>-<yyyy-mm-dd>.canvast`. */

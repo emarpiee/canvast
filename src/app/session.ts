@@ -1,6 +1,6 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import type { AssetLibrary } from "../assets/asset-library";
-import { AssetCatalog, AssetInUseError } from "../assets/asset-catalog";
+import { AssetCatalog, AssetInUseError, CatalogInputError } from "../assets/asset-catalog";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
@@ -280,6 +280,24 @@ export class Session {
     this.post({ kind: "assets" });
     this.emitAssets();
     return { erased };
+  }
+
+  /**
+   * Organize the library (ADR 0011): change an asset's tags, favourite flag or
+   * folders, or create, rename and delete folders. Writer only; other tabs
+   * refresh. Returns false (with a message) when refused.
+   */
+  async organize(op: (c: AssetCatalog) => Promise<unknown>): Promise<boolean> {
+    if (!this.guardWrite() || !this.catalog) return false;
+    try {
+      await op(this.catalog);
+    } catch (e) {
+      this.tell(e instanceof CatalogInputError ? e.message[0]!.toUpperCase() + e.message.slice(1) + "." : `Could not save: ${(e as Error).message}`);
+      return false;
+    }
+    this.post({ kind: "assets" });
+    this.emitAssets();
+    return true;
   }
 
   /** Every canvas where an asset is placed, with board and canvas names. */

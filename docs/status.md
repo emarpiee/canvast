@@ -16,7 +16,8 @@ Unverified / Committed / Next bounded task**.
 | 1c | Portable `.canvast` archives: four export scopes, verification, validated transactional import, backup status | **done** (see below) |
 | 1d | Raster tile cache for committed objects (exact zoom, whole-pixel reuse, per-object invalidation) | **done** (see below) |
 | 1e | Density preview: sub-pixel content stays visible as soft marks; one draw-or-preview rule shared by index and projection | **done** (see below) |
-| 1+ | Asset organization (tags, folders, collections), zoom preview for dense scenes, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
+| 1f | Asset organization: tags, favourites, nested folders (non-exclusive), search, sidebar scopes, archive round trip | **done** (see below) |
+| 1+ | Zoom preview for dense scenes, text/media content, adjustments, Settings, persistent undo, smart folders and batch asset edits, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -278,6 +279,37 @@ visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
 
+## Phase 1, slice 6 — organizing the asset library
+
+**Implemented** ([ADR 0011](adr/0011-asset-organization.md))
+- **Catalog fields:** tags (normalized), a favourite flag and folder ids
+  (any number). There is no schema change: old entries read with empty
+  defaults.
+- **Folders:** one `meta` record, nested by parent id. Deleting a folder
+  removes its subfolders and filing, never assets.
+- **Edits are changes applied inside one transaction** (add and remove),
+  so quick or concurrent edits never overwrite each other. They are
+  writer-only, and other tabs refresh.
+- **Assets view:**
+  - a sidebar (All, Favourites, Unfiled, folder tree, tags, with counts);
+  - inspector controls for the favourite, tag chips and input, and folder
+    checkboxes;
+  - search on name, type and tags, with `#tag` for an exact match.
+- **Archives** carry tags, favourite and folder paths. Import merges them
+  (folders are matched by path, so there are no duplicates).
+
+**Tested:** [testing/phase-1f.md](testing/phase-1f.md).
+
+**Known failures:** none.
+
+**Unverified:**
+- libraries with tens of thousands of assets (the filter is linear);
+- screen-reader behaviour.
+
+**Next bounded task:** the zoom preview for dense scenes (deferred in
+ADR 0009), then text objects (§14.11). Text is the next content type, and
+needs its own exact-coverage path and deep-zoom test.
+
 ## Phase 1, slice 5 — density preview
 
 **Implemented** ([ADR 0010](adr/0010-density-preview.md))
@@ -306,8 +338,8 @@ visible strokes). Alternatives:
 - No paint-order interleaving with drawn objects.
 - Cost grows with the occupied summary cells of skipped levels.
 
-**Next bounded task:** asset organization (tags, folders, collections, and
-search in the Assets view). Then the zoom preview for dense scenes.
+**Next bounded task (done in slice 6):** asset organization (tags,
+folders, collections, and search in the Assets view).
 
 ## Phase 1, slice 4 — raster tile cache
 

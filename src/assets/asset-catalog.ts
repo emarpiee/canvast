@@ -32,7 +32,74 @@ export interface CatalogEntry {
   importedAt: number;
   state: CatalogState;
   deletedAt: number | null;
+  /** Organization (ADR 0011). Absent on entries written before v0.6.0: read through `meta()`. */
+  tags?: string[];
+  favorite?: boolean;
+  /** Folders the asset is filed in (any number; filing never copies the original). */
+  folderIds?: string[];
 }
+
+/** A library folder. Order is by name; nesting by `parentId`. */
+export interface AssetFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
+/** Organization fields of an entry, with defaults for entries that predate them. */
+export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; folderIds: string[] } {
+  return { tags: e.tags ?? [], favorite: e.favorite ?? false, folderIds: e.folderIds ?? [] };
+}
+
+export class CatalogInputError extends Error {}
+
+const MAX_TAG = 64;
+const MAX_TAGS = 100;
+const MAX_FOLDER_NAME = 120;
+
+/** Trim, collapse spaces, drop empties and case-insensitive duplicates (first spelling wins). */
+export function normalizeTags(tags: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags) {
+    const t = raw.replace(/\s+/g, " ").trim().replace(/^#+/, "");
+    if (!t) continue;
+    if (t.length > MAX_TAG) throw new CatalogInputError(`a tag can be at most ${MAX_TAG} characters`);
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  if (out.length > MAX_TAGS) throw new CatalogInputError(`an asset can have at most ${MAX_TAGS} tags`);
+  return out;
+}
+
+function folderName(name: string): string {
+  const n = name.replace(/\s+/g, " ").trim();
+  if (!n) throw new CatalogInputError("a folder needs a name");
+  if (n.length > MAX_FOLDER_NAME) throw new CatalogInputError(`a folder name can be at most ${MAX_FOLDER_NAME} characters`);
+  return n;
+}
+
+/** Ids of `id` and every folder below it. */
+export function folderSubtree(folders: readonly AssetFolder[], id: string): Set<string> {
+  const out = new Set([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of folders) if (f.parentId && out.has(f.parentId) && !out.has(f.id)) (out.add(f.id), (grew = true));
+  }
+  return out;
+}
+
+/** Folder name path from the top, e.g. ["Refs", "Hands"]. */
+export function folderPath(folders: readonly AssetFolder[], id: string): string[] {
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  const path: string[] = [];
+  for (let f = byId.get(id); f && path.length < 64; f = f.parentId ? byId.get(f.parentId) : undefined) path.unshift(f.name);
+  return path;
+}
+
+const FOLDERS_KEY = "assetFolders";
 
 export interface Usage {
   /** Stored image instances that reference the asset, across all canvases. */
@@ -48,6 +115,7 @@ export interface CatalogListing {
   missing: Array<{ hash: string } & Usage>;
   /** Entries deleted by the user but still retained (needed by undo history). */
   pendingDeletion: number;
+  folders: AssetFolder[];
 }
 
 export interface AssetLocation {
@@ -85,6 +153,9 @@ export function entryFromRecord(r: AssetRecord): CatalogEntry {
     importedAt: r.importedAt,
     state: "active",
     deletedAt: null,
+    tags: [],
+    favorite: false,
+    folderIds: [],
   };
 }
 
@@ -98,7 +169,8 @@ export class AssetCatalog {
 
   /** The whole library with usage, in one read-only transaction (keys only for usage; no bytes are read). */
   async list(): Promise<CatalogListing> {
-    const tx = this.db.transaction(["assetCatalog", "assets", "objects"], "readonly");
+    const tx = this.db.transaction(["assetCatalog", "assets", "objects", "meta"], "readonly");
+    const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const blobKeys = new Set((await req(tx.objectStore("assets").getAllKeys())) as string[]);
     const usage = new Map<string, { instances: number; canvases: Set<string> }>();
@@ -122,7 +194,99 @@ export class AssetCatalog {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: blobKeys.has(e.hash) })),
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: entries.filter((e) => e.state === "deleted").length,
+      folders,
     };
+  }
+
+  /**
+   * Change an entry's organization. Changes are applied to the stored entry
+   * inside one transaction (add/remove, never "replace with what the screen
+   * showed"), so quick successive edits and edits from another tab never
+   * overwrite each other. Tags are normalized; folders must exist.
+   */
+  async updateMeta(
+    hash: string,
+    change: { favorite?: boolean; addTags?: readonly string[]; removeTags?: readonly string[]; addFolders?: readonly string[]; removeFolders?: readonly string[] },
+  ): Promise<CatalogEntry> {
+    return this.write(["assetCatalog", "meta"], async (tx) => {
+      const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
+      if (!e || e.state !== "active") throw new CatalogInputError("the asset is not in the library");
+      const m = meta(e);
+      const next: CatalogEntry = { ...e, ...m };
+      if (change.favorite !== undefined) next.favorite = change.favorite;
+      if (change.addTags || change.removeTags) {
+        const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
+        next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
+      }
+      if (change.addFolders || change.removeFolders) {
+        const known = new Set((await this.readFolders(tx)).map((f) => f.id));
+        if ((change.addFolders ?? []).some((id) => !known.has(id))) throw new CatalogInputError("that folder no longer exists");
+        const drop = new Set(change.removeFolders ?? []);
+        next.folderIds = [...new Set([...m.folderIds.filter((id) => !drop.has(id)), ...(change.addFolders ?? [])])];
+      }
+      tx.objectStore("assetCatalog").put(next);
+      return next;
+    });
+  }
+
+  async createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder> {
+    return this.write(["meta"], async (tx) => {
+      const folders = await this.readFolders(tx);
+      if (parentId && !folders.some((f) => f.id === parentId)) throw new CatalogInputError("the parent folder no longer exists");
+      const f: AssetFolder = { id, name: folderName(name), parentId };
+      tx.objectStore("meta").put([...folders, f], FOLDERS_KEY);
+      return f;
+    });
+  }
+
+  async renameFolder(id: string, name: string): Promise<void> {
+    await this.write(["meta"], async (tx) => {
+      const folders = await this.readFolders(tx);
+      const f = folders.find((x) => x.id === id);
+      if (!f) throw new CatalogInputError("that folder no longer exists");
+      f.name = folderName(name);
+      tx.objectStore("meta").put(folders, FOLDERS_KEY);
+    });
+  }
+
+  /** Delete a folder and its subfolders. Assets filed there stay in the library; only the filing is removed. */
+  async deleteFolder(id: string): Promise<{ folders: number; unfiled: number }> {
+    return this.write(["meta", "assetCatalog"], async (tx) => {
+      const folders = await this.readFolders(tx);
+      const gone = folderSubtree(folders, id);
+      tx.objectStore("meta").put(folders.filter((f) => !gone.has(f.id)), FOLDERS_KEY);
+      let unfiled = 0;
+      for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) {
+        const ids = e.folderIds ?? [];
+        if (!ids.some((x) => gone.has(x))) continue;
+        tx.objectStore("assetCatalog").put({ ...e, folderIds: ids.filter((x) => !gone.has(x)) });
+        unfiled++;
+      }
+      return { folders: gone.size, unfiled };
+    });
+  }
+
+  private async readFolders(tx: IDBTransaction): Promise<AssetFolder[]> {
+    return (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+  }
+
+  /** One readwrite transaction; aborts (writing nothing) if `body` throws. */
+  private async write<T>(stores: string[], body: (tx: IDBTransaction) => Promise<T>): Promise<T> {
+    const tx = this.db.transaction(stores, "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    try {
+      const r = await body(tx);
+      await committed;
+      return r;
+    } catch (err) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      await committed.catch(() => undefined);
+      throw err;
+    }
   }
 
   async entry(hash: string): Promise<CatalogEntry | undefined> {

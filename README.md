@@ -6,14 +6,15 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 5 — nothing vanishes when zoomed out.** On top of
+> **Status: Phase 1, slice 6 — an organized asset library.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
 > scales with what is on screen (0C), your work is organized as
 > Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
 > Assets library (1b), export/import of `.canvast` archives (1c), and a raster
 > tile cache that keeps panning and drawing over dense scenes at 60 fps (1d),
-> and a density preview that keeps far-away and tiny content visible (1e). Text,
-> video, groups, asset tags and folders, and settings are **not implemented
+> a density preview that keeps far-away and tiny content visible (1e), and
+> tags, favourites and folders in the Assets library (1f). Text, video,
+> groups and settings are **not implemented
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
 
@@ -132,6 +133,18 @@ or network connection.
   - Deleting instances, canvases or boards never erases an original.
 - **Missing originals** (for example, cleared storage) are shown with their
   usage. Importing the same file again restores every instance.
+- **Organizing:**
+  - In an asset's details: ☆ marks it a favourite, the tag box adds tags
+    (Enter; separate several with commas), and the folder checkboxes file
+    it. One image can be in several folders without being copied.
+  - The sidebar shows All, Favourites, Unfiled, your folders (nested; a
+    folder also shows its subfolders) and your tags.
+  - Hover or tab to a folder for **+** (a subfolder), **Rename** and
+    **Delete**. Deleting a folder never deletes images.
+  - **Search** matches names, types and tags; `#tag` matches one tag
+    exactly.
+  - Tags, favourites and folders are included in `.canvast` backups.
+    Importing merges them without duplicating folders.
 
 ### Backups: export and import (Phase 1)
 
@@ -338,6 +351,8 @@ docs/status.md              roadmap and current status (single source of truth)
   exactness rules, invalidation, fidelity criterion, measurements.
 - [ADR 0010](docs/adr/0010-density-preview.md): density preview — ink
   summaries, one draw-or-preview rule, presence floor, cost.
+- [ADR 0011](docs/adr/0011-asset-organization.md): organizing the asset
+  library — tags, favourites, folders, search, archive merge.
 
 ## Storage, backups, import/export
 
@@ -412,8 +427,8 @@ docs/status.md              roadmap and current status (single source of truth)
     bounds);
   - text, video, GIF, audio and PDF;
   - adjustments and settings;
-  - asset tags, folders, collections and similar-image review; dragging an
-    asset onto the canvas (use Place);
+  - smart folders, ratings, batch editing of several assets and
+    similar-image review; dragging an asset onto the canvas (use Place);
   - collaboration.
 - **Large backups.** One archive holds at most 4 GiB and 65,535 files, and it
   is built in the browser before download. Export and import speed for large
@@ -466,3 +481,4 @@ reproduces on any checkout.
 | Firefox support (v0.3.1) | Firefox 157 added as a 4th E2E project; grid drawing 7.8× faster in Firefox; quick E2E 165 passed / 3 by-design skips / 0 failed (4 projects); tested build `f64a472e…92bf` (same code, pre-bump label); `dist/canvast.html` v0.3.1 sha256 `60ccde68…1a30` | see `git log` |
 | Phase 1 slice 4 — raster tile cache | tiles 24/24 (4 projects); dense 10K pan 89→2.2 ms, still 152→3.3 ms p50 (Chromium), Firefox 98→2 / 172→2 ms; quick E2E 189 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.4.0 sha256 `4528f2b3…f65a` | see `git log` |
 | Phase 1 slice 5 — density preview | 79/79 unit (4 new); density 3 tests × 4 projects; cost ≤ ~1 ms Chromium / ≤ 4 ms Firefox at 1M objects; quick E2E 201 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.5.0 sha256 `5d1504dc…0ede0` | see `git log` |
+| Phase 1 slice 6 — asset organization | 82/82 unit (3 new); organize 4 tests × 4 projects (12/12 repeated); 1 mutation check caught; quick E2E 217 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.6.0 sha256 `07154eec…26b4` | see `git log` |
