@@ -14,6 +14,7 @@ import type { FrameIndex } from "../scene/frame-index";
 import type { CanvasObject } from "../doc/model";
 import { worldForm } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
+import { classifyCoarse } from "../render/coarse";
 import type { WorldPoint } from "../core/camera";
 import { approxIn, depthOf, expressExactIn, expressIn, levelsBetween } from "../core/frames";
 import { generateBenchScene } from "./bench";
@@ -72,6 +73,8 @@ export interface DebugHook {
   setLassoFilter(f: LassoFilter): void;
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
+  /** How a coarse object (far above the camera) is drawn: "cover", "miss", "exact", or "near" when it is not coarse. */
+  coarseState(id: string): "cover" | "miss" | "exact" | "near";
   canUndo(): boolean;
   canRedo(): boolean;
   flushSave(): Promise<string>;
@@ -283,6 +286,14 @@ export function installDebugHook(
       const cam = camFor(o);
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? { box: { ...po.box }, q: [...po.q], radius: po.radius } : null;
+    },
+    coarseState: (id) => {
+      const o = doc.get(id);
+      if (!o) throw new Error(`no object ${id}`);
+      const c = deps.index.views(view.frameCamera).find((v) => v.frame === (o.frame ?? doc.space.world))?.coarse;
+      if (!c) return "near";
+      const r = classifyCoarse(o, c.center, c.info, view.viewport);
+      return typeof r === "string" ? r : "cover";
     },
     canUndo: () => doc.canUndo,
     canRedo: () => doc.canRedo,

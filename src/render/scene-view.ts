@@ -6,7 +6,8 @@ import type { ObjectId } from "../doc/model";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
-import { cellFrame, projectEntry, projectObject } from "./projection";
+import { cellFrame, coverObject, projectEntry, projectObject } from "./projection";
+import { classifyCoarse } from "./coarse";
 
 export interface VisibleStats {
   levelsVisited: number;
@@ -40,16 +41,25 @@ export function visibleObjects(
   let levelsVisited = 0;
   let cellsProbed = 0;
   let candidates = 0;
-  for (const { cam, index: ix } of index.views(fc)) {
+  for (const { cam, index: ix, coarse } of index.views(fc)) {
     const q = ix.query(cam, vp);
     levelsVisited += q.levelsVisited;
     cellsProbed += q.cellsProbed;
     candidates += q.candidates;
     for (const cell of q.cells) {
-      const cf = cellFrame(cell, cam, vp);
+      const cf = coarse ? null : cellFrame(cell, cam, vp);
       for (const e of cell.entries) {
         if (previewIds.has(e.obj.id)) continue;
-        const po = projectEntry(e, cf, cam, vp);
+        if (coarse) {
+          // Far coarser than the camera: covers the view, misses it, or an edge is near (render/coarse.ts).
+          const r = classifyCoarse(e.obj, coarse.center, coarse.info, vp);
+          if (r === "miss") continue;
+          const exact = r === "exact" ? coarse.exactCam() : null;
+          const po = r !== "exact" ? coverObject(e.obj, vp, r) : exact && projectObject(e.obj, exact, vp);
+          if (po) out.push(po);
+          continue;
+        }
+        const po = projectEntry(e, cf!, cam, vp);
         if (po) out.push(po);
       }
     }

@@ -316,13 +316,40 @@ in bits.
 
 An object much coarser than the camera (e.g. a stroke drawn at home seen
 from Δ levels below with the view inside it) is far by its anchor but may
-still cover the view. Today (spike) it is drawn through the exact form,
-cost O(Δ) bits, and skipped when Δ > 100,000 levels (a marked shortcut;
-the HUD counts skipped strokes). Step 3 replaces this with the **carried
-near-edge set**: each edge near the view kept as a line `n · p = c` in the
-camera frame, updated on rebase down by `c' = (c − n · cell) · 2^K` (exact,
-small), dropped when it leaves the view for good, with the object's
-covers/misses state recorded instead. See the plan, §3.
+still cover the view. Seen from far below, such an object is in one of
+three states: it **covers** the view, it **misses** it, or an **edge is
+near** the view. Built (`render/coarse.ts`, `scene/frame-index.ts`):
+
+1. The camera centre is expressed in the object's frame to 2^-256 of that
+   frame's unit (`COARSE_ROUND_BITS`; the term walk of §7.2, so the cost is
+   the path length, not Δ). The rounding error is below 2^-208 frame units.
+2. `classifyCoarse` measures the signed distance from that centre to the
+   object's outline (stroke: distance to the polyline minus the radius;
+   image: to the rectangle, then to the source-pixel grid; text: its box).
+   If the distance exceeds the rounding error plus the view's own size plus
+   the double rounding (2^-46 of the object's size), **every point of the
+   view is on the same side**, so the dropped bits cannot change a pixel:
+   the object covers the view (one fill; an image shows the source pixel
+   under the view) or is skipped.
+3. Otherwise an edge is near (or the object is text with the centre in its
+   box): the exact centre is built (`cameraIn`) and the ordinary exact path
+   draws it. That costs O(Δ) bits, so it is limited to `COARSE_EXACT_MAX`
+   (100,000 levels); past it the object is not drawn (marked shortcut).
+
+The classification is applied from `COARSE_ROUND_MIN` (4,096 levels) down;
+nearer frames use the exact path as before, and the two agree (tested at
+5,000 levels against the exact stroke coverage).
+
+**Why not carried lines.** The plan (§3) kept each near edge as a line
+`n · p = c` with a small exact `c`, updated by `c' = (c − n · cell) · 2^K`.
+That is exact for edges at dyadic positions (image sides), but a stroke's
+side line is at distance `r` from the segment, i.e. `perp = r · |U|` with
+`|U|` a square root: irrational. Carrying it needs the square root's digits
+as deep as the camera has followed the edge, which is O(Δ) bits again, and
+more bits than Firefox allows past 2^20. The cover/miss test above needs no
+carried state at all: the cost depends on how close the camera is to the
+outline, not on Δ. What stays costly is a camera that follows an edge
+(within a view-size of it) for more than 100,000 levels.
 
 ## 8. In the app (step 3)
 
@@ -332,7 +359,7 @@ covers/misses state recorded instead. See the plan, §3.
 | Objects | `doc/model.ts` | Optional `frame` (absent = world frame). `homeObject` re-homes exactly (6); `worldForm` gives the absolute form; `expressObjectIn` compares objects of different frames |
 | Document | `doc/document-store.ts` | Owns the `FrameSpace`; `load` re-homes every object. Edits re-home before the transaction is built, so undo compares the same object states |
 | Index | `scene/frame-index.ts` | One `SpatialIndex` per frame, in that frame's own coordinates, so index cells stay small integers |
-| Drawing and picking | `cameraIn(fc, g)` | Instead of converting objects, the **camera** is expressed in each frame with content and that frame's objects go through the unchanged index query, projection, tile cache and density preview. Finer or nearby frames (L ≤ 0 levels coarser): g's origin found in the camera frame with `DRAW_BITS − L` bits, then `centre_g = (centre_f − origin) · 2^(−L)`. Coarser frames (L > 0): the camera centre carried up with `DRAW_BITS + L` bits. Either way skipped beyond 100,000 levels (shortcut until the near-edge set and per-frame ink summaries) |
+| Drawing and picking | `cameraIn(fc, g)` | Instead of converting objects, the **camera** is expressed in each frame with content and that frame's objects go through the unchanged index query, projection, tile cache and density preview. Finer or nearby frames (L ≤ 0 levels coarser): g's origin found in the camera frame with `DRAW_BITS − L` bits, then `centre_g = (centre_f − origin) · 2^(−L)`. Coarser frames (L > 0): the camera centre carried up with `DRAW_BITS + L` bits. Frames more than 4,096 levels coarser use the rounded centre and the cover/miss test of §7.3 instead (`FrameView.coarse`): no limit on the level gap, except for an edge near the view (100,000). Frames more than 100,000 levels finer are dots |
 | Far-finer frames | `FrameIndex.dots` | A frame whose whole content is below a pixel (`z + L + K + H + 2 < log2(MIN_CELL_PX) − 8`) is not queried in its own units: there the camera centre would be a number of ~|L| bits (a hang found by the zoom-out tests). It is drawn as **one density dot** at its origin's screen position, with the index's running ink total (`SpatialIndex.total`, area × 4^level). Cost: one cheap walk per frame |
 | Gestures | `interaction/tools.ts`, `app/editor-state.ts` | A draft stroke, a move's start point and a resize's fixed point stay in the frame where the gesture began; points arriving after a rebase are converted exactly. Previews convert a displacement by an exact shift, `d_g = d_f · 2^(−levels(g→f))`, and a fixed point by `expressExactIn` |
 | Backdrop | `worldBackdrop` | The world axes (each coordinate separately) and landmarks re-expressed in the camera frame once per frame change. The grid needs nothing: its spacing (≤ 2^22 frame units) divides every frame corner (a multiple of 2^32) |
@@ -347,7 +374,8 @@ covers/misses state recorded instead. See the plan, §3.
 | Jump of any size ≤ 2^50 | A few rebases; O(1) frames created | Yes |
 | Express a point (drawing) | O(path length) small operations | Yes |
 | Scene rebuild | On frame change only, O(objects considered) | Yes |
-| Coarse object covering the view, Δ levels below | O(Δ) bits until step 3 | **No** (open) |
+| Coarse object covering or missing the view, Δ levels below | O(path length) small operations (256-bit centre) | Yes |
+| Coarse object with an edge near the view | O(Δ) bits, limited to 100,000 levels | No (shortcut) |
 | Exact absolute conversion | O(depth) bits | No, by design; never per frame |
 
 ## 10. Limits
@@ -358,7 +386,9 @@ covers/misses state recorded instead. See the plan, §3.
 | One jump | 2^50 levels | Double zoom counts |
 | Long wheel zooms | One frame per 32 levels on the path (0.6 ms walk at 10^5 levels) | If it matters: merge chains of empty frames into a dive |
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
-| Coarse objects from > 100,000 levels below | Not drawn | §7.3, near-edge set (step 3) |
+| Coarse object whose edge stays near the view, from > 100,000 levels below | Not drawn (the camera followed its edge that far) | §7.3 |
+| Coarse text from > 4,096 levels below, centre inside its box | Drawn only up to 100,000 levels (text is not summarised) | §7.3 |
+| Landmarks much coarser than the camera, edge crossing the view | Not drawn | Landmark edges are not summarised |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
 | Saving very deep objects | Absolute form beyond 2^24 levels, or too large for the browser (Firefox: ~2^20-bit BigInts), cannot be written: such objects stay queued with a save error, the rest saves. The view is not saved deeper than 2^19 levels | Storage holds frames in step 4 |
 | Firefox BigInt limit | About 2^20 bits per number; every per-frame path stays far below it | Keep it that way: no temporaries of ~depth bits |
@@ -375,6 +405,7 @@ covers/misses state recorded instead. See the plan, §3.
 | Depth stress | 10^18 levels by 1,000 jumps of 10^15, exact both ways; 2^51 jump rejected; wheel zoom through 10^5 levels in and out | `frames.test.ts` |
 | Regressions found by testing | Climbing part of a dive; walks splitting dives; mixed-scale numbers after zooming into a neighbouring cell from 5·10^12 levels up | `frames.test.ts` (one test each) |
 | Constant frame time | p95 0.2 ms (Chromium), 1–3 ms (Firefox) from 2^10 to 2^10^12; jump 10^12 levels in 3–10 ms; 0 px drift and pan error | `spike-measure.mjs` |
+| Coarse objects | 5,000 levels down at 150 random places vs the exact stroke coverage (covers and misses agree on 5 view points); a camera a hair from an edge (2^-10 to 2^-400) is never decided wrongly and is "exact" below 2^-60; random zooms of 1e3–1e12 levels both ways with pans, 250 ms a step; E2E: a stroke covers the view at 5e3, 1e5, 1e6, 1e9, 1e12 levels through wheel, keys, drag, picking and back, and one level at a time across the 4,096 cut-over, in 4 projects | `coarse.test.ts`, `frames.spec.ts` |
 | No hangs | Fuzz: 3 seeds × 2,500 random jumps, Home, pans, zooms, strokes, both browsers; no step over 250 ms | `spike-measure.mjs` |
 
 Run: `npx vitest run tests/unit/frames.test.ts`;
@@ -411,4 +442,4 @@ Run: `npx vitest run tests/unit/frames.test.ts`;
 | Re-home | Re-expressing an object in the frame that suits it, exactly |
 | Term sum | A number kept as separated small terms (§7.2) |
 | Far | Farther than 2^80 frame units: off screen for good at this depth |
-| Near-edge set | Planned: edges of coarse objects near the view, carried as small exact lines |
+| Cover / miss | A coarse object whose outline is farther from the rounded centre than the error and the view: the whole view is inside it or outside it (§7.3) |

@@ -49,9 +49,21 @@ dense-scene tile-preview flake). New `tests/e2e/frames.spec.ts`: work at
 2^10^12, a stroke drawn while wheel-zooming across frame changes, and
 −10^12 five times then wheel, keys, drag pan and Home, in all four projects.
 
-**Known failures:** coarse objects covering the view from more than
-100,000 levels below, and frames more than 100,000 levels finer, are not
-drawn exactly (marked shortcuts; far-finer content shows as a dot). Saving
+**Step 3 slice 2 (coarse objects):** a stroke, image or text far above the
+camera is classified against the camera centre rounded to 2^-256 of its
+frame's unit (`render/coarse.ts`): it covers the view (one fill; an image
+shows the source pixel under the view), or it is skipped, at any level gap,
+in constant time. Only an edge near the view needs the exact centre, which
+stays limited to 100,000 levels (`COARSE_EXACT_MAX`). The plan's carried
+exact lines could not hold stroke edges (irrational offsets); the reference
+§7.3 says why. Tests: unit `coarse.test.ts` (8); E2E `frames.spec.ts` (3 new,
+4 projects each).
+
+**Known failures:** an edge of a coarse object that stays within the view
+for more than 100,000 levels (the camera followed it), coarse text from
+more than 4,096 levels with the centre inside its box (past 100,000), and
+coarse landmark edges are not drawn (marked shortcuts). Frames more than
+100,000 levels finer show as a dot. Saving
 is absolute until step 4: very deep objects whose absolute form is too
 large (beyond 2^24 levels, or Firefox's ~2^20-bit BigInt limit) stay
 queued with a save error, and the view is not saved deeper than 2^19. The Firefox dense-scene
@@ -62,8 +74,7 @@ editing on frames (steps 3–4).
 
 **Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
 
-**Next bounded task:** step 3, slice 2: the carried near-edge set for
-coarse objects (removes the 100,000-level limit), then step 4 (storage
+**Next bounded task:** step 4 (storage
 with frames, removes the 2^24 save limit).
 
 ## Phase 0A — endless navigation proof

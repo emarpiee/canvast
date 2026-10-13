@@ -2,17 +2,31 @@ import * as D from "../core/dyadic";
 import type { Camera, WorldPoint } from "../core/camera";
 import type { Frame, FrameCamera, FrameSpace } from "../core/frames";
 import { DRAW_BITS, H, K, approxIn, expressIn, levelsBetween } from "../core/frames";
+import type { CoarseInfo } from "../render/coarse";
 import type { Landmark } from "./landmarks";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import { MIN_CELL_PX, SpatialIndex } from "./spatial-index";
 import type { Ink } from "./spatial-index";
 
 /**
- * shortcut: a frame more than this many levels coarser than the camera's is
- * not drawn (expressing the camera there costs ~levels bits); the carried
- * near-edge set (plan §3, step 3) removes the limit.
+ * shortcut: an object whose edge stays near the view, in a frame more than
+ * this many levels coarser than the camera's, is not drawn (its exact
+ * position costs ~levels bits). Objects that cover the view or miss it need
+ * no such limit (coarse views below).
  */
 export const COARSE_EXACT_MAX = 100_000;
+
+/** Frames this many levels coarser than the camera's are seen with a rounded centre (render/coarse.ts). */
+export const COARSE_ROUND_MIN = 4096;
+const COARSE_ROUND_BITS = 256;
+/** The rounding drops less than 2^-COARSE_ROUND_BITS per frame on the path (under 2^48 frames): all of it is below this. */
+const COARSE_ERR_LOG2 = -COARSE_ROUND_BITS + 48;
+/** Zoom of the camera used to query a coarse frame's index: its view window (~2^-190) covers the rounding error. */
+const COARSE_QUERY_ZI = 200;
+
+export function isCoarse(fc: FrameCamera, g: Frame): boolean {
+  return levelsBetween(g, fc.f) > COARSE_ROUND_MIN;
+}
 
 const ORIGIN: WorldPoint = { x: D.ZERO, y: D.ZERO };
 
@@ -40,9 +54,24 @@ export function cameraIn(fc: FrameCamera, g: Frame): Camera | null {
     center = expressIn(space, f, { x: fc.x, y: fc.y }, g, DRAW_BITS + L);
     if (!center) return null;
   }
-  const z = fc.z + L;
-  const zi = Math.floor(z);
-  return { center, zi, zf: z - zi, pz: fc.pz + L };
+  const zi0 = Math.floor(fc.z); // not fc.z + L: a double that large drops the fraction
+  return { center, zi: zi0 + L, zf: fc.z - zi0, pz: fc.pz + L };
+}
+
+/** What a coarse frame's objects are drawn from (see classifyCoarse). */
+export interface CoarseCamera {
+  /** The camera centre in the frame, rounded to 2^-256 of its unit. */
+  readonly center: WorldPoint;
+  readonly info: CoarseInfo;
+  /** A camera for the frame's index: a window around the centre that covers the view and the rounding error. */
+  readonly query: Camera;
+}
+
+function coarseCameraIn(fc: FrameCamera, g: Frame): CoarseCamera | null {
+  const L = levelsBetween(g, fc.f);
+  const center = expressIn(fc.f.space, fc.f, { x: fc.x, y: fc.y }, g, COARSE_ROUND_BITS);
+  if (!center) return null;
+  return { center, info: { errLog2: COARSE_ERR_LOG2, zTrue: fc.z + L }, query: { center, zi: COARSE_QUERY_ZI, zf: 0, pz: COARSE_QUERY_ZI } };
 }
 
 export interface FrameDot {
@@ -56,9 +85,11 @@ export interface FrameDot {
 
 export interface FrameView {
   readonly frame: Frame;
-  /** The camera in this frame's coordinates. */
+  /** The camera in this frame's coordinates (for a coarse frame: the window used to query its index). */
   readonly cam: Camera;
   readonly index: SpatialIndex;
+  /** Set for a frame far coarser than the camera's: its objects are classified against the rounded centre. */
+  readonly coarse?: CoarseCamera & { readonly exactCam: () => Camera | null };
 }
 
 /**
@@ -152,6 +183,14 @@ export class FrameIndex {
           const c = index.inkCentre;
           const g = 2 ** (fc.z + L);
           dots.push({ dx: D.toNumber(D.sub(o.x, fc.x)) * s + c.x * g, dy: D.toNumber(D.sub(o.y, fc.y)) * s + c.y * g, areaPx: index.total.a * g * g, ink: index.total });
+        }
+        continue;
+      }
+      if (L > COARSE_ROUND_MIN) {
+        const coarse = coarseCameraIn(fc, frame);
+        if (coarse) {
+          let exact: Camera | null | undefined;
+          views.push({ frame, cam: coarse.query, index, coarse: { ...coarse, exactCam: () => (exact === undefined ? (exact = cameraIn(fc, frame)) : exact) } });
         }
         continue;
       }

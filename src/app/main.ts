@@ -12,7 +12,7 @@ import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
-import { projectObject } from "../render/projection";
+import { coverObject, projectObject } from "../render/projection";
 import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
@@ -20,7 +20,7 @@ import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
-import { FrameIndex, cameraIn, worldBackdrop } from "../scene/frame-index";
+import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-index";
 import type { Frame } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
@@ -157,6 +157,8 @@ async function start(): Promise<void> {
             (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
             (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2),
             (o, infl) => {
+              // A changed coarse object may cover any tile: drop them all.
+              if (isCoarse(fc, o.frame ?? doc.space.world)) return coverObject(o, infl, {});
               const oc = cameraIn(fc, o.frame ?? doc.space.world);
               return oc && projectObject(o, oc, infl, { keepTiny: true });
             },

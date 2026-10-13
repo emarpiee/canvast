@@ -132,6 +132,11 @@ under 2^-40 px (the accuracy the renderer already guarantees).
 Hit testing uses the same set, as today: drawing and picking share one
 projection.
 
+**As built (step 3, slice 2).** Stroke edges are not small exact lines
+(the offset side of a segment is `r · |U|`, irrational), so what was built
+is a cover/miss test against a rounded camera centre, with the exact path
+only for an edge near the view. See the reference, §7.3.
+
 ### Jumps
 
 A jump (zoom read-out) descends along the view centre's own bits. Once

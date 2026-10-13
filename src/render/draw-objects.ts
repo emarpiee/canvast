@@ -80,7 +80,7 @@ export function strokeLineWidth(po: ProjectedObject): number {
 
 /** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
 export function batchable(po: ProjectedObject): boolean {
-  return po.obj.kind === "stroke" && !po.exact && po.obj.opacity === 1;
+  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1;
 }
 
 /**
@@ -132,6 +132,26 @@ function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {
     ctx.closePath();
   }
   ctx.fill("nonzero");
+}
+
+/**
+ * A coarse object that covers the whole view: one fill with its colour (an
+ * image: the colour of the source pixel under the view).
+ */
+export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, src: RasterSource | null, placeholder: string): void {
+  const o = po.obj;
+  paint(ctx, o, () => {
+    if (o.kind === "image") {
+      const [x, y] = po.cover!.pixel!;
+      if (!src) ctx.fillStyle = placeholder;
+      else {
+        const [r, g, b, a] = src.readPixels(x, y, 1, 1) as unknown as [number, number, number, number];
+        if (a === 0) return;
+        ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+      }
+    } else ctx.fillStyle = o.color;
+    ctx.fillRect(-1, -1, vp.width + 2, vp.height + 2);
+  });
 }
 
 /** Above this many CSS px per source pixel, pixels are drawn as exact rectangles. */

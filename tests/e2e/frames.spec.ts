@@ -1,5 +1,6 @@
 import { expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
+import { blockyFixture } from "./png";
 
 /**
  * Nested frames (ADR 0014): work at any depth costs the same, and every
@@ -138,4 +139,107 @@ test("work at 2^10,000,000 off the origin saves and reopens after a reload (Fire
   await p.evaluate((v) => window.__canvastDebug.setCamera(v), view);
   await app.frame();
   expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id), s!.id)).not.toBeNull();
+});
+
+/** Colour of the canvas at the corners and the centre, or null when they differ. */
+async function uniformColour(app: App): Promise<string | null> {
+  const vp = await app.page.evaluate(() => window.__canvastDebug.viewport());
+  const pts = [[2, 2], [vp.width - 3, 2], [2, vp.height - 3], [vp.width - 3, vp.height - 3], [vp.width / 2, vp.height / 2]] as const;
+  const c = await app.page.evaluate((ps) => ps.map(([x, y]) => window.__canvastDebug.pixelAt(x, y).join(",")), pts);
+  return c.every((v) => v === c[0]) ? c[0]! : null;
+}
+
+const state = (app: App, id: string) => app.page.evaluate((i) => window.__canvastDebug.coarseState(i), id);
+
+test("a stroke far above the view covers it at any depth: every input path, both directions, exact return", async ({ app }, info) => {
+  const p = app.page;
+  const { timed, steps } = timer(app);
+  await p.keyboard.press("p");
+  await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6); // through the view centre
+  await app.drag({ x: 300, y: 150 }, { x: 980, y: 150 }, 6); // well off it
+  const [thru, off] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  const homeBox = (await boxOf(app, thru!))!;
+  const ink = (await p.evaluate(() => window.__canvastDebug.pixelAt(640, 400))).join(",");
+  expect(await uniformColour(app), "at home the stroke is a thin line").toBeNull();
+  await p.keyboard.press("v");
+
+  // Two frames later, so the tile cache has built its tiles from the covering object too.
+  const allInk = async (what: string): Promise<void> => {
+    await app.frame();
+    await app.frame();
+    expect(await uniformColour(app), what).toBe(ink);
+  };
+  for (const depth of [5_000, 100_001, 1e6, 1e9, 1e12]) {
+    await timed(() => p.evaluate((d) => window.__canvastDebug.jump(d), depth));
+    expect(await state(app, thru!), `${depth}`).toBe("cover");
+    expect(await state(app, off!), `${depth}`).toBe("miss");
+    await allInk(`${depth} levels down: the whole view is inside the stroke`);
+
+    // Every input path, in both directions, at this depth.
+    for (const d of [-240, 240]) await timed(() => app.wheel(640, 400, d));
+    for (const k of ["+", "+", "-", "-", "ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"]) await timed(() => p.keyboard.press(k));
+    await p.keyboard.press("h");
+    await timed(() => app.drag({ x: 600, y: 420 }, { x: 640, y: 380 }, 6));
+    await allInk(`${depth}: after wheel, keys and drag`);
+    expect(await state(app, thru!)).toBe("cover");
+
+    // Picking: the view is inside the stroke, and only that stroke.
+    await p.keyboard.press("v");
+    await timed(() => p.mouse.click(700, 450));
+    expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([thru]);
+    await p.keyboard.press("Escape");
+
+    // Back out by the same jump after undoing the pan: the stroke returns to exactly the same pixels.
+    await p.keyboard.press("h");
+    await timed(() => app.drag({ x: 640, y: 380 }, { x: 600, y: 420 }, 6));
+    await p.keyboard.press("v");
+    await timed(() => p.evaluate((d) => window.__canvastDebug.jump(-d), depth));
+    expect(await boxOf(app, thru!)).toEqual(homeBox);
+    expect(await uniformColour(app)).toBeNull();
+    await p.keyboard.press("Home");
+  }
+  expect(Math.max(...steps)).toBeLessThan(MAX_STEP_MS);
+  recordMetric(info, "coarse stroke from 5e3 to 1e12 levels", { maxStepMs: Math.max(...steps) });
+});
+
+test("crossing from near to coarse (4,096 levels) one level at a time keeps the stroke covering the view, in and out", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
+  const [thru] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  const ink = (await p.evaluate(() => window.__canvastDebug.pixelAt(640, 400))).join(",");
+  await p.evaluate(() => window.__canvastDebug.jump(4_150));
+  const seen = new Set<string>();
+  for (const dir of [-1, 1]) {
+    for (let i = 0; i < 110; i++) {
+      await p.evaluate((d) => window.__canvastDebug.jump(d), dir);
+      await app.frame();
+      await app.frame(); // the first frame can still be the one scheduled before the jump
+      seen.add(await state(app, thru!));
+      expect(await uniformColour(app), `level ${await p.evaluate(() => window.__canvastDebug.depth())}`).toBe(ink);
+    }
+  }
+  expect([...seen].sort(), "both the exact path and the coarse path were crossed").toEqual(["cover", "near"]);
+});
+
+test("an image far above the view shows the source pixel under it, at any depth", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: blockyFixture() });
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 1);
+  await app.frame();
+  const [img] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  // The image (8 px wide at home) is centred on the view, on a pixel corner: zoom in so a pixel is 64 px, then move off the corner.
+  await p.evaluate(() => window.__canvastDebug.jump(6));
+  await p.keyboard.press("h");
+  await app.drag({ x: 600, y: 420 }, { x: 617, y: 413 }, 4);
+  await p.keyboard.press("v");
+  const colour = (await p.evaluate(() => window.__canvastDebug.pixelAt(640, 400))).join(",");
+  for (const depth of [5_000, 1e6, 1e12]) {
+    await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    await app.frame();
+    expect(await state(app, img!), `${depth}`).toBe("cover");
+    expect(await uniformColour(app), `${depth}: one source pixel fills the view`).toBe(colour);
+    await p.evaluate((d) => window.__canvastDebug.jump(-d), depth);
+    await app.frame();
+  }
 });

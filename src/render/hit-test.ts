@@ -16,6 +16,7 @@ export const HIT_TOLERANCE_PX = 4;
 export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_TOLERANCE_PX): boolean {
   const b = po.box;
   if (x < b.minX - tol || x > b.maxX + tol || y < b.minY - tol || y > b.maxY + tol) return false;
+  if (po.cover) return true; // the view is inside the object
   if (po.obj.kind !== "stroke") {
     // Bounds-based picking (images and text boxes). Alpha-aware picking is not implemented yet.
     return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;

@@ -5,7 +5,7 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
-import { batchable, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
+import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
 import { drawText } from "./draw-text";
 
@@ -80,7 +80,11 @@ export function drawObjects(
       continue;
     }
     flush();
-    if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
+    if (po.cover) {
+      const src = po.obj.kind === "image" ? assets.get(po.obj.assetId) : null;
+      if (po.obj.kind === "image" && !src) pending = true;
+      drawCover(ctx, po, vp, src, theme.imagePlaceholder);
+    } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
     else {
       const src = assets.get(po.obj.assetId);
