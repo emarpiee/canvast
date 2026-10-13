@@ -9,8 +9,8 @@ Unverified / Committed / Next bounded task**.
 | Phase | Scope | State |
 | --- | --- | --- |
 | 0A | Endless pan/zoom prototype, exact coordinate model, CPU rendering, navigation regression harness, single-file build | **done** (see below) |
-| 0B | One editable vector type; create/select/hit-test/drag/resize at any reached scale; world↔screen round trips for objects; minimal snapshot save/reload | next |
-| 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | planned |
+| 0B | One editable vector type; create/select/hit-test/drag/resize at any reached scale; world↔screen round trips for objects; minimal snapshot save/reload | **done** (see below) |
+| 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **next** |
 | 1+ | Document/operation model, transactional storage (IndexedDB/OPFS), Workspace → Boards → Canvas, Canvas/Assets views, raster/vector/text/media content, non-destructive adjustments, Settings, portable format, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
@@ -42,11 +42,52 @@ recorded in the test log.
 
 **Committed:** see `git log` (Phase 0A commit).
 
-**Next bounded task:** Phase 0B. Add an editable rectangle/path object type
-with an exact dyadic anchor, local double geometry and a unit exponent. Then:
-create it, select it and drag/resize it at depths of ±1,000 levels and
-distances of 2^±1000; save and reload a JSON snapshot; extend the E2E harness
-with the "new-scale creation" and "distant spatial persistence" cases.
+**Next bounded task:** Phase 0B (done).
+
+## Phase 0B — editing, precision and recovery
+
+**Implemented**
+- Canvas objects (`src/doc/model.ts`): freehand strokes and image instances.
+  Each has an exact anchor, a scale exponent and an opacity, and no implicit
+  parent.
+- Tools: pen, select (click, shift, alt-cycle, drag-move, corner resize),
+  box selection, lasso (Strokes / All filters), and hand. Undo/redo of every
+  edit as single exact transactions.
+- Image import (button, drag-drop, paste). Assets are deduplicated by SHA-256
+  and stored once; magnified pixels are shown crisply, with no invented
+  detail.
+- IndexedDB snapshot persistence: debounced after transactions, camera
+  restored, damaged items skipped and reported, save state shown in the HUD.
+- Exact rendering and picking at any magnification. There is no cap, and
+  each object is painted once, which is correct under opacity
+  ([ADR 0003](adr/0003-objects-selection-and-projection.md)).
+- Click the zoom read-out to type a level; `#debug` dev panel with jump
+  buttons and auto-zoom.
+
+**Tested:** [testing/phase-0b.md](testing/phase-0b.md) records U1, U2, U4,
+U5, U7, U8, new-scale creation at ±1000 levels, the deep-zoom rendering
+regressions, the zoom controls, and the full Phase 0A regression suite.
+
+**Known failures:** none open. Four defects were found and fixed, two of
+them reported by the user; see the test log.
+
+**Unverified**
+- Firefox and Safari, and real touch or pen hardware.
+- Multi-tab editing (last save wins).
+- Large documents: Phase 0C.
+
+**Committed:** see `git log` (Phase 0B commit).
+
+**Next bounded task:** Phase 0C — scale proof:
+1. a multi-scale spatial index with visibility queries;
+2. cell-relative fast projection, so per-object `BigInt` work drops out of
+   the frame;
+3. sub-pixel aggregation (LOD);
+4. batched drawing of consecutive opaque same-paint objects;
+5. benchmarks of dense visible scenes versus sparse distant clusters at
+   10K, 100K and 1M objects (p50/p95/p99 frame and query time, build time,
+   heap);
+6. a decision record on WebGL or WASM backed by those numbers.
 
 ## Backlog of open questions (not blocking 0B)
 

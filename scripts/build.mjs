@@ -27,16 +27,22 @@ const result = await build({
     __CANVAST_DEBUG__: JSON.stringify(debug),
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
   },
+  loader: { ".svg": "text" },
   logLevel: "warning",
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
 const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
+// Third-party notices travel inside the single file (Lucide icons are ISC).
+const lucide = JSON.parse(await readFile(resolve(root, "node_modules/lucide-static/package.json"), "utf8"));
+const lucideLicense = (await readFile(resolve(root, "node_modules/lucide-static/LICENSE"), "utf8")).replace(/--/g, "- -").trim();
+const notices = `<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${lucideLicense}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)
-  .replace("/*__CANVAST_SCRIPT__*/", () => script);
+  .replace("/*__CANVAST_SCRIPT__*/", () => script)
+  .replace("<html", () => `${notices}<html`);
 
 const out = resolve(root, "dist", debug ? "canvast-debug.html" : "canvast.html");
 await mkdir(dirname(out), { recursive: true });

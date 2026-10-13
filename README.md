@@ -1,18 +1,22 @@
 # canvast
 
 canvast is an offline-first **endless canvas**: you can pan in any direction
-and zoom in or out without hitting a boundary or a zoom stop. The finished
-app ships as **one self-contained HTML file** that works from `file://` with no
-server, account or network connection.
+and zoom in or out without hitting a boundary or a zoom stop, and you can draw,
+place images and edit at whatever scale you reach. The app ships as **one
+self-contained HTML file** that works from `file://` with no server, account
+or network connection.
 
-> **Status: Phase 0A — endless navigation prototype.** The current build
-> proves the navigation foundation: panning, anchored zoom, an exact
-> coordinate model, rendering that works on the CPU, and an automated test
-> harness. Editing, documents, storage, assets and media are **not implemented
-> yet**; see [Roadmap and status](docs/status.md). This README describes only
-> what exists.
+> **Status: Phase 0B — editing, precision and recovery prototype.** On top of
+> the Phase 0A navigation foundation, you can now draw freehand strokes,
+> import images, select, move, resize, delete, undo and redo at any depth and
+> distance, and your canvas is saved in the browser. Workspaces and boards,
+> the Assets view, text, video, groups, export/import and settings are **not
+> implemented yet**; see [Roadmap and status](docs/status.md). This README
+> describes only what exists.
 
 ## What works today
+
+### Endless navigation (Phase 0A)
 
 - **Endless zoom in both directions.** There is no minimum or maximum zoom.
   The automated suite covers 1,000 levels of wheel zoom (≈10^301) in each
@@ -21,39 +25,74 @@ server, account or network connection.
   recenters behind your back. Coordinates are exact at any distance, including
   2^5000 units from the origin.
 - **Anchored zoom.** The point under the pointer, or under the pinch centre,
-  stays put. On the test machine the measured drift is below 0.01 CSS px; see
-  [test results](docs/testing/phase-0a.md).
+  stays put (measured drift ≤ 2.8e-14 px).
 - **Exact round trips.** If you zoom far out and back in at the same pointer,
   or pan and pan back, you return to the same pixels.
-- **Inputs:** mouse wheel; trackpad pinch (ctrl+wheel); shift+wheel to pan;
-  drag with the primary or middle button; two-finger touch pinch and pan;
-  keyboard; on-screen zoom and Home buttons.
-- **Orientation aids:** a hierarchical grid that fades continuously between
-  scales, the world axes, nested reference squares at the origin every 8
-  binary orders of magnitude, and a few distant landmarks. A live read-out
-  shows the zoom level and position.
-- **CPU-only rendering** with Canvas 2D. No GPU, WebGL or WebGPU is needed.
-- **A single offline file:** `dist/canvast.html` is about 16 KiB. It has a
-  strict Content-Security-Policy that blocks all network access.
+- **Orientation aids:** a hierarchical grid, the world axes, nested reference
+  squares at the origin, and a live zoom/position read-out.
+
+### Editing (Phase 0B)
+
+- **Pen:** freehand vector strokes in 4 colours and 3 widths. A stroke is
+  authored at the current scale, so a 3 px line drawn 1,000 levels deep is a
+  3 px line there. It stays crisp vector geometry at every magnification.
+- **Images:** import with the toolbar button, drag-and-drop, or paste. One
+  source pixel is placed as one CSS pixel, shrunk to fit if needed. Zooming in
+  shows the image's real pixels as crisp blocks. No detail is invented and
+  the source file is never altered.
+- **Independent objects:** a stroke drawn over an image is its own object.
+  Moving the image leaves the stroke where it was drawn. Drawing never selects
+  or attaches to what is underneath.
+- **Select tool:**
+  - click to select (shift adds, alt+click cycles through overlapping
+    objects);
+  - drag strokes to move them;
+  - drag the corner handles to resize (uniform; shift gives free aspect
+    ratio for a single image);
+  - drag on empty space for a box selection.
+  Images must be clicked first before a drag moves them, so a huge image
+  filling the screen is never grabbed by accident.
+- **Lasso:** draw around strokes to select them. The default "Strokes" filter
+  never selects media. "All" also selects images that are entirely enclosed.
+- **Undo/redo** of every edit (draw, import, move, resize, delete), each
+  undone in one step, exactly.
+- **Saved automatically** in the browser (IndexedDB) shortly after each
+  edit, together with the camera. Reloading the file restores the canvas and
+  the view. The HUD shows the save state.
+- **Correct deep-zoom rendering:** zooming far into a stroke never
+  produces holes or flicker. Each object, including semi-transparent ones, is
+  painted exactly once, so overlaps never double-darken.
+- **Exact at every scale:** the automated suite creates, selects, drags,
+  resizes and undoes objects at depth +1,000 and −1,000 levels, at distances
+  of 2^1000. It also draws in two regions 2^1013 units apart and confirms that
+  both stay addressable after a reload.
 
 ### Controls
 
 | Action | Input |
 | --- | --- |
 | Zoom at pointer | Mouse wheel · trackpad pinch · ctrl+wheel |
-| Pan | Drag (primary or middle button) · two-finger drag · shift+wheel · arrow keys (shift = larger steps) |
+| Pan | Middle-drag · hold **Space** and drag · Hand tool drag · two-finger drag · shift+wheel · arrow keys (shift = larger steps) |
 | Zoom at centre | `+` / `=` and `-` (shift = 4× step) · on-screen `+` / `−` |
-| Return to origin | `0` · `Home` key · on-screen **Home** |
-| Debug panel | open the file with `#debug` at the end of the URL |
+| Return to origin | `0` · `Home` key · on-screen house button |
+| Tools | `V` select · `P` pen · `L` lasso · `H` hand |
+| Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
+| Delete selection | `Delete` / `Backspace` |
+| Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
+| Import images | toolbar image button · drag files onto the page · paste |
+| Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
+| Debug + dev panel | open the file with `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
 
 ## Terminology
 
 **canvas** is the endless creative surface. **World coordinates** are the
 authoritative positions of things on the canvas. The **camera** is the current
 view: its centre in world coordinates plus a zoom level. A **zoom level** of
-`z` means 2^z CSS pixels per world unit; each +1 doubles the magnification.
-The planned organization is Workspace → Boards → Canvas, with separate Canvas
-and Assets views. None of that is implemented yet.
+`z` means 2^z CSS pixels per world unit. An **object** is something placed on
+the canvas: a stroke or an image instance. An **asset** is an imported source
+file. Each asset is stored once, and placed images refer to it. The planned
+organization is Workspace → Boards → Canvas, with separate Canvas and Assets
+views. Those are not implemented yet.
 
 ## Quick start
 
@@ -79,109 +118,150 @@ connection.
   the page makes any request other than `file:`, `data:` or `blob:`.
 - At runtime, the page's CSP (`default-src 'none'; connect-src 'none'`) blocks
   network access even if code tried it.
-- By hand: disconnect the network, open the file, and pan and zoom.
+- By hand: disconnect the network, open the file, then draw, import, reload.
 
 ## Testing
 
 ```sh
 npm run typecheck          # TypeScript, strict
-npm run test:unit          # Vitest: exact arithmetic + camera invariants
+npm run test:unit          # Vitest: exact arithmetic, camera, document, projection, selection
 npm run test:e2e           # builds, then Playwright against file://dist/canvast.html#debug
-npm run check:names       # naming policy: no external product names in first-party text
-npm test                   # all of the above + offline check + naming check
+npm run check:offline      # no external references in the built file
+npm run check:names        # naming policy: no external product names in first-party text
+npm test                   # all of the above
 ```
 
 The E2E suite runs every test in three Chromium configurations: the default,
 GPU disabled (`--disable-gpu --disable-accelerated-2d-canvas`), and
-devicePixelRatio 2 with touch. Measurements are written to
-`metrics/*.json` (gitignored). Thresholds were fixed before the runs in
-`tests/e2e/harness.ts` (`LIMITS`) and are never loosened after a run.
+devicePixelRatio 2 with touch. Measurements are written to `metrics/*.json`
+(gitignored). Thresholds were fixed before the runs in
+`tests/e2e/harness.ts` (`LIMITS`) and are never loosened after a run. Test
+image fixtures are generated in code (`tests/e2e/png.ts`); no binary
+fixtures are committed.
 
-Measured results, the reference hardware and known caveats are in
-[docs/testing/phase-0a.md](docs/testing/phase-0a.md). In summary: 25/25 unit
-tests and 22 of 22 applicable E2E cases pass. The touch case is skipped by
-design in the 2 projects without touch. In the wheel tests, anchor drift was
-≤ 2.8e-14 px and the round-trip error was 0. Render p95 was 1.5–2.5 ms in every configuration, including with
-the GPU disabled, on an Intel i5-4460 with integrated graphics. These are
-measurements, not targets.
+Results with environment and caveats:
+
+- [Phase 0A navigation](docs/testing/phase-0a.md)
+- [Phase 0B editing](docs/testing/phase-0b.md)
+
+Latest results (Phase 0B):
+- 52/52 unit tests.
+- Final full E2E run: 61 passed and 2 skipped (by design). The 6 failures
+  were test-harness defects; after fixing them, every failed or related test
+  passed in all 3 projects (21/21).
+- Details: [docs/testing/phase-0b.md](docs/testing/phase-0b.md).
 
 ## Browser support and requirements
 
-- Requires a browser with `BigInt`, Pointer Events, `ResizeObserver` and
-  Canvas 2D. Roughly: Chromium ≥ 67, Firefox ≥ 68, Safari ≥ 14.
+- Requires a browser with `BigInt`, Pointer Events, `ResizeObserver`,
+  Canvas 2D and IndexedDB (for saving). Roughly: Chromium ≥ 67, Firefox ≥ 68,
+  Safari ≥ 14.
 - **Tested** only in Chromium 156 (Playwright) on Linux. Firefox and Safari
-  are **unverified** so far.
+  are **unverified** so far. Firefox's IndexedDB support for `file://` pages
+  differs from Chromium's. If storage cannot be opened, the app keeps working
+  in memory and says so in the HUD.
 - No GPU features are used. Rendering is Canvas 2D only.
-- Chromium delivers mouse and wheel events at whole CSS pixels, while touch
-  and pen input keeps fractional positions. Both are anchored exactly.
 
-## Architecture (Phase 0A)
+## Architecture
 
 ```
 src/
-  core/dyadic.ts        exact m·2^e numbers (BigInt mantissa), conversion, serialization
-  core/camera.ts        camera model, world↔screen, anchored zoom, pan, serialization
-  scene/landmarks.ts    read-only reference squares used for orientation and tests
-  render/canvas2d-renderer.ts   grid, axes, landmarks; CPU-compatible Canvas 2D
-  interaction/navigation.ts     wheel/pointer/touch/keyboard → zoomAt/panBy
-  app/view-state.ts     owner of the live camera + viewport (immutable snapshots)
-  app/hud.ts            zoom/position read-out, zoom & home buttons, debug panel
-  app/debug-hook.ts     inspection API for tests (debug builds or #debug only)
-  app/main.ts           bootstrap, render scheduling, resize/DPR handling
-  index.html, styles.css  template + design tokens (light/dark)
-scripts/build.mjs       single-file build (esbuild bundle inlined into HTML)
-scripts/check-offline.mjs  static scan for external references
-tests/unit/             Vitest
-tests/e2e/              Playwright navigation regression harness
-docs/adr/               architecture decision records
-docs/testing/           test logs with measured results
-docs/status.md          roadmap and current status (single source of truth)
+  core/dyadic.ts            exact m·2^e numbers (BigInt mantissa), double-double split
+  core/camera.ts            camera model, world↔screen, anchored zoom, pan
+  doc/model.ts              canvas objects (stroke, image), validation, serialization
+  doc/edit-ops.ts           exact translate, scale-about-point, unit renormalization
+  doc/document-store.ts     authoritative object set, transactions, undo/redo
+  render/projection.ts      object → screen projection shared by drawing and picking
+  render/draw-objects.ts    stroke/image drawing; one paint per object (opacity)
+  render/stroke-coverage.ts exact stroke coverage and edge distance for deep magnification
+  render/hit-test.ts        pick, lasso and box selection policies
+  render/scene-view.ts      visible objects (with previews) for the current camera
+  render/scene-renderer.ts  objects, draft stroke, selection, lasso/marquee overlays
+  render/canvas2d-renderer.ts  grid, axes, landmarks
+  interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
+  interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
+  assets/                   SHA-256 content addressing, decoding, pixel access
+  storage/                  IndexedDB wrapper and snapshot persistence
+  ui/                       toolbar and Lucide icons
+  app/                      bootstrap, editor state, actions, HUD, debug hook
+scripts/                    single-file build, offline check, naming check
+tests/unit/, tests/e2e/     Vitest and Playwright suites
+docs/adr/                   architecture decision records
+docs/testing/               test logs with measured results
+docs/status.md              roadmap and current status (single source of truth)
 ```
 
-**The authoritative spatial model:** world coordinates are exact dyadic
-rationals, and the camera is a dyadic centre plus a zoom level of the form
-log2 (integer part + fraction). Rendering projects positions relative to the
-camera centre, so no floating origin, rebasing step or renderer offset
-exists to leak into saved data. Inputs are quantized, which makes every zoom
-and pan operation exactly reversible. Why, and the limits:
-[ADR 0001](docs/adr/0001-exact-dyadic-world-coordinates.md).
-Renderer, language and build choices:
-[ADR 0002](docs/adr/0002-cpu-first-canvas2d-and-single-file-build.md).
+**Data flow:** input → transient preview (never stored) → one transaction
+on pointer-up → validation → document mutation → redraw and a debounced
+snapshot save.
 
-## Known limitations (honest list)
-
-- **Precision budget.** After zooming out more than 4,096 binary levels
-  (≈10^1233) beyond the deepest level you visited, zooming back in at the
-  same pointer no longer returns to the exact sub-pixel spot. The position is
-  still exact to 2^-96 px at the coarse scale. This tradeoff bounds memory
-  and is tested.
-- **Cost at depth.** Each camera operation costs a few `BigInt` operations on
-  numbers with roughly |zoom level| + 96 bits. This is negligible at
-  thousands of levels. Millions of levels would be slow and memory-hungry.
-- **No content yet.** There is nothing to create, select, edit, save or
-  import: that is Phase 0B and later. Landmarks are fixed test fixtures.
-- **No persistence.** Reloading resets the camera.
-- **Testing scope:** Chromium only, and one reference machine.
+- [ADR 0001](docs/adr/0001-exact-dyadic-world-coordinates.md): the exact
+  coordinate model.
+- [ADR 0002](docs/adr/0002-cpu-first-canvas2d-and-single-file-build.md):
+  renderer, language and build.
+- [ADR 0003](docs/adr/0003-objects-selection-and-projection.md): objects,
+  projection, selection policy and persistence.
 
 ## Storage, backups, import/export
 
-Not implemented yet. The camera already serializes losslessly
-(`serializeCamera`), but nothing is stored.
+- Data lives in the browser's IndexedDB under the database name `canvast`. It
+  has two stores:
+  - `snapshots`: the document and the camera;
+  - `assets`: original image bytes, keyed by SHA-256 and stored once.
+- **Origin caveat:** Chromium gives all `file://` pages one shared storage
+  origin. Moving the HTML file to another folder keeps your data. Opening it
+  in a different browser or profile does not.
+- Save states shown in the HUD: *Saved*, *Unsaved changes…*, *Saving…*,
+  *Save failed* (changes are only in memory) and *Storage unavailable*.
+- On load, damaged objects are skipped and reported, never silently "fixed".
+- **Not yet available:** export/import, backups, multi-tab coordination
+  (two tabs editing at once: the last save wins), and quota reporting. Undo
+  history does not survive a reload.
+
+## Known limitations (honest list)
+
+- **Precision budget (camera).** Zooming out more than 4,096 levels beyond
+  the deepest point and back in no longer returns to the exact sub-pixel
+  spot. It still lands within 2^-96 px at the coarse scale.
+- **Object magnification.** Deeply magnified strokes and image pixels
+  switch to an exact-arithmetic path. There is no magnification limit.
+  - Verified: edges exact up to 2^5000×, visible and selectable after 1,500
+    levels beyond the placement scale.
+  - Each extra level of depth makes the numbers involved larger, so very
+    deep views cost more CPU per frame. Measurements are in the Phase 0B
+    test log.
+- **Scale.** Every object is checked every frame because there is no spatial
+  index yet (Phase 0C). Large scenes will slow down.
+- **Not implemented:**
+  - groups, attach/detach, locking, rotation, and a Layers panel;
+  - picking that respects image transparency (images are picked by their
+    bounds);
+  - text, video, GIF, audio and PDF;
+  - adjustments and settings;
+  - Workspace/Boards and the Assets view;
+  - collaboration.
+- Tested only in Chromium on one Linux machine. Touch is emulated in tests.
 
 ## Security
 
-- CSP: `default-src 'none'`. Only inline script and style are allowed. No
-  `connect-src`, and `worker-src` is limited to `blob:`.
+- CSP: `default-src 'none'`. Only inline script and style are allowed.
+  Images come from `blob:`/`data:` only. There is no `connect-src`, and
+  `worker-src` is limited to `blob:`.
 - The app makes no network requests and has no runtime dependencies.
-- Camera input is validated: non-finite values are rejected and never stored.
+- Imports are limited to `image/*` files of at most 256 MiB. Each file is
+  decoded before it is stored, and files that fail to decode are rejected
+  with a message.
+- Every object is validated before it enters the document or is loaded:
+  finite numbers, known kinds, well-formed ids and hashes.
 
 ## Licenses
 
-canvast's own code has no published license yet (`UNLICENSED`). The shipped
-HTML contains only first-party code. Development-only dependencies, which are
-not shipped: TypeScript (Apache-2.0), esbuild (MIT), Vitest (MIT),
-Playwright (Apache-2.0). Lucide icons are planned and will be bundled locally
-with their ISC license notice.
+canvast's own code has no published license yet (`UNLICENSED`). Bundled
+third-party material: Lucide icons (ISC), with its notice embedded at the top
+of `dist/canvast.html` and listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only
+dependencies, which are not shipped: TypeScript (Apache-2.0), esbuild (MIT),
+Vitest (MIT), Playwright (Apache-2.0).
 
 ## Contributing and workflow
 
@@ -189,10 +269,12 @@ Every change follows the same loop: pick one bounded slice, implement it,
 run `npm test`, update this README and the docs with measured results, then
 commit. A milestone isn't done until its tests pass and it is committed.
 Releases record the SHA-256 of `dist/canvast.html`, which `npm run build`
-prints.
+prints. Line endings are pinned to LF (`.gitattributes`), so the digest
+reproduces on any checkout.
 
 ## Milestone log
 
 | Milestone | Result | Commit |
 | --- | --- | --- |
-| Phase 0A — endless navigation prototype | 25/25 unit, 22/22 E2E (2 by-design skips), offline + naming checks pass; `dist/canvast.html` v0.0.1 sha256 `1411e6d0…a92` | see `git log` |
+| Phase 0A — endless navigation prototype | 25/25 unit, 22/22 E2E (2 by-design skips), offline + naming checks pass; `dist/canvast.html` v0.0.1 sha256 `1411e6d0…a92` | `1ce2c05` |
+| Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |

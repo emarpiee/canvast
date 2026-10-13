@@ -9,6 +9,12 @@ import type { App } from "./harness";
 
 const LANDMARK = "origin-0"; // unit square at the world origin
 
+// Navigation tests drive the Hand tool so primary-button drags pan.
+test.beforeEach(async ({ app }) => {
+  await app.page.keyboard.press("h");
+  expect(await app.page.evaluate(() => window.__canvastDebug.tool())).toBe("hand");
+});
+
 async function expectInked(app: App, label: string): Promise<number> {
   await app.frame();
   const n = await app.inked();
@@ -174,8 +180,8 @@ test("drag pans content exactly with the pointer, near and astronomically far aw
     { cx: "3p-3000", cy: "1p0", zi: 3005, zf: 0.25, pz: 3005 },
   ]) {
     await app.page.evaluate((c) => window.__canvastDebug.setCamera(c), cam);
-    const w = await app.worldAt(200, 200);
-    await app.drag({ x: 200, y: 200 }, { x: 517, y: 133 }, 13);
+    const w = await app.worldAt(380, 260);
+    await app.drag({ x: 380, y: 260 }, { x: 517, y: 133 }, 13);
     await app.frame();
     expect(distance(await app.screenOf(w), { x: 517, y: 133 })).toBeLessThan(LIMITS.anchorDriftPx);
     await expectInked(app, `camera ${cam.cx}`);

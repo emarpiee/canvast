@@ -45,6 +45,21 @@ export interface App {
   consoleErrors: string[];
 }
 
+/**
+ * Input helpers must start on the canvas, not on an overlay (toolbar, HUD,
+ * dev panel); otherwise a test silently exercises the wrong element.
+ */
+const checkedPoints = new WeakMap<Page, Set<string>>();
+async function assertCanvasAt(page: Page, x: number, y: number): Promise<void> {
+  const key = `${x},${y}`;
+  let seen = checkedPoints.get(page);
+  if (!seen) checkedPoints.set(page, (seen = new Set()));
+  if (seen.has(key)) return; // overlays are static during a test
+  const id = await page.evaluate(([a, b]) => document.elementFromPoint(a!, b!)?.id ?? "", [x, y]);
+  expect(id, `input at (${x}, ${y}) must land on the canvas, not an overlay`).toBe("canvas");
+  seen.add(key);
+}
+
 export function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -76,12 +91,14 @@ export const test = base.extend<{ app: App }>({
       inked: () => page.evaluate(() => window.__canvastDebug.inkedPixels()),
       wheel: async (x, y, deltaY, opts) => {
         // Trusted input through the browser's own event pipeline.
+        await assertCanvasAt(page, x, y);
         await page.mouse.move(x, y);
         if (opts?.ctrl) await page.keyboard.down("Control");
         await page.mouse.wheel(0, deltaY);
         if (opts?.ctrl) await page.keyboard.up("Control");
       },
       drag: async (from, to, steps = 8) => {
+        await assertCanvasAt(page, from.x, from.y);
         await page.mouse.move(from.x, from.y);
         await page.mouse.down();
         await page.mouse.move(to.x, to.y, { steps });

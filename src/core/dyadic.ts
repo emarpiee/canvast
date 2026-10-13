@@ -112,6 +112,23 @@ export function sub(a: Dyadic, b: Dyadic): Dyadic {
   return add(a, neg(b));
 }
 
+/** Exact product. */
+export function mul(a: Dyadic, b: Dyadic): Dyadic {
+  if (a.m === 0n || b.m === 0n) return ZERO;
+  return make(a.m * b.m, a.e + b.e);
+}
+
+/**
+ * Double-double approximation: hi + lo ≈ a with about 106 significant bits.
+ * Used to project local geometry around a far-away anchor without losing the
+ * sub-pixel part. hi may be ±Infinity for values beyond the double range.
+ */
+export function toDD(a: Dyadic): { hi: number; lo: number } {
+  const hi = toNumber(a);
+  if (!Number.isFinite(hi) || hi === 0) return { hi, lo: 0 };
+  return { hi, lo: toNumber(sub(a, fromNumber(hi))) };
+}
+
 export function sign(a: Dyadic): -1 | 0 | 1 {
   return a.m === 0n ? 0 : a.m < 0n ? -1 : 1;
 }

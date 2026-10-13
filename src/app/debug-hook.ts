@@ -9,6 +9,15 @@ import type { ScreenPoint, SerializedCamera } from "../core/camera";
 import { findLandmark } from "../scene/landmarks";
 import type { ViewState } from "./view-state";
 import type { FrameStats } from "./frame-stats";
+import type { DocumentStore } from "../doc/document-store";
+import type { SerializedObject } from "../doc/model";
+import { serializeObject } from "../doc/model";
+import type { EditorState, Tool } from "./editor-state";
+import type { SnapshotWriter } from "../storage/snapshot";
+import { projectObject } from "../render/projection";
+import { exactStrokeEdgeDistancePx } from "../render/stroke-coverage";
+import type { ScreenBox } from "../render/projection";
+import type { LassoFilter } from "../render/hit-test";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -29,6 +38,29 @@ export interface DebugHook {
   nextFrame(): Promise<void>;
   /** Count canvas pixels that differ from the background colour (sampled). */
   inkedPixels(step?: number): number;
+  /** RGB of the canvas pixel at CSS px (x, y). */
+  pixelAt(x: number, y: number): [number, number, number];
+  objects(): SerializedObject[];
+  selection(): string[];
+  tool(): Tool;
+  setTool(t: Tool): void;
+  setLassoFilter(f: LassoFilter): void;
+  /** Projected screen geometry of an object (null when offscreen). */
+  objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  flushSave(): Promise<string>;
+  saveStatus(): string;
+  /** Signed px distance from a screen point to a stroke's outline (negative inside), computed exactly. */
+  strokeEdgeDistance(id: string, x: number, y: number): number;
+  /** Set an object's opacity through a normal transaction (no UI for this yet). */
+  setOpacity(id: string, opacity: number): void;
+}
+
+export interface DebugDeps {
+  doc: DocumentStore;
+  editor: EditorState;
+  writer: SnapshotWriter;
 }
 
 export function installDebugHook(
@@ -36,7 +68,9 @@ export function installDebugHook(
   stats: FrameStats,
   canvas: HTMLCanvasElement,
   nextFrame: () => Promise<void>,
+  deps: DebugDeps,
 ): void {
+  const { doc, editor, writer } = deps;
   const hook: DebugHook = {
     camera: () => serializeCamera(view.camera),
     setCamera: (c) => view.setCamera(deserializeCamera(c)),
@@ -79,6 +113,44 @@ export function installDebugHook(
       let n = 0;
       for (const rgb of samples) if (channelDiff(rgb, bg) > 6) n++;
       return n;
+    },
+    pixelAt: (x, y) => {
+      const dpr = canvas.width / view.viewport.width;
+      const d = canvas.getContext("2d")!.getImageData(Math.floor(x * dpr), Math.floor(y * dpr), 1, 1).data;
+      return [d[0]!, d[1]!, d[2]!];
+    },
+    objects: () => doc.ordered().map(serializeObject),
+    selection: () => [...editor.selection].sort(),
+    tool: () => editor.tool,
+    setTool: (t) => editor.setTool(t),
+    setLassoFilter: (f) => {
+      editor.lassoFilter = f;
+      editor.changed();
+    },
+    objectScreen: (id) => {
+      const o = doc.get(id);
+      if (!o) throw new Error(`no object ${id}`);
+      const po = projectObject(o, view.camera, view.viewport, { keepTiny: true });
+      return po ? { box: { ...po.box }, q: [...po.q], radius: po.radius } : null;
+    },
+    canUndo: () => doc.canUndo,
+    canRedo: () => doc.canRedo,
+    flushSave: async () => {
+      await writer.flush();
+      await writer.saveCamera();
+      return writer.status;
+    },
+    saveStatus: () => writer.status,
+    strokeEdgeDistance: (id, x, y) => {
+      const o = doc.get(id);
+      if (!o || o.kind !== "stroke") throw new Error(`no stroke ${id}`);
+      const po = projectObject(o, view.camera, view.viewport, { keepTiny: true });
+      return po ? exactStrokeEdgeDistancePx(po, x, y) : Infinity;
+    },
+    setOpacity: (id, opacity) => {
+      const o = doc.get(id);
+      if (!o) throw new Error(`no object ${id}`);
+      doc.commit(doc.transaction("Set opacity", [{ ...o, opacity }]));
     },
   };
   (window as unknown as { __canvastDebug: DebugHook }).__canvastDebug = hook;

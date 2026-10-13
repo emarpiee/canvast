@@ -218,3 +218,18 @@ describe("grid placement", () => {
     }
   });
 });
+
+describe("typed zoom levels", () => {
+  it("parses plain, power-of-two and power-of-ten forms", async () => {
+    const { parseZoomLevel } = await import("../../src/interaction/navigation");
+    expect(parseZoomLevel("3000")).toBe(3000);
+    expect(parseZoomLevel(" -12.5 ")).toBe(-12.5);
+    expect(parseZoomLevel("2^3000")).toBe(3000);
+    expect(parseZoomLevel("2^-500")).toBe(-500);
+    expect(parseZoomLevel("×2^40")).toBe(40);
+    expect(parseZoomLevel("−7")).toBe(-7);
+    expect(parseZoomLevel("1e3")).toBe(1000);
+    expect(parseZoomLevel("10^300")).toBeCloseTo(300 / Math.log10(2), 9);
+    for (const bad of ["", "abc", "2^", "3^5", "1/0", "NaN", "Infinity", "2^1e400"]) expect(parseZoomLevel(bad), bad).toBeNull();
+  });
+});
