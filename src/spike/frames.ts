@@ -224,7 +224,7 @@ export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame):
   let y = p.y;
   let a = g;
   while (!onF.has(a)) {
-    const up = space.parentOf(a);
+    const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
     x = D.add(a.ox, D.shift(x, -K * Number(a.n)));
     y = D.add(a.oy, D.shift(y, -K * Number(a.n)));
     a = up;
@@ -254,7 +254,7 @@ export function expressExactIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Fr
   let y = p.y;
   let a = g;
   while (!onF.has(a)) {
-    const up = space.parentOf(a);
+    const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
     x = D.add(a.ox, D.shift(x, -K * Number(a.n)));
     y = D.add(a.oy, D.shift(y, -K * Number(a.n)));
     a = up;

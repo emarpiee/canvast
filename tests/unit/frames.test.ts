@@ -195,6 +195,18 @@ describe("nested frames behave exactly like absolute coordinates", () => {
     sameCamera(toAbsoluteCamera(space, f3), old, "jump 3000");
   });
 
+  it("expressing a point up through a long dive does not split it", () => {
+    for (const up of [-1e6, -1e9, -1e12]) {
+      const space = new FrameSpace();
+      const t0 = performance.now();
+      const fc = fjump(space, { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, up);
+      const p = expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.fromBigInt(-3n) }, fc.f);
+      expect(performance.now() - t0).toBeLessThan(50);
+      expect(space.count).toBeLessThan(5);
+      expect(p && D.log2Abs(p.x) < 0).toBe(true);
+    }
+  });
+
   it("climbing part of a long dive is one step, not one per frame", () => {
     for (const up of [-1e9, -1e6, -1e12 + 1e9]) {
       const space = new FrameSpace();
