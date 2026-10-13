@@ -1,4 +1,4 @@
-import { LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, test } from "./harness";
+import { LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, reps, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -33,7 +33,8 @@ test("loads offline from file:// with no network requests or errors", async ({ a
 });
 
 for (const direction of ["in-first", "out-first"] as const) {
-  test(`continuous wheel zoom ${direction}: 1200 notches each way, anchored, exact return`, async ({ app }, info) => {
+  const NOTCHES = reps(1200, 240);
+  test(`continuous wheel zoom ${direction}: ${NOTCHES} notches each way, anchored, exact return`, async ({ app }, info) => {
     // Trusted mouse events are delivered at integer CSS px in Chromium.
     const pointer = { x: 913, y: 247 };
     const before = await app.landmark(LANDMARK);
@@ -46,7 +47,7 @@ for (const direction of ["in-first", "out-first"] as const) {
     // depth from the zoom change the first notch actually produced.
     let perNotch = 0;
     for (const phase of [sign, -sign]) {
-      for (let i = 0; i < 1200; i++) {
+      for (let i = 0; i < NOTCHES; i++) {
         const anchor = i % 25 === 0 ? await app.worldAt(pointer.x, pointer.y) : null;
         await app.wheel(pointer.x, pointer.y, 100 * phase);
         if (perNotch === 0) {
@@ -65,10 +66,10 @@ for (const direction of ["in-first", "out-first"] as const) {
       const cam = await app.camera();
       assertFiniteCamera(cam);
       if (phase === sign) {
-        // 1200 notches × 100/240 level = 500 levels at DPR 1. Every notch must
-        // keep zooming by the same amount: no ramp-down, no clamp.
-        expect(Math.abs(cam.zi + cam.zf)).toBeCloseTo(1200 * perNotch, 3);
-        expect(Math.abs(cam.zi + cam.zf)).toBeGreaterThan(240);
+        // Full: 1200 notches × 100/240 level = 500 levels at DPR 1. Every notch
+        // must keep zooming by the same amount: no ramp-down, no clamp.
+        expect(Math.abs(cam.zi + cam.zf)).toBeCloseTo(NOTCHES * perNotch, 3);
+        expect(Math.abs(cam.zi + cam.zf)).toBeGreaterThan(NOTCHES * 0.2);
         await expectInked(app, `zoom ${cam.zi}`);
       }
     }
@@ -76,9 +77,9 @@ for (const direction of ["in-first", "out-first"] as const) {
     const cam = await app.camera();
     const frames = await app.page.evaluate(() => window.__canvastDebug.frameTimes());
     recordMetric(info, `wheel-zoom-${direction}`, {
-      notches: 2400,
+      notches: 2 * NOTCHES,
       levelsPerNotch: perNotch,
-      depthLevels: 1200 * perNotch,
+      depthLevels: NOTCHES * perNotch,
       anchorChecks: checks,
       maxAnchorDriftPx: maxDrift,
       roundTripErrorPx: distance(after, before),
@@ -98,12 +99,13 @@ test("mixed zoom inputs: pinch (ctrl+wheel), keyboard, buttons", async ({ app },
   const before = await app.landmark(LANDMARK);
   let maxDrift = 0;
   const anchor = await app.worldAt(pointer.x, pointer.y);
-  for (let i = 0; i < 300; i++) {
+  const PINCH = reps(300, 60);
+  for (let i = 0; i < PINCH; i++) {
     await app.wheel(pointer.x, pointer.y, -3.7, { ctrl: true });
   }
   await app.frame();
   maxDrift = Math.max(maxDrift, distance(await app.screenOf(anchor), pointer));
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < PINCH; i++) {
     await app.wheel(pointer.x, pointer.y, 3.7, { ctrl: true });
   }
   await app.frame();
@@ -126,7 +128,7 @@ test("mixed zoom inputs: pinch (ctrl+wheel), keyboard, buttons", async ({ app },
   const centerDrift = distance(await app.screenOf(center), { x: 640, y: 400 });
   const after = await app.landmark(LANDMARK);
   recordMetric(info, "mixed-zoom", {
-    pinchSteps: 600,
+    pinchSteps: 2 * PINCH,
     pinchAnchorDriftPx: maxDrift,
     pinchRoundTripPx: distance(afterPinch, before),
     keyboardButtonCenterDriftPx: centerDrift,
@@ -141,16 +143,18 @@ test("mixed zoom inputs: pinch (ctrl+wheel), keyboard, buttons", async ({ app },
 test("directional pan at shallow, deep and far-out zoom returns exactly", async ({ app }, info) => {
   test.setTimeout(480_000); // 480 drags + full-resolution ink checks; slow at DPR 2
   const results: Record<string, number> = {};
-  for (const [label, notches] of [["home", 0], ["deep +300 levels", -720], ["far out -300 levels", 720]] as const) {
+  const DEPTH_NOTCHES = reps(720, 120); // 300 or 50 levels at DPR 1
+  const DRAGS = reps(40, 8);
+  for (const [label, notches] of [["home", 0], ["deep", -DEPTH_NOTCHES], ["far out", DEPTH_NOTCHES]] as const) {
     await app.page.getByRole("button", { name: "Return to origin" }).click();
     for (let i = 0; i < Math.abs(notches); i++) await app.wheel(500, 300, Math.sign(notches) * 100);
     await app.frame();
     const ref = await app.worldAt(640, 400);
     const startPos = await app.screenOf(ref);
-    // Long traversal: 40 drags of 600 px in each direction, then back.
+    // Long traversal: DRAGS drags of 600 px in each direction, then back.
     const legs: Array<[number, number]> = [[600, 0], [0, 350], [-600, 0], [0, -350]];
     for (const [dx, dy] of legs) {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < DRAGS; i++) {
         await app.drag({ x: 640 - dx / 2, y: 400 - dy / 2 }, { x: 640 + dx / 2, y: 400 + dy / 2 });
       }
       await expectInked(app, `${label} after leg ${dx},${dy}`);
@@ -163,7 +167,7 @@ test("directional pan at shallow, deep and far-out zoom returns exactly", async 
   const ref = await app.worldAt(640, 400);
   await app.page.locator("#canvas").focus();
   for (const key of ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"]) {
-    for (let i = 0; i < 25; i++) await app.page.keyboard.press(key);
+    for (let i = 0; i < reps(25, 10); i++) await app.page.keyboard.press(key);
   }
   await app.frame();
   results["keyboard"] = distance(await app.screenOf(ref), { x: 640, y: 400 });
@@ -236,7 +240,7 @@ test("touch pinch zooms about a fractional finger centroid and returns", async (
   const anchor = await app.worldAt(c.x, c.y);
   const before = await app.landmark(LANDMARK);
   let maxDrift = 0;
-  for (let rep = 0; rep < 6; rep++) {
+  for (let rep = 0; rep < reps(6, 2); rep++) {
     for (const [from, to] of [[40, 320], [320, 40]] as const) {
       await touch("touchStart", [{ x: c.x - from, y: c.y }, { x: c.x + from, y: c.y }]);
       for (let s = 1; s <= 12; s++) {
@@ -250,7 +254,7 @@ test("touch pinch zooms about a fractional finger centroid and returns", async (
   }
   const after = await app.landmark(LANDMARK);
   const cam = await app.camera();
-  recordMetric(info, "touch-pinch", { gestures: 12, maxAnchorDriftPx: maxDrift, roundTripPx: distance(after, before), finalZoom: cam.zi + cam.zf });
+  recordMetric(info, "touch-pinch", { gestures: 2 * reps(6, 2), maxAnchorDriftPx: maxDrift, roundTripPx: distance(after, before), finalZoom: cam.zi + cam.zf });
   expect(maxDrift).toBeLessThan(LIMITS.anchorDriftPx);
   expect(distance(after, before)).toBeLessThan(LIMITS.roundTripPx);
 });

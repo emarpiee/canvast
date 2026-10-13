@@ -157,15 +157,20 @@ connection.
 
 ## Testing
 
-```sh
-npm run typecheck          # TypeScript, strict
-npm run test:unit          # Vitest: exact arithmetic, camera, document, projection, selection
-npm run test:e2e           # builds, then Playwright against file://dist/canvast.html#debug
-npm run check:offline      # no external references in the built file
-npm run check:names        # naming policy: no external product names in first-party text
-npm test                   # all of the above
-npm run bench              # scale benchmarks: 1K–1M objects, dense vs sparse (not part of npm test)
-```
+**Which suite to run** (full guide: [docs/testing/README.md](docs/testing/README.md)):
+
+| Command | Time | When |
+| --- | --- | --- |
+| `npm test` | ~8 min | After every ordinary change (quick E2E suite: short stress loops) |
+| `npm run test:full` | ~35 min | Before committing the end of a phase or milestone (full stress loops); log the result |
+| `npm run test:unit` | ~15 s | While developing |
+| `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
+
+Both E2E lengths run the same tests; only the stress-loop counts differ.
+Never rebuild `dist/` while a suite is running.
+
+Individual commands: `npm run typecheck`, `npm run test:e2e` (quick),
+`npm run test:e2e:full`, `npm run check:offline`, `npm run check:names`.
 
 The E2E suite runs every test in three Chromium configurations: the default,
 GPU disabled (`--disable-gpu --disable-accelerated-2d-canvas`), and

@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { expect, percentile, recordMetric, test } from "./harness";
+import { expect, percentile, recordMetric, reps, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -65,7 +65,8 @@ test("zooming deep into a curvy stroke never shows holes or spill (wheel input)"
   let checks = 0;
   await app.page.evaluate(() => window.__canvastDebug.resetFrameTimes());
   let exactFrames = 0;
-  for (let step = 0; step < 240; step++) {
+  const STEPS = reps(240, 120); // ~100 or ~50 levels at DPR 1
+  for (let step = 0; step < STEPS; step++) {
     await app.wheel(tx, ty, -100);
     if (step % 4) continue;
     await app.frame();
@@ -80,11 +81,11 @@ test("zooming deep into a curvy stroke never shows holes or spill (wheel input)"
   recordMetric(info, "deep-zoom-curvy", {
     checks,
     exactFrames,
-    levels: 100,
+    levels: Math.round((STEPS * 100) / 240),
     worst,
     renderMs: { p50: percentile(frames, 50), p95: percentile(frames, 95), p99: percentile(frames, 99), max: Math.max(...frames) },
   });
-  expect(exactFrames).toBeGreaterThan(20); // the exact path was exercised
+  expect(exactFrames).toBeGreaterThan(reps(20, 4)); // the exact path was exercised
   expect(worst).toEqual({ holes: 0, spill: 0, z: 0 });
 });
 
@@ -187,7 +188,8 @@ for (const item of ["stroke", "image"] as const) {
     }
     await app.page.locator("#canvas").focus();
     const failures: number[] = [];
-    for (let i = 1; i <= 750; i++) {
+    const PRESSES = reps(750, 150); // +2 levels each: 1500 or 300 levels by keyboard
+    for (let i = 1; i <= PRESSES; i++) {
       await app.page.keyboard.press("Shift+Equal"); // +2 levels at the viewport centre
       if (i % 25 === 0) {
         await app.frame();
@@ -195,8 +197,17 @@ for (const item of ["stroke", "image"] as const) {
         if (Math.max(...c.map((v, k) => Math.abs(v - expectColor[k]!))) > 3) failures.push(600 + 2 * i);
       }
     }
+    if (PRESSES < 750) {
+      // Quick suite: jump the rest of the way (past the old 2^900 cutoff) and check again.
+      await app.page.getByTestId("zoom-readout").click();
+      await app.page.getByTestId("zoom-input").fill("2100.5");
+      await app.page.getByTestId("zoom-input").press("Enter");
+      await app.frame();
+      const c = await app.page.evaluate(() => window.__canvastDebug.pixelAt(640, 400));
+      if (Math.max(...c.map((v, k) => Math.abs(v - expectColor[k]!))) > 3) failures.push(2100);
+    }
     const cam = await app.camera();
-    recordMetric(info, `deep-item-${item}`, { finalZoom: cam.zi + cam.zf, magnificationBeyondItemLog2: 1500, failures });
+    recordMetric(info, `deep-item-${item}`, { finalZoom: cam.zi + cam.zf, magnificationBeyondItemLog2: 1500, keyboardLevels: 2 * PRESSES, failures });
     expect(cam.zi).toBe(2100);
     // Picking agrees with drawing at this depth: a click selects the item.
     const id = (await app.page.evaluate(() => window.__canvastDebug.objects()))[0]!.id;

@@ -171,7 +171,7 @@ exhaustion, and storage eviction.
 - reference-checked mark-and-sweep garbage collection;
 - deleting canvases and boards safely.
 
-## Decided, scheduled next: quick vs full test suites (2026-10-13)
+## Decided and implemented: quick vs full test suites (2026-10-13)
 
 The full E2E suite runs thousands of real input events in 3 browser
 configurations and takes about 35 minutes. Most of that is a handful of
@@ -187,8 +187,18 @@ project owner:
 - **Never skip the full suite before a phase commit.** Never rebuild `dist/`
   while any suite is running, because the tests load the built file.
 
-This is implemented as the first task after the Phase 1 slice 1 commit, with
-the exact commands in the README "Testing" section.
+**Implemented:**
+- `npm test` runs the quick suite;
+- `npm run test:full` runs the full suite;
+- `reps(full, quick)` in `tests/e2e/harness.ts` sets loop lengths;
+- the guide is [testing/README.md](testing/README.md).
+
+**Measured:** quick E2E 7.7 min (90 tests: 87 passed and 2 skipped in the
+first run; the 1 failure was a quick-mode threshold that assumed DPR 1, since
+fixed and re-run 3/3) against 29 min for the full suite. That misses the
+3–5 min target. The remaining time is mostly the larger pixel-sampling and
+traversal tests in 3 configs. Parallel workers for the functional tests are
+the next lever if needed.
 
 ## Backlog of open questions (not blocking 0B)
 

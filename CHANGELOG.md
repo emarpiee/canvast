@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Test tooling: a quick E2E suite (`npm test`, about 8 min) for everyday
+  changes and the full stress suite (`npm run test:full`, about 35 min) for
+  milestone commits. See [docs/testing/README.md](docs/testing/README.md).
+
 ## 0.1.0 — Phase 1 slice 1: workspace and storage foundation (2026-10-13)
 
 - **Workspace → Boards → Canvas.** A navigator switches, creates and renames
