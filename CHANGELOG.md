@@ -4,6 +4,18 @@
 
 (nothing yet)
 
+## 0.3.1 — Firefox support (2026-10-13)
+
+- **Firefox is now tested on every run** (Firefox 157, a 4th E2E
+  configuration).
+  - Storage, multi-tab safety, assets, archives and deep-zoom rendering all
+    pass.
+  - Details, including Firefox's smaller `file://` storage quota (about
+    790 MiB), are in `docs/testing/firefox.md`.
+- **Faster grid drawing:** the background grid is drawn with filled
+  rectangles instead of stroked lines. It is 7.8× faster in Firefox (14.9 →
+  1.9 ms per frame) and slightly faster in Chromium.
+
 ## 0.3.0 — Phase 1 slice 3: portable archives (2026-10-13)
 
 - **Export** a `.canvast` archive (a standard ZIP) for the whole workspace

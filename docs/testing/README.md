@@ -6,8 +6,8 @@ test runs in both; only the length of the stress loops differs (for example
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (3 browser configs), offline and naming checks | ~10 min (E2E 9.5 min, v0.2.0) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
-| `npm run test:full` | The same, with the **full** E2E stress loops | ~35 min (E2E 34.5 min, v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
+| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox), offline and naming checks | ~16 min (E2E 15.6 min with Firefox, v0.3.1) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
+| `npm run test:full` | The same, with the **full** E2E stress loops | ~50 min (estimate with Firefox; 34.5 min for Chromium only at v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npx playwright test -g "<name>"` | Selected quick E2E tests | seconds | While developing a specific feature |
 | `npm run bench` | Scale benchmarks, 1K–1M objects (not a pass/fail gate) | ~10 min | After rendering or performance changes; compare with `metrics/bench-*.json` and docs/testing/phase-0c.md |
@@ -51,7 +51,8 @@ To run the full length of a single test:
 | --- | --- |
 | `chromium` | Default |
 | `chromium-cpu` | GPU and accelerated canvas disabled (the CPU-only tier) |
-| `chromium-dpr2` | DPR 2, touch enabled. The touch-pinch test runs only here; it is the 2 "skipped by design" in the other projects |
+| `chromium-dpr2` | DPR 2, touch enabled. The touch-pinch test runs only here; it is the "skipped by design" count in the other projects |
+| `firefox` | Firefox 157 (the project owner's main browser). Note: `performance.now()` has 1 ms resolution on `file://` in Firefox, so frame times there are whole milliseconds. See [firefox.md](firefox.md) |
 
 ## Test logs
 

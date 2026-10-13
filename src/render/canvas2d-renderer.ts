@@ -76,28 +76,24 @@ function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, them
   let g = Math.ceil(Math.log2(GRID_MIN_PX) - z);
   if (g % 2 !== 0) g += 1;
   let lines = 0;
-  ctx.strokeStyle = theme.grid;
-  ctx.lineWidth = 1;
+  // 1-px lines as filled rects (same pixels as a stroke at +0.5): stroking
+  // hundreds of long lines costs ~15 ms per frame in Firefox, fillRect ~2 ms
+  // in both engines. Same-tier crossings blend twice, as tiers already do.
+  ctx.fillStyle = theme.grid;
   for (; ; g += 2) {
     const spacing = 2 ** (g + z);
     if (spacing > GRID_MAX_PX || spacing > 4 * Math.max(vp.width, vp.height)) break;
     const alpha = GRID_TIER_ALPHA * smoothstep(GRID_MIN_PX, GRID_FADE_PX, spacing);
     if (alpha <= 0.002) continue;
     ctx.globalAlpha = alpha;
-    ctx.beginPath();
     for (let x = firstLineOffset(cam.center.x, g, vp.width / 2, cam); x <= vp.width; x += spacing) {
-      const px = Math.round(x) + 0.5;
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, vp.height);
+      ctx.fillRect(Math.round(x), 0, 1, vp.height);
       lines++;
     }
     for (let y = firstLineOffset(cam.center.y, g, vp.height / 2, cam); y <= vp.height; y += spacing) {
-      const py = Math.round(y) + 0.5;
-      ctx.moveTo(0, py);
-      ctx.lineTo(vp.width, py);
+      ctx.fillRect(0, Math.round(y), vp.width, 1);
       lines++;
     }
-    ctx.stroke();
   }
   ctx.globalAlpha = 1;
   return lines;

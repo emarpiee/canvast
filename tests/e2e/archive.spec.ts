@@ -89,8 +89,12 @@ async function importArchive(p: Page, name: string, bytes: Buffer, accept = true
   const dlg = p.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   const text = (await dlg.textContent()) ?? "";
+  // Clear the last message so the wait below sees this import's outcome, not an earlier one.
+  await p.getByTestId("toast").evaluate((t) => (t.textContent = ""));
   await p.getByTestId(accept ? "confirm-ok" : "confirm-cancel").click();
   await expect(dlg).toHaveCount(0);
+  // Wait for the outcome, not the dialog: a fresh profile already shows "Board 1 › Canvas 1".
+  if (accept) await expect(p.getByTestId("toast")).toContainText(/Imported|Import failed/);
   return text;
 }
 

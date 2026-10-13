@@ -215,8 +215,8 @@ connection.
 
 | Command | Time | When |
 | --- | --- | --- |
-| `npm test` | ~10 min | After every ordinary change (quick E2E suite: short stress loops) |
-| `npm run test:full` | ~35 min | Only when a whole phase is complete (full stress loops); log the result |
+| `npm test` | ~16 min | After every ordinary change (quick E2E suite: short stress loops) |
+| `npm run test:full` | ~50 min | Only when a whole phase is complete (full stress loops); log the result |
 | `npm run test:unit` | ~15 s | While developing |
 | `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
 
@@ -260,10 +260,16 @@ Phase 0B results:
 - Requires a browser with `BigInt`, Pointer Events, `ResizeObserver`,
   Canvas 2D and IndexedDB (for saving). Roughly: Chromium ≥ 67, Firefox ≥ 68,
   Safari ≥ 14.
-- **Tested** only in Chromium 156 (Playwright) on Linux. Firefox and Safari
-  are **unverified** so far. Firefox's IndexedDB support for `file://` pages
-  differs from Chromium's. If storage cannot be opened, the app keeps working
-  in memory and says so in the HUD.
+- **Tested** in Chromium 156 (3 configurations) and **Firefox 157** on Linux
+  (Playwright), on every test run. Safari is **unverified**.
+  - Firefox on `file://` supports everything canvast uses (IndexedDB, Web
+    Locks, BroadcastChannel), and its frame times are close to Chromium's.
+  - Firefox gives a local file about **790 MiB** of storage (Chromium about
+    10 GiB), which limits the size of the image library. Export a backup
+    regularly.
+  - Details: [docs/testing/firefox.md](docs/testing/firefox.md).
+- If storage cannot be opened, the app keeps working in memory and says so
+  in the HUD.
 - No GPU features are used. Rendering is Canvas 2D only.
 
 ## Architecture
@@ -439,3 +445,4 @@ reproduces on any checkout.
 | Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |
 | Phase 1 slice 2 — Assets view, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |
 | Phase 1 slice 3 — portable archives (export/import) | 75/75 unit; quick E2E 121 passed / 2 by-design skips / 3 failed (one stale assertion, fixed and re-run 3/3); 2 mutation checks caught; `dist/canvast.html` v0.3.0 sha256 `2db91b09…9d9a` | see `git log` |
+| Firefox support (v0.3.1) | Firefox 157 added as a 4th E2E project; grid drawing 7.8× faster in Firefox; quick E2E 165 passed / 3 by-design skips / 0 failed (4 projects); tested build `f64a472e…92bf` (same code, pre-bump label); `dist/canvast.html` v0.3.1 sha256 `60ccde68…1a30` | see `git log` |

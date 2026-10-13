@@ -215,7 +215,7 @@ exhaustion, and storage eviction.
 
 **Unverified**
 - Libraries with many thousands of assets (grid and thumbnail cost).
-- Firefox and Safari.
+- Safari (Firefox has been verified since v0.3.1).
 - Deleting very large canvases (one key-range delete; the time is not
   measured).
 
@@ -275,6 +275,26 @@ the largest measured performance gap (about 59 ms per frame at 3K–7.7K
 visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
+
+## Firefox support (v0.3.1, between slices 3 and 4)
+
+**Implemented**
+- A `firefox` E2E project (Firefox 157) in the quick and full suites.
+- **Fix:** grid lines are drawn with `fillRect` instead of a stroked path.
+  The grid cost drops from 14.9 to 1.9 ms per frame in Firefox, and from 2.1
+  to 1.9 ms in Chromium.
+
+**Tested:** [testing/firefox.md](testing/firefox.md). First run: 5 failures,
+explained there. After the fix the quick suite passes in all 4 projects
+(165 passed, 3 skipped by design).
+
+**Known differences**
+- Storage quota for `file://` is about 790 MiB in Firefox, against about
+  10 GiB in Chromium.
+- `performance.now()` has 1 ms resolution in Firefox.
+
+**Unverified:** the owner's own Firefox profile (its `file://` origin
+rules), and Firefox on Windows and macOS.
 
 ## Decided and implemented: quick vs full test suites (2026-10-13)
 
