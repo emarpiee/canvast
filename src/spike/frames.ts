@@ -21,6 +21,8 @@ export const K = 32;
 const H = 8;
 /** Beyond this many frame units from the view, a point is "far" for good at this depth. */
 const FAR_LOG2 = 80;
+/** expressIn's precision, in bits below the target frame's unit: covers zoom up to K + H and objects 2K levels finer. */
+const DRAW_BITS = 2 * K + 128;
 
 export interface Frame {
   readonly id: number;
@@ -211,31 +213,68 @@ export function depthOf(c: FrameCamera): { levels: bigint; frac: number } {
 }
 
 /**
+ * A number kept as a sum of small terms, coarse to fine, each at least
+ * GAP bits below the previous one (so the sum is the first term to within
+ * 2^(1-GAP)). Walking between frames adds and drops terms at the coarse end
+ * only, so a point 2^-10^12 from a corner never becomes a 10^12-bit number.
+ */
+type Terms = D.Dyadic[];
+const GAP = 64;
+
+/** Add `c` at the coarse end, merging terms that overlap and removing zeros. */
+function addTerm(c: D.Dyadic, ts: Terms): Terms {
+  const out = c.m === 0n ? ts.slice() : [c, ...ts];
+  while (out.length > 1 && (out[0]!.m === 0n || D.log2Abs(out[1]!) >= out[0]!.e - GAP)) {
+    out.splice(0, 2, D.add(out[0]!, out[1]!));
+  }
+  if (out.length === 1 && out[0]!.m === 0n) out.pop();
+  return out;
+}
+
+/** Shift every term, then drop the fine end below 2^q (it cannot reach a pixel). */
+function shiftTerms(ts: Terms, by: number, q: number): Terms {
+  const out = ts.map((t) => D.shift(t, by));
+  while (out.length && D.log2Abs(out[out.length - 1]!) < q - 2) out.pop();
+  return out;
+}
+
+const leadLog2 = (ts: Terms): number => (ts.length ? D.log2Abs(ts[0]!) : -Infinity);
+
+function sumTerms(ts: Terms): D.Dyadic {
+  return ts.reduce((a, t) => D.add(a, t), D.ZERO);
+}
+
+/**
  * Express a point of frame `g` in frame `f`'s units, or null when it is
  * farther than 2^FAR_LOG2 units from `f`'s origin region (then it is off
  * screen for good at this depth). Walks up from `g` to the common ancestor,
- * then down to `f`, stopping as soon as the point is far: the numbers stay
- * small, so the cost is the path length, not the depth in bits.
+ * then down to `f`, stopping as soon as the point is far. Every number stays
+ * small (see Terms), so the cost is the path length, not the depth in bits.
+ *
+ * For drawing only: terms below 2^-DRAW_BITS of `f`'s unit are dropped (far
+ * below 10^-6 px at any zoom the frame allows). Exact work uses expressExactIn.
  */
 export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame): WorldPoint | null {
   const pathF = space.path(f);
   const onF = new Set(pathF);
-  let x = p.x;
-  let y = p.y;
+  let x: Terms = addTerm(p.x, []);
+  let y: Terms = addTerm(p.y, []);
   let a = g;
   while (!onF.has(a)) {
     const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
-    x = D.add(a.ox, D.shift(x, -K * Number(a.n)));
-    y = D.add(a.oy, D.shift(y, -K * Number(a.n)));
+    const q = -(DRAW_BITS + levelsBetween(up, f));
+    x = addTerm(a.ox, shiftTerms(x, -K * Number(a.n), q));
+    y = addTerm(a.oy, shiftTerms(y, -K * Number(a.n), q));
     a = up;
   }
   for (let i = pathF.indexOf(a) + 1; i < pathF.length; i++) {
     const d = pathF[i]!;
-    x = D.shift(D.sub(x, d.ox), K * Number(d.n));
-    y = D.shift(D.sub(y, d.oy), K * Number(d.n));
-    if (D.log2Abs(x) > FAR_LOG2 || D.log2Abs(y) > FAR_LOG2) return null;
+    const q = -(DRAW_BITS + levelsBetween(d, f));
+    x = shiftTerms(addTerm(D.neg(d.ox), x), K * Number(d.n), q);
+    y = shiftTerms(addTerm(D.neg(d.oy), y), K * Number(d.n), q);
+    if (leadLog2(x) > FAR_LOG2 + 1 || leadLog2(y) > FAR_LOG2 + 1) return null;
   }
-  return { x, y };
+  return { x: sumTerms(x), y: sumTerms(y) };
 }
 
 /** Levels by which frame `f` is finer than frame `g` (positive when f is deeper). */

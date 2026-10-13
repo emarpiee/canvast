@@ -207,6 +207,42 @@ describe("nested frames behave exactly like absolute coordinates", () => {
     }
   });
 
+  it("a home point seen from 5e12 levels up stays cheap after zooming into a neighbouring cell", () => {
+    const space = new FrameSpace();
+    let fc: FrameCamera = { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
+    for (let i = 0; i < 5; i++) fc = fjump(space, fc, -1e12);
+    const t0 = performance.now();
+    for (let i = 0; i < 120; i++) {
+      fc = fzoomAt(space, fc, VP, { x: 300, y: 200 }, 1);
+      expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.fromBigInt(-3n) }, fc.f);
+    }
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+
+  it("expressIn matches the exact path to 2^-150 wherever it finds the point", () => {
+    const r = rng(41);
+    const space = new FrameSpace();
+    let fc: FrameCamera = { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
+    const pts: { f: Frame; p: WorldPoint }[] = [];
+    let found = 0;
+    for (let i = 0; i < 400; i++) {
+      const k = r();
+      if (k < 0.1) fc = fjump(space, fc, Math.round((r() - 0.5) * 400));
+      else if (k < 0.6) fc = fpanBy(space, fc, (r() - 0.5) * 3000, (r() - 0.5) * 3000);
+      else fc = fzoomAt(space, fc, VP, { x: r() * 1280, y: r() * 800 }, (r() - 0.5) * 8);
+      pts.push({ f: fc.f, p: { x: D.add(fc.x, D.fromNumber(r() - 0.5)), y: D.sub(fc.y, D.fromNumber(r())) } });
+      for (const q of pts.slice(-30)) {
+        const cheap = expressIn(space, q.f, q.p, fc.f);
+        if (!cheap) continue;
+        found++;
+        const exact = expressExactIn(space, q.f, q.p, fc.f);
+        expect(D.log2Abs(D.sub(cheap.x, exact.x))).toBeLessThan(-150);
+        expect(D.log2Abs(D.sub(cheap.y, exact.y))).toBeLessThan(-150);
+      }
+    }
+    expect(found).toBeGreaterThan(1000);
+  });
+
   it("climbing part of a long dive is one step, not one per frame", () => {
     for (const up of [-1e9, -1e6, -1e12 + 1e9]) {
       const space = new FrameSpace();

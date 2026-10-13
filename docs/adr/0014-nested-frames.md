@@ -53,6 +53,10 @@ is tested by running both systems side by side (`tests/unit/frames.test.ts`):
   to 2^10^12; a 10^12-level jump in 3–8 ms).
 - `roundTo` ties change in the main code too (sub-2^-96 differences in
   rare exact ties); no stored data changes.
+- The drawing path re-expresses points between frames as a short sum of
+  small terms (one per frame step), never one long number, and drops what
+  lies below 2^-192 camera-frame units (far below 10^-6 px). Stored
+  positions and every edit stay exact; exact conversion is separate.
 - Open: coarse objects seen from far below still cost O(Δ); the carried
   near-edge set (plan §3) removes it in step 3.
 

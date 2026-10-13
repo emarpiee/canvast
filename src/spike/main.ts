@@ -64,7 +64,9 @@ let overlay = false;
  * changes frame (or content changes): per frame, nothing touches other
  * frames, so frame cost does not depend on depth.
  */
-let scene: { f: Frame; strokes: StrokeObject[]; landmarks: Landmark[]; buildMs: number } | null = null;
+let scene: { f: Frame; strokes: StrokeObject[]; landmarks: Landmark[]; buildMs: number; skipped: number } | null = null;
+/** shortcut: coarse strokes covering the view from more levels below than this are not drawn (exact path is O(levels)); step 3's near-edge set removes the limit. */
+const COARSE_EXACT_MAX = 100_000;
 
 /** Exact expression without the far cut-off, for coarse objects that may cover the view (bits grow with the level gap). */
 function expressExact(g: Frame, p: WorldPoint, f: Frame): WorldPoint {
@@ -96,6 +98,7 @@ function buildScene(): NonNullable<typeof scene> {
   const f = cam.f;
   const out: StrokeObject[] = [];
   const onPath = new Set(space.path(f));
+  let skipped = 0;
   for (const s of strokes) {
     const d = levelsBetween(s.f, f); // > 0: the stroke's frame is coarser than the camera's
     if (d < -2 * K) continue; // far finer than the view: sub-pixel (density preview is out of the spike's scope)
@@ -109,7 +112,8 @@ function buildScene(): NonNullable<typeof scene> {
       const ay = D.toNumber(s.obj.anchor.y);
       const m = 1e-9 * u * (b.maxX - b.minX + b.maxY - b.minY);
       if (c.x >= ax + b.minX * u - m && c.x <= ax + b.maxX * u + m && c.y >= ay + b.minY * u - m && c.y <= ay + b.maxY * u + m) {
-        a = expressExact(s.f, s.obj.anchor, f);
+        if (d <= COARSE_EXACT_MAX) a = expressExact(s.f, s.obj.anchor, f);
+        else skipped++;
       }
     }
     if (a) out.push({ ...s.obj, anchor: a, unit: s.obj.unit + d });
@@ -120,7 +124,7 @@ function buildScene(): NonNullable<typeof scene> {
     const c = expressIn(space, space.world, l.center, f);
     if (c) lms.push({ ...l, center: c, sizeExp: l.sizeExp + d });
   }
-  return { f, strokes: out, landmarks: lms, buildMs: performance.now() - t0 };
+  return { f, strokes: out, landmarks: lms, buildMs: performance.now() - t0, skipped };
 }
 
 function render(): number {
@@ -144,7 +148,8 @@ function render(): number {
   hud.textContent =
     `zoom 2^${dep.levels} (+${dep.frac.toFixed(2)}) · render ${lastMs.toFixed(1)} ms · ` +
     `frame #${cam.f.id} (level ${cam.f.level}${cam.f.n > 1n ? `, dive of ${cam.f.n} steps` : ""}) · local z ${cam.z.toFixed(2)} · pz ${cam.pz} · ` +
-    `rebases ${rebaseCount} · frames ${space.count} · scene ${scene.strokes.length} strokes, built in ${scene.buildMs.toFixed(1)} ms`;
+    `rebases ${rebaseCount} · frames ${space.count} · scene ${scene.strokes.length} strokes, built in ${scene.buildMs.toFixed(1)} ms` +
+    (scene.skipped ? ` · ${scene.skipped} coarse strokes not drawn (> ${COARSE_EXACT_MAX} levels above, step 3)` : "");
   return lastMs;
 }
 
