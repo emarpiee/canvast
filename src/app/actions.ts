@@ -2,7 +2,7 @@ import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { ImageObject } from "../doc/model";
-import { newObjectId } from "../doc/model";
+import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
@@ -62,6 +62,8 @@ export function placeImage(
   const img: ImageObject = {
     id: newObjectId(),
     kind: "image",
+    // `c` is in the camera frame's coordinates (ADR 0014).
+    ...(view.frame === doc.space.world ? {} : { frame: view.frame }),
     anchor: { x: D.sub(c.x, D.shift(D.fromNumber(w / 2), unit)), y: D.sub(c.y, D.shift(D.fromNumber(h / 2), unit)) },
     unit,
     z: doc.topZ() + 1,
@@ -73,7 +75,7 @@ export function placeImage(
     pixelW: rec.pixelW,
     pixelH: rec.pixelH,
   };
-  const obj = normalizeUnit(img) as ImageObject;
+  const obj = homeObject(normalizeUnit(img), doc.space) as ImageObject;
   doc.commit(doc.transaction(label, [obj]));
   return obj;
 }

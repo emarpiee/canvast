@@ -1,4 +1,6 @@
-import type { Camera, Viewport } from "../core/camera";
+import type { Viewport } from "../core/camera";
+import type { FrameCamera } from "../core/frames";
+import { cameraIn } from "../scene/frame-index";
 import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
@@ -99,13 +101,14 @@ export function drawOverlays(
   ctx: CanvasRenderingContext2D,
   selected: readonly ProjectedObject[],
   editor: EditorState,
-  cam: Camera,
+  fc: FrameCamera,
   vp: Viewport,
   theme: SceneTheme,
 ): void {
-  // In-progress stroke, drawn through the same projection as committed ones.
+  // In-progress stroke, drawn through the same projection as committed ones (with the camera in its frame).
   const d = editor.draft;
-  if (d && d.points.length >= 2) {
+  const cam = d && cameraIn(fc, d.frame);
+  if (d && cam && d.points.length >= 2) {
     const draft: StrokeObject = {
       id: DRAFT_ID,
       kind: "stroke",

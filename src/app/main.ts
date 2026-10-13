@@ -12,13 +12,16 @@ import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
+import { projectObject } from "../render/projection";
 import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
-import { SpatialIndex, syncIndex } from "../scene/spatial-index";
+import { syncIndex } from "../scene/spatial-index";
+import { FrameIndex, cameraIn, worldBackdrop } from "../scene/frame-index";
+import type { Frame } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
 import { WorkspaceRepo } from "../storage/workspace-repo";
@@ -75,11 +78,11 @@ async function start(): Promise<void> {
     return;
   }
 
-  const view = new ViewState();
-  const stats = new FrameStats();
   const doc = new DocumentStore();
+  const view = new ViewState(() => doc.space);
+  const stats = new FrameStats();
   // The spatial index mirrors the document incrementally (changed ids only).
-  const index = new SpatialIndex();
+  const index = new FrameIndex(() => doc.space);
   syncIndex(doc, index);
   // Committed objects are drawn through a raster tile cache (ADR 0009).
   const tiles = new TileCache(
@@ -128,13 +131,17 @@ async function start(): Promise<void> {
     invalidate();
   });
 
+  let backdrop: ({ f: Frame } & ReturnType<typeof worldBackdrop>) | null = null;
   /** Render synchronously and return the timing breakdown. */
   const renderNow = (): FrameBreakdown => {
     const t0 = performance.now();
     const cam = view.camera;
+    const fc = view.frameCamera;
     const vp = view.viewport;
-    renderFrame(ctx, cam, vp, dpr, theme, LANDMARKS);
-    density.draw(ctx, index, cam, vp, doc.revision);
+    // Axes and landmarks are world-frame content, re-expressed in the camera frame (once per frame change).
+    if (backdrop?.f !== fc.f) backdrop = { f: fc.f, ...worldBackdrop(fc.f, LANDMARKS) };
+    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin);
+    density.draw(ctx, index.views(fc), index.dots(fc), vp, doc.revision);
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
     let runs: Map<ProjectedObject, number> | undefined;
@@ -143,23 +150,28 @@ async function start(): Promise<void> {
         ? tiles.draw(
             ctx,
             cam,
+            fc.f.id,
             vp,
             dpr,
-            (infl) => visibleObjects(doc, index, null, cam, infl),
+            (infl) => visibleObjects(doc, index, null, fc, infl),
             (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
             (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2),
+            (o, infl) => {
+              const oc = cameraIn(fc, o.frame ?? doc.space.world);
+              return oc && projectObject(o, oc, infl, { keepTiny: true });
+            },
           )
         : null;
     let visible: ReturnType<typeof visibleObjects> | null = null;
     let t2 = performance.now();
     if (!tiled) {
-      visible = visibleObjects(doc, index, editor, cam, vp);
+      visible = visibleObjects(doc, index, editor, fc, vp);
       t2 = performance.now();
       drawObjects(ctx, visible, assets, vp, dpr, theme);
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
-    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, cam, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
-    drawOverlays(ctx, selected, editor, cam, vp, theme);
+    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
+    drawOverlays(ctx, selected, editor, fc, vp, theme);
     const t3 = performance.now();
     const b: FrameBreakdown = {
       totalMs: t3 - t0,

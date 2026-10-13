@@ -18,11 +18,11 @@ import { CENTER_GUARD_BITS, PRECISION_BUDGET, ZOOM_QUANTUM, panBy, zoomAt } from
 
 export const K = 32;
 /** Rebase hysteresis (levels). */
-const H = 8;
+export const H = 8;
 /** Beyond this many frame units from the view, a point is "far" for good at this depth. */
 const FAR_LOG2 = 80;
 /** expressIn's precision, in bits below the target frame's unit: covers zoom up to K + H and objects 2K levels finer. */
-const DRAW_BITS = 2 * K + 128;
+export const DRAW_BITS = 2 * K + 128;
 
 export interface Frame {
   readonly id: number;
@@ -33,17 +33,19 @@ export interface Frame {
   /** Depth in K-level steps from the original root (negative above it). */
   level: bigint;
   readonly kids: Map<string, Frame>;
+  /** The tree this frame belongs to (for exact conversion to the world frame). */
+  readonly space: FrameSpace;
 }
 
 let nextId = 0;
-function frame(parent: Frame | null, n: bigint, ox: D.Dyadic, oy: D.Dyadic, level: bigint): Frame {
-  return { id: nextId++, parent, n, ox, oy, level, kids: new Map() };
+function frame(space: FrameSpace, parent: Frame | null, n: bigint, ox: D.Dyadic, oy: D.Dyadic, level: bigint): Frame {
+  return { id: nextId++, parent, n, ox, oy, level, kids: new Map(), space };
 }
 
 export const ROOT_LEVEL = 0n;
 
 export class FrameSpace {
-  root: Frame = frame(null, 1n, D.ZERO, D.ZERO, ROOT_LEVEL);
+  root: Frame = frame(this, null, 1n, D.ZERO, D.ZERO, ROOT_LEVEL);
   /** The frame the world (level-0 dyadic coordinates) was defined in. */
   readonly world = this.root;
   count = 1;
@@ -52,7 +54,7 @@ export class FrameSpace {
     const key = `${n}|${D.toString(ox)}|${D.toString(oy)}`;
     let c = p.kids.get(key);
     if (!c) {
-      c = frame(p, n, ox, oy, p.level + n);
+      c = frame(this, p, n, ox, oy, p.level + n);
       p.kids.set(key, c);
       this.count++;
     }
@@ -62,7 +64,7 @@ export class FrameSpace {
   /** The parent of `f`, creating one above the root, and splitting a compressed dive so the step is `k` K-steps. */
   parentOf(f: Frame, k = 1n): Frame {
     if (!f.parent) {
-      const r = frame(null, 1n, D.ZERO, D.ZERO, f.level - 1n);
+      const r = frame(this, null, 1n, D.ZERO, D.ZERO, f.level - 1n);
       f.parent = r;
       r.kids.set(`1|0p0|0p0`, f);
       this.root = r;
@@ -113,7 +115,7 @@ export function localCamera(c: FrameCamera): Camera {
   return { center: { x: c.x, y: c.y }, zi, zf: c.z - zi, pz: c.pz };
 }
 
-function fromLocal(f: Frame, cam: Camera): FrameCamera {
+export function fromLocal(f: Frame, cam: Camera): FrameCamera {
   return { f, x: cam.center.x, y: cam.center.y, z: cam.zi + cam.zf, pz: cam.pz };
 }
 
@@ -255,10 +257,22 @@ function sumTerms(ts: Terms): D.Dyadic {
  * then down to `f`, stopping as soon as the point is far. Every number stays
  * small (see Terms), so the cost is the path length, not the depth in bits.
  *
- * For drawing only: terms below 2^-DRAW_BITS of `f`'s unit are dropped (far
- * below 10^-6 px at any zoom the frame allows). Exact work uses expressExactIn.
+ * For drawing only: terms below 2^-bits of `f`'s unit are dropped (by
+ * default DRAW_BITS: far below 10^-6 px at any zoom the frame allows).
+ * Exact work uses expressExactIn.
  */
-export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame): WorldPoint | null {
+export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, bits = DRAW_BITS): WorldPoint | null {
+  const w = walk(space, g, p, f, FAR_LOG2, bits);
+  return w && { x: sumTerms(w.x), y: sumTerms(w.y) };
+}
+
+/** A point of frame `g` in frame `f`'s units at any distance, to a relative error below 2^(1−GAP): for read-outs. */
+export function approxIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame): WorldPoint {
+  const w = walk(space, g, p, f, Infinity, DRAW_BITS)!;
+  return { x: w.x[0] ?? D.ZERO, y: w.y[0] ?? D.ZERO };
+}
+
+function walk(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, far: number, bits: number): { x: Terms; y: Terms } | null {
   const pathF = space.path(f);
   const onF = new Set(pathF);
   let x: Terms = addTerm(p.x, []);
@@ -266,19 +280,19 @@ export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame):
   let a = g;
   while (!onF.has(a)) {
     const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
-    const q = -(DRAW_BITS + levelsBetween(up, f));
+    const q = -(bits + levelsBetween(up, f));
     x = addTerm(a.ox, shiftTerms(x, -K * Number(a.n), q));
     y = addTerm(a.oy, shiftTerms(y, -K * Number(a.n), q));
     a = up;
   }
   for (let i = pathF.indexOf(a) + 1; i < pathF.length; i++) {
     const d = pathF[i]!;
-    const q = -(DRAW_BITS + levelsBetween(d, f));
+    const q = -(bits + levelsBetween(d, f));
     x = shiftTerms(addTerm(D.neg(d.ox), x), K * Number(d.n), q);
     y = shiftTerms(addTerm(D.neg(d.oy), y), K * Number(d.n), q);
-    if (leadLog2(x) > FAR_LOG2 + 1 || leadLog2(y) > FAR_LOG2 + 1) return null;
+    if (leadLog2(x) > far + 1 || leadLog2(y) > far + 1) return null;
   }
-  return { x: sumTerms(x), y: sumTerms(y) };
+  return { x, y };
 }
 
 /** Levels by which frame `f` is finer than frame `g` (positive when f is deeper). */

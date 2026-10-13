@@ -1,11 +1,13 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { lookAt, worldToScreen } from "../core/camera";
+import { fromLocal } from "../core/frames";
+import { cameraIn } from "../scene/frame-index";
 import type { ViewState } from "../app/view-state";
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { TextObject } from "../doc/model";
-import { newObjectId } from "../doc/model";
+import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
@@ -94,7 +96,8 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
 
   const position = (): void => {
     if (!target) return;
-    const cam = view.camera;
+    // The camera in the text's frame (ADR 0014); the text is near the view, so this is cheap.
+    const cam = cameraIn(view.frameCamera, target.frame ?? doc.space.world) ?? view.camera;
     const s = worldToScreen(cam, view.viewport, target.anchor);
     const ppu = 2 ** (target.unit + cam.zi + cam.zf);
     const em = target.size * ppu;
@@ -111,7 +114,8 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
 
   /** Zoom so the text is at a readable size, with its top-left corner in view. */
   const zoomToEdit = (o: TextObject): void => {
-    const cam = view.camera;
+    const of = o.frame ?? doc.space.world;
+    const cam = cameraIn(view.frameCamera, of) ?? { zi: -Infinity, zf: 0 };
     const px = Math.log2(o.size) + o.unit + cam.zi + cam.zf;
     if (px >= Math.log2(MIN_EDIT_PX) && px <= Math.log2(MAX_EDIT_PX)) return;
     const level = Math.log2(NEW_TEXT_PX / o.size) - o.unit;
@@ -122,7 +126,7 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     const dx = Math.min((o.w / o.size) * NEW_TEXT_PX, vp.width - 64) / 2;
     const dy = Math.min(l.height * NEW_TEXT_PX, vp.height - 160) / 2;
     const off = (px: number): D.Dyadic => D.shift(D.fromNumber(px / 2 ** zf), -zi);
-    view.setCamera(lookAt({ x: D.add(o.anchor.x, off(dx)), y: D.add(o.anchor.y, off(dy)) }, zi, zf));
+    view.setFrameCamera(fromLocal(of, lookAt({ x: D.add(o.anchor.x, off(dx)), y: D.add(o.anchor.y, off(dy)) }, zi, zf)));
   };
 
   const close = (): void => {
@@ -146,7 +150,7 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     close();
     const cur = doc.get(o.id);
     if (wasNew || !cur || cur.kind !== "text") {
-      if (md) doc.commit(doc.transaction("Add text", [normalizeUnit({ ...o, md, z: doc.topZ() + 1 })]));
+      if (md) doc.commit(doc.transaction("Add text", [homeObject(normalizeUnit({ ...o, md, z: doc.topZ() + 1 }), doc.space)]));
     } else if (!md) {
       doc.commit(doc.transaction("Delete text", [], [o.id]));
       editor.selection.delete(o.id);
@@ -170,7 +174,9 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
       const size = NEW_TEXT_PX / f;
       // The click point is the middle of the first line.
       const anchor = { x: at.x, y: D.sub(at.y, D.shift(D.fromNumber(size * 0.65), unit)) };
-      target = { id: newObjectId(), kind: "text", anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: NEW_TEXT_WRAP_PX / f, size, color: editor.penColor };
+      // `at` is in the camera frame's coordinates: the new text starts there.
+      const frame = view.frame === doc.space.world ? {} : { frame: view.frame };
+      target = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: NEW_TEXT_WRAP_PX / f, size, color: editor.penColor };
       isNew = true;
     }
     box.innerHTML = blocksToHtml(parse(target.md));

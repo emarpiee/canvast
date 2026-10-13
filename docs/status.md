@@ -28,23 +28,40 @@ Unverified / Committed / Next bounded task**.
 dives, giant jumps (capped at 2^50 levels each), term-sum point walks,
 re-homing; debug overlay, jump panel, HUD and `__spike` hook. ADR 0014
 accepted 2026-10-14. Technical reference written.
+Step 3 slice 1 (the app on frames): `src/core/frames.ts`; camera in frames
+(`ViewState`); objects carry a frame and are re-homed on load and edit;
+one spatial index per frame with the camera expressed per frame
+(`scene/frame-index.ts`); far-finer frames as density dots; gestures,
+previews, text editor, image placement, HUD (BigInt depth), dev panel and
+debug hook frame-aware; one jump up to 2^50 levels (was 10^7).
 
 **Tested:** `tests/unit/frames.test.ts` (camera bit-identical to the
 absolute system, strokes within 10^-6 px, boundary rules, depth stress, one
 test per regression found); `scripts/spike-measure.mjs` (flat frame time
 2^10 to 2^10^12, 0 px drift, fuzz 3 × 2,500 steps in both browsers, no step
-over 250 ms). Unit suite 105/105. The E2E suite has not run on this branch.
+over 250 ms). Step 3 slice 1, quick suite (2026-10-14, run in a scratch
+copy so `dist/` was not rebuilt): unit 108/108; E2E 262/265, the 3
+failures being the timing-sensitive dense-scene zoom-preview tile tests
+(they fail at the same rate on `main` on this machine: 1 in 12 each);
+offline and names checks pass. New `tests/e2e/frames.spec.ts`: work at
+2^10^12, a stroke drawn while wheel-zooming across frame changes, and
+−10^12 five times then wheel, keys, drag pan and Home, in all four projects.
 
 **Known failures:** coarse objects covering the view from more than
-100,000 levels below are not drawn in the spike (marked shortcut).
+100,000 levels below, and frames more than 100,000 levels finer, are not
+drawn exactly (marked shortcuts; far-finer content shows as a dot). Saving
+is absolute until step 4: objects deeper than 2^24 levels stay queued with
+a save error, and the view is not saved there. The Firefox dense-scene
+zoom-preview tile test fails on this machine on `main` too (timing, see 1g).
 
 **Unverified:** storage, spatial index, images, text, selection and
 editing on frames (steps 3–4).
 
 **Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
 
-**Next bounded task:** step 3, slice 1: camera and drawing on frames in
-the app.
+**Next bounded task:** step 3, slice 2: the carried near-edge set for
+coarse objects (removes the 100,000-level limit), then step 4 (storage
+with frames, removes the 2^24 save limit).
 
 ## Phase 0A — endless navigation proof
 

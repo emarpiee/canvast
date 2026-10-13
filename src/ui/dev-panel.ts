@@ -1,4 +1,3 @@
-import { zoomAt } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 import { zoomByStep } from "../interaction/navigation";
 
@@ -45,8 +44,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState): void {
     if (!dir) return;
     const dt = Math.min(0.1, (t - last) / 1000); // cap after a stalled frame
     last = t;
-    const vp = view.viewport;
-    view.setCamera(zoomAt(view.camera, vp, { x: vp.width / 2, y: vp.height / 2 }, dir * Number(select.value) * dt));
+    view.zoomBy(dir * Number(select.value) * dt);
     raf = requestAnimationFrame(tick);
   };
 

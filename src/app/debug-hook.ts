@@ -10,7 +10,12 @@ import { findLandmark } from "../scene/landmarks";
 import type { ViewState } from "./view-state";
 import type { FrameBreakdown, FrameStats } from "./frame-stats";
 import type { BenchScene } from "./bench";
-import type { SpatialIndex } from "../scene/spatial-index";
+import type { FrameIndex } from "../scene/frame-index";
+import type { CanvasObject } from "../doc/model";
+import { worldForm } from "../doc/model";
+import { cameraIn } from "../scene/frame-index";
+import type { WorldPoint } from "../core/camera";
+import { approxIn, depthOf, expressExactIn, expressIn, levelsBetween } from "../core/frames";
 import { generateBenchScene } from "./bench";
 import { panBy, zoomAt } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
@@ -41,6 +46,12 @@ import { localToWorld } from "../doc/edit-ops";
  */
 export interface DebugHook {
   camera(): SerializedCamera;
+  /** Zoom by any number of levels (≤ 2^50) about the centre, in frames: cheap at any depth (ADR 0014). */
+  jump(levels: number): void;
+  /** Absolute zoom level as a BigInt string (exact at any depth). */
+  depth(): string;
+  /** Each object's frame: level (BigInt string, K-steps below the world frame) and id; world-frame objects have level "0". */
+  objectFrames(): Array<{ id: string; kind: string; level: string; frame: number | null }>;
   setCamera(cam: SerializedCamera): void;
   viewport(): { width: number; height: number };
   worldToScreen(x: string, y: string): ScreenPoint;
@@ -136,7 +147,7 @@ export interface DebugDeps {
   editor: EditorState;
   session: Session;
   renderNow: () => FrameBreakdown;
-  index: SpatialIndex;
+  index: FrameIndex;
   appView: () => AppView;
   setView: (v: AppView) => void;
   tiles: TileCache;
@@ -190,7 +201,8 @@ export function installDebugHook(
     return { p50: at(50), p95: at(95), p99: at(99), max: s[s.length - 1] ?? 0 };
   };
   const glyphOf = (id: string, n: number): { o: TextObject; line: Line; g: PlacedGlyph } => {
-    const o = doc.get(id);
+    const stored = doc.get(id);
+    const o = stored && worldForm(stored); // the hook speaks world coordinates
     if (!o || o.kind !== "text") throw new Error(`no text ${id}`);
     let i = 0;
     for (const line of layoutText(o.md, o.w / o.size).lines) {
@@ -198,20 +210,31 @@ export function installDebugHook(
     }
     throw new Error(`text ${id} has no character ${n}`);
   };
+  // The hook speaks world-frame (absolute) coordinates, as before frames (ADR 0014); conversions are exact or within 2^-192 frame units.
+  const toView = (p: WorldPoint): WorldPoint => expressIn(doc.space, doc.space.world, p, view.frame) ?? approxIn(doc.space, doc.space.world, p, view.frame);
+  /** The camera in an object's frame, or null when the object cannot be on screen. */
+  const camFor = (o: CanvasObject) => cameraIn(view.frameCamera, o.frame ?? doc.space.world);
   const hook: DebugHook = {
-    camera: () => serializeCamera(view.camera),
-    setCamera: (c) => view.setCamera(deserializeCamera(c)),
+    camera: () => serializeCamera(view.worldCamera()),
+    jump: (levels) => view.zoomBy(levels),
+    depth: () => {
+      const d = depthOf(view.frameCamera);
+      return `${d.levels}`;
+    },
+    objectFrames: () => doc.ordered().map((o) => ({ id: o.id, kind: o.kind, level: `${o.frame?.level ?? 0n}`, frame: o.frame?.id ?? null })),
+    setCamera: (c) => view.setWorldCamera(deserializeCamera(c)),
     viewport: () => ({ ...view.viewport }),
-    worldToScreen: (x, y) => worldToScreen(view.camera, view.viewport, { x: D.parse(x), y: D.parse(y) }),
+    worldToScreen: (x, y) => worldToScreen(view.camera, view.viewport, toView({ x: D.parse(x), y: D.parse(y) })),
     screenToWorld: (x, y) => {
-      const p = screenToWorld(view.camera, view.viewport, { x, y });
+      const p = expressExactIn(doc.space, view.frame, screenToWorld(view.camera, view.viewport, { x, y }), doc.space.world);
       return { x: D.toString(p.x), y: D.toString(p.y) };
     },
     landmarkScreen: (id) => {
       const lm = findLandmark(id);
       if (!lm) throw new Error(`unknown landmark ${id}`);
-      const s = worldToScreen(view.camera, view.viewport, lm.center);
-      return { ...s, sizePx: 2 ** (lm.sizeExp + view.camera.zi + view.camera.zf) };
+      const s = worldToScreen(view.camera, view.viewport, toView(lm.center));
+      const d = levelsBetween(doc.space.world, view.frame);
+      return { ...s, sizePx: 2 ** (lm.sizeExp + d + view.camera.zi + view.camera.zf) };
     },
     frameTimes: () => stats.snapshot(),
     resetFrameTimes: () => stats.reset(),
@@ -257,7 +280,8 @@ export function installDebugHook(
     objectScreen: (id) => {
       const o = doc.get(id);
       if (!o) throw new Error(`no object ${id}`);
-      const po = projectObject(o, view.camera, view.viewport, { keepTiny: true });
+      const cam = camFor(o);
+      const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? { box: { ...po.box }, q: [...po.q], radius: po.radius } : null;
     },
     canUndo: () => doc.canUndo,
@@ -293,7 +317,8 @@ export function installDebugHook(
     strokeEdgeDistance: (id, x, y) => {
       const o = doc.get(id);
       if (!o || o.kind !== "stroke") throw new Error(`no stroke ${id}`);
-      const po = projectObject(o, view.camera, view.viewport, { keepTiny: true });
+      const cam = camFor(o);
+      const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? exactStrokeEdgeDistancePx(po, x, y) : Infinity;
     },
     benchLoad: (scene) => {
@@ -301,7 +326,7 @@ export function installDebugHook(
       const { objects, camera } = generateBenchScene(scene);
       const t1 = performance.now();
       doc.load(objects);
-      view.setCamera(camera);
+      view.setWorldCamera(camera);
       const t2 = performance.now();
       return { objects: objects.length, generateMs: t1 - t0, loadMs: t2 - t1, heapMB: heapMB() };
     },
@@ -348,15 +373,17 @@ export function installDebugHook(
     heapMB,
     indexStats: () => {
       const t0 = performance.now();
-      const q = deps.index.query(view.camera, view.viewport);
+      const views = deps.index.views(view.frameCamera);
+      const qs = views.map((v) => v.index.query(v.cam, view.viewport));
       const queryMs = performance.now() - t0;
+      const sum = (k: "levelsVisited" | "levelsSkippedSubPixel" | "cellsProbed" | "candidates"): number => qs.reduce((a, q) => a + q[k], 0);
       return {
         objects: deps.index.size,
-        levels: deps.index.levelCount,
-        levelsVisited: q.levelsVisited,
-        levelsSkippedSubPixel: q.levelsSkippedSubPixel,
-        cellsProbed: q.cellsProbed,
-        candidates: q.candidates,
+        levels: views.reduce((a, v) => a + v.index.levelCount, 0),
+        levelsVisited: sum("levelsVisited"),
+        levelsSkippedSubPixel: sum("levelsSkippedSubPixel"),
+        cellsProbed: sum("cellsProbed"),
+        candidates: sum("candidates"),
         queryMs,
       };
     },

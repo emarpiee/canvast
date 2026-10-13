@@ -4,13 +4,19 @@ import { lookAt, panBy, zoomAt } from "../../src/core/camera";
 import type { Camera } from "../../src/core/camera";
 import { DocumentStore } from "../../src/doc/document-store";
 import type { CanvasObject, StrokeObject } from "../../src/doc/model";
-import { newObjectId } from "../../src/doc/model";
+import { newObjectId, worldForm } from "../../src/doc/model";
+import { FrameIndex } from "../../src/scene/frame-index";
+import { fjump, fpanBy, fromAbsoluteCamera } from "../../src/core/frames";
+import type { FrameCamera } from "../../src/core/frames";
 import { translate } from "../../src/doc/edit-ops";
 import { SpatialIndex, objectLevel, syncIndex } from "../../src/scene/spatial-index";
 import { projectObject } from "../../src/render/projection";
 import { visibleObjects } from "../../src/render/scene-view";
 import { generateBenchScene } from "../../src/app/bench";
 import { rng } from "./rng";
+
+/** An absolute camera as a frame camera in the document's frames (exact). */
+const frameCam = (doc: DocumentStore, cam: Camera): FrameCamera => fromAbsoluteCamera(doc.space, cam.center, cam.zi + cam.zf, cam.pz);
 
 const VP = { width: 1280, height: 800 };
 
@@ -66,20 +72,22 @@ describe("spatial index", () => {
 
   it("visibleObjects through the index equals the brute-force exact result, in paint order", () => {
     const doc = new DocumentStore();
-    const index = new SpatialIndex();
+    const index = new FrameIndex(() => doc.space);
     syncIndex(doc, index);
     const objs = randomScene(3, 2000);
     doc.load(objs);
+    expect([...doc.all()].filter((o) => o.frame).length, "objects homed into other frames").toBeGreaterThan(100);
     const r = rng(4);
     let maxBoxErr = 0;
     for (let i = 0; i < 150; i++) {
       const target = objs[Math.floor(r() * objs.length)]!;
       const cam = lookAt(target.anchor, -target.unit + Math.floor((r() - 0.5) * 16), r());
-      const vis = visibleObjects(doc, index, null, cam, VP);
+      // Objects live in frames (ADR 0014); the result must equal the absolute brute force.
+      const vis = visibleObjects(doc, index, null, frameCam(doc, cam), VP);
       expect(vis.map((p) => p.obj.id).sort()).toEqual(bruteVisible(objs, cam));
       for (let k = 1; k < vis.length; k++) expect(vis[k - 1]!.obj.z).toBeLessThanOrEqual(vis[k]!.obj.z);
       for (const p of vis) {
-        const exact = projectObject(p.obj, cam, VP)!;
+        const exact = projectObject(worldForm(p.obj), cam, VP)!;
         for (const key of ["minX", "minY", "maxX", "maxY"] as const) {
           maxBoxErr = Math.max(maxBoxErr, Math.abs(p.box[key] - exact.box[key]));
         }
@@ -90,9 +98,68 @@ describe("spatial index", () => {
     expect(maxBoxErr).toBeLessThan(1e-6);
   });
 
+  it("objects across ±300 levels in many frames: visible set equals the absolute brute force", () => {
+    const doc = new DocumentStore();
+    const index = new FrameIndex(() => doc.space);
+    syncIndex(doc, index);
+    const r = rng(9);
+    const objs: CanvasObject[] = [];
+    for (let i = 0; i < 600; i++) {
+      // Clusters at a few depths, so views see content of several frames at once.
+      const unit = [-300, -150, -40, 0, 40, 150, 300][i % 7]! + Math.floor((r() - 0.5) * 70);
+      const x = D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 14)), unit + 2);
+      const y = D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 14)), unit + 2);
+      objs.push(stroke(x, y, unit, [0, 0, (r() - 0.5) * 300, (r() - 0.5) * 300], 1 + r() * 20, i));
+    }
+    doc.load(objs);
+    expect(new Set([...doc.all()].map((o) => o.frame)).size).toBeGreaterThan(8);
+    for (let i = 0; i < 200; i++) {
+      const t = objs[Math.floor(r() * objs.length)]!;
+      const cam = lookAt(t.anchor, -t.unit + Math.floor((r() - 0.5) * 40), r());
+      const vis = visibleObjects(doc, index, null, frameCam(doc, cam), VP);
+      expect(vis.map((p) => p.obj.id).sort()).toEqual(bruteVisible(objs, cam));
+    }
+  });
+
+  it("content far finer than the camera becomes one density dot, cheaply, at its screen position", () => {
+    const doc = new DocumentStore();
+    const index = new FrameIndex(() => doc.space);
+    syncIndex(doc, index);
+    doc.load([stroke(D.ZERO, D.ZERO, 0, [0, 0, 100, 50]), stroke(D.fromBigInt(3n, -1_000_000), D.ZERO, -1_000_010, [0, 0, 100, 50])]);
+    for (const out of [-4e12, -1e6, -200]) {
+      let fc: FrameCamera = { f: doc.space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
+      for (let left = out; left < 0; left -= Math.max(left, -1e12)) fc = fjump(doc.space, fc, Math.max(left, -1e12));
+      fc = fpanBy(doc.space, fc, 300, -120); // the home content is now 300 px right of, 120 px above the centre
+      const t0 = performance.now();
+      const views = index.views(fc);
+      const dots = index.dots(fc);
+      expect(performance.now() - t0, `${out}: no numbers of ~depth bits`).toBeLessThan(500);
+      expect(views.length + dots.length).toBeGreaterThan(0);
+      for (const d of dots) {
+        expect(Math.abs(d.dx - 300)).toBeLessThan(1);
+        expect(Math.abs(d.dy + 120)).toBeLessThan(1);
+      }
+    }
+    // Content straddling a frame corner (frames at cells −1 and 0): the dots sit on the content, not on the corners.
+    const far = D.fromBigInt(1234567891n, 0);
+    const c2 = new DocumentStore();
+    const ix2 = new FrameIndex(() => c2.space);
+    syncIndex(c2, ix2);
+    c2.load([-80, -40, 0, 40].map((px, i) => stroke(D.add(far, D.fromBigInt(BigInt(px), -60)), D.sub(far, D.fromBigInt(60n, -60)), -60, [0, 0, 25, 12], 3, i)));
+    expect(new Set([...c2.all()].map((o) => o.frame)).size, "content spans two frames").toBe(2);
+    const look: FrameCamera = fromAbsoluteCamera(c2.space, { x: D.sub(far, D.fromNumber(260)), y: D.sub(far, D.fromNumber(100)) }, 0, 0);
+    for (const d of ix2.dots(look)) {
+      expect(Math.floor(640 + d.dx)).toBe(900);
+      expect(Math.floor(400 + d.dy)).toBe(500);
+    }
+    // From home, the stroke 10^6 levels down is a dot too.
+    const home: FrameCamera = { f: doc.space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
+    expect(index.dots(home).length).toBe(1);
+  });
+
   it("stays consistent through incremental moves, deletes, undo and redo", () => {
     const doc = new DocumentStore();
-    const index = new SpatialIndex();
+    const index = new FrameIndex(() => doc.space);
     syncIndex(doc, index);
     const objs = randomScene(5, 500);
     doc.load(objs);
@@ -105,12 +172,12 @@ describe("spatial index", () => {
       if (r() < 0.3) doc.undo();
       if (r() < 0.1) doc.redo();
     }
-    const fresh = new SpatialIndex();
+    const fresh = new FrameIndex(() => doc.space);
     fresh.rebuild(doc.all());
     expect(index.size).toBe(doc.size);
     for (let i = 0; i < 50; i++) {
-      const t = [...doc.all()][Math.floor(r() * doc.size)]!;
-      const cam = lookAt(t.anchor, -t.unit + Math.floor((r() - 0.5) * 10));
+      const t = worldForm([...doc.all()][Math.floor(r() * doc.size)]!);
+      const cam = frameCam(doc, lookAt(t.anchor, -t.unit + Math.floor((r() - 0.5) * 10)));
       const a = visibleObjects(doc, index, null, cam, VP).map((p) => p.obj.id);
       const b = visibleObjects(doc, fresh, null, cam, VP).map((p) => p.obj.id);
       expect(a).toEqual(b);

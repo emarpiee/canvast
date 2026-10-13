@@ -1,0 +1,120 @@
+import { expect, recordMetric, test } from "./harness";
+import type { App } from "./harness";
+
+/**
+ * Nested frames (ADR 0014): work at any depth costs the same, and every
+ * input path (jumps, wheel, keys, drag pan, Home) works in both directions.
+ * Before frames a pan took 5.9 s at 2^1,000,000 and 2^10^12 was unreachable.
+ */
+
+/** Slowest acceptable input step (input plus the frames it causes). */
+const MAX_STEP_MS = 500;
+
+type Box = { minX: number; minY: number; maxX: number; maxY: number };
+
+async function boxOf(app: App, id: string): Promise<Box | null> {
+  const s = await app.page.evaluate((i) => window.__canvastDebug.objectScreen(i), id);
+  return s && s.box;
+}
+
+function timer(app: App): { timed: (fn: () => Promise<void>) => Promise<void>; steps: number[] } {
+  const steps: number[] = [];
+  return {
+    steps,
+    timed: async (fn) => {
+      const t0 = Date.now();
+      await fn();
+      await app.frame();
+      steps.push(Date.now() - t0);
+    },
+  };
+}
+
+test("at 2^10^12 (reached by a jump) drawing, selecting, moving, undo, redo and panning stay fast and exact", async ({ app }, info) => {
+  const p = app.page;
+  const { timed, steps } = timer(app);
+  await timed(() => p.evaluate(() => window.__canvastDebug.jump(1e12)));
+  expect(await p.evaluate(() => window.__canvastDebug.depth())).toBe("1000000000000");
+  await p.mouse.click(640, 400);
+  for (let i = 0; i < 4; i++) await timed(() => p.keyboard.press("ArrowRight"));
+
+  await p.keyboard.press("p");
+  await timed(() => app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 6));
+  const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  expect(s?.kind).toBe("stroke");
+  expect(BigInt(s!.level), "the stroke lives in a deep frame").toBeGreaterThan(10n ** 10n);
+  const drawn = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), s!.id))!;
+  expect(Math.abs(drawn.q[0]! - 500) + Math.abs(drawn.q[1]! - 400), "first point under the pointer").toBeLessThan(1);
+
+  await p.keyboard.press("v");
+  await timed(() => p.mouse.click(600, 425));
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([s!.id]);
+  await timed(() => app.drag({ x: 600, y: 425 }, { x: 650, y: 475 }, 6));
+  const moved = (await boxOf(app, s!.id))!;
+  expect(moved.minX - drawn.box.minX).toBeCloseTo(50, 0);
+  expect(moved.minY - drawn.box.minY).toBeCloseTo(50, 0);
+
+  await timed(() => p.keyboard.press("Control+z"));
+  expect(await boxOf(app, s!.id)).toEqual(drawn.box);
+  await timed(() => p.keyboard.press("Control+y"));
+  expect(await boxOf(app, s!.id)).toEqual(moved);
+
+  // Pan away and back: the stroke returns to exactly the same pixels.
+  for (const k of ["ArrowLeft", "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight", "ArrowRight"]) await timed(() => p.keyboard.press(k));
+  expect(await boxOf(app, s!.id)).toEqual(moved);
+
+  // Saving deeper than 2^24 levels waits for storage that holds frames (plan step 4): reported, never hung.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("error");
+
+  recordMetric(info, "work at 2^10^12", { maxStepMs: Math.max(...steps), steps });
+  expect(Math.max(...steps)).toBeLessThan(MAX_STEP_MS);
+});
+
+test("a stroke drawn while wheel-zooming across frame changes stays under the pointer", async ({ app }) => {
+  const p = app.page;
+  await p.mouse.click(640, 400);
+  await p.keyboard.press("p");
+  await p.mouse.move(400, 400);
+  await p.mouse.down();
+  await p.mouse.move(500, 400, { steps: 5 });
+  // Past 40 levels about the pointer: the camera changes frame at least once mid-stroke.
+  // (Levels per notch depend on the device pixel ratio, so wheel until there.)
+  for (let i = 0; i < 400 && Number(await p.evaluate(() => window.__canvastDebug.depth())) <= 40; i++) await app.wheel(500, 400, -100);
+  await p.mouse.move(600, 420, { steps: 5 });
+  await p.mouse.up();
+  await app.frame();
+  const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  expect(s?.kind).toBe("stroke");
+  const q = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), s!.id))!.q;
+  // The point drawn before zooming stays at the zoom anchor; the last one is under the pointer.
+  let nearAnchor = Infinity;
+  for (let i = 0; i < q.length; i += 2) nearAnchor = Math.min(nearAnchor, Math.hypot(q[i]! - 500, q[i + 1]! - 400));
+  expect(nearAnchor).toBeLessThan(1);
+  expect(Math.hypot(q[q.length - 2]! - 600, q[q.length - 1]! - 420)).toBeLessThan(1);
+  expect(Number(await p.evaluate(() => window.__canvastDebug.depth()))).toBeGreaterThan(40);
+});
+
+test("after giant zoom-outs (−10^12 five times) wheel, keys, drag pan and Home stay fast and return exactly", async ({ app }, info) => {
+  const p = app.page;
+  const { timed, steps } = timer(app);
+  await p.mouse.click(640, 400);
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 6);
+  const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  const home = (await boxOf(app, s!.id))!;
+
+  // In, then far out: the camera ends 4·10^12 levels above home.
+  await timed(() => p.evaluate(() => window.__canvastDebug.jump(1e12)));
+  for (let i = 0; i < 5; i++) await timed(() => p.evaluate(() => window.__canvastDebug.jump(-1e12)));
+  expect(await p.evaluate(() => window.__canvastDebug.depth())).toBe("-4000000000000");
+  for (let i = 0; i < 20; i++) await timed(() => app.wheel(640, 400, i < 10 ? -240 : 240));
+  for (const k of ["+", "+", "-", "-", "ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"]) await timed(() => p.keyboard.press(k));
+  await p.keyboard.press("h");
+  await timed(() => app.drag({ x: 600, y: 400 }, { x: 300, y: 250 }, 8));
+  await timed(() => p.keyboard.press("Home"));
+
+  expect(await app.camera()).toEqual({ cx: "0p0", cy: "0p0", zi: 0, zf: 0, pz: 0 });
+  expect(await boxOf(app, s!.id)).toEqual(home);
+  recordMetric(info, "zoom out 5e12 then every input", { maxStepMs: Math.max(...steps) });
+  expect(Math.max(...steps)).toBeLessThan(MAX_STEP_MS);
+});

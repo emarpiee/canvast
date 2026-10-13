@@ -289,7 +289,22 @@ camera frame, updated on rebase down by `c' = (c − n · cell) · 2^K` (exact,
 small), dropped when it leaves the view for good, with the object's
 covers/misses state recorded instead. See the plan, §3.
 
-## 8. Complexity
+## 8. In the app (step 3)
+
+| Piece | Where | How |
+| --- | --- | --- |
+| Camera | `app/view-state.ts` | Holds a `FrameCamera`. `view.camera` is the ordinary camera in the coordinates of `view.frame`, so pan and zoom code is unchanged; `setCamera` rebases. Zoom changes beyond one step (K levels) go through `fjump`. `worldCamera()` / `setWorldCamera()` convert exactly to and from the absolute form |
+| Objects | `doc/model.ts` | Optional `frame` (absent = world frame). `homeObject` re-homes exactly (6); `worldForm` gives the absolute form; `expressObjectIn` compares objects of different frames |
+| Document | `doc/document-store.ts` | Owns the `FrameSpace`; `load` re-homes every object. Edits re-home before the transaction is built, so undo compares the same object states |
+| Index | `scene/frame-index.ts` | One `SpatialIndex` per frame, in that frame's own coordinates, so index cells stay small integers |
+| Drawing and picking | `cameraIn(fc, g)` | Instead of converting objects, the **camera** is expressed in each frame with content and that frame's objects go through the unchanged index query, projection, tile cache and density preview. Finer or nearby frames (L ≤ 0 levels coarser): g's origin found in the camera frame with `DRAW_BITS − L` bits, then `centre_g = (centre_f − origin) · 2^(−L)`. Coarser frames (L > 0): the camera centre carried up with `DRAW_BITS + L` bits. Either way skipped beyond 100,000 levels (shortcut until the near-edge set and per-frame ink summaries) |
+| Far-finer frames | `FrameIndex.dots` | A frame whose whole content is below a pixel (`z + L + K + H + 2 < log2(MIN_CELL_PX) − 8`) is not queried in its own units: there the camera centre would be a number of ~|L| bits (a hang found by the zoom-out tests). It is drawn as **one density dot** at its origin's screen position, with the index's running ink total (`SpatialIndex.total`, area × 4^level). Cost: one cheap walk per frame |
+| Gestures | `interaction/tools.ts`, `app/editor-state.ts` | A draft stroke, a move's start point and a resize's fixed point stay in the frame where the gesture began; points arriving after a rebase are converted exactly. Previews convert a displacement by an exact shift, `d_g = d_f · 2^(−levels(g→f))`, and a fixed point by `expressExactIn` |
+| Backdrop | `worldBackdrop` | The world axes (each coordinate separately) and landmarks re-expressed in the camera frame once per frame change. The grid needs nothing: its spacing (≤ 2^22 frame units) divides every frame corner (a multiple of 2^32) |
+| Storage (until step 4) | `serializeObject`, `CanvasPersistence` | Still absolute: objects and the saved view are converted with `worldForm` / `worldCamera`. Deeper than 2^24 levels that number is too large: such objects stay queued with a save error shown, the rest still saves, and the last saved view is kept |
+| Debug hook | `app/debug-hook.ts` | Same absolute interface for the tests, plus `jump`, `depth` and `objectFrames` |
+
+## 9. Complexity
 
 | Operation | Cost | Independent of depth |
 | --- | --- | --- |
@@ -300,7 +315,7 @@ covers/misses state recorded instead. See the plan, §3.
 | Coarse object covering the view, Δ levels below | O(Δ) bits until step 3 | **No** (open) |
 | Exact absolute conversion | O(depth) bits | No, by design; never per frame |
 
-## 9. Limits
+## 10. Limits
 
 | Limit | Value | Reason |
 | --- | --- | --- |
@@ -308,9 +323,12 @@ covers/misses state recorded instead. See the plan, §3.
 | One jump | 2^50 levels | Double zoom counts |
 | Long wheel zooms | One frame per 32 levels on the path (0.6 ms walk at 10^5 levels) | If it matters: merge chains of empty frames into a dive |
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
-| Coarse objects from > 100,000 levels below | Not drawn in the spike | §7.3, step 3 |
+| Coarse objects from > 100,000 levels below | Not drawn | §7.3, near-edge set (step 3) |
+| Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
+| Saving deeper than 2^24 levels | Objects stay queued with a save error; view not saved | Storage holds frames in step 4 |
+| Frames with content | Every one is visited per view change (cheap walks) | Cull by the frame tree when documents hold thousands of frames |
 
-## 10. Verification
+## 11. Verification
 
 | Claim | Evidence | Where |
 | --- | --- | --- |
@@ -326,7 +344,7 @@ covers/misses state recorded instead. See the plan, §3.
 Run: `npx vitest run tests/unit/frames.test.ts`;
 `node scripts/build-spike.mjs && node scripts/spike-measure.mjs`.
 
-## 11. Lessons (pitfalls to avoid in any implementation)
+## 12. Lessons (pitfalls to avoid in any implementation)
 
 1. **Never materialise a mixed-scale sum.** `offset + tiny` where the two
    are 10^9 levels apart is a 10^9-bit number. Keep term sums (§7.2), or
@@ -340,7 +358,7 @@ Run: `npx vitest run tests/unit/frames.test.ts`;
 5. **Rounding must commute with grid-aligned shifts** (4), or two exact
    systems disagree on ties.
 
-## 12. Glossary
+## 13. Glossary
 
 | Term | Meaning |
 | --- | --- |

@@ -1,5 +1,5 @@
-import type { Camera, Viewport } from "../core/camera";
-import type { SpatialIndex } from "../scene/spatial-index";
+import type { Viewport } from "../core/camera";
+import type { FrameDot, FrameView } from "../scene/frame-index";
 import { densityQuery } from "../scene/spatial-index";
 
 /**
@@ -33,20 +33,21 @@ export class DensityLayer {
   private canvas: HTMLCanvasElement | null = null;
   private acc = new Float32Array(0);
   private presence = new Uint8Array(0);
-  // Camera and viewport objects are replaced, never mutated: identity is the cache key.
-  private lastCam: Camera | null = null;
+  // View lists (one per camera, see FrameIndex.views) and viewports are replaced, never mutated: identity is the cache key.
+  private lastViews: readonly FrameView[] | null = null;
   private lastVp: Viewport | null = null;
   private lastRev = -1;
   private cached: { x: number; y: number; w: number; h: number } | null = null;
 
   /** Draw the preview for this frame into `ctx` (transform: CSS px → device). */
-  draw(ctx: CanvasRenderingContext2D, index: SpatialIndex, cam: Camera, vp: Viewport, docRevision: number): void {
+  /** `dots`: frames whose whole content is below a pixel (FrameIndex.dots), drawn as points. */
+  draw(ctx: CanvasRenderingContext2D, views: readonly FrameView[], dots: readonly FrameDot[], vp: Viewport, docRevision: number): void {
     if (!this.enabled) return;
-    if (cam !== this.lastCam || vp !== this.lastVp || docRevision !== this.lastRev) {
-      this.lastCam = cam;
+    if (views !== this.lastViews || vp !== this.lastVp || docRevision !== this.lastRev) {
+      this.lastViews = views;
       this.lastVp = vp;
       this.lastRev = docRevision;
-      this.cached = index.hasSubPixelLevels(cam) ? this.render(index, cam, vp) : null;
+      this.cached = dots.length || views.some((v) => v.index.hasSubPixelLevels(v.cam)) ? this.render(views, dots, vp) : null;
       if (!this.cached) this.lastCells = 0;
     }
     const c = this.cached;
@@ -54,10 +55,15 @@ export class DensityLayer {
   }
 
   /** Accumulate and rasterize; returns the touched rectangle (CSS px) or null. */
-  private render(index: SpatialIndex, cam: Camera, vp: Viewport): { x: number; y: number; w: number; h: number } | null {
-    const q = densityQuery(index, cam, vp, 2);
-    this.lastCells = q.cells.length;
-    if (!q.cells.length) return null;
+  private render(views: readonly FrameView[], dots: readonly FrameDot[], vp: Viewport): { x: number; y: number; w: number; h: number } | null {
+    // Each frame's squares come from its own index, queried with the camera in its coordinates.
+    const cells = views.flatMap((v) => densityQuery(v.index, v.cam, vp, 2).cells);
+    for (const d of dots) {
+      const size = 2 ** -11; // a point (see below)
+      cells.push({ x: vp.width / 2 + d.dx, y: vp.height / 2 + d.dy, size, cover: d.areaPx / size / size, r: d.ink.r / d.ink.a, g: d.ink.g / d.ink.a, b: d.ink.b / d.ink.a });
+    }
+    this.lastCells = cells.length;
+    if (!cells.length) return null;
     const W = Math.ceil(vp.width);
     const H = Math.ceil(vp.height);
     if (this.acc.length < W * H * 5) {
@@ -85,7 +91,7 @@ export class DensityLayer {
       acc[i + 4] = acc[i + 4]! + wt * c.b;
       touch(px, py);
     };
-    for (const c of q.cells) {
+    for (const c of cells) {
       if (c.size < 2 ** -10) {
         // Far below a pixel (possibly below one double step at this screen
         // position, so its edges would coincide): a point at its centre.

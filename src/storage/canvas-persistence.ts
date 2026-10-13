@@ -1,4 +1,6 @@
 import { serializeCamera } from "../core/camera";
+import { depthOf, levelsBetween } from "../core/frames";
+import { MAX_WORLD_FORM_LEVELS } from "../doc/model";
 import type { ViewState } from "../app/view-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId } from "../doc/model";
@@ -109,10 +111,19 @@ export class CanvasPersistence {
     this.dirty.clear();
     const puts: CanvasObject[] = [];
     const deletes: ObjectId[] = [];
+    // shortcut: objects deeper than 2^24 levels cannot be stored until storage holds frames (plan step 4); they stay queued, the rest is saved.
+    const waiting: ObjectId[] = [];
     for (const id of ids) {
       const o = this.doc.get(id);
-      if (o) puts.push(o);
+      if (o && o.frame && Math.abs(levelsBetween(o.frame.space.world, o.frame)) > MAX_WORLD_FORM_LEVELS) waiting.push(id);
+      else if (o) puts.push(o);
       else deletes.push(id);
+    }
+    if (!puts.length && !deletes.length) {
+      for (const id of waiting) this.dirty.add(id);
+      this.lastError = `${waiting.length} object(s) deeper than 2^24 levels are not saved yet (needs the storage update)`;
+      this.setState("error");
+      return;
     }
     const canvasId = this.canvasId;
     this.setState("saving");
@@ -129,7 +140,11 @@ export class CanvasPersistence {
         if (stored === result.revision) {
           this.lastVerifiedAt = Date.now();
           this.onCommitted?.(canvasId, result.revision);
-          if (this.dirty.size === 0) this.setState("verified");
+          if (waiting.length) {
+            for (const id of waiting) this.dirty.add(id);
+            this.lastError = `${waiting.length} object(s) deeper than 2^24 levels are not saved yet (needs the storage update)`;
+            this.setState("error");
+          } else if (this.dirty.size === 0) this.setState("verified");
         } else {
           throw new RevisionConflictError(canvasId, result.revision, stored ?? -1);
         }
@@ -155,8 +170,11 @@ export class CanvasPersistence {
 
   async saveCamera(): Promise<void> {
     if (!this.repo || !this.canvasId || !this.writable) return;
+    // shortcut: the saved view is absolute until storage holds frames (plan step 4); deeper than 2^24 levels it would be a huge number, so the last view saved is kept.
+    const depth = depthOf(this.view.frameCamera).levels;
+    if (depth > 2n ** 24n || depth < -(2n ** 24n)) return;
     try {
-      await this.repo.saveCamera(this.canvasId, serializeCamera(this.view.camera));
+      await this.repo.saveCamera(this.canvasId, serializeCamera(this.view.worldCamera()));
     } catch {
       // View state is a convenience; object saves report their own errors.
     }

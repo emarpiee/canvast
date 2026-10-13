@@ -1,4 +1,7 @@
 import type { Dyadic } from "../core/dyadic";
+import type { Frame } from "../core/frames";
+import { expressExactIn, levelsBetween } from "../core/frames";
+import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
@@ -15,12 +18,15 @@ const EMPTY: ReadonlySet<ObjectId> = new Set();
  */
 export type Preview =
   | { kind: "none" }
-  | { kind: "move"; ids: readonly ObjectId[]; dx: Dyadic; dy: Dyadic }
-  | { kind: "scale"; ids: readonly ObjectId[]; fixed: WorldPoint; kx: number; ky: number }
+  /** `dx`, `dy` and `fixed` are in the units of `frame` (ADR 0014); each object gets them in its own frame. */
+  | { kind: "move"; ids: readonly ObjectId[]; frame: Frame; dx: Dyadic; dy: Dyadic }
+  | { kind: "scale"; ids: readonly ObjectId[]; frame: Frame; fixed: WorldPoint; kx: number; ky: number }
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
   | { kind: "edit"; ids: readonly ObjectId[] };
 
 export interface DraftStroke {
+  /** The frame the stroke started in: its points stay there if the camera rebases mid-stroke (ADR 0014). */
+  frame: Frame;
   anchor: WorldPoint;
   unit: number;
   points: number[];
@@ -89,9 +95,15 @@ export class EditorState {
   previewed(o: CanvasObject): CanvasObject | null {
     const p = this.preview;
     if (p.kind === "edit" && p.ids.includes(o.id)) return null;
-    if (p.kind === "move" && p.ids.includes(o.id)) return translate(o, p.dx, p.dy);
+    if (p.kind === "move" && p.ids.includes(o.id)) {
+      // A displacement only scales between frames: exact shift.
+      const L = levelsBetween(o.frame ?? p.frame.space.world, p.frame);
+      return translate(o, D.shift(p.dx, -L), D.shift(p.dy, -L));
+    }
     if (p.kind === "scale" && p.ids.includes(o.id)) {
-      return scaleAbout(o, p.fixed, p.kx, o.kind === "image" ? p.ky : p.kx);
+      const f = o.frame ?? p.frame.space.world;
+      const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
+      return scaleAbout(o, fixed, p.kx, o.kind === "image" ? p.ky : p.kx);
     }
     return o;
   }

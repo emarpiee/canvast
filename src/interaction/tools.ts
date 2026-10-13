@@ -6,10 +6,12 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId, StrokeObject, TextObject } from "../doc/model";
-import { newObjectId } from "../doc/model";
-import { normalizeUnit, scaleAbout, translate } from "../doc/edit-ops";
+import { homeObject, newObjectId } from "../doc/model";
+import type { Frame } from "../core/frames";
+import { expressExactIn } from "../core/frames";
+import { normalizeUnit } from "../doc/edit-ops";
 import { visibleObjects } from "../render/scene-view";
-import type { SpatialIndex } from "../scene/spatial-index";
+import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, lassoSelect, pickAll } from "../render/hit-test";
 import { HANDLE_SIZE_PX, handlePoints, selectionBox } from "../render/scene-renderer";
 import { PanGesture } from "./navigation";
@@ -45,7 +47,7 @@ type Gesture =
   | { kind: "pen"; pointerId: number; last: ScreenPoint }
   | { kind: "lasso"; pointerId: number }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
-  | { kind: "move"; pointerId: number; startWorld: WorldPoint; ids: ObjectId[] }
+  | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; ids: ObjectId[] }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint }
   | {
@@ -53,6 +55,7 @@ type Gesture =
       pointerId: number;
       ids: ObjectId[];
       fixed: ScreenPoint;
+      frame: Frame;
       fixedWorld: WorldPoint;
       start: ScreenPoint;
       uniform: boolean;
@@ -67,7 +70,7 @@ export function attachTools(
   el: HTMLElement,
   view: ViewState,
   doc: DocumentStore,
-  index: SpatialIndex,
+  index: FrameIndex,
   editor: EditorState,
   hooks: ToolHooks,
 ): () => void {
@@ -82,8 +85,11 @@ export function attachTools(
     const r = el.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  /** A screen point in the coordinates of the camera's frame (`view.frame`). */
   const world = (s: ScreenPoint): WorldPoint => screenToWorld(view.camera, view.viewport, s);
-  const visible = () => visibleObjects(doc, index, null, view.camera, view.viewport);
+  /** A screen point in the coordinates of frame `f` (exact; the camera may have rebased since `f` was chosen). */
+  const worldIn = (s: ScreenPoint, f: Frame): WorldPoint => (view.frame === f ? world(s) : expressExactIn(f.space, view.frame, world(s), f));
+  const visible = () => visibleObjects(doc, index, null, view.frameCamera, view.viewport);
   const textAt = (s: ScreenPoint): TextObject | null =>
     (pickAll(visible(), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
 
@@ -101,7 +107,7 @@ export function attachTools(
   // ---- pen --------------------------------------------------------------
   const penPoint = (s: ScreenPoint): void => {
     const d = editor.draft!;
-    const w = world(s);
+    const w = worldIn(s, d.frame);
     // Local units relative to the stroke anchor (exact difference, then one rounding).
     d.points.push(
       D.toNumber(D.shift(D.sub(w.x, d.anchor.x), -d.unit)),
@@ -116,6 +122,7 @@ export function attachTools(
     const stroke: StrokeObject = {
       id: newObjectId(),
       kind: "stroke",
+      ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
       anchor: d.anchor,
       unit: d.unit,
       z: doc.topZ() + 1,
@@ -125,7 +132,7 @@ export function attachTools(
       width: d.width,
       color: d.color,
     };
-    doc.commit(doc.transaction("Draw stroke", [normalizeUnit(stroke)]));
+    doc.commit(doc.transaction("Draw stroke", [homeObject(normalizeUnit(stroke), doc.space)]));
   };
 
   // ---- select -------------------------------------------------------------
@@ -146,6 +153,7 @@ export function attachTools(
             pointerId: e.pointerId,
             ids,
             fixed: { x: fx, y: fy },
+            frame: view.frame,
             fixedWorld: world({ x: fx, y: fy }),
             start: { x: hx, y: hy },
             uniform: !(onlyImage && e.shiftKey),
@@ -171,7 +179,7 @@ export function attachTools(
     if (t && draggable) {
       if (!editor.selection.has(t.id)) editor.select([t.id], gp.additive);
       const ids = [...editor.selection].filter((id) => doc.get(id));
-      g = { kind: "move", pointerId: gp.pointerId, startWorld: world(gp.start), ids };
+      g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), ids };
       updateMove(s);
       return;
     }
@@ -182,8 +190,8 @@ export function attachTools(
 
   const updateMove = (s: ScreenPoint): void => {
     if (g.kind !== "move") return;
-    const w = world(s);
-    editor.preview = { kind: "move", ids: g.ids, dx: D.sub(w.x, g.startWorld.x), dy: D.sub(w.y, g.startWorld.y) };
+    const w = worldIn(s, g.frame);
+    editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx: D.sub(w.x, g.startWorld.x), dy: D.sub(w.y, g.startWorld.y) };
     editor.changed();
   };
 
@@ -202,19 +210,19 @@ export function attachTools(
 
   const commitPreview = (): void => {
     const p = editor.preview;
-    editor.preview = { kind: "none" };
-    if (p.kind === "move") {
-      if (p.dx.m === 0n && p.dy.m === 0n) return;
-      const next = p.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o).map((o) => translate(o, p.dx, p.dy));
-      doc.commit(doc.transaction(next.length === 1 ? `Move ${next[0]!.kind}` : `Move ${next.length} objects`, next));
-    } else if (p.kind === "scale") {
-      if (p.kx === 1 && p.ky === 1) return;
-      const next = p.ids
-        .map((id) => doc.get(id))
-        .filter((o): o is CanvasObject => !!o)
-        .map((o) => scaleAbout(o, p.fixed, p.kx, o.kind === "image" ? p.ky : p.kx));
-      doc.commit(doc.transaction("Resize", next));
+    // The committed state is exactly the previewed one, then re-homed if it left its frame's bounds.
+    const next = (ids: readonly ObjectId[]): CanvasObject[] =>
+      ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o).map((o) => homeObject(editor.previewed(o)!, doc.space));
+    if (p.kind === "move" && !(p.dx.m === 0n && p.dy.m === 0n)) {
+      const n = next(p.ids);
+      editor.preview = { kind: "none" };
+      doc.commit(doc.transaction(n.length === 1 ? `Move ${n[0]!.kind}` : `Move ${n.length} objects`, n));
+    } else if (p.kind === "scale" && !(p.kx === 1 && p.ky === 1)) {
+      const n = next(p.ids);
+      editor.preview = { kind: "none" };
+      doc.commit(doc.transaction("Resize", n));
     }
+    editor.preview = { kind: "none" };
   };
 
   // ---- pointer events ----------------------------------------------------
@@ -248,7 +256,7 @@ export function attachTools(
         }
         const cam = view.camera;
         const f = 2 ** cam.zf;
-        editor.draft = { anchor: world(s), unit: -cam.zi, points: [], width: editor.penWidthPx / f, color: editor.penColor };
+        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: editor.penWidthPx / f, color: editor.penColor };
         penPoint(s);
         g = { kind: "pen", pointerId: e.pointerId, last: s };
         editor.changed();
@@ -308,7 +316,7 @@ export function attachTools(
         break;
       case "scale": {
         const { kx, ky } = scaleFactors(g, s);
-        editor.preview = { kind: "scale", ids: g.ids, fixed: g.fixedWorld, kx, ky };
+        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: g.fixedWorld, kx, ky };
         editor.changed();
         break;
       }
