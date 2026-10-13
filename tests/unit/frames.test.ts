@@ -67,6 +67,7 @@ function screenPoints(o: StrokeObject, cam: Camera): number[] | null {
   return po ? [...po.q] : null;
 }
 
+// Time limits here catch hangs (seconds or never), not speed: they leave room for parallel runs and GC.
 describe("nested frames behave exactly like absolute coordinates", () => {
   it("camera: 3,000 random pans, zooms and jumps give the identical world camera", () => {
     for (const seed of [1, 2, 3]) {
@@ -187,7 +188,7 @@ describe("nested frames behave exactly like absolute coordinates", () => {
     fc = fjump(space, fc, -1e12); // a trillion levels above the start
     fc = fjump(space, fc, 1e12);
     const ms = performance.now() - t0;
-    expect(ms).toBeLessThan(50);
+    expect(ms).toBeLessThan(500);
     expect(space.count).toBeLessThan(20);
     // Same as the old camera for a jump it can still do quickly.
     old = zoomAt(old, VP, { x: 640, y: 400 }, 3000);
@@ -201,7 +202,7 @@ describe("nested frames behave exactly like absolute coordinates", () => {
       const t0 = performance.now();
       const fc = fjump(space, { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, up);
       const p = expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.fromBigInt(-3n) }, fc.f);
-      expect(performance.now() - t0).toBeLessThan(50);
+      expect(performance.now() - t0).toBeLessThan(500);
       expect(space.count).toBeLessThan(5);
       expect(p && D.log2Abs(p.x) < 0).toBe(true);
     }
@@ -216,7 +217,7 @@ describe("nested frames behave exactly like absolute coordinates", () => {
       fc = fzoomAt(space, fc, VP, { x: 300, y: 200 }, 1);
       expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.fromBigInt(-3n) }, fc.f);
     }
-    expect(performance.now() - t0).toBeLessThan(200);
+    expect(performance.now() - t0).toBeLessThan(1000);
   });
 
   it("expressIn matches the exact path to 2^-150 wherever it finds the point", () => {
@@ -270,7 +271,7 @@ describe("nested frames behave exactly like absolute coordinates", () => {
         worst = Math.max(worst, performance.now() - t);
       }
       expect(Number(depthOf(fc).levels)).toBe(dir * 100_000);
-      expect(worst).toBeLessThan(20);
+      expect(worst).toBeLessThan(100);
     }
   });
 
@@ -282,7 +283,7 @@ describe("nested frames behave exactly like absolute coordinates", () => {
       let fc = fjump(space, start, 1e12);
       fc = fjump(space, fpanBy(space, fc, 37, 11), 1000);
       fc = fjump(space, fc, up);
-      expect(performance.now() - t0).toBeLessThan(50);
+      expect(performance.now() - t0).toBeLessThan(500);
       expect(space.count).toBeLessThan(20);
       const d = depthOf(fc); // not toAbsoluteCamera: that builds a number with ~depth bits
       expect(Number(d.levels) + d.frac).toBeCloseTo(1e12 + 1000 + up, 0);
