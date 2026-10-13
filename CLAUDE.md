@@ -18,8 +18,8 @@ npm run test:unit        # Vitest, ~15 s
 npx vitest run tests/unit/camera.test.ts       # one unit file
 npm run build && npx playwright test -g "<name>"            # selected E2E tests (quick length)
 npx playwright test -c playwright.full.config.ts -g "<name>"  # one test, full length
-npm test                 # typecheck + unit + quick E2E + offline + naming checks, ~10 min
-npm run test:full        # same with full stress loops, ~35 min
+npm test                 # typecheck + unit + quick E2E (3 Chromium + Firefox) + offline + naming checks, ~16 min
+npm run test:full        # same with full stress loops, ~50 min
 npm run bench            # scale benchmarks 1K–1M objects (not a gate)
 ```
 
