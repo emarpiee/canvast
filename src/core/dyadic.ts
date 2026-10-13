@@ -158,6 +158,18 @@ function ldexp(x: number, e: number): number {
 }
 
 /**
+ * log2|a| as a double (−Infinity for zero). Exact in the exponent at any
+ * magnitude, so it never overflows the way toNumber does.
+ */
+export function log2Abs(a: Dyadic): number {
+  if (a.m === 0n) return -Infinity;
+  const m = a.m < 0n ? -a.m : a.m;
+  const bl = bitLength(m);
+  const drop = Math.max(0, bl - 64);
+  return Math.log2(Number(m >> BigInt(drop))) + drop + a.e;
+}
+
+/**
  * Nearest double. Magnitudes beyond the double range become ±Infinity (callers
  * treat that as "far offscreen"); this never produces NaN.
  */

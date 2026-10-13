@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+(nothing yet)
+
+## 0.2.0 — Phase 1 slice 2: Assets view, catalog and safe deletion (2026-10-13)
+
+- **Assets view:** a top-level Canvas | Assets switch and a full-window
+  library. It has search, filter, sort, thumbnail size, a library-only
+  import, and an inspector showing where each asset is used.
+- **Show** opens a canvas, selects the instances and frames them exactly, at
+  any depth. **Place on** adds an instance to the open canvas.
+- **One original per file, derived usage:**
+  - IndexedDB schema 3 adds a metadata-only `assetCatalog` and an index from
+    image instances to their asset;
+  - usage counts come from stored instances;
+  - existing originals get catalog entries automatically.
+- **Reference-checked garbage collection:**
+  - "Delete from library" is refused while an asset is used;
+  - the original is erased only when no stored instance and no undo or redo
+    state needs it, in one transaction;
+  - undo after deleting returns the asset to the library.
+- **Missing originals** are listed with their usage; re-importing the same
+  file restores them.
+- **Delete canvases and boards** from the breadcrumb menu, with
+  confirmation. Each deletion is one revision-checked transaction; originals
+  stay in the library, and other tabs follow.
+- **Fix:** canvas shortcuts (Delete, Escape, tools) no longer act while a
+  modal dialog or Assets view has focus.
 - Test tooling: a quick E2E suite (`npm test`, about 8 min) for everyday
   changes and the full stress suite (`npm run test:full`, about 35 min) for
   milestone commits. See [docs/testing/README.md](docs/testing/README.md).

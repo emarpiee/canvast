@@ -4,7 +4,7 @@ import type { DocumentStore } from "../doc/document-store";
 import type { ImageObject } from "../doc/model";
 import { newObjectId } from "../doc/model";
 import { normalizeUnit } from "../doc/edit-ops";
-import type { AssetLibrary } from "../assets/asset-library";
+import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
 import type { ViewState } from "./view-state";
 
@@ -39,10 +39,46 @@ export function deleteSelection(doc: DocumentStore, editor: EditorState): void {
 const PLACE_MAX_VIEWPORT_FRACTION = 0.6;
 
 /**
- * Import image files and place one instance of each at the viewport centre,
- * at the current scale (1 source pixel = 1 CSS px, shrunk to fit). Placing an
- * image does not select it or touch any existing object.
+ * Place one new instance of a stored asset at the viewport centre (shifted by
+ * `offsetPx`), at the current scale: 1 source pixel = 1 CSS px, shrunk to fit.
+ * Placing does not select it or touch any existing object.
  */
+export function placeImage(
+  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">,
+  doc: DocumentStore,
+  view: ViewState,
+  offsetPx: number,
+  label: string,
+): ImageObject {
+  const cam = view.camera;
+  const vp = view.viewport;
+  const f = 2 ** cam.zf;
+  const fit = Math.min(1, (PLACE_MAX_VIEWPORT_FRACTION * vp.width) / rec.pixelW, (PLACE_MAX_VIEWPORT_FRACTION * vp.height) / rec.pixelH);
+  // Local unit = 2^-zi world = f CSS px.
+  const w = (rec.pixelW * fit) / f;
+  const h = (rec.pixelH * fit) / f;
+  const c = screenToWorld(cam, vp, { x: vp.width / 2 + offsetPx, y: vp.height / 2 + offsetPx });
+  const unit = -cam.zi;
+  const img: ImageObject = {
+    id: newObjectId(),
+    kind: "image",
+    anchor: { x: D.sub(c.x, D.shift(D.fromNumber(w / 2), unit)), y: D.sub(c.y, D.shift(D.fromNumber(h / 2), unit)) },
+    unit,
+    z: doc.topZ() + 1,
+    opacity: 1,
+    attachmentTargetId: null,
+    assetId: rec.hash,
+    w,
+    h,
+    pixelW: rec.pixelW,
+    pixelH: rec.pixelH,
+  };
+  const obj = normalizeUnit(img) as ImageObject;
+  doc.commit(doc.transaction(label, [obj]));
+  return obj;
+}
+
+/** Import image files and place one instance of each (see placeImage). */
 export async function importImages(
   files: Iterable<File>,
   assets: AssetLibrary,
@@ -55,33 +91,7 @@ export async function importImages(
   for (const file of files) {
     try {
       const rec = await assets.importFile(file);
-      const cam = view.camera;
-      const vp = view.viewport;
-      const f = 2 ** cam.zf;
-      const fit = Math.min(1, (PLACE_MAX_VIEWPORT_FRACTION * vp.width) / rec.pixelW, (PLACE_MAX_VIEWPORT_FRACTION * vp.height) / rec.pixelH);
-      // Local unit = 2^-zi world = f CSS px.
-      const w = (rec.pixelW * fit) / f;
-      const h = (rec.pixelH * fit) / f;
-      const offset = placed.length * 24;
-      const c = screenToWorld(cam, vp, { x: vp.width / 2 + offset, y: vp.height / 2 + offset });
-      const unit = -cam.zi;
-      const img: ImageObject = {
-        id: newObjectId(),
-        kind: "image",
-        anchor: { x: D.sub(c.x, D.shift(D.fromNumber(w / 2), unit)), y: D.sub(c.y, D.shift(D.fromNumber(h / 2), unit)) },
-        unit,
-        z: doc.topZ() + 1,
-        opacity: 1,
-        attachmentTargetId: null,
-        assetId: rec.hash,
-        w,
-        h,
-        pixelW: rec.pixelW,
-        pixelH: rec.pixelH,
-      };
-      const obj = normalizeUnit(img) as ImageObject;
-      doc.commit(doc.transaction("Import image", [obj]));
-      placed.push(obj);
+      placed.push(placeImage(rec, doc, view, placed.length * 24, "Import image"));
     } catch (e) {
       editor.message = `Could not import ${file.name || "file"}: ${(e as Error).message}`;
       editor.changed();

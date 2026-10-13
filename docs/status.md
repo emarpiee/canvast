@@ -12,7 +12,8 @@ Unverified / Committed / Next bounded task**.
 | 0B | One editable vector type; create/select/hit-test/drag/resize at any reached scale; world↔screen round trips for objects; minimal snapshot save/reload | **done** (see below) |
 | 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **done** (see below) |
 | 1a | Workspace → Boards → Canvas, per-object transactional storage, v1 migration, multi-tab safety, save states, storage panel | **done** (see below) |
-| 1+ | Assets view and catalog with reference-checked GC, portable export/import, raster tile cache, text/media content, adjustments, Settings, collaboration | planned |
+| 1b | Assets view and shared catalog, usage and navigation to instances, reference-checked mark-and-sweep GC, safe deletion of boards and canvases | **done** (see below) |
+| 1+ | Asset organization (tags, folders, collections), portable export/import, raster tile cache, density preview, text/media content, adjustments, Settings, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -164,12 +165,69 @@ exhaustion, and storage eviction.
 
 **Committed:** see `git log`.
 
-**Next bounded task:** Assets view with a shared asset catalog. That means:
+**Next bounded task (done in slice 2):** Assets view with a shared asset catalog. That means:
 - catalog entries over the content-addressed blobs;
 - usage and instance counts, and navigation from an asset to where it is
   used;
 - reference-checked mark-and-sweep garbage collection;
 - deleting canvases and boards safely.
+
+## Phase 1, slice 2 — Assets view, catalog and safe deletion
+
+**Implemented** ([ADR 0007](adr/0007-asset-catalog-and-gc.md))
+- IndexedDB schema 3:
+  - an `assetCatalog` store, with metadata only (no bytes);
+  - an `objects.assetId` index, so usage is always derived from stored
+    instances and never from a counter.
+- Top-level **Canvas | Assets** view switch. The canvas's view, selection
+  and history are kept while hidden, its rendering is suspended, and canvas
+  shortcuts are inactive in Assets view and inside dialogs.
+- **Assets view:**
+  - search, usage filter, sort and thumbnail size;
+  - library-only import;
+  - an inspector with metadata and a "Where it is used" list per canvas.
+    **Show** opens the canvas, selects the instances and frames them exactly
+    at any depth (`fitRect`, `log2Abs`).
+  - **Place on** the open canvas;
+  - **Delete from library**, refused while used.
+- **Mark-and-sweep GC** in one transaction:
+  - a deleted entry that is referenced again is restored;
+  - one held by the writer's live roots (document, undo and redo history) is
+    retained;
+  - otherwise the bytes are erased.
+  It runs at startup (after `reconcile`), after deletion, after a canvas
+  switch, and after commits while anything is retained.
+- **Reconcile** creates catalog entries for stored originals without one, so
+  schema-2 data is upgraded. Missing originals are listed with their usage,
+  and re-importing the file restores them.
+- **Deleting a canvas or board** is one revision-checked transaction
+  (objects, views, records, parent list). It is refused for the last canvas,
+  the last board and the open canvas, and the session moves away first. A
+  confirmation dialog states that originals stay in the library. Other tabs
+  follow.
+- If `meta.current` names a missing canvas, startup reopens the first canvas
+  instead of creating a new workspace.
+
+**Tested:** [testing/phase-1b.md](testing/phase-1b.md).
+
+**Known failures:** none.
+
+**Unverified**
+- Libraries with many thousands of assets (grid and thumbnail cost).
+- Firefox and Safari.
+- Deleting very large canvases (one key-range delete; the time is not
+  measured).
+
+**Committed:** see `git log`.
+
+**Next bounded task:** choose one of:
+- the raster tile cache (ADR 0005), for dense-scene frame time;
+- portable export/import (backups), which the storage panel still reports
+  as "none";
+- asset organization (tags, folders, collections).
+
+The recommended order is export/import first, because there is still no
+backup outside the browser.
 
 ## Decided and implemented: quick vs full test suites (2026-10-13)
 

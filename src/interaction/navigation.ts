@@ -1,3 +1,4 @@
+import { canvasShortcutsActive } from "./shortcut-scope";
 import { HOME, panBy, zoomAt } from "../core/camera";
 import type { ScreenPoint } from "../core/camera";
 import type { ViewState } from "../app/view-state";
@@ -88,8 +89,7 @@ export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
   };
 
   const onKeyDown = (e: KeyboardEvent): void => {
-    const target = e.target as HTMLElement | null;
-    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+    if (!canvasShortcutsActive(e)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const vp = view.viewport;
     const panStep = (e.shiftKey ? 0.5 : 0.125) * Math.min(vp.width, vp.height);

@@ -166,6 +166,25 @@ export function lookAt(p: WorldPoint, zi: number, zf = 0): Camera {
   return { center: roundCenter(p, pz), zi: z.zi, zf: z.zf, pz };
 }
 
+/**
+ * The camera that shows the exact world rectangle [min, max] centred, filling
+ * at most `fill` of the viewport in each axis. Works at any depth: the
+ * centre is exact and the level is derived from the extent's exponent, so a
+ * rectangle 2^-5000 wide gets a level near 5000. A degenerate (zero-size)
+ * rectangle keeps `fallbackLevel`.
+ */
+export function fitRect(min: WorldPoint, max: WorldPoint, vp: Viewport, fill: number, fallbackLevel: number): Camera {
+  const center = { x: D.shift(D.add(min.x, max.x), -1), y: D.shift(D.add(min.y, max.y), -1) };
+  const lw = D.log2Abs(D.sub(max.x, min.x));
+  const lh = D.log2Abs(D.sub(max.y, min.y));
+  let level = Math.min(Math.log2(fill * vp.width) - lw, Math.log2(fill * vp.height) - lh);
+  if (!Number.isFinite(level)) level = fallbackLevel;
+  const zi = Math.floor(level);
+  // Quantize down so the rectangle never ends up larger than requested.
+  const zf = Math.floor((level - zi) / ZOOM_QUANTUM) * ZOOM_QUANTUM;
+  return lookAt(center, zi, zf);
+}
+
 function assertFinite(...xs: number[]): void {
   for (const x of xs) {
     if (!Number.isFinite(x)) throw new RangeError(`non-finite camera input: ${x}`);

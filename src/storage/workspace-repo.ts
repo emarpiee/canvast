@@ -63,6 +63,9 @@ export class RevisionConflictError extends Error {
   }
 }
 
+/** A structural rule would be broken (last canvas, last board, open canvas). Nothing was changed. */
+export class HierarchyError extends Error {}
+
 export interface LoadedCanvas {
   canvas: CanvasRecord;
   objects: CanvasObject[];
@@ -184,6 +187,82 @@ export class WorkspaceRepo {
     // Renaming does not change the object revision (it is not an object edit).
     tx.objectStore("canvases").put({ ...c, name });
     await done(tx);
+  }
+
+  /**
+   * Delete one canvas with its objects and saved view, in one transaction.
+   * Refused if it is the board's only canvas (delete the board instead), if
+   * it is the current canvas (switch away first), or if its revision is not
+   * `expectedRevision` (it changed since the user confirmed). Originals of
+   * images on it stay in the asset library.
+   */
+  async deleteCanvas(canvasId: string, expectedRevision: number): Promise<{ objects: number }> {
+    return this.deleteTx(["boards"], async (tx) => {
+      const canvas = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
+      if (!canvas) throw new Error(`canvas ${canvasId} not found`);
+      const board = await req(tx.objectStore("boards").get(canvas.boardId) as IDBRequest<BoardRecord | undefined>);
+      if (!board) throw new Error(`board ${canvas.boardId} not found`);
+      if (board.canvasIds.length <= 1) throw new HierarchyError("A board needs at least one canvas. Delete the board instead.");
+      const objects = await this.removeCanvas(tx, canvas, expectedRevision);
+      tx.objectStore("boards").put({ ...board, canvasIds: board.canvasIds.filter((id) => id !== canvasId) });
+      return { objects };
+    });
+  }
+
+  /**
+   * Delete a board with all its canvases, objects and views, in one
+   * transaction. Refused for the workspace's only board, for the current
+   * board, and if any canvas revision differs from `expected`.
+   */
+  async deleteBoard(boardId: string, expected: ReadonlyMap<string, number>): Promise<{ canvases: number; objects: number }> {
+    return this.deleteTx(["workspaces", "boards"], async (tx) => {
+      const board = await req(tx.objectStore("boards").get(boardId) as IDBRequest<BoardRecord | undefined>);
+      if (!board) throw new Error(`board ${boardId} not found`);
+      const ws = await req(tx.objectStore("workspaces").get(board.workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
+      if (!ws) throw new Error(`workspace ${board.workspaceId} not found`);
+      if (ws.boardIds.length <= 1) throw new HierarchyError("A workspace needs at least one board.");
+      let objects = 0;
+      for (const cid of board.canvasIds) {
+        const canvas = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
+        if (!canvas) continue;
+        const rev = expected.get(cid);
+        if (rev === undefined) throw new RevisionConflictError(cid, -1, canvas.revision);
+        objects += await this.removeCanvas(tx, canvas, rev);
+      }
+      tx.objectStore("boards").delete(boardId);
+      tx.objectStore("workspaces").put({ ...ws, boardIds: ws.boardIds.filter((id) => id !== boardId) });
+      return { canvases: board.canvasIds.length, objects };
+    });
+  }
+
+  private async removeCanvas(tx: IDBTransaction, canvas: CanvasRecord, expectedRevision: number): Promise<number> {
+    if (canvas.revision !== expectedRevision) throw new RevisionConflictError(canvas.id, expectedRevision, canvas.revision);
+    const cur = await req(tx.objectStore("meta").get("current") as IDBRequest<CurrentMeta | undefined>);
+    if (cur?.canvasId === canvas.id) throw new HierarchyError("The open canvas cannot be deleted. Switch to another canvas first.");
+    const range = IDBKeyRange.bound([canvas.id, ""], [canvas.id, "￿"]);
+    const n = await req(tx.objectStore("objects").count(range));
+    tx.objectStore("objects").delete(range);
+    tx.objectStore("canvasViews").delete(canvas.id);
+    tx.objectStore("canvases").delete(canvas.id);
+    return n;
+  }
+
+  private async deleteTx<T>(extra: string[], body: (tx: IDBTransaction) => Promise<T>): Promise<T> {
+    const tx = this.db.transaction([...extra, "canvases", "objects", "canvasViews", "meta"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    try {
+      const result = await body(tx);
+      await committed;
+      return result;
+    } catch (e) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      await committed.catch(() => undefined);
+      throw e;
+    }
   }
 
   /** Load one canvas's objects (lazily, per canvas) and its saved camera. */

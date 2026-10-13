@@ -138,6 +138,19 @@ export class DocumentStore {
     }
   }
 
+  /**
+   * Every object state the document can still return to without storage:
+   * the current objects plus all states held by undo and redo. These are the
+   * live roots for asset garbage collection.
+   */
+  *retainedObjects(): IterableIterator<CanvasObject> {
+    yield* this.objects.values();
+    for (const tx of [...this.undoStack, ...this.redoStack]) {
+      for (const o of tx.before.values()) if (o) yield o;
+      for (const o of tx.after.values()) if (o) yield o;
+    }
+  }
+
   /** All objects, unordered. */
   all(): IterableIterator<CanvasObject> {
     return this.objects.values();

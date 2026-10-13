@@ -24,6 +24,9 @@ import { mountNavigator } from "../ui/navigator";
 import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
 import { mountDevPanel } from "../ui/dev-panel";
+import { mountAssetsView } from "../ui/assets-view";
+import { mountViewSwitch } from "../ui/view-switch";
+import type { AppView } from "../ui/view-switch";
 
 declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
@@ -118,15 +121,17 @@ async function start(): Promise<void> {
     return b;
   };
 
+  let appView: AppView = "canvas";
   const draw = (): void => {
     scheduled = false;
-    stats.record(renderNow().totalMs);
+    // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
+    if (appView === "canvas") stats.record(renderNow().totalMs);
     const waiters = frameWaiters;
     frameWaiters = [];
     for (const w of waiters) w();
   };
 
-  const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor);
+  const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor, assets);
   if (db) {
     try {
       await session.start();
@@ -185,24 +190,53 @@ async function start(): Promise<void> {
     },
   });
   if (debug) mountDevPanel(document.getElementById("hud")!, view);
-  mountNavigator(document.getElementById("nav")!, session);
+  mountNavigator(document.getElementById("workspace")!, session);
+
+  // Top-level views. The canvas keeps its camera, selection and history while hidden.
+  const assetsRoot = document.getElementById("assets-view")!;
+  const setView = (v: AppView): void => {
+    if (v === appView) return;
+    appView = v;
+    document.body.dataset["view"] = v;
+    markTab(v);
+    host.inert = v !== "canvas";
+    if (v === "assets") assetsView.show();
+    else {
+      assetsView.hide();
+      invalidate();
+      canvas.focus();
+    }
+    try {
+      localStorage.setItem("canvast.view", v);
+    } catch {
+      // per-device convenience only
+    }
+  };
+  const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
+  markTab("canvas");
+  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"));
   mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
 
   // Drag-and-drop and paste import.
   window.addEventListener("dragover", (e) => {
     if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
   });
+  // In Assets view, files go into the library only; in Canvas view they are also placed.
+  const receive = (files: File[]): void => {
+    if (appView === "assets") void assetsView.importFiles(files);
+    else importFiles(files);
+  };
   window.addEventListener("drop", (e) => {
     const files = [...(e.dataTransfer?.files ?? [])];
     if (!files.length) return;
     e.preventDefault();
-    importFiles(files);
+    receive(files);
   });
   window.addEventListener("paste", (e) => {
     const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
     if (files.length) {
       e.preventDefault();
-      importFiles(files);
+      receive(files);
     }
   });
   // Best-effort flush when the page is hidden; saves are already debounced to 150 ms.
@@ -222,13 +256,20 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;
   resize();
   canvas.focus();
   editor.changed();
+  let lastView: string | null = null;
+  try {
+    lastView = localStorage.getItem("canvast.view");
+  } catch {
+    // unavailable: start in Canvas view
+  }
+  if (lastView === "assets") setView("assets");
 }
 
 void start();

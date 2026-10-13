@@ -50,6 +50,16 @@ export type StartupOutcome =
 export async function ensureWorkspace(repo: WorkspaceRepo): Promise<StartupOutcome> {
   const existing = await repo.current();
   if (existing && (await repo.canvas(existing.canvasId))) return { kind: "existing", current: existing };
+  if (existing && (await repo.workspace(existing.workspaceId))) {
+    // The current canvas is gone (deleted elsewhere): reopen the first one rather than starting over.
+    const tree = await repo.tree(existing.workspaceId);
+    const first = tree.boards.find((b) => b.canvases.length > 0);
+    if (first) {
+      const current = { workspaceId: existing.workspaceId, boardId: first.board.id, canvasId: first.canvases[0]!.id };
+      await repo.setCurrent(current);
+      return { kind: "existing", current };
+    }
+  }
   const legacy = await idbGet<LegacySnapshot>(repo.db, "snapshots", "main");
   if (legacy && Array.isArray(legacy.objects) && legacy.objects.length > 0) {
     const migration = await migrateV1(repo, legacy);

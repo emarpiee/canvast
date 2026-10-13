@@ -1,6 +1,8 @@
 import type { RasterSource } from "../render/draw-objects";
 import { sha256Hex } from "./sha256";
-import { idbGet, idbPut } from "../storage/idb";
+import { done, idbGet, req } from "../storage/idb";
+import type { CatalogEntry } from "./asset-catalog";
+import { entryFromRecord } from "./asset-catalog";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -92,6 +94,7 @@ export class AssetLibrary {
     const existing = await this.record(hash);
     if (existing) {
       await this.ensureDecoded(existing);
+      if (this.db) await this.store(existing, false);
       return existing;
     }
     let img;
@@ -111,10 +114,37 @@ export class AssetLibrary {
       importedAt: Date.now(),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
-    if (this.db) await idbPut(this.db, "assets", hash, record);
+    if (this.db) await this.store(record, true);
     else this.memoryOnly.set(hash, record);
     this.decoded.set(hash, makeSource(img));
+    this.missing.delete(hash);
     return record;
+  }
+
+  /**
+   * Write the original (when new) and its catalog entry in one transaction.
+   * Importing bytes that are already stored adds no copy; it only returns a
+   * deleted or absent catalog entry to the library.
+   */
+  private async store(record: AssetRecord, writeBytes: boolean): Promise<void> {
+    const tx = this.db!.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    if (writeBytes) tx.objectStore("assets").put(record, record.hash);
+    const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
+    if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
+    else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
+    await committed;
+  }
+
+  /** Drop the decoded copy of an erased original (after garbage collection). */
+  forget(hash: string): void {
+    this.decoded.delete(hash);
+    this.missing.delete(hash);
+  }
+
+  /** Forget that a hash was missing so the next draw retries (after a restore). */
+  retry(hash: string): void {
+    this.missing.delete(hash);
   }
 
   async record(hash: string): Promise<AssetRecord | undefined> {

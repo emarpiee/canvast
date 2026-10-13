@@ -88,7 +88,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
     root.querySelector<HTMLButtonElement>('[data-action="delete"]')!.disabled = editor.selection.size === 0;
-    if (editor.message) {
+    // In Assets view, that view shows (and consumes) messages instead.
+    if (editor.message && document.body.dataset["view"] !== "assets") {
       toast.textContent = editor.message;
       toast.hidden = false;
       editor.message = "";

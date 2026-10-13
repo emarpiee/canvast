@@ -1,4 +1,6 @@
 import type { Session } from "../app/session";
+import { confirmDialog } from "./confirm";
+import { esc } from "./format";
 
 /**
  * Workspace › Board › Canvas navigator (top-left) and the read-only banner.
@@ -21,8 +23,6 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
   const banner = root.querySelector<HTMLElement>(".readonly-banner")!;
   let renaming: { kind: "board" | "canvas"; id: string } | null = null;
 
-  const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
   const renderMenu = (): void => {
     const tree = session.tree;
     if (!tree) {
@@ -42,7 +42,9 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
             board.id,
             board.name,
             `<span class="nav-board-name">${esc(board.name)}</span>
-             <button type="button" class="nav-mini" data-action="rename-board" data-id="${board.id}" aria-label="Rename board ${esc(board.name)}" title="Rename board">Rename</button>`,
+             <button type="button" class="nav-mini" data-action="rename-board" data-id="${board.id}" aria-label="Rename board ${esc(board.name)}" title="Rename board">Rename</button>
+             <button type="button" class="nav-mini" data-action="delete-board" data-id="${board.id}" aria-label="Delete board ${esc(board.name)}"
+               ${tree.boards.length <= 1 ? 'disabled title="A workspace needs at least one board"' : 'title="Delete board"'}>Delete</button>`,
           );
           const items = canvases
             .map((c) => {
@@ -52,7 +54,9 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
                 c.id,
                 c.name,
                 `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}">${esc(c.name)}<span class="nav-count">${c.objectCount}</span></button>
-                 <button type="button" class="nav-mini" data-action="rename-canvas" data-id="${c.id}" aria-label="Rename canvas ${esc(c.name)}" title="Rename canvas">Rename</button>`,
+                 <button type="button" class="nav-mini" data-action="rename-canvas" data-id="${c.id}" aria-label="Rename canvas ${esc(c.name)}" title="Rename canvas">Rename</button>
+                 <button type="button" class="nav-mini" data-action="delete-canvas" data-id="${c.id}" aria-label="Delete canvas ${esc(c.name)}"
+                   ${canvases.length <= 1 ? 'disabled title="A board needs at least one canvas; delete the board instead"' : 'title="Delete canvas"'}>Delete</button>`,
               )}</li>`;
             })
             .join("");
@@ -122,8 +126,42 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
         renaming = { kind: "canvas", id };
         renderMenu();
         break;
+      case "delete-canvas":
+        void confirmDeleteCanvas(id);
+        break;
+      case "delete-board":
+        void confirmDeleteBoard(id);
+        break;
     }
   });
+
+  const KEPT = "Images placed on it stay in the Assets library. This cannot be undone.";
+  const confirmDeleteCanvas = async (id: string): Promise<void> => {
+    const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === id));
+    const c = entry?.canvases.find((x) => x.id === id);
+    if (!entry || !c) return;
+    setOpen(false);
+    const ok = await confirmDialog({
+      title: `Delete canvas “${c.name}”?`,
+      lines: [`It holds ${c.objectCount} object(s) on board “${entry.board.name}”.`, KEPT],
+      confirmLabel: "Delete canvas",
+    });
+    if (ok) await session.deleteCanvas(id);
+    crumb.focus();
+  };
+  const confirmDeleteBoard = async (id: string): Promise<void> => {
+    const entry = session.tree?.boards.find((b) => b.board.id === id);
+    if (!entry) return;
+    setOpen(false);
+    const objects = entry.canvases.reduce((n, c) => n + c.objectCount, 0);
+    const ok = await confirmDialog({
+      title: `Delete board “${entry.board.name}”?`,
+      lines: [`Its ${entry.canvases.length} canvas(es) and ${objects} object(s) will be deleted.`, KEPT],
+      confirmLabel: "Delete board",
+    });
+    if (ok) await session.deleteBoard(id);
+    crumb.focus();
+  };
   menu.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
     if (!input.classList.contains("nav-rename")) return;

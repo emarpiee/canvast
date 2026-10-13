@@ -68,3 +68,26 @@ export function localToWorld(o: CanvasObject, lx: number, ly: number): WorldPoin
     y: D.add(o.anchor.y, D.shift(D.fromNumber(ly), o.unit)),
   };
 }
+
+/** Exact world-space bounding box of an object. */
+export function worldBounds(o: CanvasObject): { min: WorldPoint; max: WorldPoint } {
+  const b = localBounds(o);
+  return { min: localToWorld(o, b.minX, b.minY), max: localToWorld(o, b.maxX, b.maxY) };
+}
+
+/** Exact union of the world bounding boxes of `objects` (null when empty). */
+export function unionBounds(objects: Iterable<CanvasObject>): { min: WorldPoint; max: WorldPoint } | null {
+  let r: { min: { x: D.Dyadic; y: D.Dyadic }; max: { x: D.Dyadic; y: D.Dyadic } } | null = null;
+  for (const o of objects) {
+    const b = worldBounds(o);
+    if (!r) {
+      r = { min: { ...b.min }, max: { ...b.max } };
+      continue;
+    }
+    if (D.cmp(b.min.x, r.min.x) < 0) r.min.x = b.min.x;
+    if (D.cmp(b.min.y, r.min.y) < 0) r.min.y = b.min.y;
+    if (D.cmp(b.max.x, r.max.x) > 0) r.max.x = b.max.x;
+    if (D.cmp(b.max.y, r.max.y) > 0) r.max.y = b.max.y;
+  }
+  return r;
+}

@@ -101,6 +101,35 @@ or network connection.
 - **Upgrades keep your data.** A canvas saved by the previous version
   (v0.0.x) is migrated into Board 1 › Canvas 1 automatically and verified
   object by object. The old data is kept unchanged.
+- **Deleting boards and canvases.** Each has a **Delete** button in the
+  breadcrumb menu. A confirmation says what will be removed. Images placed
+  there stay in the Assets library. A board always keeps at least one canvas,
+  and the workspace at least one board.
+
+### Assets view (Phase 1)
+
+- **Canvas | Assets** at top-left switches between the endless canvas and
+  the asset library. The canvas keeps its view, selection and undo history
+  while you are in Assets.
+- **One original, many instances.** Each imported file is stored once.
+  Every image you place is an instance that refers to it, on any board or
+  canvas.
+- **The library** shows each asset with its size, type and usage (for
+  example "4 uses · 3 canvases"). You can search, filter (in use or unused),
+  sort, and resize thumbnails. **Import** adds files to the library without
+  placing them.
+- **Details:** click an asset to see where it is used. **Show** opens that
+  canvas, selects the instances and zooms to them, at any depth. **Place on
+  …** puts a new instance on the open canvas.
+- **Safe deletion:**
+  - **Delete from library** is only possible when no instance uses the
+    asset.
+  - The original is erased only once nothing can bring it back. While undo
+    could still re-place it, it is kept, and undoing returns it to the
+    library.
+  - Deleting instances, canvases or boards never erases an original.
+- **Missing originals** (for example, cleared storage) are shown with their
+  usage. Importing the same file again restores every instance.
 
 ### Controls
 
@@ -114,7 +143,8 @@ or network connection.
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
-| Import images | toolbar image button · drag files onto the page · paste |
+| Import images | toolbar image button · drag files onto the page · paste (in Assets view these add to the library only) |
+| Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
 | Debug + dev panel | open the file with `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
 
@@ -125,9 +155,10 @@ authoritative positions of things on the canvas. The **camera** is the current
 view: its centre in world coordinates plus a zoom level. A **zoom level** of
 `z` means 2^z CSS pixels per world unit. An **object** is something placed on
 the canvas: a stroke or an image instance. An **asset** is an imported source
-file. Each asset is stored once, and placed images refer to it. The planned
-organization is Workspace → Boards → Canvas, with separate Canvas and Assets
-views. Those are not implemented yet.
+file. Each asset is stored once, and placed images are **instances** that
+refer to it. A **workspace** holds **boards**; each board holds one or more
+**canvases**. **Canvas view** shows one canvas; **Assets view** shows the
+workspace's shared library.
 
 ## Quick start
 
@@ -161,7 +192,7 @@ connection.
 
 | Command | Time | When |
 | --- | --- | --- |
-| `npm test` | ~8 min | After every ordinary change (quick E2E suite: short stress loops) |
+| `npm test` | ~10 min | After every ordinary change (quick E2E suite: short stress loops) |
 | `npm run test:full` | ~35 min | Before committing the end of a phase or milestone (full stress loops); log the result |
 | `npm run test:unit` | ~15 s | While developing |
 | `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
@@ -231,10 +262,12 @@ src/
   render/canvas2d-renderer.ts  grid, axes, landmarks
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
   interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
-  assets/                   SHA-256 content addressing, decoding, pixel access
+  assets/                   SHA-256 content addressing, decoding, pixel access; asset catalog,
+                            usage lookups and mark-and-sweep garbage collection
   storage/                  IndexedDB schema, workspace repository, incremental persistence,
                             v1 migration, multi-tab writer lease
-  ui/                       toolbar, workspace navigator, storage panel, dev panel, Lucide icons
+  ui/                       toolbar, view switch, workspace navigator, Assets view, confirmation
+                            dialog, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
 scripts/                    single-file build, offline check, naming check
 tests/unit/, tests/e2e/     Vitest and Playwright suites
@@ -263,16 +296,21 @@ docs/status.md              roadmap and current status (single source of truth)
   acceleration (raster tile cache before WebGL; no WASM yet).
 - [ADR 0006](docs/adr/0006-workspace-storage.md): workspace storage —
   hierarchy, per-object commits, migration, multi-tab safety.
+- [ADR 0007](docs/adr/0007-asset-catalog-and-gc.md): asset catalog, Assets
+  view, reference-checked garbage collection, safe deletion of boards and
+  canvases.
 
 ## Storage, backups, import/export
 
-- **Where data lives:** IndexedDB database `canvast`, schema version 2
-  (details in [ADR 0006](docs/adr/0006-workspace-storage.md)). It has these
-  stores:
+- **Where data lives:** IndexedDB database `canvast`, schema version 3
+  (details in [ADR 0006](docs/adr/0006-workspace-storage.md) and
+  [ADR 0007](docs/adr/0007-asset-catalog-and-gc.md)). It has these stores:
   - `workspaces`, `boards`, `canvases`;
-  - `objects`, with one record per object;
+  - `objects`, with one record per object, indexed by the asset an image
+    uses;
   - `canvasViews`, the per-canvas camera;
   - `assets`, the original image bytes, keyed by SHA-256 and stored once;
+  - `assetCatalog`, the library entries (metadata only);
   - `meta`;
   - the legacy `snapshots` store from v0.0.x, kept unchanged after migration.
 - **Origin caveat:** Chromium gives all `file://` pages one shared storage
@@ -285,11 +323,12 @@ docs/status.md              roadmap and current status (single source of truth)
   - *Read-only*, *Not saved — changed in another tab*, *Save failed*, and
     *Storage unavailable*.
 - On load, damaged objects are skipped and reported, never silently "fixed".
+- **What can delete data:** deleting objects, canvases and boards (canvas
+  and board deletion is confirmed and cannot be undone), and **Delete from
+  library**, which erases an unused original once undo can no longer need
+  it. Nothing else deletes anything.
 - **Not yet available:**
   - export/import (portable backups);
-  - deleting boards or canvases;
-  - asset garbage collection (nothing is ever deleted, so nothing can be
-    lost);
   - persistent undo history.
 
 ## Known limitations (honest list)
@@ -317,8 +356,12 @@ docs/status.md              roadmap and current status (single source of truth)
     bounds);
   - text, video, GIF, audio and PDF;
   - adjustments and settings;
-  - Workspace/Boards and the Assets view;
+  - asset tags, folders, collections and similar-image review; dragging an
+    asset onto the canvas (use Place);
   - collaboration.
+- **Large asset libraries.** Thumbnails are generated in memory each
+  session, and the grid draws every card. Very large libraries (many
+  thousands of assets) have not been measured.
 - Tested only in Chromium on one Linux machine. Touch is emulated in tests.
 
 ## Security
@@ -359,3 +402,4 @@ reproduces on any checkout.
 | Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |
 | Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |
 | Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |
+| Phase 1 slice 2 — Assets view, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |

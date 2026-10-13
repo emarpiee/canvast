@@ -1,13 +1,37 @@
-import { HOME, deserializeCamera } from "../core/camera";
+import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
+import type { AssetLibrary } from "../assets/asset-library";
+import { AssetCatalog, AssetInUseError } from "../assets/asset-catalog";
+import type { GcReport } from "../assets/asset-catalog";
+import type { ObjectId } from "../doc/model";
+import { unionBounds } from "../doc/edit-ops";
+import { placeImage } from "./actions";
 import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
 import type { EditorState } from "./editor-state";
 import { CanvasPersistence } from "../storage/canvas-persistence";
 import type { BoardRecord, CanvasRecord, CurrentMeta, WorkspaceRecord } from "../storage/workspace-repo";
-import { WorkspaceRepo } from "../storage/workspace-repo";
+import { HierarchyError, RevisionConflictError, WorkspaceRepo } from "../storage/workspace-repo";
 import { ensureWorkspace } from "../storage/migrate-v1";
 import type { StartupOutcome } from "../storage/migrate-v1";
 import { WriterLease } from "../storage/writer-lease";
+
+/** Messages between tabs of the same profile (BroadcastChannel "canvast-commits"). */
+type TabMessage =
+  | { kind: "commit"; canvasId: string; revision: number }
+  | { kind: "tree" }
+  | { kind: "assets" };
+
+/** Where an asset is used: one row per canvas, named for display. */
+export interface AssetPlace {
+  boardId: string;
+  boardName: string;
+  canvasId: string;
+  canvasName: string;
+  ids: ObjectId[];
+}
+
+/** Fraction of the viewport that revealed instances fill. */
+const REVEAL_FILL = 0.6;
 
 export interface WorkspaceTree {
   workspace: WorkspaceRecord;
@@ -26,32 +50,83 @@ export class Session {
   startup: StartupOutcome | null = null;
   readonly persistence: CanvasPersistence;
   readonly lease: WriterLease;
+  readonly catalog: AssetCatalog | null;
+  /** The last garbage-collection result (diagnostics and tests). */
+  lastGc: GcReport | null = null;
   private readonly listeners = new Set<() => void>();
+  private readonly assetListeners = new Set<() => void>();
   private switching: Promise<void> | null = null;
+  private channel: BroadcastChannel | null = null;
+  /** Deleted assets are still retained by roots: collect again when the roots may have shrunk. */
+  private gcPending = true;
 
   constructor(
     readonly repo: WorkspaceRepo | null,
     readonly doc: DocumentStore,
     readonly view: ViewState,
     readonly editor: EditorState,
+    readonly assets: AssetLibrary | null = null,
   ) {
     this.persistence = new CanvasPersistence(repo, doc, view);
+    this.catalog = repo ? new AssetCatalog(repo.db) : null;
     this.lease = new WriterLease();
     this.lease.subscribe(() => void this.onLease());
+    this.persistence.onCommitted = (canvasId, revision) => {
+      this.post({ kind: "commit", canvasId, revision });
+      this.emitAssets(); // usage counts changed
+      // An undo may have re-created an instance of an asset deleted from the library.
+      if (this.gcPending) void this.collectGarbage();
+    };
     // Read-only tabs follow the writer: reload the canvas when it commits.
     if (typeof BroadcastChannel === "function") {
       try {
-        const channel = new BroadcastChannel("canvast-commits");
-        this.persistence.onCommitted = (canvasId, revision) => channel.postMessage({ canvasId, revision });
-        channel.onmessage = (e: MessageEvent<{ canvasId: string; revision: number }>) => {
-          if (this.readOnly && this.current && e.data.canvasId === this.current.canvasId && e.data.revision !== this.persistence.revision) {
-            void this.load(this.current.canvasId);
-          }
-        };
+        this.channel = new BroadcastChannel("canvast-commits");
+        this.channel.onmessage = (e: MessageEvent<TabMessage>) => void this.onTabMessage(e.data);
       } catch {
         // BroadcastChannel unavailable (some file:// configurations): read-only tabs refresh on promotion only.
       }
     }
+  }
+
+  private post(m: TabMessage): void {
+    this.channel?.postMessage(m);
+  }
+
+  private async onTabMessage(m: TabMessage): Promise<void> {
+    if (m.kind === "commit") {
+      if (this.readOnly && this.current && m.canvasId === this.current.canvasId && m.revision !== this.persistence.revision) {
+        await this.load(this.current.canvasId);
+      }
+      this.emitAssets();
+    } else if (m.kind === "tree") {
+      await this.refreshTree();
+      await this.leaveDeletedCanvas();
+      this.emitAssets();
+    } else {
+      this.emitAssets();
+    }
+  }
+
+  /** If the open canvas no longer exists (deleted in another tab), open the first one that does. */
+  private async leaveDeletedCanvas(): Promise<void> {
+    if (!this.tree || !this.current) return;
+    const cur = this.current;
+    if (this.tree.boards.some((b) => b.canvases.some((c) => c.id === cur.canvasId))) return;
+    const first = this.tree.boards.find((b) => b.canvases.length);
+    if (!first) return;
+    this.current = { workspaceId: cur.workspaceId, boardId: first.board.id, canvasId: first.canvases[0]!.id };
+    await this.load(this.current.canvasId);
+    this.emit();
+  }
+
+  /** Listen for changes to the asset library or its usage. */
+  subscribeAssets(fn: () => void): () => void {
+    this.assetListeners.add(fn);
+    return () => this.assetListeners.delete(fn);
+  }
+
+  private emitAssets(): void {
+    for (const fn of this.assetListeners) fn();
   }
 
   subscribe(fn: () => void): () => void {
@@ -80,6 +155,14 @@ export class Session {
     this.current = this.startup.current;
     await this.refreshTree();
     await this.load(this.current.canvasId);
+    if (!this.readOnly && this.catalog) {
+      try {
+        await this.catalog.reconcile();
+        await this.collectGarbage();
+      } catch (e) {
+        console.warn("canvast: asset catalog maintenance failed", e);
+      }
+    }
   }
 
   async refreshTree(): Promise<void> {
@@ -128,6 +211,171 @@ export class Session {
     } finally {
       this.switching = null;
     }
+    // Loading cleared the undo history, which may have been the last root of a deleted asset.
+    if (this.gcPending) await this.collectGarbage();
+  }
+
+  /** Hashes the open document can still bring back without storage: its objects and undo/redo states. */
+  gcRoots(): Set<string> {
+    const roots = new Set<string>();
+    for (const o of this.doc.retainedObjects()) if (o.kind === "image") roots.add(o.assetId);
+    return roots;
+  }
+
+  /**
+   * Erase originals the user deleted from the library once nothing can use
+   * them any more (ADR 0007). Only the writer collects; read-only tabs cannot
+   * edit, so they hold no roots of their own.
+   */
+  async collectGarbage(): Promise<GcReport | null> {
+    if (!this.catalog || this.readOnly) return null;
+    await this.persistence.flush();
+    const report = await this.catalog.collect(this.gcRoots());
+    this.lastGc = report;
+    this.gcPending = report.retained.length > 0;
+    for (const h of report.swept) this.assets?.forget(h);
+    if (report.swept.length || report.restored.length) {
+      this.post({ kind: "assets" });
+      this.emitAssets();
+    }
+    return report;
+  }
+
+  /**
+   * Delete an asset from the library. Refused while instances use it. The
+   * original is erased at once if nothing else needs it, or later when the
+   * undo history that could re-create an instance is gone.
+   */
+  async deleteAsset(hash: string): Promise<{ erased: boolean } | null> {
+    if (!this.guardWrite() || !this.catalog) return null;
+    await this.persistence.flush();
+    try {
+      await this.catalog.markDeleted(hash);
+    } catch (e) {
+      this.tell(e instanceof AssetInUseError ? `Not deleted: ${e.message}.` : `Could not delete the asset: ${(e as Error).message}`);
+      return null;
+    }
+    this.gcPending = true;
+    const report = await this.collectGarbage();
+    const erased = !!report?.swept.includes(hash);
+    this.tell(erased ? "Deleted from the library. The original was erased." : "Deleted from the library. The original is kept until undo history no longer needs it.");
+    this.post({ kind: "assets" });
+    this.emitAssets();
+    return { erased };
+  }
+
+  /** Every canvas where an asset is placed, with board and canvas names. */
+  async assetPlaces(hash: string): Promise<AssetPlace[]> {
+    if (!this.catalog || !this.tree) return [];
+    await this.persistence.flush();
+    const locs = await this.catalog.locations(hash);
+    const places: AssetPlace[] = [];
+    for (const { board, canvases } of this.tree.boards) {
+      for (const c of canvases) {
+        const loc = locs.find((l) => l.canvasId === c.id);
+        if (loc) places.push({ boardId: board.id, boardName: board.name, canvasId: c.id, canvasName: c.name, ids: loc.ids });
+      }
+    }
+    return places;
+  }
+
+  /**
+   * Open a canvas, select the given instances and frame them exactly, at
+   * whatever depth they were placed.
+   */
+  async reveal(canvasId: string, ids: readonly ObjectId[]): Promise<void> {
+    await this.openCanvas(canvasId);
+    const objects = ids.map((id) => this.doc.get(id)).filter((o) => o !== undefined);
+    const bounds = unionBounds(objects);
+    if (bounds) this.view.setCamera(fitRect(bounds.min, bounds.max, this.view.viewport, REVEAL_FILL, zoomLevel(this.view.camera)));
+    this.editor.select(objects.map((o) => o.id));
+  }
+
+  /** Place a new instance of a library asset at the centre of the open canvas. */
+  async placeAsset(hash: string): Promise<ObjectId | null> {
+    if (this.editor.blockEdit() || !this.assets) return null;
+    const rec = await this.assets.record(hash);
+    if (!rec) {
+      this.tell("The original of this asset is missing, so it cannot be placed.");
+      return null;
+    }
+    return placeImage(rec, this.doc, this.view, 0, "Place asset").id;
+  }
+
+  /**
+   * Delete a canvas and its objects. If it is open, switch to a neighbour
+   * first. Image originals stay in the asset library.
+   */
+  async deleteCanvas(canvasId: string): Promise<boolean> {
+    if (!this.guardWrite() || !this.tree || !this.current) return false;
+    const entry = this.tree.boards.find((b) => b.canvases.some((c) => c.id === canvasId));
+    if (!entry) return false;
+    if (entry.canvases.length <= 1) {
+      this.tell("A board needs at least one canvas. Delete the board instead.");
+      return false;
+    }
+    if (this.current.canvasId === canvasId) {
+      const i = entry.canvases.findIndex((c) => c.id === canvasId);
+      await this.openCanvas(entry.canvases[i > 0 ? i - 1 : 1]!.id);
+    } else {
+      await this.persistence.flush();
+    }
+    return this.structural(async () => {
+      // Our own pending edits are flushed above; the revision check now guards against another writer.
+      await this.refreshTree();
+      const rev = this.findCanvas(canvasId)?.revision ?? -1;
+      await this.repo!.deleteCanvas(canvasId, rev);
+    });
+  }
+
+  private findCanvas(id: string): CanvasRecord | undefined {
+    for (const b of this.tree?.boards ?? []) for (const c of b.canvases) if (c.id === id) return c;
+    return undefined;
+  }
+
+  /** Delete a board with all its canvases. If it is open, switch to a neighbouring board first. */
+  async deleteBoard(boardId: string): Promise<boolean> {
+    if (!this.guardWrite() || !this.tree || !this.current) return false;
+    const boards = this.tree.boards;
+    const i = boards.findIndex((b) => b.board.id === boardId);
+    if (i < 0) return false;
+    if (boards.length <= 1) {
+      this.tell("A workspace needs at least one board.");
+      return false;
+    }
+    if (this.current.boardId === boardId) {
+      const other = boards[i > 0 ? i - 1 : 1]!;
+      await this.openCanvas(other.canvases[0]!.id);
+    } else {
+      await this.persistence.flush();
+    }
+    return this.structural(async () => {
+      await this.refreshTree();
+      const entry = this.tree?.boards.find((b) => b.board.id === boardId);
+      const expected = new Map((entry?.canvases ?? []).map((c) => [c.id, c.revision]));
+      await this.repo!.deleteBoard(boardId, expected);
+    });
+  }
+
+  private async structural(op: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await op();
+    } catch (e) {
+      if (e instanceof HierarchyError) this.tell(e.message);
+      else if (e instanceof RevisionConflictError) this.tell("Not deleted: it changed since you confirmed. Check it and try again.");
+      else this.tell(`Could not delete: ${(e as Error).message}`);
+      await this.refreshTree();
+      return false;
+    }
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+    this.emitAssets(); // usage counts changed
+    return true;
+  }
+
+  private tell(message: string): void {
+    this.editor.message = message;
+    this.editor.changed();
   }
 
   async newBoard(): Promise<void> {
@@ -135,6 +383,7 @@ export class Session {
     const n = (this.tree?.boards.length ?? 0) + 1;
     const { canvas } = await this.repo!.createBoard(this.current.workspaceId, `Board ${n}`);
     await this.refreshTree();
+    this.post({ kind: "tree" });
     await this.openCanvas(canvas.id);
   }
 
@@ -144,6 +393,7 @@ export class Session {
     const n = (entry?.canvases.length ?? 0) + 1;
     const canvas = await this.repo!.createCanvas(boardId, `Canvas ${n}`);
     await this.refreshTree();
+    this.post({ kind: "tree" });
     await this.openCanvas(canvas.id);
   }
 
@@ -151,12 +401,14 @@ export class Session {
     if (!this.guardWrite() || !name.trim()) return;
     await this.repo!.renameBoard(id, name.trim());
     await this.refreshTree();
+    this.post({ kind: "tree" });
   }
 
   async renameCanvas(id: string, name: string): Promise<void> {
     if (!this.guardWrite() || !name.trim()) return;
     await this.repo!.renameCanvas(id, name.trim());
     await this.refreshTree();
+    this.post({ kind: "tree" });
   }
 
   /** Take over the writer role from another tab. */
@@ -167,8 +419,7 @@ export class Session {
   private guardWrite(): boolean {
     if (!this.repo) return false;
     if (this.readOnly) {
-      this.editor.message = "Read-only: this workspace is open for editing in another tab. Use “Take over” to edit here.";
-      this.editor.changed();
+      this.tell("Read-only: this workspace is open for editing in another tab. Use “Take over” to edit here.");
       return false;
     }
     return true;

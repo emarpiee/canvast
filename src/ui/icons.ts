@@ -10,6 +10,12 @@ import trash from "lucide-static/icons/trash-2.svg";
 import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
 import minus from "lucide-static/icons/minus.svg";
+import infinity from "lucide-static/icons/infinity.svg";
+import images from "lucide-static/icons/images.svg";
+import locate from "lucide-static/icons/locate.svg";
+import mapPin from "lucide-static/icons/map-pin.svg";
+import upload from "lucide-static/icons/upload.svg";
+import x from "lucide-static/icons/x.svg";
 
 function clean(svg: string): string {
   return svg
@@ -31,4 +37,10 @@ export const ICONS = {
   house: clean(house),
   plus: clean(plus),
   minus: clean(minus),
+  infinity: clean(infinity),
+  images: clean(images),
+  locate: clean(locate),
+  mapPin: clean(mapPin),
+  upload: clean(upload),
+  x: clean(x),
 } as const;

@@ -1,3 +1,4 @@
+import { canvasShortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
 import { screenToWorld } from "../core/camera";
@@ -357,13 +358,8 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
   };
 
   // ---- keyboard ----------------------------------------------------------
-  const isTyping = (t: EventTarget | null): boolean => {
-    const el2 = t as HTMLElement | null;
-    return !!el2 && (el2.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el2.tagName));
-  };
-
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (isTyping(e.target)) return;
+    if (!canvasShortcutsActive(e)) return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     if (mod && key === "z") {

@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { esc, fmtBytes } from "./format";
 
 /**
  * Storage status popover (opened from the HUD save indicator). It states
@@ -15,9 +16,6 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
   panel.hidden = true;
   root.appendChild(panel);
 
-  const fmtBytes = (n: number): string =>
-    n >= 2 ** 30 ? `${(n / 2 ** 30).toFixed(1)} GiB` : n >= 2 ** 20 ? `${(n / 2 ** 20).toFixed(1)} MiB` : `${Math.round(n / 1024)} KiB`;
-  const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const fmtTime = (t: number | null): string => (t ? new Date(t).toLocaleTimeString() : "not yet");
 
   const render = async (): Promise<void> => {

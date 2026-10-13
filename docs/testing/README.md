@@ -6,8 +6,8 @@ test runs in both; only the length of the stress loops differs (for example
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (3 browser configs), offline and naming checks | ~8 min (E2E 7.7 min) | **After every ordinary change**, before pushing a branch |
-| `npm run test:full` | The same, with the **full** E2E stress loops | ~35 min (E2E ~29 min) | **Before committing the end of a phase or milestone**; record the result in that phase's test log |
+| `npm test` | Typecheck, unit tests, **quick** E2E suite (3 browser configs), offline and naming checks | ~10 min (E2E 9.5 min, v0.2.0) | **After every ordinary change**, before pushing a branch |
+| `npm run test:full` | The same, with the **full** E2E stress loops | ~35 min (E2E 34.5 min, v0.2.0) | **Before committing the end of a phase or milestone**; record the result in that phase's test log |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npx playwright test -g "<name>"` | Selected quick E2E tests | seconds | While developing a specific feature |
 | `npm run bench` | Scale benchmarks, 1K–1M objects (not a pass/fail gate) | ~10 min | After rendering or performance changes; compare with `metrics/bench-*.json` and docs/testing/phase-0c.md |

@@ -22,6 +22,9 @@ import { projectObject } from "../render/projection";
 import { exactStrokeEdgeDistancePx } from "../render/stroke-coverage";
 import type { ScreenBox } from "../render/projection";
 import type { LassoFilter } from "../render/hit-test";
+import type { AppView } from "../ui/view-switch";
+import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
+import { done } from "../storage/idb";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -83,6 +86,27 @@ export interface DebugHook {
   indexStats(): { objects: number; levels: number; levelsVisited: number; levelsSkippedSubPixel: number; cellsProbed: number; candidates: number; queryMs: number };
   /** Set an object's opacity through a normal transaction (no UI for this yet). */
   setOpacity(id: string, opacity: number): void;
+  /** The visible top-level view. */
+  appView(): AppView;
+  setView(v: AppView): void;
+  /** The asset library as Assets view lists it (after flushing saves). */
+  assetListing(): Promise<CatalogListing>;
+  /** Every catalog entry, including ones deleted and awaiting collection. */
+  catalogEntries(): Promise<CatalogEntry[]>;
+  /** Hashes whose original bytes are stored. */
+  storedAssetHashes(): Promise<string[]>;
+  /** Run asset garbage collection now (writer only). */
+  gc(): Promise<GcReport | null>;
+  /** Hashes the open document and its undo/redo history can still use. */
+  gcRoots(): string[];
+  /**
+   * Fault injection for tests: set a catalog entry's state directly, skipping
+   * the in-use check that the UI applies. Used to prove that collection
+   * itself never erases a referenced original.
+   */
+  forceCatalogState(hash: string, state: "active" | "deleted"): Promise<void>;
+  /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
+  removeAssetBytes(hash: string): Promise<void>;
 }
 
 export interface DebugDeps {
@@ -91,6 +115,8 @@ export interface DebugDeps {
   session: Session;
   renderNow: () => FrameBreakdown;
   index: SpatialIndex;
+  appView: () => AppView;
+  setView: (v: AppView) => void;
 }
 
 export interface BenchRunResult {
@@ -212,8 +238,14 @@ export function installDebugHook(
         : null,
     }),
     storedObjectIds: async (canvasId) => {
-      const loaded = await session.repo!.loadCanvas(canvasId);
-      return loaded.objects.map((o) => o.id).sort();
+      // Raw object records under this canvas id (works for a deleted canvas too).
+      const range = IDBKeyRange.bound([canvasId, ""], [canvasId, "\uffff"]);
+      const keys = await new Promise<IDBValidKey[]>((res, rej) => {
+        const r = session.repo!.db.transaction("objects", "readonly").objectStore("objects").getAllKeys(range);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+      return (keys as Array<[string, string]>).map((k) => k[1]).sort();
     },
     strokeEdgeDistance: (id, x, y) => {
       const o = doc.get(id);
@@ -277,6 +309,45 @@ export function installDebugHook(
       if (!o) throw new Error(`no object ${id}`);
       doc.commit(doc.transaction("Set opacity", [{ ...o, opacity }]));
     },
+    appView: deps.appView,
+    setView: deps.setView,
+    assetListing: async () => {
+      await writer.flush();
+      return session.catalog!.list();
+    },
+    catalogEntries: () => readAll<CatalogEntry>("assetCatalog"),
+    storedAssetHashes: async () => {
+      const tx = session.repo!.db.transaction("assets", "readonly");
+      const keys = await new Promise<IDBValidKey[]>((res, rej) => {
+        const r = tx.objectStore("assets").getAllKeys();
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+      return (keys as string[]).sort();
+    },
+    gc: () => session.collectGarbage(),
+    gcRoots: () => [...session.gcRoots()].sort(),
+    forceCatalogState: async (hash, state) => {
+      const tx = session.repo!.db.transaction("assetCatalog", "readwrite");
+      const store = tx.objectStore("assetCatalog");
+      const r = store.get(hash);
+      r.onsuccess = () => {
+        if (r.result) store.put({ ...r.result, state, deletedAt: state === "deleted" ? Date.now() : null });
+      };
+      await done(tx);
+    },
+    removeAssetBytes: async (hash) => {
+      const tx = session.repo!.db.transaction("assets", "readwrite");
+      tx.objectStore("assets").delete(hash);
+      await done(tx);
+    },
   };
+  function readAll<T>(store: string): Promise<T[]> {
+    return new Promise((res, rej) => {
+      const r = session.repo!.db.transaction(store, "readonly").objectStore(store).getAll();
+      r.onsuccess = () => res(r.result as T[]);
+      r.onerror = () => rej(r.error);
+    });
+  }
   (window as unknown as { __canvastDebug: DebugHook }).__canvastDebug = hook;
 }

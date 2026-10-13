@@ -5,7 +5,7 @@ Its license text is also embedded as a comment at the top of the built file.
 
 ## Lucide icons
 
-- Package: `lucide-static` 1.48.0 (icons: hand, mouse-pointer-2, pencil, lasso, image-plus, undo-2, redo-2, trash-2, house, plus, minus)
+- Package: `lucide-static` 1.48.0 (icons: hand, mouse-pointer-2, pencil, lasso, image-plus, undo-2, redo-2, trash-2, house, plus, minus, infinity, images, locate, map-pin, upload, x)
 - License: ISC
 
 ```

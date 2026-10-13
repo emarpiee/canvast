@@ -1,15 +1,18 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 2 (see docs/adr/0006-workspace-storage.md):
+ * Database "canvast", version 3 (see docs/adr/0006-workspace-storage.md and
+ * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
  *   workspaces   keyPath "id"      → WorkspaceRecord
  *   boards       keyPath "id"      → BoardRecord
  *   canvases     keyPath "id"      → CanvasRecord            (index "boardId")
- *   objects      keyPath [canvasId, id] → ObjectRecord        (one record per canvas object)
+ *   objects      keyPath [canvasId, id] → ObjectRecord        (one record per canvas object;
+ *                                                             index "assetId" on data.assetId, v3)
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
  *   assets       key sha256        → AssetRecord              (original bytes, stored once)
+ *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
  *
  * Legacy (version 1, read-only after migration, never deleted here):
  *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
@@ -20,7 +23,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -47,6 +50,10 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       if (!has("canvases")) db.createObjectStore("canvases", { keyPath: "id" }).createIndex("boardId", "boardId");
       if (!has("objects")) db.createObjectStore("objects", { keyPath: ["canvasId", "id"] });
       if (!has("canvasViews")) db.createObjectStore("canvasViews");
+      // v3: usage lookups. Strokes have no assetId, so the index holds image instances only.
+      const objects = req.transaction!.objectStore("objects");
+      if (!objects.indexNames.contains("assetId")) objects.createIndex("assetId", "data.assetId");
+      if (!has("assetCatalog")) db.createObjectStore("assetCatalog", { keyPath: "hash" });
     };
     req.onsuccess = () => {
       const db = req.result;
