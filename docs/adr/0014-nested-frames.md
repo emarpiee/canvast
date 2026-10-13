@@ -57,6 +57,16 @@ is tested by running both systems side by side (`tests/unit/frames.test.ts`):
   small terms (one per frame step), never one long number, and drops what
   lies below 2^-192 camera-frame units (far below 10^-6 px). Stored
   positions and every edit stay exact; exact conversion is separate.
+- Limits found by stress tests (`tests/unit/frames.test.ts`, the fuzz in
+  `scripts/spike-measure.mjs`):
+  - Depth is unbounded (frame levels are BigInt): 10^18 levels by 1,000
+    jumps, exact both ways. **One jump is capped at 2^50 levels** (zoom
+    counts are doubles; past that a jump would be off by whole levels).
+  - A long wheel zoom leaves one frame per 32 levels; walking them is
+    cheap (0.6 ms at 10^5 levels). If that ever matters, merge chains of
+    empty frames into one dive.
+  - Frames are not yet freed when nothing refers to them (about 1,300
+    after 2,500 random steps). Step 3 frees unreferenced frames.
 - Open: coarse objects seen from far below still cost O(Δ); the carried
   near-edge set (plan §3) removes it in step 3.
 

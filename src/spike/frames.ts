@@ -196,6 +196,8 @@ export function fzoomAt(space: FrameSpace, c: FrameCamera, vp: Viewport, at: Scr
  * it, computed after rebasing so no number grows with the jump.
  */
 export function fjump(space: FrameSpace, c: FrameCamera, levels: number): FrameCamera {
+  // Zoom counts are doubles: beyond this a jump is no longer exact. Depth itself is unbounded (frame levels are BigInt).
+  if (!(Math.abs(levels) <= MAX_FRAME_JUMP)) throw new RangeError(`jumps are limited to 2^50 levels at a time`);
   const dzq = Math.round(levels / ZOOM_QUANTUM) * ZOOM_QUANTUM;
   if (dzq === 0) return c;
   const z = c.z + dzq;
@@ -205,6 +207,8 @@ export function fjump(space: FrameSpace, c: FrameCamera, levels: number): FrameC
   const q = -(n.pz + CENTER_GUARD_BITS);
   return { ...n, x: roundSmall(n.x, q), y: roundSmall(n.y, q) };
 }
+
+export const MAX_FRAME_JUMP = 2 ** 50;
 
 /** Absolute zoom level (levels below the world frame), as a BigInt plus fraction. */
 export function depthOf(c: FrameCamera): { levels: bigint; frac: number } {

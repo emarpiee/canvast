@@ -81,5 +81,33 @@ for (const name of names) {
     console.log(`Δ ${delta} | ${r.error ?? `${r.t.p50.toFixed(1)}/${r.t.p95.toFixed(1)} | ${r.ink}`}`);
     await page.close();
   }
+  // Random clicks, pans, zooms, strokes and Home (including zooming out): no step may take longer than 250 ms.
+  console.log("\nfuzz seed | steps | worst step ms | frames | ok");
+  for (const seed of [7, 11, 13]) {
+    const page = await open(browser);
+    const r = await Promise.race([page.evaluate((seed) => {
+      const JUMPS = [-1e12, -1e9, -1e6, -1000, -32, 32, 1000, 1e6, 1e9, 1e12].map(String);
+      const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+      const s = window.__spike;
+      const btn = (t) => [...document.querySelectorAll("#jumps button")].find((b) => b.dataset.jump === t || b.textContent === t);
+      s.stroke([[300, 300], [500, 340], [700, 300]]);
+      let worst = 0;
+      for (let i = 0; i < 2500; i++) {
+        const k = rnd();
+        const t = performance.now();
+        if (k < 0.15) btn(JUMPS[Math.floor(rnd() * JUMPS.length)]).click();
+        else if (k < 0.17) btn("Home").click();
+        else if (k < 0.6) s.pan((rnd() - 0.5) * 2000, (rnd() - 0.5) * 2000);
+        else if (k < 0.97) s.zoomAt(rnd() * 1280, rnd() * 800, (rnd() - 0.5) * 4);
+        else s.stroke([[rnd() * 1280, rnd() * 800], [rnd() * 1280, rnd() * 800]]);
+        s.render();
+        worst = Math.max(worst, performance.now() - t);
+        if (worst > 250) return { steps: i + 1, worst, frames: s.frames() };
+      }
+      return { steps: 2500, worst, frames: s.frames() };
+    }, seed), new Promise((res) => setTimeout(() => res({ steps: "hung", worst: Infinity, frames: "?" }), 120000))]);
+    console.log(`${seed} | ${r.steps} | ${r.worst.toFixed(1)} | ${r.frames} | ${r.worst <= 250}`);
+    await page.close().catch(() => {});
+  }
   await browser.close();
 }

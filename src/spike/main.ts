@@ -294,7 +294,9 @@ window.addEventListener("keydown", (e) => {
   else if (k === "ArrowDown") setCam(fpanBy(space, cam, 0, -step));
   else if (k === "j") {
     const v = Number(prompt("Zoom by how many levels? (e.g. 1000000000000 or -1000)") ?? "");
-    if (Number.isFinite(v) && v) setCam(fjump(space, cam, v));
+    if (Number.isFinite(v) && v) {
+      try { setCam(fjump(space, cam, v)); } catch (err) { alert(String(err)); }
+    }
   } else return;
   canvas.dataset["tool"] = tool;
   e.preventDefault();

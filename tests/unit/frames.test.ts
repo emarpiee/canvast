@@ -243,6 +243,37 @@ describe("nested frames behave exactly like absolute coordinates", () => {
     expect(found).toBeGreaterThan(1000);
   });
 
+  it("stress: 10^18 levels by 10^15 jumps is exact both ways; one jump is capped at 2^50", () => {
+    const space = new FrameSpace();
+    let fc = fpanBy(space, { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, 12.3, 4.5);
+    const t0 = performance.now();
+    for (let i = 0; i < 1000; i++) fc = fpanBy(space, fjump(space, fc, 1e15), 50, -20);
+    expect(depthOf(fc).levels).toBe(10n ** 18n);
+    expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.ZERO }, fc.f);
+    for (let i = 0; i < 1000; i++) fc = fjump(space, fc, -1e15);
+    expect(depthOf(fc).levels).toBe(0n);
+    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(() => fjump(space, fc, 2 ** 51)).toThrow(RangeError);
+  });
+
+  it("stress: wheel zoom through 10^5 levels in and out keeps every frame change cheap", () => {
+    for (const dir of [1, -1]) {
+      const space = new FrameSpace();
+      let fc = fpanBy(space, { f: space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 }, 123.37, -56.71);
+      let worst = 0;
+      for (let i = 0; i < 50_000; i++) {
+        const prev = fc.f;
+        fc = fzoomAt(space, fc, VP, { x: 700, y: 380 }, 2 * dir);
+        if (fc.f === prev) continue;
+        const t = performance.now();
+        expressIn(space, space.world, { x: D.fromBigInt(5n), y: D.ZERO }, fc.f);
+        worst = Math.max(worst, performance.now() - t);
+      }
+      expect(Number(depthOf(fc).levels)).toBe(dir * 100_000);
+      expect(worst).toBeLessThan(20);
+    }
+  });
+
   it("climbing part of a long dive is one step, not one per frame", () => {
     for (const up of [-1e9, -1e6, -1e12 + 1e9]) {
       const space = new FrameSpace();
