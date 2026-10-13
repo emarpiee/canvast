@@ -118,3 +118,24 @@ test("after giant zoom-outs (−10^12 five times) wheel, keys, drag pan and Home
   recordMetric(info, "zoom out 5e12 then every input", { maxStepMs: Math.max(...steps) });
   expect(Math.max(...steps)).toBeLessThan(MAX_STEP_MS);
 });
+
+test("work at 2^10,000,000 off the origin saves and reopens after a reload (Firefox caps BigInts at ~2^20 bits)", async ({ app }) => {
+  const p = app.page;
+  const view = { cx: "12345p-10000003", cy: "-678p-10000001", zi: 10_000_000, zf: 0.25, pz: 10_000_000 };
+  await p.evaluate((v) => window.__canvastDebug.setCamera(v), view);
+  await p.mouse.click(640, 400);
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 6);
+  const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  const t0 = Date.now();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect(Date.now() - t0, "reopens quickly").toBeLessThan(10_000);
+  expect(await p.evaluate(() => document.querySelector('[role="status"]')?.textContent ?? "")).not.toContain("Could not open");
+  expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id)).toEqual([s!.id]);
+  await p.evaluate((v) => window.__canvastDebug.setCamera(v), view);
+  await app.frame();
+  expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id), s!.id)).not.toBeNull();
+});

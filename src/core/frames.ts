@@ -163,21 +163,77 @@ export function normalize(space: FrameSpace, c: FrameCamera): FrameCamera {
       pz += K * n;
       f = p;
     } else if (z > K + H) {
-      const i = D.fromBigInt(D.floorDivPow2(x, 0));
-      const j = D.fromBigInt(D.floorDivPow2(y, 0));
-      x = D.sub(x, i);
-      y = D.sub(y, j);
-      // Nothing left below the cell corner: dive the remaining whole steps at once.
-      const steps = x.m === 0n && y.m === 0n ? Math.max(1, Math.floor((z - K - H) / K) + 1) : 1;
-      f = space.child(f, BigInt(steps), i, j);
-      x = D.shift(x, K * steps);
-      y = D.shift(y, K * steps);
+      // Every step needed at once (linear in the point's bits; empty trailing steps become a dive).
+      const steps = Math.floor((z - K - H) / K) + 1;
+      ({ f, x, y } = descend(space, f, x, y, steps));
       z -= K * steps;
       pz -= K * steps;
     } else {
       return { f, x, y, z, pz };
     }
   }
+}
+
+/**
+ * Descend `steps` K-steps from frame `f` at point (x, y), exactly, in time
+ * linear in the point's size (stepping one level at a time redoes
+ * arithmetic on the whole number each step: quadratic, hours for a point
+ * with 10^7 significant bits).
+ *
+ * Cells use balanced digits: each level's offset is the nearest integer, so
+ * the remainder lies in [−1/2, 1/2) of a cell and offsets in [−2^(K−1),
+ * 2^(K−1)). With floor digits a point just below a corner would read
+ * 0.FFFF… at every level and never compress; balanced, it reads 0, 0, …,
+ * then its few significant digits. Every non-zero cell takes the empty
+ * cells after it as one compressed dive, so a point 2^-10^7 from a corner
+ * needs a few frames, not 312,500.
+ */
+function descend(space: FrameSpace, f: Frame, x: D.Dyadic, y: D.Dyadic, steps: number): { f: Frame; x: D.Dyadic; y: D.Dyadic } {
+  // Nearest integer, ties toward +∞ (as roundTo), without adding 1/2 (see D.roundShift).
+  const nearest = (v: D.Dyadic): bigint => (v.e >= 0 ? D.floorDivPow2(v, 0) : D.roundShift(v.m, -v.e));
+  const ix = nearest(x);
+  const iy = nearest(y);
+  const fx = ix === 0n ? x : D.sub(x, D.fromBigInt(ix)); // in [−1/2, 1/2)
+  const fy = iy === 0n ? y : D.sub(y, D.fromBigInt(iy));
+  // Digit chunks after the first cell; beyond the point's lowest bit they are all zero.
+  const bitsBelow = (v: D.Dyadic): number => (v.m === 0n ? 0 : Math.ceil(-v.e / K));
+  const rest = Math.min(steps - 1, Math.max(bitsBelow(fx), bitsBelow(fy)));
+  // F = round(f·2^(K·rest)): the digits as one integer (exact when the digits cover every bit).
+  const F = (v: D.Dyadic): bigint => nearest(D.shift(v, K * rest));
+  const FX = F(fx);
+  const FY = F(fy);
+  // Balanced base-2^K digits of F, low digit first, from one hex string: add the bias
+  // 2^(K−1) to every digit, read unsigned digits, subtract the bias.
+  const hexDigits = K / 4;
+  const digits = (v: bigint): bigint[] => {
+    if (v === 0n) return [];
+    const a = v < 0n ? -v : v;
+    const count = Math.min(rest, Math.ceil((D.bitLength(a) + 1) / K) + 1);
+    const bias = BigInt("0x" + "8".padEnd(hexDigits, "0").repeat(count));
+    const hex = (v + bias).toString(16).padStart(count * hexDigits, "0");
+    const out: bigint[] = [];
+    for (let j = 0; j < count; j++) out.push(BigInt("0x" + hex.slice(hex.length - (j + 1) * hexDigits, hex.length - j * hexDigits)) - (1n << BigInt(K - 1)));
+    return out;
+  };
+  const dx = digits(FX);
+  const dy = digits(FY);
+  // Chunk k (1..rest, coarse to fine) is digit rest − k.
+  const at = (d: bigint[], k: number): bigint => d[rest - k] ?? 0n;
+  const cell = (k: number): [bigint, bigint] => (k === 0 ? [ix, iy] : [at(dx, k), at(dy, k)]);
+  // Remainder below the last cell, in the final frame's units: [−2^(K−1), 2^(K−1)). Zero when the digits ran out first.
+  const full = rest === steps - 1;
+  const rx = full ? D.sub(D.shift(fx, K * steps), D.fromBigInt(FX << BigInt(K))) : D.ZERO;
+  const ry = full ? D.sub(D.shift(fy, K * steps), D.fromBigInt(FY << BigInt(K))) : D.ZERO;
+  const starts = new Set<number>([0]);
+  for (const d of [dx, dy]) d.forEach((v, j) => v !== 0n && rest - j >= 1 && starts.add(rest - j));
+  const ks = [...starts].sort((a, b) => a - b);
+  let g = f;
+  for (let i = 0; i < ks.length; i++) {
+    const k = ks[i]!;
+    const [a, b] = cell(k);
+    g = space.child(g, BigInt((ks[i + 1] ?? steps) - k), D.fromBigInt(a), D.fromBigInt(b));
+  }
+  return { f: g, x: rx, y: ry };
 }
 
 /** Ordinary pan (CSS px). */
@@ -268,25 +324,21 @@ export function expressIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, 
 
 /** A point of frame `g` in frame `f`'s units at any distance, to a relative error below 2^(1−GAP): for read-outs. */
 export function approxIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame): WorldPoint {
-  const w = walk(space, g, p, f, Infinity, DRAW_BITS)!;
+  // Nothing is dropped: the read-out needs relative, not absolute, precision (a point 2^-10^7 from the origin is not 0).
+  const w = walk(space, g, p, f, Infinity, Infinity)!;
   return { x: w.x[0] ?? D.ZERO, y: w.y[0] ?? D.ZERO };
 }
 
-function walk(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, far: number, bits: number): { x: Terms; y: Terms } | null {
-  const pathF = space.path(f);
-  const onF = new Set(pathF);
+function walk(_space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, far: number, bits: number): { x: Terms; y: Terms } | null {
+  const { up, down } = route(g, f);
   let x: Terms = addTerm(p.x, []);
   let y: Terms = addTerm(p.y, []);
-  let a = g;
-  while (!onF.has(a)) {
-    const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
-    const q = -(bits + levelsBetween(up, f));
+  for (const a of up) {
+    const q = -(bits + levelsBetween(a.parent!, f));
     x = addTerm(a.ox, shiftTerms(x, -K * Number(a.n), q));
     y = addTerm(a.oy, shiftTerms(y, -K * Number(a.n), q));
-    a = up;
   }
-  for (let i = pathF.indexOf(a) + 1; i < pathF.length; i++) {
-    const d = pathF[i]!;
+  for (const d of down) {
     const q = -(bits + levelsBetween(d, f));
     x = shiftTerms(addTerm(D.neg(d.ox), x), K * Number(d.n), q);
     y = shiftTerms(addTerm(D.neg(d.oy), y), K * Number(d.n), q);
@@ -306,23 +358,67 @@ export function levelsBetween(g: Frame, f: Frame): number {
  * and coarse objects; never on the per-frame path for ordinary content.
  */
 export function expressExactIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame): WorldPoint {
-  const onF = new Set(space.path(f));
-  let x = p.x;
-  let y = p.y;
+  // In the common ancestor A's units the point is a sum of offsets at falling scales (2):
+  // up from g, + o·2^(−K·levels above), and down to f, − o·2^(−K·levels above). Summed
+  // one by one this is quadratic in the depth (every addition copies the growing number);
+  // a balanced sum is O(bits · log steps).
+  const { up, down: path } = route(g, f);
+  const xs: D.Dyadic[] = [];
+  const ys: D.Dyadic[] = [];
+  let depth = 0; // K-steps below A so far
+  for (let i = up.length - 1; i >= 0; i--) {
+    const u = up[i]!;
+    xs.push(D.shift(u.ox, -K * depth));
+    ys.push(D.shift(u.oy, -K * depth));
+    depth += Number(u.n);
+  }
+  xs.push(D.shift(p.x, -K * depth));
+  ys.push(D.shift(p.y, -K * depth));
+  let down = 0;
+  for (const d of path) {
+    xs.push(D.neg(D.shift(d.ox, -K * down)));
+    ys.push(D.neg(D.shift(d.oy, -K * down)));
+    down += Number(d.n);
+  }
+  return { x: D.shift(balancedSum(xs), K * down), y: D.shift(balancedSum(ys), K * down) };
+}
+
+/**
+ * The frames between `g` and `f` through their nearest common ancestor A:
+ * `up` from g to below A (bottom-up), `down` from below A to f (top-down).
+ * Read only; the cost is the distance between them, not their depth.
+ */
+function route(g: Frame, f: Frame): { up: Frame[]; down: Frame[] } {
+  const up: Frame[] = [];
+  const down: Frame[] = [];
   let a = g;
-  while (!onF.has(a)) {
-    const up = a.parent!; // read only: a split here would cost one loop per step of a compressed dive
-    x = D.add(a.ox, D.shift(x, -K * Number(a.n)));
-    y = D.add(a.oy, D.shift(y, -K * Number(a.n)));
-    a = up;
+  let b = f;
+  while (a !== b) {
+    if (a.level >= b.level) {
+      up.push(a);
+      a = a.parent!;
+    } else {
+      down.push(b);
+      b = b.parent!;
+    }
   }
-  const pathF = space.path(f);
-  for (let i = pathF.indexOf(a) + 1; i < pathF.length; i++) {
-    const d = pathF[i]!;
-    x = D.shift(D.sub(x, d.ox), K * Number(d.n));
-    y = D.shift(D.sub(y, d.oy), K * Number(d.n));
+  return { up, down: down.reverse() };
+}
+
+/**
+ * Exact sum, adding neighbours pairwise: O(total bits · log n) instead of
+ * quadratic, as long as neighbours have similar scales (callers pass runs
+ * ordered coarse to fine).
+ */
+function balancedSum(ts: D.Dyadic[]): D.Dyadic {
+  let a = ts;
+  if (!a.length) return D.ZERO;
+  while (a.length > 1) {
+    const b: D.Dyadic[] = [];
+    for (let i = 0; i < a.length; i += 2) b.push(i + 1 < a.length ? D.add(a[i]!, a[i + 1]!) : a[i]!);
+    a = b;
   }
-  return { x, y };
+  return a[0]!;
 }
 
 /** The camera as the old absolute system sees it (world centre, zoom level). Exact. */
@@ -365,12 +461,9 @@ export function rehome(space: FrameSpace, pl: Placement, extentLog2: number): Pl
       unit -= K;
       f = p;
     } else if (s < -H) {
-      const i = D.fromBigInt(D.floorDivPow2(x, 0));
-      const j = D.fromBigInt(D.floorDivPow2(y, 0));
-      f = space.child(f, 1n, i, j);
-      x = D.shift(D.sub(x, i), K);
-      y = D.shift(D.sub(y, j), K);
-      unit += K;
+      const steps = Math.ceil((-H - s) / K);
+      ({ f, x, y } = descend(space, f, x, y, steps));
+      unit += K * steps;
     } else {
       return { f, anchor: { x, y }, unit };
     }

@@ -10,7 +10,9 @@ import type { Frame, FrameCamera, Placement } from "../../src/core/frames";
 import {
   FrameSpace,
   K,
+  approxIn,
   depthOf,
+  fromAbsoluteCamera,
   expressExactIn,
   expressIn,
   fjump,
@@ -273,6 +275,22 @@ describe("nested frames behave exactly like absolute coordinates", () => {
       expect(Number(depthOf(fc).levels)).toBe(dir * 100_000);
       expect(worst).toBeLessThan(100);
     }
+  });
+
+  it("a point 2^-10^7 from a corner with few bits takes a few frames, linear time, exact both ways", () => {
+    const space = new FrameSpace();
+    const p = { x: D.parse("12345p-10000003"), y: D.parse("-678p-10000001") };
+    const t0 = performance.now();
+    const fc = fromAbsoluteCamera(space, p, 10_000_000, 10_000_000);
+    const pl = rehome(space, { f: space.world, anchor: p, unit: -10_000_000 }, 8);
+    expect(performance.now() - t0).toBeLessThan(500);
+    expect(space.count, "runs of empty cells are compressed dives").toBeLessThan(20);
+    expect(D.equals(toAbsoluteCamera(space, fc).center.x, D.roundTo(p.x, -(10_000_000 + 96)))).toBe(true);
+    const back = expressExactIn(space, pl.f, pl.anchor, space.world);
+    expect(D.equals(back.x, p.x) && D.equals(back.y, p.y)).toBe(true);
+    // The read-out keeps relative precision: not 0.
+    const r = approxIn(space, fc.f, { x: fc.x, y: fc.y }, space.world);
+    expect(Math.abs(D.log2Abs(r.x) - D.log2Abs(p.x))).toBeLessThan(1);
   });
 
   it("climbing part of a long dive is one step, not one per frame", () => {

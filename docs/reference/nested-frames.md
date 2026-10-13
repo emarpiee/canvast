@@ -91,7 +91,7 @@ total depth is unbounded.
 | Event | Effect |
 | --- | --- |
 | Zoom far in | A child frame for the cell under the view: `child(F, 1, i, j)` |
-| Zoom in where the remaining position is exactly a cell corner | A **compressed dive**: one child with `n = s` steps instead of s frames (memory O(1) for any dive into empty space) |
+| Zoom in (or load a point) where a run of levels has empty cells (offset 0) | A **compressed dive**: one child with `n = run + 1` steps instead of that many frames (memory O(1) for any dive into empty space; §5.4) |
 | Zoom far out above the root | A new root: one record whose child step `n` is the whole climb |
 | Climb `k` steps out of a dive of `n > k` steps | **Split once**: see 3.5 |
 
@@ -162,13 +162,14 @@ Repeat until (5) holds:
   A term `x · 2^(−K·n)` below `2^(q−2)` with `q = −(pz + K·n + 96)` is
   dropped: the old system's rounding at `2^q` removes it anyway, and
   keeping it would build a number as long as the climb.
-- **Down** (`z > K + H`): `i = floor(x)`, `j = floor(y)`,
+- **Down** (`z > K + H`): descend `s = floor((z − K − H) / K) + 1` steps.
+  One step is, with **balanced digits** (`i` = nearest integer, ties
+  toward +∞):
   ```
   x' = (x − i) · 2^K,  z' = z − K,  pz' = pz − K,  frame = child(f,1,i,j) (7)
   ```
-  If `x − i` and `y − j` are both exactly 0, the remaining descent is
-  empty: descend `s = floor((z − K − H) / K) + 1` steps in one compressed
-  dive (`x' = 0`, `z' = z − K·s`).
+  so offsets lie in [−2^(K−1), 2^(K−1)) and the remainder in [−½, ½) of
+  a cell. All `s` steps are taken at once by `descend` (§5.4).
 
 (6) and (7) are exact changes of frame: the absolute position (2), the
 absolute zoom and the precision depth do not change, so **nothing moves on
@@ -190,6 +191,32 @@ A jump by `L` levels about the screen centre (the zoom read-out):
 
 Result: the same camera as the old `zoomAt` about the centre, at a cost of a
 few small operations for any `L`.
+
+### 5.4 Descending many steps at once (`descend`)
+
+Used by camera rebasing, jumps, loading a camera, and re-homing objects.
+
+- **Digits, not steps.** Below the first cell, the cell offsets of a point
+  are its base-2^K digits. They come from one integer
+  `F = round(f · 2^(K·r))` (f the fraction after the first cell, r the
+  number of digit levels the point's bits reach), read as balanced digits
+  from one hex string: add 2^(K−1) to every digit, read unsigned, subtract.
+  Cost is linear in the point's bits. Taking the steps one at a time
+  instead redoes arithmetic on the whole number per step: quadratic, about
+  half an hour for a point with 10^7 significant bits (a v0.8 position at
+  2^10,000,000).
+- **Runs of empty cells are compressed dives.** Each non-zero cell takes the
+  zero cells after it as one frame `child(g, run + 1, cell)`. Exact by (3).
+- **Why balanced digits.** With floor digits, a point just below a corner
+  reads 0.FFFF… at every level and nothing compresses (312,500 frames for
+  a point 2^-10^7 from a corner). Balanced, it reads 0, 0, …, then its few
+  significant digits: 3 frames.
+- **No big temporaries.** Rounding `m · 2^−s` uses
+  `((m >> (s−1)) + 1) >> 1` (`D.roundShift`), which equals
+  `floor(v + ½)` but never builds `2^(s−1)`. Adding ½ first creates an
+  s-bit number for a moment: fine in Chrome, but **Firefox caps BigInts at
+  about 2^20 bits** and throws, which made Firefox fail to open a
+  workspace with v0.8 data from 2^10,000,000.
 
 ## 6. Objects
 
@@ -228,10 +255,18 @@ Walks only **read** parent links; they never create or split frames.
 
 ### 7.1 Exact form (`expressExactIn`)
 
-Applies (9) with exact dyadics. Correct, but a point that is a small
-distance from a corner `2^10^12` levels up, minus a neighbouring cell's
-offset, needs a 10^12-bit number. Used only for migration, export, debug
-and tests.
+Applies (9) with exact dyadics, written as one sum (2): the offsets on the
+way up and (negated) on the way down, each scaled to the common ancestor,
+plus the point. The sum is **balanced** (neighbours by scale added
+pairwise): O(bits · log steps), where adding one by one is quadratic. The
+result can be as long as the depth in bits (a point a small distance from
+a corner 2^10^12 levels up needs a 10^12-bit number), so it is used only
+for storage until step 4, export, debugging and tests.
+
+**Walks never go above the nearest common ancestor** (`route`, using frame
+levels): their cost is the distance between the two frames, not the depth
+of either. Building the whole path from the root on every call cost
+312,500 steps per view change for a deep position.
 
 ### 7.2 Drawing form (`expressIn`): term sums
 
@@ -325,7 +360,8 @@ covers/misses state recorded instead. See the plan, §3.
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
 | Coarse objects from > 100,000 levels below | Not drawn | §7.3, near-edge set (step 3) |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
-| Saving deeper than 2^24 levels | Objects stay queued with a save error; view not saved | Storage holds frames in step 4 |
+| Saving very deep objects | Absolute form beyond 2^24 levels, or too large for the browser (Firefox: ~2^20-bit BigInts), cannot be written: such objects stay queued with a save error, the rest saves. The view is not saved deeper than 2^19 levels | Storage holds frames in step 4 |
+| Firefox BigInt limit | About 2^20 bits per number; every per-frame path stays far below it | Keep it that way: no temporaries of ~depth bits |
 | Frames with content | Every one is visited per view change (cheap walks) | Cull by the frame tree when documents hold thousands of frames |
 
 ## 11. Verification
@@ -357,6 +393,13 @@ Run: `npx vitest run tests/unit/frames.test.ts`;
    time limit. The first gate only zoomed in and missed three hangs.
 5. **Rounding must commute with grid-aligned shifts** (4), or two exact
    systems disagree on ties.
+6. **Never step one level at a time through a long number.** Read all the
+   digits at once (§5.4); sum many offsets in a balanced tree (§7.1).
+7. **Use balanced digits** so runs of empty levels compress whichever side
+   of a corner a point is on.
+8. **Firefox caps BigInts at ~2^20 bits.** Code that works in Chrome can
+   throw in Firefox; never build a temporary as long as the depth, even
+   briefly. Test deep data in Firefox, including reloads.
 
 ## 13. Glossary
 

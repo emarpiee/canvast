@@ -212,9 +212,17 @@ export function diffToNumber(a: Dyadic, b: Dyadic, k: number): number {
  */
 export function roundTo(a: Dyadic, q: number): Dyadic {
   if (a.m === 0n || a.e >= q) return a;
-  const s = BigInt(q - a.e);
-  // BigInt >> floors for negatives too.
-  return make((a.m + (1n << (s - 1n))) >> s, q);
+  return make(roundShift(a.m, q - a.e), q);
+}
+
+/**
+ * floor(m / 2^s + 1/2) for s ≥ 1, as ((m >> (s−1)) + 1) >> 1: exact, and it
+ * never builds 2^(s−1). Adding 1/2 first would make a number of s bits for a
+ * moment, beyond Firefox's BigInt limit (about 2^20 bits) for points deep
+ * in the canvas. BigInt >> floors for negatives too.
+ */
+export function roundShift(m: bigint, s: number): bigint {
+  return ((m >> BigInt(s - 1)) + 1n) >> 1n;
 }
 
 /** floor(a / 2^g) as an integer. */

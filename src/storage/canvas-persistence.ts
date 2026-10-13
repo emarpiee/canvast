@@ -1,6 +1,6 @@
 import { serializeCamera } from "../core/camera";
 import { depthOf, levelsBetween } from "../core/frames";
-import { MAX_WORLD_FORM_LEVELS } from "../doc/model";
+import { serializeObject } from "../doc/model";
 import type { ViewState } from "../app/view-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId } from "../doc/model";
@@ -29,6 +29,16 @@ export type SaveState = "verified" | "committed" | "queued" | "saving" | "readon
 
 const DEBOUNCE_MS = 150;
 const CAMERA_DEBOUNCE_MS = 600;
+
+/** Whether the object's absolute (storage) form can be written in this browser. */
+function fitsWorldForm(o: CanvasObject): boolean {
+  try {
+    serializeObject(o);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export class CanvasPersistence {
   state: SaveState;
@@ -111,17 +121,19 @@ export class CanvasPersistence {
     this.dirty.clear();
     const puts: CanvasObject[] = [];
     const deletes: ObjectId[] = [];
-    // shortcut: objects deeper than 2^24 levels cannot be stored until storage holds frames (plan step 4); they stay queued, the rest is saved.
+    // shortcut: storage is absolute until it holds frames (plan step 4). A deep object whose absolute
+    // position is too large to write (beyond 2^24 levels, or beyond Firefox's ~2^20-bit BigInt limit)
+    // stays queued with a save error; the rest is saved.
     const waiting: ObjectId[] = [];
     for (const id of ids) {
       const o = this.doc.get(id);
-      if (o && o.frame && Math.abs(levelsBetween(o.frame.space.world, o.frame)) > MAX_WORLD_FORM_LEVELS) waiting.push(id);
+      if (o && o.frame && Math.abs(levelsBetween(o.frame.space.world, o.frame)) > 2 ** 19 && !fitsWorldForm(o)) waiting.push(id);
       else if (o) puts.push(o);
       else deletes.push(id);
     }
     if (!puts.length && !deletes.length) {
       for (const id of waiting) this.dirty.add(id);
-      this.lastError = `${waiting.length} object(s) deeper than 2^24 levels are not saved yet (needs the storage update)`;
+      this.lastError = `${waiting.length} very deep object(s) are not saved yet (needs the storage update)`;
       this.setState("error");
       return;
     }
@@ -142,7 +154,7 @@ export class CanvasPersistence {
           this.onCommitted?.(canvasId, result.revision);
           if (waiting.length) {
             for (const id of waiting) this.dirty.add(id);
-            this.lastError = `${waiting.length} object(s) deeper than 2^24 levels are not saved yet (needs the storage update)`;
+            this.lastError = `${waiting.length} very deep object(s) are not saved yet (needs the storage update)`;
             this.setState("error");
           } else if (this.dirty.size === 0) this.setState("verified");
         } else {
@@ -170,9 +182,9 @@ export class CanvasPersistence {
 
   async saveCamera(): Promise<void> {
     if (!this.repo || !this.canvasId || !this.writable) return;
-    // shortcut: the saved view is absolute until storage holds frames (plan step 4); deeper than 2^24 levels it would be a huge number, so the last view saved is kept.
+    // shortcut: the saved view is absolute until storage holds frames (plan step 4); it is written after every view change, and deeper than 2^19 levels that takes seconds (and can exceed Firefox's BigInt limit), so the last view saved is kept.
     const depth = depthOf(this.view.frameCamera).levels;
-    if (depth > 2n ** 24n || depth < -(2n ** 24n)) return;
+    if (depth > 2n ** 19n || depth < -(2n ** 19n)) return;
     try {
       await this.repo.saveCamera(this.canvasId, serializeCamera(this.view.worldCamera()));
     } catch {

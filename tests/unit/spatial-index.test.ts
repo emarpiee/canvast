@@ -140,8 +140,8 @@ describe("spatial index", () => {
         expect(Math.abs(d.dy + 120)).toBeLessThan(1);
       }
     }
-    // Content straddling a frame corner (frames at cells −1 and 0): the dots sit on the content, not on the corners.
-    const far = D.fromBigInt(1234567891n, 0);
+    // Content straddling a frame edge (cells are centred: edges at half a cell, here 2^-33): the dots sit on the content, not on the frame origins.
+    const far = D.add(D.fromBigInt(1234567891n, 0), D.fromBigInt(1n, -33));
     const c2 = new DocumentStore();
     const ix2 = new FrameIndex(() => c2.space);
     syncIndex(c2, ix2);
@@ -149,8 +149,8 @@ describe("spatial index", () => {
     expect(new Set([...c2.all()].map((o) => o.frame)).size, "content spans two frames").toBe(2);
     const look: FrameCamera = fromAbsoluteCamera(c2.space, { x: D.sub(far, D.fromNumber(260)), y: D.sub(far, D.fromNumber(100)) }, 0, 0);
     for (const d of ix2.dots(look)) {
-      expect(Math.floor(640 + d.dx)).toBe(900);
-      expect(Math.floor(400 + d.dy)).toBe(500);
+      expect(Math.abs(640 + d.dx - 900)).toBeLessThan(0.5);
+      expect(Math.abs(400 + d.dy - 500)).toBeLessThan(0.5);
     }
     // From home, the stroke 10^6 levels down is a dot too.
     const home: FrameCamera = { f: doc.space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
