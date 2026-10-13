@@ -1,14 +1,35 @@
 /**
- * Minimal promise wrapper over IndexedDB for the Phase 0B snapshot.
+ * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 1:
- *   snapshots  key "main" → SnapshotRecord (objects + camera)
- *   assets     key sha256  → AssetRecord (original bytes, deduplicated)
+ * Database "canvast", version 2 (see docs/adr/0006-workspace-storage.md):
+ *
+ *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
+ *   workspaces   keyPath "id"      → WorkspaceRecord
+ *   boards       keyPath "id"      → BoardRecord
+ *   canvases     keyPath "id"      → CanvasRecord            (index "boardId")
+ *   objects      keyPath [canvasId, id] → ObjectRecord        (one record per canvas object)
+ *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
+ *   assets       key sha256        → AssetRecord              (original bytes, stored once)
+ *
+ * Legacy (version 1, read-only after migration, never deleted here):
+ *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
+ *
+ * The upgrade callback only creates stores and indexes. Converting legacy
+ * data happens afterwards in one verified readwrite transaction
+ * (migrate-v1.ts), so a failed conversion never leaves a half-upgraded
+ * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
-export function openDb(name = DB_NAME): Promise<IDBDatabase> {
+export interface OpenOptions {
+  /** Called while an upgrade waits for other tabs to close their connections. */
+  onBlocked?: () => void;
+  /** Called when another tab needs this connection closed for an upgrade. */
+  onVersionChange?: () => void;
+}
+
+export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
       reject(new Error("IndexedDB is not available in this browser context"));
@@ -17,16 +38,31 @@ export function openDb(name = DB_NAME): Promise<IDBDatabase> {
     const req = indexedDB.open(name, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains("snapshots")) db.createObjectStore("snapshots");
-      if (!db.objectStoreNames.contains("assets")) db.createObjectStore("assets");
+      const has = (s: string): boolean => db.objectStoreNames.contains(s);
+      if (!has("snapshots")) db.createObjectStore("snapshots"); // legacy v1, kept for migration
+      if (!has("assets")) db.createObjectStore("assets");
+      if (!has("meta")) db.createObjectStore("meta");
+      if (!has("workspaces")) db.createObjectStore("workspaces", { keyPath: "id" });
+      if (!has("boards")) db.createObjectStore("boards", { keyPath: "id" });
+      if (!has("canvases")) db.createObjectStore("canvases", { keyPath: "id" }).createIndex("boardId", "boardId");
+      if (!has("objects")) db.createObjectStore("objects", { keyPath: ["canvasId", "id"] });
+      if (!has("canvasViews")) db.createObjectStore("canvasViews");
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        opts.onVersionChange?.();
+      };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
-    req.onblocked = () => reject(new Error("IndexedDB upgrade blocked by another tab"));
+    // Keep waiting: the request completes once other tabs close their connections.
+    req.onblocked = () => opts.onBlocked?.();
   });
 }
 
-export function idbGet<T>(db: IDBDatabase, store: string, key: string): Promise<T | undefined> {
+export function idbGet<T>(db: IDBDatabase, store: string, key: IDBValidKey): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
     const req = db.transaction(store, "readonly").objectStore(store).get(key);
     req.onsuccess = () => resolve(req.result as T | undefined);
@@ -34,13 +70,39 @@ export function idbGet<T>(db: IDBDatabase, store: string, key: string): Promise<
   });
 }
 
+export function idbGetAll<T>(db: IDBDatabase, store: string, query?: IDBKeyRange): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(store, "readonly").objectStore(store).getAll(query);
+    req.onsuccess = () => resolve(req.result as T[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 /** Put a value; resolves only after the transaction has committed durably. */
-export function idbPut(db: IDBDatabase, store: string, key: string, value: unknown): Promise<void> {
+export function idbPut(db: IDBDatabase, store: string, key: IDBValidKey | undefined, value: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store, "readwrite", { durability: "strict" });
-    tx.objectStore(store).put(value, key);
+    if (key === undefined) tx.objectStore(store).put(value);
+    else tx.objectStore(store).put(value, key);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+  });
+}
+
+/** Wrap a request in a promise (for use inside an open transaction). */
+export function req<T>(r: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+/** Resolve when a transaction commits; reject with its error if it aborts. */
+export function done(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("IndexedDB transaction failed"));
     tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
   });
 }

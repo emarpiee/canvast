@@ -119,7 +119,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
       const corners = handlePoints(box);
       for (let i = 0; i < 4; i++) {
         const [hx, hy] = corners[i]!;
-        if (Math.abs(s.x - hx) <= HANDLE_SIZE_PX && Math.abs(s.y - hy) <= HANDLE_SIZE_PX) {
+        if (Math.abs(s.x - hx) <= HANDLE_SIZE_PX && Math.abs(s.y - hy) <= HANDLE_SIZE_PX && !editor.blockEdit()) {
           const [fx, fy] = corners[(i + 2) % 4]!;
           const ids = [...editor.selection].filter((id) => doc.get(id));
           const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image";
@@ -149,7 +149,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint): void => {
     const t = gp.target;
-    const draggable = t && (t.kind === "stroke" || editor.selection.has(t.id));
+    const draggable = t && (t.kind === "stroke" || editor.selection.has(t.id)) && !editor.readOnly;
     if (t && draggable) {
       if (!editor.selection.has(t.id)) editor.select([t.id], gp.additive);
       const ids = [...editor.selection].filter((id) => doc.get(id));
@@ -224,6 +224,10 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
     }
     switch (effectiveTool()) {
       case "pen": {
+        if (editor.blockEdit()) {
+          g = { kind: "none" };
+          break;
+        }
         const cam = view.camera;
         const f = 2 ** cam.zf;
         editor.draft = { anchor: world(s), unit: -cam.zi, points: [], width: editor.penWidthPx / f, color: editor.penColor };

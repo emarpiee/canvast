@@ -11,11 +11,13 @@ import type { ViewState } from "./view-state";
 /** User-level commands shared by keyboard shortcuts, toolbar and tests. */
 
 export function undo(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
   doc.undo();
   pruneSelection(doc, editor);
 }
 
 export function redo(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
   doc.redo();
   pruneSelection(doc, editor);
 }
@@ -26,6 +28,7 @@ export function pruneSelection(doc: DocumentStore, editor: EditorState): void {
 }
 
 export function deleteSelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.selection.size && editor.blockEdit()) return;
   const ids = [...editor.selection].filter((id) => doc.get(id));
   if (!ids.length) return;
   doc.commit(doc.transaction(ids.length === 1 ? "Delete object" : `Delete ${ids.length} objects`, [], ids));
@@ -48,6 +51,7 @@ export async function importImages(
   editor: EditorState,
 ): Promise<ImageObject[]> {
   const placed: ImageObject[] = [];
+  if (editor.blockEdit()) return placed;
   for (const file of files) {
     try {
       const rec = await assets.importFile(file);

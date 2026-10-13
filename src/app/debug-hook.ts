@@ -17,7 +17,7 @@ import type { DocumentStore } from "../doc/document-store";
 import type { SerializedObject } from "../doc/model";
 import { serializeObject } from "../doc/model";
 import type { EditorState, Tool } from "./editor-state";
-import type { SnapshotWriter } from "../storage/snapshot";
+import type { Session } from "./session";
 import { projectObject } from "../render/projection";
 import { exactStrokeEdgeDistancePx } from "../render/stroke-coverage";
 import type { ScreenBox } from "../render/projection";
@@ -55,6 +55,19 @@ export interface DebugHook {
   canRedo(): boolean;
   flushSave(): Promise<string>;
   saveStatus(): string;
+  /** Workspace/session state for storage tests. */
+  session(): {
+    current: { workspaceId: string; boardId: string; canvasId: string } | null;
+    readOnly: boolean;
+    lease: string;
+    revision: number;
+    lastCommit: { puts: number; deletes: number; revision: number } | null;
+    startup: string | null;
+    migration: unknown;
+    tree: Array<{ id: string; name: string; canvases: Array<{ id: string; name: string; objectCount: number; revision: number }> }> | null;
+  };
+  /** Ids of the objects stored (in IndexedDB) for a canvas. */
+  storedObjectIds(canvasId: string): Promise<string[]>;
   /** Signed px distance from a screen point to a stroke's outline (negative inside), computed exactly. */
   strokeEdgeDistance(id: string, x: number, y: number): number;
   /** Replace the document with a generated benchmark scene (no history, no save). */
@@ -75,7 +88,7 @@ export interface DebugHook {
 export interface DebugDeps {
   doc: DocumentStore;
   editor: EditorState;
-  writer: SnapshotWriter;
+  session: Session;
   renderNow: () => FrameBreakdown;
   index: SpatialIndex;
 }
@@ -105,7 +118,8 @@ export function installDebugHook(
   nextFrame: () => Promise<void>,
   deps: DebugDeps,
 ): void {
-  const { doc, editor, writer, renderNow } = deps;
+  const { doc, editor, session, renderNow } = deps;
+  const writer = session.persistence;
   const heapMB = (): number | null => {
     const m = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     return m ? Math.round((m.usedJSHeapSize / 2 ** 20) * 10) / 10 : null;
@@ -182,9 +196,25 @@ export function installDebugHook(
     flushSave: async () => {
       await writer.flush();
       await writer.saveCamera();
-      return writer.status;
+      return writer.state === "verified" || writer.state === "committed" ? "saved" : writer.state;
     },
-    saveStatus: () => writer.status,
+    saveStatus: () => writer.state,
+    session: () => ({
+      current: session.current,
+      readOnly: session.readOnly,
+      lease: session.lease.mechanism,
+      revision: writer.revision,
+      lastCommit: writer.lastCommit ? { puts: writer.lastCommit.puts, deletes: writer.lastCommit.deletes, revision: writer.lastCommit.revision } : null,
+      startup: session.startup?.kind ?? null,
+      migration: session.startup?.kind === "migrated" ? session.startup.migration : null,
+      tree: session.tree
+        ? session.tree.boards.map((b) => ({ id: b.board.id, name: b.board.name, canvases: b.canvases.map((c) => ({ id: c.id, name: c.name, objectCount: c.objectCount, revision: c.revision })) }))
+        : null,
+    }),
+    storedObjectIds: async (canvasId) => {
+      const loaded = await session.repo!.loadCanvas(canvasId);
+      return loaded.objects.map((o) => o.id).sort();
+    },
     strokeEdgeDistance: (id, x, y) => {
       const o = doc.get(id);
       if (!o || o.kind !== "stroke") throw new Error(`no stroke ${id}`);

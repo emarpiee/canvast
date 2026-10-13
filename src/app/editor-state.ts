@@ -44,6 +44,8 @@ export class EditorState {
   lasso: number[] | null = null;
   marquee: { x0: number; y0: number; x1: number; y1: number } | null = null;
   message = "";
+  /** Another tab holds the writer lease: navigation and selection only. */
+  readOnly = false;
   private readonly listeners = new Set<() => void>();
 
   subscribe(fn: () => void): () => void {
@@ -53,6 +55,14 @@ export class EditorState {
 
   changed(): void {
     for (const fn of this.listeners) fn();
+  }
+
+  /** Returns true (and tells the user) when an edit must not happen. */
+  blockEdit(): boolean {
+    if (!this.readOnly) return false;
+    this.message = "Read-only: this workspace is open for editing in another tab. Use “Take over” to edit here.";
+    this.changed();
+    return true;
   }
 
   setTool(t: Tool): void {

@@ -11,7 +11,8 @@ Unverified / Committed / Next bounded task**.
 | 0A | Endless pan/zoom prototype, exact coordinate model, CPU rendering, navigation regression harness, single-file build | **done** (see below) |
 | 0B | One editable vector type; create/select/hit-test/drag/resize at any reached scale; world↔screen round trips for objects; minimal snapshot save/reload | **done** (see below) |
 | 0C | Spatial index + visibility queries, incremental drawing, LOD, resource tracking; 10K/100K/1M-object benchmarks; decision on a GPU accelerator and WASM | **done** (see below) |
-| 1+ | Document/operation model, transactional storage (IndexedDB/OPFS), Workspace → Boards → Canvas, Canvas/Assets views, raster/vector/text/media content, non-destructive adjustments, Settings, portable format, collaboration | planned |
+| 1a | Workspace → Boards → Canvas, per-object transactional storage, v1 migration, multi-tab safety, save states, storage panel | **done** (see below) |
+| 1+ | Assets view and catalog with reference-checked GC, portable export/import, raster tile cache, text/media content, adjustments, Settings, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -133,6 +134,71 @@ foundation:
 
 The raster tile cache (ADR 0005) is scheduled as the first performance slice
 after that, gated by `npm run bench`.
+
+## Phase 1, slice 1 — workspace and storage foundation
+
+**Implemented** ([ADR 0006](adr/0006-workspace-storage.md))
+- IndexedDB schema 2: workspaces, boards, canvases, per-object records, and
+  per-canvas views; the legacy store is retained.
+- Incremental commits: one atomic, revision-checked transaction per
+  debounced batch of changed ids, then read back to verify.
+- Save states queued → saving → committed → verified, plus readonly,
+  conflict, error and unavailable.
+- Workspace navigator: switch, create and rename boards and canvases; each
+  canvas has its own objects and camera, loaded lazily; the app reopens on the
+  last canvas.
+- Verified, idempotent migration of v0.0.x snapshots that never touches
+  legacy records.
+- Multi-tab safety: a Web Locks writer lease, a localStorage heartbeat
+  fallback, and the revision check as the final guard. Read-only tabs follow
+  the writer over BroadcastChannel and offer Take over.
+- Storage panel: state, role, quota estimate, persistence request, backup
+  status, origin caveat.
+
+**Tested:** [testing/phase-1a.md](testing/phase-1a.md).
+
+**Known failures:** none.
+
+**Unverified:** Firefox and Safari `file://` storage behaviour, real quota
+exhaustion, and storage eviction.
+
+**Committed:** see `git log`.
+
+**Next bounded task:** Assets view with a shared asset catalog. That means:
+- catalog entries over the content-addressed blobs;
+- usage and instance counts, and navigation from an asset to where it is
+  used;
+- reference-checked mark-and-sweep garbage collection;
+- deleting canvases and boards safely.
+
+## Decided and implemented: quick vs full test suites (2026-10-13)
+
+The full E2E suite runs thousands of real input events in 3 browser
+configurations and takes about 35 minutes. Most of that is a handful of
+deliberate stress loops, and it grows with every feature. Decision, with the
+project owner:
+
+- **Quick suite** (target 3–5 min): every test, with short stress loops (for
+  example 200 wheel notches instead of 2,400). Run it after ordinary
+  changes.
+- **Full suite** (the current one, unchanged): run it only when finishing a
+  phase or milestone, right before that commit, and record its results in
+  the test log.
+- **Never skip the full suite before a phase commit.** Never rebuild `dist/`
+  while any suite is running, because the tests load the built file.
+
+**Implemented:**
+- `npm test` runs the quick suite;
+- `npm run test:full` runs the full suite;
+- `reps(full, quick)` in `tests/e2e/harness.ts` sets loop lengths;
+- the guide is [testing/README.md](testing/README.md).
+
+**Measured:** quick E2E 7.7 min (90 tests: 87 passed and 2 skipped in the
+first run; the 1 failure was a quick-mode threshold that assumed DPR 1, since
+fixed and re-run 3/3) against 29 min for the full suite. That misses the
+3–5 min target. The remaining time is mostly the larger pixel-sampling and
+traversal tests in 3 configs. Parallel workers for the functional tests are
+the next lever if needed.
 
 ## Backlog of open questions (not blocking 0B)
 

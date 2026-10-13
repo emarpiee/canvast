@@ -17,8 +17,11 @@ import { DocumentStore } from "../doc/document-store";
 import { SpatialIndex, syncIndex } from "../scene/spatial-index";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
-import { SnapshotWriter, loadSnapshot } from "../storage/snapshot";
-import type { SaveStatus } from "../storage/snapshot";
+import { WorkspaceRepo } from "../storage/workspace-repo";
+import type { SaveState } from "../storage/canvas-persistence";
+import { Session } from "./session";
+import { mountNavigator } from "../ui/navigator";
+import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
 import { mountDevPanel } from "../ui/dev-panel";
 
@@ -41,10 +44,13 @@ function readTheme(el: HTMLElement): Theme & SceneTheme {
   };
 }
 
-const SAVE_TEXT: Record<SaveStatus, string> = {
-  saved: "Saved",
-  pending: "Unsaved changes…",
+const SAVE_TEXT: Record<SaveState, string> = {
+  verified: "Saved (verified)",
+  committed: "Saved",
+  queued: "Unsaved changes…",
   saving: "Saving…",
+  readonly: "Read-only (another tab is editing)",
+  conflict: "Not saved — changed in another tab; reload to continue",
   error: "Save failed — changes are only in memory",
   unavailable: "Storage unavailable — changes are only in memory",
 };
@@ -74,7 +80,17 @@ async function start(): Promise<void> {
   let db: IDBDatabase | null = null;
   let storageError = "";
   try {
-    db = await openDb();
+    db = await openDb(undefined, {
+      onBlocked: () => {
+        editor.message = "Upgrading storage: close other canvast tabs to continue.";
+        editor.changed();
+      },
+      onVersionChange: () => {
+        editor.message = "canvast was upgraded in another tab. Reload this tab to keep working.";
+        editor.readOnly = true;
+        editor.changed();
+      },
+    });
   } catch (e) {
     storageError = (e as Error).message;
   }
@@ -110,22 +126,23 @@ async function start(): Promise<void> {
     for (const w of waiters) w();
   };
 
+  const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor);
   if (db) {
     try {
-      const loaded = await loadSnapshot(db);
-      doc.load(loaded.objects);
-      if (loaded.camera) view.setCamera(loaded.camera);
-      if (loaded.skipped.length) {
-        editor.message = `Skipped ${loaded.skipped.length} damaged item(s) while loading.`;
-        console.warn("canvast: skipped while loading", loaded.skipped);
+      await session.start();
+      if (session.startup?.kind === "migrated") {
+        const m = session.startup.migration;
+        editor.message = m.verified
+          ? `Upgraded your canvas to the new storage format (${m.copied} objects, verified). The old data was kept.`
+          : `Upgrade could not be verified (${m.verifyError ?? "unknown"}). The old data was kept unchanged.`;
       }
     } catch (e) {
-      editor.message = `Could not load the saved canvas: ${(e as Error).message}`;
+      editor.message = `Could not open the workspace: ${(e as Error).message}`;
     }
   } else {
     editor.message = `Storage unavailable (${storageError}); work will not be saved.`;
   }
-  const writer = new SnapshotWriter(db, doc, view);
+  const persistence = session.persistence;
 
   const resize = (): void => {
     const r = host.getBoundingClientRect();
@@ -159,15 +176,17 @@ async function start(): Promise<void> {
     deleteSelection: () => deleteSelection(doc, editor),
   });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
-    saveText: () => SAVE_TEXT[writer.status] + (writer.status === "error" && writer.lastError ? ` (${writer.lastError})` : ""),
-    saveState: () => writer.status,
-    subscribe: (fn) => void writer.subscribe(fn),
+    saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
+    saveState: () => persistence.state,
+    subscribe: (fn) => void persistence.subscribe(fn),
     notify: (message) => {
       editor.message = message;
       editor.changed();
     },
   });
   if (debug) mountDevPanel(document.getElementById("hud")!, view);
+  mountNavigator(document.getElementById("nav")!, session);
+  mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
 
   // Drag-and-drop and paste import.
   window.addEventListener("dragover", (e) => {
@@ -186,9 +205,12 @@ async function start(): Promise<void> {
       importFiles(files);
     }
   });
-  // Best-effort flush when the page is hidden; saves are already debounced to 250 ms.
+  // Best-effort flush when the page is hidden; saves are already debounced to 150 ms.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void writer.flush();
+    if (document.visibilityState === "hidden") {
+      void persistence.flush();
+      void persistence.saveCamera();
+    }
   });
 
   if (debug) {
@@ -200,7 +222,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, writer, renderNow, index },
+      { doc, editor, session, renderNow, index },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

@@ -6,10 +6,11 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 0C — scale proof.** On top of endless navigation (0A) and
-> editing at any depth and distance (0B), rendering now scales with what is
-> on screen rather than with document size. A million-object board renders
-> in about 8–10 ms per frame when a few hundred objects are visible. Workspaces and boards,
+> **Status: Phase 1, slice 1 — workspace and storage foundation.** On top of
+> endless navigation (0A), editing at any depth (0B) and rendering that
+> scales with what is on screen (0C), your work is now organized as
+> Workspace → Boards → Canvases. Saves are incremental and transactional,
+> and opening the app in a second tab can no longer overwrite your work. Workspaces and boards,
 > the Assets view, text, video, groups, export/import and settings are **not
 > implemented yet**; see [Roadmap and status](docs/status.md). This README
 > describes only what exists.
@@ -83,6 +84,24 @@ or network connection.
   limited by Canvas 2D rasterization (about 59 ms p50 at 3K–7.7K visible
   strokes). The planned fix is a raster tile cache (ADR 0005).
 
+### Workspace and storage (Phase 1)
+
+- **Workspace → Boards → Canvases.** The breadcrumb at top-left (for example
+  "Board 1 › Canvas 2") opens a menu to switch canvases, add a canvas or a
+  board, and rename them. Each canvas keeps its own objects and camera. The
+  app reopens on the last canvas you used.
+- **Incremental, transactional saving.** Each change writes only the objects
+  it touched, in one atomic transaction. The save indicator shows Unsaved
+  changes… → Saving… → Saved → Saved (verified), the last only after the
+  write is read back. Click it for the storage panel: tab role, space used,
+  persistence permission, and backup status.
+- **Safe in multiple tabs.** The first tab edits. Others are read-only and
+  follow its changes live, with a **Take over** button. A stale tab can never
+  overwrite newer data: its save is rejected and reported as a conflict.
+- **Upgrades keep your data.** A canvas saved by the previous version
+  (v0.0.x) is migrated into Board 1 › Canvas 1 automatically and verified
+  object by object. The old data is kept unchanged.
+
 ### Controls
 
 | Action | Input |
@@ -138,15 +157,20 @@ connection.
 
 ## Testing
 
-```sh
-npm run typecheck          # TypeScript, strict
-npm run test:unit          # Vitest: exact arithmetic, camera, document, projection, selection
-npm run test:e2e           # builds, then Playwright against file://dist/canvast.html#debug
-npm run check:offline      # no external references in the built file
-npm run check:names        # naming policy: no external product names in first-party text
-npm test                   # all of the above
-npm run bench              # scale benchmarks: 1K–1M objects, dense vs sparse (not part of npm test)
-```
+**Which suite to run** (full guide: [docs/testing/README.md](docs/testing/README.md)):
+
+| Command | Time | When |
+| --- | --- | --- |
+| `npm test` | ~8 min | After every ordinary change (quick E2E suite: short stress loops) |
+| `npm run test:full` | ~35 min | Before committing the end of a phase or milestone (full stress loops); log the result |
+| `npm run test:unit` | ~15 s | While developing |
+| `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
+
+Both E2E lengths run the same tests; only the stress-loop counts differ.
+Never rebuild `dist/` while a suite is running.
+
+Individual commands: `npm run typecheck`, `npm run test:e2e` (quick),
+`npm run test:e2e:full`, `npm run check:offline`, `npm run check:names`.
 
 The E2E suite runs every test in three Chromium configurations: the default,
 GPU disabled (`--disable-gpu --disable-accelerated-2d-canvas`), and
@@ -161,9 +185,13 @@ Results with environment and caveats:
 - [Phase 0A navigation](docs/testing/phase-0a.md)
 - [Phase 0B editing](docs/testing/phase-0b.md)
 - [Phase 0C scale benchmarks](docs/testing/phase-0c.md)
+- [Phase 1 slice 1 storage](docs/testing/phase-1a.md)
 
-Latest results (Phase 0C): 58/58 unit tests; full E2E suite 67 passed, 2
-skipped by design, 0 failed across 3 projects; scale benchmarks in
+Latest results (Phase 1 slice 1): 58/58 unit tests; full E2E suite 88
+passed, 2 skipped by design, 0 failed across 3 projects
+([docs/testing/phase-1a.md](docs/testing/phase-1a.md)).
+
+Phase 0C: 67 passed, 2 skipped, 0 failed; scale benchmarks in
 [docs/testing/phase-0c.md](docs/testing/phase-0c.md).
 
 Phase 0B results:
@@ -204,8 +232,9 @@ src/
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
   interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
   assets/                   SHA-256 content addressing, decoding, pixel access
-  storage/                  IndexedDB wrapper and snapshot persistence
-  ui/                       toolbar and Lucide icons
+  storage/                  IndexedDB schema, workspace repository, incremental persistence,
+                            v1 migration, multi-tab writer lease
+  ui/                       toolbar, workspace navigator, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
 scripts/                    single-file build, offline check, naming check
 tests/unit/, tests/e2e/     Vitest and Playwright suites
@@ -214,9 +243,13 @@ docs/testing/               test logs with measured results
 docs/status.md              roadmap and current status (single source of truth)
 ```
 
-**Data flow:** input → transient preview (never stored) → one transaction
-on pointer-up → validation → document mutation → redraw and a debounced
-snapshot save.
+**Data flow:**
+1. Input produces a transient preview, which is never stored.
+2. On pointer-up, the gesture becomes one transaction, which is validated.
+3. The document is mutated, and the changed ids update the spatial index.
+4. The canvas redraws.
+5. After a 150 ms debounce, the changed objects are written in one atomic,
+   revision-checked IndexedDB commit, then read back to verify it.
 
 - [ADR 0001](docs/adr/0001-exact-dyadic-world-coordinates.md): the exact
   coordinate model.
@@ -228,22 +261,36 @@ snapshot save.
   cell-relative projection, level of detail and batching.
 - [ADR 0005](docs/adr/0005-dense-scene-acceleration.md): dense-scene
   acceleration (raster tile cache before WebGL; no WASM yet).
+- [ADR 0006](docs/adr/0006-workspace-storage.md): workspace storage —
+  hierarchy, per-object commits, migration, multi-tab safety.
 
 ## Storage, backups, import/export
 
-- Data lives in the browser's IndexedDB under the database name `canvast`. It
-  has two stores:
-  - `snapshots`: the document and the camera;
-  - `assets`: original image bytes, keyed by SHA-256 and stored once.
+- **Where data lives:** IndexedDB database `canvast`, schema version 2
+  (details in [ADR 0006](docs/adr/0006-workspace-storage.md)). It has these
+  stores:
+  - `workspaces`, `boards`, `canvases`;
+  - `objects`, with one record per object;
+  - `canvasViews`, the per-canvas camera;
+  - `assets`, the original image bytes, keyed by SHA-256 and stored once;
+  - `meta`;
+  - the legacy `snapshots` store from v0.0.x, kept unchanged after migration.
 - **Origin caveat:** Chromium gives all `file://` pages one shared storage
   origin. Moving the HTML file to another folder keeps your data. Opening it
-  in a different browser or profile does not.
-- Save states shown in the HUD: *Saved*, *Unsaved changes…*, *Saving…*,
-  *Save failed* (changes are only in memory) and *Storage unavailable*.
+  in a different browser, profile or private window does not, and clearing
+  site data deletes it.
+- **Save states:**
+  - *Unsaved changes…* (queued) and *Saving…*;
+  - *Saved* (transaction committed) and *Saved (verified)* (read back);
+  - *Read-only*, *Not saved — changed in another tab*, *Save failed*, and
+    *Storage unavailable*.
 - On load, damaged objects are skipped and reported, never silently "fixed".
-- **Not yet available:** export/import, backups, multi-tab coordination
-  (two tabs editing at once: the last save wins), and quota reporting. Undo
-  history does not survive a reload.
+- **Not yet available:**
+  - export/import (portable backups);
+  - deleting boards or canvases;
+  - asset garbage collection (nothing is ever deleted, so nothing can be
+    lost);
+  - persistent undo history.
 
 ## Known limitations (honest list)
 
@@ -311,3 +358,4 @@ reproduces on any checkout.
 | Phase 0A — endless navigation prototype | 25/25 unit, 22/22 E2E (2 by-design skips), offline + naming checks pass; `dist/canvast.html` v0.0.1 sha256 `1411e6d0…a92` | `1ce2c05` |
 | Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |
 | Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |
+| Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |

@@ -23,6 +23,18 @@ export const LIMITS = {
 
 export const APP_URL = pathToFileURL(resolve("dist/canvast.html")).href + "#debug";
 
+/**
+ * Quick vs full suites (docs/testing/README.md). Every test runs in both;
+ * only the length of the stress loops differs. The full suite (milestone
+ * commits) sets CANVAST_E2E_FULL=1 via playwright.full.config.ts.
+ */
+export const FULL = process.env["CANVAST_E2E_FULL"] === "1";
+
+/** Repetition count: `full` in the full suite, `quick` otherwise. */
+export function reps(full: number, quick: number): number {
+  return FULL ? full : quick;
+}
+
 type Hook = DebugHook;
 
 declare global {

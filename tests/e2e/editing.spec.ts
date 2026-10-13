@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, distance, expect, recordMetric, test } from "./harness";
+import { LIMITS, distance, expect, recordMetric, reps, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
 
@@ -186,10 +186,12 @@ test("U7: stroke drawn at a tiny scale is stable after zooming out and back, and
   const stroke = await penStroke(app, [[400, 300], [520, 380], [700, 340], [760, 520]]);
   const s0 = (await screenOfObject(app, stroke.id))!;
   // Zoom out ~125 levels at a point away from the stroke, then back in.
-  await wheelSteps(app, 1000, 150, 300, 100);
+  const OUT = reps(300, 80); // ~125 or ~33 levels out, then back
+  await wheelSteps(app, 1000, 150, OUT, 100);
   const tiny = (await screenOfObject(app, stroke.id))!;
-  expect(tiny.box.maxX - tiny.box.minX).toBeLessThan(1e-30); // ~2^-116 of its drawn size
-  await wheelSteps(app, 1000, 150, 300, -100);
+  // Far below a pixel. (Quick mode at DPR 2 zooms out only ~17 levels: a notch is 50 CSS px there.)
+  expect(tiny.box.maxX - tiny.box.minX).toBeLessThan(reps(1e-30, 0.05));
+  await wheelSteps(app, 1000, 150, OUT, -100);
   const s1 = (await screenOfObject(app, stroke.id))!;
   let maxErr = 0;
   for (let i = 0; i < s0.q.length; i += 2) maxErr = Math.max(maxErr, distance({ x: s0.q[i]!, y: s0.q[i + 1]! }, { x: s1.q[i]!, y: s1.q[i + 1]! }));
@@ -274,17 +276,18 @@ test("U8: strokes in far-apart regions stay independent, addressable and persist
   // Travel with real input: zoom out ~1000 levels (shift+minus = 2 levels),
   // pan 12 half-screens to the right and 6 down, zoom back in ~1000 levels.
   await app.page.locator("#canvas").focus();
-  for (let i = 0; i < 500; i++) await app.page.keyboard.press("Shift+Minus");
+  const TRAVEL = reps(500, 100); // ×2 levels: ~1000 or ~200 levels out and back
+  for (let i = 0; i < TRAVEL; i++) await app.page.keyboard.press("Shift+Minus");
   for (let i = 0; i < 12; i++) await app.page.keyboard.press("Shift+ArrowRight");
   for (let i = 0; i < 6; i++) await app.page.keyboard.press("Shift+ArrowDown");
-  for (let i = 0; i < 500; i++) await app.page.keyboard.press("Shift+Equal");
+  for (let i = 0; i < TRAVEL; i++) await app.page.keyboard.press("Shift+Equal");
   await app.frame();
   const farCam = await app.camera();
   expect(farCam.zi + farCam.zf).toBeCloseTo(0, 6);
   // The new region is ~2^1000 world units away: the first stroke is far offscreen.
   expect(await screenOfObject(app, a.id)).toBeNull();
   const farX = D.parse(farCam.cx);
-  expect(D.bitLength(farX.m) + farX.e).toBeGreaterThan(900); // log2 of the distance
+  expect(D.bitLength(farX.m) + farX.e).toBeGreaterThan(2 * TRAVEL - 100); // log2 of the distance
   const b = await penStroke(app, [[500, 300], [600, 250], [700, 320]]);
   const bScreen = (await screenOfObject(app, b.id))!;
 
