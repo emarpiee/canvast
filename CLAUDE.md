@@ -21,6 +21,7 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 - Write loop counts with `reps(full, quick)` from the harness. Don't assume a fixed zoom depth from wheel notches (DPR-dependent); use keyboard steps or measured values.
 - `app.drag` / `app.wheel` assert input starts on the canvas.
 - Image fixtures are generated in code (`tests/e2e/png.ts`); no binary fixtures.
+- **Break complex logic on purpose before calling it done.** For coordinate, frame, precision or other tricky logic, list what else could break it and add a small, fast test for each: every input path (wheel, keyboard and button zoom, drag and arrow pan, jumps, Home), both directions (zoom in *and* out, up *and* down), starting from Home and from deep, repeated actions (e.g. −1e12 five times, then zoom), with content on screen, plus a random fuzz with a per-step time limit. One path passing proves nothing about the others: after five −1e12 jumps, panning worked but wheel zoom hung. Reproduce reported bugs with real input in both browsers before claiming a fix.
 - `npm run check:names` (`scripts/check-names.mjs`) fails if certain external reference-product names (base64-encoded in the script) appear in any first-party file. Don't name other canvas/reference apps in code, docs or commits.
 
 ## Architecture (big picture)
