@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0 — Phase 1 slice 1: workspace and storage foundation (2026-10-13)
+
+- **Workspace → Boards → Canvas.** A navigator switches, creates and renames
+  boards and canvases. Each canvas has its own objects and camera, and the
+  app reopens on the last canvas.
+- **IndexedDB schema 2** with per-object records. Each save is one atomic,
+  revision-checked transaction containing only the changed objects, and is
+  read back to verify it.
+- **Honest save states:** queued, saving, committed, verified, read-only,
+  conflict, error and unavailable. A storage panel shows quota, persistence
+  and backup status.
+- **Upgrades:** v0.0.x snapshots are migrated automatically and verified
+  object by object; legacy data is kept unchanged.
+- **Multi-tab safety:** one writer (Web Locks, with a localStorage heartbeat
+  fallback); other tabs are read-only, follow live and can take over. A stale
+  commit is rejected, never applied.
+
 ## 0.0.3 — Phase 0C: scale and backend proof (2026-10-13)
 
 - **Spatial index:** multi-scale (levels × `BigInt` cells, with coarse
