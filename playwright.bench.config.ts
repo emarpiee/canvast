@@ -10,10 +10,9 @@ export default defineConfig({
   use: {
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
-    launchOptions: { args: ["--enable-precise-memory-info", "--js-flags=--expose-gc"] },
   },
   projects: [
-    { name: "chromium", use: { browserName: "chromium" } },
+    { name: "chromium", use: { browserName: "chromium", launchOptions: { args: ["--enable-precise-memory-info", "--js-flags=--expose-gc"] } } },
     {
       name: "chromium-cpu",
       use: {
@@ -23,5 +22,7 @@ export default defineConfig({
         },
       },
     },
+    // The project owner's main browser (no heap readings: performance.memory is Chromium-only).
+    { name: "firefox", use: { browserName: "firefox" } },
   ],
 });

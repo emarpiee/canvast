@@ -9,7 +9,10 @@ import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
-import { drawScene } from "../render/scene-renderer";
+import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
+import { strokeLineWidth } from "../render/draw-objects";
+import type { ProjectedObject } from "../render/projection";
+import { TileCache } from "../render/tile-cache";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
@@ -75,6 +78,9 @@ async function start(): Promise<void> {
   // The spatial index mirrors the document incrementally (changed ids only).
   const index = new SpatialIndex();
   syncIndex(doc, index);
+  // Committed objects are drawn through a raster tile cache (ADR 0009).
+  const tiles = new TileCache((id) => doc.get(id));
+  doc.subscribe((_source, changed) => tiles.invalidate(changed));
   const editor = new EditorState();
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
@@ -104,7 +110,10 @@ async function start(): Promise<void> {
     scheduled = true;
     requestAnimationFrame(draw);
   };
-  const assets = new AssetLibrary(db, invalidate);
+  const assets = new AssetLibrary(db, () => {
+    tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
+    invalidate();
+  });
 
   /** Render synchronously and return the timing breakdown. */
   const renderNow = (): FrameBreakdown => {
@@ -113,11 +122,39 @@ async function start(): Promise<void> {
     const vp = view.viewport;
     renderFrame(ctx, cam, vp, dpr, theme, LANDMARKS);
     const t1 = performance.now();
-    const visible = visibleObjects(doc, index, editor, cam, vp);
-    const t2 = performance.now();
-    drawScene(ctx, visible, editor, assets, cam, vp, dpr, theme);
+    // Previews (move/resize in progress) change committed objects' appearance: draw directly.
+    let runs: Map<ProjectedObject, number> | undefined;
+    const tiled =
+      editor.preview.kind === "none"
+        ? tiles.draw(
+            ctx,
+            cam,
+            vp,
+            dpr,
+            (infl) => visibleObjects(doc, index, null, cam, infl),
+            (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
+            (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2),
+          )
+        : null;
+    let visible: ReturnType<typeof visibleObjects> | null = null;
+    let t2 = performance.now();
+    if (!tiled) {
+      visible = visibleObjects(doc, index, editor, cam, vp);
+      t2 = performance.now();
+      drawObjects(ctx, visible, assets, vp, dpr, theme);
+    }
+    // Selection outlines need the visible selected objects; query only when something is selected.
+    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, cam, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
+    drawOverlays(ctx, selected, editor, cam, vp, theme);
     const t3 = performance.now();
-    const b: FrameBreakdown = { totalMs: t3 - t0, baseMs: t1 - t0, visibleMs: t2 - t1, drawMs: t3 - t2, visibleCount: visible.length };
+    const b: FrameBreakdown = {
+      totalMs: t3 - t0,
+      baseMs: t1 - t0,
+      visibleMs: tiled ? 0 : t2 - t1,
+      drawMs: tiled ? t3 - t1 : t3 - t2,
+      visibleCount: tiled ? tiled.visible : visible!.length,
+      tiles: tiled,
+    };
     stats.last = b;
     return b;
   };
@@ -161,6 +198,7 @@ async function start(): Promise<void> {
   new ResizeObserver(resize).observe(host);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
+    tiles.clear();
     invalidate();
   });
 
@@ -261,7 +299,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

@@ -6,11 +6,12 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 3 — portable backups.** On top of
+> **Status: Phase 1, slice 4 — fast dense scenes.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
 > scales with what is on screen (0C), your work is organized as
 > Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
-> Assets library (1b), and export/import of `.canvast` archives (1c). Text,
+> Assets library (1b), export/import of `.canvast` archives (1c), and a raster
+> tile cache that keeps panning and drawing over dense scenes at 60 fps (1d). Text,
 > video, groups, asset tags and folders, and settings are **not implemented
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
@@ -218,7 +219,7 @@ connection.
 | `npm test` | ~16 min | After every ordinary change (quick E2E suite: short stress loops) |
 | `npm run test:full` | ~50 min | Only when a whole phase is complete (full stress loops); log the result |
 | `npm run test:unit` | ~15 s | While developing |
-| `npm run bench` | ~10 min | After rendering or performance changes (scale benchmarks, not a gate) |
+| `npm run bench` (scale + tile-cache benchmarks, 3 browser setups) | ~15–25 min | After rendering or performance changes (scale benchmarks, not a gate) |
 
 Both E2E lengths run the same tests; only the stress-loop counts differ.
 Never rebuild `dist/` while a suite is running.
@@ -287,7 +288,8 @@ src/
   render/hit-test.ts        pick, lasso and box selection policies
   render/scene-view.ts      visible objects via the spatial index (with previews)
   scene/spatial-index.ts    multi-scale spatial index (levels × BigInt cells, coarse summaries)
-  render/scene-renderer.ts  objects, draft stroke, selection, lasso/marquee overlays
+  render/scene-renderer.ts  objects (with batch runs), draft stroke, selection, lasso/marquee overlays
+  render/tile-cache.ts      raster tile cache for committed objects (exact zoom, whole-pixel reuse)
   render/canvas2d-renderer.ts  grid, axes, landmarks
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
   interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
@@ -330,6 +332,8 @@ docs/status.md              roadmap and current status (single source of truth)
   canvases.
 - [ADR 0008](docs/adr/0008-portable-archives.md): portable archives —
   format, export scopes, verification, validated transactional import.
+- [ADR 0009](docs/adr/0009-raster-tile-cache.md): raster tile cache —
+  exactness rules, invalidation, fidelity criterion, measurements.
 
 ## Storage, backups, import/export
 
@@ -381,9 +385,14 @@ docs/status.md              roadmap and current status (single source of truth)
   - Each extra level of depth makes the numbers involved larger, so very
     deep views cost more CPU per frame. Measurements are in the Phase 0B
     test log.
-- **Dense visible scenes.** Thousands of strokes on screen at once render
-  at about 10–17 fps on the CPU-only reference machine, because Canvas 2D
-  rasterization dominates. Fix planned: raster tile cache (ADR 0005).
+- **Dense visible scenes.**
+  - Panning and drawing over thousands of visible strokes now run at 60 fps,
+    thanks to the raster tile cache
+    ([ADR 0009](docs/adr/0009-raster-tile-cache.md)): 2–3 ms per frame,
+    against 89–172 ms before.
+  - **Zooming** over such scenes is still about 60–70 ms per frame (about
+    15 fps). Tiles are deliberately not used while the zoom changes, so a
+    stale or rescaled image is never shown.
 - **Very large documents.** A 1M-object board needs about 940 MB of heap,
   and about 6 s to build the spatial index on load.
 - **Far zoom-out.** Content more than about 3 levels below a pixel is not
@@ -446,3 +455,4 @@ reproduces on any checkout.
 | Phase 1 slice 2 — Assets view, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |
 | Phase 1 slice 3 — portable archives (export/import) | 75/75 unit; quick E2E 121 passed / 2 by-design skips / 3 failed (one stale assertion, fixed and re-run 3/3); 2 mutation checks caught; `dist/canvast.html` v0.3.0 sha256 `2db91b09…9d9a` | see `git log` |
 | Firefox support (v0.3.1) | Firefox 157 added as a 4th E2E project; grid drawing 7.8× faster in Firefox; quick E2E 165 passed / 3 by-design skips / 0 failed (4 projects); tested build `f64a472e…92bf` (same code, pre-bump label); `dist/canvast.html` v0.3.1 sha256 `60ccde68…1a30` | see `git log` |
+| Phase 1 slice 4 — raster tile cache | tiles 24/24 (4 projects); dense 10K pan 89→2.2 ms, still 152→3.3 ms p50 (Chromium), Firefox 98→2 / 172→2 ms; quick E2E 189 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.4.0 sha256 `4528f2b3…f65a` | see `git log` |

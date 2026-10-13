@@ -1,3 +1,5 @@
+import type { TileFrame } from "../render/tile-cache";
+
 /** Timing breakdown of one rendered frame (ms). */
 export interface FrameBreakdown {
   totalMs: number;
@@ -8,6 +10,8 @@ export interface FrameBreakdown {
   /** Drawing objects and overlays. */
   drawMs: number;
   visibleCount: number;
+  /** Tile cache use this frame, or null when the frame was rendered directly. */
+  tiles: TileFrame | null;
 }
 
 /** Rolling window of render durations (ms) for diagnostics and benchmarks. */

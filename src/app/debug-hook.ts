@@ -23,6 +23,7 @@ import { exactStrokeEdgeDistancePx } from "../render/stroke-coverage";
 import type { ScreenBox } from "../render/projection";
 import type { LassoFilter } from "../render/hit-test";
 import type { AppView } from "../ui/view-switch";
+import type { TileCache, TileFrame } from "../render/tile-cache";
 import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
 import { done } from "../storage/idb";
 
@@ -80,7 +81,11 @@ export interface DebugHook {
    * fixed trajectory (pan 37 px/frame in a square, zoom ±0.05 level
    * oscillation), returning timing percentiles.
    */
-  benchRun(frames: number): BenchRunResult;
+  benchRun(frames: number, mode?: BenchMode): BenchRunResult;
+  /** Turn the raster tile cache on or off (to compare against direct rendering). */
+  setTileCache(on: boolean): void;
+  /** Tile use of the last rendered frame (null: rendered directly), and tiles held. */
+  tileStats(): { last: TileFrame | null; held: number; renderedTotal: number };
   heapMB(): number | null;
   /** Spatial index size and the result of a query for the current view. */
   indexStats(): { objects: number; levels: number; levelsVisited: number; levelsSkippedSubPixel: number; cellsProbed: number; candidates: number; queryMs: number };
@@ -119,7 +124,16 @@ export interface DebugDeps {
   index: SpatialIndex;
   appView: () => AppView;
   setView: (v: AppView) => void;
+  tiles: TileCache;
 }
+
+/**
+ * Bench trajectories. "panzoom": pan 37 px and zoom ±0.05 every frame (the
+ * Phase 0C trajectory: the zoom changes each frame, so no tiles are used).
+ * "pan": pan 37 px per frame in a square, fixed zoom. "static": the camera
+ * stays put and only an overlay changes (like drawing a stroke).
+ */
+export type BenchMode = "panzoom" | "pan" | "static";
 
 export interface BenchRunResult {
   frames: number;
@@ -264,7 +278,12 @@ export function installDebugHook(
       const t2 = performance.now();
       return { objects: objects.length, generateMs: t1 - t0, loadMs: t2 - t1, heapMB: heapMB() };
     },
-    benchRun: (frames) => {
+    setTileCache: (on) => {
+      deps.tiles.enabled = on;
+      deps.tiles.clear();
+    },
+    tileStats: () => ({ last: stats.last?.tiles ?? null, held: deps.tiles.tileCount, renderedTotal: deps.tiles.renderedTotal }),
+    benchRun: (frames, mode = "panzoom") => {
       const total: number[] = [];
       const frame: number[] = [];
       const ctx2d = canvas.getContext("2d")!;
@@ -276,9 +295,11 @@ export function installDebugHook(
       for (let i = 0; i < frames; i++) {
         const vp = view.viewport;
         const [dx, dy] = legs[Math.floor(i / 10) % 4]!;
-        let cam = panBy(view.camera, dx, dy);
-        cam = zoomAt(cam, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05);
-        view.setCamera(cam);
+        if (mode !== "static") {
+          let cam = panBy(view.camera, dx, dy);
+          if (mode === "panzoom") cam = zoomAt(cam, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05);
+          view.setCamera(cam);
+        }
         const t0 = performance.now();
         const b = renderNow();
         ctx2d.getImageData(0, 0, 1, 1); // flush: include rasterization

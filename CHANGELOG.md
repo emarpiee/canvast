@@ -4,6 +4,23 @@
 
 (nothing yet)
 
+## 0.4.0 — Phase 1 slice 4: raster tile cache (2026-10-13)
+
+- **Fast panning and drawing over dense scenes.**
+  - Committed objects are cached in 256 px tiles and reused while panning,
+    drawing, selecting and lassoing.
+  - Dense 10K scene: panning from 89 to 2.2 ms per frame, a still camera
+    from 152 to 3.3 ms (Chromium p50). Firefox: 98 → 2 ms and 172 → 2 ms.
+- **No visual compromise at depth.**
+  - Tiles are never scaled or resampled, and they are not used while the
+    zoom is changing.
+  - They match direct rendering, including 1,600 levels deep.
+  - Only tiles touched by an edit are redrawn.
+- **Fix:** re-importing a missing original now refreshes everything that
+  showed its placeholder.
+- **Benchmarks:** `tests/bench/tiles.bench.ts` (pan, still and pan+zoom,
+  tiles on and off); `npm run bench` now also runs in Firefox.
+
 ## 0.3.1 — Firefox support (2026-10-13)
 
 - **Firefox is now tested on every run** (Firefox 157, a 4th E2E

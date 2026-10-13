@@ -93,7 +93,10 @@ export class AssetLibrary {
     const hash = await sha256Hex(bytes);
     const existing = await this.record(hash);
     if (existing) {
+      const had = this.decoded.has(hash);
       await this.ensureDecoded(existing);
+      this.missing.delete(hash);
+      if (!had) this.onReady(); // e.g. a missing original restored: redraw what showed its placeholder
       if (this.db) await this.store(existing, false);
       return existing;
     }
@@ -118,6 +121,7 @@ export class AssetLibrary {
     else this.memoryOnly.set(hash, record);
     this.decoded.set(hash, makeSource(img));
     this.missing.delete(hash);
+    this.onReady(); // redraw any placeholder of this original (a restored missing asset)
     return record;
   }
 

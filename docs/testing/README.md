@@ -10,7 +10,7 @@ test runs in both; only the length of the stress loops differs (for example
 | `npm run test:full` | The same, with the **full** E2E stress loops | ~50 min (estimate with Firefox; 34.5 min for Chromium only at v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npx playwright test -g "<name>"` | Selected quick E2E tests | seconds | While developing a specific feature |
-| `npm run bench` | Scale benchmarks, 1K–1M objects (not a pass/fail gate) | ~10 min | After rendering or performance changes; compare with `metrics/bench-*.json` and docs/testing/phase-0c.md |
+| `npm run bench` | Scale benchmarks, 1K–1M objects, plus tile-cache benchmarks (tiles on/off; pan, still, pan+zoom) in Chromium, Chromium CPU-only and Firefox. Not a pass/fail gate | ~15–25 min (not yet timed with Firefox; tile benchmarks alone 2.2 min) | After rendering or performance changes; compare with `metrics/bench-*.json`, `metrics/tiles-*.json`, docs/testing/phase-0c.md and phase-1d.md |
 
 ## Rules
 

@@ -14,7 +14,8 @@ Unverified / Committed / Next bounded task**.
 | 1a | Workspace → Boards → Canvas, per-object transactional storage, v1 migration, multi-tab safety, save states, storage panel | **done** (see below) |
 | 1b | Assets view and shared catalog, usage and navigation to instances, reference-checked mark-and-sweep GC, safe deletion of boards and canvases | **done** (see below) |
 | 1c | Portable `.canvast` archives: four export scopes, verification, validated transactional import, backup status | **done** (see below) |
-| 1+ | Asset organization (tags, folders, collections), raster tile cache, density preview, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
+| 1d | Raster tile cache for committed objects (exact zoom, whole-pixel reuse, per-object invalidation) | **done** (see below) |
+| 1+ | Asset organization (tags, folders, collections), zoom preview for dense scenes, density preview, text/media content, adjustments, Settings, persistent undo, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -275,6 +276,51 @@ the largest measured performance gap (about 59 ms per frame at 3K–7.7K
 visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
+
+## Phase 1, slice 4 — raster tile cache
+
+**Implemented** ([ADR 0009](adr/0009-raster-tile-cache.md))
+- Committed objects are rendered into 256 px tiles, reused while panning
+  and on every redraw that does not move the camera. Overlays and the base
+  layer are drawn live.
+- **Exactness:**
+  - tiles exist for one exact zoom and DPR, and are never scaled;
+  - no tiles are used while the zoom changes;
+  - tiles are reused only after whole-device-pixel pans;
+  - an 8 px guard border prevents seams;
+  - each tile keeps the frame's batch runs.
+- **Invalidation:**
+  - an edit (including undo and redo) drops the tiles that drew the object
+    or that its new state overlaps;
+  - a tile that showed an image placeholder refreshes when the original
+    loads;
+  - any document load, and any theme or DPR change, clears the tiles.
+- Move and resize previews render directly.
+- **Benchmarks:** a pan-only and a still-camera trajectory, plus a Firefox
+  bench project.
+
+**Tested:** [testing/phase-1d.md](testing/phase-1d.md).
+- Dense 10K, p50: pan 89 → 2.2 ms, still camera 152 → 3.3 ms (Chromium).
+  Firefox: 98 → 2 ms and 172 → 2 ms.
+- Pan+zoom is unchanged, as designed.
+
+**Known failures:** none.
+
+**Known limits:**
+- Continuous zoom over dense scenes is still 60–70 ms per frame.
+- Tiled and direct frames differ in anti-aliasing at same-colour stroke
+  overlaps (0.02% of pixels by more than 16 levels; the criterion is in the
+  ADR).
+
+**Unverified:**
+- a hardware-GPU canvas;
+- pen-input latency;
+- long-session memory;
+- fractional DPRs (the cache turns itself off).
+
+**Next bounded task:** a zoom preview for dense scenes (deferred in ADR
+0009), or asset organization (tags, folders, collections). Then a density
+preview for sub-pixel content.
 
 ## Firefox support (v0.3.1, between slices 3 and 4)
 

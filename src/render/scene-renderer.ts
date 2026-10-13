@@ -15,43 +15,92 @@ export interface SceneTheme {
 
 export const HANDLE_SIZE_PX = 9;
 
-export function drawScene(
+/**
+ * Batch runs over a whole paint-ordered list: consecutive opaque fast-path
+ * strokes of one colour and width (within 1/64 px) share a run number;
+ * everything else gets a run of its own. A tile draws a subset of the list
+ * and keeps these runs, so it batches exactly as a full frame does.
+ */
+export function batchRuns(list: readonly ProjectedObject[]): Map<ProjectedObject, number> {
+  const runs = new Map<ProjectedObject, number>();
+  let id = 0;
+  let color = "";
+  let width = 0;
+  let open = false;
+  for (const po of list) {
+    if (batchable(po)) {
+      const w = strokeLineWidth(po);
+      const c = (po.obj as StrokeObject).color;
+      if (!open || c !== color || Math.abs(w - width) > 1 / 64) {
+        id++;
+        color = c;
+        width = w;
+        open = true;
+      }
+    } else {
+      id++;
+      open = false;
+    }
+    runs.set(po, id);
+  }
+  return runs;
+}
+
+/**
+ * Draw objects in paint order. Runs of identical opaque strokes share a
+ * call (`runs` from batchRuns over the full frame list; computed here when
+ * omitted). Returns true if an image was drawn as a placeholder because its
+ * original is still loading (or missing).
+ */
+export function drawObjects(
   ctx: CanvasRenderingContext2D,
-  visible: readonly ProjectedObject[],
-  editor: EditorState,
+  list: readonly ProjectedObject[],
   assets: AssetLibrary,
-  cam: Camera,
   vp: Viewport,
   dpr: number,
   theme: SceneTheme,
-): void {
-  // Paint order is preserved; runs of identical opaque strokes share a call.
+  runs: ReadonlyMap<ProjectedObject, number> = batchRuns(list),
+): boolean {
+  let pending = false;
   let run: ProjectedObject[] = [];
-  let runColor = "";
-  let runWidth = 0;
+  let runId = -1;
   const flush = (): void => {
-    if (run.length) strokeBatch(ctx, run, runWidth, vp);
+    if (run.length) strokeBatch(ctx, run, strokeLineWidth(run[0]!), vp);
     run = [];
   };
-  for (const po of visible) {
+  for (const po of list) {
     if (batchable(po)) {
-      const w = strokeLineWidth(po);
-      const color = (po.obj as StrokeObject).color;
-      // Widths within 1/64 px share a batch (visually identical).
-      if (run.length && (color !== runColor || Math.abs(w - runWidth) > 1 / 64)) flush();
-      if (!run.length) {
-        runColor = color;
-        runWidth = w;
-      }
+      const r = runs.get(po) ?? -1;
+      if (run.length && r !== runId) flush();
+      runId = r;
       run.push(po);
       continue;
     }
     flush();
     if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
-    else drawImageObject(ctx, po, vp, dpr, assets.get(po.obj.assetId), theme.imagePlaceholder);
+    else {
+      const src = assets.get(po.obj.assetId);
+      if (!src) pending = true;
+      drawImageObject(ctx, po, vp, dpr, src, theme.imagePlaceholder);
+    }
   }
   flush();
+  return pending;
+}
 
+/**
+ * Everything drawn on top of committed objects, never cached: the stroke
+ * being drawn, selection outlines and handles (`selected` holds the visible
+ * selected objects), lasso and marquee.
+ */
+export function drawOverlays(
+  ctx: CanvasRenderingContext2D,
+  selected: readonly ProjectedObject[],
+  editor: EditorState,
+  cam: Camera,
+  vp: Viewport,
+  theme: SceneTheme,
+): void {
   // In-progress stroke, drawn through the same projection as committed ones.
   const d = editor.draft;
   if (d && d.points.length >= 2) {
@@ -71,7 +120,7 @@ export function drawScene(
     if (po) drawStroke(ctx, po, vp);
   }
 
-  drawSelection(ctx, visible, editor, theme, vp);
+  drawSelection(ctx, selected, editor, theme, vp);
 
   if (editor.lasso && editor.lasso.length >= 4) {
     ctx.save();
