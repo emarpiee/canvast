@@ -1,0 +1,2 @@
+# Keep LF everywhere so the single-file build digest is reproducible on any checkout.
+* text=auto eol=lf

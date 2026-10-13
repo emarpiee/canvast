@@ -1,0 +1,117 @@
+:root {
+  color-scheme: light dark;
+  --canvas-bg: #f7f7f5;
+  --canvas-grid: #4a4f5a;
+  --canvas-axis: #c2410c;
+  --canvas-landmark: #2563eb;
+  --canvas-landmark-label: #1e3a8a;
+  --hud-bg: rgba(255, 255, 255, 0.86);
+  --hud-fg: #1f2329;
+  --hud-border: rgba(31, 35, 41, 0.14);
+  --hud-accent: #2563eb;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas-bg: #16181d;
+    --canvas-grid: #c9ced8;
+    --canvas-axis: #fb923c;
+    --canvas-landmark: #60a5fa;
+    --canvas-landmark-label: #bfdbfe;
+    --hud-bg: rgba(28, 31, 38, 0.88);
+    --hud-fg: #e6e8ec;
+    --hud-border: rgba(230, 232, 236, 0.14);
+    --hud-accent: #60a5fa;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--canvas-bg);
+  color: var(--hud-fg);
+  font-family: var(--font-ui);
+}
+
+#canvas-host {
+  position: fixed;
+  inset: 0;
+}
+
+#canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+}
+
+#canvas.is-panning { cursor: grabbing; }
+
+#hud { position: absolute; inset: 0; pointer-events: none; }
+
+.hud-readout,
+.hud-controls,
+.hud-debug {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+}
+
+.hud-readout {
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  font: 12px/1.35 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  max-width: calc(100vw - 200px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-controls {
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+}
+
+.hud-controls button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 500 14px var(--font-ui);
+  cursor: pointer;
+}
+
+.hud-controls button:hover { background: var(--hud-border); }
+.hud-controls button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+
+.hud-debug {
+  left: 12px;
+  top: 12px;
+  margin: 0;
+  padding: 8px 10px;
+  font: 11px/1.4 var(--font-mono);
+  white-space: pre;
+}
+
+.hud-debug[hidden] { display: none; }
