@@ -1,10 +1,11 @@
-# ADR 0014 — Nested frames (proposed)
+# ADR 0014 — Nested frames
 
-- Status: **proposed**, on branch `exp/nested-frames`; needs owner approval
+- Status: **accepted** by the owner on 2026-10-14 (implementation on branch `exp/nested-frames`)
 - Date: 2026-10-14
 - Supersedes, once accepted: the *representation* in
   [ADR 0001](0001-exact-dyadic-world-coordinates.md). Its exactness rules stay.
 - Plan and measurements: [docs/plans/nested-frames.md](../plans/nested-frames.md)
+- Technical reference (model, formulas, invariants, error bounds, limits): [docs/reference/nested-frames.md](../reference/nested-frames.md)
 
 ## Decision
 

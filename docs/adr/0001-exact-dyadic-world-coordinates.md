@@ -1,6 +1,7 @@
 # ADR 0001 — Exact dyadic world coordinates with a log2 camera
 
 - Status: accepted (Phase 0A), validated by `tests/unit/camera.test.ts` and `tests/e2e/navigation.spec.ts`
+- Representation **superseded** by [ADR 0014](0014-nested-frames.md) (nested frames, 2026-10-14): positions become relative to frames so per-frame cost no longer grows with depth. The exactness rules below stay.
 - Date: 2026-10-13
 
 ## Question

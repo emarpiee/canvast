@@ -1,6 +1,7 @@
 # Plan — nested frames: constant cost at any depth
 
-- Status: **proposed** (experimental branch `exp/nested-frames`)
+- Status: **approved**; steps 1–2 done, step 3 next (branch `exp/nested-frames`)
+- Technical reference: [reference/nested-frames.md](../reference/nested-frames.md)
 - Date: 2026-10-14
 - Replaces: the storage form of positions decided in
   [ADR 0001](../adr/0001-exact-dyadic-world-coordinates.md). Exactness stays.

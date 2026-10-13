@@ -19,7 +19,32 @@ Unverified / Committed / Next bounded task**.
 | 1f | Asset organization: tags, favourites, nested folders (non-exclusive), search, sidebar scopes, archive round trip | **done** (see below) |
 | 1g | Zoom preview for dense scenes: a bounded scaled preview during zoom gestures, refined to exact | **done** (see below) |
 | 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
+| NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
 | 1+ | Video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, persistent undo, groups, smart folders and batch asset edits, collaboration | planned |
+
+## Nested frames redesign (branch `exp/nested-frames`)
+
+**Implemented:** spike (`src/spike/`): frames, exact rebasing, compressed
+dives, giant jumps (capped at 2^50 levels each), term-sum point walks,
+re-homing; debug overlay, jump panel, HUD and `__spike` hook. ADR 0014
+accepted 2026-10-14. Technical reference written.
+
+**Tested:** `tests/unit/frames.test.ts` (camera bit-identical to the
+absolute system, strokes within 10^-6 px, boundary rules, depth stress, one
+test per regression found); `scripts/spike-measure.mjs` (flat frame time
+2^10 to 2^10^12, 0 px drift, fuzz 3 × 2,500 steps in both browsers, no step
+over 250 ms). Unit suite 105/105. The E2E suite has not run on this branch.
+
+**Known failures:** coarse objects covering the view from more than
+100,000 levels below are not drawn in the spike (marked shortcut).
+
+**Unverified:** storage, spatial index, images, text, selection and
+editing on frames (steps 3–4).
+
+**Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
+
+**Next bounded task:** step 3, slice 1: camera and drawing on frames in
+the app.
 
 ## Phase 0A — endless navigation proof
 
