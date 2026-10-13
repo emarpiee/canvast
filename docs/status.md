@@ -18,7 +18,8 @@ Unverified / Committed / Next bounded task**.
 | 1e | Density preview: sub-pixel content stays visible as soft marks; one draw-or-preview rule shared by index and projection | **done** (see below) |
 | 1f | Asset organization: tags, favourites, nested folders (non-exclusive), search, sidebar scopes, archive round trip | **done** (see below) |
 | 1g | Zoom preview for dense scenes: a bounded scaled preview during zoom gestures, refined to exact | **done** (see below) |
-| 1+ | Text/media content, adjustments, Settings, persistent undo, smart folders and batch asset edits, collaboration | planned |
+| 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
+| 1+ | Video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, persistent undo, groups, smart folders and batch asset edits, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -280,6 +281,49 @@ visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
 
+## Phase 1, slice 8 — text objects
+
+**Implemented** ([ADR 0013](adr/0013-text-objects.md))
+- `TextObject` storing canonical Markdown (paragraphs, H1–H3, bulleted and
+  numbered items, bold, italic, escapes); canonicalized on load and import.
+- Bundled Inter Regular (OFL 1.1): own TrueType reader for metrics, character
+  map and outlines; browser `FontFace` from memory (no CSP change).
+- Browser-independent layout (greedy wrap, font advances, no kerning).
+- Drawing: browser glyphs up to 2,000 px per em; exact outline projection
+  above that (midpoint splitting, far pieces replaced by arcs that keep the
+  winding number). Bold and italic identical in every mode. System-font
+  characters pixelate at depth.
+- Editing: Text tool (`T`), double-click with Select, contenteditable
+  overlay with a format bar; plain-text paste; Copy Markdown (format bar and
+  toolbar); commit as one transaction; read-only tabs cannot edit.
+- **Fix (reported by the owner):** at 2^10,000,000 each frame took ~1.8 s,
+  since Phase 0A. World → screen offsets now skip an exact subtraction when
+  one operand is more than 2^128 times smaller (`diffToNumber`): ~15 ms.
+
+**Tested:** [testing/phase-1h.md](testing/phase-1h.md).
+- 10 new unit tests (font, Markdown round trip incl. 300 random documents,
+  layout, model). 4 new E2E tests × 4 projects, including text placed 3,000
+  levels deep and magnified 4,000 levels further.
+- 2 mutation checks caught (far-piece winding disabled; old world → screen).
+- Extreme depth: 1 E2E test × 4 projects at 2^10,000,000.
+- Quick suite: 253 passed, 3 skipped by design, 0 failed.
+
+**Known failures:** none. Two Firefox zoom-preview tile tests failed once
+under machine load (also on v0.7.0), then passed: timing-sensitive.
+
+**Known limits:**
+- Lines with system-font characters can sit a few px lower in the editor
+  than on the canvas.
+- Not yet: other fonts and weights, alignment, links, code, mentions and
+  backlinks (notes slice), bidirectional text and complex shaping.
+- The wrap width cannot be changed on its own yet (resizing scales the text).
+
+**Unverified:** IME composition (CJK input methods), screen readers inside
+the editor, real (non-headless) displays.
+
+**Next bounded task:** video, GIF and audio objects (§14.12), or the
+Markdown notes slice (mentions, backlinks), whichever the owner picks.
+
 ## Phase 1, slice 7 — zoom preview for dense scenes
 
 **Implemented** ([ADR 0012](adr/0012-zoom-preview.md))
@@ -301,9 +345,7 @@ visible strokes). Alternatives:
 - A full exact rebuild on each level crossed.
 - An empty border after zooming out until refinement.
 
-**Next bounded task:** text objects (§14.11). They are the next content
-type and need their own exact-coverage path and a "place deep, zoom 1,500+
-levels in" regression test.
+**Next bounded task:** text objects (§14.11). Done in slice 8.
 
 ## Phase 1, slice 6 — organizing the asset library
 

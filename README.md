@@ -169,6 +169,26 @@ or network connection.
   to inspect it. Do not re-compress it, because canvast only reads its own
   uncompressed archives.
 
+### Text (Phase 1)
+
+- **Text tool** (`T`): click on the canvas and type. With the Select tool,
+  **double-click** a text to edit it. Esc, **Done** or clicking away
+  finishes; emptying a text deletes it.
+- **Format bar** while editing: Bold, Italic (`Ctrl/⌘+B`, `Ctrl/⌘+I`),
+  Heading 1–3, Body, bulleted and numbered lists. Pasted text arrives as
+  plain text.
+- **What you edit is what you get:** the editor sits exactly over the text,
+  in the same font, size and line breaks.
+- **Markdown inside.** Each text is stored as a Markdown entry.
+  **Copy Markdown** is in the format bar, and in the toolbar when text is
+  selected.
+- **No zoom limit.** Zoom into a letter as far as you like: beyond 2,000 px
+  per letter canvast draws the font's real outlines, exactly. Characters the
+  bundled font (Inter) lacks, such as Chinese or emoji, use a system font
+  and pixelate at extreme depth.
+- Text resizes as a whole with the corner handles; the pen colours apply to
+  new text.
+
 ### Controls
 
 | Action | Input |
@@ -177,7 +197,8 @@ or network connection.
 | Pan | Middle-drag · hold **Space** and drag · Hand tool drag · two-finger drag · shift+wheel · arrow keys (shift = larger steps) |
 | Zoom at centre | `+` / `=` and `-` (shift = 4× step) · on-screen `+` / `−` |
 | Return to origin | `0` · `Home` key · on-screen house button |
-| Tools | `V` select · `P` pen · `L` lasso · `H` hand |
+| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text |
+| Edit text | Text tool click · double-click with Select · `Esc` or `Ctrl/⌘+Enter` to finish |
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
@@ -193,7 +214,7 @@ or network connection.
 authoritative positions of things on the canvas. The **camera** is the current
 view: its centre in world coordinates plus a zoom level. A **zoom level** of
 `z` means 2^z CSS pixels per world unit. An **object** is something placed on
-the canvas: a stroke or an image instance. An **asset** is an imported source
+the canvas: a stroke, an image instance or a text. An **asset** is an imported source
 file. Each asset is stored once, and placed images are **instances** that
 refer to it. A **workspace** holds **boards**; each board holds one or more
 **canvases**. **Canvas view** shows one canvas; **Assets view** shows the
@@ -294,7 +315,7 @@ Phase 0B results:
 src/
   core/dyadic.ts            exact m·2^e numbers (BigInt mantissa), double-double split
   core/camera.ts            camera model, world↔screen, anchored zoom, pan
-  doc/model.ts              canvas objects (stroke, image), validation, serialization
+  doc/model.ts              canvas objects (stroke, image, text), validation, serialization
   doc/edit-ops.ts           exact translate, scale-about-point, unit renormalization
   doc/document-store.ts     authoritative object set, transactions, undo/redo
   render/projection.ts      object → screen projection shared by drawing and picking
@@ -307,13 +328,16 @@ src/
   render/tile-cache.ts      raster tile cache for committed objects (exact zoom, whole-pixel reuse)
   render/density.ts         density preview of sub-pixel content (ink summaries from the index)
   render/canvas2d-renderer.ts  grid, axes, landmarks
+  render/draw-text.ts       text drawing: browser glyphs, exact glyph outlines at any depth
+  text/                     TrueType reader, Markdown model and canonical form, layout,
+                            bundled font (Inter Regular)
   interaction/navigation.ts wheel/keyboard navigation and the pan/pinch gesture
   interaction/tools.ts      pointer routing: pen, select/move/resize, marquee, lasso
   assets/                   SHA-256 content addressing, decoding, pixel access; asset catalog,
                             usage lookups and mark-and-sweep garbage collection
   storage/                  IndexedDB schema, workspace repository, incremental persistence,
                             v1 migration, multi-tab writer lease, ZIP container, archive export/import
-  ui/                       toolbar, view switch, workspace navigator, Assets view, confirmation
+  ui/                       toolbar, text editor overlay, view switch, workspace navigator, Assets view, confirmation
                             dialog, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
 scripts/                    single-file build, offline check, naming check
@@ -356,6 +380,8 @@ docs/status.md              roadmap and current status (single source of truth)
   library — tags, favourites, folders, search, archive merge.
 - [ADR 0012](docs/adr/0012-zoom-preview.md): zoom preview for dense scenes —
   bounds, refinement, measurements.
+- [ADR 0013](docs/adr/0013-text-objects.md): text objects — Markdown model,
+  bundled font, layout, exact outlines at any depth, editing.
 
 ## Storage, backups, import/export
 
@@ -433,25 +459,34 @@ docs/status.md              roadmap and current status (single source of truth)
   - groups, attach/detach, locking, rotation, and a Layers panel;
   - picking that respects image transparency (images are picked by their
     bounds);
-  - text, video, GIF, audio and PDF;
+  - video, GIF, audio and PDF;
+  - in text: other fonts and weights, alignment, links, code, mentions and
+    backlinks, right-to-left and complex scripts (Arabic, Indic), and
+    changing the wrap width on its own;
   - adjustments and settings;
   - smart folders, ratings, batch editing of several assets and
     similar-image review; dragging an asset onto the canvas (use Place);
   - collaboration.
+- **Text and system fonts.** Characters the bundled font lacks use the
+  system font: their width comes from the browser, so such text can wrap
+  differently on another computer, and in the editor its line can sit a
+  few px lower than on the canvas.
 - **Large backups.** One archive holds at most 4 GiB and 65,535 files, and it
   is built in the browser before download. Export and import speed for large
   workspaces has not been measured.
 - **Large asset libraries.** Thumbnails are generated in memory each
   session, and the grid draws every card. Very large libraries (many
   thousands of assets) have not been measured.
-- Tested only in Chromium on one Linux machine. Touch is emulated in tests.
+- Tested in Chromium and Firefox on one Linux machine. Touch is emulated in tests.
 
 ## Security
 
 - CSP: `default-src 'none'`. Only inline script and style are allowed.
   Images come from `blob:`/`data:` only. There is no `connect-src`, and
   `worker-src` is limited to `blob:`.
-- The app makes no network requests and has no runtime dependencies.
+- The app makes no network requests and has no runtime dependencies. The
+  bundled font is handed to the browser from memory, so no font source is
+  allowed either.
 - Imports are limited to `image/*` files of at most 256 MiB. Each file is
   decoded before it is stored, and files that fail to decode are rejected
   with a message.
@@ -461,8 +496,9 @@ docs/status.md              roadmap and current status (single source of truth)
 ## Licenses
 
 canvast's own code has no published license yet (`UNLICENSED`). Bundled
-third-party material: Lucide icons (ISC), with its notice embedded at the top
-of `dist/canvast.html` and listed in
+third-party material: Lucide icons (ISC) and the Inter Regular font (SIL Open
+Font License 1.1), with their notices embedded at the top of
+`dist/canvast.html` and listed in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only
 dependencies, which are not shipped: TypeScript (Apache-2.0), esbuild (MIT),
 Vitest (MIT), Playwright (Apache-2.0).
@@ -491,3 +527,4 @@ reproduces on any checkout.
 | Phase 1 slice 5 — density preview | 79/79 unit (4 new); density 3 tests × 4 projects; cost ≤ ~1 ms Chromium / ≤ 4 ms Firefox at 1M objects; quick E2E 201 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.5.0 sha256 `5d1504dc…0ede0` | see `git log` |
 | Phase 1 slice 6 — asset organization | 82/82 unit (3 new); organize 4 tests × 4 projects (12/12 repeated); 1 mutation check caught; quick E2E 217 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.6.0 sha256 `07154eec…26b4` | see `git log` |
 | Phase 1 slice 7 — zoom preview | tiles 40/40 (4 projects); dense 10K zoom 113→5.3 ms p50 (Chromium), 125→6 ms (Firefox); 1 mutation check caught; quick E2E 233 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.7.0 sha256 `ec455d1c…f905` | see `git log` |
+| Phase 1 slice 8 — text objects | 94/94 unit (12 new); text 16/16 and extreme depth 4/4 (4 projects); 2 mutation checks caught; owner-reported hang at 2^10,000,000 fixed (1.8 s → 15 ms per frame); quick E2E 253 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.8.0 sha256 `457ea053…6fb2` | see `git log` |

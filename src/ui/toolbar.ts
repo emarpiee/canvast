@@ -8,6 +8,8 @@ export interface ToolbarActions {
   undo(): void;
   redo(): void;
   deleteSelection(): void;
+  /** Copy the Markdown of the selected text objects. */
+  copyMarkdown(): void;
 }
 
 const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
@@ -15,6 +17,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "select", icon: ICONS.pointer, label: "Select", key: "V" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
+  { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
 ];
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
@@ -25,10 +28,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
         ).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="pen">
+      <div class="tb-group tb-options" data-for="pen text">
         ${PEN_COLORS.map(
-          (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen colour"><span style="background:${c}"></span></button>`,
+          (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${c}"></span></button>`,
         ).join("")}
+      </div>
+      <div class="tb-group tb-options" data-for="pen">
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
@@ -42,6 +47,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
         <button type="button" data-action="delete" aria-label="Delete selection" title="Delete selection (Del)">${ICONS.trash}</button>
+        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
       </div>
       <input type="file" accept="image/*" multiple hidden data-testid="import-input">
     </div>
@@ -72,6 +78,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
     else if (d["action"] === "delete") actions.deleteSelection();
+    else if (d["action"] === "copy-md") actions.copyMarkdown();
   });
 
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,10 +91,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
-    for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = g.dataset["for"] !== editor.tool;
+    for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool);
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
     root.querySelector<HTMLButtonElement>('[data-action="delete"]')!.disabled = editor.selection.size === 0;
+    root.querySelector<HTMLButtonElement>('[data-action="copy-md"]')!.hidden = ![...editor.selection].some((id) => doc.get(id)?.kind === "text");
     // In Assets view, that view shows (and consumes) messages instead.
     if (editor.message && document.body.dataset["view"] !== "assets") {
       toast.textContent = editor.message;

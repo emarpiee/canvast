@@ -5,6 +5,7 @@ import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
 import { batchable, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
+import { drawText } from "./draw-text";
 
 export interface SceneTheme {
   selection: string;
@@ -78,6 +79,7 @@ export function drawObjects(
     }
     flush();
     if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
+    else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
     else {
       const src = assets.get(po.obj.assetId);
       if (!src) pending = true;

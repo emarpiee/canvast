@@ -23,8 +23,8 @@ function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyad
 }
 
 /**
- * Scale about a fixed world point by (kx, ky). Strokes require kx === ky
- * (vector strokes scale uniformly, including width).
+ * Scale about a fixed world point by (kx, ky). Strokes and text require
+ * kx === ky (they scale uniformly, including stroke width and font size).
  */
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
@@ -35,6 +35,10 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   if (o.kind === "stroke") {
     if (kx !== ky) throw new RangeError("strokes scale uniformly");
     return normalizeUnit({ ...o, anchor, points: o.points.map((v) => v * kx), width: o.width * kx });
+  }
+  if (o.kind === "text") {
+    if (kx !== ky) throw new RangeError("text scales uniformly");
+    return normalizeUnit({ ...o, anchor, w: o.w * kx, size: o.size * kx });
   }
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
 }
@@ -58,6 +62,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   const s = 2 ** -n;
   const unit = o.unit + n;
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
+  if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s };
   return { ...o, unit, w: o.w * s, h: o.h * s };
 }
 

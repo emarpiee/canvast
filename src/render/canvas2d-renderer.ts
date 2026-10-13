@@ -64,7 +64,7 @@ function smoothstep(a: number, b: number, x: number): number {
 export function firstLineOffset(centerCoord: D.Dyadic, g: number, half: number, cam: Camera): number {
   const k = D.floorDivPow2(centerCoord, g);
   const lineWorld = D.fromBigInt(k, g); // greatest grid line <= center
-  const offset = D.toNumber(D.shift(D.sub(lineWorld, centerCoord), cam.zi)) * 2 ** cam.zf; // in (-spacing, 0]
+  const offset = D.diffToNumber(lineWorld, centerCoord, cam.zi) * 2 ** cam.zf; // in (-spacing, 0]
   const spacing = 2 ** (g + cam.zi + cam.zf);
   const steps = Math.ceil((half + offset) / spacing);
   return half + offset - steps * spacing;

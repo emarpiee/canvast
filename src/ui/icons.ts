@@ -16,6 +16,17 @@ import locate from "lucide-static/icons/locate.svg";
 import mapPin from "lucide-static/icons/map-pin.svg";
 import upload from "lucide-static/icons/upload.svg";
 import x from "lucide-static/icons/x.svg";
+import type from "lucide-static/icons/type.svg";
+import bold from "lucide-static/icons/bold.svg";
+import italic from "lucide-static/icons/italic.svg";
+import heading1 from "lucide-static/icons/heading-1.svg";
+import heading2 from "lucide-static/icons/heading-2.svg";
+import heading3 from "lucide-static/icons/heading-3.svg";
+import pilcrow from "lucide-static/icons/pilcrow.svg";
+import list from "lucide-static/icons/list.svg";
+import listOrdered from "lucide-static/icons/list-ordered.svg";
+import copy from "lucide-static/icons/copy.svg";
+import check from "lucide-static/icons/check.svg";
 
 function clean(svg: string): string {
   return svg
@@ -43,4 +54,15 @@ export const ICONS = {
   mapPin: clean(mapPin),
   upload: clean(upload),
   x: clean(x),
+  type: clean(type),
+  bold: clean(bold),
+  italic: clean(italic),
+  heading1: clean(heading1),
+  heading2: clean(heading2),
+  heading3: clean(heading3),
+  pilcrow: clean(pilcrow),
+  list: clean(list),
+  listOrdered: clean(listOrdered),
+  copy: clean(copy),
+  check: clean(check),
 } as const;

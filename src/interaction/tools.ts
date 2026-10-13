@@ -5,7 +5,7 @@ import { screenToWorld } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ObjectId, StrokeObject } from "../doc/model";
+import type { CanvasObject, ObjectId, StrokeObject, TextObject } from "../doc/model";
 import { newObjectId } from "../doc/model";
 import { normalizeUnit, scaleAbout, translate } from "../doc/edit-ops";
 import { visibleObjects } from "../render/scene-view";
@@ -28,6 +28,8 @@ import { deleteSelection, redo, undo } from "../app/actions";
  *   moves it; dragging from unselected media starts a box selection instead,
  *   so a viewport-filling image is never grabbed by accident.
  * - Alt+click cycles through overlapping objects.
+ * - Text tool: a click on a text object edits it, anywhere else starts a new
+ *   one. With the Select tool, a double-click on a text object edits it.
  */
 
 /** Pointer travel (CSS px) that turns a press into a drag. */
@@ -45,6 +47,7 @@ type Gesture =
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; startWorld: WorldPoint; ids: ObjectId[] }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
+  | { kind: "text"; pointerId: number; start: ScreenPoint }
   | {
       kind: "scale";
       pointerId: number;
@@ -55,7 +58,19 @@ type Gesture =
       uniform: boolean;
     };
 
-export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore, index: SpatialIndex, editor: EditorState): () => void {
+export interface ToolHooks {
+  /** Open the text editor on `target`, or on a new text object at `at`. */
+  editText(target: TextObject | null, at: WorldPoint): void;
+}
+
+export function attachTools(
+  el: HTMLElement,
+  view: ViewState,
+  doc: DocumentStore,
+  index: SpatialIndex,
+  editor: EditorState,
+  hooks: ToolHooks,
+): () => void {
   const pan = new PanGesture(view);
   let g: Gesture = { kind: "none" };
   let spaceDown = false;
@@ -69,6 +84,8 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
   };
   const world = (s: ScreenPoint): WorldPoint => screenToWorld(view.camera, view.viewport, s);
   const visible = () => visibleObjects(doc, index, null, view.camera, view.viewport);
+  const textAt = (s: ScreenPoint): TextObject | null =>
+    (pickAll(visible(), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
 
   const cancelGesture = (): void => {
     editor.preview = { kind: "none" };
@@ -195,7 +212,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
       const next = p.ids
         .map((id) => doc.get(id))
         .filter((o): o is CanvasObject => !!o)
-        .map((o) => scaleAbout(o, p.fixed, p.kx, o.kind === "stroke" ? p.kx : p.ky));
+        .map((o) => scaleAbout(o, p.fixed, p.kx, o.kind === "image" ? p.ky : p.kx));
       doc.commit(doc.transaction("Resize", next));
     }
   };
@@ -244,6 +261,9 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
         break;
       case "select":
         startSelectPress(e, s);
+        break;
+      case "text":
+        g = { kind: "text", pointerId: e.pointerId, start: s };
         break;
       default:
         break;
@@ -352,9 +372,20 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();
         break;
+      case "text":
+        // Opened after the pointer is released, so the editor keeps the focus.
+        if (!cancelled && !editor.blockEdit()) hooks.editText(textAt(g.start), world(g.start));
+        break;
     }
     g = { kind: "none" };
     editor.changed();
+  };
+
+  const onDoubleClick = (e: MouseEvent): void => {
+    if (effectiveTool() !== "select" || editor.readOnly) return;
+    const s = local(e);
+    const t = textAt(s);
+    if (t) hooks.editText(t, world(s));
   };
 
   // ---- keyboard ----------------------------------------------------------
@@ -381,6 +412,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
     else if (key === "p") editor.setTool("pen");
     else if (key === "l") editor.setTool("lasso");
     else if (key === "h") editor.setTool("hand");
+    else if (key === "t") editor.setTool("text");
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else editor.select([]);
@@ -403,6 +435,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
   el.addEventListener("pointermove", onPointerMove);
   el.addEventListener("pointerup", onPointerUp);
   el.addEventListener("pointercancel", onPointerUp);
+  el.addEventListener("dblclick", onDoubleClick);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", () => {
@@ -414,6 +447,7 @@ export function attachTools(el: HTMLElement, view: ViewState, doc: DocumentStore
     el.removeEventListener("pointermove", onPointerMove);
     el.removeEventListener("pointerup", onPointerUp);
     el.removeEventListener("pointercancel", onPointerUp);
+    el.removeEventListener("dblclick", onDoubleClick);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
   };

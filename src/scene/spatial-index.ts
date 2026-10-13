@@ -60,17 +60,22 @@ interface InkCell {
 /** Colour of image instances in the density preview (originals are not decoded for it). */
 const IMAGE_INK_RGB: readonly [number, number, number] = [138, 138, 138];
 
+/** Ink of a text character, as a fraction of em² (a typical glyph covers about this much). */
+const TEXT_INK_PER_CHAR = 0.3;
+
 /**
  * Covered area of an object in local units² (opacity-weighted) and its
  * colour. Strokes: polyline length × width plus the round caps.
  */
 function objectInk(o: CanvasObject): { area: number; rgb: readonly [number, number, number] } {
   if (o.kind === "image") return { area: o.w * o.h * o.opacity, rgb: IMAGE_INK_RGB };
+  const c = parseInt(o.color.slice(1), 16);
+  const rgb = [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  if (o.kind === "text") return { area: o.md.replace(/\s/g, "").length * o.size * o.size * TEXT_INK_PER_CHAR * o.opacity, rgb };
   const p = o.points;
   let len = 0;
   for (let i = 2; i + 1 < p.length; i += 2) len += Math.hypot(p[i]! - p[i - 2]!, p[i + 1]! - p[i - 1]!);
-  const c = parseInt(o.color.slice(1), 16);
-  return { area: (len * o.width + (Math.PI * o.width * o.width) / 4) * o.opacity, rgb: [(c >> 16) & 255, (c >> 8) & 255, c & 255] };
+  return { area: (len * o.width + (Math.PI * o.width * o.width) / 4) * o.opacity, rgb };
 }
 
 function addInk(t: Ink, area: number, rgb: readonly [number, number, number], sign: 1 | -1): void {

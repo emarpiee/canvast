@@ -32,6 +32,8 @@ import { mountAssetsView } from "../ui/assets-view";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
+import { copyText, mountTextEditor } from "../ui/text-editor";
+import { installTextFont } from "../text/inter";
 
 declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
@@ -116,6 +118,11 @@ async function start(): Promise<void> {
     scheduled = true;
     requestAnimationFrame(draw);
   };
+  // Before any document loads: text bounds come from the bundled font's metrics.
+  installTextFont(() => {
+    tiles.clear(); // text drawn before the font was ready used the interim fallback
+    invalidate();
+  });
   const assets = new AssetLibrary(db, () => {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
@@ -219,12 +226,21 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  attachTools(canvas, view, doc, index, editor);
+  const textEditor = mountTextEditor(host, view, doc, editor);
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at) });
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
+    copyMarkdown: () => {
+      const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
+      if (!md.length) return;
+      void copyText(md.join("\n\n")).then(() => {
+        editor.message = "Copied Markdown";
+        editor.changed();
+      });
+    },
   });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),

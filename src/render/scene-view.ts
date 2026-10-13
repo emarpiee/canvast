@@ -44,8 +44,9 @@ export function visibleObjects(
   }
   for (const id of previewIds) {
     const o = doc.get(id);
-    if (!o) continue;
-    const po = projectObject(editor!.previewed(o), cam, vp);
+    const shown = o && editor!.previewed(o);
+    if (!shown) continue;
+    const po = projectObject(shown, cam, vp);
     if (po) out.push(po);
   }
   out.sort((a, b) => a.obj.z - b.obj.z || (a.obj.id < b.obj.id ? -1 : a.obj.id > b.obj.id ? 1 : 0));

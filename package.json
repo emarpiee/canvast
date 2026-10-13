@@ -1,8 +1,8 @@
 {
   "name": "canvast",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
-  "description": "canvast \u2014 an offline-first endless canvas that ships as a single HTML file",
+  "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
@@ -19,6 +19,7 @@
     "bench": "npm run build && playwright test -c playwright.bench.config.ts"
   },
   "devDependencies": {
+    "@expo-google-fonts/inter": "0.4.2",
     "@playwright/test": "1.64.0",
     "@types/node": "26.6.5",
     "esbuild": "0.28.2",

@@ -104,8 +104,8 @@ function screenOffsetToWorld(cam: Camera, ox: number, oy: number): { dx: Dyadic;
 export function worldToScreen(cam: Camera, vp: Viewport, p: WorldPoint): ScreenPoint {
   const f = 2 ** cam.zf;
   return {
-    x: vp.width / 2 + D.toNumber(D.shift(D.sub(p.x, cam.center.x), cam.zi)) * f,
-    y: vp.height / 2 + D.toNumber(D.shift(D.sub(p.y, cam.center.y), cam.zi)) * f,
+    x: vp.width / 2 + D.diffToNumber(p.x, cam.center.x, cam.zi) * f,
+    y: vp.height / 2 + D.diffToNumber(p.y, cam.center.y, cam.zi) * f,
   };
 }
 

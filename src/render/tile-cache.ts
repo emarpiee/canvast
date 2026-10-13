@@ -290,8 +290,8 @@ export class TileCache {
     const s = 2 ** dz;
     const f = 2 ** cam.zf;
     // Device position of the set's reference point (its viewport's top-left) under this camera.
-    const ox = (vp.width / 2 + D.toNumber(D.shift(D.sub(g.center.x, cam.center.x), cam.zi)) * f) * dpr - (g.vp.width / 2) * dpr * s;
-    const oy = (vp.height / 2 + D.toNumber(D.shift(D.sub(g.center.y, cam.center.y), cam.zi)) * f) * dpr - (g.vp.height / 2) * dpr * s;
+    const ox = (vp.width / 2 + D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f) * dpr - (g.vp.width / 2) * dpr * s;
+    const oy = (vp.height / 2 + D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f) * dpr - (g.vp.height / 2) * dpr * s;
     if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null;
     const td = TILE_CSS * dpr;
     const gd = GUARD_CSS * dpr;
@@ -324,8 +324,8 @@ export class TileCache {
    */
   private offset(g: Generation, cam: Camera, vp: Viewport, dpr: number): { dx: number; dy: number } | null {
     const f = 2 ** cam.zf;
-    const ax = (D.toNumber(D.shift(D.sub(g.center.x, cam.center.x), cam.zi)) * f + (vp.width - g.vp.width) / 2) * dpr;
-    const ay = (D.toNumber(D.shift(D.sub(g.center.y, cam.center.y), cam.zi)) * f + (vp.height - g.vp.height) / 2) * dpr;
+    const ax = (D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f + (vp.width - g.vp.width) / 2) * dpr;
+    const ay = (D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f + (vp.height - g.vp.height) / 2) * dpr;
     const dx = Math.round(ax);
     const dy = Math.round(ay);
     if (Math.abs(ax - dx) > 1e-6 || Math.abs(ay - dy) > 1e-6 || Math.abs(dx) > 2 ** 30 || Math.abs(dy) > 2 ** 30) return null;

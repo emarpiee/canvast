@@ -1,5 +1,7 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
+import { layoutText } from "../text/layout";
+import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 
 /**
  * Authoritative canvas objects.
@@ -52,7 +54,21 @@ export interface ImageObject extends ObjectBase {
   readonly pixelH: number;
 }
 
-export type CanvasObject = StrokeObject | ImageObject;
+export interface TextObject extends ObjectBase {
+  readonly kind: "text";
+  /** Canonical Markdown (text/markdown.ts); the anchor is the top-left corner. */
+  readonly md: string;
+  /** Wrap width in local units. */
+  readonly w: number;
+  /** Body font size (1 em) in local units. */
+  readonly size: number;
+  readonly color: string;
+}
+
+export type CanvasObject = StrokeObject | ImageObject | TextObject;
+
+/** Margin around a text box (em) for italic overhang, bold and descenders past the line box. */
+export const TEXT_PAD_EM = 0.25;
 
 export interface LocalBounds {
   minX: number;
@@ -63,6 +79,11 @@ export interface LocalBounds {
 
 export function localBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
+  if (o.kind === "text") {
+    const l = layoutText(o.md, o.w / o.size);
+    const p = TEXT_PAD_EM * o.size;
+    return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
+  }
   const p = o.points;
   let minX = Infinity;
   let minY = Infinity;
@@ -128,6 +149,11 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.w, "w");
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
+  } else if (o.kind === "text") {
+    if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
+    positive(o.w, "w");
+    positive(o.size, "size");
+    if (!COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }
@@ -167,6 +193,9 @@ export function deserializeObject(s: SerializedObject): CanvasObject {
       pixelW: s["pixelW"] as number,
       pixelH: s["pixelH"] as number,
     };
+  } else if (s.kind === "text") {
+    // Imported or older text is stored in canonical form.
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

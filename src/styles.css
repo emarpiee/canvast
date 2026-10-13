@@ -569,3 +569,36 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
   .hud-readout { max-width: calc(100vw - 150px); }
 }
 .storage-panel button:disabled { opacity: 0.4; cursor: default; }
+
+/* Text editing overlay (ui/text-editor.ts). Spacing mirrors text/layout.ts:
+   line height 1.3, block gap 0.6 em, list item gap 0.2 em, list indent 1.5 em. */
+#canvas[data-tool="text"] { cursor: text; }
+.text-editor {
+  position: absolute;
+  box-sizing: content-box;
+  margin: 0;
+  padding: 0;
+  min-height: 1.3em;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0;
+  font-weight: 400;
+  outline: 1px dashed var(--canvas-selection);
+  outline-offset: 2px;
+  cursor: text;
+  caret-color: currentColor;
+}
+.text-editor[hidden], .text-format[hidden] { display: none; }
+.text-editor > *, .text-editor li { margin: 0 0 calc(var(--em) * 0.6); padding: 0; font-weight: 400; line-height: 1.3; }
+.text-editor > :last-child { margin-bottom: 0; }
+.text-editor h1 { font-size: 2em; }
+.text-editor h2 { font-size: 1.5em; }
+.text-editor h3 { font-size: 1.25em; }
+.text-editor ul, .text-editor ol { padding-left: calc(var(--em) * 1.5); }
+.text-editor li { margin-bottom: calc(var(--em) * 0.2); }
+.text-editor li:last-child { margin-bottom: 0; }
+.text-editor b, .text-editor strong { font-weight: 700; }
+.text-format { position: absolute; flex-wrap: nowrap; }

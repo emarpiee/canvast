@@ -104,9 +104,9 @@ export interface ProjectedObject {
   readonly proj: Projection;
   /** Exact screen bounding box (may be far beyond the viewport, or ±Infinity). */
   readonly box: ScreenBox;
-  /** Stroke: projected polyline [x0, y0, ...]; image: [left, top, right, bottom]. */
+  /** Stroke: projected polyline [x0, y0, ...]; image and text: [left, top, right, bottom]. */
   readonly q: Float64Array;
-  /** Stroke radius in px (0 for images; may be Infinity at extreme magnification). */
+  /** Stroke radius in px (0 for images and text; may be Infinity at extreme magnification). */
   readonly radius: number;
   /**
    * True when the double-precision fast path is not accurate enough for this
@@ -180,8 +180,10 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
   if (!opts.keepTiny && tooSmallToDraw(o, cam)) return null;
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
-  if (o.kind === "image") {
-    return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, p);
+  if (o.kind !== "stroke") {
+    // Text draws its glyphs exactly (draw-text.ts) when doubles are not accurate enough.
+    const exact = o.kind === "text" && (!(extent <= EXACT_COORD_THRESHOLD) || !(fastPathError(p, localMag) <= 2 ** -40));
+    return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, exact, cam, vp, p);
   }
   const radius = toPx(p, D.fromNumber(o.width / 2));
   const exact =
@@ -209,8 +211,8 @@ export function cellFrame(cell: IndexCell, cam: Camera, vp: Viewport): CellFrame
   const L = cell.level;
   const f = 2 ** cam.zf;
   return {
-    x: vp.width / 2 + D.toNumber(D.shift(D.sub(D.fromBigInt(cell.ix, L), cam.center.x), cam.zi)) * f,
-    y: vp.height / 2 + D.toNumber(D.shift(D.sub(D.fromBigInt(cell.iy, L), cam.center.y), cam.zi)) * f,
+    x: vp.width / 2 + D.diffToNumber(D.fromBigInt(cell.ix, L), cam.center.x, cam.zi) * f,
+    y: vp.height / 2 + D.diffToNumber(D.fromBigInt(cell.iy, L), cam.center.y, cam.zi) * f,
     pxPerCell: 2 ** (L + cam.zi) * f,
   };
 }
@@ -237,11 +239,12 @@ export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: View
     return null;
   }
   // No size cull here: the index only returns cells of levels drawn individually.
-  if (o.kind === "image") {
+  const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
+  if (o.kind !== "stroke") {
+    if (o.kind === "text" && !(extent <= EXACT_COORD_THRESHOLD)) return projectObject(o, cam, vp);
     return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, null);
   }
   const radius = (o.width / 2) * s;
-  const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   if (!(radius <= EXACT_RADIUS_THRESHOLD) || !(extent <= EXACT_COORD_THRESHOLD)) return projectObject(o, cam, vp);
   const pts = o.points;
   const q = new Float64Array(pts.length);

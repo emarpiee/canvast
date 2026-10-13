@@ -27,6 +27,11 @@ import type { TileCache, TileFrame } from "../render/tile-cache";
 import type { DensityLayer } from "../render/density";
 import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
 import { done } from "../storage/idb";
+import { lastCopiedText } from "../ui/text-editor";
+import { layoutText, textFont } from "../text/layout";
+import type { PlacedGlyph, Line } from "../text/layout";
+import type { TextObject } from "../doc/model";
+import { localToWorld } from "../doc/edit-ops";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -118,6 +123,12 @@ export interface DebugHook {
   canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null }>;
   /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
   removeAssetBytes(hash: string): Promise<void>;
+  /** Text most recently copied by canvast (Copy Markdown). */
+  lastCopied(): string;
+  /** The n-th visible character of a text object: code point and outline bounds (font units, y up). */
+  textGlyph(id: string, n: number): { cp: number; gid: number; xMin: number; yMin: number; xMax: number; yMax: number; upm: number };
+  /** Exact world position of a point (font units, upright) of the n-th visible character of a text object. */
+  textGlyphWorld(id: string, n: number, fx: number, fy: number): { x: string; y: string };
 }
 
 export interface DebugDeps {
@@ -177,6 +188,15 @@ export function installDebugHook(
     const s = [...xs].sort((a, b) => a - b);
     const at = (p: number): number => s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))] ?? 0;
     return { p50: at(50), p95: at(95), p99: at(99), max: s[s.length - 1] ?? 0 };
+  };
+  const glyphOf = (id: string, n: number): { o: TextObject; line: Line; g: PlacedGlyph } => {
+    const o = doc.get(id);
+    if (!o || o.kind !== "text") throw new Error(`no text ${id}`);
+    let i = 0;
+    for (const line of layoutText(o.md, o.w / o.size).lines) {
+      for (const g of line.glyphs) if (g.cp !== 32 && i++ === n) return { o, line, g };
+    }
+    throw new Error(`text ${id} has no character ${n}`);
   };
   const hook: DebugHook = {
     camera: () => serializeCamera(view.camera),
@@ -382,6 +402,22 @@ export function installDebugHook(
       const tx = session.repo!.db.transaction("assets", "readwrite");
       tx.objectStore("assets").delete(hash);
       await done(tx);
+    },
+    lastCopied: lastCopiedText,
+    textGlyph: (id, n) => {
+      const { g } = glyphOf(id, n);
+      const gl = textFont().glyph(g.gid);
+      return { cp: g.cp, gid: g.gid, xMin: gl.xMin, yMin: gl.yMin, xMax: gl.xMax, yMax: gl.yMax, upm: textFont().unitsPerEm };
+    },
+    textGlyphWorld: (id, n, fx, fy) => {
+      const { o, line, g } = glyphOf(id, n);
+      // Same exact arithmetic as draw-text.ts (upright, unshifted).
+      const SIZE = D.fromNumber(o.size);
+      const C = D.mul(SIZE, D.fromNumber(line.scale / textFont().unitsPerEm));
+      const lx = D.add(D.mul(D.fromNumber(g.x), SIZE), D.mul(D.fromNumber(fx), C));
+      const ly = D.sub(D.mul(D.fromNumber(line.baseline), SIZE), D.mul(D.fromNumber(fy), C));
+      const at = localToWorld(o, 0, 0);
+      return { x: D.toString(D.add(at.x, D.shift(lx, o.unit))), y: D.toString(D.add(at.y, D.shift(ly, o.unit))) };
     },
   };
   function readAll<T>(store: string): Promise<T[]> {

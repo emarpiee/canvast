@@ -4,6 +4,28 @@
 
 (nothing yet)
 
+## 0.8.0 — Phase 1 slice 8: text objects (2026-10-13)
+
+- **Text on the canvas.** Text tool (`T`): click and type. Double-click a
+  text with the Select tool to edit it.
+  - Bold, italic, three heading sizes, bulleted and numbered lists, from
+    the format bar or `Ctrl/⌘+B`, `Ctrl/⌘+I`.
+  - Edited in place: what you type is laid out like the final text.
+  - Pasted text arrives as plain text.
+- **Stored as Markdown.** Each text is a Markdown entry, not editor HTML.
+  **Copy Markdown** in the format bar, or in the toolbar for selected text.
+- **No zoom limit for text.** Up to 2,000 px per letter the browser draws
+  it; beyond that canvast draws the font's real outlines, exactly, at any
+  depth. Tested 4,000 levels beyond where the text was written: edges stay
+  sharp and exact, letters stay solid. Characters the bundled font lacks
+  (CJK, emoji) use a system font and pixelate at extreme depth.
+- **Fix: working extremely deep no longer freezes the computer.** At
+  2^10,000,000, every frame took about 1.8 s (since Phase 0A): placing the
+  origin's landmarks on screen built 10-million-bit numbers. Now about
+  15 ms per frame; drawing a stroke there takes 0.2 s instead of 24 s.
+- **Bundled font:** Inter Regular (SIL Open Font License 1.1), embedded in
+  the single file, which grows by about 460 KB (to ~649 KB).
+
 ## 0.7.0 — Phase 1 slice 7: zoom preview for dense scenes (2026-10-13)
 
 - **Smooth zooming over dense scenes.** While you zoom, a scene with many

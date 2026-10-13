@@ -96,3 +96,24 @@ describe("dyadic arithmetic", () => {
     expect(D.toDisplay(D.fromNumber(12.5))).toBe("12.5");
   });
 });
+
+describe("diffToNumber", () => {
+  it("equals toNumber((a − b)·2^k), skipping only operands too small to matter", () => {
+    const exact = (a: D.Dyadic, b: D.Dyadic, k: number): number => D.toNumber(D.shift(D.sub(a, b), k));
+    const cases: Array<[D.Dyadic, D.Dyadic, number]> = [
+      [D.fromNumber(2 ** 40), D.fromBigInt(3n, -10_000), 10_000], // landmark seen from very deep
+      [D.fromBigInt(5n, -9000), D.fromNumber(1.5), 9000],
+      [D.add(D.fromNumber(2 ** 40), D.fromBigInt(1n, -5000)), D.fromNumber(2 ** 40), 5000], // near-equal: exact
+      [D.fromNumber(0), D.fromBigInt(7n, -300), 300],
+      [D.fromNumber(123.25), D.fromNumber(-7.5), 3],
+    ];
+    for (const [a, b, k] of cases) expect(D.diffToNumber(a, b, k)).toBe(exact(a, b, k));
+    expect(D.diffToNumber(D.add(D.fromNumber(2 ** 40), D.fromBigInt(1n, -5000)), D.fromNumber(2 ** 40), 5000)).toBe(1);
+  });
+
+  it("is fast across a 10-million-level gap", () => {
+    const t0 = performance.now();
+    for (let i = 0; i < 20; i++) D.diffToNumber(D.fromNumber(2 ** 40), D.fromBigInt(3n, -10_000_000), 10_000_000);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
+});

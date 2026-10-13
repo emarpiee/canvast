@@ -40,7 +40,7 @@ function viewRect(vp: Viewport, margin: number): Rect {
 }
 
 /** Apply per-object paint state (opacity today; blend mode is the next field here). */
-function paint(ctx: CanvasRenderingContext2D, o: CanvasObject, body: () => void): void {
+export function paint(ctx: CanvasRenderingContext2D, o: CanvasObject, body: () => void): void {
   const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = prevAlpha * o.opacity;
   try {

@@ -189,6 +189,21 @@ export function toNumber(a: Dyadic): number {
 }
 
 /**
+ * toNumber((a − b) · 2^k). When one operand is more than 2^128 times smaller
+ * than the other, it cannot change the double result (relative effect below
+ * 2^-127, so at most a different rounding in a tie), and the exact
+ * difference is skipped. That difference would need a mantissa as long as
+ * the exponent gap: 10 million bits for a landmark seen from 2^10,000,000.
+ */
+export function diffToNumber(a: Dyadic, b: Dyadic, k: number): number {
+  const ta = a.m === 0n ? -Infinity : bitLength(a.m) + a.e;
+  const tb = b.m === 0n ? -Infinity : bitLength(b.m) + b.e;
+  if (ta > tb + 128) return toNumber(shift(a, k));
+  if (tb > ta + 128) return -toNumber(shift(b, k));
+  return toNumber(shift(sub(a, b), k));
+}
+
+/**
  * Round to the nearest multiple of 2^q (ties away from zero). Used to bound
  * mantissa growth of camera state; the error is at most 2^(q-1).
  */

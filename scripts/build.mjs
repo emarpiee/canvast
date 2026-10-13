@@ -27,17 +27,21 @@ const result = await build({
     __CANVAST_DEBUG__: JSON.stringify(debug),
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
   },
-  loader: { ".svg": "text" },
+  loader: { ".svg": "text", ".ttf": "binary" },
   logLevel: "warning",
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
 const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
-// Third-party notices travel inside the single file (Lucide icons are ISC).
-const lucide = JSON.parse(await readFile(resolve(root, "node_modules/lucide-static/package.json"), "utf8"));
-const lucideLicense = (await readFile(resolve(root, "node_modules/lucide-static/LICENSE"), "utf8")).replace(/--/g, "- -").trim();
-const notices = `<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${lucideLicense}\n-->\n`;
+// Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
+const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));
+const licence = async (path) => (await readFile(resolve(root, "node_modules", path), "utf8")).replace(/--/g, "- -").trim();
+const lucide = await pkgOf("lucide-static");
+const inter = await pkgOf("@expo-google-fonts/inter");
+const notices =
+  `<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
+  `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)

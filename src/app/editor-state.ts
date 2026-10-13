@@ -4,7 +4,7 @@ import type { CanvasObject, ObjectId } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { scaleAbout, translate } from "../doc/edit-ops";
 
-export type Tool = "select" | "pen" | "lasso" | "hand";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -16,7 +16,9 @@ const EMPTY: ReadonlySet<ObjectId> = new Set();
 export type Preview =
   | { kind: "none" }
   | { kind: "move"; ids: readonly ObjectId[]; dx: Dyadic; dy: Dyadic }
-  | { kind: "scale"; ids: readonly ObjectId[]; fixed: WorldPoint; kx: number; ky: number };
+  | { kind: "scale"; ids: readonly ObjectId[]; fixed: WorldPoint; kx: number; ky: number }
+  /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
+  | { kind: "edit"; ids: readonly ObjectId[] };
 
 export interface DraftStroke {
   anchor: WorldPoint;
@@ -83,12 +85,13 @@ export class EditorState {
     return p.kind === "none" ? EMPTY : new Set(p.ids);
   }
 
-  /** Apply the active preview to an object (identity when not affected). */
-  previewed(o: CanvasObject): CanvasObject {
+  /** Apply the active preview to an object (identity when not affected; null when hidden). */
+  previewed(o: CanvasObject): CanvasObject | null {
     const p = this.preview;
+    if (p.kind === "edit" && p.ids.includes(o.id)) return null;
     if (p.kind === "move" && p.ids.includes(o.id)) return translate(o, p.dx, p.dy);
     if (p.kind === "scale" && p.ids.includes(o.id)) {
-      return scaleAbout(o, p.fixed, p.kx, o.kind === "stroke" ? p.kx : p.ky);
+      return scaleAbout(o, p.fixed, p.kx, o.kind === "image" ? p.ky : p.kx);
     }
     return o;
   }
