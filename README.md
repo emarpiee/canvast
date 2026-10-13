@@ -6,14 +6,15 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 6 — an organized asset library.** On top of
+> **Status: Phase 1, slice 7 — smooth zooming over dense scenes.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
 > scales with what is on screen (0C), your work is organized as
 > Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
 > Assets library (1b), export/import of `.canvast` archives (1c), and a raster
 > tile cache that keeps panning and drawing over dense scenes at 60 fps (1d),
 > a density preview that keeps far-away and tiny content visible (1e), and
-> tags, favourites and folders in the Assets library (1f). Text, video,
+> tags, favourites and folders in the Assets library (1f), and a zoom preview
+> that keeps zooming over dense scenes at about 60 fps (1g). Text, video,
 > groups and settings are **not implemented
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
@@ -353,6 +354,8 @@ docs/status.md              roadmap and current status (single source of truth)
   summaries, one draw-or-preview rule, presence floor, cost.
 - [ADR 0011](docs/adr/0011-asset-organization.md): organizing the asset
   library — tags, favourites, folders, search, archive merge.
+- [ADR 0012](docs/adr/0012-zoom-preview.md): zoom preview for dense scenes —
+  bounds, refinement, measurements.
 
 ## Storage, backups, import/export
 
@@ -409,9 +412,14 @@ docs/status.md              roadmap and current status (single source of truth)
     thanks to the raster tile cache
     ([ADR 0009](docs/adr/0009-raster-tile-cache.md)): 2–3 ms per frame,
     against 89–172 ms before.
-  - **Zooming** over such scenes is still about 60–70 ms per frame (about
-    15 fps). Tiles are deliberately not used while the zoom changes, so a
-    stale or rescaled image is never shown.
+  - **Zooming** over such scenes shows a briefly scaled image of the last
+    exact frame ([ADR 0012](docs/adr/0012-zoom-preview.md)): about 5 ms
+    per frame, against 87–125 ms before.
+    - It snaps to the exact picture 150 ms after you stop, and every time
+      you pass a whole zoom level. Those crossings take one full frame each
+      (about 0.16–0.2 s at 10K strokes).
+    - Scenes with few objects, including anything you work on deep inside
+      the canvas, are always drawn exactly.
 - **Very large documents.** A 1M-object board needs about 940 MB of heap,
   and about 6 s to build the spatial index on load.
 - **Far zoom-out.** Content too small to draw stroke by stroke appears as a
@@ -482,3 +490,4 @@ reproduces on any checkout.
 | Phase 1 slice 4 — raster tile cache | tiles 24/24 (4 projects); dense 10K pan 89→2.2 ms, still 152→3.3 ms p50 (Chromium), Firefox 98→2 / 172→2 ms; quick E2E 189 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.4.0 sha256 `4528f2b3…f65a` | see `git log` |
 | Phase 1 slice 5 — density preview | 79/79 unit (4 new); density 3 tests × 4 projects; cost ≤ ~1 ms Chromium / ≤ 4 ms Firefox at 1M objects; quick E2E 201 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.5.0 sha256 `5d1504dc…0ede0` | see `git log` |
 | Phase 1 slice 6 — asset organization | 82/82 unit (3 new); organize 4 tests × 4 projects (12/12 repeated); 1 mutation check caught; quick E2E 217 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.6.0 sha256 `07154eec…26b4` | see `git log` |
+| Phase 1 slice 7 — zoom preview | tiles 40/40 (4 projects); dense 10K zoom 113→5.3 ms p50 (Chromium), 125→6 ms (Firefox); 1 mutation check caught; quick E2E 233 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.7.0 sha256 `ec455d1c…f905` | see `git log` |

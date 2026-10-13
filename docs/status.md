@@ -17,7 +17,8 @@ Unverified / Committed / Next bounded task**.
 | 1d | Raster tile cache for committed objects (exact zoom, whole-pixel reuse, per-object invalidation) | **done** (see below) |
 | 1e | Density preview: sub-pixel content stays visible as soft marks; one draw-or-preview rule shared by index and projection | **done** (see below) |
 | 1f | Asset organization: tags, favourites, nested folders (non-exclusive), search, sidebar scopes, archive round trip | **done** (see below) |
-| 1+ | Zoom preview for dense scenes, text/media content, adjustments, Settings, persistent undo, smart folders and batch asset edits, collaboration | planned |
+| 1g | Zoom preview for dense scenes: a bounded scaled preview during zoom gestures, refined to exact | **done** (see below) |
+| 1+ | Text/media content, adjustments, Settings, persistent undo, smart folders and batch asset edits, collaboration | planned |
 
 ## Phase 0A — endless navigation proof
 
@@ -279,6 +280,31 @@ visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
 
+## Phase 1, slice 7 — zoom preview for dense scenes
+
+**Implemented** ([ADR 0012](adr/0012-zoom-preview.md))
+- In dense scenes only (the last full tile build took more than 12 ms),
+  zoom frames show the last exact tile set scaled, by at most 1 level.
+- **Refinement:** exact again 150 ms after the zoom stops, or immediately
+  when the 1-level bound is crossed. Pending edits disable the preview.
+  Preview frames build nothing.
+- Sparse scenes and deep-zoom work stay exact on every frame.
+- **Bench:** a `zoomin` mode (a steady zoom gesture).
+
+**Tested:** [testing/phase-1g.md](testing/phase-1g.md).
+- Dense 10K zoom: 113 → 5.3 ms p50 (Chromium) and 125 → 6 ms (Firefox).
+- A one-frame rebuild per level crossed (p99 160–213 ms).
+
+**Known failures:** none.
+
+**Known limits:**
+- A full exact rebuild on each level crossed.
+- An empty border after zooming out until refinement.
+
+**Next bounded task:** text objects (§14.11). They are the next content
+type and need their own exact-coverage path and a "place deep, zoom 1,500+
+levels in" regression test.
+
 ## Phase 1, slice 6 — organizing the asset library
 
 **Implemented** ([ADR 0011](adr/0011-asset-organization.md))
@@ -306,9 +332,8 @@ visible strokes). Alternatives:
 - libraries with tens of thousands of assets (the filter is linear);
 - screen-reader behaviour.
 
-**Next bounded task:** the zoom preview for dense scenes (deferred in
-ADR 0009), then text objects (§14.11). Text is the next content type, and
-needs its own exact-coverage path and deep-zoom test.
+**Next bounded task (done in slice 7):** the zoom preview for dense
+scenes. Then text objects.
 
 ## Phase 1, slice 5 — density preview
 

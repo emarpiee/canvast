@@ -80,7 +80,10 @@ async function start(): Promise<void> {
   const index = new SpatialIndex();
   syncIndex(doc, index);
   // Committed objects are drawn through a raster tile cache (ADR 0009).
-  const tiles = new TileCache((id) => doc.get(id));
+  const tiles = new TileCache(
+    (id) => doc.get(id),
+    () => invalidate(),
+  );
   // Content too small to draw individually is shown as a density preview (ADR 0010).
   const density = new DensityLayer();
   doc.subscribe((_source, changed) => tiles.invalidate(changed));

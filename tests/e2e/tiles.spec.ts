@@ -117,7 +117,10 @@ test("panning reuses tiles; a still camera renders none; the zoom changing rende
     h.benchRun(20, "panzoom"); // synchronous frames, new zoom each frame
     return { added: h.tileStats().renderedTotal - before, last: h.tileStats().last };
   });
-  expect(during).toEqual({ added: 0, last: null });
+  // A dense scene shows scaled previews of the existing set while the zoom changes (ADR 0012). The
+  // trajectory returns to the set's own zoom after a sub-pixel pan, where exactly one set is rebuilt
+  // (tiles are never reused at a fractional offset); nothing else is built.
+  expect(during.added).toBeLessThanOrEqual(full);
   // Once it holds still, frames are tiled again (rebuilt at the current zoom).
   await app.frame();
   await app.frame();
@@ -213,4 +216,71 @@ test("a tile showing an image placeholder is refreshed when the original finishe
   await app.frame();
   expect((await stats(p)).last).not.toBeNull(); // drawn from tiles, not because the cache was bypassed
   expect(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), at)).toEqual([40, 140, 220]);
+});
+
+// ---- zoom preview (ADR 0012) -------------------------------------------------
+
+/** Zoom by `dz` levels about the centre through the camera (one frame). */
+async function zoomBy(p: Page, dz: number): Promise<void> {
+  await p.evaluate((d) => {
+    const h = window.__canvastDebug;
+    const c = h.camera();
+    const z = c.zi + c.zf + d;
+    const zi = Math.floor(z);
+    h.setCamera({ ...c, zi, zf: Math.round((z - zi) * 2 ** 20) / 2 ** 20, pz: Math.max(c.pz, zi) });
+  }, dz);
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+}
+
+test("dense scenes: zoom frames show a scaled preview, then refine to the exact picture on their own", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 10000 }));
+  await renderedDuring(p, async () => undefined); // exact tile set built (its cost marks the scene as dense)
+  await zoomBy(p, 0.25);
+  expect((await stats(p)).last).toMatchObject({ preview: true, rendered: 0 });
+  await zoomBy(p, 0.25);
+  expect((await stats(p)).last).toMatchObject({ preview: true });
+  // With no further input, an exact frame follows (about 150 ms later)...
+  await expect.poll(async () => (await stats(p)).last?.preview, { timeout: 3000 }).toBe(false);
+  // ...and it is the exact picture.
+  expectSamePicture(await compare(p), "after refine");
+});
+
+test("dense scenes: zooming more than one level from the tile set renders exactly", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 10000 }));
+  await renderedDuring(p, async () => undefined);
+  await zoomBy(p, 0.75);
+  expect((await stats(p)).last?.preview).toBe(true);
+  const rebuilt = await renderedDuring(p, () => zoomBy(p, 0.5)); // 1.25 levels from the set
+  expect(rebuilt).toBeGreaterThan(0);
+  expect((await stats(p)).last?.preview).toBe(false);
+});
+
+test("sparse scenes and deep zoom never use the preview: every zoom frame is exact", async ({ app }) => {
+  const p = app.page;
+  // One stroke placed 1,600 levels in: cheap to draw, so frames stay exact while zooming.
+  await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "123456789p-1590", cy: "-98765p-1590", zi: 1600, zf: 0.25, pz: 1600 }));
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 300 }, { x: 800, y: 500 });
+  await renderedDuring(p, async () => undefined);
+  for (let i = 0; i < 6; i++) {
+    await zoomBy(p, 0.25);
+    expect((await stats(p)).last?.preview ?? false, `frame ${i}`).toBe(false);
+  }
+});
+
+test("an edit during a zoom preview is never hidden behind a stale preview", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 10000 }));
+  await renderedDuring(p, async () => undefined);
+  await zoomBy(p, 0.25);
+  expect((await stats(p)).last?.preview).toBe(true);
+  // Change one object, then zoom again: the frame must not be a preview of the old set.
+  await p.evaluate(() => {
+    const h = window.__canvastDebug;
+    h.setOpacity(h.objects()[0]!.id, 0.5);
+  });
+  await zoomBy(p, 0.25);
+  expect((await stats(p)).last?.preview ?? false).toBe(false);
 });

@@ -37,6 +37,17 @@ export const TILE_CSS = 256;
  */
 const GUARD_CSS = 8;
 
+/**
+ * Zoom preview (ADR 0012). In dense scenes, where an exact frame costs more
+ * than DENSE_MS, frames during a zoom gesture show the last exact tile set
+ * scaled, as long as the zoom is within PREVIEW_MAX_LEVELS of it. An exact
+ * set is rebuilt when the zoom moves further, and REFINE_MS after the zoom
+ * stops. Sparse scenes never use it: they stay exact on every frame.
+ */
+const DENSE_MS = 12;
+const PREVIEW_MAX_LEVELS = 1;
+const REFINE_MS = 150;
+
 /** Objects drawn into one tile, and whether any image in it was still loading. */
 interface Tile {
   canvas: HTMLCanvasElement | null;
@@ -46,6 +57,8 @@ interface Tile {
 
 interface Generation {
   key: string;
+  /** Zoom of this tile set (preview scaling is relative to it). */
+  z: number;
   center: Camera["center"];
   vp: Viewport;
   tiles: Map<string, Tile>;
@@ -58,6 +71,8 @@ export interface TileFrame {
   rendered: number;
   /** Objects found by the visibility query (0 when every tile was reused). */
   visible: number;
+  /** True when this frame showed tiles scaled from another zoom (a zoom preview, refined later). */
+  preview: boolean;
 }
 
 /**
@@ -77,12 +92,20 @@ export class TileCache {
   enabled = true;
   /** Tiles rendered since the page loaded (diagnostics and tests). */
   renderedTotal = 0;
+  /** Cost of the last full tile-set build (about one exact frame of committed objects). */
+  lastFullMs = 0;
+  private refineTimer: ReturnType<typeof setTimeout> | null = null;
+  private refineNow = false;
   private gen: Generation | null = null;
   private lastKey = "";
   private readonly dirty = new Set<ObjectId>();
   private readonly pool: HTMLCanvasElement[] = [];
 
-  constructor(private readonly getObject: (id: ObjectId) => CanvasObject | undefined) {}
+  constructor(
+    private readonly getObject: (id: ObjectId) => CanvasObject | undefined,
+    /** Schedules a redraw (used to refine a zoom preview once the zoom stops). */
+    private readonly requestFrame: () => void = () => undefined,
+  ) {}
 
   /** Drop everything (document replaced, theme changed). */
   clear(): void {
@@ -120,19 +143,27 @@ export class TileCache {
     const td = TILE_CSS * dpr;
     if (!this.enabled || !Number.isInteger(td) || !Number.isInteger(GUARD_CSS * dpr)) return null;
     const key = `${cam.zi}|${cam.zf}|${dpr}`;
-    const stable = key === this.lastKey;
+    const stable = key === this.lastKey || this.refineNow;
+    this.refineNow = false;
     this.lastKey = key;
-    if (this.gen && this.gen.key !== key) this.clear();
+    const z = cam.zi + cam.zf;
+    const dense = this.lastFullMs > DENSE_MS;
+    if (this.gen && this.gen.key !== key) {
+      const pv = !stable && dense ? this.preview(ctx, cam, vp, dpr) : null;
+      if (pv) return pv;
+      this.clear();
+    }
     if (!this.gen) {
-      // Build tiles only once the zoom has held still for a frame.
-      if (!stable) return null;
-      this.gen = { key, center: cam.center, vp, tiles: new Map() };
+      // Build tiles only once the zoom has held still for a frame; in a dense
+      // scene build now (the zoom moved beyond the preview range).
+      if (!stable && !dense) return null;
+      this.gen = { key, z, center: cam.center, vp, tiles: new Map() };
     }
     let off = this.offset(this.gen, cam, vp, dpr);
     if (!off) {
       // Not a whole-device-pixel move: start over at this camera.
       this.clear();
-      this.gen = { key, center: cam.center, vp, tiles: new Map() };
+      this.gen = { key, z, center: cam.center, vp, tiles: new Map() };
       off = { dx: 0, dy: 0 };
     }
     const g = this.gen!;
@@ -193,6 +224,7 @@ export class TileCache {
       }
     }
     let visible = 0;
+    const buildStart = performance.now();
     if (missing.length) {
       const list = query(infl);
       visible = list.length;
@@ -241,7 +273,49 @@ export class TileCache {
       }
     }
     this.renderedTotal += missing.length;
-    return { tiles: needed.length, rendered: missing.length, visible };
+    if (missing.length === needed.length && needed.length) this.lastFullMs = performance.now() - buildStart;
+    return { tiles: needed.length, rendered: missing.length, visible, preview: false };
+  }
+
+  /**
+   * Draw the current tile set scaled to this camera's zoom, if allowed: same
+   * DPR, no pending edits, and within PREVIEW_MAX_LEVELS. Schedules an exact
+   * refinement for when the zoom stops. Areas the set never covered (the
+   * border after zooming out) stay empty until then.
+   */
+  private preview(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, dpr: number): TileFrame | null {
+    const g = this.gen!;
+    const dz = cam.zi + cam.zf - g.z;
+    if (this.dirty.size || !g.key.endsWith(`|${dpr}`) || Math.abs(dz) > PREVIEW_MAX_LEVELS || !g.tiles.size) return null;
+    const s = 2 ** dz;
+    const f = 2 ** cam.zf;
+    // Device position of the set's reference point (its viewport's top-left) under this camera.
+    const ox = (vp.width / 2 + D.toNumber(D.shift(D.sub(g.center.x, cam.center.x), cam.zi)) * f) * dpr - (g.vp.width / 2) * dpr * s;
+    const oy = (vp.height / 2 + D.toNumber(D.shift(D.sub(g.center.y, cam.center.y), cam.zi)) * f) * dpr - (g.vp.height / 2) * dpr * s;
+    if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null;
+    const td = TILE_CSS * dpr;
+    const gd = GUARD_CSS * dpr;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "low";
+    let n = 0;
+    for (const [k, t] of g.tiles) {
+      if (!t.canvas) continue;
+      const [i, j] = k.split(",").map(Number) as [number, number];
+      // Tiles are positioned in the set's frame (at its own camera, tile i starts at i·td).
+      ctx.drawImage(t.canvas, gd, gd, td, td, ox + i * td * s, oy + j * td * s, td * s, td * s);
+      n++;
+    }
+    ctx.restore();
+    if (this.refineTimer) clearTimeout(this.refineTimer);
+    this.refineTimer = setTimeout(() => {
+      this.refineTimer = null;
+      this.refineNow = true; // the next frame counts as stable and is rendered exactly
+      this.requestFrame();
+    }, REFINE_MS);
+    return { tiles: n, rendered: 0, visible: 0, preview: true };
   }
 
   /**

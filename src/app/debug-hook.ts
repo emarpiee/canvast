@@ -138,8 +138,9 @@ export interface DebugDeps {
  * "pan": pan 37 px per frame in a square, fixed zoom. "static": the camera
  * stays put and only an overlay changes (like drawing a stroke). "zoom":
  * zoom ±0.05 about the centre every frame, no pan (stays on the content).
+ * "zoomin": zoom +0.05 per frame about the centre (a steady gesture: 1 level per 20 frames).
  */
-export type BenchMode = "panzoom" | "pan" | "static" | "zoom";
+export type BenchMode = "panzoom" | "pan" | "static" | "zoom" | "zoomin";
 
 export interface BenchRunResult {
   frames: number;
@@ -305,8 +306,8 @@ export function installDebugHook(
       for (let i = 0; i < frames; i++) {
         const vp = view.viewport;
         const [dx, dy] = legs[Math.floor(i / 10) % 4]!;
-        if (mode === "zoom") {
-          view.setCamera(zoomAt(view.camera, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05));
+        if (mode === "zoom" || mode === "zoomin") {
+          view.setCamera(zoomAt(view.camera, vp, { x: vp.width / 2, y: vp.height / 2 }, mode === "zoomin" || i % 20 < 10 ? 0.05 : -0.05));
         } else if (mode !== "static") {
           let cam = panBy(view.camera, dx, dy);
           if (mode === "panzoom") cam = zoomAt(cam, vp, { x: vp.width / 2, y: vp.height / 2 }, i % 20 < 10 ? 0.05 : -0.05);

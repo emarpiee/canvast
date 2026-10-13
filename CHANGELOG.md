@@ -4,6 +4,18 @@
 
 (nothing yet)
 
+## 0.7.0 — Phase 1 slice 7: zoom preview for dense scenes (2026-10-13)
+
+- **Smooth zooming over dense scenes.** While you zoom, a scene with many
+  objects shows the last exact picture scaled (by at most 2×), then snaps
+  to the exact picture 150 ms after you stop, or as you pass each zoom
+  level.
+- Dense 10K scene: about 5 ms per frame while zooming, down from 87–125 ms.
+- **Exactness is unchanged where it matters.** Scenes with few objects,
+  including deep-zoom work, are drawn exactly on every frame, and an edit
+  is never hidden behind a preview.
+- **Bench:** a `zoomin` trajectory (a steady zoom gesture).
+
 ## 0.6.0 — Phase 1 slice 6: organizing the asset library (2026-10-13)
 
 - **Tags, favourites and folders** in the Assets view.
