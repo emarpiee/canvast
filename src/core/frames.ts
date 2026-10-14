@@ -35,20 +35,169 @@ export interface Frame {
   readonly kids: Map<string, Frame>;
   /** The tree this frame belongs to (for exact conversion to the world frame). */
   readonly space: FrameSpace;
+  /** Stable identity in storage (ADR 0014, step 4); assigned when first saved. The world frame is "world". */
+  uid: string | null;
 }
 
 let nextId = 0;
 function frame(space: FrameSpace, parent: Frame | null, n: bigint, ox: D.Dyadic, oy: D.Dyadic, level: bigint): Frame {
-  return { id: nextId++, parent, n, ox, oy, level, kids: new Map(), space };
+  return { id: nextId++, parent, n, ox, oy, level, kids: new Map(), space, uid: null };
 }
 
 export const ROOT_LEVEL = 0n;
+export const WORLD_UID = "world";
+
+/** A frame as stored (core/frames.ts FrameSpace.records): ids are stable, numbers are strings. */
+export interface FrameRecord {
+  id: string;
+  parent: string | null;
+  n: string;
+  ox: string;
+  oy: string;
+  level: string;
+}
+
+interface ParsedRecord {
+  parent: string | null;
+  n: bigint;
+  ox: D.Dyadic;
+  oy: D.Dyadic;
+  level: bigint;
+}
+
+export class FrameRecordError extends Error {}
+
+function randomUid(): string {
+  const b = new Uint8Array(12);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+}
 
 export class FrameSpace {
   root: Frame = frame(this, null, 1n, D.ZERO, D.ZERO, ROOT_LEVEL);
   /** The frame the world (level-0 dyadic coordinates) was defined in. */
   readonly world = this.root;
   count = 1;
+  private readonly byUid = new Map<string, Frame>();
+
+  constructor() {
+    this.world.uid = WORLD_UID;
+    this.byUid.set(WORLD_UID, this.world);
+  }
+
+  /** The frame's stable id for storage, assigned on first use. */
+  uidOf(f: Frame): string {
+    if (!f.uid) {
+      do f.uid = randomUid();
+      while (this.byUid.has(f.uid));
+      this.byUid.set(f.uid, f);
+    }
+    return f.uid;
+  }
+
+  frameByUid(uid: string): Frame | undefined {
+    return this.byUid.get(uid);
+  }
+
+  /**
+   * Frame records for storage: every given frame, all its ancestors and the
+   * world frame's chain (so the stored tree always reaches the root), parents
+   * first. Cost: the path lengths, not the depth in bits.
+   */
+  records(frames: Iterable<Frame>): FrameRecord[] {
+    const seen = new Set<Frame>();
+    const out: Frame[] = [];
+    for (const start of [...frames, this.world]) {
+      for (let f: Frame | null = start; f && !seen.has(f); f = f.parent) {
+        seen.add(f);
+        out.push(f);
+      }
+    }
+    out.sort((a, b) => (a.level < b.level ? -1 : a.level > b.level ? 1 : 0));
+    return out.filter((f) => f.parent || f !== this.world).map((f) => this.record(f));
+  }
+
+  record(f: Frame): FrameRecord {
+    return { id: this.uidOf(f), parent: f.parent ? this.uidOf(f.parent) : null, n: `${f.n}`, ox: D.toString(f.ox), oy: D.toString(f.oy), level: `${f.level}` };
+  }
+
+  /**
+   * Build the frames of stored records into this (fresh) tree. Records are
+   * untrusted: ids, links, levels and the single root are checked. Throws
+   * FrameRecordError; nothing is half-built (the tree is changed only after
+   * every check passed).
+   */
+  restore(records: readonly FrameRecord[]): void {
+    if (this.count !== 1 || this.world.parent) throw new FrameRecordError("frames can only be restored into a fresh tree");
+    const made = new Map<string, Frame>([[WORLD_UID, this.world]]);
+    const fresh: Array<{ f: Frame; rec: ParsedRecord }> = [];
+    const parsed = new Map<string, ParsedRecord>();
+    for (const r of records) {
+      if (!r || typeof r.id !== "string" || !r.id || r.id.length > 64) throw new FrameRecordError("bad frame id");
+      if (parsed.has(r.id)) throw new FrameRecordError(`frame ${r.id} is stored twice`);
+      let n: bigint;
+      let level: bigint;
+      let ox: D.Dyadic;
+      let oy: D.Dyadic;
+      try {
+        if (!/^-?\d{1,40}$/.test(r.n) || !/^-?\d{1,40}$/.test(r.level)) throw new Error("bad integer");
+        n = BigInt(r.n);
+        level = BigInt(r.level);
+        ox = D.parse(r.ox);
+        oy = D.parse(r.oy);
+      } catch {
+        throw new FrameRecordError(`frame ${r.id} is damaged`);
+      }
+      if (n < 1n) throw new FrameRecordError(`frame ${r.id} has a bad step count`);
+      if (r.parent !== null && typeof r.parent !== "string") throw new FrameRecordError(`frame ${r.id} has a bad parent`);
+      parsed.set(r.id, { parent: r.parent, n, ox, oy, level });
+    }
+    for (const [id, rec] of parsed) {
+      if (id === WORLD_UID) continue;
+      const f = frame(this, null, rec.n, rec.ox, rec.oy, rec.level);
+      f.uid = id;
+      made.set(id, f);
+      fresh.push({ f, rec });
+    }
+    const w = parsed.get(WORLD_UID);
+    const links: Array<{ f: Frame; rec: ParsedRecord }> = [...fresh, ...(w ? [{ f: this.world, rec: w }] : [])];
+    for (const { f, rec } of links) {
+      if (rec.parent === null) continue;
+      const p = made.get(rec.parent);
+      if (!p) throw new FrameRecordError(`frame ${f.uid} has a missing parent ${rec.parent}`);
+      const plevel = p === this.world ? 0n : parsed.get(rec.parent)!.level;
+      if (f === this.world && rec.level !== 0n) throw new FrameRecordError("the world frame must be at level 0");
+      if (plevel + rec.n !== (f === this.world ? 0n : rec.level)) throw new FrameRecordError(`frame ${f.uid} has an inconsistent level`);
+    }
+    // Links: acyclic, one root (an ancestor of the world frame).
+    const parentOf = (f: Frame): string | null => (f === this.world ? (w ? w.parent : null) : parsed.get(f.uid!)!.parent);
+    for (const { f } of links) {
+      let g: Frame | undefined = f;
+      for (let i = 0; g && parentOf(g) !== null; i++) {
+        if (i > made.size) throw new FrameRecordError("frames form a cycle");
+        g = made.get(parentOf(g)!);
+      }
+    }
+    let top = this.world;
+    for (let i = 0; parentOf(top) !== null; i++) top = made.get(parentOf(top)!)!;
+    for (const f of made.values()) if (parentOf(f) === null && f !== top) throw new FrameRecordError("frames have more than one root");
+    // All checks passed: link.
+    for (const { f, rec } of links) {
+      if (rec.parent === null) continue;
+      const p = made.get(rec.parent)!;
+      f.parent = p;
+      f.n = rec.n;
+      f.ox = rec.ox;
+      f.oy = rec.oy;
+      p.kids.set(`${rec.n}|${D.toString(rec.ox)}|${D.toString(rec.oy)}`, f);
+    }
+    for (const [id, f] of made) {
+      if (f !== this.world) this.byUid.set(id, f);
+    }
+    if (w) this.world.level = 0n;
+    this.root = top;
+    this.count = made.size;
+  }
 
   child(p: Frame, n: bigint, ox: D.Dyadic, oy: D.Dyadic): Frame {
     const key = `${n}|${D.toString(ox)}|${D.toString(oy)}`;
@@ -107,6 +256,28 @@ export interface FrameCamera {
   readonly z: number;
   /** Precision depth in the frame's levels (as Camera.pz, see core/camera.ts). */
   readonly pz: number;
+}
+
+/** A saved view in frame form (storage schema 4): the camera's frame by id, and its small local numbers. */
+export interface StoredFrameView {
+  v: 2;
+  frame: string;
+  x: string;
+  y: string;
+  z: number;
+  pz: number;
+}
+
+export function serializeFrameCamera(c: FrameCamera): StoredFrameView {
+  return { v: 2, frame: c.f.space.uidOf(c.f), x: D.toString(c.x), y: D.toString(c.y), z: c.z, pz: c.pz };
+}
+
+/** The camera of a stored view in `space`'s frames; throws RangeError for anything invalid. */
+export function deserializeFrameCamera(space: FrameSpace, s: StoredFrameView): FrameCamera {
+  const f = typeof s.frame === "string" ? space.frameByUid(s.frame) : undefined;
+  if (!f) throw new RangeError("the saved view names an unknown frame");
+  if (!Number.isFinite(s.z) || !Number.isSafeInteger(s.pz)) throw new RangeError("invalid saved zoom");
+  return normalize(space, { f, x: D.parse(s.x), y: D.parse(s.y), z: s.z, pz: s.pz });
 }
 
 /** The ordinary camera in the frame's own coordinates (all small), for the existing renderer and maths. */

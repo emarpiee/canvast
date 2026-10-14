@@ -1,5 +1,5 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
-import { fromLocal, levelsBetween } from "../core/frames";
+import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError } from "../assets/asset-catalog";
 import type { GcReport } from "../assets/asset-catalog";
@@ -194,17 +194,19 @@ export class Session {
   private async load(canvasId: string): Promise<void> {
     const loaded = await this.repo!.loadCanvas(canvasId);
     this.editor.select([]);
-    this.doc.load(loaded.objects);
-    let cam = HOME;
+    this.doc.load(loaded.objects, loaded.space);
+    let placed = false;
     if (loaded.camera) {
       try {
-        cam = deserializeCamera(loaded.camera);
+        if ("v" in loaded.camera) this.view.setFrameCamera(deserializeFrameCamera(loaded.space, loaded.camera));
+        else this.view.setWorldCamera(deserializeCamera(loaded.camera));
+        placed = true;
       } catch {
         // invalid saved view: start at home
       }
     }
-    this.view.setWorldCamera(cam);
-    this.persistence.attach(canvasId, loaded.canvas.revision);
+    if (!placed) this.view.setWorldCamera(HOME);
+    this.persistence.attach(canvasId, loaded.canvas.revision, loaded.space);
     if (loaded.skipped.length) {
       this.editor.message = `Skipped ${loaded.skipped.length} damaged item(s) on "${loaded.canvas.name}".`;
       console.warn("canvast: skipped while loading", loaded.skipped);

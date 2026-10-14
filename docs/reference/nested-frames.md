@@ -261,7 +261,7 @@ plus the point. The sum is **balanced** (neighbours by scale added
 pairwise): O(bits · log steps), where adding one by one is quadratic. The
 result can be as long as the depth in bits (a point a small distance from
 a corner 2^10^12 levels up needs a 10^12-bit number), so it is used only
-for storage until step 4, export, debugging and tests.
+for debugging, tests and archives of version 1.
 
 **Walks never go above the nearest common ancestor** (`route`, using frame
 levels): their cost is the distance between the two frames, not the depth
@@ -363,8 +363,28 @@ outline, not on Δ. What stays costly is a camera that follows an edge
 | Far-finer frames | `FrameIndex.dots` | A frame whose whole content is below a pixel (`z + L + K + H + 2 < log2(MIN_CELL_PX) − 8`) is not queried in its own units: there the camera centre would be a number of ~|L| bits (a hang found by the zoom-out tests). It is drawn as **one density dot** at its origin's screen position, with the index's running ink total (`SpatialIndex.total`, area × 4^level). Cost: one cheap walk per frame |
 | Gestures | `interaction/tools.ts`, `app/editor-state.ts` | A draft stroke, a move's start point and a resize's fixed point stay in the frame where the gesture began; points arriving after a rebase are converted exactly. Previews convert a displacement by an exact shift, `d_g = d_f · 2^(−levels(g→f))`, and a fixed point by `expressExactIn` |
 | Backdrop | `worldBackdrop` | The world axes (each coordinate separately) and landmarks re-expressed in the camera frame once per frame change. The grid needs nothing: its spacing (≤ 2^22 frame units) divides every frame corner (a multiple of 2^32) |
-| Storage (until step 4) | `serializeObject`, `CanvasPersistence` | Still absolute: objects and the saved view are converted with `worldForm` / `worldCamera`. Deeper than 2^24 levels that number is too large: such objects stay queued with a save error shown, the rest still saves, and the last saved view is kept |
+| Storage | `serializeObject`, `CanvasPersistence`, `WorkspaceRepo`, `archive.ts` | Frame form, §8a. No absolute numbers on the save or load path |
 | Debug hook | `app/debug-hook.ts` | Same absolute interface for the tests, plus `jump`, `depth` and `objectFrames` |
+
+## 8a. Storage (step 4)
+
+IndexedDB schema 4 adds a store `frames` (key `[canvasId, id]`). Nothing
+else changes: the stores, revisions, leases and the one-transaction commit
+are as before.
+
+| Item | Stored form |
+| --- | --- |
+| Frame | `{ id, parent, n, ox, oy, level }`, numbers as strings; ids are random 96-bit hex, the world frame is `"world"`; the record of a frame carries its link to its parent, so a split dive or a new root rewrites that record |
+| Object | The v0.8 record plus `frame` (a frame id). `ax`, `ay`, `unit` are local to that frame. No `frame` means the world frame, which is the v0.8 absolute form: **old data needs no conversion** and is re-homed exactly when loaded |
+| Saved view | `{ v: 2, frame, x, y, z, pz }` (small local numbers). A view without `v` is the old absolute camera |
+| Commit | Frame records that changed (by signature) go in the same transaction as the objects, with the closure of the objects' frames (their ancestors, and the world frame's chain, so the stored tree always reaches the root) |
+| Load | `FrameSpace.restore` builds the tree from the records (checks ids, links, levels, one root, no cycles; nothing is built if any check fails), then objects are read in it. An object naming a frame that is missing is skipped and reported, never placed at the origin |
+| Archive v2 | `canvases/<id>.json` = `{ objects, frames, view }`. Version 1 archives (absolute positions, no `frames`) import unchanged and are re-homed on load. A version 1 reader refuses version 2 as newer |
+| Clean-up | `saveCamera` drops stored frames that no object, the view or the world chain needs, in the same transaction as the new view |
+
+The cost of a save is the length of the frame path, not the depth in bits,
+and no number on this path is longer than a frame-local one, so it works in
+Firefox at any depth.
 
 ## 9. Complexity
 
@@ -390,7 +410,7 @@ outline, not on Δ. What stays costly is a camera that follows an edge
 | Coarse text from > 4,096 levels below, centre inside its box | Drawn only up to 100,000 levels (text is not summarised) | §7.3 |
 | Landmarks much coarser than the camera, edge crossing the view | Not drawn | Landmark edges are not summarised |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
-| Saving very deep objects | Absolute form beyond 2^24 levels, or too large for the browser (Firefox: ~2^20-bit BigInts), cannot be written: such objects stay queued with a save error, the rest saves. The view is not saved deeper than 2^19 levels | Storage holds frames in step 4 |
+| Unreferenced frame records | Collected with the saved view after 200 frames were written (and when idle) | Frames nothing refers to stay stored until then |
 | Firefox BigInt limit | About 2^20 bits per number; every per-frame path stays far below it | Keep it that way: no temporaries of ~depth bits |
 | Frames with content | Every one is visited per view change (cheap walks) | Cull by the frame tree when documents hold thousands of frames |
 
@@ -398,6 +418,7 @@ outline, not on Δ. What stays costly is a camera that follows an edge
 
 | Claim | Evidence | Where |
 | --- | --- | --- |
+| Storage | Objects at 10^12 levels and above the world, a camera-made object 4·10^12 levels out, and a view saved at 5·10^12 levels: records round-trip through JSON to the same tree (identity of every object's frame path); damaged records (missing parent, cycle, duplicate, bad level, bad number, two roots) are rejected with nothing built; E2E: work at 2^10^12 and 5·10^14 saves, reloads at the same view and travels in an archive to another profile; a version 1 archive imports | `frame-storage.test.ts`, `frames.spec.ts`, `archive.spec.ts` |
 | Camera identical to the absolute system | 3,000 random pan/zoom/jump steps, 3 seeds, up to ±3,000 levels: centre, `zi`, `zf`, `pz` bit-identical after every step | `frames.test.ts` |
 | Drawing identical | > 1,000 stroke screen points from random viewpoints within 10^-6 px; same visibility | `frames.test.ts` |
 | Drawing form matches exact form | > 1,000 random comparisons within 2^-150 frame units | `frames.test.ts` |

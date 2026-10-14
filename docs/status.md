@@ -59,23 +59,35 @@ exact lines could not hold stroke edges (irrational offsets); the reference
 §7.3 says why. Tests: unit `coarse.test.ts` (8); E2E `frames.spec.ts` (3 new,
 4 projects each).
 
+**Step 4 (storage with frames):** IndexedDB schema 4 (store `frames`), objects
+and the saved view stored in frame form, archive version 2, version 1
+archives still import, unreferenced frames collected. No absolute numbers on
+the save or load path, so the 2^24-level save limit and the "view not saved
+deeper than 2^19" limit are gone (Firefox included). Old records are
+already valid (world frame = absolute form). Details: reference §8a. Tests:
+unit `frame-storage.test.ts` (4); E2E: deep work saves, reloads and travels
+in an archive, frame collection, a version 1 archive; the existing storage,
+archive and Firefox 2^10,000,000 tests pass.
+
 **Known failures:** an edge of a coarse object that stays within the view
 for more than 100,000 levels (the camera followed it), coarse text from
 more than 4,096 levels with the centre inside its box (past 100,000), and
 coarse landmark edges are not drawn (marked shortcuts). Frames more than
-100,000 levels finer show as a dot. Saving
-is absolute until step 4: very deep objects whose absolute form is too
-large (beyond 2^24 levels, or Firefox's ~2^20-bit BigInt limit) stay
-queued with a save error, and the view is not saved deeper than 2^19. The Firefox dense-scene
+100,000 levels finer show as a dot. Loading v0.8 data with an object more
+than ~10^6 levels coarser than the world is slow (re-homing climbs one frame
+at a time). The Firefox dense-scene
 zoom-preview tile test fails on this machine on `main` too (timing, see 1g).
 
-**Unverified:** storage, spatial index, images, text, selection and
-editing on frames (steps 3–4).
+**Quick suite (2026-10-14, scratch copy):** unit 121/121; E2E 292 passed, 3 skipped, 1 failed (the known Firefox dense-scene zoom-preview flake); offline and names checks pass.
+
+**Unverified:** the full suite on the branch (run at the end of the phase,
+step 6).
 
 **Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
 
-**Next bounded task:** step 4 (storage
-with frames, removes the 2^24 save limit).
+**Next bounded task:** step 5, the depth suite (depth sweep, giant jumps,
+rebase continuity, work at 2^10^12, memory after a dive), then step 6
+(merge decision).
 
 ## Phase 0A — endless navigation proof
 

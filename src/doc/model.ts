@@ -169,15 +169,32 @@ export function validateObject(o: CanvasObject): CanvasObject {
 
 export type SerializedObject = Record<string, unknown> & { id: string; kind: string; ax: string; ay: string };
 
+/**
+ * Stored form: the anchor and unit are local to the object's frame, and
+ * `frame` names it (absent = the world frame, which is exactly the v0.8
+ * absolute form, so old records stay valid). The frame's own record is
+ * stored beside it (FrameSpace.records).
+ */
 export function serializeObject(o: CanvasObject): SerializedObject {
-  // Stored in world-frame form until storage holds frames (plan step 4).
-  const w = worldForm(o);
-  const { anchor, frame: _frame, ...rest } = w;
+  const { anchor, frame, ...rest } = o;
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
-  return { ...rest, unit: w.unit + 0, points: w.kind === "stroke" ? [...w.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  const s = { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
+  return s;
 }
 
-export function deserializeObject(s: SerializedObject): CanvasObject {
+/** The object in world-frame (absolute) form, serialized: for tests, archives of version 1 and debugging. */
+export function serializeWorld(o: CanvasObject): SerializedObject {
+  return serializeObject(worldForm(o));
+}
+
+/** `space` resolves `frame` ids; without it only world-frame (absolute) records are accepted. */
+export function deserializeObject(s: SerializedObject, space?: FrameSpace): CanvasObject {
+  let frame: Frame | undefined;
+  if (s["frame"] !== undefined) {
+    frame = typeof s["frame"] === "string" ? space?.frameByUid(s["frame"]) : undefined;
+    if (!frame) throw new InvalidObjectError(`unknown frame ${String(s["frame"])}`);
+  }
   const anchor = { x: D.parse(String(s.ax)), y: D.parse(String(s.ay)) };
   const base = {
     id: String(s.id),
@@ -187,6 +204,7 @@ export function deserializeObject(s: SerializedObject): CanvasObject {
     // Snapshots written before opacity existed are fully opaque.
     opacity: (s["opacity"] ?? 1) as number,
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
+    ...(frame && frame !== frame.space.world ? { frame } : {}),
   };
   let o: CanvasObject;
   if (s.kind === "stroke") {
@@ -244,7 +262,7 @@ export function worldForm(o: CanvasObject): CanvasObject {
   if (!f) return o;
   const w = f.space.world;
   const levels = levelsBetween(w, f);
-  // shortcut: storage is absolute until it holds frames (plan step 4); deeper, the anchor would be a number of ~levels bits.
+  // Absolute form: the anchor is a number of ~levels bits, so this is only for tests, debugging and version 1 archives (storage holds frames).
   if (Math.abs(levels) > MAX_WORLD_FORM_LEVELS) throw new RangeError("objects deeper than 2^24 levels cannot be saved until storage holds frames");
   return inFrame(o, w, expressExactIn(f.space, f, o.anchor, w), o.unit - levels);
 }

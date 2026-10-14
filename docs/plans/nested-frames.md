@@ -171,6 +171,8 @@ drawing and picking.
 | Saved views | The camera saves frame + offset + zoom + depth |
 | Frame GC | Frames with no objects, no saved view and no children are collected |
 
+**As built (step 4).** Schema 4 adds the `frames` store; old absolute records are already valid world-frame records, so no conversion or verification pass was needed (the migration is the exact re-homing on load). See the reference, §8a.
+
 ## 5. Steps
 
 | Step | Deliverable | Gate |

@@ -1,6 +1,8 @@
 import { expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
+import { readFile } from "node:fs/promises";
+import { APP_URL } from "./harness";
 
 /**
  * Nested frames (ADR 0014): work at any depth costs the same, and every
@@ -64,8 +66,8 @@ test("at 2^10^12 (reached by a jump) drawing, selecting, moving, undo, redo and 
   for (const k of ["ArrowLeft", "ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight", "ArrowRight"]) await timed(() => p.keyboard.press(k));
   expect(await boxOf(app, s!.id)).toEqual(moved);
 
-  // Saving deeper than 2^24 levels waits for storage that holds frames (plan step 4): reported, never hung.
-  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("error");
+  // Storage holds frames (plan step 4): work a trillion levels down saves like any other.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
 
   recordMetric(info, "work at 2^10^12", { maxStepMs: Math.max(...steps), steps });
   expect(Math.max(...steps)).toBeLessThan(MAX_STEP_MS);
@@ -242,4 +244,78 @@ test("an image far above the view shows the source pixel under it, at any depth"
     await p.evaluate((d) => window.__canvastDebug.jump(-d), depth);
     await app.frame();
   }
+});
+
+test("work at 2^10^12 and 10^15 saves, reopens after a reload, and travels in an archive to another profile", async ({ app, browser }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 6); // at home
+  const [home] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  await p.evaluate(() => window.__canvastDebug.jump(1e12));
+  await app.drag({ x: 500, y: 300 }, { x: 640, y: 350 }, 6); // a trillion levels down
+  await p.evaluate(() => window.__canvastDebug.jump(1e12));
+  await p.evaluate(() => window.__canvastDebug.jump(5e14));
+  await app.drag({ x: 400, y: 300 }, { x: 600, y: 380 }, 6); // 5·10^14 levels down
+  const objs = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  expect(objs).toHaveLength(3);
+  const depth = await p.evaluate(() => window.__canvastDebug.depth());
+  expect(BigInt(depth)).toBe(2n * 10n ** 12n + 5n * 10n ** 14n);
+  const deep = objs.find((o) => o.id !== home!.id && BigInt(o.level) > 10n ** 13n)!;
+  const where = (pg: typeof p, id: string) => pg.evaluate((i) => window.__canvastDebug.objectScreen(i), id);
+  const before = (await where(p, deep.id))!;
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+
+  // Reload: the objects are in the same frames and the view (frame form, no absolute numbers) is where it was.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect(await p.evaluate(() => window.__canvastDebug.depth())).toBe(depth);
+  expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => [o.id, o.level]).sort()).toEqual(objs.map((o) => [o.id, o.level]).sort());
+  expect(await where(p, deep.id)).toEqual(before);
+
+  // Export the workspace and import it into an empty profile.
+  await p.getByTestId("save-status").click();
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("export-workspace").click()]);
+  const bytes = await readFile((await dl.path())!);
+  const context = await browser.newContext();
+  const q = await context.newPage();
+  await q.setViewportSize({ width: 1280, height: 800 });
+  await q.goto(APP_URL);
+  await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await q.getByTestId("save-status").click();
+  await q.getByTestId("import-archive-input").setInputFiles({ name: "deep.canvast", mimeType: "application/zip", buffer: bytes });
+  await q.getByTestId("confirm-ok").click();
+  await expect(q.getByTestId("toast")).toContainText(/Imported/);
+  // The imported canvas opens at its saved view with the same three objects in the same frames.
+  await expect.poll(async () => (await q.evaluate(() => window.__canvastDebug.objectFrames())).length).toBe(3);
+  expect(await q.evaluate(() => window.__canvastDebug.depth())).toBe(depth);
+  await q.evaluate(() => window.__canvastDebug.nextFrame());
+  expect(await where(q, deep.id)).toEqual(before);
+  await context.close();
+});
+
+test("frames of paths the camera has left are collected, and the ones objects and the view need are kept", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 6);
+  const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
+  // A long wheel-like zoom path: thousands of levels in many steps, each frame on the path saved with the view.
+  for (let i = 0; i < 40; i++) {
+    await p.evaluate(() => window.__canvastDebug.jump(31));
+    await p.evaluate(() => window.__canvastDebug.jump(1));
+    if (i % 8 === 7) await p.evaluate(() => window.__canvastDebug.flushSave());
+  }
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  const deep = await p.evaluate(() => window.__canvastDebug.storedFrameCount());
+  expect(deep, "the path down is stored").toBeGreaterThan(10);
+  await p.keyboard.press("Home");
+  await p.evaluate(() => window.__canvastDebug.collectFrames());
+  const after = await p.evaluate(() => window.__canvastDebug.storedFrameCount());
+  expect(after, "paths nothing refers to any more are gone").toBeLessThanOrEqual(2);
+  expect(s).toBeDefined();
+  // And everything still opens.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id)).toEqual([s!.id]);
 });

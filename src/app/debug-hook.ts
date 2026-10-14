@@ -16,12 +16,12 @@ import { worldForm } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { classifyCoarse } from "../render/coarse";
 import type { WorldPoint } from "../core/camera";
-import { approxIn, depthOf, expressExactIn, expressIn, levelsBetween } from "../core/frames";
+import { approxIn, depthOf, deserializeFrameCamera, expressExactIn, expressIn, levelsBetween, toAbsoluteCamera } from "../core/frames";
 import { generateBenchScene } from "./bench";
 import { panBy, zoomAt } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { SerializedObject } from "../doc/model";
-import { serializeObject } from "../doc/model";
+import { serializeWorld } from "../doc/model";
 import type { EditorState, Tool } from "./editor-state";
 import type { Session } from "./session";
 import { projectObject } from "../render/projection";
@@ -32,7 +32,7 @@ import type { AppView } from "../ui/view-switch";
 import type { TileCache, TileFrame } from "../render/tile-cache";
 import type { DensityLayer } from "../render/density";
 import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
-import { done } from "../storage/idb";
+import { done, req } from "../storage/idb";
 import { lastCopiedText } from "../ui/text-editor";
 import { layoutText, textFont } from "../text/layout";
 import type { PlacedGlyph, Line } from "../text/layout";
@@ -73,6 +73,10 @@ export interface DebugHook {
   setLassoFilter(f: LassoFilter): void;
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
+  /** Save the view and collect stored frames nothing refers to (normally done after many frames were written). */
+  collectFrames(): Promise<void>;
+  /** Number of stored frame records of the current canvas. */
+  storedFrameCount(): Promise<number>;
   /** How a coarse object (far above the camera) is drawn: "cover", "miss", "exact", or "near" when it is not coarse. */
   coarseState(id: string): "cover" | "miss" | "exact" | "near";
   canUndo(): boolean;
@@ -272,7 +276,7 @@ export function installDebugHook(
       const d = canvas.getContext("2d")!.getImageData(Math.floor(x * dpr), Math.floor(y * dpr), 1, 1).data;
       return [d[0]!, d[1]!, d[2]!];
     },
-    objects: () => doc.ordered().map(serializeObject),
+    objects: () => doc.ordered().map(serializeWorld),
     selection: () => [...editor.selection].sort(),
     tool: () => editor.tool,
     setTool: (t) => editor.setTool(t),
@@ -286,6 +290,15 @@ export function installDebugHook(
       const cam = camFor(o);
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? { box: { ...po.box }, q: [...po.q], radius: po.radius } : null;
+    },
+    collectFrames: async () => {
+      await writer.flush();
+      await writer.saveCamera(true);
+    },
+    storedFrameCount: async () => {
+      const range = IDBKeyRange.bound([session.current!.canvasId, ""], [session.current!.canvasId, "\uffff"]);
+      const tx = session.repo!.db.transaction("frames", "readonly");
+      return req<number>(tx.objectStore("frames").count(range));
     },
     coarseState: (id) => {
       const o = doc.get(id);
@@ -434,7 +447,9 @@ export function installDebugHook(
       await writer.flush();
       await writer.saveCamera();
       const loaded = await session.repo!.loadCanvas(canvasId);
-      return { objects: loaded.objects.map(serializeObject).sort((a, b) => (a.id < b.id ? -1 : 1)), view: loaded.camera };
+      // The hook speaks absolute (world-frame) coordinates.
+      const view = loaded.camera && ("v" in loaded.camera ? serializeCamera(toAbsoluteCamera(loaded.space, deserializeFrameCamera(loaded.space, loaded.camera))) : loaded.camera);
+      return { objects: loaded.objects.map(serializeWorld).sort((a, b) => (a.id < b.id ? -1 : 1)), view };
     },
     removeAssetBytes: async (hash) => {
       const tx = session.repo!.db.transaction("assets", "readwrite");

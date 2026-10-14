@@ -332,3 +332,36 @@ test("a read-only tab can export but not import", async ({ app, context }) => {
   await expect(p1.getByTestId("storage-backup")).toContainText("none");
   await p2.close();
 });
+
+test("a version 1 archive (absolute positions, no frames) still imports, converted into frames", async ({ app }) => {
+  const p = app.page;
+  const obj = (id: string, ax: string, ay: string, unit: number) => ({
+    id, kind: "stroke", unit, z: 1, opacity: 1, attachmentTargetId: null, points: [0, 0, 50, 30], width: 3, color: "#102030", ax, ay,
+  });
+  const planned = [
+    obj("a".repeat(32), "5p0", "-3p0", 0),
+    obj("b".repeat(32), "7p-3000", "9p-3000", -3000), // 3,000 levels in
+    obj("c".repeat(32), "1p500", "1p500", 500), // far out
+  ];
+  const manifest = {
+    format: "canvast-archive", version: 1, app: "test", exportedAt: Date.now(), scope: "canvas", workspaceName: "old",
+    boards: [{ id: "x", name: "Old", canvases: [{ id: "y", name: "Old canvas", objectCount: 3, file: "canvases/y.json" }] }],
+    assets: [], missingAssets: [],
+  };
+  const file = Buffer.from(
+    await (
+      await writeZip([
+        { name: "manifest.json", data: new Blob([JSON.stringify(manifest)]) },
+        { name: "canvases/y.json", data: new Blob([JSON.stringify({ objects: planned, view: { cx: "5p0", cy: "-3p0", zi: 2, zf: 0, pz: 2 } })]) },
+      ])
+    ).arrayBuffer(),
+  );
+  await importArchive(p, "old.canvast", file);
+  const tree = (await sess(p)).tree!;
+  const imported = tree.flatMap((b) => b.canvases).find((c) => c.name === "Old canvas")!;
+  expect((await sess(p)).current!.canvasId).toBe(imported.id);
+  // Every object has the same absolute position, and the ones far from the origin live in frames of their own.
+  expect((await objects(p)).map((o) => [o.id[0], o.ax, o.ay, o.unit]).sort()).toEqual(planned.map((o) => [o.id[0], o.ax, o.ay, o.unit]).sort());
+  expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).filter((o) => o.level !== "0")).toHaveLength(2);
+  expect((await dump(p, imported.id)).view).toMatchObject({ cx: "5p0", cy: "-3p0", zi: 2 });
+});

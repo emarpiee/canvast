@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import * as D from "../../src/core/dyadic";
 import { DocumentStore } from "../../src/doc/document-store";
 import type { CanvasObject, ImageObject, StrokeObject } from "../../src/doc/model";
-import { InvalidObjectError, deserializeObject, localBounds, newObjectId, serializeObject, validateObject } from "../../src/doc/model";
+import { InvalidObjectError, deserializeObject, localBounds, newObjectId, serializeObject, serializeWorld, validateObject } from "../../src/doc/model";
 import { localToWorld, normalizeUnit, scaleAbout, translate } from "../../src/doc/edit-ops";
 import { sha256Portable } from "../../src/assets/sha256";
 import { rng } from "./rng";
@@ -195,11 +195,11 @@ describe("objects in frames (ADR 0014)", () => {
     const doc = new DocumentStore();
     doc.load(objs);
     expect([...doc.all()].filter((o) => o.frame).length).toBeGreaterThan(250);
-    const saved = [...doc.all()].map(serializeObject);
+    const saved = [...doc.all()].map(serializeWorld);
     expect(saved.map((s) => JSON.stringify(s)).sort()).toEqual(objs.map((o) => JSON.stringify(serializeObject(o))).sort());
-    // Reload: the same frames are rebuilt and the stored form round-trips.
+    // Reload: the same frames are rebuilt and the absolute form round-trips.
     const again = new DocumentStore();
-    again.load(saved.map(deserializeObject));
-    expect([...again.all()].map((o) => JSON.stringify(serializeObject(o))).sort()).toEqual(saved.map((s) => JSON.stringify(s)).sort());
+    again.load(saved.map((s) => deserializeObject(s)));
+    expect([...again.all()].map((o) => JSON.stringify(serializeWorld(o))).sort()).toEqual(saved.map((s) => JSON.stringify(s)).sort());
   });
 });

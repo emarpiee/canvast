@@ -112,12 +112,15 @@ export class DocumentStore {
     return tx;
   }
 
-  /** Replace the whole document (snapshot load), each object in the frame that suits it. Clears history. */
-  load(objects: readonly CanvasObject[]): void {
+  /**
+   * Replace the whole document (snapshot load), each object in the frame that suits it. Clears history.
+   * `space`: the frames the objects were stored in (they keep them); without it a new tree is made and
+   * objects in world-frame (absolute) form are re-expressed exactly.
+   */
+  load(objects: readonly CanvasObject[], space?: FrameSpace): void {
     for (const o of objects) validateObject(o);
-    this.space = new FrameSpace();
+    this.space = space ?? new FrameSpace();
     this.objects.clear();
-    // Objects arrive in world-frame form (or another document's frames): re-express them exactly.
     for (const o of objects) this.objects.set(o.id, homeObject(o.frame && o.frame.space !== this.space ? worldForm(o) : o, this.space));
     this.undoStack.length = 0;
     this.redoStack.length = 0;

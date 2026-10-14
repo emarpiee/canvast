@@ -1,6 +1,5 @@
-import { serializeCamera } from "../core/camera";
-import { depthOf, levelsBetween } from "../core/frames";
-import { serializeObject } from "../doc/model";
+import type { Frame, FrameRecord, FrameSpace } from "../core/frames";
+import { serializeFrameCamera } from "../core/frames";
 import type { ViewState } from "../app/view-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId } from "../doc/model";
@@ -28,17 +27,12 @@ import { RevisionConflictError, WorkspaceRepo } from "./workspace-repo";
 export type SaveState = "verified" | "committed" | "queued" | "saving" | "readonly" | "conflict" | "error" | "unavailable";
 
 const DEBOUNCE_MS = 150;
+/** Collect unreferenced frame records once this many were written since the last collection. */
+const GC_AFTER = 200;
 const CAMERA_DEBOUNCE_MS = 600;
 
-/** Whether the object's absolute (storage) form can be written in this browser. */
-function fitsWorldForm(o: CanvasObject): boolean {
-  try {
-    serializeObject(o);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** What a stored frame says (to find the ones that changed: a dive can be split, a new root added). */
+const signature = (r: FrameRecord): string => `${r.parent}|${r.n}|${r.ox}|${r.oy}|${r.level}`;
 
 export class CanvasPersistence {
   state: SaveState;
@@ -48,6 +42,11 @@ export class CanvasPersistence {
   canvasId: string | null = null;
   revision = 0;
   private readonly dirty = new Set<ObjectId>();
+  /** Frame records as last written (or loaded), by frame id: only changed ones are written again. */
+  private stored = new Map<string, string>();
+  private space: FrameSpace | null = null;
+  /** Frame records written since the last clean-up of frames nothing refers to. */
+  private written = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private camTimer: ReturnType<typeof setTimeout> | null = null;
   private inFlight: Promise<void> | null = null;
@@ -81,10 +80,14 @@ export class CanvasPersistence {
   }
 
   /** Bind to a freshly loaded canvas. Pending changes must be flushed first. */
-  attach(canvasId: string, revision: number): void {
+  attach(canvasId: string, revision: number, space: FrameSpace): void {
     this.canvasId = canvasId;
     this.revision = revision;
     this.dirty.clear();
+    // Frames just loaded are as stored.
+    this.space = space;
+    this.stored = new Map(space.records([...walk(space.root)]).map((r) => [r.id, signature(r)]));
+    this.written = 0;
     if (this.state !== "unavailable") this.setState(this.writable ? "verified" : "readonly");
   }
 
@@ -121,28 +124,20 @@ export class CanvasPersistence {
     this.dirty.clear();
     const puts: CanvasObject[] = [];
     const deletes: ObjectId[] = [];
-    // shortcut: storage is absolute until it holds frames (plan step 4). A deep object whose absolute
-    // position is too large to write (beyond 2^24 levels, or beyond Firefox's ~2^20-bit BigInt limit)
-    // stays queued with a save error; the rest is saved.
-    const waiting: ObjectId[] = [];
     for (const id of ids) {
       const o = this.doc.get(id);
-      if (o && o.frame && Math.abs(levelsBetween(o.frame.space.world, o.frame)) > 2 ** 19 && !fitsWorldForm(o)) waiting.push(id);
-      else if (o) puts.push(o);
+      if (o) puts.push(o);
       else deletes.push(id);
     }
-    if (!puts.length && !deletes.length) {
-      for (const id of waiting) this.dirty.add(id);
-      this.lastError = `${waiting.length} very deep object(s) are not saved yet (needs the storage update)`;
-      this.setState("error");
-      return;
-    }
+    const frames = this.changedFrames(puts.map((o) => o.frame ?? this.doc.space.world));
     const canvasId = this.canvasId;
     this.setState("saving");
     this.inFlight = (async () => {
       try {
-        const result = await this.repo!.commit(canvasId, this.revision, puts, deletes);
+        const result = await this.repo!.commit(canvasId, this.revision, puts, deletes, frames);
         if (canvasId !== this.canvasId) return; // switched canvases meanwhile
+        for (const r of frames) this.stored.set(r.id, signature(r));
+        this.written += frames.length;
         this.revision = result.revision;
         this.lastCommit = { ...result, at: Date.now() };
         this.lastError = "";
@@ -152,11 +147,7 @@ export class CanvasPersistence {
         if (stored === result.revision) {
           this.lastVerifiedAt = Date.now();
           this.onCommitted?.(canvasId, result.revision);
-          if (waiting.length) {
-            for (const id of waiting) this.dirty.add(id);
-            this.lastError = `${waiting.length} very deep object(s) are not saved yet (needs the storage update)`;
-            this.setState("error");
-          } else if (this.dirty.size === 0) this.setState("verified");
+          if (this.dirty.size === 0) this.setState("verified");
         } else {
           throw new RevisionConflictError(canvasId, result.revision, stored ?? -1);
         }
@@ -180,13 +171,34 @@ export class CanvasPersistence {
     if (this.dirty.size && after !== "conflict" && after !== "error") await this.flush();
   }
 
-  async saveCamera(): Promise<void> {
+  /** Records of the given frames (with their ancestors and the world chain) that are not stored as they are now. */
+  private changedFrames(frames: Iterable<Frame>): FrameRecord[] {
+    const space = this.doc.space;
+    if (space !== this.space) return [];
+    return space.records(frames).filter((r) => this.stored.get(r.id) !== signature(r));
+  }
+
+  /** Stored frames that no object, the view or the world frame's chain needs. */
+  private unreferenced(view: Frame): string[] {
+    const keep = new Set(this.doc.space.records([view, ...[...this.doc.all()].flatMap((o) => (o.frame ? [o.frame] : []))]).map((r) => r.id));
+    return [...this.stored.keys()].filter((id) => !keep.has(id));
+  }
+
+  /** `collect`: clean up unreferenced frames now (tests); otherwise only after GC_AFTER frames were written. */
+  async saveCamera(collect = false): Promise<void> {
     if (!this.repo || !this.canvasId || !this.writable) return;
-    // shortcut: the saved view is absolute until storage holds frames (plan step 4); it is written after every view change, and deeper than 2^19 levels that takes seconds (and can exceed Firefox's BigInt limit), so the last view saved is kept.
-    const depth = depthOf(this.view.frameCamera).levels;
-    if (depth > 2n ** 19n || depth < -(2n ** 19n)) return;
+    const fc = this.view.frameCamera;
+    if (fc.f.space !== this.space) return; // a canvas is loading
     try {
-      await this.repo.saveCamera(this.canvasId, serializeCamera(this.view.worldCamera()));
+      const frames = this.changedFrames([fc.f]);
+      // Frames of paths the camera has left (and of deleted objects) pile up; collect them with the view, once things are saved.
+      const idle = this.dirty.size === 0 && !this.inFlight;
+      const gc = idle && (collect || this.written + frames.length >= GC_AFTER);
+      const dead = gc ? this.unreferenced(fc.f) : [];
+      await this.repo.saveCamera(this.canvasId, serializeFrameCamera(fc), frames, dead);
+      for (const r of frames) this.stored.set(r.id, signature(r));
+      for (const id of dead) this.stored.delete(id);
+      this.written = gc ? 0 : this.written + frames.length;
     } catch {
       // View state is a convenience; object saves report their own errors.
     }
@@ -196,5 +208,14 @@ export class CanvasPersistence {
     if (s === this.state) return;
     this.state = s;
     for (const fn of this.listeners) fn();
+  }
+}
+
+/** Every frame of a tree (root first; iterative: paths can be thousands of frames long). */
+function* walk(root: Frame): Generator<Frame> {
+  const todo = [root];
+  for (let f = todo.pop(); f; f = todo.pop()) {
+    yield f;
+    todo.push(...f.kids.values());
   }
 }
