@@ -4,7 +4,7 @@ canvast is an offline-first **endless canvas**: you can pan in any direction
 and zoom in or out without hitting a boundary or a zoom stop, and you can draw,
 place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
-or network connection.
+or network connection. A Linux **AppImage** (Electron, portable, x86_64) wraps the same file: build it with `npm run dist:appimage` (output in `release/`), or try it with `npm run electron`. In the app, `CANVAST_DEBUG=1` opens the debug panel and DevTools, F12 / Ctrl+Shift+I toggle DevTools and F5 / Ctrl+R reload.
 
 > **Status: Phase 1, slice 7 — smooth zooming over dense scenes.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that

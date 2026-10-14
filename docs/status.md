@@ -92,7 +92,9 @@ step 6).
 
 **Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
 
-**Next bounded task:** step 6 (merge decision: full suite, docs, version bump; the owner decides).
+**Electron (2026-10-14):** `electron/main.cjs` opens `dist/canvast.html` (no menu; no network; sandboxed page); Linux AppImage via electron-builder (`npm run dist:appimage`, x86_64). The Firefox E2E project was removed; the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite (3 Chromium projects): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-electron-branch.md](testing/full-run-electron-branch.md). Unverified: the AppImage on other distros or architectures, and Windows or macOS builds.
+
+**Next bounded task:** version bump and release notes (the owner decides).
 
 ## Phase 0A — endless navigation proof
 
