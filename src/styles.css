@@ -736,3 +736,6 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .media-scrub { flex: 1; min-width: 0; }
 .media-time { font: 500 11px var(--font-ui); white-space: nowrap; opacity: 0.8; }
 .media-bar button[hidden] { display: none; }
+.media-settings { position: absolute; bottom: calc(100% + 6px); right: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 8px; font-size: 12px; }
+.media-settings[hidden] { display: none; }
+.media-settings input { width: 72px; }

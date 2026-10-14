@@ -3,7 +3,7 @@ import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject, MediaState } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
-import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
+import { normalizeUnit, placeAbove, restack, translate } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
@@ -395,6 +395,22 @@ export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixe
   const objs = recs.map((r, i) => imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i));
   doc.commit(doc.transaction(label, objs));
   return objs;
+}
+
+/**
+ * Extract Frame (ADR 0043): the picture a video or GIF instance shows now becomes a new PNG original in the library
+ * and a plain image placed just right of the instance, at its size. The source is never changed.
+ */
+export async function extractFrame(doc: DocumentStore, editor: EditorState, assets: AssetLibrary, sourceId: string, png: Blob): Promise<void> {
+  if (editor.blockEdit()) return;
+  const src = doc.get(sourceId);
+  if (!src || src.kind !== "image" || !src.media) return;
+  const { record } = await assets.importFileDetailed(new File([png], "frame.png", { type: "image/png" }), true);
+  const { media: _m, groups: _g, hidden: _h, locked: _l, rot, ...rest } = src;
+  const frame: ImageObject = { ...rest, ...(rot ? { rot } : {}), id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
+  const placed = translate(frame, D.shift(D.fromNumber(src.w * 1.05), src.unit), D.ZERO) as ImageObject;
+  doc.commit(doc.transaction("Extract frame", [placed]));
+  editor.select([placed.id]);
 }
 
 /** Import image files and place one instance of each (see placeImage). */

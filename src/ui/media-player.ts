@@ -9,7 +9,7 @@ import { GifFrames } from "../assets/gif";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
 import { radiansFromAngle } from "../core/angle";
-import type { SettingsStore } from "../settings/settings";
+import type { SettingKey, SettingsStore } from "../settings/settings";
 import { ICONS } from "./icons";
 
 /**
@@ -20,6 +20,8 @@ import { ICONS } from "./icons";
  */
 export interface MediaPlayerActions {
   setMedia(id: string, patch: { t?: number; repeat?: boolean }, label: string): void;
+  /** The picture shown now, as a PNG, to become a new image next to the instance. */
+  extract(id: string, png: Blob): void;
 }
 
 /** Beyond this many CSS px a side, the overlay is not laid out (browsers cap element sizes); the media still plays. */
@@ -42,6 +44,8 @@ interface Engine {
   setLoop(on: boolean): void;
   step(dir: 1 | -1, amount: number, repeat: boolean): void;
   label(): string;
+  /** The picture shown now as a PNG (null when there is none to take). */
+  frame(): Promise<Blob | null>;
   /** Called when the position moved by itself (playing) and when playback ended. */
   onTick: () => void;
   onEnded: () => void;
@@ -81,6 +85,14 @@ function avEngine(v: HTMLVideoElement): Engine {
     setLoop: (on) => void (v.loop = on),
     step: (dir, amount, repeat) => void (v.currentTime = stepTime(v.currentTime, dir * amount, duration, repeat)),
     label: () => `${formatTime(v.currentTime)} / ${formatTime(duration)}`,
+    async frame() {
+      if (!v.videoWidth || v.readyState < 2) return null;
+      const c = document.createElement("canvas");
+      c.width = v.videoWidth;
+      c.height = v.videoHeight;
+      c.getContext("2d")!.drawImage(v, 0, 0);
+      return new Promise((res) => c.toBlob(res, "image/png"));
+    },
     onTick: () => undefined,
     onEnded: () => undefined,
   };
@@ -156,6 +168,7 @@ function gifEngine(c: HTMLCanvasElement): Engine {
     setLoop: (v) => void (loop = v),
     step: (dir, amount, repeat) => g && show(stepFrame(idx, dir * amount, g.count, repeat)),
     label: () => `Frame ${idx + 1} / ${g?.count ?? 0}`,
+    frame: () => new Promise((res) => c.toBlob(res, "image/png")),
     onTick: () => undefined,
     onEnded: () => undefined,
   };
@@ -183,7 +196,12 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   bar.innerHTML = `${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}
     <input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position">
     <output class="media-time">0:00 / 0:00</output>
-    ${btn("repeat", ICONS.repeat, "Repeat")}${btn("mute", ICONS.volume, "Mute")}`;
+    ${btn("extract", ICONS.imagePlus, "Extract frame")}${btn("repeat", ICONS.repeat, "Repeat")}${btn("mute", ICONS.volume, "Mute")}${btn("settings", ICONS.settings, "Media & Playback settings")}
+    <div class="media-settings" role="group" aria-label="Media &amp; Playback" hidden>
+      <label>Video step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.video"></label>
+      <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
+      <label>GIF step (frames) <input type="number" min="1" max="1000" step="1" data-step="media.step.gif"></label>
+    </div>`;
   host.append(v, gc, bar);
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");
@@ -191,6 +209,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const playBtn = $<HTMLButtonElement>('[data-cmd="play"]');
   const repeatBtn = $<HTMLButtonElement>('[data-cmd="repeat"]');
   const muteBtn = $<HTMLButtonElement>('[data-cmd="mute"]');
+  const extractBtn = $<HTMLButtonElement>('[data-cmd="extract"]');
 
   let cur: ImageObject | null = null;
   let eng: Engine | null = null;
@@ -207,6 +226,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     playBtn.title = playing ? "Pause" : "Play";
     repeatBtn.setAttribute("aria-pressed", String(!!cur?.media?.repeat));
     muteBtn.hidden = cur?.media?.kind === "gif";
+    extractBtn.hidden = cur?.media?.kind === "audio";
     muteBtn.setAttribute("aria-pressed", String(v.muted));
     muteBtn.innerHTML = v.muted ? ICONS.volumeOff : ICONS.volume;
   };
@@ -309,6 +329,13 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   scrub.addEventListener("change", () => {
     if (cur && eng && !eng.playing()) actions.setMedia(cur.id, { t: eng.pos() }, "Seek media");
   });
+  // Steps are device settings: a bad value is refused and the field shows the current one again.
+  bar.addEventListener("change", (e) => {
+    const i = e.target as HTMLInputElement;
+    const key = i.dataset["step"] as SettingKey | undefined;
+    if (!key) return;
+    if (!settings.set(key, Number(i.value) as never)) i.value = String(settings.get(key));
+  });
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
     if (!cur || !eng || !cmd) return;
@@ -324,6 +351,15 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       if (!eng.playing()) actions.setMedia(cur.id, { t: eng.pos() }, "Step media");
     } else if (cmd === "repeat") actions.setMedia(cur.id, { repeat: !cur.media!.repeat }, "Repeat media");
     else if (cmd === "mute") v.muted = !v.muted;
+    else if (cmd === "settings") {
+      const box = bar.querySelector<HTMLElement>(".media-settings")!;
+      box.hidden = !box.hidden;
+      for (const i of box.querySelectorAll<HTMLInputElement>("[data-step]")) i.value = String(settings.get(i.dataset["step"] as SettingKey));
+    }
+    else if (cmd === "extract") {
+      const id = cur.id;
+      void eng.frame().then((png) => png && actions.extract(id, png));
+    }
     refresh();
   });
   view.subscribe(position);

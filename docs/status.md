@@ -418,7 +418,9 @@ visible strokes). Alternatives:
 
 **Phase 6, slice 3 done:** animated GIFs with a frame-index decoder ([ADR 0042](adr/0042-gif-frames.md)); tested in `gif.test.ts` (4) and `assets.spec.ts` "animated GIF" (chromium, firefox).
 
-**Next bounded task:** Phase 6: Extract Frame (video and GIF), Settings screen (Media & Playback), decoder budgets, then the Phase 6 full suite.
+**Phase 6, slice 4 done:** Extract Frame and the step settings in the player ([ADR 0043](adr/0043-extract-frame-and-media-settings.md)); tested in `assets.spec.ts` (chromium, firefox: 24 pass).
+
+**Next bounded task:** Phase 6 full suite, v0.15.0, then ask before pushing (Phases 5 and 6 are local).
 
 ## Phase 1, slice 9 — settings scopes
 

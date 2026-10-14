@@ -546,10 +546,10 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   // Play, then pause: the position moved and is written once, on pause.
   await p.evaluate(() => window.__canvastDebug.flushSave());
   const before = await p.evaluate(() => window.__canvastDebug.session().revision);
-  await bar.getByRole("button", { name: "Play" }).click();
+  await bar.getByRole("button", { name: "Play", exact: true }).click();
   await expect.poll(() => p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.currentTime)).toBeGreaterThan(0.2);
   expect(await p.evaluate(() => window.__canvastDebug.session().revision), "playing writes nothing").toBe(before);
-  await bar.getByRole("button", { name: "Pause" }).click();
+  await bar.getByRole("button", { name: "Pause", exact: true }).click();
   await expect.poll(t).toBeGreaterThan(0.2);
   const paused = await t();
   await saved(p);
@@ -564,6 +564,12 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
       return Math.max(r!, g!, bl!) - Math.min(r!, g!, bl!);
     })
     .toBeGreaterThan(80);
+  // Extract Frame from the video: a plain image next to it.
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((b2.minX + b2.maxX) / 2), Math.round((b2.minY + b2.maxY) / 2));
+  await p.getByTestId("media-bar").getByRole("button", { name: "Extract frame" }).click();
+  await expect.poll(async () => (await objects(p)).length).toBe(2);
+  expect((await objects(p))[1]!["media"]).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -586,8 +592,16 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   const t = async () => ((await objects(p))[0]!["media"] as { t: number }).t;
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect.poll(t).toBeCloseTo(1, 1);
+  // The step is a setting (Media & Playback): a bad value is refused, a good one applies to the next press.
+  await bar.getByRole("button", { name: "Media & Playback settings" }).click();
+  const audioStep = bar.getByLabel("Audio step (s)");
+  await audioStep.fill("0");
+  await audioStep.blur();
+  await expect(audioStep).toHaveValue("1");
+  await audioStep.fill("1.5");
+  await audioStep.blur();
   await bar.getByRole("button", { name: "Step forward" }).click();
-  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect.poll(t).toBeCloseTo(2.5, 1);
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect.poll(t).toBeCloseTo(3, 1); // stops at the end
   await saved(p);
@@ -635,7 +649,16 @@ test("an animated GIF steps by frame: placed paused, stepped, wrapped, played an
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect(bar.locator(".media-time")).toHaveText("Frame 2 / 4");
   await expect.poll(t).toBe(1);
-  // Unselected, the canvas draws the paused frame (green).
+  // Extract Frame: a plain image of the shown frame (green) appears to the right; the GIF is unchanged.
+  await bar.getByRole("button", { name: "Extract frame" }).click();
+  await expect.poll(async () => (await objects(p)).length).toBe(2);
+  const [orig, ext] = await objects(p);
+  expect(ext!["media"]).toBeUndefined();
+  expect(ext!["assetId"]).not.toBe(orig!["assetId"]);
+  expect(orig!["media"]).toEqual({ kind: "gif", t: 1, repeat: false });
+  const xb = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), ext!.id))!.box;
+  expect(xb.minX).toBeGreaterThan(box.maxX);
+  await expect.poll(async () => (await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), [Math.round(xb.minX + (xb.maxX - xb.minX) * 0.75), at[1]] as const)).slice(0, 3).map((v) => Math.round(v / 40))).toEqual([0, 5, 0]);
   await p.mouse.click(1100, 700);
   await expect.poll(colour).toEqual([0, 5, 0]);
   // Back to the instance: repeat wraps stepping back from the first frame to the last.
@@ -647,11 +670,15 @@ test("an animated GIF steps by frame: placed paused, stepped, wrapped, played an
   // Playing runs through the frames and writes nothing; pausing writes the shown frame.
   await p.evaluate(() => window.__canvastDebug.flushSave());
   const before = await p.evaluate(() => window.__canvastDebug.session().revision);
-  await bar.getByRole("button", { name: "Play" }).click();
+  await bar.getByRole("button", { name: "Play", exact: true }).click();
   await expect(bar.locator(".media-time")).toHaveText(/Frame [12] \/ 4/); // wrapped past the last frame
   expect(await p.evaluate(() => window.__canvastDebug.session().revision)).toBe(before);
-  await bar.getByRole("button", { name: "Pause" }).click();
+  await bar.getByRole("button", { name: "Pause", exact: true }).click();
   const shown = Number((await bar.locator(".media-time").textContent())!.match(/Frame (\d+)/)![1]) - 1;
   await expect.poll(t).toBe(shown);
+  // A duplicate keeps the paused frame and starts paused.
+  await p.keyboard.press("Control+d");
+  await expect.poll(async () => (await objects(p)).length).toBe(3);
+  expect((await objects(p))[2]!["media"]).toEqual({ kind: "gif", t: shown, repeat: true });
   expect(app.consoleErrors).toEqual([]);
 });
