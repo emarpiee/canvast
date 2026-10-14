@@ -77,7 +77,7 @@ archive and Firefox 2^10,000,000 tests pass.
 
 **Dimmed fill and Select size slider (ADR 0016):** an edge of a coarse object in the view past 100,000 levels is drawn as a dimmed approximate fill (every sampler has `approx`); the size slider on Select sets the thickness of the selected strokes. Tests: E2E `frames.spec.ts` (corner colour at 2·10^5 to 10^12 levels; slider with undo).
 
-**Step 5, the depth suite (`tests/e2e/depth-suite.spec.ts`, all four projects, 20/20 on 2026-10-14):** A1 median frame time at 2^10, 10^3, 10^6, 10^9, 10^12 within 3× the 2^10 median + 3 ms; A2 ±10^12 jumps under 100 ms; A3 rebase continuity (zoom steps across frame boundaries and round trips of 0.3 to 1000 levels, at home and 10^12 levels down) under 10^-6 px (measured 4.5·10^-13); A5 draw, select, move, resize, undo, redo, open text and type at 2^10^12 each under 100 ms (Firefox slowest: draw 68 ms); A7 heap flat over 15 dives (Chromium; Firefox has no heap figure, so object and stored-frame counts are checked there too). Limits fixed before the first run.
+**Step 5, the depth suite (`tests/e2e/depth-suite.spec.ts`, all four projects, 20/20 on 2026-10-14):** A1 median frame time at 2^10, 10^3, 10^6, 10^9, 10^12 within 3× the 2^10 median + 3 ms; A2 ±10^12 jumps under 100 ms; A3 rebase continuity (zoom steps across frame boundaries and round trips of 0.3 to 1000 levels, at home and 10^12 levels down) under 10^-6 px (measured 4.5·10^-13); A5 draw, select, move, resize, undo, redo, open text and type at 2^10^12: the time from the last input to the frame showing it, and the slowest frame, each under 100 ms (measured in the page: 4-15 ms; the first version timed Playwright's mouse round trips, 12-25 ms each at pixel ratio 2, and failed at 108-111 ms for that reason); A7 heap flat over 15 dives (Chromium; Firefox has no heap figure, so object and stored-frame counts are checked there too). Limits fixed before the first run.
 
 **Known failures:** coarse landmark edges are not drawn (marked shortcut). Frames more than
 100,000 levels finer show as a dot. Loading v0.8 data with an object more
@@ -90,11 +90,11 @@ zoom-preview tile test fails on this machine on `main` too (timing, see 1g).
 **Unverified:** the full suite on the branch (run at the end of the phase,
 step 6).
 
-**Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
+**Committed:** v0.9.0 on `main`.
 
 **Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite on the 3 Chromium projects (before Firefox was restored; the full suite with Firefox has not been run): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md). An Electron AppImage was tried and removed again the same day (only the single HTML file ships).
 
-**Next bounded task:** version bump and release notes (the owner decides).
+**Next bounded task:** run the full suite with Firefox (not yet run after Firefox was restored), then the next feature slice.
 
 ## Phase 0A — endless navigation proof
 

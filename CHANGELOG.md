@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — Nested frames (2026-10-14)
 
-Nested frames redesign (branch `exp/nested-frames`, ADR 0014; not merged).
+Nested frames redesign (ADR 0014, 0015, 0016).
 
 - **Endless depth, constant cost.** The camera and objects live in nested
   frames, so pan, zoom and drawing cost the same at 2^10 and 2^10^12, and
@@ -21,6 +21,10 @@ Nested frames redesign (branch `exp/nested-frames`, ADR 0014; not merged).
   (on release, one undo step).
 - **Select option:** ignore the object that fills the view, so it cannot be
   picked or deleted by accident.
+- **Tests:** a depth suite (frame time from 2^10 to 2^10^12, 10^12 jumps under
+  100 ms, rebase continuity under 10^-6 px, work at 2^10^12, memory after
+  dives). The E2E suites are cheaper: logic specs run in `chromium` only,
+  loops are smaller, and one full-only run does 2,000 wheel notches.
 - **Debug (#debug) panel:** jumps of ±10, 100, 1000, 10^6, 10^9, 10^12
   levels, a Clear button for the canvas (undoable), and auto-zoom keeps
   running while you draw (stops with its button, the wheel or Escape).

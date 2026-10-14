@@ -29,6 +29,32 @@ async function timed(app: App, fn: () => Promise<void>): Promise<number> {
   return Date.now() - t0;
 }
 
+/**
+ * A5 step cost as the app sees it: time from the last input event of the step to the frame that shows its
+ * result, and the slowest frame during the step. Wall time would include Playwright's own round trips
+ * (12-25 ms per mouse call at pixel ratio 2), which say nothing about the app.
+ */
+async function latency(app: App, fn: () => Promise<void>): Promise<{ wall: number; latencyMs: number; maxFrameMs: number }> {
+  const p = app.page;
+  await p.evaluate(() => {
+    const w = window as unknown as { __lastInput: number };
+    w.__lastInput = performance.now();
+    for (const t of ["pointerdown", "pointermove", "pointerup", "keydown", "click"]) {
+      window.addEventListener(t, () => (w.__lastInput = performance.now()), { capture: true });
+    }
+    window.__canvastDebug.resetFrameTimes();
+  });
+  const t0 = Date.now();
+  await fn();
+  const latencyMs = await p.evaluate(async () => {
+    await window.__canvastDebug.nextFrame();
+    return performance.now() - (window as unknown as { __lastInput: number }).__lastInput;
+  });
+  const wall = Date.now() - t0;
+  const maxFrameMs = Math.max(0, ...(await p.evaluate(() => window.__canvastDebug.frameTimes())));
+  return { wall, latencyMs, maxFrameMs };
+}
+
 /** Draw one stroke with the pen at the centre of the view and return its id. */
 async function drawStroke(app: App, from = { x: 560, y: 380 }, to = { x: 700, y: 440 }): Promise<string> {
   const p = app.page;
@@ -142,35 +168,38 @@ test("A5: at 2^10^12 draw, select, move, resize, undo and type each take under 1
   const p = app.page;
   await jump(app, 1e12);
   expect(await p.evaluate(() => window.__canvastDebug.depth())).toBe("1000000000000");
-  const steps: Record<string, number> = {};
+  const steps: Record<string, { wall: number; latencyMs: number; maxFrameMs: number }> = {};
   await p.mouse.click(640, 400);
   await p.keyboard.press("p");
-  steps["draw"] = await timed(app, () => app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 2));
+  steps["draw"] = await latency(app, () => app.drag({ x: 500, y: 400 }, { x: 700, y: 450 }, 2));
   const [s] = await p.evaluate(() => window.__canvastDebug.objectFrames());
   expect(s?.kind).toBe("stroke");
   await p.keyboard.press("v");
-  steps["select"] = await timed(app, () => p.mouse.click(600, 425));
+  steps["select"] = await latency(app, () => p.mouse.click(600, 425));
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([s!.id]);
   const box0 = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), s!.id))!.box;
-  steps["move"] = await timed(app, () => app.drag({ x: 600, y: 425 }, { x: 640, y: 455 }, 2));
+  steps["move"] = await latency(app, () => app.drag({ x: 600, y: 425 }, { x: 640, y: 455 }, 2));
   const box1 = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), s!.id))!.box;
   expect(box1.minX - box0.minX).toBeCloseTo(40, 0);
-  steps["resize"] = await timed(app, () => app.drag({ x: Math.round(box1.maxX), y: Math.round(box1.maxY) }, { x: Math.round(box1.maxX) + 60, y: Math.round(box1.maxY) + 30 }, 2));
+  steps["resize"] = await latency(app, () => app.drag({ x: Math.round(box1.maxX), y: Math.round(box1.maxY) }, { x: Math.round(box1.maxX) + 60, y: Math.round(box1.maxY) + 30 }, 2));
   const box2 = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), s!.id))!.box;
   expect(box2.maxX - box2.minX).toBeGreaterThan((box1.maxX - box1.minX) * 1.2);
-  steps["undo"] = await timed(app, () => p.keyboard.press("Control+z"));
-  steps["redo"] = await timed(app, () => p.keyboard.press("Control+y"));
+  steps["undo"] = await latency(app, () => p.keyboard.press("Control+z"));
+  steps["redo"] = await latency(app, () => p.keyboard.press("Control+y"));
   await p.keyboard.press("t");
-  steps["type-open"] = await timed(app, () => p.mouse.click(400, 250));
+  steps["type-open"] = await latency(app, () => p.mouse.click(400, 250));
   await expect(p.getByTestId("text-editor")).toBeFocused();
-  steps["type"] = await timed(app, () => p.keyboard.type("Hi"));
+  steps["type"] = await latency(app, () => p.keyboard.type("Hi"));
   await p.keyboard.press("Escape");
   await app.frame();
   const texts = (await p.evaluate(() => window.__canvastDebug.objectFrames())).filter((o) => o.kind === "text");
   expect(texts).toHaveLength(1);
   expect(BigInt(texts[0]!.level), "the text lives a trillion levels down").toBeGreaterThan(10n ** 10n);
   recordMetric(info, "A5 step ms at 2^10^12", steps);
-  for (const [name, ms] of Object.entries(steps)) expect(ms, name).toBeLessThan(LIM.stepMs);
+  for (const [name, m] of Object.entries(steps)) {
+    expect(m.latencyMs, `${name}: last input to frame`).toBeLessThan(LIM.stepMs);
+    expect(m.maxFrameMs, `${name}: slowest frame`).toBeLessThan(LIM.stepMs);
+  }
 });
 
 test("A7: memory stays flat after many dives to 2^10^12 and back", async ({ app }, info) => {
