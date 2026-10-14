@@ -1,9 +1,10 @@
 import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { ImageObject } from "../doc/model";
+import type { CanvasObject, ImageObject } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
-import { normalizeUnit } from "../doc/edit-ops";
+import { normalizeUnit, restack } from "../doc/edit-ops";
+import { groupObjects, ungroupObjects } from "../doc/groups";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
 import type { ViewState } from "./view-state";
@@ -33,6 +34,37 @@ export function deleteSelection(doc: DocumentStore, editor: EditorState): void {
   if (!ids.length) return;
   doc.commit(doc.transaction(ids.length === 1 ? "Delete object" : `Delete ${ids.length} objects`, [], ids));
   editor.select([]);
+}
+
+/** The selected objects that exist (in paint order). */
+const selected = (doc: DocumentStore, editor: EditorState): CanvasObject[] => doc.ordered().filter((o) => editor.selection.has(o.id));
+
+/** Group the selection (at least two units) into one group at the level the user is working at. */
+export function groupSelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const objs = selected(doc, editor);
+  const level = editor.entered.length;
+  if (new Set(objs.map((o) => o.groups?.[level] ?? o.id)).size < 2) return;
+  doc.commit(doc.transaction(`Group ${objs.length} objects`, groupObjects(objs, level)));
+  editor.changed();
+}
+
+/** Dissolve the selected groups (one level): the members stay selected. */
+export function ungroupSelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const changed = ungroupObjects(selected(doc, editor), editor.entered.length);
+  if (!changed.length) return;
+  doc.commit(doc.transaction("Ungroup", changed));
+  editor.changed();
+}
+
+/** Bring the selection to the front, or send it to the back, of the paint order. */
+export function arrangeSelection(doc: DocumentStore, editor: EditorState, to: "front" | "back"): void {
+  if (editor.blockEdit()) return;
+  const objs = selected(doc, editor);
+  if (!objs.length) return;
+  doc.commit(doc.transaction(to === "front" ? "Bring to front" : "Send to back", restack(objs, doc.ordered(), to)));
+  editor.changed();
 }
 
 /** Largest fraction of the viewport a newly placed image may cover. */

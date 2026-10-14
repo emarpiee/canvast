@@ -44,6 +44,8 @@ interface ObjectBase {
    * 2^-32 turns (core/angle.ts, ADR 0018); absent = not rotated.
    */
   readonly rot?: number;
+  /** The groups containing this object, outermost first (doc/groups.ts, ADR 0020); absent = not grouped. */
+  readonly groups?: readonly string[];
 }
 
 export interface StrokeObject extends ObjectBase {
@@ -226,6 +228,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   finite(o.z, "z");
   if (!(finite(o.opacity, "opacity") > 0 && o.opacity <= 1)) throw new InvalidObjectError("opacity must be in (0, 1]");
   if (o.attachmentTargetId !== null) throw new InvalidObjectError("attachment is not supported yet");
+  if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
     if (o.points.length < 2 || o.points.length % 2 !== 0) throw new InvalidObjectError("stroke needs at least one point");
@@ -286,6 +289,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     opacity: (s["opacity"] ?? 1) as number,
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
     ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}),
+    ...(s["groups"] !== undefined ? { groups: s["groups"] as string[] } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),
   };
   let o: CanvasObject;

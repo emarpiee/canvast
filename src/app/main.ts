@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { deleteSelection, importImages, pruneSelection, redo, undo } from "./actions";
+import { arrangeSelection, deleteSelection, groupSelection, importImages, pruneSelection, redo, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -268,6 +268,9 @@ async function start(): Promise<void> {
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
+    groupSelection: () => groupSelection(doc, editor),
+    ungroupSelection: () => ungroupSelection(doc, editor),
+    arrangeSelection: (to) => arrangeSelection(doc, editor, to),
     depth: () => depthOf(view.frameCamera),
     setSelectedWidth: (px) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.

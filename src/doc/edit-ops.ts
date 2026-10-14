@@ -66,6 +66,21 @@ export function rotateAbout(o: CanvasObject, about: WorldPoint, delta: number): 
   return { ...rest, anchor: moved, ...(rot ? { rot } : {}) };
 }
 
+/**
+ * Move `objects` to the front or back of the paint order, keeping their order
+ * among themselves. `others` is the rest of the document in paint order.
+ */
+export function restack(objects: readonly CanvasObject[], others: readonly CanvasObject[], to: "front" | "back"): CanvasObject[] {
+  const own = [...objects].sort((a, b) => a.z - b.z || (a.id < b.id ? -1 : 1));
+  const rest = others.filter((o) => !objects.includes(o));
+  if (to === "front") {
+    const top = rest.length ? rest[rest.length - 1]!.z : 0;
+    return own.map((o, i) => ({ ...o, z: top + 1 + i }));
+  }
+  const bottom = rest.length ? rest[0]!.z : 0;
+  return own.map((o, i) => ({ ...o, z: bottom - own.length + i }));
+}
+
 const MIN_EXTENT_LOG2 = 0;
 const MAX_EXTENT_LOG2 = 16;
 const TARGET_EXTENT_LOG2 = 8;

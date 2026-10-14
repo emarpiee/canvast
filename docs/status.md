@@ -21,7 +21,7 @@ Unverified / Committed / Next bounded task**.
 | 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
 | NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
 | 1i | Settings scopes ([ADR 0017](adr/0017-settings-scopes.md)): device scope built (pen and select options persist), workspace and board scopes declared | **done** (see below) |
-| 2 | Rendering and interaction productionization: selection and transforms including **item rotation**, **snapping and guides**, layers and groups, object eraser, per-canvas cameras | **in progress**: rotating strokes, images and text ([ADR 0018](adr/0018-item-rotation.md)) and snapping while moving ([ADR 0019](adr/0019-snapping-and-guides.md)) done; next layers and groups, object eraser, per-canvas cameras |
+| 2 | Rendering and interaction productionization: selection and transforms including **item rotation**, **snapping and guides**, layers and groups, object eraser, per-canvas cameras | **in progress**: rotating strokes, images and text ([ADR 0018](adr/0018-item-rotation.md)) snapping while moving ([ADR 0019](adr/0019-snapping-and-guides.md)) and groups with stacking order ([ADR 0020](adr/0020-groups-and-stacking.md)) done; next layer visibility and locking, object eraser, per-canvas cameras |
 | 1+ | Persisted WebP thumbnails, slide view and recognisable broken assets ([plan](plans/asset-thumbnails.md)), video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, groups, smart folders and batch asset edits, collaboration | planned |
 
 ## Nested frames redesign (branch `exp/nested-frames`)
@@ -372,7 +372,9 @@ visible strokes). Alternatives:
 
 **Snapping (slice 3):** `interaction/snap.ts`; a moving selection snaps its edges and centres to other visible objects within 6 px, aligned from the exact world coordinates (exact at any depth), with a guide line and a magnet toggle (device setting `snap.enabled`). [ADR 0019](adr/0019-snapping-and-guides.md). Tested: unit `snap.test.ts`; E2E `frames.spec.ts` "snapping" (exact alignment at home and 10^12 levels down; the toggle). Not built: snapping while resizing, equal spacing, user guides.
 
-**Next bounded task:** layers and groups.
+**Groups (slice 4):** `doc/groups.ts`; `groups` on every object (outermost first), selection in whole units, enter with double-click and leave with Escape, Group, Ungroup, Bring to front, Send to back (toolbar and shortcuts); one undo step each; stored with the objects. [ADR 0020](adr/0020-groups-and-stacking.md). Tested: unit `groups.test.ts` (2); E2E `frames.spec.ts` "groups" (pick, move as one, nest, enter, ungroup, undo, reorder, reload). Not built: named layers with visibility and locking, blending, reusable instances, attach and detach.
+
+**Next bounded task:** layer visibility and locking.
 
 ## Phase 1, slice 9 — settings scopes
 

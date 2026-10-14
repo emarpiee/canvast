@@ -53,6 +53,8 @@ export class EditorState {
   penWidthPx: number = PEN_WIDTHS[1];
   /** Thickness lock (interaction/pen-width.ts): new strokes keep the same width on the canvas, not on screen. */
   lock: PenLock | null = null;
+  /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
+  entered: string[] = [];
   /** Snapping while moving (interaction/snap.ts). */
   snap = true;
   /** Guide lines (screen px) shown while a move is snapped to something. */

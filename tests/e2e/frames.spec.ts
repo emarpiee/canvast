@@ -882,3 +882,57 @@ test("snapping: a moved stroke lines up exactly with another one (home and a tri
     await p.keyboard.press("Home");
   }
 });
+
+test("groups: picking one member picks the group, it moves as one, nests, enters, ungroups, reorders, and survives undo and a reload (ADR 0020)", async ({ app }) => {
+  const p = app.page;
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection());
+  const zs = () => p.evaluate(() => Object.fromEntries(window.__canvastDebug.objects().map((o) => [o.id, o["z"] as number])));
+  await p.keyboard.press("p");
+  for (const y of [250, 350, 450]) await app.drag({ x: 400, y }, { x: 600, y }, 4);
+  const [a, b, c] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id) as [string, string, string];
+  await p.keyboard.press("v");
+  await p.mouse.click(500, 250);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(500, 350);
+  await p.keyboard.up("Shift");
+  expect(await sel()).toEqual([a, b].sort());
+  await p.keyboard.press("Control+g");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(500, 250);
+  expect((await sel()).sort(), "one member picks the group").toEqual([a, b].sort());
+  const before = { a: (await boxOf(app, a))!, b: (await boxOf(app, b))!, c: (await boxOf(app, c))! };
+  await app.drag({ x: 500, y: 250 }, { x: 560, y: 250 }, 6);
+  expect((await boxOf(app, b))!.minX - before.b.minX, "the whole group moved").toBeCloseTo(60, 4);
+  expect((await boxOf(app, c))!, "the loose stroke did not").toEqual(before.c);
+  // Nest: group the group with the loose stroke; entering goes one level at a time.
+  await p.mouse.click(500, 450);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(560, 250);
+  await p.keyboard.up("Shift");
+  await p.keyboard.press("Control+g");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(500, 450);
+  expect((await sel()).sort(), "the outer group").toEqual([a, b, c].sort());
+  await p.mouse.dblclick(560, 250);
+  expect((await sel()).sort(), "entered: the inner group").toEqual([a, b].sort());
+  await p.keyboard.press("Control+Shift+g"); // ungroup the inner level
+  await p.mouse.click(560, 250);
+  expect(await sel(), "a is loose inside the outer group now").toEqual([a]);
+  await p.keyboard.press("Control+z"); // undo the ungroup: the inner group is back
+  await p.mouse.click(560, 250);
+  expect((await sel()).sort()).toEqual([a, b].sort());
+  // Arrange: the picked group goes behind everything, in the same order among its members.
+  const z0 = await zs();
+  await p.keyboard.press("Control+[");
+  const z1 = await zs();
+  expect(z1[a]! < z1[c]! && z1[b]! < z1[c]!, "behind the loose stroke").toBe(true);
+  expect(z1[a]! < z1[b]!, "a is still below b").toBe(true);
+  expect(z0[a]! < z0[b]!).toBe(true);
+  // Saved with the objects: after a reload one click still picks the whole outer group.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  await p.mouse.click(500, 450);
+  expect((await sel()).sort()).toEqual([a, b, c].sort());
+});

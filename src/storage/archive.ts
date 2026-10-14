@@ -21,7 +21,7 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  *   manifest.json             format, version, scope, hierarchy, asset list
  *   canvases/<id>.json        { objects: SerializedObject[], frames: FrameRecord[], view: StoredView | null }
  *                             (version 1 had no frames: absolute objects, which import unchanged;
- *                             version 3: strokes may carry `rot`, a rotation, ADR 0018)
+ *                             version 3: objects may carry `rot`, a rotation (ADR 0018), and `groups` (ADR 0020))
  *   assets/<sha256>           original bytes, exactly once per hash
  *
  * Export reads one consistent snapshot (a single read-only transaction),

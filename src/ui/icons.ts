@@ -26,7 +26,11 @@ import pilcrow from "lucide-static/icons/pilcrow.svg";
 import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
+import bringToFront from "lucide-static/icons/bring-to-front.svg";
+import group from "lucide-static/icons/group.svg";
 import lock from "lucide-static/icons/lock.svg";
+import sendToBack from "lucide-static/icons/send-to-back.svg";
+import ungroup from "lucide-static/icons/ungroup.svg";
 import magnet from "lucide-static/icons/magnet.svg";
 import waves from "lucide-static/icons/waves.svg";
 import scaling from "lucide-static/icons/scaling.svg";
@@ -74,5 +78,9 @@ export const ICONS = {
   scaling: clean(scaling),
   waves: clean(waves),
   lock: clean(lock),
+  group: clean(group),
+  ungroup: clean(ungroup),
+  bringToFront: clean(bringToFront),
+  sendToBack: clean(sendToBack),
   magnet: clean(magnet),
 } as const;

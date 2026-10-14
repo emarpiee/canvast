@@ -20,7 +20,8 @@ import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, handlePoints, rotateHandlePoint, selectionBox } from "../render/scene-renderer";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { deleteSelection, redo, undo } from "../app/actions";
+import { arrangeSelection, deleteSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
+import { expandToUnits, isInside } from "../doc/groups";
 
 /**
  * Pointer routing and tool behaviour.
@@ -154,6 +155,16 @@ export function attachTools(
   };
   const textAt = (s: ScreenPoint): TextObject | null =>
     (pickAll(visible(), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
+
+  /**
+   * Select what the user picked, widened to whole groups (at the level they are working at).
+   * Picking something outside the group they entered leaves that group.
+   */
+  const pick = (ids: readonly ObjectId[], additive = false): void => {
+    const picked = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+    if (editor.entered.length && !picked.every((o) => isInside(o, editor.entered))) editor.entered = [];
+    editor.select(expandToUnits(doc.ordered(), picked, editor.entered), additive);
+  };
 
   const cancelGesture = (): void => {
     editor.preview = { kind: "none" };
@@ -295,7 +306,7 @@ export function attachTools(
     const t = gp.target;
     const draggable = t && (t.kind === "stroke" || editor.selection.has(t.id)) && !editor.readOnly;
     if (t && draggable) {
-      if (!editor.selection.has(t.id)) editor.select([t.id], gp.additive);
+      if (!editor.selection.has(t.id)) pick([t.id], gp.additive);
       const ids = [...editor.selection].filter((id) => doc.get(id));
       g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, snap: editor.snap ? snapContext(ids, view.frame) : null };
       updateMove(s);
@@ -537,7 +548,7 @@ export function attachTools(
       case "lasso": {
         const poly = editor.lasso!;
         editor.lasso = null;
-        if (!cancelled) editor.select(lassoSelect(visible(), poly, editor.lassoFilter), e.shiftKey);
+        if (!cancelled) pick(lassoSelect(visible(), poly, editor.lassoFilter), e.shiftKey);
         break;
       }
       case "press": {
@@ -548,7 +559,7 @@ export function attachTools(
             editor.selection.delete(t.id);
             editor.changed();
           } else {
-            editor.select([t.id], g.additive);
+            pick([t.id], g.additive);
           }
         } else if (!g.additive) {
           editor.select([]);
@@ -566,7 +577,7 @@ export function attachTools(
         editor.marquee = null;
         if (!cancelled) {
           const box = { minX: Math.min(m.x0, m.x1), minY: Math.min(m.y0, m.y1), maxX: Math.max(m.x0, m.x1), maxY: Math.max(m.y0, m.y1) };
-          editor.select(boxSelect(visible(), box), g.additive);
+          pick(boxSelect(visible(), box), g.additive);
         }
         break;
       }
@@ -587,6 +598,13 @@ export function attachTools(
   const onDoubleClick = (e: MouseEvent): void => {
     if (effectiveTool() !== "select" || editor.readOnly) return;
     const s = local(e);
+    // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
+    const hit = pickAll(visible(), s.x, s.y)[0]?.obj;
+    if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {
+      editor.entered = hit.groups.slice(0, editor.entered.length + 1);
+      editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
+      return;
+    }
     const t = textAt(s);
     if (t) hooks.editText(t, world(s));
   };
@@ -604,6 +622,11 @@ export function attachTools(
       if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
       editor.select(doc.ordered().map((o) => o.id));
+    } else if (mod && key === "g") {
+      if (e.shiftKey) ungroupSelection(doc, editor);
+      else groupSelection(doc, editor);
+    } else if (mod && (e.key === "]" || e.key === "[")) {
+      arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
     } else if (mod || e.altKey) {
       return;
     } else if (e.key === " ") {
@@ -618,7 +641,11 @@ export function attachTools(
     else if (key === "t") editor.setTool("text");
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
-      else editor.select([]);
+      else if (editor.entered.length) {
+        // Leave the group entered last; what was picked inside it stays selected.
+        editor.entered = editor.entered.slice(0, -1);
+        editor.changed();
+      } else editor.select([]);
     } else if (e.key === "Delete" || e.key === "Backspace") {
       deleteSelection(doc, editor);
     } else {
