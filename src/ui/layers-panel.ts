@@ -1,6 +1,8 @@
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject } from "../doc/model";
+import type { Backlink } from "../app/session";
+import { mentionIds, plainText } from "../text/markdown";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 
@@ -15,6 +17,12 @@ export interface LayersActions {
   setFlagOn(ids: readonly string[], flag: "hidden" | "locked", on: boolean): void;
   moveAbove(ids: readonly string[], aboveId: string): void;
   setOpacity(ids: readonly string[], opacity: number): void;
+  /** Texts on the board's other canvases that mention an object (stored index). */
+  backlinksElsewhere(id: string): Promise<Backlink[]>;
+  /** Open a canvas (null = this one) and select and frame objects there. */
+  reveal(canvasId: string | null, ids: readonly string[]): void;
+  /** Where mentioned objects are on the board's other canvases. */
+  locateMentions(ids: readonly string[]): Promise<Map<string, Backlink>>;
 }
 
 /** Lowest opacity the slider sets (the model needs more than 0; use Hide for nothing). */
@@ -60,7 +68,7 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
 export function labelOf(o: CanvasObject): { icon: string; text: string; swatch?: string } {
   if (o.kind === "stroke") return { icon: ICONS.pencil, text: "Stroke", swatch: o.color };
   if (o.kind === "image") return { icon: ICONS.image, text: `Image ${o.pixelW}×${o.pixelH}` };
-  const plain = o.md.replace(/\[\[item:[^|\]]*\|((?:[^\]\\]|\\.)*)\]\]/g, "$1").replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 28);
+  const plain = plainText(o.md, 28);
   return { icon: ICONS.type, text: plain || "Text", swatch: o.color };
 }
 
@@ -80,6 +88,49 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const sel = selectedObjs();
     const pct = Math.round((sel[0]?.opacity ?? 1) * 100);
     return `<label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
+  };
+
+  // Links of the one selected object (ADR 0040): texts that mention it, and what a selected text mentions.
+  let elsewhere: { id: string; list: Backlink[] } | null = null;
+  let located: { id: string; md: string; map: Map<string, Backlink> | null } | null = null; // map null = asked, not answered
+  const linkRow = (canvasId: string, id: string, label: string, where: string): string =>
+    `<li><button type="button" data-go="${esc(id)}" data-canvas="${esc(canvasId)}">${esc(label || "Text")}</button><span>${esc(where)}</span></li>`;
+  const linksHtml = (): string => {
+    const sel = selectedObjs();
+    const one = sel.length === 1 ? sel[0]! : null;
+    if (!one || elsewhere?.id !== one.id) elsewhere = null; // reselecting asks the store again
+    if (!one) return "";
+    const here = doc.ordered().filter((o) => o.kind === "text" && o.id !== one.id && mentionIds(o.md).includes(one.id));
+    const rows = here.map((o) => linkRow("", o.id, plainText((o as { md: string }).md), "this canvas"));
+    if (elsewhere?.id === one.id) for (const b of elsewhere.list) rows.push(linkRow(b.canvasId, b.id, b.label, b.canvasName));
+    else void actions.backlinksElsewhere(one.id).then((list) => {
+      elsewhere = { id: one.id, list };
+      if (editor.selection.size === 1 && editor.selection.has(one.id)) schedule();
+    });
+    const out: string[] = [];
+    if (rows.length) out.push(`<h3>Mentioned in</h3><ul>${rows.join("")}</ul>`);
+    if (one.kind === "text") {
+      const ids = mentionIds(one.md);
+      if (ids.length) {
+        if (located?.id !== one.id || located.md !== one.md) {
+          const { id, md } = one;
+          located = { id, md, map: null };
+          void actions.locateMentions(ids.filter((i) => !doc.get(i))).then((map) => {
+            located = { id, md, map };
+            if (editor.selection.size === 1 && editor.selection.has(id)) schedule();
+          });
+        }
+        const items = ids.map((id) => {
+          const t = doc.get(id);
+          if (t) return linkRow("", id, labelOf(t).text, "");
+          const b = located?.map?.get(id);
+          if (b) return linkRow(b.canvasId, id, b.label, b.canvasName);
+          return located?.map ? `<li class="broken"><span>Missing item</span><span>not on this board</span></li>` : "";
+        });
+        out.push(`<h3>Mentions</h3><ul>${items.join("")}</ul>`);
+      }
+    }
+    return out.join("");
   };
 
   const render = (): void => {
@@ -112,6 +163,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     panel.innerHTML = `
       <header><h2>Layers <span class="layers-count">${all.length}</span></h2><button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button></header>
       <ul role="tree" aria-label="Objects, front to back">${list || '<li class="layers-empty">Nothing on this canvas yet.</li>'}</ul>
+      <div class="layers-links" data-links>${linksHtml()}</div>
       ${footer()}
       ${rows >= MAX_ROWS ? `<p class="layers-note">Showing the front ${MAX_ROWS} rows.</p>` : ""}`;
   };
@@ -142,6 +194,11 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
 
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
+    const go = t.closest<HTMLElement>("[data-go]");
+    if (go) {
+      actions.reveal(go.dataset["canvas"] || null, [go.dataset["go"]!]);
+      return;
+    }
     if (t.closest("[data-close]")) {
       editor.layersOpen = false;
       editor.changed();

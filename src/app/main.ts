@@ -328,7 +328,7 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  const textEditor = mountTextEditor(host, view, doc, editor);
+  const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6));
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at) });
   const side = document.createElement("div");
   side.id = "side-panels";
@@ -338,6 +338,9 @@ async function start(): Promise<void> {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
+    backlinksElsewhere: (id) => session.backlinksElsewhere(id),
+    locateMentions: (ids) => session.locateMentions(ids),
+    reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
   });
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,

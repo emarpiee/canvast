@@ -164,6 +164,61 @@ test("@ mentions an object by stable id; the mention survives reopening and relo
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("backlinks: mentions are listed both ways, across the board's canvases, and a deleted target shows as missing (ADR 0040)", async ({ app }) => {
+  const p = app.page;
+  const nav = p.getByTestId("workspace-nav");
+  const panel = p.getByTestId("layers-panel");
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 500 }, { x: 700, y: 520 }, 4);
+  const [stroke] = await objects(p);
+  await newText(p, 500, 300);
+  await p.keyboard.type("note @");
+  await p.getByRole("textbox", { name: "Mention an item" }).fill("stro");
+  await p.keyboard.press("Enter");
+  await finish(p);
+  const [t1] = await textObjects(p);
+  const row = (id: string) => panel.locator(`li.layer[data-key="${id}"]`);
+  // Target lists the text that mentions it; the text lists its target, which can be revealed.
+  await p.keyboard.press("v");
+  await row(stroke!.id).click();
+  await expect(panel.locator(".layers-links").getByRole("button", { name: /note/ })).toHaveCount(1);
+  await row(t1!.id).click();
+  await panel.locator(".layers-links").getByRole("button", { name: "Stroke" }).click();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([stroke!.id]);
+  // A second canvas: mention the first canvas's text from there.
+  await nav.click();
+  await p.getByRole("button", { name: "+ Canvas" }).last().click();
+  await expect(nav).toHaveText("Board 1 › Canvas 2");
+  await newText(p, 500, 300);
+  await p.keyboard.type("see @");
+  await p.getByRole("textbox", { name: "Mention an item" }).fill("note");
+  await expect(p.getByRole("option", { name: /note.*Canvas 1/ })).toBeVisible();
+  await p.keyboard.press("Enter");
+  await finish(p);
+  const [t2] = await textObjects(p);
+  expect(t2!.md).toContain(`[[item:${t1!.id}|`);
+  // Back on canvas 1, the text shows the mention from canvas 2; clicking goes there.
+  await nav.click();
+  await p.getByRole("menuitemradio", { name: /Canvas 1/ }).click();
+  await expect(nav).toHaveText("Board 1 › Canvas 1");
+  await row(t1!.id).click();
+  const back = panel.locator(".layers-links").getByRole("button", { name: /see/ });
+  await expect(back).toHaveCount(1);
+  await back.click();
+  await expect(nav).toHaveText("Board 1 › Canvas 2");
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([t2!.id]);
+  // Delete the target on canvas 1: the mention shows as missing.
+  await nav.click();
+  await p.getByRole("menuitemradio", { name: /Canvas 1/ }).click();
+  await expect(nav).toHaveText("Board 1 › Canvas 1");
+  await row(stroke!.id).click();
+  await p.keyboard.press("Delete");
+  await row(t1!.id).click();
+  await expect(panel.locator(".layers-links .broken")).toHaveCount(1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {
   const p1 = app.page;
   await newText(p1, 300, 300);

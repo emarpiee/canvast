@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 6 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 7 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -9,7 +9,9 @@
  *   boards       keyPath "id"      → BoardRecord
  *   canvases     keyPath "id"      → CanvasRecord            (index "boardId")
  *   objects      keyPath [canvasId, id] → ObjectRecord        (one record per canvas object;
- *                                                             index "assetId" on data.assetId, v3)
+ *                                                             index "assetId" on data.assetId, v3;
+ *                                                             multi-entry index "refs" on data.refs: the ids a text mentions, and
+ *                                                             index "kind" on data.kind, for the mention picker; v7)
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
  *   assets       key sha256        → AssetRecord              (original bytes, stored once)
  *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
@@ -28,7 +30,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -58,6 +60,9 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       // v3: usage lookups. Strokes have no assetId, so the index holds image instances only.
       const objects = req.transaction!.objectStore("objects");
       if (!objects.indexNames.contains("assetId")) objects.createIndex("assetId", "data.assetId");
+      // v7: backlinks (ADR 0040). A derived index over texts' mentions; texts saved before it have none.
+      if (!objects.indexNames.contains("refs")) objects.createIndex("refs", "data.refs", { multiEntry: true });
+      if (!objects.indexNames.contains("kind")) objects.createIndex("kind", "data.kind");
       if (!has("assetCatalog")) db.createObjectStore("assetCatalog", { keyPath: "hash" });
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
       if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });

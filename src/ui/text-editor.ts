@@ -75,7 +75,14 @@ export interface TextEditor {
   readonly isOpen: boolean;
 }
 
-export function mountTextEditor(host: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState): TextEditor {
+export function mountTextEditor(
+  host: HTMLElement,
+  view: ViewState,
+  doc: DocumentStore,
+  editor: EditorState,
+  /** Texts and images on the board's other canvases matching a query (the picker's second list). */
+  elsewhere: (query: string) => Promise<Array<{ id: string; label: string; canvasName: string }>> = () => Promise.resolve([]),
+): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
   box.contentEditable = "true";
@@ -147,7 +154,8 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
 
   // `@` opens a picker of this canvas's objects; the pick becomes an atomic mention span (ADR 0039).
   let pickAt: Range | null = null;
-  let choices: Array<{ id: string; label: string }> = [];
+  let choices: Array<{ id: string; label: string; canvasName?: string }> = [];
+  let asked = 0;
   let active = 0;
   const closePicker = (refocus: boolean): void => {
     picker.hidden = true;
@@ -157,9 +165,18 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
   const fillPicker = (): void => {
     const q = pickInput.value.trim().toLowerCase();
     choices = [...doc.ordered()].reverse().filter((o) => o.id !== target?.id).map((o) => ({ id: o.id, label: labelOf(o).text })).filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
+    const ask = ++asked;
+    void elsewhere(q).then((more) => {
+      if (ask !== asked || picker.hidden) return; // a newer query, or closed
+      choices = [...choices.filter((c) => !c.canvasName), ...more.filter((m) => !choices.some((c) => c.id === m.id))];
+      paint();
+    });
+    paint();
+  };
+  const paint = (): void => {
     active = Math.min(active, Math.max(0, choices.length - 1));
     pickList.innerHTML = choices.length
-      ? choices.map((c, i) => `<li role="option" aria-selected="${i === active}" data-id="${c.id}">${esc(c.label)}</li>`).join("")
+      ? choices.map((c, i) => `<li role="option" aria-selected="${i === active}" data-id="${c.id}">${esc(c.label)}${c.canvasName ? ` <small>${esc(c.canvasName)}</small>` : ""}</li>`).join("")
       : `<li class="empty">Nothing matches.</li>`;
   };
   const openPicker = (): void => {
@@ -211,7 +228,7 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     else if (e.key === "Enter") choose(active);
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       active = (active + (e.key === "ArrowDown" ? 1 : -1) + choices.length) % Math.max(1, choices.length);
-      fillPicker();
+      paint();
     } else return;
     e.preventDefault();
     e.stopPropagation(); // Esc closes the picker, not the editor

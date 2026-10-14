@@ -4,7 +4,7 @@ import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
-import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
+import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
 
 /**
  * Authoritative canvas objects.
@@ -267,7 +267,9 @@ export type SerializedObject = Record<string, unknown> & { id: string; kind: str
 export function serializeObject(o: CanvasObject): SerializedObject {
   const { anchor, frame, ...rest } = o;
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
-  const s = { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  // `refs` is derived from the Markdown for the storage index of backlinks (ADR 0040); never read back.
+  const refs = o.kind === "text" ? mentionIds(o.md) : [];
+  const s = { ...rest, ...(refs.length ? { refs } : {}), unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
   if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
   return s;
 }

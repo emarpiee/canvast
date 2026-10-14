@@ -408,7 +408,9 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 5 done:** mentions in text, same canvas ([ADR 0039](adr/0039-mentions.md)); tested in `text.test.ts` (syntax, fuzz with mentions) and `text.spec.ts` (chromium, firefox).
 
-**Next bounded task:** Phase 5: backlinks index and panel, reveal of a mention's target, same-board other canvases in the picker, broken-link state; then the Phase 5 full suite.
+**Phase 5, slice 6 done:** backlinks, board-wide picker, missing-target state, storage v7 ([ADR 0040](adr/0040-backlinks.md)); tested in `text.spec.ts` "backlinks" (chromium, firefox) and storage, archive and assets specs (chromium, unchanged results).
+
+**Next bounded task:** Phase 5 remaining: relink of missing mentions, Markdown export of notes (a text's Copy Markdown exists); history; then the Phase 5 full suite, v0.14.0, push.
 
 ## Phase 1, slice 9 — settings scopes
 

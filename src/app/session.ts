@@ -4,6 +4,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError } from "../assets/asset-catalog";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
+import { plainText } from "../text/markdown";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { placeImage } from "./actions";
@@ -36,6 +37,13 @@ export interface AssetPlace {
 }
 
 /** The last full (workspace) backup, stored in meta["backup"]. */
+export interface Backlink {
+  canvasId: string;
+  canvasName: string;
+  id: ObjectId;
+  label: string;
+}
+
 export interface BackupRecord {
   at: number;
   bytes: number;
@@ -302,6 +310,48 @@ export class Session {
     this.post({ kind: "assets" });
     this.emitAssets();
     return true;
+  }
+
+  private boardCanvases(): CanvasRecord[] {
+    return this.tree?.boards.find((b) => b.board.id === this.current?.boardId)?.canvases ?? [];
+  }
+
+  /** Texts and images on the board's other canvases to mention (the picker's second list). */
+  async mentionableElsewhere(query: string, limit: number): Promise<Backlink[]> {
+    if (!this.repo || !this.current) return [];
+    await this.persistence.flush();
+    const others = this.boardCanvases().filter((c) => c.id !== this.current!.canvasId);
+    const hits = await this.repo.findMentionable(new Set(others.map((c) => c.id)), query, limit);
+    return hits.map((h) => ({ ...h, canvasName: others.find((c) => c.id === h.canvasId)!.name }));
+  }
+
+  /** Where objects mentioned by a text are on the board's other canvases; a missing id is not on the board. */
+  async locateMentions(ids: readonly ObjectId[]): Promise<Map<ObjectId, Backlink>> {
+    const out = new Map<ObjectId, Backlink>();
+    if (!this.repo || !this.current) return out;
+    await this.persistence.flush();
+    const others = this.boardCanvases().filter((c) => c.id !== this.current!.canvasId);
+    for (const id of ids) {
+      const r = await this.repo.locate(others.map((c) => c.id), id);
+      if (!r) continue;
+      const d = r.data;
+      const label = d["kind"] === "text" ? plainText(String(d["md"]), 28) || "Text" : d["kind"] === "image" ? `Image ${String(d["pixelW"])}×${String(d["pixelH"])}` : "Stroke";
+      out.set(id, { canvasId: r.canvasId, canvasName: others.find((c) => c.id === r.canvasId)!.name, id, label });
+    }
+    return out;
+  }
+
+  /** Texts on the other canvases of this board that mention an object (ADR 0040). */
+  async backlinksElsewhere(targetId: ObjectId): Promise<Backlink[]> {
+    if (!this.repo || !this.tree || !this.current) return [];
+    await this.persistence.flush();
+    const canvases = this.boardCanvases();
+    const out: Backlink[] = [];
+    for (const r of await this.repo.mentionedBy(targetId)) {
+      const c = canvases.find((k) => k.id === r.canvasId);
+      if (c && c.id !== this.current.canvasId) out.push({ canvasId: c.id, canvasName: c.name, id: r.id, label: plainText(String(r.data["md"])) });
+    }
+    return out;
   }
 
   /** Every canvas where an asset is placed, with board and canvas names. */

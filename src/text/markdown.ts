@@ -151,6 +151,18 @@ function escapeText(s: string, blockStart: boolean): string {
   return e;
 }
 
+/** The text without Markup, mentions as their labels, on one line (names in lists). */
+export function plainText(md: string, max = 40): string {
+  return parse(md).map((b) => b.spans.map((s) => s.text).join("")).join(" ").slice(0, max);
+}
+
+/** Ids mentioned in Markdown, each once, in order of appearance. */
+export function mentionIds(md: string): string[] {
+  const ids = new Set<string>();
+  for (const b of parse(md)) for (const s of b.spans) if (s.ref !== undefined) ids.add(s.ref);
+  return [...ids];
+}
+
 export function serialize(blocks: readonly Block[]): string {
   const out: string[] = [];
   let n = 0;
@@ -164,7 +176,7 @@ export function serialize(blocks: readonly Block[]): string {
     let italic = false;
     const delim = (nb: boolean, ni: boolean): string => (bold !== nb ? "**" : "") + (italic !== ni ? "*" : "");
     spans.forEach((sp, j) => {
-      s += delim(sp.bold, sp.italic) + (sp.ref !== undefined ? `[[item:${sp.ref}|${sp.text.replace(/[\\\]]/g, "\\$&")}]]` : escapeText(sp.text, j === 0));
+      s += delim(sp.bold, sp.italic) + (sp.ref !== undefined ? `[[item:${sp.ref}|${sp.text.replace(/[\\\][]/g, "\\$&")}]]` : escapeText(sp.text, j === 0));
       bold = sp.bold;
       italic = sp.italic;
     });

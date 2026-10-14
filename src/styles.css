@@ -634,6 +634,7 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .mention-picker ul { list-style: none; margin: 6px 0 0; padding: 0; }
 .mention-picker li { padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mention-picker li[aria-selected="true"] { background: var(--hud-border); }
+.mention-picker small { opacity: 0.6; margin-left: 4px; }
 .mention-picker li.empty { cursor: default; opacity: 0.6; }
 
 /* Floating Layers panel (ui/layers-panel.ts) */
@@ -660,6 +661,14 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .layers-panel header { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 6px 10px; border-bottom: 1px solid var(--hud-border); }
 .layers-panel h2 { margin: 0; font: 600 12px var(--font-ui); }
 .layers-count { opacity: 0.55; font-weight: 500; margin-left: 4px; }
+.layers-links { padding: 0 8px; font-size: 12px; }
+.layers-links:empty { display: none; }
+.layers-links h3 { margin: 6px 0 2px; font-size: 11px; opacity: 0.6; font-weight: 600; }
+.layers-links ul { list-style: none; margin: 0; padding: 0; }
+.layers-links li { display: flex; justify-content: space-between; gap: 8px; }
+.layers-links li button { all: unset; cursor: pointer; text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layers-links li span { opacity: 0.6; white-space: nowrap; }
+.layers-links li.broken { color: #b00020; }
 .layers-opacity { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; }
 .layers-opacity input { flex: 1; min-width: 0; }
 .layers-panel ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
