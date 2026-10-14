@@ -4,10 +4,14 @@ import { zoomByStep } from "../interaction/navigation";
 /**
  * Developer navigation panel (shown only with #debug): fixed-size zoom jumps
  * and continuous auto-zoom about the viewport centre, for exploring extreme
- * depths without holding keys. Any pointer, wheel or key input stops
- * auto-zoom.
+ * depths without holding keys. Auto-zoom keeps running while you draw or
+ * edit; it stops with its own button, the mouse wheel, or Escape.
  */
-const JUMPS = [-1000, -100, -10, 10, 100, 1000] as const;
+const JUMPS = [-1e12, -1e9, -1e6, -1000, -100, -10, 10, 100, 1000, 1e6, 1e9, 1e12] as const;
+const label = (j: number): string => {
+  const a = Math.abs(j);
+  return `${j > 0 ? "+" : "−"}${a >= 1e6 ? `1e${Math.log10(a)}` : a}`;
+};
 const SPEEDS = [1, 10, 100, 1000] as const;
 
 export function mountDevPanel(root: HTMLElement, view: ViewState): void {
@@ -16,7 +20,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState): void {
   panel.dataset["testid"] = "dev-panel";
   panel.innerHTML = `
     <div class="dev-row" role="group" aria-label="Zoom jumps">
-      ${JUMPS.map((j) => `<button type="button" data-jump="${j}" title="Zoom ${j > 0 ? "in" : "out"} ${Math.abs(j)} levels (×2^${j})">${j > 0 ? "+" : "−"}${Math.abs(j)}</button>`).join("")}
+      ${JUMPS.map((j) => `<button type="button" data-jump="${j}" title="Zoom ${j > 0 ? "in" : "out"} ${Math.abs(j)} levels (×2^${j})">${label(j)}</button>`).join("")}
     </div>
     <div class="dev-row" role="group" aria-label="Auto-zoom">
       <button type="button" data-auto="-1" title="Auto-zoom out">◀ auto out</button>
@@ -67,10 +71,8 @@ export function mountDevPanel(root: HTMLElement, view: ViewState): void {
       render();
     }
   });
-  // Any navigation or editing input outside the panel stops auto-zoom.
-  const stopOutside = (e: Event): void => {
-    if (dir && !panel.contains(e.target as Node)) stop();
-  };
-  for (const type of ["pointerdown", "wheel", "keydown"]) window.addEventListener(type, stopOutside, { capture: true });
+  // The wheel (a manual zoom) and Escape stop auto-zoom; drawing and tool keys do not.
+  window.addEventListener("wheel", (e) => dir && !panel.contains(e.target as Node) && stop(), { capture: true });
+  window.addEventListener("keydown", (e) => e.key === "Escape" && dir && stop(), { capture: true });
   render();
 }

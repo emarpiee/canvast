@@ -55,7 +55,7 @@ test("a placed stroke is still coloured after typing a 3000-level jump into it",
   }
 });
 
-test("dev panel: jump buttons and auto-zoom (stops on any input)", async ({ app }) => {
+test("dev panel: jump buttons and auto-zoom (keeps running while drawing; stops on Escape)", async ({ app }) => {
   const panel = app.page.getByTestId("dev-panel");
   await expect(panel).toBeVisible();
   for (let i = 0; i < 3; i++) await panel.getByRole("button", { name: "+1000" }).click();
@@ -67,13 +67,20 @@ test("dev panel: jump buttons and auto-zoom (stops on any input)", async ({ app 
   await panel.getByRole("combobox").selectOption("100");
   await panel.getByRole("button", { name: "auto in ▶" }).click();
   await app.page.waitForTimeout(1000);
-  await app.page.mouse.click(1000, 600); // any input outside the panel stops it
+  // Drawing does not stop it: it zooms on while the stroke is drawn.
+  await app.page.keyboard.press("p");
+  await app.drag({ x: 900, y: 500 }, { x: 1000, y: 600 }, 6);
+  expect((await app.page.evaluate(() => window.__canvastDebug.objects())).length).toBe(1);
+  await app.page.keyboard.press("Escape");
   await app.frame();
   const stopped = await app.camera();
   expect(stopped.zi + stopped.zf).toBeGreaterThan(2990 + 30); // ~100 levels/s for ~1 s
   await app.page.waitForTimeout(400);
   cam = await app.camera();
   expect(cam).toEqual(stopped); // really stopped
+  for (const name of ["+1e12", "−1e12", "+1e9", "−1e9", "+1e6", "−1e6"]) await panel.getByRole("button", { name, exact: true }).click();
+  await app.frame();
+  expect(Number((await app.page.evaluate(() => window.__canvastDebug.depth())))).toBeGreaterThan(0); // all six worked
 
   await panel.getByRole("button", { name: "◀ auto out" }).click();
   await app.page.waitForTimeout(500);
