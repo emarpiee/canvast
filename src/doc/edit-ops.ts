@@ -53,6 +53,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
  * moves around it (that move is rounded once, like a scale).
  */
 export function rotateAbout(o: CanvasObject, about: WorldPoint, delta: number): CanvasObject {
+  delta = Math.round(delta); // an angle is a whole number of 2^-32 turns
   const rot = normAngle((o.rot ?? 0) + delta);
   const { c, s } = cosSin(delta);
   const pv = pivotOf(o);

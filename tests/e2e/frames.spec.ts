@@ -1339,3 +1339,33 @@ test("keyboard shortcuts still work after using a slider (focus stays on it)", a
   await p.keyboard.press("Control+y");
   expect((await p.evaluate(() => window.__canvastDebug.objects())).length, "and redo").toBe(1);
 });
+
+test("Shift snaps a rotation to whole 15 degree steps and it sticks (a step is not a whole number of angle units); corners show a resize cursor", async ({ app }) => {
+  const p = app.page;
+  const stored = () => p.evaluate(() => window.__canvastDebug.storedObjects().map((o) => o["rot"] as number | undefined));
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 700, y: 440 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(600, 420);
+  const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const c = (a: number): [number, number] => [(f.corners[a]![0] + f.corners[(a + 2) % 4]![0]) / 2, (f.corners[a]![1] + f.corners[(a + 2) % 4]![1]) / 2];
+  const centre = c(0);
+  const top = [(f.corners[0]![0] + f.corners[1]![0]) / 2, (f.corners[0]![1] + f.corners[1]![1]) / 2] as const;
+  // From straight above the centre to 20 degrees clockwise of that, holding Shift: it lands on 15 degrees, not back at 0.
+  const r = Math.hypot(top[0] - centre[0], top[1] - centre[1]) + 26;
+  const a = (20 * Math.PI) / 180;
+  await p.keyboard.down("Shift");
+  await app.drag({ x: Math.round(top[0]), y: Math.round(top[1]) - 26 }, { x: Math.round(centre[0] + r * Math.sin(a)), y: Math.round(centre[1] - r * Math.cos(a)) }, 8);
+  await p.keyboard.up("Shift");
+  await app.frame();
+  const [rot] = await stored();
+  expect(Number.isInteger(rot), "a whole number of angle units").toBe(true);
+  expect(Math.abs(rot! - 2 ** 32 / 24), "15 degrees").toBeLessThan(3);
+  // Over a corner handle: a resize cursor (and the rotate arrow just outside it).
+  const f2 = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const corner = f2.corners[2]!;
+  await p.mouse.move(Math.round(corner[0]), Math.round(corner[1]));
+  await expect(p.locator("#canvas")).toHaveAttribute("data-hover", /^(ew|ns|nwse|nesw)$/);
+  await p.mouse.move(Math.round(centre[0]), Math.round(centre[1]) + 80);
+  await expect(p.locator("#canvas")).not.toHaveAttribute("data-hover", /.+/);
+});

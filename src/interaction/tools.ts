@@ -436,6 +436,17 @@ export function attachTools(
   };
 
   const commitPreview = (): void => {
+    try {
+      commitPreviewNow();
+    } catch (e) {
+      // A change the document refuses must not leave a preview on screen that was never stored.
+      editor.preview = { kind: "none" };
+      editor.message = `Could not apply that change: ${(e as Error).message}`;
+      editor.changed();
+    }
+  };
+
+  const commitPreviewNow = (): void => {
     const p = editor.preview;
     // The committed state is exactly the previewed one, then re-homed if it left its frame's bounds.
     const next = (ids: readonly ObjectId[]): CanvasObject[] =>
@@ -534,6 +545,13 @@ export function attachTools(
       const b = editor.selectionBoxOnScreen;
       const p = local(e);
       el.classList.toggle("is-rotate", !!b && b.rotatable && inRotateZone(p, b.frame, b.handle));
+      // A resize cursor over a corner handle, drawn along the diagonal the corner points along (turned boxes included).
+      const c = b && !el.classList.contains("is-rotate") ? b.frame.corners.find((q) => Math.abs(p.x - q[0]) <= HANDLE_SIZE_PX && Math.abs(p.y - q[1]) <= HANDLE_SIZE_PX) : undefined;
+      if (b && c) {
+        const deg = (Math.atan2(c[1] - b.frame.centre[1], c[0] - b.frame.centre[0]) * 180) / Math.PI;
+        const a = ((deg % 180) + 180) % 180;
+        el.dataset["hover"] = a < 22.5 || a >= 157.5 ? "ew" : a < 67.5 ? "nwse" : a < 112.5 ? "ns" : "nesw";
+      } else delete el.dataset["hover"];
     }
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
@@ -581,7 +599,8 @@ export function attachTools(
         let delta = angleFromRadians(Math.atan2(s.y - g.centre.y, s.x - g.centre.x) - g.start);
         if (e.shiftKey) {
           // Whole 15 degree steps: of the stroke's own angle when one is selected, else of the turn.
-          delta = Math.round((g.rot0 + delta) / ANGLE_STEP) * ANGLE_STEP - g.rot0;
+          // (A step is TURN / 24, not a whole number; the angle stored must be one.)
+          delta = Math.round(Math.round((g.rot0 + delta) / ANGLE_STEP) * ANGLE_STEP) - g.rot0;
         }
         editor.preview = { kind: "rotate", ids: g.ids, frame: g.frame, about: g.about, delta };
         editor.changed();
