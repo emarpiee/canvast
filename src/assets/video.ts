@@ -26,10 +26,11 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
     const at = Math.min(Math.max(0, t), duration);
     if (Math.abs(v.currentTime - at) > 1e-3) {
       const s = once("seeked");
+      const shown = presented(v, 600); // asked before the seek: the first picture shown after it
       v.currentTime = at;
       await s;
-    }
-    await presented(v);
+      await shown;
+    } else await presented(v);
     return { bitmap: await createImageBitmap(v), duration };
   } finally {
     URL.revokeObjectURL(url);

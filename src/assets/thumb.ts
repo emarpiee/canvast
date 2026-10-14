@@ -1,6 +1,8 @@
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { decodeAudio, decodeVideo } from "./video";
+import { probeMp4 } from "./mp4-probe";
+import { makeCard } from "./card";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -16,7 +18,14 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
     const bmp = rec.type.startsWith("video/")
-      ? (await decodeVideo(rec.blob)).bitmap
+      ? await decodeVideo(rec.blob).then(
+          (v) => v.bitmap,
+          async (e) => {
+            const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
+            if (!pr) throw e;
+            return makeCard(pr.w, pr.h, rec.name, pr.codec); // a video this browser cannot decode: its card
+          },
+        )
       : rec.type.startsWith("audio/")
         ? (await decodeAudio(rec.blob)).bitmap
         : await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);

@@ -5,6 +5,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
+import { makeFakeMp4 } from "./mp4";
 import { makeWav, makeWebm } from "./video";
 
 /**
@@ -762,5 +763,29 @@ test("an animated GIF steps by frame: placed paused, stepped, wrapped, played an
   await p.keyboard.press("Control+d");
   await expect.poll(async () => (await objects(p)).length).toBe(3);
   expect((await objects(p))[2]!["media"]).toEqual({ kind: "gif", t: shown, repeat: true });
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a video this browser cannot decode is still imported as a card of its own shape, with the original available to save (ADR 0045)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "hevc.mp4", mimeType: "video/mp4", buffer: makeFakeMp4(1080, 1920, 7) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  expect([o!["pixelW"], o!["pixelH"]]).toEqual([1080, 1920]);
+  expect(o!["media"]).toEqual({ kind: "video", t: 0, repeat: false });
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  expect((box.maxY - box.minY) / (box.maxX - box.minX)).toBeCloseTo(1920 / 1080, 1);
+  // The card is drawn (dark, not a placeholder gap) and selecting it offers the file, not playback.
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));
+  const bar = p.getByTestId("media-bar");
+  await expect(bar.locator(".media-time")).toHaveText("Can't play in this browser");
+  await expect(bar.getByRole("button", { name: "Play", exact: true })).toBeDisabled();
+  const download = p.waitForEvent("download");
+  await bar.getByRole("button", { name: /Save the original file/ }).click();
+  expect((await download).suggestedFilename()).toBe("hevc.mp4");
+  // A selected, unplayable instance has no black layer over its card.
+  await expect(p.locator("video.media-video")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

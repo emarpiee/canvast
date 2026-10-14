@@ -27,6 +27,8 @@ export interface MediaPlayerActions {
   setMedia(id: string, patch: { t?: number; repeat?: boolean }, label: string): void;
   /** The picture shown now, as a PNG, to become a new image next to the instance. */
   extract(id: string, png: Blob): void;
+  /** Draw the instance again (its picture was replaced). */
+  repaint(id: string): void;
 }
 
 /** Beyond this many CSS px a side, the overlay is not laid out (browsers cap element sizes); the media still plays. */
@@ -74,7 +76,10 @@ function avEngine(v: HTMLVideoElement): Engine {
       url = URL.createObjectURL(blob);
       v.muted = false;
       v.src = url;
-      await new Promise<void>((res) => v.addEventListener("loadedmetadata", () => res(), { once: true }));
+      await new Promise<void>((res, rej) => {
+        v.addEventListener("loadedmetadata", () => res(), { once: true });
+        v.addEventListener("error", () => rej(new Error("this browser cannot play the file")), { once: true });
+      });
       duration = Number.isFinite(v.duration) ? v.duration : dur;
       const at = Math.min(o.media!.t, duration);
       if (Math.abs(v.currentTime - at) > 1e-3) {
@@ -228,6 +233,8 @@ interface Player {
   o: ImageObject;
   eng: Engine;
   loading: number;
+  /** This browser could not play the file (say its codec): the bar offers only the original file. */
+  failed?: boolean;
 }
 
 export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState, assets: AssetLibrary, settings: SettingsStore, actions: MediaPlayerActions): void {
@@ -239,7 +246,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
   bar.innerHTML = `<div class="media-row"><input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position"><output class="media-time">0:00 / 0:00</output></div>
-    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.imagePlus, "Extract frame")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume">${btn("settings", ICONS.settings, "Media & Playback settings")}</div>
+    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.imagePlus, "Extract frame")}${btn("repeat", ICONS.repeat, "Repeat")}${btn("download", ICONS.download, "Save the original file (to open in your system player)")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume">${btn("settings", ICONS.settings, "Media & Playback settings")}</div>
     <div class="media-settings" role="group" aria-label="Media &amp; Playback" hidden>
       <label>Video step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.video"></label>
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
@@ -263,6 +270,13 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const refresh = (): void => {
     if (!sel) return;
     const { eng, o } = sel;
+    const failed = !!sel.failed;
+    for (const b of bar.querySelectorAll<HTMLButtonElement>("button:not([data-cmd=download])")) b.disabled = failed;
+    scrub.disabled = failed;
+    if (failed) {
+      time.textContent = "Can't play in this browser";
+      return;
+    }
     const len = eng.len();
     if (document.activeElement !== scrub) scrub.value = String(len ? eng.pos() / len : 0);
     time.textContent = eng.label();
@@ -283,7 +297,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const release = (p: Player): void => {
     if (p.eng.playing()) p.eng.pause();
     const t = p.eng.pos();
-    const write = !p.loading && !!doc.get(p.o.id);
+    const write = !p.loading && !p.failed && !!doc.get(p.o.id);
     // Out of the map first: writing the position notifies the document's listeners, which look at the players again.
     players.delete(p.o.id);
     if (sel === p) {
@@ -310,7 +324,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     // One that is not selected has nothing to show or control once it is out of view: it stops (its position is kept).
     if (!inView && p !== sel) return release(p);
     // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
-    const visible = p.eng.visual && !p.loading && !transforming(o.id) && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && inView;
+    const visible = p.eng.visual && !p.loading && !p.failed && !transforming(o.id) && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && inView;
     const el = p.eng.el;
     el.style.display = visible ? "" : "none";
     if (visible) {
@@ -365,7 +379,10 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       void presented(v).then(async () => {
         if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
         const bmp = await createImageBitmap(v).catch(() => null);
-        if (bmp) assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
+        if (bmp) {
+          assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
+          actions.repaint(p.o.id); // a picture already drawn from the file's own decode is replaced by this one
+        }
       });
     };
     eng.onEnded = () => {
@@ -385,7 +402,11 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       if (!rec) throw new Error("original missing");
       await p.eng.load(p.o, rec.blob, rec.duration ?? 0);
     } catch {
-      if (mine === p.loading) release(p);
+      if (mine === p.loading) {
+        p.loading = 0;
+        p.failed = true; // keeps the card; the bar offers the original file
+        refresh();
+      }
       return;
     }
     if (mine !== p.loading) return;
@@ -479,7 +500,17 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), o.media!.repeat);
       if (!eng.playing()) actions.setMedia(o.id, { t: eng.pos() }, "Step media");
     } else if (cmd === "repeat") actions.setMedia(o.id, { repeat: !o.media!.repeat }, "Repeat media");
-    else if (cmd === "mute") {
+    else if (cmd === "download") {
+      void assets.record(o.assetId).then((rec) => {
+        if (!rec) return;
+        // A page cannot start the system's player; saving the file lets the browser or the file manager open it there.
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(rec.blob);
+        a.download = rec.name || "media";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      });
+    } else if (cmd === "mute") {
       const v = videoOf(sel);
       if (v) v.muted = !v.muted;
     } else if (cmd === "settings") {

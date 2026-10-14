@@ -335,7 +335,7 @@ async function start(): Promise<void> {
   side.id = "side-panels";
   host.appendChild(side);
   mountBookmarksPanel(side, editor, new BookmarkList(session, view, doc), () => captureThumb(canvas));
-  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png) => void extractFrame(doc, editor, assets, id, png) });
+  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png) => void extractFrame(doc, editor, assets, id, png), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),

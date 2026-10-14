@@ -6,6 +6,8 @@ import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
 import { decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
+import { probeMp4 } from "./mp4-probe";
+import { makeCard } from "./card";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -196,11 +198,21 @@ export class AssetLibrary {
     let img;
     let duration: number | undefined;
     let frames: number | undefined;
+    let size: { w: number; h: number } | undefined;
     try {
       if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
-        const m = file.type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
-        img = m.bitmap;
-        duration = m.duration;
+        try {
+          const m = file.type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
+          img = m.bitmap;
+          duration = m.duration;
+        } catch (e) {
+          // A video this browser cannot decode is still kept (for another browser or player), as a card of its own shape.
+          const pr = file.type.startsWith("video/") ? probeMp4(new Uint8Array(bytes)) : null;
+          if (!pr) throw e;
+          img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec);
+          duration = pr.duration;
+          size = { w: pr.w, h: pr.h };
+        }
       } else img = await decode(file);
       if (file.type === "image/gif") {
         try {
@@ -225,8 +237,8 @@ export class AssetLibrary {
       type: file.type,
       size: file.size,
       name: file.name ?? "",
-      pixelW: img.width,
-      pixelH: img.height,
+      pixelW: size?.w ?? img.width,
+      pixelH: size?.h ?? img.height,
       blob: new Blob([bytes], { type: file.type }),
       importedAt: Date.now(),
       ...(duration !== undefined ? { duration } : {}),
@@ -365,12 +377,20 @@ export class AssetLibrary {
   private async ensureDecoded(rec: AssetRecord, key = rec.hash): Promise<void> {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
-      const img = await decode(rec.blob, ms);
+      let img: CanvasImageSource & { width: number; height: number };
+      try {
+        img = await decode(rec.blob, ms);
+      } catch (e) {
+        if (!rec.type.startsWith("video/")) throw e;
+        const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
+        if (!pr) throw e;
+        img = await makeCard(pr.w, pr.h, rec.name, pr.codec);
+      }
       if (this.decoded.has(key)) {
         (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins
         return;
       }
-      this.decoded.set(key, makeSource(img));
+      this.decoded.set(key, makeSource(img, rec.pixelW));
       this.evict();
     }
   }

@@ -7,6 +7,7 @@ import repeat from "lucide-static/icons/repeat.svg";
 import volume2 from "lucide-static/icons/volume-2.svg";
 import volumeX from "lucide-static/icons/volume-x.svg";
 import settingsIcon from "lucide-static/icons/settings.svg";
+import download from "lucide-static/icons/download.svg";
 import hand from "lucide-static/icons/hand.svg";
 import pointer from "lucide-static/icons/mouse-pointer-2.svg";
 import pencil from "lucide-static/icons/pencil.svg";
@@ -73,6 +74,7 @@ function clean(svg: string): string {
 
 export const ICONS = {
   settings: clean(settingsIcon),
+  download: clean(download),
   play: clean(play),
   pause: clean(pause),
   rewind: clean(rewind),
