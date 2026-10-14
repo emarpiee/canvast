@@ -38,3 +38,4 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 ## Workflow
 
 - Work happens in phases/slices (see `docs/status.md`); a finished slice bumps `package.json` version, updates `CHANGELOG.md`, `docs/status.md`, README and its test log, and is committed as `feat(<area>): ... (vX.Y.Z)`.
+- When summarizing what was accomplished, mark each finished item with ✅ so it is visibly green (and ❌ for failed, ⚠️ for done with a caveat); never mark something ✅ that was not verified.
