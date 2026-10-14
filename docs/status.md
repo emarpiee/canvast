@@ -21,7 +21,7 @@ Unverified / Committed / Next bounded task**.
 | 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
 | NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
 | 1i | Settings scopes ([ADR 0017](adr/0017-settings-scopes.md)): device scope built (pen and select options persist), workspace and board scopes declared | **done** (see below) |
-| 2 | Rendering and interaction productionization: selection and transforms including **item rotation**, **snapping and guides**, layers and groups, object eraser, per-canvas cameras | planned (next) |
+| 2 | Rendering and interaction productionization: selection and transforms including **item rotation**, **snapping and guides**, layers and groups, object eraser, per-canvas cameras | **in progress**: rotating strokes done ([ADR 0018](adr/0018-item-rotation.md)); next rotating images and text, then snapping |
 | 1+ | Persisted WebP thumbnails, slide view and recognisable broken assets ([plan](plans/asset-thumbnails.md)), video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, groups, smart folders and batch asset edits, collaboration | planned |
 
 ## Nested frames redesign (branch `exp/nested-frames`)
@@ -353,6 +353,22 @@ the largest measured performance gap (about 59 ms per frame at 3K–7.7K
 visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
+
+## Phase 2, slice 1 — rotating strokes
+
+**Implemented:** `rot` on strokes (a whole number of 2^-32 turns, `core/angle.ts`), one rotated geometry `strokePoints` used by bounds, projection, exact coverage, picking, the coarse samplers and the index summary; `rotateAbout`; a rotate handle (Shift: 15 degree steps); preview and one-step transaction; archive version 3. [ADR 0018](adr/0018-item-rotation.md).
+
+**Tested:** unit `rotation.test.ts` (3: exact quarter turns, rotating back is the identical object, storage and validation; 137/137 in all); E2E `frames.spec.ts` "rotate a stroke with its handle" (shape, picking, undo, reload, 10^12 levels down; 4 projects); `editing`, `deep-zoom-rendering`, `tiles`, `density` and `archive` specs in Chromium and Firefox (see README).
+
+**Known failures:** none.
+
+**Unverified:** the full suite since v0.9.0; rotating several strokes at once is covered by the same code path as one but has no test of its own.
+
+**Not built:** rotating images and text (next slice), snapping.
+
+**Committed:** v0.11.0 on `main`.
+
+**Next bounded task:** rotating images and text, then snapping and guides.
 
 ## Phase 1, slice 9 — settings scopes
 

@@ -1,7 +1,7 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
-import { localBounds } from "../doc/model";
+import { localBounds, strokePoints } from "../doc/model";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
 import type { Cover } from "./coarse";
@@ -191,7 +191,7 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
   const radius = toPx(p, D.fromNumber(o.width / 2));
   const exact =
     !(radius <= EXACT_RADIUS_THRESHOLD) || !(extent <= EXACT_COORD_THRESHOLD) || !(fastPathError(p, localMag) <= 2 ** -40);
-  const pts = o.points;
+  const pts = strokePoints(o);
   const q = new Float64Array(pts.length);
   for (let i = 0; i < pts.length; i += 2) {
     q[i] = exact ? exactX(p, pts[i]!) : projX(p, pts[i]!);
@@ -249,7 +249,7 @@ export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: View
   }
   const radius = (o.width / 2) * s;
   if (!(radius <= EXACT_RADIUS_THRESHOLD) || !(extent <= EXACT_COORD_THRESHOLD)) return projectObject(o, cam, vp);
-  const pts = o.points;
+  const pts = strokePoints(o);
   const q = new Float64Array(pts.length);
   for (let i = 0; i < pts.length; i += 2) {
     q[i] = ox + pts[i]! * s;

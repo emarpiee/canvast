@@ -744,3 +744,52 @@ test("pen and select options come back after a reload (device settings, ADR 0017
   await expect(p.getByRole("button", { name: "Pen width 8 px" })).toHaveClass(/is-on/);
   await expect(p.getByRole("button", { name: "Stabilizer", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
+
+test("rotate a stroke with its handle: the shape turns, picking follows, one undo step, it survives a reload and works a trillion levels down (ADR 0018)", async ({ app }) => {
+  const p = app.page;
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const rotateQuarter = async (id: string) => {
+    const b = await box(id);
+    const cx = Math.round((b.minX + b.maxX) / 2);
+    const cy = Math.round((b.minY + b.maxY) / 2);
+    // The handle is 26 px above the top edge; drag it to the right of the centre: a quarter turn clockwise.
+    await app.drag({ x: cx, y: Math.round(b.minY) - 26 }, { x: cx + Math.round(cy - b.minY) + 26, y: cy }, 8);
+  };
+  for (const deep of [false, true]) {
+    if (deep) await p.evaluate(() => window.__canvastDebug.jump(1e12));
+    await p.keyboard.press("p");
+    await app.drag({ x: 500, y: 400 }, { x: 740, y: 420 }, 6); // a wide, flat stroke
+    const id = (await p.evaluate(() => window.__canvastDebug.objectFrames())).at(-1)!.id;
+    await p.keyboard.press("v");
+    await p.mouse.click(620, 410);
+    const flat = await box(id);
+    expect(flat.maxX - flat.minX).toBeGreaterThan((flat.maxY - flat.minY) * 4);
+    await rotateQuarter(id);
+    const tall = await box(id);
+    expect(tall.maxY - tall.minY, "now taller than wide").toBeGreaterThan((tall.maxX - tall.minX) * 4);
+    const rot = (await p.evaluate(() => window.__canvastDebug.storedObjects())).find((o) => o.id === id)!["rot"];
+    expect(rot as number, "a quarter turn, to the nearest whole angle").toBeGreaterThan(2 ** 30 * 0.97);
+    expect(rot as number).toBeLessThan(2 ** 30 * 1.03);
+    // Picking follows the rotated stroke: its old horizontal middle is empty now, its new vertical middle is not.
+    await p.keyboard.press("Escape");
+    await p.mouse.click(Math.round(flat.minX) + 8, Math.round((flat.minY + flat.maxY) / 2));
+    expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
+    await p.mouse.click(Math.round((tall.minX + tall.maxX) / 2), Math.round((tall.minY + tall.maxY) / 2));
+    expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
+    // One undo step, exactly back.
+    await p.keyboard.press("Control+z");
+    expect(await box(id)).toEqual(flat);
+    await p.keyboard.press("Control+y");
+    expect(await box(id)).toEqual(tall);
+    // Saved and reloaded (the view is saved with it).
+    expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+    await p.reload();
+    await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    expect(await box(id)).toEqual(tall);
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    await p.keyboard.press("Home");
+  }
+});

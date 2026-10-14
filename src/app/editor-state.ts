@@ -4,8 +4,9 @@ import { expressExactIn, levelsBetween } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
+import { strokePivot } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
-import { scaleAbout, translate } from "../doc/edit-ops";
+import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 
 export type Tool = "select" | "pen" | "lasso" | "hand" | "text";
 
@@ -21,6 +22,8 @@ export type Preview =
   /** `dx`, `dy` and `fixed` are in the units of `frame` (ADR 0014); each object gets them in its own frame. */
   | { kind: "move"; ids: readonly ObjectId[]; frame: Frame; dx: Dyadic; dy: Dyadic }
   | { kind: "scale"; ids: readonly ObjectId[]; frame: Frame; fixed: WorldPoint; kx: number; ky: number; keepWidth?: boolean }
+  /** Rotate strokes by `delta` (core/angle.ts). `about` null: each stroke about its own centre (a single selection); otherwise a point in `frame`. */
+  | { kind: "rotate"; ids: readonly ObjectId[]; frame: Frame; about: WorldPoint | null; delta: number }
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
   | { kind: "edit"; ids: readonly ObjectId[] };
 
@@ -111,6 +114,12 @@ export class EditorState {
       // A displacement only scales between frames: exact shift.
       const L = levelsBetween(o.frame ?? p.frame.space.world, p.frame);
       return translate(o, D.shift(p.dx, -L), D.shift(p.dy, -L));
+    }
+    if (p.kind === "rotate" && p.ids.includes(o.id) && o.kind === "stroke") {
+      const pv = strokePivot(o);
+      const f = o.frame ?? p.frame.space.world;
+      const about = p.about === null ? localToWorld(o, pv.x, pv.y) : f === p.frame ? p.about : expressExactIn(f.space, p.frame, p.about, f);
+      return rotateAbout(o, about, p.delta);
     }
     if (p.kind === "scale" && p.ids.includes(o.id)) {
       const f = o.frame ?? p.frame.space.world;

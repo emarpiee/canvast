@@ -2,6 +2,7 @@ import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
+import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 
@@ -44,6 +45,12 @@ export interface StrokeObject extends ObjectBase {
   readonly kind: "stroke";
   /** Flat [x0, y0, x1, y1, ...] polyline in local units, relative to anchor. */
   readonly points: readonly number[];
+  /**
+   * Rotation about the centre of the points' bounding box, in whole 2^-32
+   * turns (core/angle.ts); absent or 0 = not rotated. Use `strokePoints` for
+   * the geometry that is drawn, hit and indexed.
+   */
+  readonly rot?: number;
   /** Stroke diameter in local units. */
   readonly width: number;
   readonly color: string;
@@ -84,6 +91,43 @@ export interface LocalBounds {
   maxY: number;
 }
 
+const rotated = new WeakMap<StrokeObject, readonly number[]>();
+
+/** Centre of a stroke's points (the rotation pivot), in local units. */
+export function strokePivot(o: StrokeObject): { x: number; y: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const p = o.points;
+  for (let i = 0; i < p.length; i += 2) {
+    minX = Math.min(minX, p[i]!);
+    maxX = Math.max(maxX, p[i]!);
+    minY = Math.min(minY, p[i + 1]!);
+    maxY = Math.max(maxY, p[i + 1]!);
+  }
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+/** The polyline that is drawn: `points` rotated by `rot` about their centre (the same array when not rotated). */
+export function strokePoints(o: StrokeObject): readonly number[] {
+  if (!o.rot) return o.points;
+  let r = rotated.get(o);
+  if (!r) {
+    const { x: px, y: py } = strokePivot(o);
+    const { c, s } = cosSin(o.rot);
+    const out = new Array<number>(o.points.length);
+    for (let i = 0; i < out.length; i += 2) {
+      const dx = o.points[i]! - px;
+      const dy = o.points[i + 1]! - py;
+      out[i] = px + c * dx - s * dy;
+      out[i + 1] = py + s * dx + c * dy;
+    }
+    rotated.set(o, (r = out));
+  }
+  return r;
+}
+
 export function localBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
@@ -91,7 +135,7 @@ export function localBounds(o: CanvasObject): LocalBounds {
     const p = TEXT_PAD_EM * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
   }
-  const p = o.points;
+  const p = strokePoints(o);
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -151,6 +195,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     o.points.forEach((v, i) => finite(v, `point[${i}]`));
     positive(o.width, "width");
     if (!COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
+    if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   } else if (o.kind === "image") {
     if (!HASH_RE.test(o.assetId)) throw new InvalidObjectError(`bad asset id ${o.assetId}`);
     positive(o.w, "w");
@@ -209,7 +254,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
   let o: CanvasObject;
   if (s.kind === "stroke") {
     if (!Array.isArray(s["points"])) throw new InvalidObjectError("points missing");
-    o = { ...base, kind: "stroke", points: s["points"] as number[], width: s["width"] as number, color: String(s["color"]) };
+    o = { ...base, kind: "stroke", points: s["points"] as number[], width: s["width"] as number, color: String(s["color"]), ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}) };
   } else if (s.kind === "image") {
     o = {
       ...base,

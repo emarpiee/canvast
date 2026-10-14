@@ -16,7 +16,8 @@ import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, hitsObject, lassoSelect, pickAll } from "../render/hit-test";
 import type { ProjectedObject } from "../render/projection";
-import { HANDLE_SIZE_PX, handlePoints, selectionBox } from "../render/scene-renderer";
+import { HANDLE_SIZE_PX, canRotate, handlePoints, rotateHandlePoint, selectionBox } from "../render/scene-renderer";
+import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { deleteSelection, redo, undo } from "../app/actions";
 
@@ -41,6 +42,8 @@ import { deleteSelection, redo, undo } from "../app/actions";
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum pen sample spacing in CSS px. */
 const PEN_MIN_STEP_PX = 0.75;
+/** Shift while rotating snaps to whole steps of 15 degrees. */
+const ANGLE_STEP = TURN / 24;
 /** Smallest scale factor a resize drag can produce (prevents flips/zero size). */
 const MIN_SCALE = 1e-6;
 
@@ -62,6 +65,18 @@ type Gesture =
       fixedWorld: WorldPoint;
       start: ScreenPoint;
       uniform: boolean;
+    }
+  | {
+      kind: "rotate";
+      pointerId: number;
+      ids: ObjectId[];
+      frame: Frame;
+      /** null: a single stroke, turning about its own centre. */
+      about: WorldPoint | null;
+      centre: ScreenPoint;
+      start: number;
+      /** The single stroke's angle before the gesture (for snapping to whole steps), else 0. */
+      rot0: number;
     };
 
 export interface ToolHooks {
@@ -188,6 +203,25 @@ export function attachTools(
     const vis = visible();
     // Resize handles take priority when a selection is visible.
     const box = editor.selection.size ? selectionBox(vis, editor) : null;
+    if (box && canRotate(vis, editor) && !editor.blockEdit()) {
+      const [rx, ry] = rotateHandlePoint(box);
+      if (Math.hypot(s.x - rx, s.y - ry) <= HANDLE_SIZE_PX) {
+        const ids = [...editor.selection].filter((id) => doc.get(id));
+        const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+        const single = ids.length === 1 ? (doc.get(ids[0]!) as StrokeObject) : null;
+        g = {
+          kind: "rotate",
+          pointerId: e.pointerId,
+          ids,
+          frame: view.frame,
+          about: single ? null : world(centre),
+          centre,
+          start: Math.atan2(s.y - centre.y, s.x - centre.x),
+          rot0: single?.rot ?? 0,
+        };
+        return;
+      }
+    }
     if (box) {
       const corners = handlePoints(box);
       for (let i = 0; i < 4; i++) {
@@ -265,6 +299,10 @@ export function attachTools(
       const n = next(p.ids);
       editor.preview = { kind: "none" };
       doc.commit(doc.transaction(n.length === 1 ? `Move ${n[0]!.kind}` : `Move ${n.length} objects`, n));
+    } else if (p.kind === "rotate" && p.delta !== 0) {
+      const n = next(p.ids);
+      editor.preview = { kind: "none" };
+      doc.commit(doc.transaction(n.length === 1 ? "Rotate stroke" : `Rotate ${n.length} strokes`, n));
     } else if (p.kind === "scale" && !(p.kx === 1 && p.ky === 1)) {
       const n = next(p.ids);
       editor.preview = { kind: "none" };
@@ -367,6 +405,16 @@ export function attachTools(
         editor.marquee = { x0: g.start.x, y0: g.start.y, x1: s.x, y1: s.y };
         editor.changed();
         break;
+      case "rotate": {
+        let delta = angleFromRadians(Math.atan2(s.y - g.centre.y, s.x - g.centre.x) - g.start);
+        if (e.shiftKey) {
+          // Whole 15 degree steps: of the stroke's own angle when one is selected, else of the turn.
+          delta = Math.round((g.rot0 + delta) / ANGLE_STEP) * ANGLE_STEP - g.rot0;
+        }
+        editor.preview = { kind: "rotate", ids: g.ids, frame: g.frame, about: g.about, delta };
+        editor.changed();
+        break;
+      }
       case "scale": {
         const { kx, ky } = scaleFactors(g, s);
         editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: g.fixedWorld, kx, ky, keepWidth: editor.lock !== null };
@@ -431,6 +479,7 @@ export function attachTools(
         }
         break;
       }
+      case "rotate":
       case "scale":
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();

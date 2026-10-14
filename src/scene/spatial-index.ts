@@ -3,7 +3,7 @@ import type { Camera, Viewport } from "../core/camera";
 import { screenToWorld } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { DocumentStore } from "../doc/document-store";
-import { localBounds } from "../doc/model";
+import { localBounds, strokePoints } from "../doc/model";
 
 /**
  * Multi-scale spatial index over exact world coordinates.
@@ -72,7 +72,7 @@ function objectInk(o: CanvasObject): { area: number; rgb: readonly [number, numb
   const c = parseInt(o.color.slice(1), 16);
   const rgb = [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
   if (o.kind === "text") return { area: o.md.replace(/\s/g, "").length * o.size * o.size * TEXT_INK_PER_CHAR * o.opacity, rgb };
-  const p = o.points;
+  const p = strokePoints(o);
   let len = 0;
   for (let i = 2; i + 1 < p.length; i += 2) len += Math.hypot(p[i]! - p[i - 2]!, p[i + 1]! - p[i - 1]!);
   return { area: (len * o.width + (Math.PI * o.width * o.width) / 4) * o.opacity, rgb };

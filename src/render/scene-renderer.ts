@@ -180,6 +180,25 @@ export function selectionBox(visible: readonly ProjectedObject[], editor: Editor
   return box;
 }
 
+/** Distance of the rotate handle above the selection box (CSS px). */
+export const ROTATE_HANDLE_OFFSET_PX = 26;
+
+/** Centre of the rotate handle: above the middle of the top edge. */
+export function rotateHandlePoint(b: ScreenBox): [number, number] {
+  return [(b.minX + b.maxX) / 2, b.minY - ROTATE_HANDLE_OFFSET_PX];
+}
+
+/** Rotation is offered when every selected object is a stroke (images and text come later). */
+export function canRotate(visible: readonly ProjectedObject[], editor: EditorState): boolean {
+  let any = false;
+  for (const po of visible) {
+    if (!editor.selection.has(po.obj.id)) continue;
+    if (po.obj.kind !== "stroke") return false;
+    any = true;
+  }
+  return any;
+}
+
 /** Corner handle centers: tl, tr, br, bl. */
 export function handlePoints(b: ScreenBox): Array<[number, number]> {
   return [
@@ -215,6 +234,19 @@ function drawSelection(
       const h = HANDLE_SIZE_PX;
       ctx.fillRect(x - h / 2, y - h / 2, h, h);
       ctx.strokeRect(x - h / 2, y - h / 2, h, h);
+    }
+    if (canRotate(visible, editor)) {
+      const [rx, ry] = rotateHandlePoint(box);
+      if (Math.abs(rx) < 1e6 && Math.abs(ry) < 1e6) {
+        ctx.beginPath();
+        ctx.moveTo(rx, ry + HANDLE_SIZE_PX / 2);
+        ctx.lineTo(rx, box.minY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(rx, ry, HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
   }
   ctx.restore();

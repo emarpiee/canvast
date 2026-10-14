@@ -3,7 +3,7 @@ import type { WorldPoint } from "../core/camera";
 import type { TermSum } from "../core/frames";
 import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
 import type { CanvasObject, ImageObject, StrokeObject, TextObject } from "../doc/model";
-import { localBounds } from "../doc/model";
+import { localBounds, strokePoints } from "../doc/model";
 import { layoutText, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
 
@@ -113,7 +113,7 @@ export function approxCoarse(o: CanvasObject, center: WorldPoint, info: CoarseIn
 
 const strokeSampler: CoarseSampler<StrokeObject> = {
   classify(o, { lx, ly, m }) {
-    const p = o.points;
+    const p = strokePoints(o);
     let d = Infinity;
     if (p.length === 2) d = Math.hypot(lx - p[0]!, ly - p[1]!);
     else for (let i = 0; i + 3 < p.length; i += 2) d = Math.min(d, distToSegment(lx, ly, p[i]!, p[i + 1]!, p[i + 2]!, p[i + 3]!));

@@ -1,6 +1,7 @@
 import * as D from "../core/dyadic";
 import type { Viewport } from "../core/camera";
 import type { StrokeObject } from "../doc/model";
+import { strokePoints } from "../doc/model";
 import type { ProjectedObject, Projection } from "./projection";
 import { fromPx, toPx } from "./projection";
 import { distToSegment } from "./geometry2d";
@@ -78,7 +79,7 @@ export function orientPositive(poly: number[]): number[] {
 }
 
 function vertex(o: StrokeObject, i: number): { x: D.Dyadic; y: D.Dyadic } {
-  return { x: D.fromNumber(o.points[2 * i]!), y: D.fromNumber(o.points[2 * i + 1]!) };
+  return { x: D.fromNumber(strokePoints(o)[2 * i]!), y: D.fromNumber(strokePoints(o)[2 * i + 1]!) };
 }
 
 /**
@@ -97,7 +98,7 @@ function localCull(p: Projection, o: StrokeObject, reachPx: number): LocalCull {
   const cx = D.toNumber(p.lx);
   const cy = D.toNumber(p.ly);
   let mag = Math.max(Math.abs(cx), Math.abs(cy));
-  for (const v of o.points) mag = Math.max(mag, Math.abs(v));
+  for (const v of strokePoints(o)) mag = Math.max(mag, Math.abs(v));
   // reachPx · 2^-e / f, computed without overflow; tiny or zero at deep zoom.
   const reachLocal = D.toNumber(fromPx(p, reachPx));
   return { cx, cy, reach: o.width / 2 + Math.abs(reachLocal) + mag * 2 ** -40 + 2 ** -1000 };
@@ -134,7 +135,7 @@ export function exactStrokeCoverage(po: ProjectedObject, vp: Viewport): number[]
   const hh = vp.height / 2 + VIEW_MARGIN;
   const view = [-hw, -hh, hw, -hh, hw, hh, -hw, hh];
   const cull = localCull(p, o, Math.hypot(hw, hh) + 4);
-  const pts = o.points;
+  const pts = strokePoints(o);
   const polys: number[][] = [];
   const nVerts = pts.length / 2;
 
@@ -262,7 +263,7 @@ export function exactStrokeEdgeDistancePx(po: ProjectedObject, sx: number, sy: n
   const r = o.width / 2;
   const rd = D.fromNumber(r);
   const r2 = D.mul(rd, rd);
-  const pts = o.points;
+  const pts = strokePoints(o);
   const n = pts.length / 2;
   // Cull around the query point (not the viewport centre).
   const base = localCull(p, o, 64);

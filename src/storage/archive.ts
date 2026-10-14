@@ -20,7 +20,8 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  *
  *   manifest.json             format, version, scope, hierarchy, asset list
  *   canvases/<id>.json        { objects: SerializedObject[], frames: FrameRecord[], view: StoredView | null }
- *                             (version 1 had no frames: absolute objects, which import unchanged)
+ *                             (version 1 had no frames: absolute objects, which import unchanged;
+ *                             version 3: strokes may carry `rot`, a rotation, ADR 0018)
  *   assets/<sha256>           original bytes, exactly once per hash
  *
  * Export reads one consistent snapshot (a single read-only transaction),
@@ -35,7 +36,7 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * Originals are deduplicated by hash.
  */
 export const ARCHIVE_FORMAT = "canvast-archive";
-export const ARCHIVE_VERSION = 2;
+export const ARCHIVE_VERSION = 3;
 export const ARCHIVE_EXTENSION = ".canvast";
 
 export type ExportScope =
