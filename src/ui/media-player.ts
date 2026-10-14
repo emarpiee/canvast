@@ -251,6 +251,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const visible = eng.visual && editor.preview.kind === "none" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
     const el = eng.el;
     el.style.display = visible ? "" : "none";
+    bar.style.display = editor.preview.kind === "none" ? "" : "none"; // the bar would stay behind a moving instance
     if (visible) {
       el.style.left = `${s.x}px`;
       el.style.top = `${s.y}px`;
@@ -286,7 +287,9 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     v.volume = settings.get("media.volume") / 100;
     eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
     const mine = ++loading;
-    v.hidden = gc.hidden = bar.hidden = false;
+    v.hidden = eng.el !== v; // only the element of this kind is shown: the other one would linger at its old place
+    gc.hidden = eng.el !== gc;
+    bar.hidden = false;
     const rec = await assets.record(o.assetId);
     if (mine !== loading || cur?.id !== o.id) return;
     if (!rec) {

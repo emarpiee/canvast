@@ -538,8 +538,10 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await p.mouse.down();
   await p.mouse.move(cx + 60, cy + 40, { steps: 4 });
   await expect(overlay).toBeHidden();
+  await expect(bar).toBeHidden(); // the bar would stay behind
   await p.mouse.up();
   await expect(overlay).toBeVisible();
+  await expect(bar).toBeVisible();
   const ob = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
   expect(Math.abs((await overlay.boundingBox())!.x - ob.minX)).toBeLessThan(2);
   const t = async () => ((await objects(p))[0]!["media"] as { t: number; repeat: boolean }).t;
@@ -593,6 +595,25 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await expect(slide.locator("video")).toBeVisible();
   await expect(slide.locator("figcaption")).not.toContainText("missing");
   expect(await slide.locator("video").evaluate((v: HTMLVideoElement) => v.error)).toBeNull();
+  // Switching from the video to a GIF leaves nothing of the video's player behind, and back.
+  await p.keyboard.press("Escape");
+  await toCanvas(p);
+  await p.getByTestId("import-input").setInputFiles({ name: "tiny.gif", mimeType: "image/gif", buffer: Buffer.from(encodeGif(8, 8, [[255, 0, 0], [0, 0, 255]], [0, 1].map((c) => ({ w: 8, h: 8, pixels: Array(64).fill(c) })))) });
+  await expect.poll(async () => (await objects(p)).length).toBe(3);
+  const [vid, , gifObj] = await objects(p);
+  const centre = async (id: string) => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)] as const;
+  };
+  const row = (id: string) => p.getByTestId("layers-panel").locator(`li.layer[data-key="${id}"]`);
+  await row(vid!.id).click();
+  await expect(p.locator("video.media-video")).toBeVisible();
+  await row(gifObj!.id).click();
+  await expect(p.locator("canvas.media-video")).toBeVisible();
+  await expect(p.locator("video.media-video")).toBeHidden();
+  await row(vid!.id).click();
+  await expect(p.locator("video.media-video")).toBeVisible();
+  await expect(p.locator("canvas.media-video")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
 
