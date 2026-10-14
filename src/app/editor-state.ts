@@ -53,6 +53,8 @@ export class EditorState {
   penWidthPx: number = PEN_WIDTHS[1];
   /** Thickness lock (interaction/pen-width.ts): new strokes keep the same width on the canvas, not on screen. */
   lock: PenLock | null = null;
+  /** The floating Layers panel is open (ui/layers-panel.ts). */
+  layersOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */

@@ -3,7 +3,7 @@ import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
-import { normalizeUnit, restack } from "../doc/edit-ops";
+import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects } from "../doc/groups";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
@@ -74,6 +74,36 @@ export function setFlag(doc: DocumentStore, editor: EditorState, flag: "hidden" 
   if (!objs.length) return;
   doc.commit(doc.transaction(flag === "hidden" ? "Hide" : "Lock", objs.map((o) => ({ ...o, [flag]: true }) as CanvasObject)));
   editor.select([]);
+}
+
+/** Set or clear a flag on specific objects (the Layers panel's eye and lock). */
+export function setFlagOn(doc: DocumentStore, editor: EditorState, ids: readonly string[], flag: "hidden" | "locked", on: boolean): void {
+  if (editor.blockEdit()) return;
+  const objs = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !!o[flag] !== on);
+  if (!objs.length) return;
+  const label = flag === "hidden" ? (on ? "Hide" : "Show") : on ? "Lock" : "Unlock";
+  doc.commit(
+    doc.transaction(
+      label,
+      objs.map((o) => {
+        const { [flag]: _old, ...rest } = o;
+        return (on ? { ...rest, [flag]: true } : rest) as CanvasObject;
+      }),
+    ),
+  );
+  if (on && flag === "hidden") for (const o of objs) editor.selection.delete(o.id);
+  editor.changed();
+}
+
+/** Move objects in front of `above` in the paint order (the Layers panel's drag). */
+export function moveAbove(doc: DocumentStore, editor: EditorState, ids: readonly string[], aboveId: string): void {
+  if (editor.blockEdit()) return;
+  const moving = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+  const above = doc.get(aboveId);
+  if (!moving.length || !above || moving.some((o) => o.id === aboveId)) return;
+  const changed = placeAbove(doc.ordered(), moving, above);
+  if (changed.length) doc.commit(doc.transaction("Reorder", changed));
+  editor.changed();
 }
 
 /** Show every hidden object, or unlock every locked one. */

@@ -33,3 +33,19 @@ describe("groups (ADR 0020)", () => {
     expect(restack([c!], [a!, b!, c!], "back").map((o) => o.z)).toEqual([0]);
   });
 });
+
+describe("layers panel data (ADR 0024)", () => {
+  it("places objects just in front of another without touching the rest, and builds the group tree front first", async () => {
+    const { placeAbove } = await import("../../src/doc/edit-ops");
+    const { layerTree } = await import("../../src/ui/layers-panel");
+    const [a, b, c, d] = [stroke(1), stroke(2), stroke(3), stroke(4)];
+    const moved = placeAbove([a!, b!, c!, d!], [d!], a!); // d goes just above a
+    expect(moved).toHaveLength(1);
+    expect(moved[0]!.z).toBeGreaterThan(1);
+    expect(moved[0]!.z).toBeLessThan(2);
+    const grouped = [...groupObjects([a!, c!], 0), b!];
+    const tree = layerTree(grouped);
+    expect(tree.map((n) => n.group)).toEqual([true, false]); // the group (its top member is c) in front of b
+    expect(tree[0]!.children.map((n) => n.id)).toEqual([c!.id, a!.id]);
+  });
+});

@@ -15,7 +15,6 @@ import images from "lucide-static/icons/images.svg";
 import locate from "lucide-static/icons/locate.svg";
 import mapPin from "lucide-static/icons/map-pin.svg";
 import upload from "lucide-static/icons/upload.svg";
-import x from "lucide-static/icons/x.svg";
 import type from "lucide-static/icons/type.svg";
 import bold from "lucide-static/icons/bold.svg";
 import italic from "lucide-static/icons/italic.svg";
@@ -27,10 +26,15 @@ import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
+import chevronDown from "lucide-static/icons/chevron-down.svg";
+import chevronRight from "lucide-static/icons/chevron-right.svg";
 import eraser from "lucide-static/icons/eraser.svg";
+import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
 import group from "lucide-static/icons/group.svg";
+import image from "lucide-static/icons/image.svg";
+import layers from "lucide-static/icons/layers.svg";
 import lock from "lucide-static/icons/lock.svg";
 import lockKeyhole from "lucide-static/icons/lock-keyhole.svg";
 import lockKeyholeOpen from "lucide-static/icons/lock-keyhole-open.svg";
@@ -85,6 +89,10 @@ export const ICONS = {
   lock: clean(lock),
   group: clean(group),
   eraser: clean(eraser),
+  chevronDown: clean(chevronDown),
+  chevronRight: clean(chevronRight),
+  image: clean(image),
+  layers: clean(layers),
   eye: clean(eye),
   eyeOff: clean(eyeOff),
   lockKeyhole: clean(lockKeyhole),

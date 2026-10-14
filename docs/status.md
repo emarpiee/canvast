@@ -380,7 +380,9 @@ visible strokes). Alternatives:
 
 **Per-canvas cameras and recovery (slice 7):** per-canvas cameras already existed (Phase 1a; test re-run); new: `contextlost` and `contextrestored` handlers (drop the tile cache, redraw) so a browser reset of the drawing surface loses nothing. [ADR 0023](adr/0023-per-canvas-cameras-and-backend-recovery.md). Tested: E2E `frames.spec.ts` "backend recovery" (events fired by hand; same ink, same camera, editing works; 4 projects).
 
-**Phase 2 is built.** Per the owner, the full suite runs now (it has not run since v0.9.0), on his signal; limits to remember: no snapping while resizing, no list of hidden or locked objects, text erased by its box, selection outline of a turned object is its bounding box.
+**Layers panel (owner request):** `ui/layers-panel.ts`: floating, hideable (device setting `ui.layersOpen`, default hidden), tree of objects and groups front to back with eye, lock, select and drag to reorder. [ADR 0024](adr/0024-layers-panel.md). Tested: unit (`placeAbove`, `layerTree`); E2E `frames.spec.ts` "layers panel".
+
+**Phase 2 is built.** Per the owner, the full suite runs now (it has not run since v0.9.0), on his signal; limits to remember: no snapping while resizing, text erased by its box, selection outline of a turned object is its bounding box.
 
 **Next bounded task:** the full suite, then Phase 3 (performance infrastructure).
 

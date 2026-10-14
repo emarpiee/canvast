@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, clearFlag, deleteSelection, groupSelection, importImages, pruneSelection, redo, setFlag, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -31,6 +31,7 @@ import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
 import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
+import { mountLayersPanel } from "../ui/layers-panel";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountViewSwitch } from "../ui/view-switch";
@@ -104,6 +105,7 @@ async function start(): Promise<void> {
   editor.ignoreFilling = settings.get("select.ignoreFilling");
   editor.lassoFilter = settings.get("lasso.filter");
   editor.snap = settings.get("snap.enabled");
+  editor.layersOpen = settings.get("ui.layersOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
   editor.subscribe(() => {
@@ -115,6 +117,7 @@ async function start(): Promise<void> {
     settings.set("select.ignoreFilling", editor.ignoreFilling);
     settings.set("lasso.filter", editor.lassoFilter);
     settings.set("snap.enabled", editor.snap);
+    settings.set("ui.layersOpen", editor.layersOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
   });
@@ -280,6 +283,10 @@ async function start(): Promise<void> {
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor);
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at) });
+  mountLayersPanel(host, editor, doc, {
+    setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
+    moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
+  });
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     undo: () => undo(doc, editor),

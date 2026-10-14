@@ -81,6 +81,30 @@ export function restack(objects: readonly CanvasObject[], others: readonly Canva
   return own.map((o, i) => ({ ...o, z: bottom - own.length + i }));
 }
 
+/**
+ * Put `moving` (any order) just in front of the object `above` in the paint
+ * order, keeping their order among themselves. `all` is the whole document in
+ * paint order. Their new z values sit in the gap between `above` and the next
+ * object in front of it, so no other object changes; if the gap is too small
+ * for the numbers to stay distinct, the whole document is renumbered.
+ */
+export function placeAbove(all: readonly CanvasObject[], moving: readonly CanvasObject[], above: CanvasObject): CanvasObject[] {
+  const ids = new Set(moving.map((o) => o.id));
+  const rest = all.filter((o) => !ids.has(o.id));
+  const own = [...moving].sort((a, b) => a.z - b.z || (a.id < b.id ? -1 : 1));
+  const at = rest.findIndex((o) => o.id === above.id);
+  if (at < 0) return [];
+  const lo = rest[at]!.z;
+  const hi = at + 1 < rest.length ? rest[at + 1]!.z : lo + own.length + 1;
+  const step = (hi - lo) / (own.length + 1);
+  const placed = own.map((o, i) => ({ ...o, z: lo + step * (i + 1) }));
+  const distinct = step > Math.abs(lo) * 2 ** -40 && placed.every((o, i) => i === 0 || o.z > placed[i - 1]!.z) && placed[0]!.z > lo;
+  if (distinct) return placed;
+  // Renumber everything in the new order.
+  const order = [...rest.slice(0, at + 1), ...own, ...rest.slice(at + 1)];
+  return order.map((o, i) => ({ ...o, z: i })).filter((o, i) => o.z !== order[i]!.z || ids.has(o.id));
+}
+
 const MIN_EXTENT_LOG2 = 0;
 const MAX_EXTENT_LOG2 = 16;
 const TARGET_EXTENT_LOG2 = 8;

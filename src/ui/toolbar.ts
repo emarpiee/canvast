@@ -40,6 +40,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ).join("")}
       </div>
       <div class="tb-group">
+        <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" data-action="import" aria-label="Import image" title="Import image">${ICONS.imagePlus}</button>
         <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
@@ -141,6 +142,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["stab"] !== undefined) {
       editor.stabilizer = { ...editor.stabilizer, on: !editor.stabilizer.on };
       editor.changed();
+    } else if (d["layers"] !== undefined) {
+      editor.layersOpen = !editor.layersOpen;
+      editor.changed();
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
@@ -191,6 +195,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (document.activeElement !== es) es.value = String(editor.eraserPx);
     root.querySelector<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
     root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
+    root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));

@@ -1042,3 +1042,50 @@ test("backend recovery: after the drawing surface is lost and restored the pictu
   await app.drag({ x: 400, y: 500 }, { x: 800, y: 540 }, 6); // and editing still works
   expect((await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(2);
 });
+
+test("layers panel: lists objects front to back, selects, hides and locks from its rows, reorders by dragging, and can be hidden (ADR 0024)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.getByTestId("layers-panel");
+  await expect(panel).toBeHidden();
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("li.layer")).toHaveCount(0);
+  await p.keyboard.press("p");
+  for (const y of [250, 350, 450]) await app.drag({ x: 400, y }, { x: 600, y }, 4);
+  const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id); // back to front
+  const rows = panel.locator("li.layer");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toHaveAttribute("data-key", ids[2]!); // front first
+  await expect(rows.nth(2)).toHaveAttribute("data-key", ids[0]!);
+  // Click selects; the eye hides (and unselects), the lock locks.
+  const ink = () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  const withAll = await ink(); // measured with nothing selected: selection outlines add ink
+  await rows.nth(1).click();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([ids[1]]);
+  await rows.nth(1).getByRole("button", { name: /^Hide / }).click();
+  await app.frame();
+  expect(await ink(), "the hidden stroke is not drawn").toBeLessThan(withAll);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
+  await rows.nth(1).getByRole("button", { name: /^Show / }).click();
+  await app.frame();
+  expect(await ink()).toBe(withAll);
+  await rows.nth(0).getByRole("button", { name: /^Lock / }).click();
+  await p.keyboard.press("v");
+  await p.mouse.click(500, 450);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "a locked layer is not picked on the canvas").toEqual([]);
+  // Drag the back row onto the front row: it moves in front.
+  const z = () => p.evaluate(() => Object.fromEntries(window.__canvastDebug.objects().map((o) => [o.id, o["z"] as number])));
+  await rows.nth(2).dragTo(rows.nth(0));
+  const z1 = await z();
+  expect(z1[ids[0]!]! > z1[ids[2]!]!, "now in front of the one that was in front").toBe(true);
+  await p.keyboard.press("Control+z");
+  expect((await z())[ids[0]!]!, "undo puts it back").toBeLessThan((await z())[ids[1]!]!);
+  // Hide the panel with its close button; the state is kept after a reload.
+  await panel.getByRole("button", { name: "Hide the Layers panel" }).click();
+  await expect(panel).toBeHidden();
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  await expect(panel).toBeVisible();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(p.getByTestId("layers-panel")).toBeVisible();
+});

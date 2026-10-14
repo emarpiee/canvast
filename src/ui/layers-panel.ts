@@ -1,0 +1,164 @@
+import type { EditorState } from "../app/editor-state";
+import type { DocumentStore } from "../doc/document-store";
+import type { CanvasObject } from "../doc/model";
+import { esc } from "./format";
+import { ICONS } from "./icons";
+
+/**
+ * Floating Layers panel (ADR 0024), like the layers list of a design tool:
+ * objects front to back, groups as expandable rows, an eye and a lock on
+ * every row, click to select, drag to reorder, and the panel can be hidden
+ * (the Layers button in the toolbar). It only reads and writes the document
+ * through the same commands as the canvas.
+ */
+export interface LayersActions {
+  setFlagOn(ids: readonly string[], flag: "hidden" | "locked", on: boolean): void;
+  moveAbove(ids: readonly string[], aboveId: string): void;
+}
+
+/** Rows drawn at most; a bigger document shows the front of the stack (no virtual scrolling yet). */
+const MAX_ROWS = 500;
+
+interface Node {
+  /** Object id, or a group id. */
+  id: string;
+  group: boolean;
+  /** Every object under this row (itself for an object). */
+  members: CanvasObject[];
+  children: Node[];
+  /** Highest z among the members: the row's place in the stack. */
+  z: number;
+}
+
+/** The tree of groups and objects, front first. */
+export function layerTree(objects: readonly CanvasObject[]): Node[] {
+  const roots: Node[] = [];
+  const groups = new Map<string, Node>();
+  const sorted = [...objects].sort((a, b) => b.z - a.z || (a.id < b.id ? 1 : -1));
+  for (const o of sorted) {
+    let siblings = roots;
+    for (const gid of o.groups ?? []) {
+      let g = groups.get(gid);
+      if (!g) {
+        g = { id: gid, group: true, members: [], children: [], z: o.z };
+        groups.set(gid, g);
+        siblings.push(g);
+      }
+      g.members.push(o);
+      siblings = g.children;
+    }
+    siblings.push({ id: o.id, group: false, members: [o], children: [], z: o.z });
+  }
+  return roots;
+}
+
+function labelOf(o: CanvasObject): { icon: string; text: string; swatch?: string } {
+  if (o.kind === "stroke") return { icon: ICONS.pencil, text: "Stroke", swatch: o.color };
+  if (o.kind === "image") return { icon: ICONS.image, text: `Image ${o.pixelW}×${o.pixelH}` };
+  const plain = o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 28);
+  return { icon: ICONS.type, text: plain || "Text", swatch: o.color };
+}
+
+export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: LayersActions): void {
+  const panel = document.createElement("aside");
+  panel.className = "layers-panel";
+  panel.setAttribute("aria-label", "Layers");
+  panel.dataset["testid"] = "layers-panel";
+  host.appendChild(panel);
+  const open = new Set<string>(); // expanded groups
+  let scheduled = false;
+  let dragged: string[] = [];
+
+  const render = (): void => {
+    scheduled = false;
+    panel.hidden = !editor.layersOpen;
+    if (!editor.layersOpen) return;
+    const all = doc.ordered();
+    const tree = layerTree(all);
+    let rows = 0;
+    const row = (n: Node, depth: number): string => {
+      if (rows >= MAX_ROWS) return "";
+      rows++;
+      const first = n.members[0]!;
+      const lab = n.group ? { icon: ICONS.group, text: `Group (${n.members.length})`, swatch: undefined } : labelOf(first);
+      const selected = n.members.every((m) => editor.selection.has(m.id));
+      const hidden = n.members.every((m) => m.hidden);
+      const locked = n.members.every((m) => m.locked);
+      const expanded = n.group && open.has(n.id);
+      const key = n.group ? n.id : first.id;
+      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
+        <button type="button" class="layer-twist" data-twist ${n.group ? "" : "disabled tabindex=-1"} aria-label="${expanded ? "Collapse" : "Expand"}">${n.group ? (expanded ? ICONS.chevronDown : ICONS.chevronRight) : ""}</button>
+        <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${lab.swatch}"></span>` : ""}
+        <span class="layer-name">${esc(lab.text)}</span>
+        <button type="button" class="layer-btn" data-eye aria-pressed="${hidden}" aria-label="${hidden ? "Show" : "Hide"} ${esc(lab.text)}" title="${hidden ? "Show" : "Hide"}">${hidden ? ICONS.eyeOff : ICONS.eye}</button>
+        <button type="button" class="layer-btn" data-lock aria-pressed="${locked}" aria-label="${locked ? "Unlock" : "Lock"} ${esc(lab.text)}" title="${locked ? "Unlock" : "Lock"}">${locked ? ICONS.lockKeyhole : ICONS.lockKeyholeOpen}</button>
+      </li>`;
+      return head + (expanded ? n.children.map((c) => row(c, depth + 1)).join("") : "");
+    };
+    const list = tree.map((n) => row(n, 0)).join("");
+    panel.innerHTML = `
+      <header><h2>Layers <span class="layers-count">${all.length}</span></h2><button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button></header>
+      <ul role="tree" aria-label="Objects, front to back">${list || '<li class="layers-empty">Nothing on this canvas yet.</li>'}</ul>
+      ${rows >= MAX_ROWS ? `<p class="layers-note">Showing the front ${MAX_ROWS} rows.</p>` : ""}`;
+  };
+  const schedule = (): void => {
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(render);
+    }
+  };
+  doc.subscribe(schedule);
+  editor.subscribe(schedule);
+  render();
+
+  const members = (key: string): CanvasObject[] => {
+    const o = doc.get(key);
+    return o ? [o] : doc.ordered().filter((x) => x.groups?.includes(key));
+  };
+
+  panel.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-close]")) {
+      editor.layersOpen = false;
+      editor.changed();
+      return;
+    }
+    const li = t.closest<HTMLElement>("li.layer");
+    if (!li) return;
+    const key = li.dataset["key"]!;
+    const objs = members(key);
+    if (t.closest("[data-twist]")) {
+      if (open.has(key)) open.delete(key);
+      else open.add(key);
+      render();
+    } else if (t.closest("[data-eye]")) {
+      actions.setFlagOn(objs.map((o) => o.id), "hidden", !objs.every((o) => o.hidden));
+    } else if (t.closest("[data-lock]")) {
+      actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.every((o) => o.locked));
+    } else {
+      editor.entered = [];
+      editor.select(objs.filter((o) => !o.hidden).map((o) => o.id), e.shiftKey || e.ctrlKey || e.metaKey);
+    }
+  });
+
+  // Reorder: drop a row on another to put it just in front of that row (a group moves all its members).
+  panel.addEventListener("dragstart", (e) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
+    if (!li) return;
+    dragged = members(li.dataset["key"]!).map((o) => o.id);
+    e.dataTransfer?.setData("text/plain", li.dataset["key"]!);
+  });
+  panel.addEventListener("dragover", (e) => {
+    if (dragged.length && (e.target as HTMLElement).closest("li.layer")) e.preventDefault();
+  });
+  panel.addEventListener("drop", (e) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
+    if (!li || !dragged.length) return;
+    e.preventDefault();
+    const targetMembers = members(li.dataset["key"]!);
+    // In front of the target's frontmost member.
+    const top = [...targetMembers].sort((a, b) => b.z - a.z)[0];
+    if (top) actions.moveAbove(dragged, top.id);
+    dragged = [];
+  });
+}
