@@ -5,6 +5,7 @@ import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
 import { decodeAudio, decodeVideo } from "./video";
+import { GifFrames } from "./gif";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -20,8 +21,10 @@ export interface AssetRecord {
   pixelH: number;
   blob: Blob;
   importedAt: number;
-  /** Video and audio: length in seconds. */
+  /** Video, audio and animated GIF: length in seconds. */
   duration?: number;
+  /** Animated GIF: number of frames (absent on a still GIF and on one imported before frames were read). */
+  frames?: number;
 }
 
 /** Largest accepted import, to fail fast instead of exhausting memory. */
@@ -77,8 +80,17 @@ const QUEUE_STALE_MS = 1500;
 /** An image asked for within this many ms is in use and is never released. */
 const IN_USE_MS = 1500;
 
-async function decode(blob: Blob, t = 0): Promise<CanvasImageSource & { width: number; height: number }> {
-  if (blob.type.startsWith("video/")) return (await decodeVideo(blob, t)).bitmap;
+/** `at` is the part after `#` of a decoded key: milliseconds for a video, a frame index for a GIF (doc/model.ts rasterKey). */
+async function decode(blob: Blob, at = 0): Promise<CanvasImageSource & { width: number; height: number }> {
+  if (blob.type.startsWith("video/")) return (await decodeVideo(blob, at / 1000)).bitmap;
+  if (blob.type === "image/gif") {
+    try {
+      const g = new GifFrames(new Uint8Array(await blob.arrayBuffer()));
+      return await createImageBitmap(new ImageData(g.frame(Math.min(at, g.count - 1)), g.width, g.height));
+    } catch {
+      // not a GIF this decoder reads: the browser's own picture (first frame)
+    }
+  }
   if (blob.type.startsWith("audio/")) return (await decodeAudio(blob)).bitmap;
   if (typeof createImageBitmap === "function") {
     try {
@@ -183,12 +195,24 @@ export class AssetLibrary {
     }
     let img;
     let duration: number | undefined;
+    let frames: number | undefined;
     try {
       if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
         const m = file.type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
         img = m.bitmap;
         duration = m.duration;
       } else img = await decode(file);
+      if (file.type === "image/gif") {
+        try {
+          const g = new GifFrames(new Uint8Array(bytes));
+          if (g.count > 1) {
+            frames = g.count;
+            duration = g.duration;
+          }
+        } catch {
+          // shown as a still
+        }
+      }
     } catch {
       throw new ImportError(`the file could not be decoded as ${file.type.startsWith("video/") ? "a video" : file.type.startsWith("audio/") ? "audio" : "an image"}`);
     }
@@ -202,6 +226,7 @@ export class AssetLibrary {
       blob: new Blob([bytes], { type: file.type }),
       importedAt: Date.now(),
       ...(duration !== undefined ? { duration } : {}),
+      ...(frames !== undefined ? { frames } : {}),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.db) await this.store(record, true);
@@ -328,7 +353,7 @@ export class AssetLibrary {
   private async ensureDecoded(rec: AssetRecord, key = rec.hash): Promise<void> {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
-      this.decoded.set(key, makeSource(await decode(rec.blob, ms / 1000)));
+      this.decoded.set(key, makeSource(await decode(rec.blob, ms)));
       this.evict();
     }
   }

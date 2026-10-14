@@ -21,3 +21,12 @@ export function formatTime(s: number): string {
   const sec = String(total % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
+
+/** The frame a GIF steps to: frames 0..count-1, wrapping when repeating, otherwise stopping at an end. */
+export function stepFrame(i: number, delta: number, count: number, repeat: boolean): number {
+  if (!(count > 0)) return 0;
+  const next = i + delta;
+  if (next >= 0 && next < count) return next;
+  if (!repeat) return next < 0 ? 0 : count - 1;
+  return ((next % count) + count) % count;
+}

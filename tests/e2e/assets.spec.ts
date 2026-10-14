@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
+import { encodeGif } from "./gif";
 import { makeWav, makeWebm } from "./video";
 
 /**
@@ -581,7 +582,7 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   await p.mouse.click(mid[0], mid[1]);
   const bar = p.getByTestId("media-bar");
   await expect(bar.locator(".media-time")).toHaveText("0:00 / 0:03");
-  await expect(p.locator(".media-video")).toBeHidden();
+  await expect(p.locator("video.media-video")).toBeHidden();
   const t = async () => ((await objects(p))[0]!["media"] as { t: number }).t;
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect.poll(t).toBeCloseTo(1, 1);
@@ -593,5 +594,64 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   expect(await t()).toBeCloseTo(3, 1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("an animated GIF steps by frame: placed paused, stepped, wrapped, played and drawn at its paused frame (ADR 0042)", async ({ app }) => {
+  const p = app.page;
+  const W = 120;
+  const H = 80;
+  const PAL = [[255, 0, 0], [0, 200, 0], [0, 0, 255], [240, 220, 0], [0, 0, 0]];
+  // Four frames: the right half is one colour per frame; the left half is a pattern that needs a growing LZW table.
+  const frames = [0, 1, 2, 3].map((c) => ({ w: W, h: H, delay: 20, pixels: Array.from({ length: W * H }, (_, i) => (i % W < 60 ? 4 : c)) }));
+  frames[0]!.pixels = frames[0]!.pixels.map((v, i) => (i % W < 60 ? (((i % W) * 7 + Math.floor(i / W) * 3) % 3) + 1 : v));
+  const gif = Buffer.from(encodeGif(W, H, PAL, frames));
+  // The encoder is checked against the browser's own decoder first (pattern pixel (10,10) is index 2, blue; the right half is red).
+  const seen = await p.evaluate(async (bytes) => {
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: "image/gif" }));
+    const c = document.createElement("canvas");
+    c.width = bmp.width;
+    c.height = bmp.height;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(bmp, 0, 0);
+    return [...ctx.getImageData(10, 10, 1, 1).data.slice(0, 3), ...ctx.getImageData(100, 40, 1, 1).data.slice(0, 3)];
+  }, [...gif]);
+  expect(seen).toEqual([0, 0, 255, 255, 0, 0]);
+  await p.getByTestId("import-input").setInputFiles({ name: "anim.gif", mimeType: "image/gif", buffer: gif });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  expect(o!["media"]).toEqual({ kind: "gif", t: 0, repeat: false });
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  const at = [Math.round(box.minX + (box.maxX - box.minX) * 0.75), Math.round((box.minY + box.maxY) / 2)] as const;
+  const colour = async () => (await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), at)).slice(0, 3).map((v) => Math.round(v / 40));
+  await expect.poll(colour).toEqual([6, 0, 0]); // frame 0: red
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round(box.minX + (box.maxX - box.minX) * 0.25), at[1]);
+  const bar = p.getByTestId("media-bar");
+  await expect(bar.locator(".media-time")).toHaveText("Frame 1 / 4");
+  await expect(bar.getByRole("button", { name: "Mute" })).toBeHidden();
+  const t = async () => ((await objects(p))[0]!["media"] as { t: number }).t;
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect(bar.locator(".media-time")).toHaveText("Frame 2 / 4");
+  await expect.poll(t).toBe(1);
+  // Unselected, the canvas draws the paused frame (green).
+  await p.mouse.click(1100, 700);
+  await expect.poll(colour).toEqual([0, 5, 0]);
+  // Back to the instance: repeat wraps stepping back from the first frame to the last.
+  await p.mouse.click(Math.round(box.minX + (box.maxX - box.minX) * 0.25), at[1]);
+  await bar.getByRole("button", { name: "Repeat" }).click();
+  await bar.getByRole("button", { name: "Step back" }).click();
+  await bar.getByRole("button", { name: "Step back" }).click();
+  await expect.poll(t).toBe(3);
+  // Playing runs through the frames and writes nothing; pausing writes the shown frame.
+  await p.evaluate(() => window.__canvastDebug.flushSave());
+  const before = await p.evaluate(() => window.__canvastDebug.session().revision);
+  await bar.getByRole("button", { name: "Play" }).click();
+  await expect(bar.locator(".media-time")).toHaveText(/Frame [12] \/ 4/); // wrapped past the last frame
+  expect(await p.evaluate(() => window.__canvastDebug.session().revision)).toBe(before);
+  await bar.getByRole("button", { name: "Pause" }).click();
+  const shown = Number((await bar.locator(".media-time").textContent())!.match(/Frame (\d+)/)![1]) - 1;
+  await expect.poll(t).toBe(shown);
   expect(app.consoleErrors).toEqual([]);
 });

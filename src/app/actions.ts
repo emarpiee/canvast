@@ -314,8 +314,15 @@ const GRID_VIEWPORT_FRACTION = 0.9;
 /** Gap between grid cells, as a fraction of the larger cell side. */
 const GRID_GAP = 0.08;
 
+/** What kind of media a stored original is when placed; undefined for a plain image (a still GIF is one). */
+function mediaKindOf(rec: Pick<AssetRecord, "type" | "frames">): MediaState["kind"] | undefined {
+  if (rec.type?.startsWith("video/")) return "video";
+  if (rec.type?.startsWith("audio/")) return "audio";
+  return rec.type === "image/gif" && (rec.frames ?? 0) > 1 ? "gif" : undefined;
+}
+
 /** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
-function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
   const cam = view.camera;
   const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
   const c = screenToWorld(cam, view.viewport, { x, y });
@@ -336,7 +343,7 @@ function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">, 
     pixelW: rec.pixelW,
     pixelH: rec.pixelH,
     // A video is placed paused at its start (never autoplaying), ADR 0041.
-    ...(rec.type?.startsWith("video/") || rec.type?.startsWith("audio/") ? { media: { kind: rec.type.startsWith("video/") ? ("video" as const) : ("audio" as const), t: 0, repeat: false } } : {}),
+    ...(mediaKindOf(rec) ? { media: { kind: mediaKindOf(rec)!, t: 0, repeat: false } } : {}),
   };
   return homeObject(normalizeUnit(img), doc.space) as ImageObject;
 }
@@ -347,7 +354,7 @@ function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">, 
  * Placing does not select it or touch any existing object.
  */
 export function placeImage(
-  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">,
+  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">,
   doc: DocumentStore,
   view: ViewState,
   offsetPx: number,
@@ -382,7 +389,7 @@ export function gridLayout(sizes: ReadonlyArray<{ w: number; h: number }>, vp: {
 }
 
 /** Place a batch of images in a grid as one undoable step (see gridLayout). */
-export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
+export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
   const cells = gridLayout(recs.map((r) => ({ w: r.pixelW, h: r.pixelH })), view.viewport);
   const z = doc.topZ();
   const objs = recs.map((r, i) => imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i));

@@ -84,9 +84,10 @@ export interface ImageObject extends ObjectBase {
   readonly media?: MediaState;
 }
 
-/** Key of the decoded picture an image object draws: the poster of a video at its paused time (an audio file always shows its waveform), else the asset itself. */
+/** Key of the decoded picture an image object draws: the poster of a video at its paused time, a GIF at its paused frame (an audio file always shows its waveform), else the asset itself. */
 export function rasterKey(o: ImageObject): string {
-  return o.media?.kind === "video" && o.media.t > 0 ? `${o.assetId}#${Math.round(o.media.t * 1000)}` : o.assetId;
+  if (!o.media || o.media.t <= 0) return o.assetId;
+  return o.media.kind === "video" ? `${o.assetId}#${Math.round(o.media.t * 1000)}` : o.media.kind === "gif" ? `${o.assetId}#${o.media.t}` : o.assetId;
 }
 
 export interface TextObject extends ObjectBase {

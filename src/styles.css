@@ -735,3 +735,4 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .media-bar { position: absolute; transform: translateX(-50%); width: 360px; max-width: calc(100% - 24px); display: flex; align-items: center; gap: 4px; z-index: 6; flex-wrap: nowrap; }
 .media-scrub { flex: 1; min-width: 0; }
 .media-time { font: 500 11px var(--font-ui); white-space: nowrap; opacity: 0.8; }
+.media-bar button[hidden] { display: none; }

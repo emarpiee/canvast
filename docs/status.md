@@ -416,7 +416,9 @@ visible strokes). Alternatives:
 
 **Phase 6, slice 2 done:** audio instances (waveform picture, same player); tested in `assets.spec.ts` "audio is placed" (chromium, firefox).
 
-**Next bounded task:** Phase 6: GIF (own frame decoder), Extract Frame, Settings screen for the steps.
+**Phase 6, slice 3 done:** animated GIFs with a frame-index decoder ([ADR 0042](adr/0042-gif-frames.md)); tested in `gif.test.ts` (4) and `assets.spec.ts` "animated GIF" (chromium, firefox).
+
+**Next bounded task:** Phase 6: Extract Frame (video and GIF), Settings screen (Media & Playback), decoder budgets, then the Phase 6 full suite.
 
 ## Phase 1, slice 9 — settings scopes
 
