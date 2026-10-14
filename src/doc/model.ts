@@ -3,7 +3,7 @@ import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
-import { layoutObject } from "../text/layout";
+import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 
 /**
@@ -140,7 +140,7 @@ export function strokePoints(o: StrokeObject): readonly number[] {
 export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
-    const l = layoutObject(o);
+    const l = layoutText(o.md, o.w / o.size);
     const p = TEXT_PAD_EM * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
   }

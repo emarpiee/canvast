@@ -66,11 +66,6 @@ export function textFont(): Font {
   return font;
 }
 
-/** Layout of a text object. A note keeps every line of its Markdown (tables, code) on its own line on the card. */
-export function layoutObject(o: { md: string; w: number; size: number; note?: true }): TextLayout {
-  return layoutText(o.note ? o.md.replace(/\n(?!\n)/g, "\n\n") : o.md, o.w / o.size);
-}
-
 export function layoutText(md: string, wrapEm: number): TextLayout {
   const key = `${wrapEm}|${md}`;
   let l = cache.get(key);

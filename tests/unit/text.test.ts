@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
 import { parseFont } from "../../src/text/font";
 import type { Font } from "../../src/text/font";
-import { layoutObject, layoutText, setFont, LINE_HEIGHT } from "../../src/text/layout";
+import { layoutText, setFont, LINE_HEIGHT } from "../../src/text/layout";
 import { canonical, normalizeSpans, parse, serialize } from "../../src/text/markdown";
 import type { Block } from "../../src/text/markdown";
 import { deserializeObject, localBounds, serializeObject, validateObject } from "../../src/doc/model";
@@ -120,10 +120,6 @@ describe("layout", () => {
     const one = layoutText("hello", 100);
     expect(one.lines).toHaveLength(1);
     expect(one.height).toBe(LINE_HEIGHT);
-    // A note keeps each Markdown line (a table row) on its own line; a text joins them.
-    const rows = "| a | b |\n| --- | --- |";
-    expect(layoutObject({ md: rows, w: 100, size: 1, note: true }).lines).toHaveLength(2);
-    expect(layoutObject({ md: rows, w: 100, size: 1 }).lines).toHaveLength(1);
     const wrapped = layoutText("aaa bbb ccc ddd eee", 4);
     expect(wrapped.lines.length).toBeGreaterThan(1);
     for (const l of wrapped.lines) {
