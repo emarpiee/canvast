@@ -14,7 +14,11 @@ import { ICONS } from "./icons";
 export interface LayersActions {
   setFlagOn(ids: readonly string[], flag: "hidden" | "locked", on: boolean): void;
   moveAbove(ids: readonly string[], aboveId: string): void;
+  setOpacity(ids: readonly string[], opacity: number): void;
 }
+
+/** Lowest opacity the slider sets (the model needs more than 0; use Hide for nothing). */
+const MIN_OPACITY = 0.05;
 
 /** Rows drawn at most; a bigger document shows the front of the stack (no virtual scrolling yet). */
 const MAX_ROWS = 500;
@@ -69,6 +73,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   let scheduled = false;
   let dragged: string[] = [];
 
+  const selectedObjs = (): CanvasObject[] => [...editor.selection].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+  /** Opacity of the selection (the first object's when they differ). */
+  const footer = (): string => {
+    const sel = selectedObjs();
+    const pct = Math.round((sel[0]?.opacity ?? 1) * 100);
+    return `<label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
+  };
+
   const render = (): void => {
     scheduled = false;
     panel.hidden = !editor.layersOpen;
@@ -99,6 +111,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     panel.innerHTML = `
       <header><h2>Layers <span class="layers-count">${all.length}</span></h2><button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button></header>
       <ul role="tree" aria-label="Objects, front to back">${list || '<li class="layers-empty">Nothing on this canvas yet.</li>'}</ul>
+      ${footer()}
       ${rows >= MAX_ROWS ? `<p class="layers-note">Showing the front ${MAX_ROWS} rows.</p>` : ""}`;
   };
   const schedule = (): void => {
@@ -115,6 +128,16 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const o = doc.get(key);
     return o ? [o] : doc.ordered().filter((x) => x.groups?.includes(key));
   };
+
+  panel.addEventListener("input", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.matches("[data-opacity]")) t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
+  });
+  // `change` fires once, when the slider is released: one undo step per drag.
+  panel.addEventListener("change", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.matches("[data-opacity]")) actions.setOpacity([...editor.selection], Number(t.value) / 100);
+  });
 
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;

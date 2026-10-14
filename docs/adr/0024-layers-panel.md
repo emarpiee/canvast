@@ -19,3 +19,7 @@ A floating panel, hidden by default and toggled by the Layers button (or its own
 
 - The "no list of hidden or locked objects" limit of ADR 0021 is gone.
 - Names for objects and layers are the natural next step, with the bookmark and search features.
+
+## Update (Phase 5): opacity
+
+The panel footer has an Opacity slider (5–100 %) for the selection; the renderer already painted opacity once per object (ADR 0010), so only the control and `setOpacityOn` were new. One undo step per release. Still not built: blend modes, renaming, per-row opacity.

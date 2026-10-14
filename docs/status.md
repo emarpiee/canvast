@@ -404,7 +404,9 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 3 done:** copy, cut, paste and duplicate ([ADR 0038](adr/0038-copy-paste-duplicate.md)); tested in `clipboard.test.ts` and `frames.spec.ts`.
 
-**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan (Markdown-backed editing and backlinks, layers/history).
+**Phase 5, slice 4 done:** opacity slider in the Layers panel ([ADR 0024](adr/0024-layers-panel.md)); tested in `frames.spec.ts` "layers panel" (chromium, firefox).
+
+**Next bounded task:** Phase 5 (creative editing): Markdown mentions and same-board backlinks; then the Phase 5 full suite.
 
 ## Phase 1, slice 9 — settings scopes
 

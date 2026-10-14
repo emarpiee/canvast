@@ -4,6 +4,7 @@
 
 Phase 5.
 
+- **Opacity slider** in the Layers panel sets the opacity of the selection, one undo step per release (ADR 0024).
 - **Copy, cut, paste and duplicate** the selection with Ctrl/Cmd+C, X, V and D: pasted centred in the view at the size it had on screen when copied (at any depth, exactly), as one undo step; Ctrl+D duplicates in place a little offset without touching the clipboard; it works across canvases and tabs of the same browser profile (ADR 0038).
 - **Esc returns to the Select tool** from any other tool (after cancelling a stroke or gesture in progress).
 - **Four pens:** fine (as before), pencil (three soft, wandering translucent passes), ink (a broad nib: thick across, thin along, thickened by pressure or a slow stroke) and marker (wide, translucent). A pencil or ink stroke is a group of ordinary strokes, one undo step; the pen is remembered (ADR 0037).

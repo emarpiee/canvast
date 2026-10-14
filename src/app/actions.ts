@@ -260,6 +260,14 @@ export function setFlagOn(doc: DocumentStore, editor: EditorState, ids: readonly
   editor.changed();
 }
 
+/** Set the opacity of specific objects (the Layers panel's slider); one undo step. */
+export function setOpacityOn(doc: DocumentStore, editor: EditorState, ids: readonly string[], opacity: number): void {
+  if (editor.blockEdit()) return;
+  const objs = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && o.opacity !== opacity);
+  if (!objs.length) return;
+  doc.commit(doc.transaction("Set opacity", objs.map((o) => ({ ...o, opacity }))));
+}
+
 /** Move objects in front of `above` in the paint order (the Layers panel's drag). */
 export function moveAbove(doc: DocumentStore, editor: EditorState, ids: readonly string[], aboveId: string): void {
   if (editor.blockEdit()) return;

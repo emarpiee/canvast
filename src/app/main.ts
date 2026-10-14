@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, setOpacityOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -337,6 +337,7 @@ async function start(): Promise<void> {
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
+    setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
   });
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,

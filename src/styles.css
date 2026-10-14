@@ -652,6 +652,8 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .layers-panel header { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 6px 10px; border-bottom: 1px solid var(--hud-border); }
 .layers-panel h2 { margin: 0; font: 600 12px var(--font-ui); }
 .layers-count { opacity: 0.55; font-weight: 500; margin-left: 4px; }
+.layers-opacity { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; }
+.layers-opacity input { flex: 1; min-width: 0; }
 .layers-panel ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
 .layer { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 2px 0 calc(2px + var(--depth, 0) * 14px); border-radius: 6px; cursor: default; }
 .layer:hover { background: var(--hud-border); }

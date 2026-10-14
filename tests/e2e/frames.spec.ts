@@ -1082,6 +1082,14 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(z1[ids[0]!]! > z1[ids[2]!]!, "now in front of the one that was in front").toBe(true);
   await p.keyboard.press("Control+z");
   expect((await z())[ids[0]!]!, "undo puts it back").toBeLessThan((await z())[ids[1]!]!);
+  // Opacity slider acts on the selection, one undo step per release.
+  const opacityOf = () => p.evaluate((id) => window.__canvastDebug.objects().find((o) => o.id === id)!["opacity"] as number, ids[1]!);
+  await expect(panel.locator("[data-opacity]")).toBeDisabled();
+  await rows.nth(1).click();
+  await panel.locator("[data-opacity]").fill("40");
+  expect(await opacityOf()).toBeCloseTo(0.4);
+  await p.keyboard.press("Control+z");
+  expect(await opacityOf()).toBe(1);
   // Hide the panel with its close button; the state is kept after a reload.
   await panel.getByRole("button", { name: "Hide the Layers panel" }).click();
   await expect(panel).toBeHidden();
