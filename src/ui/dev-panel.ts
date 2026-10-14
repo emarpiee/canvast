@@ -21,7 +21,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
   panel.className = "hud-dev";
   panel.dataset["testid"] = "dev-panel";
   panel.innerHTML = `
-    <div class="dev-row" role="group" aria-label="Zoom jumps">
+    <div class="dev-row dev-jumps" role="group" aria-label="Zoom jumps">
       ${JUMPS.map((j) => `<button type="button" data-jump="${j}" title="Zoom ${j > 0 ? "in" : "out"} ${Math.abs(j)} levels (×2^${j})">${label(j)}</button>`).join("")}
     </div>
     <div class="dev-row" role="group" aria-label="Auto-zoom">
@@ -30,9 +30,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
       <select aria-label="Auto-zoom speed (levels per second)" title="Levels per second">
         ${SPEEDS.map((v) => `<option value="${v}"${v === 10 ? " selected" : ""}>${v} lv/s</option>`).join("")}
       </select>
-    </div>
-    <div class="dev-row" role="group" aria-label="Canvas">
-      <button type="button" data-clear title="Delete every object on this canvas (Ctrl+Z brings them back)">Clear canvas</button>
+      <button type="button" data-clear aria-label="Clear canvas" title="Clear canvas: delete every object on this canvas (Ctrl+Z brings them back)">Clear</button>
     </div>`;
   root.appendChild(panel);
   const select = panel.querySelector("select")!;

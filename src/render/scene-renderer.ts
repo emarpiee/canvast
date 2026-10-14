@@ -110,9 +110,9 @@ export function drawOverlays(
   theme: SceneTheme,
 ): void {
   // In-progress stroke, drawn through the same projection as committed ones (with the camera in its frame).
-  const d = editor.draft;
-  const cam = d && cameraIn(fc, d.frame);
-  if (d && cam && d.points.length >= 2) {
+  for (const d of [...editor.draftDone, ...(editor.draft ? [editor.draft] : [])]) {
+    const cam = cameraIn(fc, d.frame);
+    if (!cam || d.points.length < 2) continue;
     const draft: StrokeObject = {
       id: DRAFT_ID,
       kind: "stroke",

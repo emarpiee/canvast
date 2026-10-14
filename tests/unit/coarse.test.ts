@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
 import { DocumentStore } from "../../src/doc/document-store";
 import type { ImageObject, StrokeObject } from "../../src/doc/model";
@@ -12,7 +12,20 @@ import { visibleObjects } from "../../src/render/scene-view";
 import { projectObject } from "../../src/render/projection";
 import { exactStrokeCoverage } from "../../src/render/stroke-coverage";
 import { pointInPolygon } from "../../src/render/geometry2d";
+import { readFileSync } from "node:fs";
+import { parseFont } from "../../src/text/font";
+import type { Font } from "../../src/text/font";
+import { layoutText, setFont } from "../../src/text/layout";
+import { SAMPLERS, bboxSampler } from "../../src/render/coarse";
+import type { Cover } from "../../src/render/coarse";
+import type { TextObject } from "../../src/doc/model";
 import { rng } from "./rng";
+
+let font: Font;
+beforeAll(() => {
+  font = parseFont(new Uint8Array(readFileSync("node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf")));
+  setFont(font);
+});
 
 const VP = { width: 1280, height: 800 };
 const INFO = { errLog2: -208, zTrue: 5000 };
@@ -32,7 +45,7 @@ describe("classifyCoarse (objects far coarser than the camera)", () => {
   const bar = stroke([0, 0, 0, 100], 2);
 
   it("a view deep inside covers, far outside misses, and the cases between are never decided wrongly", () => {
-    expect(classifyCoarse(bar, at(0.25, 50), INFO, VP)).toEqual({});
+    expect(classifyCoarse(bar, at(0.25, 50), INFO, VP)).toEqual({ color: "#112233" });
     expect(classifyCoarse(bar, at(3, 50), INFO, VP)).toBe("miss");
     expect(classifyCoarse(bar, at(0, 200), INFO, VP)).toBe("miss");
     // Camera a hair from the edge x = 1, from 2^-10 down to below the rounding (2^-256): inside or outside by that hair.
@@ -49,21 +62,75 @@ describe("classifyCoarse (objects far coarser than the camera)", () => {
   });
 
   it("round caps: the end of a stroke and a lone dot", () => {
-    expect(classifyCoarse(bar, at(0, 100.5), INFO, VP)).toEqual({});
+    expect(classifyCoarse(bar, at(0, 100.5), INFO, VP)).toEqual({ color: "#112233" });
     expect(classifyCoarse(bar, at(0, 102), INFO, VP)).toBe("miss");
     expect(classifyCoarse(bar, at(0.9, 100.9), INFO, VP)).toBe("miss"); // the corner of the bounding box is outside the cap
     const dot = stroke([5, 5], 4);
-    expect(classifyCoarse(dot, at(5.5, 5), INFO, VP)).toEqual({});
+    expect(classifyCoarse(dot, at(5.5, 5), INFO, VP)).toEqual({ color: "#112233" });
     expect(classifyCoarse(dot, at(8, 5), INFO, VP)).toBe("miss");
   });
 
-  it("an image shows the source pixel under the view; its edges and pixel edges ask for the exact centre", () => {
+  it("an image shows the source pixel under the view; with no exact centre to hand, its edges and pixel edges are undecided", () => {
     const img = image(100, 50, 10, 5); // 10 × 10 units per source pixel
-    expect(classifyCoarse(img, at(35, 12), INFO, VP)).toEqual({ pixel: [3, 1] });
+    const one = (r: ReturnType<typeof classifyCoarse>): [number, number] | string => (typeof r === "string" ? r : r.rects!.length === 1 ? [r.rects![0]!.i, r.rects![0]!.j] : "many");
+    expect(one(classifyCoarse(img, at(35, 12), INFO, VP))).toEqual([3, 1]);
     expect(classifyCoarse(img, at(100.5, 12), INFO, VP)).toBe("miss");
     expect(classifyCoarse(img, at(100, 12), INFO, VP)).toBe("exact");
     expect(classifyCoarse(img, at(30, 12), INFO, VP)).toBe("exact");
     expect(classifyCoarse(img, at(D.add(D.fromNumber(30), D.fromBigInt(1n, -100)), D.fromNumber(12)), INFO, VP)).toBe("exact");
+  });
+
+  it("every kind of object has a sampler, and the default one keeps an unknown kind's colour", () => {
+    expect(Object.keys(SAMPLERS).sort()).toEqual(["image", "stroke", "text"]);
+    const probe = { lx: 5, ly: 5, m: 0.01, vp: VP, info: INFO, terms: () => null };
+    const box = bboxSampler<StrokeObject>(() => "#abcdef");
+    expect(box.classify(stroke([0, 0, 10, 10], 20), probe)).toEqual({ color: "#abcdef" });
+    expect(box.classify(stroke([0, 0, 10, 10], 20), { ...probe, lx: -9.995 })).toBe("exact");
+  });
+
+  it("text: inside a letter it covers with the text colour, between letters it misses, near an outline it asks for the exact centre", () => {
+    const o: TextObject = { id: newObjectId(), kind: "text", anchor: { x: D.ZERO, y: D.ZERO }, unit: 0, z: 0, opacity: 1, attachmentTargetId: null, md: "I", w: 1000, size: 100, color: "#aa0000" };
+    const line = layoutText(o.md, o.w / o.size).lines[0]!;
+    const g = line.glyphs[0]!;
+    const gl = font.glyph(g.gid);
+    const xs = gl.contours.flatMap((c) => c.flatMap((s) => [s[0]!, s[s.length - 2]!]));
+    const ys = gl.contours.flatMap((c) => c.flatMap((s) => [s[1]!, s[s.length - 1]!]));
+    const c = (o.size * line.scale) / font.unitsPerEm;
+    const [x0, x1] = [Math.min(...xs), Math.max(...xs)].map((v) => g.x * o.size + v * c) as [number, number];
+    const [y1, y0] = [Math.min(...ys), Math.max(...ys)].map((v) => line.baseline * o.size - v * c) as [number, number]; // top, bottom in local y
+    const at2 = (x: number, y: number) => classifyCoarse(o, at(x, y), INFO, VP);
+    expect(at2((x0 + x1) / 2, (y0 + y1) / 2), "the middle of the stem").toEqual({ color: "#aa0000" });
+    expect(at2(x1 + 5, (y0 + y1) / 2), "just beside the stem").toBe("miss");
+    expect(at2((x0 + x1) / 2, y0 - 5), "just below it").toBe("miss");
+    expect(at2(x0 + 0.0005 * o.size, (y0 + y1) / 2), "within 0.05% of the outline").toBe("exact");
+    // Zoomed 10^6 levels in, the same decisions (only the rounded centre matters).
+    const deep = { errLog2: -208, zTrue: 1e6 };
+    expect(classifyCoarse(o, at((x0 + x1) / 2, (y0 + y1) / 2), deep, VP)).toEqual({ color: "#aa0000" });
+  });
+
+  it("an image keeps its pixels at a pixel corner at any depth: four rectangles meeting at the view centre, moved by pans", () => {
+    const doc = new DocumentStore();
+    const index = new FrameIndex(() => doc.space);
+    syncIndex(doc, index);
+    const img: ImageObject = { ...image(8, 6, 8, 6), anchor: { x: D.fromNumber(-4), y: D.fromNumber(-3) } }; // pixel corner (4, 3) at the origin
+    doc.load([img]);
+    for (const depth of [5_000, 1e6, 1e9, 1e12, 1e15]) {
+      let fc: FrameCamera = { f: doc.space.world, x: D.ZERO, y: D.ZERO, z: 0, pz: 0 };
+      for (let left = depth; left > 0; left -= Math.min(left, 1e12)) fc = fjump(doc.space, fc, Math.min(left, 1e12));
+      const t0 = performance.now();
+      const vis = visibleObjects(doc, index, null, fpanBy(doc.space, fc, 30, -20), VP);
+      expect(performance.now() - t0, `${depth}`).toBeLessThan(500);
+      expect(vis.length, `${depth}`).toBe(1);
+      const rects = (vis[0]!.cover as Cover).rects!;
+      // Content moved 30 px right and 20 px up: the corner is at (670, 380).
+      expect(rects.map((r) => [r.i, r.j]).sort(), `${depth}`).toEqual([[3, 2], [3, 3], [4, 2], [4, 3]].sort());
+      const q = rects.find((r) => r.i === 4 && r.j === 3)!;
+      expect(q.x0).toBeCloseTo(670, 6);
+      expect(q.y0).toBeCloseTo(380, 6);
+      const p = rects.find((r) => r.i === 3 && r.j === 2)!;
+      expect(p.x1).toBeCloseTo(670, 6);
+      expect(p.y1).toBeCloseTo(380, 6);
+    }
   });
 
   it("the view's own size counts: a nearer, shallower frame is not decided from a point", () => {

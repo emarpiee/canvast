@@ -21,7 +21,7 @@ import { generateBenchScene } from "./bench";
 import { panBy, zoomAt } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { SerializedObject } from "../doc/model";
-import { serializeWorld } from "../doc/model";
+import { serializeObject, serializeWorld } from "../doc/model";
 import type { EditorState, Tool } from "./editor-state";
 import type { Session } from "./session";
 import { projectObject } from "../render/projection";
@@ -67,6 +67,8 @@ export interface DebugHook {
   /** RGB of the canvas pixel at CSS px (x, y). */
   pixelAt(x: number, y: number): [number, number, number];
   objects(): SerializedObject[];
+  /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
+  storedObjects(): SerializedObject[];
   selection(): string[];
   tool(): Tool;
   setTool(t: Tool): void;
@@ -277,6 +279,7 @@ export function installDebugHook(
       return [d[0]!, d[1]!, d[2]!];
     },
     objects: () => doc.ordered().map(serializeWorld),
+    storedObjects: () => doc.ordered().map(serializeObject),
     selection: () => [...editor.selection].sort(),
     tool: () => editor.tool,
     setTool: (t) => editor.setTool(t),
@@ -305,7 +308,7 @@ export function installDebugHook(
       if (!o) throw new Error(`no object ${id}`);
       const c = deps.index.views(view.frameCamera).find((v) => v.frame === (o.frame ?? doc.space.world))?.coarse;
       if (!c) return "near";
-      const r = classifyCoarse(o, c.center, c.info, view.viewport);
+      const r = classifyCoarse(o, c.center, c.info, view.viewport, c.terms);
       return typeof r === "string" ? r : "cover";
     },
     canUndo: () => doc.canUndo,

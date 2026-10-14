@@ -319,3 +319,351 @@ test("frames of paths the camera has left are collected, and the ones objects an
   await p.evaluate(() => window.__canvastDebug.nextFrame());
   expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id)).toEqual([s!.id]);
 });
+
+test("thickness lock: new strokes keep the same width on the canvas at any zoom; without it they keep the same width on screen", async ({ app }) => {
+  const p = app.page;
+  const radius = async (id: string): Promise<number | undefined> => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))?.radius;
+  const ids = () => p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
+  const drawn = async (from: { x: number; y: number }, to: { x: number; y: number }): Promise<string> => {
+    const before = new Set(await ids());
+    await app.drag(from, to, 5);
+    return (await ids()).find((i) => !before.has(i))!;
+  };
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  const lock = p.getByRole("button", { name: "Lock thickness" });
+  await expect(lock).toHaveAttribute("aria-pressed", "false");
+
+  // Reference stroke at home, lock off: 8 px wide.
+  const ref = await drawn({ x: 450, y: 395 }, { x: 980, y: 395 });
+  expect(await radius(ref)).toBe(4);
+  await lock.click();
+  await expect(lock).toHaveAttribute("aria-pressed", "true");
+
+  // Zoom in 3 levels: strokes scale with the canvas (the reference is 32 px of radius), and a locked stroke matches it.
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  expect(await radius(ref)).toBe(32);
+  const matched = await drawn({ x: 450, y: 500 }, { x: 980, y: 500 });
+  expect(await radius(matched), "same width on the canvas as the reference").toBe(32);
+
+  // Out to home and 2 levels beyond: the locked stroke is the reference's width again, and still equal to it.
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+  expect(await radius(matched)).toBe(4);
+  await p.evaluate(() => window.__canvastDebug.jump(-2));
+  const smaller = await drawn({ x: 450, y: 410 }, { x: 980, y: 410 });
+  expect(await radius(smaller)).toBe(1); // 2 px wide at 2^-2: 8 px at home
+  await p.evaluate(() => window.__canvastDebug.jump(2));
+  expect(await radius(smaller)).toBe(4);
+
+  // Lock off: a new stroke is 8 px on screen again, whatever the zoom.
+  await lock.click();
+  await expect(lock).toHaveAttribute("aria-pressed", "false");
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  const screen = await drawn({ x: 450, y: 400 }, { x: 980, y: 400 });
+  expect(await radius(screen)).toBe(4);
+  expect(await radius(ref), "the reference still scales with the canvas").toBe(32);
+
+  // A new pen size while locked is the new reference, at the zoom where it was chosen.
+  await lock.click();
+  await p.getByRole("button", { name: "Pen width 3 px" }).click();
+  const thin = await drawn({ x: 450, y: 380 }, { x: 980, y: 380 });
+  expect(await radius(thin)).toBe(1.5);
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+  expect(await radius(thin)).toBe(0.1875);
+
+  // The slider gives any size from 0.5 to 128 px, and it is the new reference too.
+  const setSize = (v: number) => p.evaluate((x) => {
+    const el = document.querySelector<HTMLInputElement>("[data-size]")!;
+    el.value = String(x);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, v);
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  await setSize(100);
+  await expect(p.locator("[data-size-out]")).toHaveText("128 px");
+  const big = await drawn({ x: 450, y: 420 }, { x: 980, y: 420 });
+  expect(await radius(big)).toBe(64);
+  await setSize(0);
+  await expect(p.locator("[data-size-out]")).toHaveText("0.5 px");
+  const tiny = await drawn({ x: 450, y: 440 }, { x: 980, y: 440 });
+  expect(await radius(tiny)).toBe(0.25);
+  await p.evaluate(() => window.__canvastDebug.jump(-3)); // out 3 levels: the sizes scale with the canvas
+  expect(await radius(big)).toBe(8);
+  expect(await radius(tiny)).toBe(0.03125);
+
+  // The lock keeps following far out and far in (not just a few levels), and far beyond it holds: drawing stays fast.
+  await setSize(50);
+  for (const levels of [-40, 100, 900]) {
+    await p.evaluate((d) => window.__canvastDebug.jump(d), levels);
+    const t0 = Date.now();
+    const id = await drawn({ x: 450, y: 380 + (levels > 0 ? 10 : 0) }, { x: 980, y: 380 + (levels > 0 ? 10 : 0) });
+    expect(Date.now() - t0, `${levels}`).toBeLessThan(2500);
+    expect(await radius(id), `drawn ${levels} levels away`).toBeGreaterThan(0);
+  }
+  await p.evaluate(() => window.__canvastDebug.jump(1e12));
+  const t0 = Date.now();
+  const far = await drawn({ x: 450, y: 350 }, { x: 980, y: 350 });
+  expect(await radius(far)).toBeGreaterThan(0);
+  expect(Date.now() - t0, "a trillion levels away").toBeLessThan(2500);
+});
+
+test("stabilizer: hand wobble does not reach the stroke (at home and a trillion levels down); off draws every wobble", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  const stab = p.getByRole("button", { name: "Stabilizer" });
+  const strength = p.locator("[data-strength]");
+  await expect(stab).toHaveAttribute("aria-pressed", "false");
+  await expect(strength).toBeHidden();
+  const wobble = async (y: number): Promise<{ spread: number; end: number }> => {
+    const before = new Set((await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id));
+    await p.mouse.move(400, y);
+    await p.mouse.down();
+    for (let i = 1; i <= 40; i++) await p.mouse.move(400 + i * 12, y + (i % 2 ? 7 : -7));
+    await p.mouse.up();
+    await app.frame();
+    const id = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id).find((i) => !before.has(i))!;
+    const q = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.q;
+    const ys = q.filter((_, i) => i % 2 === 1);
+    return { spread: Math.max(...ys) - Math.min(...ys), end: q[q.length - 2]! };
+  };
+  const setStrength = (v: number) => p.evaluate((x) => {
+    const el = document.querySelector<HTMLInputElement>("[data-strength]")!;
+    el.value = String(x);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }, v);
+
+  for (const depth of [0, 1e12]) {
+    if (depth) await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    const off = await wobble(300);
+    expect(off.spread, `${depth}: every wobble is drawn`).toBeGreaterThan(12);
+    await stab.click();
+    await expect(stab).toHaveAttribute("aria-pressed", "true");
+    await expect(strength).toBeVisible();
+    await setStrength(50); // a 30 px rope
+    const on = await wobble(500);
+    expect(on.spread, `${depth}: the rope hides 7 px wobble`).toBeLessThan(3);
+    expect(on.end, `${depth}: the tip follows the drag (rope behind the pointer)`).toBeGreaterThan(400 + 40 * 12 - 31);
+    await setStrength(1); // 0.6 px rope: nearly the pointer
+    expect((await wobble(600)).spread, `${depth}: a short rope barely smooths`).toBeGreaterThan(10);
+    await stab.click(); // off again for the next round
+  }
+});
+
+test("pen size follows zoom: drawing while zooming keeps the pen's screen size (pieces of different widths), in one undo step; off or locked, one stroke", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  const follow = p.getByRole("button", { name: "Pen size follows zoom" });
+  const lock = p.getByRole("button", { name: "Lock thickness" });
+  await expect(follow).toHaveAttribute("aria-pressed", "false");
+  const ids = () => p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
+  const radii = async (): Promise<Array<number | undefined>> =>
+    Promise.all((await ids()).map(async (i) => (await p.evaluate((x) => window.__canvastDebug.objectScreen(x), i))?.radius));
+  /** Draw a line, zooming in `levels` half way through (the camera zooms about the view centre, so the line is kept near it). */
+  const stroke = async (y: number, levels: number): Promise<void> => {
+    await p.mouse.move(600, y);
+    await p.mouse.down();
+    await p.mouse.move(640, y, { steps: 4 });
+    await p.evaluate((d) => window.__canvastDebug.jump(d), levels);
+    await p.mouse.move(641, y, { steps: 2 });
+    await p.mouse.move(680, y, { steps: 4 });
+    await p.mouse.up();
+    await app.frame();
+  };
+
+  // Off: one stroke, one width, which scales with the canvas (8 px at home is 64 px of radius 3 levels in... radius 32).
+  await stroke(400, 3);
+  expect(await ids()).toHaveLength(1);
+  expect(await radii()).toEqual([32]);
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+
+  // On: the part drawn after zooming in is 8 px again on screen, so the line is made of pieces.
+  await p.keyboard.press("Control+z");
+  await follow.click();
+  await expect(follow).toHaveAttribute("aria-pressed", "true");
+  await stroke(400, 3);
+  const after = await ids();
+  expect(after.length, "pieces").toBeGreaterThan(1);
+  const r = (await radii()).map((x) => x ?? 0);
+  expect(r[0], "the part drawn before zooming is magnified with the canvas").toBe(32);
+  expect(r[r.length - 1]!, "the last piece is the pen's size on screen").toBeGreaterThanOrEqual(3.9);
+  expect(r[r.length - 1]!).toBeLessThanOrEqual(4 * 2 ** 0.25 + 0.01);
+  expect(r.every((x, i) => i === 0 || x <= r[i - 1]! + 1e-9), "narrowing along the line").toBe(true);
+  // One undo takes the whole stroke away; redo brings it back.
+  await p.keyboard.press("Control+z");
+  expect(await ids()).toHaveLength(0);
+  await p.keyboard.press("Control+y");
+  expect(await ids()).toHaveLength(after.length);
+  await p.keyboard.press("Control+z");
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+
+  // With the lock the width is the same on the canvas anyway: one stroke even with the option on.
+  await lock.click();
+  await stroke(400, 3);
+  expect(await ids()).toHaveLength(1);
+  await p.keyboard.press("Control+z");
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+
+  // A huge jump mid-stroke (a trillion levels): fast, still one undo step.
+  await lock.click();
+  const t0 = Date.now();
+  await stroke(400, 1e12);
+  expect(Date.now() - t0).toBeLessThan(5000);
+  expect((await ids()).length).toBeGreaterThan(1);
+  await p.keyboard.press("Control+z");
+  expect(await ids()).toHaveLength(0);
+});
+
+test("thickness lock on resize: dragging a handle scales a stroke's shape but keeps its line width; without the lock the width scales too", async ({ app }) => {
+  const p = app.page;
+  const info = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!;
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await app.drag({ x: 400, y: 380 }, { x: 560, y: 460 }, 6);
+  const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
+  await p.keyboard.press("v");
+  const lock = p.getByRole("button", { name: "Lock thickness" });
+  await expect(lock, "the lock is on the select tool's bar too").toBeVisible();
+
+  const resize = async (): Promise<{ before: Awaited<ReturnType<typeof info>>; after: Awaited<ReturnType<typeof info>> }> => {
+    await p.mouse.click(480, 420);
+    const before = await info(id!);
+    await app.drag({ x: Math.round(before.box.maxX), y: Math.round(before.box.maxY) }, { x: Math.round(before.box.maxX) + 80, y: Math.round(before.box.maxY) + 40 }, 6);
+    return { before, after: await info(id!) };
+  };
+
+  // Lock off: the width scales with the shape.
+  const off = await resize();
+  const grew = (off.after.box.maxX - off.after.box.minX) / (off.before.box.maxX - off.before.box.minX);
+  expect(grew).toBeGreaterThan(1.3);
+  expect(off.after.radius).toBeCloseTo(off.before.radius * grew, 0);
+  await p.keyboard.press("Control+z");
+  expect((await info(id!)).radius).toBe(off.before.radius);
+
+  // Lock on: the shape grows, the line stays 8 px.
+  await lock.click();
+  await expect(lock).toHaveAttribute("aria-pressed", "true");
+  const on = await resize();
+  expect((on.after.box.maxX - on.after.box.minX) / (on.before.box.maxX - on.before.box.minX)).toBeGreaterThan(1.3);
+  expect(on.after.radius, "line width unchanged").toBe(on.before.radius);
+  // One undo returns the exact original; redo the resized one.
+  await p.keyboard.press("Control+z");
+  expect(await info(id!)).toEqual(on.before);
+  await p.keyboard.press("Control+y");
+  expect(await info(id!)).toEqual(on.after);
+
+  // Far out and deep the same holds (a trillion levels down).
+  await p.evaluate(() => window.__canvastDebug.jump(1e12));
+  await p.keyboard.press("p");
+  await lock.click(); // off for drawing (a locked brush this far from where the lock was set is astronomically wide)
+  await app.drag({ x: 400, y: 380 }, { x: 560, y: 460 }, 6);
+  const deep = (await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id))).find((i) => i !== id)!;
+  await p.keyboard.press("v");
+  await lock.click(); // on for resizing
+  await p.mouse.click(480, 420);
+  const d0 = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), deep))!;
+  await app.drag({ x: Math.round(d0.box.maxX), y: Math.round(d0.box.maxY) }, { x: Math.round(d0.box.maxX) + 60, y: Math.round(d0.box.maxY) + 30 }, 6);
+  const d1 = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), deep))!;
+  expect(d1.box.maxX - d1.box.minX).toBeGreaterThan(d0.box.maxX - d0.box.minX + 20);
+  expect(d1.radius).toBe(d0.radius);
+});
+
+test("colour at depth: zoomed 10^6, 10^9 and 10^12 levels into an image or a letter, its colour is still there (every kind of object, not just strokes)", async ({ app }) => {
+  const p = app.page;
+  const px = (pts: number[][]) => p.evaluate((ps) => ps.map(([x, y]) => window.__canvastDebug.pixelAt(x!, y!).join(",")), pts);
+
+  // An image: its centre is a source-pixel corner, so four pixels meet at the view centre.
+  await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: blockyFixture() });
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 1);
+  await p.evaluate(() => window.__canvastDebug.jump(6)); // 64 px per source pixel
+  await p.keyboard.press("h");
+  await app.drag({ x: 600, y: 420 }, { x: 630, y: 400 }, 4); // the corner is now at (670, 380): four pixels around it
+  const around = [[650, 360], [690, 360], [650, 400], [690, 400]];
+  await app.frame();
+  const home = await px(around);
+  expect(new Set(home).size, "four different source pixels").toBeGreaterThan(1);
+  await p.keyboard.press("Home"); // exactly on the corner again (the pan above moved the camera off it)
+  await app.frame();
+  for (const depth of [1e6, 1e9, 1e12]) {
+    await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    await app.drag({ x: 600, y: 420 }, { x: 630, y: 400 }, 4); // (a pan of 30, -20 px at this depth too)
+    await app.frame();
+    await app.frame();
+    expect(await px(around), `image, ${depth} levels in: the same four pixels`).toEqual(home);
+    await p.keyboard.press("Home");
+  }
+
+  // A letter: inside its stem the view is the text colour at any depth.
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await p.keyboard.press("t");
+  await p.getByRole("button", { name: "Pen colour #dc2626" }).click();
+  await p.mouse.click(600, 400);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.type("HHH");
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("text-editor")).toBeHidden();
+  await p.evaluate(() => window.__canvastDebug.jump(5));
+  await app.frame();
+  // Find a spot well inside a red stem (a 9×9 patch of red), and bring it to the view centre.
+  const spot = await p.evaluate(() => {
+    const red = (x: number, y: number): boolean => {
+      const [r, g, b] = window.__canvastDebug.pixelAt(x, y);
+      return r > 180 && g < 90 && b < 90;
+    };
+    for (let y = 120; y < 700; y += 6) for (let x = 360; x < 1000; x += 6) if ([-8, 0, 8].every((dy) => [-8, 0, 8].every((dx) => red(x + dx, y + dy)))) return [x, y];
+    return null;
+  });
+  expect(spot, "a red stem was found").not.toBeNull();
+  await p.keyboard.press("h");
+  await app.drag({ x: spot![0]!, y: spot![1]! }, { x: 640, y: 400 }, 6);
+  await app.frame();
+  const red = (await px([[640, 400]]))[0]!;
+  for (const depth of [1e6, 1e9, 1e12]) {
+    await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    await app.frame();
+    await app.frame();
+    expect(await px([[640, 400], [10, 10], [1270, 790], [10, 790], [1270, 10]]), `letter, ${depth} levels in`).toEqual([red, red, red, red, red]);
+    await p.evaluate((d) => window.__canvastDebug.jump(-d), depth);
+  }
+});
+
+test("option: ignore the object that fills the view, so zooming far into something cannot select it by accident", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
+  const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
+  await p.keyboard.press("v");
+  const ignore = p.getByRole("button", { name: "Ignore the object that fills the view" });
+  await expect(ignore).toHaveAttribute("aria-pressed", "false");
+  const selected = () => p.evaluate(() => window.__canvastDebug.selection());
+  // A band that does not fill the view (3 levels in: 64 px wide) stays selectable with the option on.
+  await ignore.click();
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  await p.mouse.click(700, 402);
+  expect(await selected(), "3 levels in: a 64 px band does not fill the view").toEqual([id]);
+  await p.keyboard.press("Escape");
+  await ignore.click();
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+  for (const depth of [30, 5_000, 1e6, 1e12]) {
+    await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    await app.frame();
+    // Off: the view is inside the stroke and a click picks it (as before).
+    await p.mouse.click(700, 402);
+    expect(await selected(), `${depth}: off`).toEqual([id]);
+    await p.keyboard.press("Escape");
+    // On: it is ignored by a click, by Ctrl+A-free lasso and box select too.
+    if ((await ignore.getAttribute("aria-pressed")) === "false") await ignore.click();
+    await p.mouse.click(700, 402);
+    expect(await selected(), `${depth}: on`).toEqual([]);
+    await app.drag({ x: 500, y: 300 }, { x: 800, y: 600 }, 6);
+    expect(await selected(), `${depth}: box select`).toEqual([]);
+    await ignore.click(); // off again
+    await expect(ignore).toHaveAttribute("aria-pressed", "false");
+    await p.evaluate((d) => window.__canvastDebug.jump(-d), depth);
+  }
+  // At home the stroke is a line: with the option on, it is still selectable (it does not fill the view).
+  await ignore.click();
+  await p.mouse.click(640, 400);
+  expect(await selected()).toEqual([id]);
+});

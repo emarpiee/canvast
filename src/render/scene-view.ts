@@ -52,7 +52,7 @@ export function visibleObjects(
         if (previewIds.has(e.obj.id)) continue;
         if (coarse) {
           // Far coarser than the camera: covers the view, misses it, or an edge is near (render/coarse.ts).
-          const r = classifyCoarse(e.obj, coarse.center, coarse.info, vp);
+          const r = classifyCoarse(e.obj, coarse.center, coarse.info, vp, coarse.terms);
           if (r === "miss") continue;
           const exact = r === "exact" ? coarse.exactCam() : null;
           const po = r !== "exact" ? coverObject(e.obj, vp, r) : exact && projectObject(e.obj, exact, vp);

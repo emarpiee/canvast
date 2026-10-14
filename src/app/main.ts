@@ -22,6 +22,7 @@ import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
 import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-index";
 import type { Frame } from "../core/frames";
+import { depthOf } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
 import { WorkspaceRepo } from "../storage/workspace-repo";
@@ -247,6 +248,7 @@ async function start(): Promise<void> {
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
+    depth: () => depthOf(view.frameCamera),
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
       if (!md.length) return;

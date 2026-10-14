@@ -69,9 +69,14 @@ unit `frame-storage.test.ts` (4); E2E: deep work saves, reloads and travels
 in an archive, frame collection, a version 1 archive; the existing storage,
 archive and Firefox 2^10,000,000 tests pass.
 
+**Thickness lock (toolbar lock button, pen tool):** with the lock, new strokes keep the same width on the canvas at any zoom (matching the artwork); without it they keep the same width on screen. Reference §8b. The size follows the zoom for 1,000 levels either way; pen sizes are three presets plus a 0.5–128 px slider. Tests: unit `pen-width.test.ts`; E2E `frames.spec.ts` (radii exact at zoom +3, −2, ±3 again, slider sizes, drawing 40 to 10^12 levels away). Not saved with the canvas; no brush-size cursor yet.
+
+**Pen options:** stabilizer (rope 0.6–60 px), pen size follows zoom (pieces, one undo step), and on the Select tool the padlock keeps line width when resizing. Tests: unit `stabilizer.test.ts`; E2E `frames.spec.ts` (wobble hidden at home and 10^12 levels down; widths per piece; one undo; resize with and without the lock).
+
+**Colour at depth for every kind:** each kind of object has a coarse sampler (`SAMPLERS`, compile-time enforced): text keeps its colour inside a glyph at any depth, an image keeps its source pixels (also on a pixel corner, from exact term sums). New Select-tool option: ignore the object that fills the view (cannot be picked or deleted by accident). Tests: unit `coarse.test.ts` (11); E2E `frames.spec.ts` (image corner and a letter at 10^6, 10^9, 10^12 levels; the option at 30 to 10^12 levels).
+
 **Known failures:** an edge of a coarse object that stays within the view
-for more than 100,000 levels (the camera followed it), coarse text from
-more than 4,096 levels with the centre inside its box (past 100,000), and
+for more than 100,000 levels (the camera followed it) — for text, within 0.4% of an em of a glyph outline — and
 coarse landmark edges are not drawn (marked shortcuts). Frames more than
 100,000 levels finer show as a dot. Loading v0.8 data with an object more
 than ~10^6 levels coarser than the world is slow (re-homing climbs one frame

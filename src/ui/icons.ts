@@ -26,6 +26,10 @@ import pilcrow from "lucide-static/icons/pilcrow.svg";
 import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
+import lock from "lucide-static/icons/lock.svg";
+import waves from "lucide-static/icons/waves.svg";
+import scaling from "lucide-static/icons/scaling.svg";
+import pointerBan from "lucide-static/icons/mouse-pointer-ban.svg";
 import check from "lucide-static/icons/check.svg";
 
 function clean(svg: string): string {
@@ -65,4 +69,8 @@ export const ICONS = {
   listOrdered: clean(listOrdered),
   copy: clean(copy),
   check: clean(check),
+  pointerBan: clean(pointerBan),
+  scaling: clean(scaling),
+  waves: clean(waves),
+  lock: clean(lock),
 } as const;

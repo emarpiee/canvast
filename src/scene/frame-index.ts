@@ -1,7 +1,7 @@
 import * as D from "../core/dyadic";
 import type { Camera, WorldPoint } from "../core/camera";
-import type { Frame, FrameCamera, FrameSpace } from "../core/frames";
-import { DRAW_BITS, H, K, approxIn, expressIn, levelsBetween } from "../core/frames";
+import type { Frame, FrameCamera, FrameSpace, TermSum } from "../core/frames";
+import { DRAW_BITS, H, K, approxIn, expressIn, expressTermsIn, levelsBetween } from "../core/frames";
 import type { CoarseInfo } from "../render/coarse";
 import type { Landmark } from "./landmarks";
 import type { CanvasObject, ObjectId } from "../doc/model";
@@ -89,7 +89,11 @@ export interface FrameView {
   readonly cam: Camera;
   readonly index: SpatialIndex;
   /** Set for a frame far coarser than the camera's: its objects are classified against the rounded centre. */
-  readonly coarse?: CoarseCamera & { readonly exactCam: () => Camera | null };
+  readonly coarse?: CoarseCamera & {
+    readonly exactCam: () => Camera | null;
+    /** The camera centre in the frame as term sums (for work near an edge; see render/coarse.ts). */
+    readonly terms: () => { x: TermSum; y: TermSum } | null;
+  };
 }
 
 /**
@@ -190,7 +194,17 @@ export class FrameIndex {
         const coarse = coarseCameraIn(fc, frame);
         if (coarse) {
           let exact: Camera | null | undefined;
-          views.push({ frame, cam: coarse.query, index, coarse: { ...coarse, exactCam: () => (exact === undefined ? (exact = cameraIn(fc, frame)) : exact) } });
+          let terms: { x: TermSum; y: TermSum } | null | undefined;
+          views.push({
+            frame,
+            cam: coarse.query,
+            index,
+            coarse: {
+              ...coarse,
+              exactCam: () => (exact === undefined ? (exact = cameraIn(fc, frame)) : exact),
+              terms: () => (terms === undefined ? (terms = expressTermsIn(fc.f.space, fc.f, { x: fc.x, y: fc.y }, frame, DRAW_BITS + L)) : terms),
+            },
+          });
         }
         continue;
       }

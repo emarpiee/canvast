@@ -473,6 +473,50 @@ function shiftTerms(ts: Terms, by: number, q: number): Terms {
 
 const leadLog2 = (ts: Terms): number => (ts.length ? D.log2Abs(ts[0]!) : -Infinity);
 
+/**
+ * Term-sum arithmetic for numbers that cannot be summed (a camera 10^6 levels
+ * below the frame it is measured in, within a pixel of a straight edge: the
+ * sum would have 10^6 bits, the difference with the edge a few). Exact; the
+ * first term is the sum to within 2^(1−GAP) of itself.
+ */
+export type TermSum = readonly D.Dyadic[];
+
+function normalizeTerms(list: D.Dyadic[]): D.Dyadic[] {
+  const byMagnitude = (a: D.Dyadic, b: D.Dyadic): number => D.log2Abs(b) - D.log2Abs(a);
+  const a = list.filter((t) => t.m !== 0n).sort(byMagnitude);
+  for (let again = true; again; ) {
+    again = false;
+    for (let i = 0; i + 1 < a.length; i++) {
+      if (D.log2Abs(a[i + 1]!) < a[i]!.e - GAP) continue;
+      const s = D.add(a[i]!, a[i + 1]!);
+      a.splice(i, 2, ...(s.m === 0n ? [] : [s]));
+      a.sort(byMagnitude);
+      again = true;
+      break;
+    }
+  }
+  return a;
+}
+
+/** `ts + c` (c anywhere in magnitude). */
+export const termsAdd = (ts: TermSum, c: D.Dyadic): TermSum => normalizeTerms([...ts, c]);
+/** `ts · k`. */
+export const termsScale = (ts: TermSum, k: D.Dyadic): TermSum => normalizeTerms(ts.map((t) => D.mul(t, k)));
+/** `ts · 2^by` (exact, free). */
+export const termsShift = (ts: TermSum, by: number): TermSum => ts.map((t) => D.shift(t, by));
+/** The sum, to 2^(1−GAP) relative precision (0 when it is exactly zero). */
+export const termsLead = (ts: TermSum): D.Dyadic => ts[0] ?? D.ZERO;
+
+/**
+ * A point of frame `g` in frame `f`'s units as term sums (never one number):
+ * for work that depends on the difference with a nearby exact value. Same
+ * walk and drop rule as expressIn.
+ */
+export function expressTermsIn(space: FrameSpace, g: Frame, p: WorldPoint, f: Frame, bits = DRAW_BITS): { x: TermSum; y: TermSum } | null {
+  const w = walk(space, g, p, f, FAR_LOG2, bits);
+  return w && { x: normalizeTerms(w.x), y: normalizeTerms(w.y) };
+}
+
 function sumTerms(ts: Terms): D.Dyadic {
   return ts.reduce((a, t) => D.add(a, t), D.ZERO);
 }

@@ -323,18 +323,26 @@ near** the view. Built (`render/coarse.ts`, `scene/frame-index.ts`):
 1. The camera centre is expressed in the object's frame to 2^-256 of that
    frame's unit (`COARSE_ROUND_BITS`; the term walk of §7.2, so the cost is
    the path length, not Δ). The rounding error is below 2^-208 frame units.
-2. `classifyCoarse` measures the signed distance from that centre to the
-   object's outline (stroke: distance to the polyline minus the radius;
-   image: to the rectangle, then to the source-pixel grid; text: its box).
-   If the distance exceeds the rounding error plus the view's own size plus
-   the double rounding (2^-46 of the object's size), **every point of the
-   view is on the same side**, so the dropped bits cannot change a pixel:
-   the object covers the view (one fill; an image shows the source pixel
-   under the view) or is skipped.
-3. Otherwise an edge is near (or the object is text with the centre in its
-   box): the exact centre is built (`cameraIn`) and the ordinary exact path
-   draws it. That costs O(Δ) bits, so it is limited to `COARSE_EXACT_MAX`
-   (100,000 levels); past it the object is not drawn (marked shortcut).
+2. `classifyCoarse` hands the rounded centre to the **sampler of the object's
+   kind** (`SAMPLERS` in `render/coarse.ts`, typed over every kind: a new kind
+   does not compile without one; `bboxSampler` is the one-line default). A
+   sampler decides from the distance to the outline, which must exceed the
+   rounding error plus the view's size plus double rounding, so that every
+   point of the view is on the same side: *covers* (one colour, or image
+   pixels) or *misses* (skipped). Stroke: distance to the polyline minus the
+   radius. Text: nonzero winding of the glyph outlines (curves flattened)
+   with the flattening error added to the margin. Image: inside a source
+   pixel (one rectangle), or, when a pixel boundary or the image edge is
+   within the view, the boundaries are placed from **exact term sums** of the
+   camera centre (`expressTermsIn`, `termsAdd`, …: `j·size − centre·count` is
+   computed without ever forming a depth-sized number), giving up to nine
+   rectangles that meet where the boundaries cross: a camera exactly on a
+   pixel corner keeps its four pixels at any depth (tested to 10^15 levels).
+3. Otherwise an edge is near and the sampler cannot place it (a stroke or glyph
+   outline within the view; a kind with no summary): the exact centre is built
+   (`cameraIn`) and the ordinary exact path draws it. That costs O(Δ) bits,
+   so it is limited to `COARSE_EXACT_MAX` (100,000 levels); past it the
+   object is not drawn (marked shortcut).
 
 The classification is applied from `COARSE_ROUND_MIN` (4,096 levels) down;
 nearer frames use the exact path as before, and the two agree (tested at
@@ -386,6 +394,48 @@ The cost of a save is the length of the frame path, not the depth in bits,
 and no number on this path is longer than a frame-local one, so it works in
 Firefox at any depth.
 
+## 8b. Thickness lock
+
+Design decision (owner, 2026-10-14): the lock means *the same width on the canvas*, so a new stroke matches the artwork at any zoom; without it the pen keeps its size on screen. An earlier version that fixed a stroke's width on screen was removed.
+
+A pen mode, not a stroke property: strokes are stored as before and always
+scale with the canvas. Without the lock a new stroke gets the chosen pen size
+in px at the current zoom (the same screen width at any depth). With the lock
+(toolbar lock button) the pen has the size it had when the lock was set,
+scaled by the zoom since (`interaction/pen-width.ts`), so a new stroke has
+the same width on the canvas as the earlier ones and matches the artwork.
+Choosing another pen size while locked makes it the new reference. The
+reference is a BigInt zoom level plus a fraction, so it works at any depth.
+The size follows the zoom for 1,000 levels either way and then holds (a
+double cannot hold more, and a brush that wide or thin looks the same). Pen
+sizes: three presets and a slider (0.5–128 px, log scale). The lock is not
+saved with the canvas. On the Select tool the same padlock means *keep line
+width when resizing*: a resize scales a stroke's shape (`scaleAbout`, `keepWidth`)
+but not its width.
+
+**Stabilizer** (`interaction/stabilizer.ts`): a lazy rope of 0.6–60 screen px; the
+brush tip follows the pointer on it, so wobble inside the rope never reaches
+the stroke, at any zoom. **Pen size follows zoom**: while drawing, once the
+width the pen should have differs by a quarter level from the current piece's,
+the piece ends and the line continues as a new stroke from its last point
+(committed together: one undo step).
+
+## 8c. Select option and debug tools
+
+**Ignore the object that fills the view** (Select tool bar, `EditorState.ignoreFilling`):
+clicking, lasso and box select skip an object the view is inside of: a coarse
+object classified as covering the view (`cover`), or one whose body is under
+the view centre and all four corners (`fillsView` in `interaction/tools.ts`).
+A stroke that is only a band across the screen stays selectable. Off by default.
+
+**Debug (`#debug` or `canvast-debug.html`).** The dev panel has jump buttons
+(±10 to ±10^12), auto-zoom (keeps running while drawing; stops with its
+button, the wheel or Escape) and **Clear** (one undoable transaction). The
+debug hook (`window.__canvastDebug`, `app/debug-hook.ts`) adds, for tests:
+`coarseState(id)` (cover, miss, exact or near), `storedObjects()` (frame
+form, works at any depth; `objects()` is the absolute form and throws beyond
+2^24 levels), `storedFrameCount()` and `collectFrames()`.
+
 ## 9. Complexity
 
 | Operation | Cost | Independent of depth |
@@ -407,7 +457,7 @@ Firefox at any depth.
 | Long wheel zooms | One frame per 32 levels on the path (0.6 ms walk at 10^5 levels) | If it matters: merge chains of empty frames into a dive |
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
 | Coarse object whose edge stays near the view, from > 100,000 levels below | Not drawn (the camera followed its edge that far) | §7.3 |
-| Coarse text from > 4,096 levels below, centre inside its box | Drawn only up to 100,000 levels (text is not summarised) | §7.3 |
+| Coarse text with the centre within 0.4% of an em of a glyph outline, from > 100,000 levels below | Not drawn (the camera followed the outline that far) | §7.3 |
 | Landmarks much coarser than the camera, edge crossing the view | Not drawn | Landmark edges are not summarised |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
 | Unreferenced frame records | Collected with the saved view after 200 frames were written (and when idle) | Frames nothing refers to stay stored until then |

@@ -135,21 +135,31 @@ function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {
 }
 
 /**
- * A coarse object that covers the whole view: one fill with its colour (an
- * image: the colour of the source pixel under the view).
+ * A coarse object that covers the view (render/coarse.ts): one colour over
+ * all of it, or rectangles each showing one source pixel of an image.
  */
 export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, src: RasterSource | null, placeholder: string): void {
-  const o = po.obj;
-  paint(ctx, o, () => {
-    if (o.kind === "image") {
-      const [x, y] = po.cover!.pixel!;
-      if (!src) ctx.fillStyle = placeholder;
-      else {
-        const [r, g, b, a] = src.readPixels(x, y, 1, 1) as unknown as [number, number, number, number];
-        if (a === 0) return;
-        ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+  const cover = po.cover!;
+  paint(ctx, po.obj, () => {
+    if (cover.rects) {
+      const margin = 1;
+      for (const r of cover.rects) {
+        const x0 = Math.max(r.x0, -margin);
+        const y0 = Math.max(r.y0, -margin);
+        const x1 = Math.min(r.x1, vp.width + margin);
+        const y1 = Math.min(r.y1, vp.height + margin);
+        if (x1 <= x0 || y1 <= y0) continue;
+        if (!src) ctx.fillStyle = placeholder;
+        else {
+          const [cr, cg, cb, ca] = src.readPixels(r.i, r.j, 1, 1) as unknown as [number, number, number, number];
+          if (ca === 0) continue;
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},${ca / 255})`;
+        }
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       }
-    } else ctx.fillStyle = o.color;
+      return;
+    }
+    ctx.fillStyle = cover.color ?? placeholder;
     ctx.fillRect(-1, -1, vp.width + 2, vp.height + 2);
   });
 }

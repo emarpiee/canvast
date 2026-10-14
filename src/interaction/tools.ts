@@ -8,11 +8,14 @@ import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId, StrokeObject, TextObject } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
 import type { Frame } from "../core/frames";
-import { expressExactIn } from "../core/frames";
+import { depthOf, expressExactIn } from "../core/frames";
+import { penWidthNow } from "./pen-width";
+import { ropeFor, ropeStep } from "./stabilizer";
 import { normalizeUnit } from "../doc/edit-ops";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
-import { boxSelect, lassoSelect, pickAll } from "../render/hit-test";
+import { boxSelect, hitsObject, lassoSelect, pickAll } from "../render/hit-test";
+import type { ProjectedObject } from "../render/projection";
 import { HANDLE_SIZE_PX, handlePoints, selectionBox } from "../render/scene-renderer";
 import { PanGesture } from "./navigation";
 import { deleteSelection, redo, undo } from "../app/actions";
@@ -44,7 +47,7 @@ const MIN_SCALE = 1e-6;
 type Gesture =
   | { kind: "none" }
   | { kind: "pan" }
-  | { kind: "pen"; pointerId: number; last: ScreenPoint }
+  | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number }
   | { kind: "lasso"; pointerId: number }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; ids: ObjectId[] }
@@ -89,13 +92,24 @@ export function attachTools(
   const world = (s: ScreenPoint): WorldPoint => screenToWorld(view.camera, view.viewport, s);
   /** A screen point in the coordinates of frame `f` (exact; the camera may have rebased since `f` was chosen). */
   const worldIn = (s: ScreenPoint, f: Frame): WorldPoint => (view.frame === f ? world(s) : expressExactIn(f.space, view.frame, world(s), f));
-  const visible = () => visibleObjects(doc, index, null, view.frameCamera, view.viewport);
+  /** An object the view is inside of: coarse ones that cover it, or any whose body is under the centre and the four corners. */
+  const fillsView = (po: ProjectedObject): boolean => {
+    if (po.cover) return true;
+    const { width: w, height: h } = view.viewport;
+    return [[w / 2, h / 2], [2, 2], [w - 2, 2], [2, h - 2], [w - 2, h - 2]].every(([x, y]) => hitsObject(po, x!, y!, 0));
+  };
+  /** The objects the pointer can act on (all visible ones, minus those that fill the view when that option is on). */
+  const visible = () => {
+    const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
+    return editor.ignoreFilling ? all.filter((po) => !fillsView(po)) : all;
+  };
   const textAt = (s: ScreenPoint): TextObject | null =>
     (pickAll(visible(), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
 
   const cancelGesture = (): void => {
     editor.preview = { kind: "none" };
     editor.draft = null;
+    editor.draftDone = [];
     editor.lasso = null;
     editor.marquee = null;
     g = { kind: "none" };
@@ -115,24 +129,58 @@ export function attachTools(
     );
   };
 
-  const commitPen = (): void => {
-    const d = editor.draft;
-    editor.draft = null;
-    if (!d || d.points.length < 2) return;
-    const stroke: StrokeObject = {
-      id: newObjectId(),
-      kind: "stroke",
-      ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
-      anchor: d.anchor,
-      unit: d.unit,
-      z: doc.topZ() + 1,
-      opacity: 1,
-      attachmentTargetId: null,
-      points: d.points,
-      width: d.width,
+  /**
+   * Pen size follows zoom: once the width the pen should have, on the canvas, differs from this piece's by
+   * a quarter level, finish the piece and continue the line from its last point as a new one.
+   */
+  const SPLIT_LOG2 = 0.25;
+  const splitIfZoomed = (g: Extract<Gesture, { kind: "pen" }>): void => {
+    const d = editor.draft!;
+    if (!editor.followZoom || d.points.length < 2) return;
+    const depth = depthOf(view.frameCamera);
+    const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
+    const dz = Number(depth.levels - g.depth.levels) + (depth.frac - g.depth.frac);
+    const drift = Math.log2(px / g.px) - dz; // log2 of (width the pen should have) / (this piece's width), on the canvas
+    if (Number.isFinite(drift) && Math.abs(drift) < SPLIT_LOG2) return;
+    const n = d.points.length;
+    const at = { x: D.add(d.anchor.x, D.shift(D.fromNumber(d.points[n - 2]!), d.unit)), y: D.add(d.anchor.y, D.shift(D.fromNumber(d.points[n - 1]!), d.unit)) };
+    const cam = view.camera;
+    editor.draftDone.push(d);
+    editor.draft = {
+      frame: view.frame,
+      anchor: view.frame === d.frame ? at : expressExactIn(d.frame.space, d.frame, at, view.frame),
+      unit: -cam.zi,
+      points: [0, 0],
+      width: px / 2 ** cam.zf,
       color: d.color,
     };
-    doc.commit(doc.transaction("Draw stroke", [homeObject(normalizeUnit(stroke), doc.space)]));
+    g.depth = depth;
+    g.px = px;
+  };
+
+  const commitPen = (): void => {
+    const pieces = [...editor.draftDone, ...(editor.draft ? [editor.draft] : [])];
+    editor.draft = null;
+    editor.draftDone = [];
+    if (!pieces.length || pieces[pieces.length - 1]!.points.length < 2) return;
+    const z = doc.topZ();
+    const strokes = pieces.map((d, i): CanvasObject => {
+      const stroke: StrokeObject = {
+        id: newObjectId(),
+        kind: "stroke",
+        ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
+        anchor: d.anchor,
+        unit: d.unit,
+        z: z + 1 + i,
+        opacity: 1,
+        attachmentTargetId: null,
+        points: d.points,
+        width: d.width,
+        color: d.color,
+      };
+      return homeObject(normalizeUnit(stroke), doc.space);
+    });
+    doc.commit(doc.transaction("Draw stroke", strokes));
   };
 
   // ---- select -------------------------------------------------------------
@@ -256,9 +304,12 @@ export function attachTools(
         }
         const cam = view.camera;
         const f = 2 ** cam.zf;
-        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: editor.penWidthPx / f, color: editor.penColor };
+        const depth = depthOf(view.frameCamera);
+        const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
+        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor };
+        editor.draftDone = [];
         penPoint(s);
-        g = { kind: "pen", pointerId: e.pointerId, last: s };
+        g = { kind: "pen", pointerId: e.pointerId, last: s, tip: s, depth, px };
         editor.changed();
         break;
       }
@@ -291,8 +342,10 @@ export function attachTools(
       case "pen": {
         const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
         for (const ce of events.length ? events : [e]) {
-          const p = local(ce);
+          // The brush tip: the pointer itself, or (stabilizer) the end of a rope it pulls.
+          const p = editor.stabilizer.on ? (g.tip = ropeStep(g.tip, local(ce), ropeFor(editor.stabilizer.strength))) : local(ce);
           if (Math.hypot(p.x - g.last.x, p.y - g.last.y) >= PEN_MIN_STEP_PX) {
+            splitIfZoomed(g);
             penPoint(p);
             g.last = p;
           }
@@ -316,7 +369,7 @@ export function attachTools(
         break;
       case "scale": {
         const { kx, ky } = scaleFactors(g, s);
-        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: g.fixedWorld, kx, ky };
+        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: g.fixedWorld, kx, ky, keepWidth: editor.lock !== null };
         editor.changed();
         break;
       }
@@ -338,8 +391,10 @@ export function attachTools(
     const s = local(e);
     switch (g.kind) {
       case "pen":
-        if (cancelled) editor.draft = null;
-        else commitPen();
+        if (cancelled) {
+          editor.draft = null;
+          editor.draftDone = [];
+        } else commitPen();
         break;
       case "lasso": {
         const poly = editor.lasso!;
