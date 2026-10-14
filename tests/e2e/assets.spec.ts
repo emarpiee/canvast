@@ -581,6 +581,12 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   // Extract Frame from the video: a plain image next to it.
   await p.keyboard.press("v");
   await p.mouse.click(Math.round((b2.minX + b2.maxX) / 2), Math.round((b2.minY + b2.maxY) / 2));
+  // The video layer appears only once it holds the paused picture (never the first frame for a moment), and the bar stays outside the picture.
+  await expect(overlay).toBeVisible();
+  expect(await overlay.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeCloseTo(paused, 1);
+  const bb = (await p.getByTestId("media-bar").boundingBox())!;
+  const pb = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  expect(bb.y >= pb.maxY || bb.y + bb.height <= pb.minY, "the player does not cover the picture").toBe(true);
   await p.getByTestId("media-bar").getByRole("button", { name: "Extract frame" }).click();
   await expect.poll(async () => (await objects(p)).length).toBe(2);
   expect((await objects(p))[1]!["media"]).toBeUndefined();

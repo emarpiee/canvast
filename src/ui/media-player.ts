@@ -8,6 +8,7 @@ import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
+import { projectObject } from "../render/projection";
 import { radiansFromAngle } from "../core/angle";
 import type { SettingKey, SettingsStore } from "../settings/settings";
 import { ICONS } from "./icons";
@@ -63,7 +64,12 @@ function avEngine(v: HTMLVideoElement): Engine {
       v.src = url;
       await new Promise<void>((res) => v.addEventListener("loadedmetadata", () => res(), { once: true }));
       duration = Number.isFinite(v.duration) ? v.duration : dur;
-      v.currentTime = Math.min(o.media!.t, duration);
+      const at = Math.min(o.media!.t, duration);
+      if (Math.abs(v.currentTime - at) > 1e-3) {
+        const seeked = new Promise<void>((res) => v.addEventListener("seeked", () => res(), { once: true }));
+        v.currentTime = at;
+        await seeked;
+      }
       v.loop = o.media!.repeat;
     },
     unload() {
@@ -248,7 +254,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const h = o.h * ppu;
     const vp = view.viewport;
     // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
-    const visible = eng.visual && editor.preview.kind === "none" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
+    const visible = eng.visual && !loading && editor.preview.kind === "none" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
     const el = eng.el;
     el.style.display = visible ? "" : "none";
     bar.style.display = editor.preview.kind === "none" ? "" : "none"; // the bar would stay behind a moving instance
@@ -263,10 +269,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         el.style.transform = `rotate(${radiansFromAngle(o.rot)}rad)`;
       } else el.style.transform = "";
     }
-    // The bar sits under the picture's centre, kept inside the view.
-    const cx = Math.min(Math.max(s.x + Math.min(w, 4000) / 2, 180), vp.width - 180);
+    // The bar stays outside the picture's bounds (rotated ones too): below it, else above its turn handle, else pinned to the bottom of the view.
+    const bb = projectObject(o, cam, vp, { keepTiny: true })?.box ?? { minX: s.x, maxX: s.x + w, minY: s.y, maxY: s.y + h };
+    const barH = bar.offsetHeight || 96;
+    const cx = Math.min(Math.max((bb.minX + bb.maxX) / 2, 210), vp.width - 210);
+    const below = bb.maxY + 12;
+    const above = bb.minY - 44 - barH;
     bar.style.left = `${cx}px`;
-    bar.style.top = `${Math.min(Math.max(s.y + Math.min(h, 4000) + 8, 60), vp.height - 56)}px`;
+    bar.style.top = `${below + barH <= vp.height - 8 ? below : above >= 56 ? above : vp.height - barH - 8}px`;
   };
 
   const release = (): void => {
@@ -287,6 +297,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     v.volume = settings.get("media.volume") / 100;
     eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
     const mine = ++loading;
+    eng.el.style.display = "none"; // shown once it holds the paused picture: never the first frame for a moment
     v.hidden = eng.el !== v; // only the element of this kind is shown: the other one would linger at its old place
     gc.hidden = eng.el !== gc;
     bar.hidden = false;
