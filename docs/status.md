@@ -392,7 +392,9 @@ visible strokes). Alternatives:
 
 **Phase 4, slice 1 done:** idle-time prebuild of the adjacent zoom levels' tiles ([ADR 0033](adr/0033-idle-prebuild-of-adjacent-zoom-tiles.md)); the dense-zoom hitch at the first crossing is gone, later crossings in one gesture still rebuild (not chained).
 
-**Next bounded task:** Phase 4: persisted thumbnails ([plan](plans/asset-thumbnails.md)).
+**Phase 4, slice 2 done:** persisted WebP thumbnails, shown also for assets whose original is lost ([ADR 0034](adr/0034-persisted-thumbnails.md)); tested in `assets.spec.ts`.
+
+**Next bounded task:** Phase 4: the rest of [the thumbnail plan](plans/asset-thumbnails.md) (thumbnail at import, slide view, archives, virtualized grid).
 
 ## Phase 1, slice 9 — settings scopes
 

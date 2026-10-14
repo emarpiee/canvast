@@ -270,6 +270,8 @@ test("deleting from the library erases only unused originals, and undo history k
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   expect(await stored(p)).toEqual([]);
   expect((await listing(p)).entries).toEqual([]);
+  // The thumbnails went with their assets.
+  expect(await p.evaluate(() => window.__canvastDebug.thumbRecords())).toEqual([]);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -363,6 +365,10 @@ test("deleting canvases and boards removes their objects, keeps shared originals
 test("a lost original is shown as missing and is restored everywhere by importing the same file", async ({ app }) => {
   const p = app.page;
   const id = await importOnCanvas(p);
+  // Looking at the library stores a lower-quality thumbnail of the asset (derived data, ADR 0034).
+  await toAssets(p);
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.thumbRecords())).map((t) => [t.hash, t.type, t.bytes > 0])).toEqual([[HASH, "image/webp", true]]);
+  await toCanvas(p);
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), HASH);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -371,6 +377,9 @@ test("a lost original is shown as missing and is restored everywhere by importin
   expect((await objects(p)).map((o) => o.id)).toEqual([id]);
   await toAssets(p);
   await expect(card(p, HASH)).toHaveClass(/is-missing/);
+  // The card still shows what the asset looked like, marked as missing.
+  await expect.poll(() => card(p, HASH).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await expect(card(p, HASH)).toContainText("Original missing");
   await card(p, HASH).click();
   await expect(p.getByTestId("asset-inspector")).toContainText("The original file is missing from storage.");
   await expect(p.getByTestId("asset-place")).toHaveCount(0);

@@ -164,8 +164,30 @@ const usageOf = (m: Map<string, { instances: number; canvases: Set<string> }>, h
   return { instances: u?.instances ?? 0, canvases: u?.canvases.size ?? 0 };
 };
 
+/** A persisted lower-quality thumbnail of an asset (derived data: never hashed, regenerated from the original when missing). */
+export interface ThumbRecord {
+  hash: string;
+  blob: Blob;
+  w: number;
+  h: number;
+}
+
 export class AssetCatalog {
   constructor(readonly db: IDBDatabase) {}
+
+  async thumb(hash: string): Promise<ThumbRecord | undefined> {
+    const tx = this.db.transaction("thumbs", "readonly");
+    return req(tx.objectStore("thumbs").get(hash) as IDBRequest<ThumbRecord | undefined>);
+  }
+
+  /** Store a thumbnail. Derived data, so any tab may write it, and a failure only means it is made again next time. */
+  async putThumb(rec: ThumbRecord): Promise<void> {
+    const tx = this.db.transaction(["thumbs", "assetCatalog"], "readwrite");
+    const committed = done(tx);
+    // Not for an asset erased in the meantime: nothing would ever remove it.
+    if (await req(tx.objectStore("assetCatalog").count(rec.hash))) tx.objectStore("thumbs").put(rec);
+    await committed;
+  }
 
   /** The whole library with usage, in one read-only transaction (keys only for usage; no bytes are read). */
   async list(): Promise<CatalogListing> {
@@ -362,7 +384,7 @@ export class AssetCatalog {
    */
   async collect(roots: ReadonlySet<string>): Promise<GcReport> {
     const report: GcReport = { swept: [], bytesFreed: 0, retained: [], restored: [] };
-    const tx = this.db.transaction(["assetCatalog", "assets", "objects"], "readwrite", { durability: "strict" });
+    const tx = this.db.transaction(["assetCatalog", "assets", "objects", "thumbs"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const catalog = tx.objectStore("assetCatalog");
     const deleted = (await req(catalog.getAll() as IDBRequest<CatalogEntry[]>)).filter((e) => e.state === "deleted");
@@ -375,6 +397,7 @@ export class AssetCatalog {
         report.retained.push(e.hash);
       } else {
         tx.objectStore("assets").delete(e.hash);
+        tx.objectStore("thumbs").delete(e.hash);
         catalog.delete(e.hash);
         report.swept.push(e.hash);
         report.bytesFreed += e.size;

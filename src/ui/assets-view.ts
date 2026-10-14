@@ -38,6 +38,7 @@ type UsageFilter = "all" | "used" | "unused";
 type SortKey = "newest" | "name" | "size" | "uses";
 
 const THUMB_PX = 256;
+const THUMB_QUALITY = 0.6;
 
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void): AssetsView {
   root.innerHTML = `
@@ -88,6 +89,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     let p = thumbs.get(hash);
     if (!p) {
       p = (async () => {
+        // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
+        const stored = await session.catalog?.thumb(hash).catch(() => undefined);
+        if (stored) return URL.createObjectURL(stored.blob);
         const rec = await assets.record(hash);
         if (!rec) throw new Error("missing");
         try {
@@ -102,8 +106,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ctx.imageSmoothingQuality = "high";
           ctx.drawImage(bmp, 0, 0, c.width, c.height);
           bmp.close();
-          const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
-          if (blob) return URL.createObjectURL(blob);
+          // Lossy WebP (JPEG where the browser cannot encode it): small enough to keep for every asset.
+          let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+          if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
+          if (blob) {
+            void session.catalog?.putThumb({ hash, blob, w: c.width, h: c.height }).catch(() => undefined);
+            return URL.createObjectURL(blob);
+          }
         } catch {
           // fall through to the original (e.g. a format createImageBitmap rejects)
         }
@@ -205,7 +214,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
       return `<button type="button" role="listitem" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
           aria-pressed="${selected === e.hash}" title="${esc(e.name || "Untitled")}">
-        <span class="asset-thumb">${e.present ? `<img alt="" class="${small.trim()}" data-hash="${e.hash}">` : `<span class="asset-missing-label">Original missing</span>`}</span>
+        <span class="asset-thumb"><img alt="" class="${small.trim()}" data-hash="${e.hash}">${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}</span>
         <span class="asset-name">${meta(e).favorite ? `<span class="asset-star" aria-label="Favourite">★</span> ` : ""}${esc(e.name || "Untitled")}</span>
         ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : ""}
         <span class="asset-meta">${e.pixelW}×${e.pixelH} · ${esc(kindOf(e.type))} · ${fmtBytes(e.size)}</span>

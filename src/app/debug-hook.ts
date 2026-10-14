@@ -31,7 +31,7 @@ import type { LassoFilter } from "../render/hit-test";
 import type { AppView } from "../ui/view-switch";
 import type { TileCache, TileFrame } from "../render/tile-cache";
 import type { DensityLayer } from "../render/density";
-import type { CatalogEntry, CatalogListing, GcReport } from "../assets/asset-catalog";
+import type { CatalogEntry, CatalogListing, GcReport, ThumbRecord } from "../assets/asset-catalog";
 import { done, req } from "../storage/idb";
 import { lastCopiedText } from "../ui/text-editor";
 import { layoutText, textFont } from "../text/layout";
@@ -138,6 +138,8 @@ export interface DebugHook {
   assetListing(): Promise<CatalogListing>;
   /** Every catalog entry, including ones deleted and awaiting collection. */
   catalogEntries(): Promise<CatalogEntry[]>;
+  /** The persisted thumbnails (hash, type, bytes, size). */
+  thumbRecords(): Promise<Array<{ hash: string; type: string; bytes: number; w: number; h: number }>>;
   /** Hashes whose original bytes are stored. */
   storedAssetHashes(): Promise<string[]>;
   /** Run asset garbage collection now (writer only). */
@@ -449,6 +451,7 @@ export function installDebugHook(
       return session.catalog!.list();
     },
     catalogEntries: () => readAll<CatalogEntry>("assetCatalog"),
+    thumbRecords: async () => (await readAll<ThumbRecord>("thumbs")).map((t) => ({ hash: t.hash, type: t.blob.type, bytes: t.blob.size, w: t.w, h: t.h })),
     storedAssetHashes: async () => {
       const tx = session.repo!.db.transaction("assets", "readonly");
       const keys = await new Promise<IDBValidKey[]>((res, rej) => {
