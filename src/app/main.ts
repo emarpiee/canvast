@@ -33,6 +33,7 @@ import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
 import { mountLayersPanel } from "../ui/layers-panel";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
+import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
 import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
@@ -127,6 +128,14 @@ async function start(): Promise<void> {
   });
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
+  // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
+  const quality = new QualityGovernor((level) => {
+    tiles.denseMs = DENSE_MS[level];
+    resize();
+  });
+  // In debug mode (the tests) the level changes only when asked to, so a slow machine cannot change what a test measures.
+  quality.pinned = !settings.get("quality.auto") || debug;
+  const effectiveDpr = (): number => Math.min(window.devicePixelRatio || 1, DPR_CAP[quality.level]);
   let scheduled = false;
   let frameWaiters: Array<() => void> = [];
 
@@ -162,6 +171,8 @@ async function start(): Promise<void> {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
+  // Decoded images nothing has asked for lately are released when over budget, even if nothing is drawn (ADR 0027).
+  setInterval(() => assets.evict(), 2000);
 
   let backdrop: ({ f: Frame } & ReturnType<typeof worldBackdrop>) | null = null;
   /** Render synchronously and return the timing breakdown. */
@@ -223,7 +234,11 @@ async function start(): Promise<void> {
   const draw = (): void => {
     scheduled = false;
     // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
-    if (appView === "canvas") stats.record(renderNow().totalMs);
+    if (appView === "canvas") {
+      const ms = renderNow().totalMs;
+      stats.record(ms);
+      quality.record(ms);
+    }
     const waiters = frameWaiters;
     frameWaiters = [];
     for (const w of waiters) w();
@@ -249,7 +264,7 @@ async function start(): Promise<void> {
 
   const resize = (): void => {
     const r = host.getBoundingClientRect();
-    dpr = window.devicePixelRatio || 1;
+    dpr = effectiveDpr();
     canvas.width = Math.max(1, Math.round(r.width * dpr));
     canvas.height = Math.max(1, Math.round(r.height * dpr));
     view.setViewport({ width: r.width, height: r.height });
@@ -399,7 +414,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

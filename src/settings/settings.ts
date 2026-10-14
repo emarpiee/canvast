@@ -37,6 +37,7 @@ export const SETTINGS = {
   "pen.stabilizer.strength": { scope: "device", default: 50, validate: range(0, 100), effect: "immediate" } as Def<number>,
   "pen.followZoom": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.bookmarksOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.layersOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "snap.enabled": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,

@@ -38,6 +38,7 @@ import { layoutText, textFont } from "../text/layout";
 import type { PlacedGlyph, Line } from "../text/layout";
 import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
+import type { QualityGovernor } from "./quality";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -115,6 +116,12 @@ export interface DebugHook {
   setTileCache(on: boolean): void;
   /** Tile use of the last rendered frame (null: rendered directly), and tiles held. */
   tileStats(): { last: TileFrame | null; held: number; renderedTotal: number };
+  /** Decoded images held (count, bytes, budget), and set the budget in bytes (ADR 0027). */
+  decodedStats(): { count: number; bytes: number; budget: number };
+  /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
+  qualityLevel(): number;
+  setQualityLevel(level: 0 | 1 | 2): void;
+  setDecodedBudget(bytes: number): void;
   heapMB(): number | null;
   /** Spatial index size and the result of a query for the current view. */
   indexStats(): { objects: number; levels: number; levelsVisited: number; levelsSkippedSubPixel: number; cellsProbed: number; candidates: number; queryMs: number };
@@ -161,6 +168,7 @@ export interface DebugDeps {
   setView: (v: AppView) => void;
   tiles: TileCache;
   density: DensityLayer;
+  quality: QualityGovernor;
 }
 
 /**
@@ -365,6 +373,10 @@ export function installDebugHook(
       deps.tiles.enabled = on;
       deps.tiles.clear();
     },
+    decodedStats: () => session.assets!.stats(),
+    qualityLevel: () => deps.quality.level,
+    setQualityLevel: (l) => deps.quality.force(l),
+    setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),
     tileStats: () => ({ last: stats.last?.tiles ?? null, held: deps.tiles.tileCount, renderedTotal: deps.tiles.renderedTotal }),
     benchRun: (frames, mode = "panzoom") => {
       const total: number[] = [];

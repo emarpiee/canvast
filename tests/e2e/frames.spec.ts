@@ -1,6 +1,6 @@
 import { expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
-import { blockyFixture } from "./png";
+import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
 import { APP_URL } from "./harness";
 
@@ -1139,4 +1139,57 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   // Delete.
   await p.getByTestId("bookmarks-panel").getByRole("button", { name: "Delete Bookmark 1" }).click();
   await expect(after).toHaveCount(1);
+});
+
+test("decoded images are a cache with a budget: idle ones are released when over it, and decoded again when drawn (ADR 0027)", async ({ app }) => {
+  const p = app.page;
+  const stats = () => p.evaluate(() => window.__canvastDebug.decodedStats());
+  const MB = 2 ** 20;
+  // Four 1000 x 1000 images (4 MB decoded each), a budget of 9 MB.
+  await p.evaluate((b) => window.__canvastDebug.setDecodedBudget(b), 9 * MB);
+  const colours: Array<[number, number, number]> = [[200, 30, 30], [30, 160, 60], [40, 70, 220], [230, 190, 20]];
+  const files = colours.map((c, i) => ({ name: `solid${i}.png`, mimeType: "image/png", buffer: makePng(1000, 1000, () => [c[0], c[1], c[2], 255]) }));
+  await p.getByTestId("import-input").setInputFiles(files);
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 4);
+  expect((await stats()).count, "all four decoded while they are in use").toBe(4);
+  // Look somewhere else; once they have been idle for a while the extra ones are released.
+  await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "1000000p0", cy: "0p0", zi: 0, zf: 0, pz: 0 }));
+  await app.frame();
+  await expect.poll(async () => (await stats()).bytes, { timeout: 15_000 }).toBeLessThanOrEqual(9 * MB);
+  expect((await stats()).count).toBeLessThan(4);
+  // Back to them: released ones are decoded again, and every image draws its own colour.
+  await p.keyboard.press("Home");
+  await app.frame();
+  await p.waitForFunction(() => window.__canvastDebug.decodedStats().count >= 2);
+  const objs = await p.evaluate(() => window.__canvastDebug.objects().map((o) => o["id"] as string));
+  for (const id of objs) {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    const x = Math.round((b.minX + b.maxX) / 2);
+    const y = Math.round((b.minY + b.maxY) / 2);
+    // (They overlap: the pixel is the colour of whichever image is in front there, never the placeholder.)
+    await expect
+      .poll(async () => colours.map((c) => c.join(",")).includes(await p.evaluate(([a, c]) => window.__canvastDebug.pixelAt(a!, c!).join(","), [x, y])), { timeout: 10_000 })
+      .toBe(true);
+  }
+});
+
+test("adaptive quality: a lower level draws the canvas at a lower resolution and everything still works (ADR 0028)", async ({ app }) => {
+  const p = app.page;
+  const ratio = () => p.evaluate(() => (document.getElementById("canvas") as HTMLCanvasElement).width / window.__canvastDebug.viewport().width);
+  const dpr = await p.evaluate(() => window.devicePixelRatio);
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 300 }, { x: 800, y: 340 }, 6);
+  const levels: Array<[0 | 1 | 2, number]> = [[0, dpr], [1, Math.min(dpr, 1.5)], [2, Math.min(dpr, 1)], [0, dpr]];
+  for (const [level, expected] of levels) {
+    await p.evaluate((l) => window.__canvastDebug.setQualityLevel(l), level);
+    await app.frame();
+    expect(await p.evaluate(() => window.__canvastDebug.qualityLevel())).toBe(level);
+    expect(await ratio(), `level ${level}: canvas pixels per CSS px`).toBeCloseTo(expected, 2);
+    expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), `level ${level}: the stroke is drawn`).toBeGreaterThan(50);
+    // Picking and the pixel read are in CSS px whatever the resolution.
+    await p.keyboard.press("v");
+    await p.mouse.click(600, 320);
+    expect((await p.evaluate(() => window.__canvastDebug.selection())).length, `level ${level}: picking works`).toBe(1);
+    await p.keyboard.press("Escape");
+  }
 });

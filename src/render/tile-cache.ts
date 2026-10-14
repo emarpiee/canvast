@@ -43,7 +43,7 @@ const GUARD_CSS = 8;
  * set is rebuilt when the zoom moves further, and REFINE_MS after the zoom
  * stops. Sparse scenes never use it: they stay exact on every frame.
  */
-const DENSE_MS = 12;
+const DENSE_MS = 12; // default; the quality governor lowers it (app/quality.ts)
 const PREVIEW_MAX_LEVELS = 1;
 const REFINE_MS = 150;
 
@@ -95,6 +95,8 @@ export class TileCache {
   renderedTotal = 0;
   /** Cost of the last full tile-set build (about one exact frame of committed objects). */
   lastFullMs = 0;
+  /** A rebuild slower than this makes the scene "dense": zoom frames show a scaled preview. */
+  denseMs = DENSE_MS;
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   private refineNow = false;
   private gen: Generation | null = null;
@@ -163,7 +165,7 @@ export class TileCache {
     this.refineNow = false;
     this.lastKey = key;
     const z = cam.zi + cam.zf;
-    const dense = this.lastFullMs > DENSE_MS;
+    const dense = this.lastFullMs > this.denseMs;
     if (this.gen && this.gen.key !== key) {
       // The preview scales the last tile set: only within the same frame.
       const pv = !stable && dense && this.gen.frameId === frameId ? this.preview(ctx, cam, vp, dpr) : null;
