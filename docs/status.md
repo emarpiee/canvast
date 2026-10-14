@@ -398,7 +398,9 @@ visible strokes). Alternatives:
 
 **Phase 4 is built and the full suite has run** (36 min 24 s; 380 passed, 6 skipped, 0 failed, [testing/full-run-phase-4.md](testing/full-run-phase-4.md)). Deferred: thumbnails and smart folders in `.canvast` archives, regenerating a bad stored thumbnail, chaining the zoom prebuild (later crossings in one gesture still rebuild).
 
-**Next bounded task:** Phase 5 (creative editing): arrange selected items in a grid, align and distribute ([plan](plans/arrange-commands.md)).
+**Phase 5, slice 1 done:** arrange in a grid, align and distribute ([ADR 0036](adr/0036-arrange-align-distribute.md)); tested in `arrange.test.ts` and `frames.spec.ts`.
+
+**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan.
 
 ## Phase 1, slice 9 — settings scopes
 

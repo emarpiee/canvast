@@ -16,6 +16,7 @@ import locate from "lucide-static/icons/locate.svg";
 import mapPin from "lucide-static/icons/map-pin.svg";
 import upload from "lucide-static/icons/upload.svg";
 import type from "lucide-static/icons/type.svg";
+import layoutGrid from "lucide-static/icons/layout-grid.svg";
 import bold from "lucide-static/icons/bold.svg";
 import italic from "lucide-static/icons/italic.svg";
 import heading1 from "lucide-static/icons/heading-1.svg";
@@ -77,6 +78,7 @@ export const ICONS = {
   upload: clean(upload),
   x: clean(x),
   type: clean(type),
+  layoutGrid: clean(layoutGrid),
   bold: clean(bold),
   italic: clean(italic),
   heading1: clean(heading1),

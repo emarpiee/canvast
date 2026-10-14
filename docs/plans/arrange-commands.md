@@ -1,6 +1,6 @@
 # Plan: arrange, align and distribute commands
 
-Status: planned for Phase 5 (creative editing), owner request of 2026-10-14. The batch-import grid it shares its layout with is built (ADR 0030).
+Status: built (ADR 0036, except sorting by date: objects have no creation time). Originally planned for Phase 5 (creative editing), owner request of 2026-10-14. The batch-import grid it shares its layout with is built (ADR 0030).
 
 ## Request
 

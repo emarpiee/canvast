@@ -1373,3 +1373,36 @@ test("Shift snaps a rotation to whole 15 degree steps and it sticks (a step is n
   await p.mouse.move(Math.round(centre[0]), Math.round(centre[1]) + 80);
   await expect(p.locator("#canvas")).not.toHaveAttribute("data-hover", /.+/);
 });
+
+test("the Arrange menu aligns and arranges the selection in a grid, each as one undo step, and says when too little is selected", async ({ app }) => {
+  const p = app.page;
+  const boxes = async (): Promise<Array<{ minX: number; minY: number; maxX: number; maxY: number }>> =>
+    p.evaluate(() => window.__canvastDebug.objects().map((o) => window.__canvastDebug.objectScreen(o.id)!.box));
+  await p.keyboard.press("p");
+  const at = [[420, 260], [560, 400], [700, 300], [500, 520]] as const;
+  for (const [x, y] of at) await app.drag({ x, y }, { x: x + 60, y: y + 40 }, 4);
+  await p.keyboard.press("v");
+  const menuItem = async (name: string): Promise<void> => {
+    await p.getByRole("button", { name: "Arrange and align" }).click();
+    await p.getByRole("menuitem", { name }).click();
+  };
+  // One stroke selected: nothing to align, and the message says so.
+  await p.mouse.click(450, 280);
+  await menuItem("Left");
+  await expect(p.getByTestId("toast")).toContainText("Select at least 2 items");
+  await p.keyboard.press("Control+a");
+  const before = await boxes();
+  await menuItem("Left");
+  const left = await boxes();
+  expect(new Set(left.map((b) => Math.round(b.minX))).size, "every left edge is the same").toBe(1);
+  expect(left.map((b) => Math.round(b.minY)), "vertical positions are untouched").toEqual(before.map((b) => Math.round(b.minY)));
+  await p.keyboard.press("Control+z"); // one step back
+  expect((await boxes()).map((b) => Math.round(b.minX))).toEqual(before.map((b) => Math.round(b.minX)));
+  await menuItem("In stacking order");
+  const grid = await boxes();
+  expect(new Set(grid.map((b) => Math.round(b.minX))).size, "2 columns").toBe(2);
+  expect(new Set(grid.map((b) => Math.round(b.minY))).size, "2 rows").toBe(2);
+  await p.keyboard.press("Control+z");
+  expect((await boxes()).map((b) => Math.round(b.minX))).toEqual(before.map((b) => Math.round(b.minX)));
+  expect(app.consoleErrors).toEqual([]);
+});

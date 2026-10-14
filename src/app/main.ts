@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -346,6 +346,17 @@ async function start(): Promise<void> {
     clearFlag: (flag) => clearFlag(doc, editor, flag),
     ungroupSelection: () => ungroupSelection(doc, editor),
     arrangeSelection: (to) => arrangeSelection(doc, editor, to),
+    layoutSelection: async (cmd) => {
+      // Sorting by name needs the file names of the selected images (the document only has their hashes).
+      const names = new Map<string, string>();
+      if ("grid" in cmd && cmd.grid.startsWith("name") && session.catalog) {
+        for (const o of doc.ordered()) {
+          if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
+          names.set(o.assetId, (await session.catalog.entry(o.assetId).catch(() => undefined))?.name ?? "");
+        }
+      }
+      layoutSelection(doc, editor, cmd, names);
+    },
     depth: () => depthOf(view.frameCamera),
     setSelectedWidth: (px) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.

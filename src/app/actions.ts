@@ -4,7 +4,9 @@ import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
-import { groupObjects, ungroupObjects } from "../doc/groups";
+import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
+import type { AlignKey, SortKey, Unit } from "../doc/arrange";
+import { alignUnits, arrangeGrid, distributeUnits, gridCells } from "../doc/arrange";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
@@ -65,6 +67,49 @@ export function arrangeSelection(doc: DocumentStore, editor: EditorState, to: "f
   const objs = selected(doc, editor);
   if (!objs.length) return;
   doc.commit(doc.transaction(to === "front" ? "Bring to front" : "Send to back", restack(objs, doc.ordered(), to)));
+  editor.changed();
+}
+
+export type LayoutCommand = { grid: SortKey } | { align: AlignKey } | { distribute: "x" | "y" };
+
+const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z to A", size: "by size", type: "by type", stack: "in stacking order" };
+
+/** The selection as units (a group at the level being worked at, else one object) in one frame, without locked ones. */
+function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, string>): Unit[] | string {
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  if (new Set(objs.map((o) => o.frame?.id ?? 0)).size > 1) return "These items are in different spaces; arrange them one space at a time.";
+  const level = editor.entered.length;
+  const byUnit = new Map<string, CanvasObject[]>();
+  for (const o of objs) {
+    const k = unitKey(o, level);
+    (byUnit.get(k) ?? byUnit.set(k, []).get(k)!).push(o);
+  }
+  const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId) ?? "") : o.kind === "text" ? o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : "");
+  return [...byUnit.values()].map((objects) => ({ objects, name: nameOf(objects[0]!) }));
+}
+
+/**
+ * Arrange the selection in a grid, or align or distribute it, as one undoable step of exact translations. `names`
+ * maps an image's content hash to its file name (for sorting by name).
+ */
+export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: LayoutCommand, names: ReadonlyMap<string, string> = new Map()): void {
+  if (editor.blockEdit()) return;
+  const units = layoutUnits(doc, editor, names);
+  if (typeof units === "string") {
+    editor.message = units;
+    editor.changed();
+    return;
+  }
+  const need = "distribute" in cmd ? 3 : 2;
+  if (units.length < need) {
+    editor.message = `Select at least ${need} items to ${"distribute" in cmd ? "distribute" : "grid" in cmd ? "arrange" : "align"}.`;
+    editor.changed();
+    return;
+  }
+  const moved = "grid" in cmd ? arrangeGrid(units, cmd.grid) : "align" in cmd ? alignUnits(units, cmd.align) : distributeUnits(units, cmd.distribute);
+  if (!moved.length) return; // already in place
+  const label = "grid" in cmd ? `Arrange ${units.length} items in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
+  doc.commit(doc.transaction(label, moved));
   editor.changed();
 }
 
@@ -188,26 +233,13 @@ export function placeImage(
 export function gridLayout(sizes: ReadonlyArray<{ w: number; h: number }>, vp: { width: number; height: number }): Array<{ x: number; y: number; w: number; h: number }> {
   const n = sizes.length;
   if (!n) return [];
-  const cellW = Math.max(...sizes.map((s) => s.w));
-  const cellH = Math.max(...sizes.map((s) => s.h));
-  const gap = GRID_GAP * Math.max(cellW, cellH);
-  const cols = Math.min(n, Math.max(1, Math.round(Math.sqrt((n * (cellH + gap)) / (cellW + gap)))));
-  const rows = Math.ceil(n / cols);
-  const gridW = cols * cellW + (cols - 1) * gap;
-  const gridH = rows * cellH + (rows - 1) * gap;
+  const g = gridCells(sizes, GRID_GAP);
+  const gridW = g.w;
+  const gridH = g.h;
   const k = Math.min(1, (GRID_VIEWPORT_FRACTION * vp.width) / gridW, (GRID_VIEWPORT_FRACTION * vp.height) / gridH);
   const x0 = vp.width / 2 - (gridW * k) / 2;
   const y0 = vp.height / 2 - (gridH * k) / 2;
-  return sizes.map((s, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    return {
-      x: x0 + (col * (cellW + gap) + (cellW - s.w) / 2) * k,
-      y: y0 + (row * (cellH + gap) + (cellH - s.h) / 2) * k,
-      w: s.w * k,
-      h: s.h * k,
-    };
-  });
+  return sizes.map((s, i) => ({ x: x0 + g.cells[i]!.x * k, y: y0 + g.cells[i]!.y * k, w: s.w * k, h: s.h * k }));
 }
 
 /** Place a batch of images in a grid as one undoable step (see gridLayout). */

@@ -689,3 +689,23 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .slide-nav { width: 44px; height: 72px; }
 .slide-close { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; }
 .slide-nav:hover, .slide-close:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* Arrange / align / distribute menu (ui/toolbar.ts). */
+.layout-wrap { position: relative; display: inline-flex; }
+.layout-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(6px);
+}
+.layout-menu[hidden] { display: none; }
+.layout-head { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; }
+.layout-menu button { display: block; width: 100%; text-align: left; padding: 6px 8px; border: 0; background: none; color: var(--hud-fg); font: inherit; border-radius: 6px; cursor: pointer; }
+.layout-menu button:hover { background: rgba(127, 127, 127, 0.18); }

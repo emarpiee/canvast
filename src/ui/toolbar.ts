@@ -1,6 +1,8 @@
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_COLORS, PEN_WIDTHS } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
+import type { LayoutCommand } from "../app/actions";
+import type { AlignKey, SortKey } from "../doc/arrange";
 import { ICONS } from "./icons";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
@@ -16,6 +18,8 @@ export interface ToolbarActions {
   groupSelection(): void;
   ungroupSelection(): void;
   arrangeSelection(to: "front" | "back"): void;
+  /** Arrange the selection in a grid, or align or distribute it (docs/plans/arrange-commands.md). */
+  layoutSelection(cmd: LayoutCommand): void;
   setFlag(flag: "hidden" | "locked"): void;
   clearFlag(flag: "hidden" | "locked"): void;
   /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
@@ -29,6 +33,30 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
+];
+
+const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string }> }> = [
+  {
+    head: "Arrange in a grid",
+    items: [
+      { id: "grid:name-asc", label: "By name, A to Z" },
+      { id: "grid:name-desc", label: "By name, Z to A" },
+      { id: "grid:size", label: "By size, largest first" },
+      { id: "grid:type", label: "By type" },
+      { id: "grid:stack", label: "In stacking order" },
+    ],
+  },
+  {
+    head: "Align",
+    items: ["left", "centre", "right", "top", "middle", "bottom"].map((a) => ({ id: `align:${a}`, label: a[0]!.toUpperCase() + a.slice(1) })),
+  },
+  {
+    head: "Distribute (3 or more)",
+    items: [
+      { id: "distribute:x", label: "Horizontally" },
+      { id: "distribute:y", label: "Vertically" },
+    ],
+  },
 ];
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
@@ -76,6 +104,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="ungroup" aria-label="Ungroup" title="Ungroup (Ctrl+Shift+G)">${ICONS.ungroup}</button>
         <button type="button" data-action="front" aria-label="Bring to front" title="Bring to front (Ctrl+])">${ICONS.bringToFront}</button>
         <button type="button" data-action="back" aria-label="Send to back" title="Send to back (Ctrl+[)">${ICONS.sendToBack}</button>
+        <span class="layout-wrap">
+          <button type="button" data-action="layout-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Arrange and align" title="Arrange in a grid, align and distribute the selection">${ICONS.layoutGrid}</button>
+          <div class="layout-menu" role="menu" data-testid="layout-menu" hidden>
+            ${LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.label}</button>`).join("")}`).join("")}
+          </div>
+        </span>
       </div>
       <div class="tb-group tb-options" data-for="select">
         <button type="button" data-action="hide" aria-label="Hide" title="Hide the selection (it is not drawn or picked until Show all)">${ICONS.eyeOff}</button>
@@ -107,6 +141,24 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     input.value = "";
   });
 
+  // The arrange menu closes on a click elsewhere or Esc.
+  const menu = root.querySelector<HTMLElement>(".layout-menu")!;
+  const menuButton = root.querySelector<HTMLElement>('[data-action="layout-menu"]')!;
+  const closeMenu = (): void => {
+    menu.hidden = true;
+    menuButton.setAttribute("aria-expanded", "false");
+  };
+  document.addEventListener("pointerdown", (e) => {
+    if (!menu.hidden && !(e.target as HTMLElement).closest(".layout-wrap")) closeMenu();
+  });
+  menu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeMenu();
+      menuButton.focus();
+      e.stopPropagation();
+    }
+  });
+
   // Continuous pen size: a new size is the new lock reference, like a preset.
   root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("input", (e) => {
     editor.penWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
@@ -133,7 +185,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const d = b.dataset;
-    if (d["tool"]) editor.setTool(d["tool"] as Tool);
+    if (d["layout"]) {
+      const [kind, arg] = d["layout"].split(":") as [string, string];
+      menu.hidden = true;
+      menuButton.setAttribute("aria-expanded", "false");
+      actions.layoutSelection(kind === "grid" ? { grid: arg as SortKey } : kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" });
+    } else if (d["action"] === "layout-menu") {
+      menu.hidden = !menu.hidden;
+      menuButton.setAttribute("aria-expanded", String(!menu.hidden));
+    } else if (d["tool"]) editor.setTool(d["tool"] as Tool);
     else if (d["color"]) {
       editor.penColor = d["color"];
       editor.changed();

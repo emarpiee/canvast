@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Phase 5.
+
+- **Arrange, align and distribute:** a menu on the Select toolbar arranges the selection in a grid (by name A to Z or Z to A, by size, by type or in stacking order), aligns it (left, centre, right, top, middle, bottom) and distributes it (three or more); groups move as one unit, every item moves by an exact translation, and each command is one undo step (ADR 0036).
+
 ## 0.13.0 — Phase 4: assets and storage (2026-10-15)
 
 Full suite: 380 passed, 6 skipped, 0 failed in 36 min 24 s ([record](docs/testing/full-run-phase-4.md)).
