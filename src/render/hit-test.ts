@@ -15,6 +15,14 @@ export const HIT_TOLERANCE_PX = 4;
 
 export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_TOLERANCE_PX): boolean {
   const b = po.box;
+  const t = po.rotated;
+  if (t) {
+    // Turn the point back into the unturned view (the box above is the turned object's bounding box).
+    if (x < b.minX - tol || x > b.maxX + tol || y < b.minY - tol || y > b.maxY + tol) return false;
+    const ox = x - t.cx;
+    const oy = y - t.cy;
+    return hitsObject(t.inner, t.vvp.width / 2 + t.c * ox + t.s * oy, t.vvp.height / 2 - t.s * ox + t.c * oy, tol);
+  }
   if (x < b.minX - tol || x > b.maxX + tol || y < b.minY - tol || y > b.maxY + tol) return false;
   if (po.cover) return true; // the view is inside the object
   if (po.obj.kind !== "stroke") {

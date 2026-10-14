@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.11.0 — Phase 2 slice 1: rotating strokes (2026-10-14)
+## 0.11.0 — Phase 2 slices 1 and 2: rotating strokes, images and text (2026-10-14)
 
-- **Rotate strokes** with a handle above the selection (Shift snaps to 15 degree steps). Rotation is a stored angle, so turning and turning back is exact, and it works at any depth and zoom. Several strokes turn about their common centre. One undo step. Images and text rotate in the next slice (ADR 0018).
+- **Rotate strokes, images and text** with a handle above the selection (Shift snaps to 15 degree steps). Rotation is a stored angle, so turning and turning back is exact, and it works at any depth and zoom. Several objects turn about their common centre. One undo step. A turned image resizes uniformly, and a turned text is edited turned (ADR 0018).
 - **Archives are version 3** (strokes may carry a rotation); earlier builds refuse them instead of dropping it.
 
 ## 0.10.0 — Phase 1 slice 9: settings scopes (2026-10-14)

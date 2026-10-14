@@ -4,7 +4,7 @@ import { expressExactIn, levelsBetween } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
-import { strokePivot } from "../doc/model";
+import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 
@@ -115,8 +115,8 @@ export class EditorState {
       const L = levelsBetween(o.frame ?? p.frame.space.world, p.frame);
       return translate(o, D.shift(p.dx, -L), D.shift(p.dy, -L));
     }
-    if (p.kind === "rotate" && p.ids.includes(o.id) && o.kind === "stroke") {
-      const pv = strokePivot(o);
+    if (p.kind === "rotate" && p.ids.includes(o.id)) {
+      const pv = pivotOf(o);
       const f = o.frame ?? p.frame.space.world;
       const about = p.about === null ? localToWorld(o, pv.x, pv.y) : f === p.frame ? p.about : expressExactIn(f.space, p.frame, p.about, f);
       return rotateAbout(o, about, p.delta);

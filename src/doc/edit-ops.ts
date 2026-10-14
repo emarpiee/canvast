@@ -2,7 +2,7 @@ import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
 import type { CanvasObject } from "./model";
-import { localBounds, strokePivot } from "./model";
+import { localBounds, pivotOf } from "./model";
 
 /**
  * Pure geometric edits. Each returns a new object; the document applies them
@@ -46,17 +46,16 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
 }
 
 /**
- * Rotate a stroke by `delta` (whole 2^-32 turns) about a world point (ADR 0018).
- * The stroke keeps its own geometry and gains `rot`, so rotating by an angle
- * and then by its opposite returns exactly the same object. The stroke turns
- * about the centre of its points; when `about` is elsewhere the stroke also
+ * Rotate an object by `delta` (whole 2^-32 turns) about a world point (ADR 0018).
+ * The object keeps its own geometry and gains `rot`, so rotating by an angle
+ * and then by its opposite returns exactly the same object. The object turns
+ * about the centre of its bounds; when `about` is elsewhere it also
  * moves around it (that move is rounded once, like a scale).
  */
 export function rotateAbout(o: CanvasObject, about: WorldPoint, delta: number): CanvasObject {
-  if (o.kind !== "stroke") throw new RangeError("only strokes rotate so far");
   const rot = normAngle((o.rot ?? 0) + delta);
   const { c, s } = cosSin(delta);
-  const pv = strokePivot(o);
+  const pv = pivotOf(o);
   // The pivot relative to `about`, in local units.
   const vx = D.toNumber(D.shift(D.sub(D.add(o.anchor.x, D.shift(D.fromNumber(pv.x), o.unit)), about.x), -o.unit));
   const vy = D.toNumber(D.shift(D.sub(D.add(o.anchor.y, D.shift(D.fromNumber(pv.y), o.unit)), about.y), -o.unit));

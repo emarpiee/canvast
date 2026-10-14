@@ -1,7 +1,8 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
-import { localBounds, strokePoints } from "../doc/model";
+import { localBounds, pivotOf, strokePoints } from "../doc/model";
+import { cosSin } from "../core/angle";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
 import type { Cover } from "./coarse";
@@ -118,6 +119,24 @@ export interface ProjectedObject {
   readonly exact: boolean;
   /** A coarse object covering the whole view (render/coarse.ts): drawn as one fill, with no projection. */
   readonly cover?: Cover;
+  /**
+   * A turned image or text (ADR 0018): `inner` is the object as if not turned,
+   * seen by a camera that is moved and widened so the turned view fits in it.
+   * Drawing turns the canvas by the object's angle; picking turns the point back.
+   */
+  readonly rotated?: RotatedView;
+}
+
+export interface RotatedView {
+  readonly inner: ProjectedObject;
+  /** Size of the widened viewport `inner` was projected for. */
+  readonly vvp: Viewport;
+  /** cos and sin of the object's angle. */
+  readonly c: number;
+  readonly s: number;
+  /** Centre of the real viewport. */
+  readonly cx: number;
+  readonly cy: number;
 }
 
 class Projected implements ProjectedObject {
@@ -172,6 +191,39 @@ export function tooSmallToDraw(o: CanvasObject, cam: Camera): boolean {
   return 2 ** (objectLevel(o) + cam.zi + cam.zf) < MIN_CELL_PX;
 }
 
+/**
+ * A turned image or text: project the unturned object for a camera whose centre is
+ * where the viewport centre lands once the turn is undone (computed exactly: the
+ * matrix entries are doubles, which are exact dyadic numbers), with a viewport
+ * large enough to contain the turned one.
+ */
+function projectRotated(o: CanvasObject, cam: Camera, vp: Viewport, p: Projection, box: ScreenBox, opts: { keepTiny?: boolean }): ProjectedObject | null {
+  const { c, s } = cosSin(o.rot!);
+  const pv = pivotOf(o);
+  const dx = D.sub(p.lx, D.fromNumber(pv.x));
+  const dy = D.sub(p.ly, D.fromNumber(pv.y));
+  // u = pivot + R(-angle) (L - pivot)
+  const ux = D.add(D.fromNumber(pv.x), D.add(D.mul(D.fromNumber(c), dx), D.mul(D.fromNumber(s), dy)));
+  const uy = D.add(D.fromNumber(pv.y), D.sub(D.mul(D.fromNumber(c), dy), D.mul(D.fromNumber(s), dx)));
+  const { rot: _turn, ...flat } = o;
+  const unturned = flat as CanvasObject;
+  const vcam: Camera = { ...cam, center: { x: D.add(o.anchor.x, D.shift(ux, o.unit)), y: D.add(o.anchor.y, D.shift(uy, o.unit)) } };
+  const vvp: Viewport = { width: Math.abs(c) * vp.width + Math.abs(s) * vp.height, height: Math.abs(s) * vp.width + Math.abs(c) * vp.height };
+  const inner = projectObject(unturned, vcam, vvp, opts);
+  if (!inner) return null;
+  return {
+    obj: o,
+    box,
+    q: Float64Array.of(box.minX, box.minY, box.maxX, box.maxY),
+    radius: 0,
+    exact: inner.exact,
+    rotated: { inner, vvp, c, s, cx: vp.width / 2, cy: vp.height / 2 },
+    get proj(): Projection {
+      return inner.proj;
+    },
+  };
+}
+
 export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: { keepTiny?: boolean } = {}): ProjectedObject | null {
   const p = projectionFor(cam, vp, o.anchor, o.unit);
   const b: LocalBounds = localBounds(o);
@@ -181,6 +233,7 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
     return null;
   }
   if (!opts.keepTiny && tooSmallToDraw(o, cam)) return null;
+  if (o.kind !== "stroke" && o.rot) return projectRotated(o, cam, vp, p, box, opts);
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
   if (o.kind !== "stroke") {
@@ -232,7 +285,7 @@ const FAST_MAX_PX_PER_CELL = 2 ** 30;
 
 export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: Viewport): ProjectedObject | null {
   const o = e.obj;
-  if (cf.pxPerCell > FAST_MAX_PX_PER_CELL) return projectObject(o, cam, vp);
+  if (cf.pxPerCell > FAST_MAX_PX_PER_CELL || (o.kind !== "stroke" && o.rot)) return projectObject(o, cam, vp);
   const s = e.scale * cf.pxPerCell; // px per local unit
   const ox = cf.x + e.ax * cf.pxPerCell;
   const oy = cf.y + e.ay * cf.pxPerCell;

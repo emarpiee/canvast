@@ -19,7 +19,7 @@ or network connection.
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
 >
-> **v0.11.0:** strokes can be rotated with a handle above the selection (ADR 0018).
+> **v0.11.0:** strokes, images and text can be rotated with a handle above the selection (ADR 0018).
 >
 > **v0.10.0:** pen and select options and the last view now persist across reloads (device settings, ADR 0017).
 >
@@ -537,4 +537,4 @@ reproduces on any checkout.
 | Phase 1 slice 8 — text objects | 94/94 unit (12 new); text 16/16 and extreme depth 4/4 (4 projects); 2 mutation checks caught; owner-reported hang at 2^10,000,000 fixed (1.8 s → 15 ms per frame); quick E2E 253 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.8.0 sha256 `457ea053…6fb2` | see `git log` |
 | v0.9.0 — nested frames | 130/130 unit; depth suite A1 A2 A3 A5 A7 (4 projects); quick E2E (4 projects, before the suites were trimmed) 346 passed / 3 skipped / 3 load flakes that pass alone; full E2E on 3 Chromium projects 214 passed / 4 skipped / 1 flake (fixed afterwards), 21 min 44 s; full E2E with Firefox (4 projects) 301 passed / 6 skipped / 1 timeout (fixed; passes alone), 32 min 25 s |
 | Phase 1 slice 9 — settings scopes | 134/134 unit (4 new); settings reload test in 4 projects; frames, assets, organize and storage specs in Chromium and Firefox 176 passed / 4 skipped; full suite not re-run since v0.9.0 |
-| Phase 2 slice 1 — rotating strokes | 137/137 unit (3 new); rotation E2E in 4 projects; editing, deep-zoom-rendering, tiles, density and archive specs in Chromium and Firefox 58 passed; full suite not re-run since v0.9.0 |
+| Phase 2 slices 1-2 — rotating strokes, images and text | 137/137 unit (3 new); rotation E2E (strokes; image and text) in 4 projects; frames, text, editing, deep-zoom-rendering, tiles and density specs in Chromium and Firefox 96 passed (6.7 min); full suite not re-run since v0.9.0 |

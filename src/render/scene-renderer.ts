@@ -80,7 +80,21 @@ export function drawObjects(
       continue;
     }
     flush();
-    if (po.cover) {
+    if (po.rotated) {
+      // A turned image or text: draw the unturned one into the widened viewport, with the canvas turned.
+      const t = po.rotated;
+      ctx.save();
+      ctx.translate(t.cx, t.cy);
+      ctx.rotate(Math.atan2(t.s, t.c));
+      ctx.translate(-t.vvp.width / 2, -t.vvp.height / 2);
+      if (po.obj.kind === "text") drawText(ctx, t.inner, t.vvp, dpr);
+      else if (po.obj.kind === "image") {
+        const src = assets.get(po.obj.assetId);
+        if (!src) pending = true;
+        drawImageObject(ctx, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
+      }
+      ctx.restore();
+    } else if (po.cover) {
       const src = po.obj.kind === "image" ? assets.get(po.obj.assetId) : null;
       if (po.obj.kind === "image" && !src) pending = true;
       drawCover(ctx, po, vp, src, theme.imagePlaceholder);
@@ -188,12 +202,12 @@ export function rotateHandlePoint(b: ScreenBox): [number, number] {
   return [(b.minX + b.maxX) / 2, b.minY - ROTATE_HANDLE_OFFSET_PX];
 }
 
-/** Rotation is offered when every selected object is a stroke (images and text come later). */
+/** Rotation is offered when something selected is visible and not a covering approximation. */
 export function canRotate(visible: readonly ProjectedObject[], editor: EditorState): boolean {
   let any = false;
   for (const po of visible) {
     if (!editor.selection.has(po.obj.id)) continue;
-    if (po.obj.kind !== "stroke") return false;
+    if (po.cover) return false;
     any = true;
   }
   return any;

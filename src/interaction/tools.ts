@@ -208,7 +208,7 @@ export function attachTools(
       if (Math.hypot(s.x - rx, s.y - ry) <= HANDLE_SIZE_PX) {
         const ids = [...editor.selection].filter((id) => doc.get(id));
         const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
-        const single = ids.length === 1 ? (doc.get(ids[0]!) as StrokeObject) : null;
+        const single = ids.length === 1 ? doc.get(ids[0]!) : null;
         g = {
           kind: "rotate",
           pointerId: e.pointerId,
@@ -229,7 +229,8 @@ export function attachTools(
         if (Math.abs(s.x - hx) <= HANDLE_SIZE_PX && Math.abs(s.y - hy) <= HANDLE_SIZE_PX && !editor.blockEdit()) {
           const [fx, fy] = corners[(i + 2) % 4]!;
           const ids = [...editor.selection].filter((id) => doc.get(id));
-          const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image";
+          // A turned image resizes uniformly: stretching its bounding box would shear it.
+          const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image" && !doc.get(ids[0]!)?.rot;
           g = {
             kind: "scale",
             pointerId: e.pointerId,

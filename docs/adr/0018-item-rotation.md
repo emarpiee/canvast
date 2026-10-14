@@ -20,10 +20,24 @@ Phase 2 adds item rotation. An object's position is an exact dyadic anchor; its 
 - **Gesture:** a handle above the selection box; drag to turn, Shift snaps to 15 degree steps (of the stroke's own angle for one stroke). One transaction on release, so one undo step.
 - **Format:** `rot` is stored in the object record; archives are version 3 (older versions refuse them rather than silently drop the rotation). Opening a rotated drawing in an older build shows it unrotated, and saving there would lose the angle: no downgrade path.
 
-## Not in this slice
+## Images and text (slice 2b)
 
-- **Images and text.** The handle is offered only when every selected object is a stroke. Rotating a bitmap or glyph outlines exactly at any depth (rotated pixel rectangles, rotated glyph winding in the coarse samplers) is the next slice, using the same `rot` field and the same `strokePoints`-style single transform.
+`rot` moved to the base of every object; the pivot is the centre of the object's own (unturned) bounds, and `localBounds` of a turned image or text is the bounding box of the turned rectangle (so culling, the index and selection need no change).
+
+Instead of teaching every drawing path (snapped pixel rectangles, exact glyph outlines, coarse samplers) about angles, a turned image or text is drawn as the **unturned object seen by a moved, widened camera, with the canvas turned**:
+
+- the camera centre is where the viewport centre lands once the turn is undone, `u = pivot + R(-angle)(L - pivot)`, computed in exact dyadic arithmetic (the matrix entries are doubles, which are exact dyadic numbers), so it is exact at any magnification;
+- the viewport is widened to the bounding box of the turned viewport; the existing code then draws the unturned object into it, unchanged, and the canvas is turned by the angle about the viewport centre (`ProjectedObject.rotated`, `projectRotated`);
+- picking turns the pointer back by the same matrix and asks the unturned projection (`hitsObject`);
+- the coarse samplers (objects far coarser than the camera) undo the turn on the rounded centre; exact pixel boundaries are not available for a turned image there, so a boundary in view past 100,000 levels is the dimmed approximation of ADR 0016;
+- turned magnified pixels would show hairline seams between neighbours (their edges are no longer on device pixels), so each is grown by half a px (`bleed`);
+- a turned image resizes uniformly (a non-uniform stretch of the bounding box would shear it); the text editor is turned the same way with CSS about the same pivot.
+
+## Not built
+
 - **Snapping to other objects and guides** (Phase 2, next).
+- The selection outline of a turned image or text is its bounding box, not the turned rectangle.
+- Lasso selection of a turned image needs all four corners of its bounding box inside the lasso (conservative).
 
 ## Consequences
 

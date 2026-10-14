@@ -745,16 +745,18 @@ test("pen and select options come back after a reload (device settings, ADR 0017
   await expect(p.getByRole("button", { name: "Stabilizer", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
+/** Drag an object's rotate handle (26 px above the selection box) to the right of its centre: a quarter turn clockwise. */
+async function turnQuarter(app: App, id: string): Promise<void> {
+  const b = (await boxOf(app, id))!;
+  const cx = Math.round((b.minX + b.maxX) / 2);
+  const cy = Math.round((b.minY + b.maxY) / 2);
+  await app.drag({ x: cx, y: Math.round(b.minY) - 26 }, { x: cx + Math.round(cy - b.minY) + 26, y: cy }, 8);
+}
+
 test("rotate a stroke with its handle: the shape turns, picking follows, one undo step, it survives a reload and works a trillion levels down (ADR 0018)", async ({ app }) => {
   const p = app.page;
   const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
-  const rotateQuarter = async (id: string) => {
-    const b = await box(id);
-    const cx = Math.round((b.minX + b.maxX) / 2);
-    const cy = Math.round((b.minY + b.maxY) / 2);
-    // The handle is 26 px above the top edge; drag it to the right of the centre: a quarter turn clockwise.
-    await app.drag({ x: cx, y: Math.round(b.minY) - 26 }, { x: cx + Math.round(cy - b.minY) + 26, y: cy }, 8);
-  };
+  const rotateQuarter = (id: string) => turnQuarter(app, id);
   for (const deep of [false, true]) {
     if (deep) await p.evaluate(() => window.__canvastDebug.jump(1e12));
     await p.keyboard.press("p");
@@ -792,4 +794,62 @@ test("rotate a stroke with its handle: the shape turns, picking follows, one und
     await p.evaluate(() => window.__canvastDebug.nextFrame());
     await p.keyboard.press("Home");
   }
+});
+
+test("rotate an image and a text: drawn turned, picked turned, exact pixels deep inside, one undo step (ADR 0018)", async ({ app }) => {
+  const p = app.page;
+  const px = (pts: number[][]) => p.evaluate((ps) => ps.map(([x, y]) => window.__canvastDebug.pixelAt(x!, y!).join(",")), pts);
+  // An image: four different source pixels meet at its centre.
+  await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: blockyFixture() });
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 1);
+  const id = (await p.evaluate(() => window.__canvastDebug.objectFrames()))[0]!.id;
+  await p.mouse.click(640, 400);
+  await app.frame();
+  const flat = (await boxOf(app, id))!;
+  // (Sampled with nothing selected: the handles are drawn over the corners.)
+  await p.keyboard.press("Escape");
+  await app.frame();
+  const topLeft = (await px([[flat.minX + 14, flat.minY + 14]]))[0]!;
+  await p.mouse.click(640, 400);
+  await turnQuarter(app, id);
+  await p.keyboard.press("Escape");
+  await app.frame();
+  const turned = (await boxOf(app, id))!;
+  expect(turned.maxX - turned.minX, "width and height swap").toBeCloseTo(flat.maxY - flat.minY, 0);
+  expect(turned.maxY - turned.minY).toBeCloseTo(flat.maxX - flat.minX, 0);
+  // A quarter turn clockwise moves the top-left corner to the top-right.
+  expect((await px([[turned.maxX - 14, turned.minY + 14]]))[0], "the corner colour went with it").toBe(topLeft);
+  // Zoomed far into the turned image (more than 64 px per source pixel) the four pixels at its centre are still there.
+  const around = [[620, 380], [660, 380], [620, 420], [660, 420]];
+  await p.evaluate(() => window.__canvastDebug.jump(6));
+  await app.frame();
+  const inside = await px(around);
+  expect(new Set(inside).size, "four source pixels meet at the centre").toBeGreaterThan(1);
+  await p.evaluate(() => window.__canvastDebug.jump(-6));
+  await p.keyboard.press("Control+z");
+  expect(await boxOf(app, id), "one undo step, exactly back").toEqual(flat);
+
+  // A text.
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await p.keyboard.press("t");
+  await p.mouse.click(500, 400);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.type("HHHH HHHH");
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("text-editor")).toBeHidden();
+  const tid = (await p.evaluate(() => window.__canvastDebug.objectFrames())).at(-1)!.id;
+  await p.keyboard.press("v");
+  const tb = (await boxOf(app, tid))!;
+  await p.mouse.click(Math.round((tb.minX + tb.maxX) / 2), Math.round((tb.minY + tb.maxY) / 2));
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([tid]);
+  await turnQuarter(app, tid);
+  await app.frame();
+  const tt = (await boxOf(app, tid))!;
+  expect(tt.maxY - tt.minY, "the text now stands up").toBeGreaterThan((tb.maxY - tb.minY) * 1.5);
+  expect(tt.maxX - tt.minX).toBeLessThan((tb.maxX - tb.minX) * 0.8);
+  expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), "it is drawn").toBeGreaterThan(50);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(Math.round((tt.minX + tt.maxX) / 2), Math.round((tt.minY + tt.maxY) / 2));
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "picked where it is now").toEqual([tid]);
 });

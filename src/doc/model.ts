@@ -39,18 +39,18 @@ interface ObjectBase {
   readonly opacity: number;
   /** Explicit attachment target. Always null until attach is implemented. */
   readonly attachmentTargetId: ObjectId | null;
+  /**
+   * Rotation about the centre of the object's own (unrotated) bounds, in whole
+   * 2^-32 turns (core/angle.ts, ADR 0018); absent = not rotated.
+   */
+  readonly rot?: number;
 }
 
 export interface StrokeObject extends ObjectBase {
   readonly kind: "stroke";
   /** Flat [x0, y0, x1, y1, ...] polyline in local units, relative to anchor. */
   readonly points: readonly number[];
-  /**
-   * Rotation about the centre of the points' bounding box, in whole 2^-32
-   * turns (core/angle.ts); absent or 0 = not rotated. Use `strokePoints` for
-   * the geometry that is drawn, hit and indexed.
-   */
-  readonly rot?: number;
+  // `rot` (ObjectBase) turns the points: use `strokePoints` for the geometry that is drawn, hit and indexed.
   /** Stroke diameter in local units. */
   readonly width: number;
   readonly color: string;
@@ -128,12 +128,48 @@ export function strokePoints(o: StrokeObject): readonly number[] {
   return r;
 }
 
-export function localBounds(o: CanvasObject): LocalBounds {
+/** Bounds of the object's own geometry before `rot` is applied. */
+export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
     const l = layoutText(o.md, o.w / o.size);
     const p = TEXT_PAD_EM * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
+  }
+  const p = o.points;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < p.length; i += 2) {
+    minX = Math.min(minX, p[i]!);
+    maxX = Math.max(maxX, p[i]!);
+    minY = Math.min(minY, p[i + 1]!);
+    maxY = Math.max(maxY, p[i + 1]!);
+  }
+  const r = o.width / 2;
+  return { minX: minX - r, minY: minY - r, maxX: maxX + r, maxY: maxY + r };
+}
+
+/** The rotation pivot: the centre of the unrotated bounds, in local units. */
+export function pivotOf(o: CanvasObject): { x: number; y: number } {
+  const b = unrotatedBounds(o);
+  return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+}
+
+export function localBounds(o: CanvasObject): LocalBounds {
+  if (o.kind !== "stroke") {
+    const b = unrotatedBounds(o);
+    if (!o.rot) return b;
+    // Bounding box of the turned rectangle.
+    const { c, s } = cosSin(o.rot);
+    const px = (b.minX + b.maxX) / 2;
+    const py = (b.minY + b.maxY) / 2;
+    const hx = (b.maxX - b.minX) / 2;
+    const hy = (b.maxY - b.minY) / 2;
+    const ex = Math.abs(c) * hx + Math.abs(s) * hy;
+    const ey = Math.abs(s) * hx + Math.abs(c) * hy;
+    return { minX: px - ex, minY: py - ey, maxX: px + ex, maxY: py + ey };
   }
   const p = strokePoints(o);
   let minX = Infinity;
@@ -190,12 +226,12 @@ export function validateObject(o: CanvasObject): CanvasObject {
   finite(o.z, "z");
   if (!(finite(o.opacity, "opacity") > 0 && o.opacity <= 1)) throw new InvalidObjectError("opacity must be in (0, 1]");
   if (o.attachmentTargetId !== null) throw new InvalidObjectError("attachment is not supported yet");
+  if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
     if (o.points.length < 2 || o.points.length % 2 !== 0) throw new InvalidObjectError("stroke needs at least one point");
     o.points.forEach((v, i) => finite(v, `point[${i}]`));
     positive(o.width, "width");
     if (!COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
-    if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   } else if (o.kind === "image") {
     if (!HASH_RE.test(o.assetId)) throw new InvalidObjectError(`bad asset id ${o.assetId}`);
     positive(o.w, "w");
@@ -249,12 +285,13 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     // Snapshots written before opacity existed are fully opaque.
     opacity: (s["opacity"] ?? 1) as number,
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
+    ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),
   };
   let o: CanvasObject;
   if (s.kind === "stroke") {
     if (!Array.isArray(s["points"])) throw new InvalidObjectError("points missing");
-    o = { ...base, kind: "stroke", points: s["points"] as number[], width: s["width"] as number, color: String(s["color"]), ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}) };
+    o = { ...base, kind: "stroke", points: s["points"] as number[], width: s["width"] as number, color: String(s["color"]) };
   } else if (s.kind === "image") {
     o = {
       ...base,

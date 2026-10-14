@@ -3,7 +3,8 @@ import type { WorldPoint } from "../core/camera";
 import type { TermSum } from "../core/frames";
 import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
 import type { CanvasObject, ImageObject, StrokeObject, TextObject } from "../doc/model";
-import { localBounds, strokePoints } from "../doc/model";
+import { localBounds, pivotOf, strokePoints } from "../doc/model";
+import { cosSin } from "../core/angle";
 import { layoutText, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
 
@@ -93,7 +94,20 @@ export function classifyCoarse(
   const m = (2 ** info.errLog2 + 2 ** viewLog2) / scale + mag * ROUND;
   if (lx < b.minX - m || lx > b.maxX + m || ly < b.minY - m || ly > b.maxY + m) return "miss";
   const sampler = SAMPLERS[o.kind] as CoarseSampler<CanvasObject>;
+  if (o.kind !== "stroke" && o.rot) {
+    // Undo the turn about the pivot, then test the unturned object. Exact pixel boundaries need the unturned centre, so they are not available.
+    const { x, y } = unturn(o, lx, ly);
+    return sampler.classify(o, { lx: x, ly: y, m, vp, info, terms: () => null });
+  }
   return sampler.classify(o, { lx, ly, m, vp, info, terms });
+}
+
+function unturn(o: CanvasObject, lx: number, ly: number): { x: number; y: number } {
+  const { c, s } = cosSin(o.rot!);
+  const pv = pivotOf(o);
+  const dx = lx - pv.x;
+  const dy = ly - pv.y;
+  return { x: pv.x + c * dx + s * dy, y: pv.y - s * dx + c * dy };
 }
 
 /**
@@ -106,7 +120,8 @@ export function approxCoarse(o: CanvasObject, center: WorldPoint, info: CoarseIn
   const lx = D.toNumber(D.sub(center.x, o.anchor.x)) / scale;
   const ly = D.toNumber(D.sub(center.y, o.anchor.y)) / scale;
   const sampler = SAMPLERS[o.kind] as CoarseSampler<CanvasObject>;
-  return { ...sampler.approx(o, { lx, ly, m: 0, vp, info, terms: () => null }), dim: true };
+  const at = o.kind !== "stroke" && o.rot ? unturn(o, lx, ly) : { x: lx, y: ly };
+  return { ...sampler.approx(o, { lx: at.x, ly: at.y, m: 0, vp, info, terms: () => null }), dim: true };
 }
 
 // ---- samplers ---------------------------------------------------------------

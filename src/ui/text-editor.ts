@@ -7,7 +7,8 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { TextObject } from "../doc/model";
-import { homeObject, newObjectId } from "../doc/model";
+import { homeObject, newObjectId, pivotOf } from "../doc/model";
+import { radiansFromAngle } from "../core/angle";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
@@ -106,6 +107,14 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     box.style.width = `${target.w * ppu}px`;
     box.style.fontSize = `${em}px`;
     box.style.setProperty("--em", `${em}px`);
+    // A turned text is edited turned, about the same pivot it is drawn about.
+    if (target.rot) {
+      const pv = pivotOf(target);
+      box.style.transformOrigin = `${pv.x * ppu}px ${pv.y * ppu}px`;
+      box.style.transform = `rotate(${radiansFromAngle(target.rot)}rad)`;
+    } else {
+      box.style.transform = "";
+    }
     box.style.color = target.color;
     box.style.fontFamily = `${TEXT_FONT_FAMILY}, sans-serif`;
     bar.style.left = `${Math.max(4, s.x)}px`;

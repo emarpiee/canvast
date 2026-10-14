@@ -179,6 +179,8 @@ export function drawImageObject(
   dpr: number,
   src: RasterSource | null,
   placeholder: string,
+  /** Grow each magnified source pixel by this many px (turned images: edges are not on pixel boundaries, so neighbours would show seams). */
+  bleed = 0,
 ): void {
   const o = po.obj as ImageObject;
   const [l, t, r, b] = po.q as unknown as [number, number, number, number];
@@ -250,7 +252,7 @@ export function drawImageObject(
         const a = data[k + 3]!;
         if (a === 0) continue;
         ctx.fillStyle = `rgba(${data[k]},${data[k + 1]},${data[k + 2]},${a / 255})`;
-        ctx.fillRect(left, top, right - left, bottom - top);
+        ctx.fillRect(left, top, right - left + bleed, bottom - top + bleed);
       }
     }
   });
