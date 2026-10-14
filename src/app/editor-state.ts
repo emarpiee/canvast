@@ -35,9 +35,14 @@ export interface DraftStroke {
   points: number[];
   width: number;
   color: string;
+  /** The pen drawing it (interaction/pens.ts), and the extra per-point input that pen may use. */
+  kind: PenKind;
+  pressure?: number[];
+  speed?: number[];
 }
 
 import type { PenLock } from "../interaction/pen-width";
+import type { PenKind } from "../interaction/pens";
 import type { SelectionFrame } from "../render/selection-frame";
 
 export const PEN_COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"] as const;
@@ -52,6 +57,8 @@ export class EditorState {
   lassoFilter: LassoFilter = "strokes";
   penColor: string = PEN_COLORS[0];
   penWidthPx: number = PEN_WIDTHS[1];
+  /** Which pen draws (interaction/pens.ts). */
+  penKind: PenKind = "fine";
   /** Thickness lock (interaction/pen-width.ts): new strokes keep the same width on the canvas, not on screen. */
   lock: PenLock | null = null;
   /** The floating Layers panel is open (ui/layers-panel.ts). */

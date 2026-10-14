@@ -400,7 +400,9 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 1 done:** arrange in a grid, align and distribute ([ADR 0036](adr/0036-arrange-align-distribute.md)); tested in `arrange.test.ts` and `frames.spec.ts`.
 
-**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan.
+**Phase 5, slice 2 done:** four pens ([ADR 0037](adr/0037-pens.md)); tested in `pens.test.ts` and `frames.spec.ts`.
+
+**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan (Markdown-backed editing and backlinks, layers/history, cross-media copy/paste).
 
 ## Phase 1, slice 9 — settings scopes
 

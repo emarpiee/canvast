@@ -3,6 +3,7 @@ import { PEN_COLORS, PEN_WIDTHS } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
+import type { PenKind } from "../interaction/pens";
 import { ICONS } from "./icons";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
@@ -33,6 +34,13 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
+];
+
+const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string }> = [
+  { id: "fine", label: "Fine pen", title: "Fine pen: a clean line of one width", icon: ICONS.penTool },
+  { id: "pencil", label: "Pencil", title: "Pencil: graphite made of three thin, soft passes that wander a little", icon: ICONS.pencilLine },
+  { id: "ink", label: "Ink pen", title: "Ink pen: a broad nib, thick across it and thin along it; pressure or speed thins and thickens the line", icon: ICONS.penLine },
+  { id: "marker", label: "Marker", title: "Marker: a wide, translucent line", icon: ICONS.highlighter },
 ];
 
 const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string }> }> = [
@@ -82,6 +90,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${PEN_COLORS.map(
           (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${c}"></span></button>`,
         ).join("")}
+      </div>
+      <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
+        ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="pen">
         ${PEN_WIDTHS.map(
@@ -186,7 +197,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const d = b.dataset;
-    if (d["layout"]) {
+    if (d["penKind"]) {
+      editor.penKind = d["penKind"] as PenKind;
+      editor.changed();
+    } else if (d["layout"]) {
       const [kind, arg] = d["layout"].split(":") as [string, string];
       menu.hidden = true;
       menuButton.setAttribute("aria-expanded", "false");
@@ -251,6 +265,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
       b.setAttribute("aria-checked", String(b.dataset["tool"] === editor.tool));
     }
+    for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
     for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", b.dataset["color"] === editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;

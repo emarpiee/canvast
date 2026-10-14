@@ -109,6 +109,7 @@ async function start(): Promise<void> {
   const settings = new SettingsStore();
   editor.penColor = settings.get("pen.color");
   editor.penWidthPx = settings.get("pen.widthPx");
+  editor.penKind = settings.get("pen.kind");
   editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") };
   editor.followZoom = settings.get("pen.followZoom");
   editor.ignoreFilling = settings.get("select.ignoreFilling");
@@ -123,6 +124,7 @@ async function start(): Promise<void> {
   editor.subscribe(() => {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
+    settings.set("pen.kind", editor.penKind);
     settings.set("pen.stabilizer.on", editor.stabilizer.on);
     settings.set("pen.stabilizer.strength", editor.stabilizer.strength);
     settings.set("pen.followZoom", editor.followZoom);

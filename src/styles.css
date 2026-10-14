@@ -180,7 +180,7 @@ html, body {
 .toolbar .swatch span { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--hud-border); }
 .toolbar .size { width: 84px; accent-color: var(--hud-accent); }
 .toolbar .size-out { font: 500 11px var(--font-ui); min-width: 38px; opacity: 0.8; }
-.toolbar .swatch.is-on, .toolbar .width.is-on, .toolbar .lock[aria-pressed="true"], .toolbar .stab[aria-pressed="true"], .toolbar .follow[aria-pressed="true"], .toolbar .ignore-fill[aria-pressed="true"], .toolbar .snap[aria-pressed="true"], .toolbar .layers-toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.toolbar .swatch.is-on, .toolbar .width.is-on, .toolbar .pen-kind[aria-checked="true"], .toolbar .lock[aria-pressed="true"], .toolbar .stab[aria-pressed="true"], .toolbar .follow[aria-pressed="true"], .toolbar .ignore-fill[aria-pressed="true"], .toolbar .snap[aria-pressed="true"], .toolbar .layers-toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
 .toolbar .width span { width: 16px; border-radius: 4px; background: currentColor; }
 
 .toast {

@@ -9,6 +9,7 @@ import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeL
 import type { StrokeObject } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
+import { expandStroke } from "../interaction/pens";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
@@ -175,20 +176,23 @@ export function drawOverlays(
   for (const d of [...editor.draftDone, ...(editor.draft ? [editor.draft] : [])]) {
     const cam = cameraIn(fc, d.frame);
     if (!cam || d.points.length < 2) continue;
-    const draft: StrokeObject = {
-      id: DRAFT_ID,
-      kind: "stroke",
-      anchor: d.anchor,
-      unit: d.unit,
-      z: Infinity,
-      opacity: 1,
-      attachmentTargetId: null,
-      points: d.points,
-      width: d.width,
-      color: d.color,
-    };
-    const po = projectObject(draft, cam, vp, { keepTiny: true });
-    if (po) drawStroke(ctx, po, vp);
+    // The pen's own strokes, so what is drawn while drawing is what is committed.
+    for (const piece of expandStroke(d.kind, { points: d.points, width: d.width, ...(d.pressure ? { pressure: d.pressure } : {}), ...(d.speed ? { speed: d.speed } : {}) })) {
+      const draft: StrokeObject = {
+        id: DRAFT_ID,
+        kind: "stroke",
+        anchor: d.anchor,
+        unit: d.unit,
+        z: Infinity,
+        opacity: piece.opacity,
+        attachmentTargetId: null,
+        points: piece.points,
+        width: piece.width,
+        color: d.color,
+      };
+      const po = projectObject(draft, cam, vp, { keepTiny: true });
+      if (po) drawStroke(ctx, po, vp);
+    }
   }
 
   drawSelection(ctx, selected, editor, theme, vp);

@@ -17,6 +17,10 @@ import mapPin from "lucide-static/icons/map-pin.svg";
 import upload from "lucide-static/icons/upload.svg";
 import type from "lucide-static/icons/type.svg";
 import layoutGrid from "lucide-static/icons/layout-grid.svg";
+import penTool from "lucide-static/icons/pen-tool.svg";
+import pencilLine from "lucide-static/icons/pencil-line.svg";
+import penLine from "lucide-static/icons/pen-line.svg";
+import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
 import italic from "lucide-static/icons/italic.svg";
 import heading1 from "lucide-static/icons/heading-1.svg";
@@ -79,6 +83,10 @@ export const ICONS = {
   x: clean(x),
   type: clean(type),
   layoutGrid: clean(layoutGrid),
+  penTool: clean(penTool),
+  pencilLine: clean(pencilLine),
+  penLine: clean(penLine),
+  highlighter: clean(highlighter),
   bold: clean(bold),
   italic: clean(italic),
   heading1: clean(heading1),

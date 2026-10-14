@@ -11,6 +11,7 @@ import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
+import { expandStroke } from "./pens";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
 import { bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
@@ -23,7 +24,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { arrangeSelection, deleteSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
-import { expandToUnits, isInside } from "../doc/groups";
+import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 
 /**
  * Pointer routing and tool behaviour.
@@ -99,7 +100,7 @@ const linesOf = (o: CanvasObject, f: Frame): ExactLines => {
 type Gesture =
   | { kind: "none" }
   | { kind: "pan" }
-  | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number }
+  | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number; at: number }
   | { kind: "lasso"; pointerId: number }
   | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId> }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
@@ -224,8 +225,11 @@ export function attachTools(
   const effectiveTool = (): Tool => (spaceDown ? "hand" : editor.tool);
 
   // ---- pen --------------------------------------------------------------
-  const penPoint = (s: ScreenPoint): void => {
+  const penPoint = (s: ScreenPoint, e?: PointerEvent, last?: { t: number; p: ScreenPoint }): void => {
     const d = editor.draft!;
+    // Extra input for the pens that use it: pressure where the device has it, and speed.
+    if (d.pressure) d.pressure.push(e && e.pointerType !== "mouse" && e.pressure > 0 ? e.pressure : 0);
+    if (d.speed) d.speed.push(e && last && e.timeStamp > last.t ? Math.hypot(s.x - last.p.x, s.y - last.p.y) / (e.timeStamp - last.t) : 0);
     const w = worldIn(s, d.frame);
     // Local units relative to the stroke anchor (exact difference, then one rounding).
     d.points.push(
@@ -258,6 +262,8 @@ export function attachTools(
       points: [0, 0],
       width: px / 2 ** cam.zf,
       color: d.color,
+      kind: d.kind,
+      ...(d.pressure ? { pressure: [0], speed: [0] } : {}),
     };
     g.depth = depth;
     g.px = px;
@@ -269,23 +275,29 @@ export function attachTools(
     editor.draftDone = [];
     if (!pieces.length || pieces[pieces.length - 1]!.points.length < 2) return;
     const z = doc.topZ();
-    const strokes = pieces.map((d, i): CanvasObject => {
-      const stroke: StrokeObject = {
-        id: newObjectId(),
-        kind: "stroke",
-        ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
-        anchor: d.anchor,
-        unit: d.unit,
-        z: z + 1 + i,
-        opacity: 1,
-        attachmentTargetId: null,
-        points: d.points,
-        width: d.width,
-        color: d.color,
-      };
-      return homeObject(normalizeUnit(stroke), doc.space);
-    });
-    doc.commit(doc.transaction("Draw stroke", strokes));
+    let at = 0;
+    // A pen can make several strokes from one gesture (pencil passes, ink pieces); they are grouped to act as one.
+    const strokes = pieces.flatMap((d) =>
+      expandStroke(d.kind, { points: d.points, width: d.width, ...(d.pressure ? { pressure: d.pressure } : {}), ...(d.speed ? { speed: d.speed } : {}) }).map((piece): CanvasObject => {
+        const stroke: StrokeObject = {
+          id: newObjectId(),
+          kind: "stroke",
+          ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
+          anchor: d.anchor,
+          unit: d.unit,
+          z: z + 1 + at++,
+          opacity: piece.opacity,
+          attachmentTargetId: null,
+          points: piece.points,
+          width: piece.width,
+          color: d.color,
+        };
+        return homeObject(normalizeUnit(stroke), doc.space);
+      }),
+    );
+    if (!strokes.length) return;
+    const made = strokes.length > 1 && pieces.some((d) => d.kind !== "fine") ? groupObjects(strokes, 0) : strokes;
+    doc.commit(doc.transaction("Draw stroke", made));
   };
 
   // ---- select -------------------------------------------------------------
@@ -502,10 +514,10 @@ export function attachTools(
         const f = 2 ** cam.zf;
         const depth = depthOf(view.frameCamera);
         const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
-        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor };
+        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor, kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}) };
         editor.draftDone = [];
-        penPoint(s);
-        g = { kind: "pen", pointerId: e.pointerId, last: s, tip: s, depth, px };
+        penPoint(s, e);
+        g = { kind: "pen", pointerId: e.pointerId, last: s, tip: s, depth, px, at: e.timeStamp };
         editor.changed();
         break;
       }
@@ -574,8 +586,9 @@ export function attachTools(
           const p = editor.stabilizer.on ? (g.tip = ropeStep(g.tip, local(ce), ropeFor(editor.stabilizer.strength))) : local(ce);
           if (Math.hypot(p.x - g.last.x, p.y - g.last.y) >= PEN_MIN_STEP_PX) {
             splitIfZoomed(g);
-            penPoint(p);
+            penPoint(p, ce, { t: g.at, p: g.last });
             g.last = p;
+            g.at = ce.timeStamp;
           }
         }
         editor.changed();

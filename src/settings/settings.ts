@@ -32,6 +32,7 @@ const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#
 export const SETTINGS = {
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
+  "pen.kind": { scope: "device", default: "fine", validate: oneOf("fine", "pencil", "ink", "marker"), effect: "immediate" } as Def<"fine" | "pencil" | "ink" | "marker">,
   "pen.widthPx": { scope: "device", default: 3, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
   "pen.stabilizer.on": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "pen.stabilizer.strength": { scope: "device", default: 50, validate: range(0, 100), effect: "immediate" } as Def<number>,

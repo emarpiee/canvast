@@ -1406,3 +1406,45 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   expect((await boxes()).map((b) => Math.round(b.minX))).toEqual(before.map((b) => Math.round(b.minX)));
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the pens differ: fine is one stroke, marker one translucent wide one, pencil and ink make grouped strokes, and the choice is remembered (ADR 0037)", async ({ app }) => {
+  const p = app.page;
+  const strokes = async () => (await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<Record<string, unknown> & { id: string; opacity: number; width: number; groups?: string[] }>;
+  const draw = async (name: string, y: number): Promise<Awaited<ReturnType<typeof strokes>>> => {
+    const before = new Set((await strokes()).map((o) => o.id));
+    await p.keyboard.press("p");
+    await p.getByRole("radio", { name }).click();
+    await p.mouse.move(480, y);
+    await p.mouse.down();
+    for (let i = 1; i <= 40; i++) await p.mouse.move(480 + i * 8, y + 30 * Math.sin(i / 5));
+    await p.mouse.up();
+    return (await strokes()).filter((o) => !before.has(o.id));
+  };
+  const fine = await draw("Fine pen", 200);
+  expect(fine).toHaveLength(1);
+  expect(fine[0]).toMatchObject({ opacity: 1 });
+  expect(fine[0]!.groups).toBeUndefined();
+  const marker = await draw("Marker", 280);
+  expect(marker).toHaveLength(1);
+  expect(marker[0]!.opacity).toBeLessThan(0.5);
+  expect(marker[0]!.width).toBeGreaterThan(fine[0]!.width * 2);
+  const pencil = await draw("Pencil", 360);
+  expect(pencil).toHaveLength(3);
+  expect(new Set(pencil.map((o) => o.groups?.[0])).size).toBe(1);
+  expect(pencil.every((o) => o.opacity < 1 && o.width < fine[0]!.width)).toBe(true);
+  const ink = await draw("Ink pen", 440);
+  expect(ink.length).toBeGreaterThan(1);
+  expect(new Set(ink.map((o) => o.groups?.[0])).size).toBe(1);
+  expect(new Set(ink.map((o) => Math.round(o.width * 1000))).size, "the width varies along the line").toBeGreaterThan(1);
+  // One undo takes a whole pencil or ink stroke away.
+  const count = (await strokes()).length;
+  await p.keyboard.press("Control+z");
+  expect((await strokes()).length).toBe(count - ink.length);
+  // The pen stays chosen after a reload.
+  await p.getByRole("radio", { name: "Ink pen" }).click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.keyboard.press("p");
+  await expect(p.getByRole("radio", { name: "Ink pen" })).toHaveAttribute("aria-checked", "true");
+  expect(app.consoleErrors).toEqual([]);
+});
