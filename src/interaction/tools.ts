@@ -19,6 +19,7 @@ import { boxSelect, hitsObject, lassoSelect, pickAll, sweepHits } from "../rende
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
+import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { arrangeSelection, deleteSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
@@ -46,7 +47,17 @@ const DRAG_THRESHOLD_PX = 3;
 /** Minimum pen sample spacing in CSS px. */
 const PEN_MIN_STEP_PX = 0.75;
 /** A press this close outside a corner of the selection box (px) turns the selection. */
-const ROTATE_ZONE_PX = 30;
+const ROTATE_ZONE_PX = 36;
+
+/** Whether a press at `s` turns the selection: on the rotate handle, or just outside a corner of the box (beyond its resize handle). */
+function inRotateZone(s: ScreenPoint, frame: SelectionFrame, handle: readonly [number, number]): boolean {
+  if (Math.hypot(s.x - handle[0], s.y - handle[1]) <= HANDLE_SIZE_PX) return true;
+  const near = frame.corners.some((p) => {
+    const d = Math.hypot(s.x - p[0], s.y - p[1]);
+    return d > HANDLE_SIZE_PX && d <= ROTATE_ZONE_PX;
+  });
+  return near && !pointInPolygon(s.x, s.y, frame.corners.flatMap((p) => [p[0], p[1]]));
+}
 /** Shift while rotating snaps to whole steps of 15 degrees. */
 const ANGLE_STEP = TURN / 24;
 /** Smallest scale factor a resize drag can produce (prevents flips/zero size). */
@@ -284,13 +295,7 @@ export function attachTools(
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
     if (sel && canRotate(vis, editor) && !editor.blockEdit()) {
       const { frame, handle } = sel;
-      // The handle above the box, or just outside a corner (like a design tool), which stays reachable when the box is bigger than the view.
-      const flat = frame.corners.flatMap((p) => [p[0], p[1]]);
-      const nearCorner = frame.corners.some((p) => {
-        const d = Math.hypot(s.x - p[0], s.y - p[1]);
-        return d > HANDLE_SIZE_PX && d <= ROTATE_ZONE_PX;
-      });
-      if (Math.hypot(s.x - handle[0], s.y - handle[1]) <= HANDLE_SIZE_PX || (nearCorner && !pointInPolygon(s.x, s.y, flat))) {
+      if (inRotateZone(s, frame, handle)) {
         const ids = [...editor.selection].filter((id) => doc.get(id));
         const centre = { x: frame.centre[0], y: frame.centre[1] };
         const single = ids.length === 1 ? doc.get(ids[0]!) : null;
@@ -523,6 +528,12 @@ export function attachTools(
     if (pan.has(e.pointerId)) {
       pan.move(e.pointerId, local(e));
       return;
+    }
+    if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) {
+      // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
+      const b = editor.selectionBoxOnScreen;
+      const p = local(e);
+      el.classList.toggle("is-rotate", !!b && b.rotatable && inRotateZone(p, b.frame, b.handle));
     }
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };

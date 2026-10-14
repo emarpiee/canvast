@@ -71,6 +71,8 @@ const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
 export interface TextEditor {
   open(target: TextObject | null, at: WorldPoint): void;
   commit(): void;
+  /** Paste text at the caret as a paste event does: as Markdown, or literally when `plain`. */
+  paste(text: string, plain: boolean): void;
   readonly isOpen: boolean;
 }
 
@@ -220,6 +222,7 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     else document.execCommand("formatBlock", false, `<${cmd === "p" ? "div" : cmd}>`);
   });
   box.addEventListener("keydown", (e) => {
+    plainNext = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "v";
     const k = e.key.toLowerCase();
     // Handled here: not every browser binds these in editable content (and U has no Markdown form).
     if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === "b" || k === "i" || k === "u")) {
@@ -233,9 +236,21 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
       host.querySelector<HTMLElement>("canvas")?.focus({ preventScroll: true });
     }
   });
+  // Pasted text is Markdown (the format a text object is stored in): headings, lists, bold and italic come in formatted.
+  // Ctrl+Shift+V pastes it as it is.
+  let plainNext = false;
+  const insertPasted = (text: string, plain: boolean): void => {
+    const blocks = plain || !text ? [] : parse(text.slice(0, MAX_MARKDOWN_LENGTH));
+    // One plain paragraph goes in as inline text, so it joins the line it is pasted into (also inside a list item).
+    const html = blocks.length === 1 && blocks[0]!.type === "p" ? blocksToHtml(blocks).replace(/^<div>|<\/div>$/g, "") : blocksToHtml(blocks);
+    if (html) document.execCommand("insertHTML", false, html);
+    else document.execCommand("insertText", false, text);
+  };
   box.addEventListener("paste", (e) => {
     e.preventDefault();
-    document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") ?? "");
+    const plain = plainNext;
+    plainNext = false;
+    insertPasted(e.clipboardData?.getData("text/plain") ?? "", plain);
   });
   box.addEventListener("focusout", (e) => {
     const to = e.relatedTarget as Node | null;
@@ -246,6 +261,8 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
   return {
     open,
     commit,
+    /** Paste text at the caret as the paste event does (Markdown, or literally when `plain`). */
+    paste: insertPasted,
     get isOpen() {
       return target !== null;
     },

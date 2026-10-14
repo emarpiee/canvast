@@ -1319,6 +1319,11 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   const out = Math.hypot(c2[0] - cc[0], c2[1] - cc[1]);
   const ux = (c2[0] - cc[0]) / out;
   const uy = (c2[1] - cc[1]) / out;
+  // The cursor says so before the press, and the box is drawn in the axis-aligned mode too.
+  await p.mouse.move(Math.round(c2[0] + ux * 20), Math.round(c2[1] + uy * 20));
+  await expect(p.locator("#canvas")).toHaveClass(/is-rotate/);
+  await p.mouse.move(Math.round(cc[0]), Math.round(cc[1]));
+  await expect(p.locator("#canvas")).not.toHaveClass(/is-rotate/);
   await app.drag({ x: Math.round(c2[0] + ux * 20), y: Math.round(c2[1] + uy * 20) }, { x: Math.round(cc[0] + 120), y: Math.round(cc[1] + 120) }, 8);
   expect((await rots())[0]!, "turned from outside the corner").not.toBe(before);
 });

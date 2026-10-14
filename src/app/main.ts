@@ -430,7 +430,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready() },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready(), pasteText: (t, plain) => textEditor.paste(t, plain) },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;

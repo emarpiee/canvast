@@ -125,6 +125,8 @@ export interface DebugHook {
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;
+  /** Paste text into the open text editor as a paste does (Markdown, or literally when plain). */
+  pasteText(text: string, plain?: boolean): void;
   setDecodedBudget(bytes: number): void;
   heapMB(): number | null;
   /** Spatial index size and the result of a query for the current view. */
@@ -175,6 +177,8 @@ export interface DebugDeps {
   quality: QualityGovernor;
   /** Resolves when the index of a big document has been built slice by slice. */
   indexReady: () => Promise<void>;
+  /** Paste text into the open text editor as a paste does. */
+  pasteText: (text: string, plain: boolean) => void;
 }
 
 /**
@@ -385,6 +389,7 @@ export function installDebugHook(
       const sel = selectedFrame(visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport), editor, view.viewport);
       return sel ? { angle: sel.frame.angle, corners: sel.frame.corners.map(([x, y]) => [x, y] as [number, number]) } : null;
     },
+    pasteText: (text, plain = false) => deps.pasteText(text, plain),
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),

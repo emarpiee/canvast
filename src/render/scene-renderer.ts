@@ -255,7 +255,10 @@ function drawSelection(
   theme: SceneTheme,
   vp: Viewport,
 ): void {
-  if (editor.selection.size === 0) return;
+  if (editor.selection.size === 0) {
+    editor.selectionBoxOnScreen = null;
+    return;
+  }
   ctx.save();
   ctx.strokeStyle = theme.selection;
   ctx.lineWidth = 1;
@@ -273,13 +276,13 @@ function drawSelection(
   const sel = selectedFrame(visible, editor, vp);
   if (sel && sel.frame.corners.every(finite)) {
     const { frame, handle } = sel;
-    if (editor.selection.size > 1) {
-      ctx.beginPath();
-      ctx.moveTo(frame.corners[0][0], frame.corners[0][1]);
-      for (let i = 1; i < 4; i++) ctx.lineTo(frame.corners[i]![0], frame.corners[i]![1]);
-      ctx.closePath();
-      ctx.stroke();
-    }
+    // The box the handles sit on, always drawn: for one object in an axis-aligned box it is not the object's own outline.
+    ctx.beginPath();
+    ctx.moveTo(frame.corners[0][0], frame.corners[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(frame.corners[i]![0], frame.corners[i]![1]);
+    ctx.closePath();
+    ctx.stroke();
+    editor.selectionBoxOnScreen = { frame, handle, rotatable: canRotate(visible, editor) };
     ctx.fillStyle = theme.handleFill;
     ctx.lineWidth = 1.25;
     for (const [x, y] of frame.corners) {

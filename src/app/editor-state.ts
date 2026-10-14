@@ -38,6 +38,7 @@ export interface DraftStroke {
 }
 
 import type { PenLock } from "../interaction/pen-width";
+import type { SelectionFrame } from "../render/selection-frame";
 
 export const PEN_COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"] as const;
 /** Pen widths in CSS px at the zoom level where the stroke is drawn. */
@@ -66,6 +67,8 @@ export class EditorState {
   eraseWholeGroups = true;
   /** While the eraser is active: the brush position, and the boxes of what the swipe has touched so far. */
   eraser: { at: { x: number; y: number } | null; boxes: Array<{ minX: number; minY: number; maxX: number; maxY: number }> } | null = null;
+  /** The selection box and rotate handle as last drawn (for the pointer hover; null when nothing is selected). */
+  selectionBoxOnScreen: { frame: SelectionFrame; handle: readonly [number, number]; rotatable: boolean } | null = null;
   /** The selection box stays axis-aligned even when the selected objects are turned (otherwise it turns with them). */
   alignBox = false;
   /** Snapping while moving (interaction/snap.ts). */
