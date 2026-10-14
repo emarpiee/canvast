@@ -18,6 +18,13 @@ function open() {
   if (debug) win.webContents.openDevTools({ mode: "detach" });
   // Offline-first: the page never navigates away or opens windows.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // No menu, so no menu shortcut: F12 and Ctrl+Shift+I toggle DevTools.
+  win.webContents.on("before-input-event", (e, i) => {
+    if (i.type === "keyDown" && (i.key === "F12" || (i.control && i.shift && i.key.toLowerCase() === "i"))) {
+      win.webContents.toggleDevTools();
+      e.preventDefault();
+    }
+  });
   win.webContents.on("will-navigate", (e) => e.preventDefault());
 }
 
