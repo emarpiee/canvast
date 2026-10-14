@@ -1270,11 +1270,15 @@ test("frame rate counter: a continuous FPS readout with its button, remembered a
   await expect(readout).toHaveText(/^\d+ FPS · [\d.]+ ms · worst \d+ ms · draw [\d.]+ ms/, { timeout: 10_000 });
   const fps = Number((await readout.textContent())!.match(/^(\d+) FPS/)![1]);
   expect(fps, "a responsive page runs near the display rate").toBeGreaterThan(20);
+  // Under it, the internal state: frame percentiles, object counts, decoded memory and the decode queue.
+  const diag = p.getByTestId("diagnostics");
+  await expect(diag).toHaveText(/p50 [\d.]+ · p95 [\d.]+ · p99 [\d.]+ ms\nobjects 0 · drawn \d+\ndecoded 0 images · 0 \/ \d+ MiB · decoding 0 · waiting 0/);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.getByTestId("fps-readout")).toBeVisible();
   await p.getByRole("button", { name: "Frame rate" }).click();
   await expect(p.getByTestId("fps-readout")).toBeHidden();
+  await expect(p.getByTestId("diagnostics")).toBeHidden();
 });
 
 test("selection boxes follow the rotation, rotation works from outside a corner, and a marquee takes what it touches (ADR 0031)", async ({ app }) => {

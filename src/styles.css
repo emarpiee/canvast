@@ -247,6 +247,8 @@ html, body {
 .hud-dev select option { color: #111; }
 
 .hud-fps { font: 500 11px var(--font-mono); opacity: 0.85; white-space: nowrap; }
+.hud-diag { margin: 0; white-space: pre; }
+.hud-diag[hidden] { display: none; }
 .hud-controls button[aria-pressed="true"] { background: var(--hud-accent); color: #fff; }
 .hud-save {
   all: unset;

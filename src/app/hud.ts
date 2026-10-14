@@ -19,6 +19,8 @@ export interface HudStatus {
   toggleFps(): void;
   /** Adaptive quality level now (app/quality.ts). */
   quality(): number;
+  /** Lines of internal state shown under the frame-rate readout (memory, queues, index). */
+  diagnostics(): string[];
 }
 
 /**
@@ -32,6 +34,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <input class="hud-zoom-input" data-testid="zoom-input" aria-label="Zoom level (log2), e.g. 3000, 2^-500 or 10^900" hidden spellcheck="false" autocomplete="off">
       <span class="hud-pos" data-testid="position-readout"></span>
       <span class="hud-fps" data-testid="fps-readout" aria-live="off" hidden></span>
+      <pre class="hud-fps hud-diag" data-testid="diagnostics" aria-live="off" hidden></pre>
       <button type="button" class="hud-save" data-testid="save-status" aria-haspopup="dialog" aria-expanded="false" title="Storage status"></button>
     </div>
     <div class="hud-controls" role="toolbar" aria-label="Navigation">
@@ -67,10 +70,13 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
 
   // Frames per second (app/fps-meter.ts): the display's frame rate, counted only while the readout is shown.
   const fpsEl = root.querySelector<HTMLElement>(".hud-fps")!;
+  const diagEl = root.querySelector<HTMLElement>(".hud-diag")!;
   const fpsButton = root.querySelector<HTMLElement>('[data-action="fps"]')!;
   const meter = new FpsMeter();
   let fpsRaf = 0;
   let fpsShownAt = 0;
+  const diagText = (): string =>
+    [`frame draw p50 ${stats.percentile(50).toFixed(1)} · p95 ${stats.percentile(95).toFixed(1)} · p99 ${stats.percentile(99).toFixed(1)} ms`, ...status.diagnostics()].join("\n");
   const fpsText = (): string => {
     const r = meter.read();
     const q = status.quality();
@@ -82,12 +88,13 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     if (now - fpsShownAt >= 250) {
       fpsShownAt = now;
       fpsEl.textContent = fpsText();
+      diagEl.textContent = diagText();
     }
     fpsRaf = requestAnimationFrame(loop);
   };
   const showFps = (): void => {
     const on = status.fpsOn();
-    fpsEl.hidden = !on;
+    fpsEl.hidden = diagEl.hidden = !on;
     fpsButton.setAttribute("aria-pressed", String(on));
     cancelAnimationFrame(fpsRaf);
     meter.reset();

@@ -224,6 +224,11 @@ export class AssetLibrary {
     return { count: this.decoded.size, bytes, budget: this.budget };
   }
 
+  /** Decodes waiting for a slot and decodes running now. */
+  decodeLoad(): { queued: number; running: number } {
+    return { queued: this.queue.size, running: this.running };
+  }
+
   setBudget(bytes: number): void {
     this.budget = bytes;
     this.evict();

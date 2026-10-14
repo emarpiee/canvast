@@ -477,21 +477,26 @@ export async function fillCooperatively(objects: Iterable<CanvasObject>, insert:
 }
 
 /** Keep an index in sync with a document: incremental on transactions, full rebuild on load (in slices for a big one). */
-export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">, coop?: Cooperative): (() => void) & { ready(): Promise<void> } {
+export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">, coop?: Cooperative): (() => void) & { ready(): Promise<void>; building(): boolean } {
   // Hidden objects are not in the index, so nothing that reads it (drawing, picking, tiles, the density preview) sees them.
   const shown = function* (): IterableIterator<CanvasObject> {
     for (const o of doc.all()) if (!o.hidden) yield o;
   };
   let epoch = 0;
   let pending: Promise<void> | null = null;
+  let building = false;
   const build = (): void => {
     const mine = ++epoch;
+    building = false;
     if (!coop || doc.size <= (coop.threshold ?? 20_000)) {
       index.rebuild(shown());
       return;
     }
     index.rebuild([]);
-    pending = fillCooperatively(shown(), (o) => index.insert(o), doc.size, () => mine === epoch, coop);
+    building = true;
+    pending = fillCooperatively(shown(), (o) => index.insert(o), doc.size, () => mine === epoch, coop).finally(() => {
+      if (mine === epoch) building = false;
+    });
   };
   build();
   const off = doc.subscribe((_source, changed) => {
@@ -513,5 +518,5 @@ export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild
       await p;
     } while (p !== pending);
   };
-  return Object.assign(off, { ready });
+  return Object.assign(off, { ready, building: () => building });
 }

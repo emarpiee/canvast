@@ -358,6 +358,15 @@ async function start(): Promise<void> {
       editor.changed();
     },
     quality: () => quality.level,
+    diagnostics: () => {
+      const mem = assets.stats();
+      const q = assets.decodeLoad();
+      const mib = (b: number): string => (b / 2 ** 20).toFixed(0);
+      return [
+        `objects ${doc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
+        `decoded ${mem.count} images · ${mib(mem.bytes)} / ${mib(mem.budget)} MiB · decoding ${q.running} · waiting ${q.queued}`,
+      ];
+    },
     notify: (message) => {
       editor.message = message;
       editor.changed();
