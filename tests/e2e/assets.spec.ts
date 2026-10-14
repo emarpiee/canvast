@@ -565,7 +565,20 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   expect(await p.evaluate(() => window.__canvastDebug.session().revision), "playing writes nothing").toBe(before);
   await bar.getByRole("button", { name: "Pause", exact: true }).click();
   await expect.poll(t).toBeGreaterThan(0.2);
-  const paused = await t();
+  let paused = await t();
+  // It keeps playing when deselected (no bar), and the bar controls it again when it is selected.
+  await bar.getByRole("button", { name: "Play", exact: true }).click();
+  await p.mouse.click(1100, 700);
+  await expect(bar).toBeHidden();
+  const timeNow = () => overlay.evaluate((v: HTMLVideoElement) => (v.paused ? -1 : v.currentTime));
+  const t0 = await timeNow();
+  expect(t0).toBeGreaterThanOrEqual(0);
+  await expect.poll(timeNow).toBeGreaterThan(t0);
+  await p.mouse.click(cx + 60, cy + 40); // the instance was moved by the drag above
+  await expect(bar.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await bar.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect.poll(t).toBeGreaterThan(paused);
+  paused = await t();
   await saved(p);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

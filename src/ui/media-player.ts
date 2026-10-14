@@ -14,10 +14,12 @@ import type { SettingKey, SettingsStore } from "../settings/settings";
 import { ICONS } from "./icons";
 
 /**
- * The on-canvas player of a selected video, audio file or GIF (ADR 0041, 0042): a native video element (or, for a GIF, a canvas) laid exactly over the instance (it
- * ignores the pointer, so selecting, moving and resizing work as for any image) and a control bar. Playing never
- * writes to the document; pausing, stepping, releasing the scrubber and the repeat switch each write one undo step.
- * Only the one selected video is loaded; deselecting pauses it and keeps its position.
+ * The on-canvas players of videos, audio files and GIFs (ADR 0041, 0042, 0044): each loaded instance has its own native
+ * video element (or, for a GIF, a canvas) laid exactly over it (it ignores the pointer, so selecting, moving and resizing
+ * work as for any image). The one selected instance also has the control bar. Playing never writes to the document;
+ * pausing, stepping, releasing the scrubber and the repeat switch each write one undo step. Deselecting a paused
+ * instance unloads it; one that is playing keeps playing (at most MAX_PLAYING at once) until it ends, is paused, is
+ * deleted or leaves the view.
  */
 export interface MediaPlayerActions {
   setMedia(id: string, patch: { t?: number; repeat?: boolean }, label: string): void;
@@ -27,6 +29,8 @@ export interface MediaPlayerActions {
 
 /** Beyond this many CSS px a side, the overlay is not laid out (browsers cap element sizes); the media still plays. */
 const MAX_OVERLAY_PX = 16000;
+/** Players playing at once; starting one more pauses the one that has been playing longest (bounded decoders). */
+export const MAX_PLAYING = 4;
 
 /** What differs between the kinds: the element laid over the picture and how time or frames move. Positions are saved units (seconds, or a GIF frame index). */
 interface Engine {
@@ -181,17 +185,14 @@ function gifEngine(c: HTMLCanvasElement): Engine {
   return e;
 }
 
+/** One loaded instance: its engine, its element and the object it plays. */
+interface Player {
+  o: ImageObject;
+  eng: Engine;
+  loading: number;
+}
+
 export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState, assets: AssetLibrary, settings: SettingsStore, actions: MediaPlayerActions): void {
-  const v = document.createElement("video");
-  v.className = "media-video";
-  v.hidden = true;
-  v.playsInline = true;
-  v.preload = "auto";
-  const gc = document.createElement("canvas");
-  gc.className = "media-video";
-  gc.hidden = true;
-  const av = avEngine(v); // one element plays both video and audio
-  const engines = { video: av, audio: av, gif: gifEngine(gc) };
   const bar = document.createElement("div");
   bar.className = "toolbar media-bar";
   bar.setAttribute("role", "toolbar");
@@ -206,7 +207,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
       <label>GIF step (frames) <input type="number" min="1" max="1000" step="1" data-step="media.step.gif"></label>
     </div>`;
-  host.append(v, gc, bar);
+  host.append(bar);
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");
   const time = $<HTMLOutputElement>(".media-time");
@@ -216,12 +217,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const volume = $<HTMLInputElement>(".media-volume");
   const extractBtn = $<HTMLButtonElement>('[data-cmd="extract"]');
 
-  let cur: ImageObject | null = null;
-  let eng: Engine | null = null;
-  let loading = 0;
+  const players = new Map<string, Player>();
+  /** The player the bar controls: that of the one selected media instance. */
+  let sel: Player | null = null;
+  const videoOf = (p: Player): HTMLVideoElement | null => (p.eng.el instanceof HTMLVideoElement ? p.eng.el : null);
 
   const refresh = (): void => {
-    if (!eng) return;
+    if (!sel) return;
+    const { eng, o } = sel;
     const len = eng.len();
     if (document.activeElement !== scrub) scrub.value = String(len ? eng.pos() / len : 0);
     time.textContent = eng.label();
@@ -229,35 +232,49 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     playBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
     playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
     playBtn.title = playing ? "Pause" : "Play";
-    repeatBtn.setAttribute("aria-pressed", String(!!cur?.media?.repeat));
-    muteBtn.hidden = volume.hidden = cur?.media?.kind === "gif";
-    if (document.activeElement !== volume) volume.value = String(v.muted ? 0 : settings.get("media.volume"));
-    extractBtn.hidden = cur?.media?.kind === "audio";
-    muteBtn.setAttribute("aria-pressed", String(v.muted));
-    muteBtn.innerHTML = v.muted ? ICONS.volumeOff : ICONS.volume;
+    repeatBtn.setAttribute("aria-pressed", String(!!o.media?.repeat));
+    muteBtn.hidden = volume.hidden = o.media?.kind === "gif";
+    extractBtn.hidden = o.media?.kind === "audio";
+    const muted = videoOf(sel)?.muted ?? false;
+    muteBtn.setAttribute("aria-pressed", String(muted));
+    muteBtn.innerHTML = muted ? ICONS.volumeOff : ICONS.volume;
+    if (document.activeElement !== volume) volume.value = String(muted ? 0 : settings.get("media.volume"));
   };
-  for (const e of new Set(Object.values(engines))) {
-    e.onTick = refresh;
-    e.onEnded = () => {
-      if (cur && !cur.media!.repeat) actions.setMedia(cur.id, { t: eng!.len() }, "Pause media");
-      refresh();
-    };
-  }
 
-  const position = (): void => {
-    if (!cur || !eng) return;
-    const o = cur;
+  /** Stop and unload a player, writing its position unless it never finished loading or its object is gone. */
+  const release = (p: Player): void => {
+    if (p.eng.playing()) p.eng.pause();
+    const t = p.eng.pos();
+    const write = !p.loading && !!doc.get(p.o.id);
+    // Out of the map first: writing the position notifies the document's listeners, which look at the players again.
+    players.delete(p.o.id);
+    if (sel === p) {
+      sel = null;
+      bar.hidden = true;
+    }
+    if (write) actions.setMedia(p.o.id, { t }, "Pause media");
+    p.eng.unload();
+    p.eng.el.remove();
+  };
+
+  const transforming = (id: string): boolean => editor.preview.kind !== "none" && "ids" in editor.preview && editor.preview.ids.includes(id);
+
+  const position = (p: Player): void => {
+    const o = p.o;
     const cam = cameraIn(view.frameCamera, o.frame ?? doc.space.world) ?? view.camera;
     const s = worldToScreen(cam, view.viewport, o.anchor);
     const ppu = 2 ** (o.unit + cam.zi + cam.zf);
     const w = o.w * ppu;
     const h = o.h * ppu;
     const vp = view.viewport;
+    const bb = projectObject(o, cam, vp, { keepTiny: true })?.box ?? { minX: s.x, maxX: s.x + w, minY: s.y, maxY: s.y + h };
+    const inView = bb.maxX > 0 && bb.maxY > 0 && bb.minX < vp.width && bb.minY < vp.height;
+    // One that is not selected has nothing to show or control once it is out of view: it stops (its position is kept).
+    if (!inView && p !== sel) return release(p);
     // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
-    const visible = eng.visual && !loading && editor.preview.kind === "none" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
-    const el = eng.el;
+    const visible = p.eng.visual && !p.loading && !transforming(o.id) && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && inView;
+    const el = p.eng.el;
     el.style.display = visible ? "" : "none";
-    bar.style.display = editor.preview.kind === "none" ? "" : "none"; // the bar would stay behind a moving instance
     if (visible) {
       el.style.left = `${s.x}px`;
       el.style.top = `${s.y}px`;
@@ -269,8 +286,9 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         el.style.transform = `rotate(${radiansFromAngle(o.rot)}rad)`;
       } else el.style.transform = "";
     }
+    if (p !== sel) return;
+    bar.style.display = transforming(o.id) ? "none" : ""; // the bar would stay behind a moving instance
     // The bar stays outside the picture's bounds (rotated ones too): below it, else above its turn handle, else pinned to the bottom of the view.
-    const bb = projectObject(o, cam, vp, { keepTiny: true })?.box ?? { minX: s.x, maxX: s.x + w, minY: s.y, maxY: s.y + h };
     const barH = bar.offsetHeight || 96;
     const cx = Math.min(Math.max((bb.minX + bb.maxX) / 2, 210), vp.width - 210);
     const below = bb.maxY + 12;
@@ -278,79 +296,113 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     bar.style.left = `${cx}px`;
     bar.style.top = `${below + barH <= vp.height - 8 ? below : above >= 56 ? above : vp.height - barH - 8}px`;
   };
-
-  const release = (): void => {
-    if (!cur || !eng) return;
-    const o = cur;
-    const e = eng;
-    if (e.playing()) e.pause();
-    if (!loading) actions.setMedia(o.id, { t: e.pos() }, "Pause media");
-    cur = null;
-    eng = null;
-    v.hidden = gc.hidden = bar.hidden = true;
-    e.unload();
+  const positionAll = (): void => {
+    for (const p of [...players.values()]) position(p);
   };
 
-  const open = async (o: ImageObject): Promise<void> => {
-    cur = o;
-    eng = engines[o.media!.kind];
-    v.volume = settings.get("media.volume") / 100;
-    eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
-    const mine = ++loading;
+  const create = (o: ImageObject): Player => {
+    let eng: Engine;
+    if (o.media!.kind === "gif") {
+      const c = document.createElement("canvas");
+      c.className = "media-video";
+      eng = gifEngine(c);
+    } else {
+      const v = document.createElement("video");
+      v.className = "media-video";
+      v.playsInline = true;
+      v.preload = "auto";
+      v.volume = settings.get("media.volume") / 100;
+      eng = avEngine(v);
+      eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
+    }
+    const p: Player = { o, eng, loading: 0 };
     eng.el.style.display = "none"; // shown once it holds the paused picture: never the first frame for a moment
-    v.hidden = eng.el !== v; // only the element of this kind is shown: the other one would linger at its old place
-    gc.hidden = eng.el !== gc;
-    bar.hidden = false;
-    const rec = await assets.record(o.assetId);
-    if (mine !== loading || cur?.id !== o.id) return;
-    if (!rec) {
-      loading = 0;
-      return;
-    }
+    host.append(eng.el);
+    eng.onTick = () => p === sel && refresh();
+    eng.onEnded = () => {
+      if (!p.o.media!.repeat) actions.setMedia(p.o.id, { t: p.eng.len() }, "Pause media");
+      if (p !== sel) release(p);
+      else refresh();
+    };
+    players.set(o.id, p);
+    return p;
+  };
+
+  const open = async (p: Player): Promise<void> => {
+    const mine = ++p.loading;
+    const rec = await assets.record(p.o.assetId);
+    if (mine !== p.loading || players.get(p.o.id) !== p) return;
     try {
-      await eng.load(o, rec.blob, rec.duration ?? 0);
+      if (!rec) throw new Error("original missing");
+      await p.eng.load(p.o, rec.blob, rec.duration ?? 0);
     } catch {
-      if (mine === loading) loading = 0;
+      if (mine === p.loading) release(p);
       return;
     }
-    if (mine !== loading) return;
-    loading = 0;
+    if (mine !== p.loading) return;
+    p.loading = 0;
     refresh();
-    position();
+    positionAll();
   };
 
   const sync = (): void => {
     const id = editor.selection.size === 1 ? [...editor.selection][0]! : null;
     const o = id ? doc.get(id) : undefined;
     const want = o && o.kind === "image" && o.media && !o.hidden ? o : null;
-    if (cur && cur.id !== want?.id) release();
-    if (!want) return;
-    if (!cur) {
-      void open(want);
-      return;
+    // Players follow their objects; one whose object is gone or hidden stops without writing.
+    for (const p of [...players.values()]) {
+      const cur = doc.get(p.o.id);
+      if (!cur || cur.kind !== "image" || !cur.media || cur.hidden) {
+        p.eng.unload();
+        p.eng.el.remove();
+        players.delete(p.o.id);
+        if (sel === p) sel = null;
+        continue;
+      }
+      const prev = p.o;
+      p.o = cur;
+      p.eng.setLoop(cur.media.repeat);
+      // An undo or redo changed the paused position: follow it (never while playing).
+      if (!p.eng.playing() && !p.loading && Math.abs(p.eng.pos() - cur.media.t) > 0.01 && cur.media.t !== prev.media!.t) p.eng.seek(cur.media.t);
     }
-    const prev = cur;
-    cur = want;
-    eng!.setLoop(want.media!.repeat);
-    // An undo or redo changed the paused position: follow it (never while playing).
-    if (!eng!.playing() && !loading && Math.abs(eng!.pos() - want.media!.t) > 0.01 && want.media!.t !== prev.media!.t) eng!.seek(want.media!.t);
-    position();
+    // The previously selected player leaves the bar: one that is playing carries on, a paused one unloads.
+    if (sel && sel.o.id !== want?.id) {
+      const left = sel;
+      sel = null;
+      if (!left.eng.playing()) release(left);
+    }
+    if (want) {
+      let p = players.get(want.id);
+      if (!p) {
+        p = create(want);
+        void open(p);
+      }
+      sel = p;
+    }
+    bar.hidden = !sel;
+    positionAll();
     refresh();
   };
 
   scrub.addEventListener("input", () => {
-    eng?.seek(Number(scrub.value) * eng.len());
+    if (!sel) return;
+    sel.eng.seek(Number(scrub.value) * sel.eng.len());
     refresh();
   });
   scrub.addEventListener("change", () => {
-    if (cur && eng && !eng.playing()) actions.setMedia(cur.id, { t: eng.pos() }, "Seek media");
+    if (sel && !sel.eng.playing()) actions.setMedia(sel.o.id, { t: sel.eng.pos() }, "Seek media");
   });
-  // Volume is a device setting (0 to 100); sliding it to 0 mutes, anything above unmutes.
+  // Volume is a device setting (0 to 100) shared by all players; sliding it to 0 mutes, anything above unmutes.
   volume.addEventListener("input", () => {
     const n = Number(volume.value);
-    v.muted = n === 0;
-    v.volume = n / 100;
     settings.set("media.volume", n);
+    for (const p of players.values()) {
+      const v = videoOf(p);
+      if (v) {
+        v.muted = n === 0;
+        v.volume = n / 100;
+      }
+    }
   });
   // Steps are device settings: a bad value is refused and the field shows the current one again.
   bar.addEventListener("change", (e) => {
@@ -361,31 +413,37 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   });
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
-    if (!cur || !eng || !cmd) return;
+    if (!sel || !cmd) return;
+    const { eng, o } = sel;
     if (cmd === "play") {
-      if (!eng.playing()) eng.play();
-      else {
+      if (!eng.playing()) {
+        // A few at once: starting one more stops the one that has played longest.
+        const others = [...players.values()].filter((q) => q !== sel && q.eng.playing());
+        if (others.length >= MAX_PLAYING) release(others[0]!);
+        eng.play();
+      } else {
         eng.pause();
-        actions.setMedia(cur.id, { t: eng.pos() }, "Pause media");
+        actions.setMedia(o.id, { t: eng.pos() }, "Pause media");
       }
     } else if (cmd === "back" || cmd === "fwd") {
-      const kind = cur.media!.kind;
-      eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), cur.media!.repeat);
-      if (!eng.playing()) actions.setMedia(cur.id, { t: eng.pos() }, "Step media");
-    } else if (cmd === "repeat") actions.setMedia(cur.id, { repeat: !cur.media!.repeat }, "Repeat media");
-    else if (cmd === "mute") v.muted = !v.muted;
-    else if (cmd === "settings") {
+      const kind = o.media!.kind;
+      eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), o.media!.repeat);
+      if (!eng.playing()) actions.setMedia(o.id, { t: eng.pos() }, "Step media");
+    } else if (cmd === "repeat") actions.setMedia(o.id, { repeat: !o.media!.repeat }, "Repeat media");
+    else if (cmd === "mute") {
+      const v = videoOf(sel);
+      if (v) v.muted = !v.muted;
+    } else if (cmd === "settings") {
       const box = bar.querySelector<HTMLElement>(".media-settings")!;
       box.hidden = !box.hidden;
       for (const i of box.querySelectorAll<HTMLInputElement>("[data-step]")) i.value = String(settings.get(i.dataset["step"] as SettingKey));
-    }
-    else if (cmd === "extract") {
-      const id = cur.id;
+    } else if (cmd === "extract") {
+      const id = o.id;
       void eng.frame().then((png) => png && actions.extract(id, png));
     }
     refresh();
   });
-  view.subscribe(position);
+  view.subscribe(positionAll);
   doc.subscribe(sync);
   editor.subscribe(sync);
 }
