@@ -18,7 +18,7 @@ A tier is a class of machine, measured by what the benchmarks can distinguish. T
 | CPU-only | `chromium-cpu` (GPU off): the reference machine (i5-4460, HD 4600) | 16 / 33 / 50 | same |
 | Low memory | decoded-image budget 128 MiB (`setBudget`) | frames as above; no out-of-memory | images under budget, the rest as above |
 
-Measured on the reference machine 2026-10-15: see `docs/testing/phase-3-bench.md`. The CPU-only tier meets its target in every scene except the first frame after loading a dense scene; desktop misses on dense-10k panning (p95 24 ms) and at 1M objects (p50 10.9 ms, heap 1.1 GB), recorded as known failures.
+Measured on the reference machine 2026-10-15: see `docs/testing/phase-3-bench.md`. The CPU-only tier meets its target in every scene except the one frame that rebuilds the exact tiles of a dense scene when a zoom crosses the preview bound (ADR 0012); desktop misses on dense-10k panning (p95 24 ms) and at 1M objects (p50 10.9 ms, heap 1.1 GB), recorded as known failures.
 
 The harness limit `renderP95Ms: 8` in `tests/e2e/harness.ts` is the desktop p95 for the standard navigation scenes and is never loosened.
 
