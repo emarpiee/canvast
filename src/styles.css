@@ -240,6 +240,8 @@ html, body {
 .hud-dev button[aria-pressed="true"] { background: var(--hud-accent); color: #fff; border-color: transparent; }
 .hud-dev select option { color: #111; }
 
+.hud-fps { font: 500 11px var(--font-mono); opacity: 0.85; white-space: nowrap; }
+.hud-controls button[aria-pressed="true"] { background: var(--hud-accent); color: #fff; }
 .hud-save {
   all: unset;
   cursor: pointer;

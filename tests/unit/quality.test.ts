@@ -52,3 +52,30 @@ describe("cooperative index build (ADR 0029)", () => {
     expect(stale.length).toBeLessThan(100);
   });
 });
+
+describe("frame rate counter", () => {
+  it("reads the display rate from frame timestamps over the last second, and the worst gap", async () => {
+    const { FpsMeter } = await import("../../src/app/fps-meter");
+    const m = new FpsMeter();
+    expect(m.read()).toBeNull();
+    for (let i = 0; i <= 60; i++) m.tick(1000 + (i * 1000) / 60); // a steady 60 Hz second
+    const r = m.read()!;
+    expect(r.fps).toBeCloseTo(60, 0);
+    expect(r.avgMs).toBeCloseTo(16.67, 1);
+    expect(r.worstMs).toBeCloseTo(16.67, 1);
+    m.tick(2000 + 120); // the page was blocked for 120 ms
+    const slow = m.read()!;
+    expect(slow.worstMs).toBeCloseTo(120 + 16.67 - 16.67, 0);
+    expect(slow.fps).toBeLessThan(55);
+    m.tick(5000); // long idle gap: older frames fall out of the window
+    expect(m.read()!.fps).toBeLessThan(1);
+  });
+
+  it("keeps recent frame times for the draw-cost figure", async () => {
+    const { FrameStats } = await import("../../src/app/frame-stats");
+    const s = new FrameStats();
+    for (const ms of [4, 5, 6, 7, 40]) s.record(ms);
+    expect(s.recent(50, 60)).toBe(6);
+    expect(s.recent(95, 2)).toBe(40);
+  });
+});

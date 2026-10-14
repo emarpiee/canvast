@@ -235,7 +235,7 @@ export async function importImages(
   for (const file of list) {
     done++;
     try {
-      const { record, duplicate } = await assets.importFileDetailed(file);
+      const { record, duplicate } = await assets.importFileDetailed(file, list.length <= 3);
       if (duplicate) seen.push({ name: record.name || file.name, duplicate });
       records.push(record);
     } catch (e) {

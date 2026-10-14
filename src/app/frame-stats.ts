@@ -28,6 +28,12 @@ export class FrameStats {
     if (this.samples.length > this.capacity) this.samples.shift();
   }
 
+  /** The p-th percentile of the last `n` frame times. */
+  recent(p: number, n = 60): number {
+    const xs = this.samples.slice(-n).sort((a, b) => a - b);
+    return xs.length ? xs[Math.min(xs.length - 1, Math.ceil((p / 100) * xs.length) - 1)]! : 0;
+  }
+
   percentile(p: number): number {
     if (this.samples.length === 0) return 0;
     const sorted = [...this.samples].sort((a, b) => a - b);

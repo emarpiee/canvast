@@ -117,7 +117,7 @@ export interface DebugHook {
   /** Tile use of the last rendered frame (null: rendered directly), and tiles held. */
   tileStats(): { last: TileFrame | null; held: number; renderedTotal: number };
   /** Decoded images held (count, bytes, budget), and set the budget in bytes (ADR 0027). */
-  decodedStats(): { count: number; bytes: number; budget: number };
+  decodedStats(): { count: number; bytes: number; budget: number; maxRunning: number };
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;
@@ -376,7 +376,7 @@ export function installDebugHook(
       deps.tiles.enabled = on;
       deps.tiles.clear();
     },
-    decodedStats: () => session.assets!.stats(),
+    decodedStats: () => ({ ...session.assets!.stats(), maxRunning: session.assets!.maxRunning }),
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),

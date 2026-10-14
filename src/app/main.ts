@@ -115,6 +115,7 @@ async function start(): Promise<void> {
   editor.lassoFilter = settings.get("lasso.filter");
   editor.snap = settings.get("snap.enabled");
   editor.layersOpen = settings.get("ui.layersOpen");
+  editor.showFps = settings.get("ui.fps");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
@@ -128,6 +129,7 @@ async function start(): Promise<void> {
     settings.set("lasso.filter", editor.lassoFilter);
     settings.set("snap.enabled", editor.snap);
     settings.set("ui.layersOpen", editor.layersOpen);
+    settings.set("ui.fps", editor.showFps);
     settings.set("ui.bookmarksOpen", editor.bookmarksOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
@@ -348,6 +350,12 @@ async function start(): Promise<void> {
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),
+    fpsOn: () => editor.showFps,
+    toggleFps: () => {
+      editor.showFps = !editor.showFps;
+      editor.changed();
+    },
+    quality: () => quality.level,
     notify: (message) => {
       editor.message = message;
       editor.changed();

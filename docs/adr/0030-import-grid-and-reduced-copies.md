@@ -15,6 +15,12 @@ Importing 300 HD images showed two problems. They were placed on a diagonal, 24 
 
 Reduced copies count in the decoded-image budget and are released with it (ADR 0027); everything else, including every deep-zoom path, still draws from the full image.
 
+**Decode queue.** The first version of this slice hung a machine importing 300 HD images: placing the batch made every image ask for its reduced copy in the same frame, about 300 decodes ran in parallel, and each briefly holds its full pixels (8 MB): gigabytes. Now at most `MAX_DECODES` = 3 images decode at a time; the most recently asked-for go first, and a queued decode nothing has asked for within 1.5 s (the image left the view) is dropped and asked for again if it comes back. In a batch of more than three files the full decode made to check each file is released at once instead of kept. A test with 40 images asked for together checks that never more than three decode together and memory stays inside the budget.
+
+## Frame rate counter
+
+A button in the navigation controls shows a continuous FPS readout (`app/fps-meter.ts`): the display frame rate counted from `requestAnimationFrame` over the last second, the average and the worst gap between display frames, and the time canvast takes to draw a frame, plus the quality level when adaptive quality has lowered it. It runs only while shown, and the setting is kept (`ui.fps`). It drops when the main thread is busy, which is what the stalls above looked like from outside.
+
 ## Not in this slice
 
 A stored (persisted) thumbnail, a virtualized Assets grid and progressive tile loading (Phase 4, `docs/plans/asset-thumbnails.md`), and arranging an existing selection in a grid with a chosen order (`docs/plans/arrange-commands.md`, Phase 5; it reuses `gridLayout`).

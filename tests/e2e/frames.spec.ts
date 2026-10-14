@@ -1151,7 +1151,7 @@ test("decoded images are a cache with a budget: idle ones are released when over
   const files = colours.map((c, i) => ({ name: `solid${i}.png`, mimeType: "image/png", buffer: makePng(1000, 1000, () => [c[0], c[1], c[2], 255]) }));
   await p.getByTestId("import-input").setInputFiles(files);
   await p.waitForFunction(() => window.__canvastDebug.objects().length === 4);
-  expect((await stats()).count, "all four decoded while they are in use").toBe(4);
+  await expect.poll(async () => (await stats()).count, { message: "all four are decoded (in full, they are shown large) while in use" }).toBe(4);
   // Look somewhere else; once they have been idle for a while the extra ones are released.
   await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "1000000p0", cy: "0p0", zi: 0, zf: 0, pz: 0 }));
   await app.frame();
@@ -1235,4 +1235,44 @@ test("a batch import is laid out in a grid in one undo step, and big images draw
   // One undo step takes the whole batch away.
   await p.keyboard.press("Control+z");
   expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
+});
+
+test("hundreds of images asked for at once decode a few at a time, so memory stays low (ADR 0030)", async ({ app }) => {
+  const p = app.page;
+  const MB = 2 ** 20;
+  // 40 images of 1600 x 1000 (6.4 MB each in full: 256 MB if decoded together), a budget of 20 MB.
+  await p.evaluate((b) => window.__canvastDebug.setDecodedBudget(b), 20 * MB);
+  const colours = Array.from({ length: 40 }, (_, i): [number, number, number] => [20 + i * 5, 240 - i * 5, 90 + (i % 7) * 20]);
+  const files = colours.map((c, i) => ({ name: `m${String(i).padStart(2, "0")}.png`, mimeType: "image/png", buffer: makePng(1600, 1000, () => [c[0], c[1], c[2], 255]) }));
+  await p.getByTestId("import-input").setInputFiles(files);
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 40, null, { timeout: 120_000 });
+  const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  // Every image ends up drawn with its own colour...
+  for (let i = 0; i < 40; i += 7) {
+    const b = (await boxOf(app, ids[i]!))!;
+    const x = Math.round((b.minX + b.maxX) / 2);
+    const y = Math.round((b.minY + b.maxY) / 2);
+    await expect.poll(() => p.evaluate(([a, c]) => window.__canvastDebug.pixelAt(a!, c!).join(","), [x, y]), { timeout: 30_000 }).toBe(colours[i]!.join(","));
+  }
+  // ...though never more than three were decoding at the same time, and memory stays within the budget.
+  const s = await p.evaluate(() => window.__canvastDebug.decodedStats());
+  expect(s.maxRunning).toBeLessThanOrEqual(3);
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.decodedStats())).bytes, { timeout: 15_000 }).toBeLessThanOrEqual(20 * MB);
+});
+
+test("frame rate counter: a continuous FPS readout with its button, remembered after a reload", async ({ app }) => {
+  const p = app.page;
+  const readout = p.getByTestId("fps-readout");
+  await expect(readout).toBeHidden();
+  await p.getByRole("button", { name: "Frame rate" }).click();
+  await expect(readout).toBeVisible();
+  // The display frame rate, counted even though nothing is being drawn: a number of frames per second and the draw cost.
+  await expect(readout).toHaveText(/^\d+ FPS · [\d.]+ ms · worst \d+ ms · draw [\d.]+ ms/, { timeout: 10_000 });
+  const fps = Number((await readout.textContent())!.match(/^(\d+) FPS/)![1]);
+  expect(fps, "a responsive page runs near the display rate").toBeGreaterThan(20);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(p.getByTestId("fps-readout")).toBeVisible();
+  await p.getByRole("button", { name: "Frame rate" }).click();
+  await expect(p.getByTestId("fps-readout")).toBeHidden();
 });

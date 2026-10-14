@@ -63,6 +63,13 @@ interface Decoded extends RasterSource {
 export const DEFAULT_DECODED_BUDGET = 384 * 2 ** 20;
 /** Key suffix of the reduced copy of an image in the decoded cache. */
 const SMALL_KEY = "@small";
+/**
+ * Images are decoded at most this many at a time. Hundreds of images asking at once (a big batch placed on the canvas)
+ * would otherwise decode in parallel, each briefly holding its full pixels: gigabytes for a few seconds (ADR 0030).
+ */
+export const MAX_DECODES = 3;
+/** A queued decode nothing has asked for within this many ms is dropped (the image left the view). */
+const QUEUE_STALE_MS = 1500;
 /** An image asked for within this many ms is in use and is never released. */
 const IN_USE_MS = 1500;
 
@@ -133,6 +140,9 @@ export class AssetLibrary {
   private readonly noReduced = new Set<string>();
   private readonly memoryOnly = new Map<string, AssetRecord>();
   private budget = DEFAULT_DECODED_BUDGET;
+  private running = 0;
+  maxRunning = 0;
+  private readonly queue = new Map<string, { hash: string; small: boolean; wanted: number }>();
   private lastEvictCheck = 0;
 
   constructor(
@@ -149,7 +159,7 @@ export class AssetLibrary {
    * Like `importFile`, and says whether these bytes were already in the library: "present" (nothing stored again) or
    * "restored" (it had been deleted from the library and is back).
    */
-  async importFileDetailed(file: Blob & { name?: string }): Promise<ImportOutcome> {
+  async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true): Promise<ImportOutcome> {
     if (!file.type.startsWith("image/")) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const bytes = await file.arrayBuffer();
@@ -159,7 +169,7 @@ export class AssetLibrary {
       const entry = this.db ? await idbGet<CatalogEntry>(this.db, "assetCatalog", hash) : undefined;
       const duplicate: ImportOutcome["duplicate"] = entry && entry.state !== "active" ? "restored" : "present";
       const had = this.decoded.has(hash);
-      await this.ensureDecoded(existing);
+      if (keepDecoded || Math.max(existing.pixelW, existing.pixelH) <= SMALL_EDGE) await this.ensureDecoded(existing);
       this.missing.delete(hash);
       if (!had) this.onReady(); // e.g. a missing original restored: redraw what showed its placeholder
       if (this.db) await this.store(existing, false);
@@ -184,7 +194,8 @@ export class AssetLibrary {
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.db) await this.store(record, true);
     else this.memoryOnly.set(hash, record);
-    this.decoded.set(hash, makeSource(img));
+    if (keepDecoded || Math.max(record.pixelW, record.pixelH) <= SMALL_EDGE) this.decoded.set(hash, makeSource(img));
+    else (img as Partial<ImageBitmap>).close?.(); // part of a big batch: it is decoded again, reduced, when it is drawn
     this.evict();
     this.missing.delete(hash);
     this.onReady(); // redraw any placeholder of this original (a restored missing asset)
@@ -267,7 +278,7 @@ export class AssetLibrary {
       if (now - this.lastEvictCheck > 500) this.evict(now); // images that fell idle since the last load
     }
     const wanted = small ? reduced : full;
-    if (!wanted && !this.pending.has(hash + (small ? SMALL_KEY : "")) && !this.missing.has(hash)) void this.load(hash, small);
+    if (!wanted && !this.missing.has(hash)) this.request(hash, small, now);
     return pick ?? null;
   }
 
@@ -288,9 +299,48 @@ export class AssetLibrary {
     }
   }
 
+  /** Ask for a decode: queued, and run when one of the few decode slots is free (the most recently asked first). */
+  private request(hash: string, small: boolean, now: number): void {
+    const key = hash + (small ? SMALL_KEY : "");
+    const q = this.queue.get(key);
+    if (q) {
+      q.wanted = now; // still in view: keep its place
+      return;
+    }
+    if (this.pending.has(key)) return;
+    this.pending.add(key);
+    this.queue.set(key, { hash, small, wanted: now });
+    this.pump();
+  }
+
+  private pump(): void {
+    const now = performance.now();
+    while (this.running < MAX_DECODES && this.queue.size) {
+      let bestKey = "";
+      let best = -Infinity;
+      for (const [k, q] of this.queue) {
+        if (now - q.wanted > QUEUE_STALE_MS) {
+          this.queue.delete(k); // left the view while waiting: forget it (it is asked for again if it comes back)
+          this.pending.delete(k);
+        } else if (q.wanted > best) {
+          best = q.wanted;
+          bestKey = k;
+        }
+      }
+      const q = this.queue.get(bestKey);
+      if (!q) return;
+      this.queue.delete(bestKey);
+      this.running++;
+      this.maxRunning = Math.max(this.maxRunning, this.running);
+      void this.load(q.hash, q.small).finally(() => {
+        this.running--;
+        this.pump();
+      });
+    }
+  }
+
   private async load(hash: string, small = false): Promise<void> {
     const key = hash + (small ? SMALL_KEY : "");
-    this.pending.add(key);
     try {
       const rec = await this.record(hash);
       if (!rec) {
