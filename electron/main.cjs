@@ -1,0 +1,30 @@
+// Electron shell for canvast: opens the single-file build from disk. No network, no preload, no Node in the page.
+const { app, BrowserWindow, Menu, session } = require("electron");
+const { join } = require("node:path");
+
+// The packaged app carries dist/canvast.html; in development the repo's dist/ is used.
+const page = join(__dirname, "..", "dist", "canvast.html");
+
+function open() {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    backgroundColor: "#ffffff",
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  win.loadFile(page);
+  // Offline-first: the page never navigates away or opens windows.
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
+}
+
+app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, done) => done(false));
+  // Same rule the tests enforce in the browser: nothing but file:, data: and blob: is requested.
+  session.defaultSession.webRequest.onBeforeRequest((d, done) => done({ cancel: !/^(file|data|blob|devtools):/.test(d.url) }));
+  open();
+  app.on("activate", () => BrowserWindow.getAllWindows().length === 0 && open());
+});
+
+app.on("window-all-closed", () => app.quit());

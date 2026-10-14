@@ -6,3 +6,4 @@ playwright-report/
 .DS_Store
 metrics/
 dist-spike/
+release/
