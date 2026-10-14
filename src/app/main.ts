@@ -104,6 +104,8 @@ async function start(): Promise<void> {
   editor.ignoreFilling = settings.get("select.ignoreFilling");
   editor.lassoFilter = settings.get("lasso.filter");
   editor.snap = settings.get("snap.enabled");
+  editor.eraserPx = settings.get("eraser.diameterPx");
+  editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
   editor.subscribe(() => {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
@@ -113,6 +115,8 @@ async function start(): Promise<void> {
     settings.set("select.ignoreFilling", editor.ignoreFilling);
     settings.set("lasso.filter", editor.lassoFilter);
     settings.set("snap.enabled", editor.snap);
+    settings.set("eraser.diameterPx", editor.eraserPx);
+    settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
   });
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;

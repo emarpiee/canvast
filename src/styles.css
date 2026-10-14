@@ -61,7 +61,7 @@ html, body {
 }
 
 #canvas[data-tool="select"] { cursor: default; }
-#canvas[data-tool="pen"], #canvas[data-tool="lasso"] { cursor: crosshair; }
+#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"] { cursor: crosshair; }
 #canvas.is-hand { cursor: grab; }
 #canvas.is-panning { cursor: grabbing; }
 

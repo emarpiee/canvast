@@ -8,7 +8,7 @@ import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -55,6 +55,11 @@ export class EditorState {
   lock: PenLock | null = null;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
+  /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */
+  eraserPx = 16;
+  eraseWholeGroups = true;
+  /** While the eraser is active: the brush position, and the boxes of what the swipe has touched so far. */
+  eraser: { at: { x: number; y: number } | null; boxes: Array<{ minX: number; minY: number; maxX: number; maxY: number }> } | null = null;
   /** Snapping while moving (interaction/snap.ts). */
   snap = true;
   /** Guide lines (screen px) shown while a move is snapped to something. */
@@ -96,6 +101,7 @@ export class EditorState {
 
   setTool(t: Tool): void {
     this.tool = t;
+    this.eraser = null;
     this.heldTool = null;
     this.changed();
   }

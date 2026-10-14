@@ -123,6 +123,27 @@ export function drawOverlays(
   vp: Viewport,
   theme: SceneTheme,
 ): void {
+  // Object eraser: the brush, and what the swipe has touched so far (it is removed when the pointer is released).
+  if (editor.tool === "eraser" && editor.eraser) {
+    ctx.save();
+    for (const b of editor.eraser.boxes) {
+      ctx.fillStyle = "rgba(220, 38, 38, 0.18)";
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.fillRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+      ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+    }
+    if (editor.eraser.at) {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.arc(editor.eraser.at.x, editor.eraser.at.y, editor.eraserPx / 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   // Snap guides: where the moving selection lines up with another object.
   if (editor.guides) {
     ctx.save();

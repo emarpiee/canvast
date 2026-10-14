@@ -27,6 +27,7 @@ import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
+import eraser from "lucide-static/icons/eraser.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
 import group from "lucide-static/icons/group.svg";
@@ -83,6 +84,7 @@ export const ICONS = {
   waves: clean(waves),
   lock: clean(lock),
   group: clean(group),
+  eraser: clean(eraser),
   eye: clean(eye),
   eyeOff: clean(eyeOff),
   lockKeyhole: clean(lockKeyhole),

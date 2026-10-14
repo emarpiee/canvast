@@ -28,6 +28,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
+  { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
@@ -72,6 +73,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
+      <div class="tb-group tb-options" data-for="eraser">
+        <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
+        <span class="size-out" data-eraser-out></span>
+        <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.group}</button>
+      </div>
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
@@ -106,6 +112,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx);
   });
 
+  root.querySelector<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
+    editor.eraserPx = Number((e.target as HTMLInputElement).value);
+    editor.changed();
+  });
+
   root.querySelector<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => {
     editor.stabilizer = { ...editor.stabilizer, strength: Number((e.target as HTMLInputElement).value) };
     editor.changed();
@@ -125,6 +136,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["stab"] !== undefined) {
       editor.stabilizer = { ...editor.stabilizer, on: !editor.stabilizer.on };
+      editor.changed();
+    } else if (d["eraseGroups"] !== undefined) {
+      editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
     } else if (d["snap"] !== undefined) {
       editor.snap = !editor.snap;
@@ -169,6 +183,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const strength = root.querySelector<HTMLInputElement>("[data-strength]")!;
     strength.hidden = !editor.stabilizer.on;
     if (document.activeElement !== strength) strength.value = String(editor.stabilizer.strength);
+    const es = root.querySelector<HTMLInputElement>("[data-eraser-size]")!;
+    if (document.activeElement !== es) es.value = String(editor.eraserPx);
+    root.querySelector<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
+    root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));

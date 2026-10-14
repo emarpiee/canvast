@@ -15,7 +15,7 @@ import { normalizeUnit, worldBounds } from "../doc/edit-ops";
 import { bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
-import { boxSelect, hitsObject, lassoSelect, pickAll } from "../render/hit-test";
+import { boxSelect, hitsObject, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, handlePoints, rotateHandlePoint, selectionBox } from "../render/scene-renderer";
 import { TURN, angleFromRadians } from "../core/angle";
@@ -87,6 +87,7 @@ type Gesture =
   | { kind: "pan" }
   | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number }
   | { kind: "lasso"; pointerId: number }
+  | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId> }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
@@ -168,7 +169,34 @@ export function attachTools(
     editor.select(expandToUnits(doc.ordered(), picked, editor.entered), additive);
   };
 
+  // ---- object eraser (ADR 0022) ------------------------------------------
+  /** What a swipe will remove: the touched objects, widened to whole groups or not; locked members never. */
+  const erasing = (picked: ReadonlySet<ObjectId>): Set<ObjectId> => {
+    const objs = [...picked].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+    const ids = editor.eraseWholeGroups ? expandToUnits(doc.ordered(), objs, []) : objs.map((o) => o.id);
+    return new Set(ids.filter((id) => !doc.get(id)?.locked));
+  };
+
+  /** Extend a swipe to `to`: every unlocked visible object the brush touches along the way is taken once. */
+  const sweep = (gs: Extract<Gesture, { kind: "erase" }>, to: ScreenPoint): void => {
+    const items = unlocked(visible());
+    const r = editor.eraserPx / 2;
+    let added = false;
+    for (const po of items) {
+      if (!gs.picked.has(po.obj.id) && sweepHits(po, gs.last.x, gs.last.y, to.x, to.y, r)) {
+        gs.picked.add(po.obj.id);
+        added = true;
+      }
+    }
+    gs.last = to;
+    const boxes = editor.eraser?.boxes ?? [];
+    const taken = added ? erasing(gs.picked) : null;
+    const next = taken ? items.filter((po) => taken.has(po.obj.id)).map((po) => ({ ...po.box })) : boxes;
+    editor.eraser = { at: to, boxes: next };
+  };
+
   const cancelGesture = (): void => {
+    editor.eraser = null;
     editor.preview = { kind: "none" };
     editor.draft = null;
     editor.draftDone = [];
@@ -459,6 +487,14 @@ export function attachTools(
         g = { kind: "lasso", pointerId: e.pointerId };
         editor.changed();
         break;
+      case "eraser": {
+        if (editor.blockEdit()) break;
+        const gs = { kind: "erase" as const, pointerId: e.pointerId, last: s, picked: new Set<ObjectId>() };
+        g = gs;
+        sweep(gs, s);
+        editor.changed();
+        break;
+      }
       case "select":
         startSelectPress(e, s);
         break;
@@ -477,9 +513,20 @@ export function attachTools(
       pan.move(e.pointerId, local(e));
       return;
     }
+    if (g.kind === "none" && effectiveTool() === "eraser") {
+      editor.eraser = { at: local(e), boxes: [] };
+      editor.changed();
+      return;
+    }
     if (!("pointerId" in g) || g.pointerId !== e.pointerId) return;
     const s = local(e);
     switch (g.kind) {
+      case "erase": {
+        const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+        for (const ce of events.length ? events : [e]) sweep(g, local(ce));
+        editor.changed();
+        break;
+      }
       case "pen": {
         const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
         for (const ce of events.length ? events : [e]) {
@@ -541,6 +588,16 @@ export function attachTools(
     const cancelled = e.type === "pointercancel";
     const s = local(e);
     switch (g.kind) {
+      case "erase": {
+        const ids = cancelled ? new Set<ObjectId>() : erasing(g.picked);
+        editor.eraser = { at: s, boxes: [] };
+        if (ids.size) {
+          // One transaction for the whole swipe, so one undo brings everything back. Originals are never touched here.
+          doc.commit(doc.transaction(ids.size === 1 ? "Erase object" : `Erase ${ids.size} objects`, [], [...ids]));
+          for (const id of ids) editor.selection.delete(id);
+        }
+        break;
+      }
       case "pen":
         if (cancelled) {
           editor.draft = null;
@@ -641,6 +698,7 @@ export function attachTools(
     else if (key === "l") editor.setTool("lasso");
     else if (key === "h") editor.setTool("hand");
     else if (key === "t") editor.setTool("text");
+    else if (key === "e") editor.setTool("eraser");
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.entered.length) {

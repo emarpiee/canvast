@@ -982,3 +982,37 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.mouse.click(600, 300);
   expect((await sel()).length).toBe(1);
 });
+
+test("object eraser: a fast swipe takes what the brush crosses once, whole groups or only members, never locked objects, in one undo step (ADR 0022)", async ({ app }) => {
+  const p = app.page;
+  const count = () => p.evaluate(() => window.__canvastDebug.objects().length);
+  await p.keyboard.press("p");
+  for (const y of [250, 350, 450]) await app.drag({ x: 400, y }, { x: 600, y }, 4);
+  const [, b, c] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id) as [string, string, string];
+  await p.keyboard.press("v");
+  await p.mouse.click(500, 250);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(500, 350);
+  await p.keyboard.up("Shift");
+  await p.keyboard.press("Control+g");
+  await p.mouse.click(500, 450);
+  await p.getByRole("button", { name: "Lock", exact: true }).click();
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("e");
+  await expect(p.getByRole("radio", { name: /Object eraser/ })).toHaveAttribute("aria-checked", "true");
+  // One pointer jump from y=200 to y=300 crosses only the first stroke; as a group both go.
+  await app.drag({ x: 500, y: 200 }, { x: 500, y: 300 }, 1);
+  expect(await count(), "the group went, the locked stroke stayed").toBe(1);
+  await p.keyboard.press("Control+z");
+  expect(await count(), "one undo brings the group back").toBe(3);
+  // Members only: the swipe takes just the stroke it crosses.
+  await p.getByRole("button", { name: "Erase whole groups" }).click();
+  await app.drag({ x: 500, y: 200 }, { x: 500, y: 300 }, 1);
+  const left = (await p.evaluate(() => window.__canvastDebug.objects())).map((o) => o.id);
+  expect(left.sort()).toEqual([b, c].sort());
+  // A swipe across everything still leaves the locked stroke, and a swipe over nothing takes nothing.
+  await app.drag({ x: 500, y: 200 }, { x: 500, y: 520 }, 1);
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).map((o) => o.id)).toEqual([c]);
+  await app.drag({ x: 900, y: 200 }, { x: 900, y: 520 }, 3);
+  expect(await count()).toBe(1);
+});

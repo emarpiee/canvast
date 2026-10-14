@@ -40,6 +40,36 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
   return false;
 }
 
+/** Whether a disc of radius `r` px at (x, y) touches the object's geometry (not just its bounding box, for strokes). */
+function discHits(po: ProjectedObject, x: number, y: number, r: number): boolean {
+  const t = po.rotated;
+  if (t) {
+    const ox = x - t.cx;
+    const oy = y - t.cy;
+    return discHits(t.inner, t.vvp.width / 2 + t.c * ox + t.s * oy, t.vvp.height / 2 - t.s * ox + t.c * oy, r);
+  }
+  if (po.cover) return true;
+  if (po.obj.kind === "stroke") return hitsObject(po, x, y, r);
+  const b = po.box;
+  return Math.hypot(Math.max(b.minX - x, 0, x - b.maxX), Math.max(b.minY - y, 0, y - b.maxY)) <= r;
+}
+
+/**
+ * Whether a brush of diameter 2r swept from (x0, y0) to (x1, y1) touches the
+ * object. The path is covered by discs at most half a radius apart, so a fast
+ * swipe between two pointer samples cannot jump over a thin object.
+ */
+export function sweepHits(po: ProjectedObject, x0: number, y0: number, x1: number, y1: number, r: number): boolean {
+  const b = po.box;
+  if (Math.max(x0, x1) + r < b.minX || Math.min(x0, x1) - r > b.maxX || Math.max(y0, y1) + r < b.minY || Math.min(y0, y1) - r > b.maxY) return false;
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / Math.max(1, r / 2)));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    if (discHits(po, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, r)) return true;
+  }
+  return false;
+}
+
 /** All objects under the point, topmost first. `ordered` is in paint order. */
 export function pickAll(ordered: readonly ProjectedObject[], x: number, y: number): ProjectedObject[] {
   const hits: ProjectedObject[] = [];
