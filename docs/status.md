@@ -75,9 +75,11 @@ archive and Firefox 2^10,000,000 tests pass.
 
 **Colour at depth for every kind:** each kind of object has a coarse sampler (`SAMPLERS`, compile-time enforced): text keeps its colour inside a glyph at any depth, an image keeps its source pixels (also on a pixel corner, from exact term sums). New Select-tool option: ignore the object that fills the view (cannot be picked or deleted by accident). Tests: unit `coarse.test.ts` (11); E2E `frames.spec.ts` (image corner and a letter at 10^6, 10^9, 10^12 levels; the option at 30 to 10^12 levels).
 
-**Known failures:** an edge of a coarse object that stays within the view
-for more than 100,000 levels (the camera followed it) — for text, within 0.4% of an em of a glyph outline — and
-coarse landmark edges are not drawn (marked shortcuts). Frames more than
+**Dimmed fill and Select size slider (ADR 0016):** an edge of a coarse object in the view past 100,000 levels is drawn as a dimmed approximate fill (every sampler has `approx`); the size slider on Select sets the thickness of the selected strokes. Tests: E2E `frames.spec.ts` (corner colour at 2·10^5 to 10^12 levels; slider with undo).
+
+**Step 5, the depth suite (`tests/e2e/depth-suite.spec.ts`, all four projects, 20/20 on 2026-10-14):** A1 median frame time at 2^10, 10^3, 10^6, 10^9, 10^12 within 3× the 2^10 median + 3 ms; A2 ±10^12 jumps under 100 ms; A3 rebase continuity (zoom steps across frame boundaries and round trips of 0.3 to 1000 levels, at home and 10^12 levels down) under 10^-6 px (measured 4.5·10^-13); A5 draw, select, move, resize, undo, redo, open text and type at 2^10^12 each under 100 ms (Firefox slowest: draw 68 ms); A7 heap flat over 15 dives (Chromium; Firefox has no heap figure, so object and stored-frame counts are checked there too). Limits fixed before the first run.
+
+**Known failures:** coarse landmark edges are not drawn (marked shortcut). Frames more than
 100,000 levels finer show as a dot. Loading v0.8 data with an object more
 than ~10^6 levels coarser than the world is slow (re-homing climbs one frame
 at a time). The Firefox dense-scene
@@ -90,9 +92,7 @@ step 6).
 
 **Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
 
-**Next bounded task:** step 5, the depth suite (depth sweep, giant jumps,
-rebase continuity, work at 2^10^12, memory after a dive), then step 6
-(merge decision).
+**Next bounded task:** step 6 (merge decision: full suite, docs, version bump; the owner decides).
 
 ## Phase 0A — endless navigation proof
 

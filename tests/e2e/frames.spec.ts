@@ -151,6 +151,13 @@ async function uniformColour(app: App): Promise<string | null> {
   return c.every((v) => v === c[0]) ? c[0]! : null;
 }
 
+/** Colour at the four corners of the view, or null when they differ (the centre has a marker drawn on it). */
+async function cornerColour(app: App): Promise<string | null> {
+  const vp = await app.page.evaluate(() => window.__canvastDebug.viewport());
+  const c = await app.page.evaluate((v) => [[2, 2], [v.width - 3, 2], [2, v.height - 3], [v.width - 3, v.height - 3]].map(([x, y]) => window.__canvastDebug.pixelAt(x!, y!).join(",")), vp);
+  return c.every((v) => v === c[0]) ? c[0]! : null;
+}
+
 const state = (app: App, id: string) => app.page.evaluate((i) => window.__canvastDebug.coarseState(i), id);
 
 test("a stroke far above the view covers it at any depth: every input path, both directions, exact return", async ({ app }, info) => {
@@ -666,4 +673,60 @@ test("option: ignore the object that fills the view, so zooming far into somethi
   await ignore.click();
   await p.mouse.click(640, 400);
   expect(await selected()).toEqual([id]);
+});
+
+test("an edge in view past 100,000 levels is drawn as a dimmed approximate fill, not nothing (ADR 0016)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
+  const [id] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  const bg = (await p.evaluate(() => window.__canvastDebug.pixelAt(20, 20))).join(",");
+  const ink = (await p.evaluate(() => window.__canvastDebug.pixelAt(640, 400))).join(",");
+  // The stroke's lower edge, exactly: centre the camera on it at home, then dive with jumps (about the centre).
+  const edge = await app.worldAt(640, 404);
+  await p.keyboard.press("v");
+  for (const depth of [5e4, 2e5, 1e6, 1e12]) {
+    await p.evaluate(([x, y]) => window.__canvastDebug.setCamera({ cx: x!, cy: y!, zi: 0, zf: 0, pz: 0 }), [edge.x, edge.y]);
+    await p.evaluate((d) => window.__canvastDebug.jump(d), depth);
+    await app.frame();
+    await app.frame();
+    expect(await state(app, id!), `${depth}: the edge is at the view centre`).toBe("exact");
+    if (depth <= 1e5) {
+      expect(await cornerColour(app), `${depth}: exact path draws the real edge`).toBeNull();
+      continue;
+    }
+    const c = await cornerColour(app);
+    expect(c, `${depth}: one dimmed colour over the view`).not.toBeNull();
+    expect(c, `${depth}: not the background`).not.toBe(bg);
+    expect(c, `${depth}: dimmer than the stroke itself`).not.toBe(ink);
+  }
+});
+
+test("size slider on Select sets the thickness of the selected strokes in one undo step; on Pen it leaves them alone", async ({ app }) => {
+  const p = app.page;
+  const radius = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.radius;
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 380 }, { x: 560, y: 460 }, 6);
+  const [id] = (await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id)));
+  const r0 = await radius(id!);
+  const setSize = (v: number) =>
+    p.evaluate((x) => {
+      const el = document.querySelector<HTMLInputElement>("[data-size]")!;
+      el.value = String(x);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true })); // a release
+    }, v);
+  await setSize(80); // pen tool: only the pen changes
+  expect(await radius(id!)).toBe(r0);
+  await p.keyboard.press("v");
+  await p.mouse.click(480, 420);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
+  await setSize(20);
+  await setSize(80);
+  await app.frame();
+  expect(await radius(id!), "thicker").toBeGreaterThan(r0 * 3);
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
+  expect(await radius(id!), "each change is one undo step; two undos restore the original").toBe(r0);
 });

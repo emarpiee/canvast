@@ -38,7 +38,7 @@ or network connection.
 
 ### Editing (Phase 0B)
 
-- **Pen:** freehand vector strokes in 4 colours, a size slider (0.5–128 px) with 3 presets, a thickness lock (new strokes keep the same width on the canvas at any zoom; on the Select tool it keeps line width when resizing), a stabilizer with adjustable strength, and "pen size follows zoom" while drawing (nested-frames branch; see ADR 0015). A stroke is
+- **Pen:** freehand vector strokes in 4 colours, a size slider (0.5–128 px) with 3 presets, a thickness lock (new strokes keep the same width on the canvas at any zoom; on the Select tool it keeps line width when resizing), a stabilizer with adjustable strength, and "pen size follows zoom" while drawing; on the Select tool the size slider sets the thickness of the selected strokes (nested-frames branch; see ADR 0015, 0016). A stroke is
   authored at the current scale, so a 3 px line drawn 1,000 levels deep is a
   3 px line there. It stays crisp vector geometry at every magnification.
 - **Images:** import with the toolbar button, drag-and-drop, or paste. One

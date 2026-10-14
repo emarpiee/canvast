@@ -11,12 +11,14 @@ Nested frames redesign (branch `exp/nested-frames`, ADR 0014; not merged).
   archives and old saved canvases open unchanged).
 - **Deep zoom keeps what you zoomed into.** Zoomed far inside a stroke, a
   letter or an image the view keeps its colour (image pixels included, also
-  on a pixel corner) at any depth. Still not drawn: an outline edge that
-  stays in the view past 100,000 levels.
+  on a pixel corner) at any depth. An outline edge that stays in the view
+  past 100,000 levels is drawn as a dimmed approximate fill (ADR 0016).
 - **Pen options.** Size slider (0.5–128 px) with the three presets;
   thickness lock (new strokes keep the same width on the canvas at any zoom;
   on the Select tool it keeps a stroke's line width when you resize);
   stabilizer with a strength slider; pen size follows zoom while drawing.
+- **Size slider on Select:** sets the thickness of the selected strokes
+  (on release, one undo step).
 - **Select option:** ignore the object that fills the view, so it cannot be
   picked or deleted by accident.
 - **Debug (#debug) panel:** jumps of ±10, 100, 1000, 10^6, 10^9, 10^12

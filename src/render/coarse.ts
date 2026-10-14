@@ -48,6 +48,8 @@ export interface PixelRect {
 export interface Cover {
   readonly color?: string;
   readonly rects?: readonly PixelRect[];
+  /** An approximation drawn dimmed (an edge in view past COARSE_EXACT_MAX levels, ADR 0016). */
+  readonly dim?: boolean;
 }
 
 export type CoarseResult = "miss" | "exact" | Cover;
@@ -67,6 +69,8 @@ export interface Probe {
 export interface CoarseSampler<T extends CanvasObject> {
   /** Called when the view centre is inside the object's bounds (grown by the margin). */
   classify(o: T, p: Probe): CoarseResult;
+  /** What to draw (dimmed) when `classify` said "exact" but the exact path is out of range: the object's colour over the view. */
+  approx(o: T, p: Probe): Cover;
 }
 
 /** Relative double rounding of the local distances below (a few ulps, with room). */
@@ -92,6 +96,19 @@ export function classifyCoarse(
   return sampler.classify(o, { lx, ly, m, vp, info, terms });
 }
 
+/**
+ * The dimmed stand-in for an object whose edge is in view where the exact
+ * path is out of range: its colour (an image: the pixel under the centre)
+ * over the whole view, drawn at half strength so it reads as approximate.
+ */
+export function approxCoarse(o: CanvasObject, center: WorldPoint, info: CoarseInfo, vp: { width: number; height: number }): Cover {
+  const scale = 2 ** o.unit;
+  const lx = D.toNumber(D.sub(center.x, o.anchor.x)) / scale;
+  const ly = D.toNumber(D.sub(center.y, o.anchor.y)) / scale;
+  const sampler = SAMPLERS[o.kind] as CoarseSampler<CanvasObject>;
+  return { ...sampler.approx(o, { lx, ly, m: 0, vp, info, terms: () => null }), dim: true };
+}
+
 // ---- samplers ---------------------------------------------------------------
 
 const strokeSampler: CoarseSampler<StrokeObject> = {
@@ -103,6 +120,7 @@ const strokeSampler: CoarseSampler<StrokeObject> = {
     const s = d - o.width / 2; // signed distance to the outline: > 0 outside
     return s > m ? "miss" : s < -m ? { color: o.color } : "exact";
   },
+  approx: (o) => ({ color: o.color }),
 };
 
 /** Source pixel boundaries of one image axis near the view: [lo, hi] px offsets from the view centre, per pixel index. */
@@ -153,6 +171,11 @@ const imageSampler: CoarseSampler<ImageObject> = {
       }
     }
     return rects.length ? { rects } : "miss";
+  },
+  approx(o, { lx, ly, vp }) {
+    const i = Math.min(o.pixelW - 1, Math.max(0, Math.floor((lx * o.pixelW) / o.w)));
+    const j = Math.min(o.pixelH - 1, Math.max(0, Math.floor((ly * o.pixelH) / o.h)));
+    return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i, j }] };
   },
 };
 
@@ -237,6 +260,7 @@ const textSampler: CoarseSampler<TextObject> = {
     }
     return inside ? { color: o.color } : "miss";
   },
+  approx: (o) => ({ color: o.color }),
 };
 
 /**
@@ -250,6 +274,7 @@ export function bboxSampler<T extends CanvasObject>(colour: (o: T) => string): C
       const b = localBounds(o);
       return lx > b.minX + m && lx < b.maxX - m && ly > b.minY + m && ly < b.maxY - m ? { color: colour(o) } : "exact";
     },
+    approx: (o) => ({ color: colour(o) }),
   };
 }
 

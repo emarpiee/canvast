@@ -134,13 +134,18 @@ function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {
   ctx.fill("nonzero");
 }
 
+/** Strength of an approximate (dimmed) cover relative to the exact one. */
+const DIM_ALPHA = 0.5;
+
 /**
  * A coarse object that covers the view (render/coarse.ts): one colour over
  * all of it, or rectangles each showing one source pixel of an image.
  */
+
 export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, src: RasterSource | null, placeholder: string): void {
   const cover = po.cover!;
   paint(ctx, po.obj, () => {
+    if (cover.dim) ctx.globalAlpha *= DIM_ALPHA;
     if (cover.rects) {
       const margin = 1;
       for (const r of cover.rects) {

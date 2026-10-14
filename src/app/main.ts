@@ -249,6 +249,14 @@ async function start(): Promise<void> {
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
     depth: () => depthOf(view.frameCamera),
+    setSelectedWidth: (px) => {
+      // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.
+      const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po) => {
+        const ppu = po.cover ? 0 : po.proj.ppu;
+        return po.obj.kind === "stroke" && editor.selection.has(po.obj.id) && ppu > 0 && ppu < Infinity ? [{ ...po.obj, width: px / ppu }] : [];
+      });
+      if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Stroke thickness" : `Thickness of ${next.length} strokes`, next));
+    },
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
       if (!md.length) return;

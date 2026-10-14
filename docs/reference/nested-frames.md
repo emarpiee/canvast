@@ -341,8 +341,9 @@ near** the view. Built (`render/coarse.ts`, `scene/frame-index.ts`):
 3. Otherwise an edge is near and the sampler cannot place it (a stroke or glyph
    outline within the view; a kind with no summary): the exact centre is built
    (`cameraIn`) and the ordinary exact path draws it. That costs O(Δ) bits,
-   so it is limited to `COARSE_EXACT_MAX` (100,000 levels); past it the
-   object is not drawn (marked shortcut).
+   so it is limited to `COARSE_EXACT_MAX` (100,000 levels); past it a dimmed
+   approximate fill is drawn instead (each sampler's `approx`: the object's
+   colour at half strength over the view; ADR 0016).
 
 The classification is applied from `COARSE_ROUND_MIN` (4,096 levels) down;
 nearer frames use the exact path as before, and the two agree (tested at
@@ -445,7 +446,7 @@ form, works at any depth; `objects()` is the absolute form and throws beyond
 | Express a point (drawing) | O(path length) small operations | Yes |
 | Scene rebuild | On frame change only, O(objects considered) | Yes |
 | Coarse object covering or missing the view, Δ levels below | O(path length) small operations (256-bit centre) | Yes |
-| Coarse object with an edge near the view | O(Δ) bits, limited to 100,000 levels | No (shortcut) |
+| Coarse object with an edge near the view | O(Δ) bits, limited to 100,000 levels; past it a dimmed approximate fill | Exact: no (shortcut); approximate: yes |
 | Exact absolute conversion | O(depth) bits | No, by design; never per frame |
 
 ## 10. Limits
@@ -456,8 +457,8 @@ form, works at any depth; `objects()` is the absolute form and throws beyond
 | One jump | 2^50 levels | Double zoom counts |
 | Long wheel zooms | One frame per 32 levels on the path (0.6 ms walk at 10^5 levels) | If it matters: merge chains of empty frames into a dive |
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
-| Coarse object whose edge stays near the view, from > 100,000 levels below | Not drawn (the camera followed its edge that far) | §7.3 |
-| Coarse text with the centre within 0.4% of an em of a glyph outline, from > 100,000 levels below | Not drawn (the camera followed the outline that far) | §7.3 |
+| Coarse object whose edge stays near the view, from > 100,000 levels below | Dimmed approximate fill (not the exact edge) | §7.3, ADR 0016 |
+| Coarse text with the centre within 0.4% of an em of a glyph outline, from > 100,000 levels below | Dimmed approximate fill | §7.3, ADR 0016 |
 | Landmarks much coarser than the camera, edge crossing the view | Not drawn | Landmark edges are not summarised |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
 | Unreferenced frame records | Collected with the saved view after 200 frames were written (and when idle) | Frames nothing refers to stay stored until then |

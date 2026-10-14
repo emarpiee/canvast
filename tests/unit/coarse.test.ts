@@ -243,7 +243,10 @@ describe("coarse frames in the index", () => {
     fc = fjump(doc.space, fc, COARSE_ROUND_MIN * 40);
     const v = index.views(fc).find((x) => x.coarse && x.frame === doc.space.world)!;
     expect(v.coarse!.exactCam(), "past the exact limit").toBeNull();
-    // The view is beyond the stroke edge at the pixel scale only if we are tracking it: here the centre is on it exactly.
-    expect(visibleObjects(doc, index, null, fc, VP)).toEqual([]);
+    // The centre is on the edge exactly: a dimmed approximate fill is drawn, not nothing (ADR 0016).
+    const vis = visibleObjects(doc, index, null, fc, VP);
+    expect(vis).toHaveLength(1);
+    expect(vis[0]!.cover?.dim).toBe(true);
+    expect(vis[0]!.cover?.color).toBeDefined();
   });
 });

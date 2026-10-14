@@ -13,6 +13,8 @@ export interface ToolbarActions {
   copyMarkdown(): void;
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
+  /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
+  setSelectedWidth(px: number): void;
 }
 
 const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
@@ -40,8 +42,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
-        <input type="range" class="size" data-size min="0" max="100" step="1" aria-label="Pen size" title="Pen size (screen px at this zoom)">
+      </div>
+      <div class="tb-group tb-options" data-for="pen select">
+        <input type="range" class="size" data-size min="0" max="100" step="1" aria-label="Pen size" title="Pen size (screen px at this zoom); on Select it sets the thickness of the selected strokes">
         <span class="size-out" data-size-out></span>
+      </div>
+      <div class="tb-group tb-options" data-for="pen">
         <button type="button" class="stab" data-stab aria-pressed="false" aria-label="Stabilizer" title="Stabilizer: smooths hand wobble; the brush follows the pointer on a rope">${ICONS.waves}</button>
         <input type="range" class="size" data-strength min="1" max="100" step="1" aria-label="Stabilizer strength" title="Stabilizer strength (rope length)" hidden>
         <button type="button" class="follow" data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
@@ -79,6 +85,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.penWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
     if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx };
     editor.changed();
+  });
+
+  // On Select the slider also sets the selected strokes' thickness, once on release (one undo step).
+  root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("change", () => {
+    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx);
   });
 
   root.querySelector<HTMLInputElement>("[data-strength]")!.addEventListener("input", (e) => {

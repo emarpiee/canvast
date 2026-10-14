@@ -7,7 +7,7 @@ import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
 import { cellFrame, coverObject, projectEntry, projectObject } from "./projection";
-import { classifyCoarse } from "./coarse";
+import { approxCoarse, classifyCoarse } from "./coarse";
 
 export interface VisibleStats {
   levelsVisited: number;
@@ -55,7 +55,8 @@ export function visibleObjects(
           const r = classifyCoarse(e.obj, coarse.center, coarse.info, vp, coarse.terms);
           if (r === "miss") continue;
           const exact = r === "exact" ? coarse.exactCam() : null;
-          const po = r !== "exact" ? coverObject(e.obj, vp, r) : exact && projectObject(e.obj, exact, vp);
+          // Out of exact range (> COARSE_EXACT_MAX levels): a dimmed approximate fill instead of nothing (ADR 0016).
+          const po = r !== "exact" ? coverObject(e.obj, vp, r) : exact ? projectObject(e.obj, exact, vp) : coverObject(e.obj, vp, approxCoarse(e.obj, coarse.center, coarse.info, vp));
           if (po) out.push(po);
           continue;
         }
