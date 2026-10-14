@@ -123,6 +123,24 @@ export function drawOverlays(
   vp: Viewport,
   theme: SceneTheme,
 ): void {
+  // Snap guides: where the moving selection lines up with another object.
+  if (editor.guides) {
+    ctx.save();
+    ctx.strokeStyle = "#d946ef";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    if (editor.guides.x !== undefined) {
+      ctx.moveTo(Math.round(editor.guides.x) + 0.5, 0);
+      ctx.lineTo(Math.round(editor.guides.x) + 0.5, vp.height);
+    }
+    if (editor.guides.y !== undefined) {
+      ctx.moveTo(0, Math.round(editor.guides.y) + 0.5);
+      ctx.lineTo(vp.width, Math.round(editor.guides.y) + 0.5);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
   // In-progress stroke, drawn through the same projection as committed ones (with the camera in its frame).
   for (const d of [...editor.draftDone, ...(editor.draft ? [editor.draft] : [])]) {
     const cam = cameraIn(fc, d.frame);

@@ -53,6 +53,10 @@ export class EditorState {
   penWidthPx: number = PEN_WIDTHS[1];
   /** Thickness lock (interaction/pen-width.ts): new strokes keep the same width on the canvas, not on screen. */
   lock: PenLock | null = null;
+  /** Snapping while moving (interaction/snap.ts). */
+  snap = true;
+  /** Guide lines (screen px) shown while a move is snapped to something. */
+  guides: { x?: number; y?: number } | null = null;
   /** Select tool: ignore an object that fills the whole view (zoomed far into it), so it cannot be picked or deleted by accident. */
   ignoreFilling = false;
   /** Pen stabilizer (interaction/stabilizer.ts): on/off and strength 0–100. */

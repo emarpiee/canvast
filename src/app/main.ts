@@ -103,6 +103,7 @@ async function start(): Promise<void> {
   editor.followZoom = settings.get("pen.followZoom");
   editor.ignoreFilling = settings.get("select.ignoreFilling");
   editor.lassoFilter = settings.get("lasso.filter");
+  editor.snap = settings.get("snap.enabled");
   editor.subscribe(() => {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
@@ -111,6 +112,7 @@ async function start(): Promise<void> {
     settings.set("pen.followZoom", editor.followZoom);
     settings.set("select.ignoreFilling", editor.ignoreFilling);
     settings.set("lasso.filter", editor.lassoFilter);
+    settings.set("snap.enabled", editor.snap);
   });
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;

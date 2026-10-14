@@ -27,6 +27,7 @@ import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
 import lock from "lucide-static/icons/lock.svg";
+import magnet from "lucide-static/icons/magnet.svg";
 import waves from "lucide-static/icons/waves.svg";
 import scaling from "lucide-static/icons/scaling.svg";
 import pointerBan from "lucide-static/icons/mouse-pointer-ban.svg";
@@ -73,4 +74,5 @@ export const ICONS = {
   scaling: clean(scaling),
   waves: clean(waves),
   lock: clean(lock),
+  magnet: clean(magnet),
 } as const;

@@ -11,11 +11,12 @@ import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
-import { normalizeUnit } from "../doc/edit-ops";
+import { normalizeUnit, worldBounds } from "../doc/edit-ops";
+import { bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, hitsObject, lassoSelect, pickAll } from "../render/hit-test";
-import type { ProjectedObject } from "../render/projection";
+import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, handlePoints, rotateHandlePoint, selectionBox } from "../render/scene-renderer";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
@@ -47,13 +48,46 @@ const ANGLE_STEP = TURN / 24;
 /** Smallest scale factor a resize drag can produce (prevents flips/zero size). */
 const MIN_SCALE = 1e-6;
 
+/** What a move can snap to (interaction/snap.ts), gathered once when the move starts. */
+interface SnapContext {
+  /** The moving selection's box in px, and its exact lines in the move's frame. */
+  box: ScreenBox;
+  src: ExactLines;
+  /** Candidates: other visible objects, their px lines and what they are. */
+  tx: Array<[number, number, number]>;
+  ty: Array<[number, number, number]>;
+  objs: CanvasObject[];
+}
+
+interface ExactLines {
+  x: [D.Dyadic, D.Dyadic, D.Dyadic];
+  y: [D.Dyadic, D.Dyadic, D.Dyadic];
+}
+
+const exactLines = (min: WorldPoint, max: WorldPoint): ExactLines => ({
+  x: [min.x, D.shift(D.add(min.x, max.x), -1), max.x],
+  y: [min.y, D.shift(D.add(min.y, max.y), -1), max.y],
+});
+
+/** The object's exact world bounding box, expressed in frame `f`. */
+function boundsIn(o: CanvasObject, f: Frame): { min: WorldPoint; max: WorldPoint } {
+  const b = worldBounds(o);
+  const of = o.frame ?? f.space.world;
+  return of === f ? b : { min: expressExactIn(f.space, of, b.min, f), max: expressExactIn(f.space, of, b.max, f) };
+}
+
+const linesOf = (o: CanvasObject, f: Frame): ExactLines => {
+  const b = boundsIn(o, f);
+  return exactLines(b.min, b.max);
+};
+
 type Gesture =
   | { kind: "none" }
   | { kind: "pan" }
   | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number }
   | { kind: "lasso"; pointerId: number }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
-  | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; ids: ObjectId[] }
+  | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint }
   | {
@@ -127,6 +161,7 @@ export function attachTools(
     editor.draftDone = [];
     editor.lasso = null;
     editor.marquee = null;
+    editor.guides = null;
     g = { kind: "none" };
     editor.changed();
   };
@@ -262,7 +297,7 @@ export function attachTools(
     if (t && draggable) {
       if (!editor.selection.has(t.id)) editor.select([t.id], gp.additive);
       const ids = [...editor.selection].filter((id) => doc.get(id));
-      g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), ids };
+      g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, snap: editor.snap ? snapContext(ids, view.frame) : null };
       updateMove(s);
       return;
     }
@@ -271,10 +306,64 @@ export function attachTools(
     editor.changed();
   };
 
+  /** Gather what a move of `ids` can snap to; null when there is nothing to measure. */
+  const snapContext = (ids: readonly ObjectId[], frame: Frame): SnapContext | null => {
+    const vis = visible();
+    const chosen = new Set(ids);
+    let box: ScreenBox | null = null;
+    let ex: { minX: D.Dyadic; minY: D.Dyadic; maxX: D.Dyadic; maxY: D.Dyadic } | null = null;
+    const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [] };
+    for (const po of vis) {
+      const b = po.box;
+      if (chosen.has(po.obj.id)) {
+        box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
+        const e = boundsIn(po.obj, frame);
+        ex = ex
+          ? {
+              minX: D.cmp(e.min.x, ex.minX) < 0 ? e.min.x : ex.minX,
+              minY: D.cmp(e.min.y, ex.minY) < 0 ? e.min.y : ex.minY,
+              maxX: D.cmp(e.max.x, ex.maxX) > 0 ? e.max.x : ex.maxX,
+              maxY: D.cmp(e.max.y, ex.maxY) > 0 ? e.max.y : ex.maxY,
+            }
+          : { minX: e.min.x, minY: e.min.y, maxX: e.max.x, maxY: e.max.y };
+      } else if (!po.cover && [b.minX, b.minY, b.maxX, b.maxY].every((v) => Math.abs(v) < 1e7)) {
+        ctx.tx.push([b.minX, (b.minX + b.maxX) / 2, b.maxX]);
+        ctx.ty.push([b.minY, (b.minY + b.maxY) / 2, b.maxY]);
+        ctx.objs.push(po.obj);
+      }
+    }
+    if (!box || !ex || !ctx.objs.length) return null;
+    ctx.box = box;
+    ctx.src = exactLines({ x: ex.minX, y: ex.minY }, { x: ex.maxX, y: ex.maxY });
+    return ctx;
+  };
+
   const updateMove = (s: ScreenPoint): void => {
     if (g.kind !== "move") return;
     const w = worldIn(s, g.frame);
-    editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx: D.sub(w.x, g.startWorld.x), dy: D.sub(w.y, g.startWorld.y) };
+    let dx = D.sub(w.x, g.startWorld.x);
+    let dy = D.sub(w.y, g.startWorld.y);
+    editor.guides = null;
+    const sn = g.snap;
+    if (sn && !editor.readOnly) {
+      const ox = s.x - g.startScreen.x;
+      const oy = s.y - g.startScreen.y;
+      const b = sn.box;
+      const hx = bestSnap([b.minX + ox, (b.minX + b.maxX) / 2 + ox, b.maxX + ox], sn.tx);
+      const hy = bestSnap([b.minY + oy, (b.minY + b.maxY) / 2 + oy, b.maxY + oy], sn.ty);
+      // The alignment is exact: target line minus where the moving line started.
+      if (hx) {
+        const t = linesOf(sn.objs[hx.target]!, g.frame);
+        dx = D.sub(t.x[hx.line]!, sn.src.x[hx.source]!);
+        editor.guides = { x: sn.tx[hx.target]![hx.line]! };
+      }
+      if (hy) {
+        const t = linesOf(sn.objs[hy.target]!, g.frame);
+        dy = D.sub(t.y[hy.line]!, sn.src.y[hy.source]!);
+        editor.guides = { ...editor.guides, y: sn.ty[hy.target]![hy.line]! };
+      }
+    }
+    editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
     editor.changed();
   };
 
@@ -468,6 +557,7 @@ export function attachTools(
       }
       case "move":
         if (!cancelled) updateMove(s);
+        editor.guides = null;
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();
         break;

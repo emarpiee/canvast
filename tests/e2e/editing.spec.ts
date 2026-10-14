@@ -112,6 +112,8 @@ test("U1/U2/U4/U5: draw over deep-zoomed media, move only the media, lasso strok
 
   // U5 — direct click selects the viewport-filling image; dragging it moves only it.
   await key(app, "v");
+  // This test checks the exact pointer delta, so snapping to the stroke nearby is off (it has its own test).
+  await app.page.getByRole("button", { name: "Snap to other objects" }).click();
   await click(app, 300, 650);
   expect(await selection(app)).toEqual([img0.id]);
   const w0 = await app.worldAt(300, 650);

@@ -853,3 +853,32 @@ test("rotate an image and a text: drawn turned, picked turned, exact pixels deep
   await p.mouse.click(Math.round((tt.minX + tt.maxX) / 2), Math.round((tt.minY + tt.maxY) / 2));
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "picked where it is now").toEqual([tid]);
 });
+
+test("snapping: a moved stroke lines up exactly with another one (home and a trillion levels down); the toggle turns it off (ADR 0019)", async ({ app }) => {
+  const p = app.page;
+  const box = async (id: string) => (await boxOf(app, id))!;
+  for (const deep of [false, true]) {
+    if (deep) await p.evaluate(() => window.__canvastDebug.jump(1e12));
+    await p.keyboard.press("p");
+    await app.drag({ x: 400, y: 300 }, { x: 600, y: 300 }, 4);
+    await app.drag({ x: 420, y: 500 }, { x: 620, y: 500 }, 4);
+    const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id).slice(-2);
+    const [a, b] = ids as [string, string];
+    await p.keyboard.press("v");
+    const snap = p.getByRole("button", { name: "Snap to other objects" });
+    await expect(snap).toHaveAttribute("aria-pressed", "true");
+    // 20 px apart; move B left by 17: within 6 px of A's left edge, so it jumps to exactly it.
+    await app.drag({ x: 520, y: 500 }, { x: 503, y: 500 }, 6);
+    expect((await box(b)).minX).toBe((await box(a)).minX);
+    await p.keyboard.press("Control+z");
+    // Off: the same move lands where the pointer put it.
+    await snap.click();
+    await expect(snap).toHaveAttribute("aria-pressed", "false");
+    await app.drag({ x: 520, y: 500 }, { x: 503, y: 500 }, 6);
+    expect((await box(b)).minX - (await box(a)).minX).toBeCloseTo(3, 6);
+    await snap.click();
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.keyboard.press("Home");
+  }
+});

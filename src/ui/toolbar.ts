@@ -56,6 +56,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
       <div class="tb-group tb-options" data-for="select">
+        <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
@@ -112,6 +113,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["stab"] !== undefined) {
       editor.stabilizer = { ...editor.stabilizer, on: !editor.stabilizer.on };
       editor.changed();
+    } else if (d["snap"] !== undefined) {
+      editor.snap = !editor.snap;
+      editor.changed();
     } else if (d["ignoreFill"] !== undefined) {
       editor.ignoreFilling = !editor.ignoreFilling;
       editor.changed();
@@ -145,6 +149,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const strength = root.querySelector<HTMLInputElement>("[data-strength]")!;
     strength.hidden = !editor.stabilizer.on;
     if (document.activeElement !== strength) strength.value = String(editor.stabilizer.strength);
+    root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
