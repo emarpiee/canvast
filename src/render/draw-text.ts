@@ -3,7 +3,7 @@ import type { Viewport } from "../core/camera";
 import type { ImageObject, TextObject } from "../doc/model";
 import { TEXT_PAD_EM } from "../doc/model";
 import type { Line, PlacedGlyph } from "../text/layout";
-import { LINE_HEIGHT, layoutText, textFont } from "../text/layout";
+import { LINE_HEIGHT, layoutObject, textFont } from "../text/layout";
 import type { ProjectedObject, Projection } from "./projection";
 import { exactX, exactY, projX, projY, toPx } from "./projection";
 import type { RasterSource } from "./draw-objects";
@@ -49,7 +49,7 @@ const RASTER_EM_PX = 128;
 export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, dpr: number): void {
   const o = po.obj as TextObject;
   const p = po.proj;
-  const lay = layoutText(o.md, o.w / o.size);
+  const lay = layoutObject(o);
   const SIZE = D.fromNumber(o.size);
   const emPx = toPx(p, SIZE);
   // Screen position of a layout coordinate (em).

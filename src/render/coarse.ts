@@ -5,7 +5,7 @@ import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
 import type { CanvasObject, ImageObject, StrokeObject, TextObject } from "../doc/model";
 import { localBounds, pivotOf, strokePoints } from "../doc/model";
 import { cosSin } from "../core/angle";
-import { layoutText, textFont } from "../text/layout";
+import { layoutObject, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
 
 /**
@@ -208,7 +208,7 @@ const textSampler: CoarseSampler<TextObject> = {
     } catch {
       return "exact"; // the font is not loaded yet
     }
-    const lay = layoutText(o.md, o.w / o.size);
+    const lay = layoutObject(o);
     const upm = font.unitsPerEm;
     let inside = false;
     for (const line of lay.lines) {

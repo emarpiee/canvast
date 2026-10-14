@@ -8,7 +8,7 @@ const buttons = [["blockStyle", "bold", "italic", "strike"], ["list_bulleted", "
 
 /** Creates the editor in `el` (balloon toolbar: it appears over a selection) and returns Markdown-in, Markdown-out accessors. */
 window.__canvastSun = (el) => {
-  const ed = suneditor.create(el, { plugins, buttonList: buttons, mode: "balloon", height: "100%", minHeight: "240px" });
+  const ed = suneditor.create(el, { plugins, buttonList: buttons, mode: "balloon", height: "320px" });
   return {
     set: (md) => ed.$.html.set(markdown.markdownToHtml(md)),
     // The converter leaves an empty "> " line after a quote.

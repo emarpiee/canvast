@@ -670,7 +670,6 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(720px, 92vw);
-  height: min(70vh, 560px);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -682,7 +681,5 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
   backdrop-filter: blur(6px);
 }
 .note-panel[hidden] { display: none; }
-.note-host { flex: 1; min-height: 0; }
-.note-host .sun-editor { height: 100%; }
 .note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--hud-fg); }
 .note-actions span { margin-right: auto; opacity: 0.6; }
