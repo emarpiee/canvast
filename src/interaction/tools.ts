@@ -755,6 +755,7 @@ export function attachTools(
     else if (key === "e") editor.setTool("eraser");
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
+      else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool
       else if (editor.entered.length) {
         // Leave the group entered last; what was picked inside it stays selected.
         editor.entered = editor.entered.slice(0, -1);

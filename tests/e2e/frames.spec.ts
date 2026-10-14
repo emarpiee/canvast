@@ -1436,11 +1436,15 @@ test("the pens differ: fine is one stroke, marker one translucent wide one, penc
   expect(ink.length).toBeGreaterThan(1);
   expect(new Set(ink.map((o) => o.groups?.[0])).size).toBe(1);
   expect(new Set(ink.map((o) => Math.round(o.width * 1000))).size, "the width varies along the line").toBeGreaterThan(1);
+  // Esc leaves the pen for the Select tool.
+  await p.keyboard.press("Escape");
+  await expect(p.getByRole("radio", { name: "Select" })).toHaveAttribute("aria-checked", "true");
   // One undo takes a whole pencil or ink stroke away.
   const count = (await strokes()).length;
   await p.keyboard.press("Control+z");
   expect((await strokes()).length).toBe(count - ink.length);
   // The pen stays chosen after a reload.
+  await p.keyboard.press("p");
   await p.getByRole("radio", { name: "Ink pen" }).click();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
