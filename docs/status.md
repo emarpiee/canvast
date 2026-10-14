@@ -394,6 +394,8 @@ visible strokes). Alternatives:
 
 **Phase 4, slices 2 and 3 done:** persisted WebP thumbnails (made at import), the slide view, and thumbnails shown also for assets whose original is lost ([ADR 0034](adr/0034-persisted-thumbnails.md)); tested in `assets.spec.ts`.
 
+**Phase 4, slice 4 done:** smart folders ([ADR 0035](adr/0035-smart-folders.md)); tested in `organize.spec.ts`.
+
 **Next bounded task:** Phase 4: the rest of [the thumbnail plan](plans/asset-thumbnails.md) (thumbnails in archives, bad-thumbnail regeneration).
 
 ## Phase 1, slice 9 — settings scopes

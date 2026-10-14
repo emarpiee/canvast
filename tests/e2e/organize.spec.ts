@@ -83,6 +83,24 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await searchFor("png colour", 1);
   await searchFor("", 2);
 
+  // A smart folder saves a search (ADR 0035): it counts its matches, applies them when clicked, and can be renamed.
+  await expect(p.getByTestId("smart-new")).toBeDisabled();
+  await searchFor("#ref", 1);
+  await p.getByTestId("smart-new").click();
+  await p.getByTestId("folder-name-input").fill("Refs");
+  await p.keyboard.press("Enter");
+  const smartItem = p.locator('[data-testid="smart-list"] .side-item');
+  await expect(smartItem).toHaveText(/Refs\s*1/);
+  await searchFor("", 2);
+  await smartItem.click();
+  await expect(p.getByTestId("assets-search")).toHaveValue("#ref");
+  await expect(cards(p)).toHaveCount(1);
+  await p.getByRole("button", { name: "Rename smart folder Refs" }).click();
+  await p.getByTestId("folder-name-input").fill("Reference");
+  await p.keyboard.press("Enter");
+  await expect(smartItem).toHaveText(/Reference/);
+  await searchFor("", 2);
+
   // Removing a tag.
   await card(p, HASH).click();
   await p.getByRole("button", { name: "Remove tag ref" }).click();
@@ -96,6 +114,9 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-tags")).toHaveText(/#Hands/);
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
+  await expect(p.getByTestId("smart-list")).toContainText("Reference");
+  await p.getByRole("button", { name: "Delete smart folder Reference" }).click();
+  await expect(p.getByTestId("smart-list")).not.toContainText("Reference");
   expect(app.consoleErrors).toEqual([]);
 });
 
