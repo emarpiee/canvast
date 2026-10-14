@@ -41,6 +41,7 @@ export const SETTINGS = {
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.bookmarksOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.layersOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "select.alignBox": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "snap.enabled": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "eraser.diameterPx": { scope: "device", default: 16, validate: range(4, 128), effect: "immediate" } as Def<number>,
   "eraser.wholeGroups": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,

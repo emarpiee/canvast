@@ -105,3 +105,43 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
 export function rectContains(outer: Rect, inner: Rect): boolean {
   return inner.minX >= outer.minX && inner.maxX <= outer.maxX && inner.minY >= outer.minY && inner.maxY <= outer.maxY;
 }
+
+/** Whether segments (a, b) and (c, d) cross or touch. */
+export function segmentsIntersect(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean {
+  const o = (px: number, py: number, qx: number, qy: number, rx: number, ry: number): number => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px));
+  const o1 = o(ax, ay, bx, by, cx, cy);
+  const o2 = o(ax, ay, bx, by, dx, dy);
+  const o3 = o(cx, cy, dx, dy, ax, ay);
+  const o4 = o(cx, cy, dx, dy, bx, by);
+  if (o1 !== o2 && o3 !== o4) return true;
+  const on = (px: number, py: number, qx: number, qy: number, rx: number, ry: number): boolean => Math.min(px, qx) <= rx && rx <= Math.max(px, qx) && Math.min(py, qy) <= ry && ry <= Math.max(py, qy);
+  return (o1 === 0 && on(ax, ay, bx, by, cx, cy)) || (o2 === 0 && on(ax, ay, bx, by, dx, dy)) || (o3 === 0 && on(cx, cy, dx, dy, ax, ay)) || (o4 === 0 && on(cx, cy, dx, dy, bx, by));
+}
+
+/** Whether two polygons (flat [x0, y0, x1, y1, ...]) overlap: an edge crosses, or one lies inside the other. */
+export function polygonsOverlap(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  const na = a.length / 2;
+  const nb = b.length / 2;
+  for (let i = 0; i < na; i++) {
+    const j = (i + 1) % na;
+    for (let k = 0; k < nb; k++) {
+      const l = (k + 1) % nb;
+      if (segmentsIntersect(a[2 * i]!, a[2 * i + 1]!, a[2 * j]!, a[2 * j + 1]!, b[2 * k]!, b[2 * k + 1]!, b[2 * l]!, b[2 * l + 1]!)) return true;
+    }
+  }
+  return pointInPolygon(a[0]!, a[1]!, b) || pointInPolygon(b[0]!, b[1]!, a);
+}
+
+/** Whether a polyline (flat points; one point counts as a dot) touches a polygon: a point inside, or a segment crossing its edge. */
+export function polylineTouchesPolygon(line: ArrayLike<number>, poly: ArrayLike<number>): boolean {
+  const n = line.length / 2;
+  for (let i = 0; i < n; i++) if (pointInPolygon(line[2 * i]!, line[2 * i + 1]!, poly)) return true;
+  const m = poly.length / 2;
+  for (let i = 0; i + 1 < n; i++) {
+    for (let k = 0; k < m; k++) {
+      const l = (k + 1) % m;
+      if (segmentsIntersect(line[2 * i]!, line[2 * i + 1]!, line[2 * i + 2]!, line[2 * i + 3]!, poly[2 * k]!, poly[2 * k + 1]!, poly[2 * l]!, poly[2 * l + 1]!)) return true;
+    }
+  }
+  return false;
+}

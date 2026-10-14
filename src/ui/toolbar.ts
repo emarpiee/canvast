@@ -82,6 +82,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
         <button type="button" data-action="lock" aria-label="Lock" title="Lock the selection (drawn, but it cannot be picked until Unlock all)">${ICONS.lockKeyhole}</button>
         <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
+        <button type="button" class="snap" data-align-box aria-pressed="false" aria-label="Axis-aligned selection box" title="Selection box: by default it turns with the selected objects when they share a rotation. On: it stays aligned to the canvas axes.">${ICONS.boxSelect}</button>
         <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
@@ -152,6 +153,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
+    } else if (d["alignBox"] !== undefined) {
+      editor.alignBox = !editor.alignBox;
+      editor.changed();
     } else if (d["snap"] !== undefined) {
       editor.snap = !editor.snap;
       editor.changed();
@@ -201,6 +205,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
+    root.querySelector<HTMLElement>("[data-align-box]")!.setAttribute("aria-pressed", String(editor.alignBox));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));

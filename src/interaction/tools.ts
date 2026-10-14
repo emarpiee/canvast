@@ -17,7 +17,8 @@ import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, hitsObject, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
-import { HANDLE_SIZE_PX, canRotate, handlePoints, rotateHandlePoint, selectionBox } from "../render/scene-renderer";
+import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
+import { pointInPolygon } from "../render/geometry2d";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { arrangeSelection, deleteSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
@@ -44,6 +45,8 @@ import { expandToUnits, isInside } from "../doc/groups";
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum pen sample spacing in CSS px. */
 const PEN_MIN_STEP_PX = 0.75;
+/** A press this close outside a corner of the selection box (px) turns the selection. */
+const ROTATE_ZONE_PX = 30;
 /** Shift while rotating snaps to whole steps of 15 degrees. */
 const ANGLE_STEP = TURN / 24;
 /** Smallest scale factor a resize drag can produce (prevents flips/zero size). */
@@ -277,13 +280,19 @@ export function attachTools(
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
     const vis = visible();
-    // Resize handles take priority when a selection is visible.
-    const box = editor.selection.size ? selectionBox(vis, editor) : null;
-    if (box && canRotate(vis, editor) && !editor.blockEdit()) {
-      const [rx, ry] = rotateHandlePoint(box);
-      if (Math.hypot(s.x - rx, s.y - ry) <= HANDLE_SIZE_PX) {
+    // Rotate and resize handles take priority when a selection is visible.
+    const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
+    if (sel && canRotate(vis, editor) && !editor.blockEdit()) {
+      const { frame, handle } = sel;
+      // The handle above the box, or just outside a corner (like a design tool), which stays reachable when the box is bigger than the view.
+      const flat = frame.corners.flatMap((p) => [p[0], p[1]]);
+      const nearCorner = frame.corners.some((p) => {
+        const d = Math.hypot(s.x - p[0], s.y - p[1]);
+        return d > HANDLE_SIZE_PX && d <= ROTATE_ZONE_PX;
+      });
+      if (Math.hypot(s.x - handle[0], s.y - handle[1]) <= HANDLE_SIZE_PX || (nearCorner && !pointInPolygon(s.x, s.y, flat))) {
         const ids = [...editor.selection].filter((id) => doc.get(id));
-        const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+        const centre = { x: frame.centre[0], y: frame.centre[1] };
         const single = ids.length === 1 ? doc.get(ids[0]!) : null;
         g = {
           kind: "rotate",
@@ -298,15 +307,15 @@ export function attachTools(
         return;
       }
     }
-    if (box) {
-      const corners = handlePoints(box);
+    if (sel) {
+      const corners = sel.frame.corners;
       for (let i = 0; i < 4; i++) {
         const [hx, hy] = corners[i]!;
         if (Math.abs(s.x - hx) <= HANDLE_SIZE_PX && Math.abs(s.y - hy) <= HANDLE_SIZE_PX && !editor.blockEdit()) {
           const [fx, fy] = corners[(i + 2) % 4]!;
           const ids = [...editor.selection].filter((id) => doc.get(id));
-          // A turned image resizes uniformly: stretching its bounding box would shear it.
-          const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image" && !doc.get(ids[0]!)?.rot;
+          // A turned image resizes uniformly: stretching its bounding box would shear it. So does anything in a turned box.
+          const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image" && !doc.get(ids[0]!)?.rot && sel.frame.angle === 0;
           g = {
             kind: "scale",
             pointerId: e.pointerId,
@@ -449,6 +458,8 @@ export function attachTools(
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
     el.focus({ preventScroll: true });
+    // A gesture whose pointer is gone (its release was lost) must not block this press, nor undo and redo.
+    if ("pointerId" in g && g.pointerId !== e.pointerId && !active.has(g.pointerId)) cancelGesture();
     const touch = e.pointerType === "touch";
     active.set(e.pointerId, { p: s, touch });
     const touchesDown = [...active.values()].filter((a) => a.touch).length;
@@ -725,6 +736,11 @@ export function attachTools(
   el.addEventListener("pointermove", onPointerMove);
   el.addEventListener("pointerup", onPointerUp);
   el.addEventListener("pointercancel", onPointerUp);
+  // If the browser takes the pointer away (a lost release, the window losing focus), end the gesture as cancelled.
+  const onLostCapture = (e: PointerEvent): void => {
+    if ("pointerId" in g && g.pointerId === e.pointerId) onPointerUp(new PointerEvent("pointercancel", { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY }));
+  };
+  el.addEventListener("lostpointercapture", onLostCapture);
   el.addEventListener("dblclick", onDoubleClick);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
@@ -737,6 +753,7 @@ export function attachTools(
     el.removeEventListener("pointermove", onPointerMove);
     el.removeEventListener("pointerup", onPointerUp);
     el.removeEventListener("pointercancel", onPointerUp);
+    el.removeEventListener("lostpointercapture", onLostCapture);
     el.removeEventListener("dblclick", onDoubleClick);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);

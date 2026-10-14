@@ -8,6 +8,8 @@ import { projectObject } from "./projection";
 import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
 import { drawText } from "./draw-text";
+import type { Pt, SelectionFrame } from "./selection-frame";
+import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
   selection: string;
@@ -227,25 +229,10 @@ function clampBox(b: ScreenBox, vp: Viewport): ScreenBox {
   };
 }
 
-/** Union screen box of the visible selected objects, or null. */
-export function selectionBox(visible: readonly ProjectedObject[], editor: EditorState): ScreenBox | null {
-  let box: ScreenBox | null = null;
-  for (const po of visible) {
-    if (!editor.selection.has(po.obj.id)) continue;
-    const b = po.box;
-    box = box
-      ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) }
-      : { ...b };
-  }
-  return box;
-}
-
-/** Distance of the rotate handle above the selection box (CSS px). */
-export const ROTATE_HANDLE_OFFSET_PX = 26;
-
-/** Centre of the rotate handle: above the middle of the top edge. */
-export function rotateHandlePoint(b: ScreenBox): [number, number] {
-  return [(b.minX + b.maxX) / 2, b.minY - ROTATE_HANDLE_OFFSET_PX];
+/** The box of the visible selected objects (turned with them when they share a rotation, see selection-frame.ts). */
+export function selectedFrame(visible: readonly ProjectedObject[], editor: EditorState, vp: Viewport): { frame: SelectionFrame; handle: Pt } | null {
+  const frame = selectionFrame(visible.filter((po) => editor.selection.has(po.obj.id)), editor.alignBox);
+  return frame ? { frame, handle: rotateHandleAt(frame, vp) } : null;
 }
 
 /** Rotation is offered when something selected is visible and not a covering approximation. */
@@ -259,15 +246,7 @@ export function canRotate(visible: readonly ProjectedObject[], editor: EditorSta
   return any;
 }
 
-/** Corner handle centers: tl, tr, br, bl. */
-export function handlePoints(b: ScreenBox): Array<[number, number]> {
-  return [
-    [b.minX, b.minY],
-    [b.maxX, b.minY],
-    [b.maxX, b.maxY],
-    [b.minX, b.maxY],
-  ];
-}
+const finite = (p: Pt): boolean => Math.abs(p[0]) < 1e6 && Math.abs(p[1]) < 1e6;
 
 function drawSelection(
   ctx: CanvasRenderingContext2D,
@@ -280,33 +259,44 @@ function drawSelection(
   ctx.save();
   ctx.strokeStyle = theme.selection;
   ctx.lineWidth = 1;
+  // Each selected object is outlined by the rectangle it occupies, turned with it.
   for (const po of visible) {
     if (!editor.selection.has(po.obj.id)) continue;
-    const b = clampBox(po.box, vp);
-    ctx.strokeRect(b.minX - 2.5, b.minY - 2.5, b.maxX - b.minX + 5, b.maxY - b.minY + 5);
+    const c = itemCorners(po);
+    if (!c.every(finite)) continue;
+    ctx.beginPath();
+    ctx.moveTo(c[0]![0], c[0]![1]);
+    for (let i = 1; i < c.length; i++) ctx.lineTo(c[i]![0], c[i]![1]);
+    ctx.closePath();
+    ctx.stroke();
   }
-  const box = selectionBox(visible, editor);
-  if (box) {
+  const sel = selectedFrame(visible, editor, vp);
+  if (sel && sel.frame.corners.every(finite)) {
+    const { frame, handle } = sel;
+    if (editor.selection.size > 1) {
+      ctx.beginPath();
+      ctx.moveTo(frame.corners[0][0], frame.corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(frame.corners[i]![0], frame.corners[i]![1]);
+      ctx.closePath();
+      ctx.stroke();
+    }
     ctx.fillStyle = theme.handleFill;
     ctx.lineWidth = 1.25;
-    for (const [x, y] of handlePoints(box)) {
-      if (Math.abs(x) > 1e6 || Math.abs(y) > 1e6) continue;
+    for (const [x, y] of frame.corners) {
       const h = HANDLE_SIZE_PX;
       ctx.fillRect(x - h / 2, y - h / 2, h, h);
       ctx.strokeRect(x - h / 2, y - h / 2, h, h);
     }
     if (canRotate(visible, editor)) {
-      const [rx, ry] = rotateHandlePoint(box);
-      if (Math.abs(rx) < 1e6 && Math.abs(ry) < 1e6) {
-        ctx.beginPath();
-        ctx.moveTo(rx, ry + HANDLE_SIZE_PX / 2);
-        ctx.lineTo(rx, box.minY);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(rx, ry, HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
+      const top: Pt = [(frame.corners[0][0] + frame.corners[1][0]) / 2, (frame.corners[0][1] + frame.corners[1][1]) / 2];
+      ctx.beginPath();
+      ctx.moveTo(handle[0], handle[1]);
+      ctx.lineTo(top[0], top[1]);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(handle[0], handle[1], HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
   }
   ctx.restore();

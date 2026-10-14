@@ -66,6 +66,8 @@ export class EditorState {
   eraseWholeGroups = true;
   /** While the eraser is active: the brush position, and the boxes of what the swipe has touched so far. */
   eraser: { at: { x: number; y: number } | null; boxes: Array<{ minX: number; minY: number; maxX: number; maxY: number }> } | null = null;
+  /** The selection box stays axis-aligned even when the selected objects are turned (otherwise it turns with them). */
+  alignBox = false;
   /** Snapping while moving (interaction/snap.ts). */
   snap = true;
   /** Guide lines (screen px) shown while a move is snapped to something. */

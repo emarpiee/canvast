@@ -39,6 +39,8 @@ import type { PlacedGlyph, Line } from "../text/layout";
 import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
 import type { QualityGovernor } from "./quality";
+import { selectedFrame } from "../render/scene-renderer";
+import { visibleObjects } from "../render/scene-view";
 
 /**
  * Inspection API for automated navigation tests and manual diagnosis.
@@ -118,6 +120,8 @@ export interface DebugHook {
   tileStats(): { last: TileFrame | null; held: number; renderedTotal: number };
   /** Decoded images held (count, bytes, budget), and set the budget in bytes (ADR 0027). */
   decodedStats(): { count: number; bytes: number; budget: number; maxRunning: number };
+  /** The box of the selection on screen: its rotation (radians) and corners (top-left first, in the box's own axes). */
+  selectionFrame(): { angle: number; corners: Array<[number, number]> } | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;
@@ -377,6 +381,10 @@ export function installDebugHook(
       deps.tiles.clear();
     },
     decodedStats: () => ({ ...session.assets!.stats(), maxRunning: session.assets!.maxRunning }),
+    selectionFrame: () => {
+      const sel = selectedFrame(visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport), editor, view.viewport);
+      return sel ? { angle: sel.frame.angle, corners: sel.frame.corners.map(([x, y]) => [x, y] as [number, number]) } : null;
+    },
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),

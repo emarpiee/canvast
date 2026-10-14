@@ -83,20 +83,23 @@ describe("selection policies", () => {
     expect(lassoSelect(vis, square(640, 410, 80), "all")).toEqual([s.id]);
   });
 
-  it("the 'all' filter selects media only when fully enclosed", () => {
+  it("the 'all' filter selects media a lasso touches, but not one drawn entirely inside the media", () => {
     const small: ImageObject = { ...big, id: newObjectId(), anchor: { x: D.fromNumber(100), y: D.fromNumber(100) }, w: 50, h: 40 };
     const v = [projectObject(small, cam, VP)!, ...vis];
     expect(lassoSelect(v, square(765, 520, 60), "all")).toEqual([small.id]);
     expect(lassoSelect(v, square(765, 520, 60), "strokes")).toEqual([]);
-    expect(lassoSelect(v, square(740, 500, 20), "all")).toEqual([]); // partial
+    expect(lassoSelect(v, square(740, 500, 20), "all"), "touching part of it").toEqual([small.id]);
+    expect(lassoSelect(v, square(765, 520, 5), "all"), "a lasso wholly inside it").toEqual([]);
+    expect(lassoSelect(v, square(300, 100, 20), "all"), "touching nothing").toEqual([]);
   });
 
-  it("strokes need at least half their vertices inside the lasso", () => {
-    expect(lassoSelect(vis, square(590, 400, 30), "strokes")).toEqual([]); // 1 of 3
-    expect(lassoSelect(vis, [560, 380, 660, 380, 660, 440, 560, 440], "strokes")).toEqual([s.id]); // 2 of 3
+  it("strokes are taken when any part of them is inside the lasso or crosses its edge", () => {
+    expect(lassoSelect(vis, square(590, 400, 30), "strokes"), "one vertex inside").toEqual([s.id]);
+    expect(lassoSelect(vis, [660, 395, 700, 395, 700, 405, 660, 405], "strokes"), "only a segment crosses it").toEqual([s.id]);
+    expect(lassoSelect(vis, square(300, 100, 30), "strokes"), "far away").toEqual([]);
   });
 
-  it("box select requires full containment; hit testing honours stroke width", () => {
+  it("box select takes what the box touches; hit testing honours stroke width", () => {
     expect(boxSelect(vis, { minX: 0, minY: 0, maxX: 1280, maxY: 800 })).toEqual([s.id]);
     const ps = vis[1]!;
     expect(hitsObject(ps, 640, 420)).toBe(true); // on the middle vertex

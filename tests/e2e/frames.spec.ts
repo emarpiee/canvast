@@ -1276,3 +1276,60 @@ test("frame rate counter: a continuous FPS readout with its button, remembered a
   await p.getByRole("button", { name: "Frame rate" }).click();
   await expect(p.getByTestId("fps-readout")).toBeHidden();
 });
+
+test("selection boxes follow the rotation, rotation works from outside a corner, and a marquee takes what it touches (ADR 0031)", async ({ app }) => {
+  const p = app.page;
+  const frame = () => p.evaluate(() => window.__canvastDebug.selectionFrame());
+  const rots = () => p.evaluate(() => window.__canvastDebug.objects().map((o) => (o["rot"] as number | undefined) ?? 0));
+  const files = Array.from({ length: 4 }, (_, i) => ({ name: `g${i}.png`, mimeType: "image/png", buffer: makePng(800, 500, () => [40 + i * 50, 90, 200 - i * 40, 255]) }));
+  await p.getByTestId("import-input").setInputFiles(files);
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 4);
+  const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  await p.evaluate(() => window.__canvastDebug.jump(-1)); // smaller, away from the toolbars
+  await app.frame();
+  const b0 = (await boxOf(app, ids[0]!))!;
+  // A marquee that starts inside an image and leaves it touches it; one that stays inside it takes nothing.
+  await p.keyboard.press("v");
+  await app.drag({ x: Math.round(b0.minX) + 20, y: Math.round(b0.minY) + 20 }, { x: Math.round(b0.minX) + 60, y: Math.round(b0.minY) + 50 }, 6);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "a marquee wholly inside an image takes nothing").toEqual([]);
+  await app.drag({ x: Math.round(b0.maxX) - 30, y: Math.round(b0.maxY) - 30 }, { x: Math.round(b0.maxX) + 30, y: Math.round(b0.maxY) + 30 }, 6);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "a marquee that touches the corner takes it").toContain(ids[0]);
+  await p.keyboard.press("Control+a");
+  const f0 = (await frame())!;
+  expect(f0.angle).toBe(0);
+  // Turn them all by a quarter by the handle above the box: the box turns with them.
+  const top: [number, number] = [(f0.corners[0][0] + f0.corners[1][0]) / 2, (f0.corners[0][1] + f0.corners[1][1]) / 2];
+  const centre: [number, number] = [(f0.corners[0][0] + f0.corners[2][0]) / 2, (f0.corners[0][1] + f0.corners[2][1]) / 2];
+  await app.drag({ x: Math.round(top[0]), y: Math.round(top[1]) - 26 }, { x: Math.round(centre[0]) + 200, y: Math.round(centre[1]) }, 8);
+  const f1 = (await frame())!;
+  expect(f1.angle, "a quarter turn clockwise").toBeCloseTo(Math.PI / 2, 1);
+  expect(Math.abs(f1.corners[1][0] - f1.corners[0][0]), "its top edge now runs down the screen").toBeLessThan(2);
+  const turned = await rots();
+  expect(turned.every((r) => r === turned[0] && r > 0), "all four turned by the same angle").toBe(true);
+  // The box can be axis-aligned instead.
+  await p.getByRole("button", { name: "Axis-aligned selection box" }).click();
+  expect((await frame())!.angle).toBe(0);
+  await p.getByRole("button", { name: "Axis-aligned selection box" }).click();
+  // Turning from just outside a corner (the handle may be out of the view for a big selection).
+  const before = (await rots())[0]!;
+  const f2 = (await frame())!;
+  const c2 = f2.corners[2]!;
+  const cc: [number, number] = [(f2.corners[0]![0] + f2.corners[2]![0]) / 2, (f2.corners[0]![1] + f2.corners[2]![1]) / 2];
+  const out = Math.hypot(c2[0] - cc[0], c2[1] - cc[1]);
+  const ux = (c2[0] - cc[0]) / out;
+  const uy = (c2[1] - cc[1]) / out;
+  await app.drag({ x: Math.round(c2[0] + ux * 20), y: Math.round(c2[1] + uy * 20) }, { x: Math.round(cc[0] + 120), y: Math.round(cc[1] + 120) }, 8);
+  expect((await rots())[0]!, "turned from outside the corner").not.toBe(before);
+});
+
+test("keyboard shortcuts still work after using a slider (focus stays on it)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 340 }, 6);
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(1);
+  await p.locator("[data-size]").focus(); // the pen size slider has keyboard focus now
+  await p.keyboard.press("Control+z");
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length, "undo works with the slider focused").toBe(0);
+  await p.keyboard.press("Control+y");
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length, "and redo").toBe(1);
+});

@@ -27,6 +27,7 @@ import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
 import activity from "lucide-static/icons/activity.svg";
+import boxSelect from "lucide-static/icons/box-select.svg";
 import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
@@ -93,6 +94,7 @@ export const ICONS = {
   group: clean(group),
   eraser: clean(eraser),
   activity: clean(activity),
+  boxSelect: clean(boxSelect),
   bookmark: clean(bookmark),
   bookmarkPlus: clean(bookmarkPlus),
   chevronDown: clean(chevronDown),

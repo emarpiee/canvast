@@ -1,6 +1,7 @@
 import type { ProjectedObject } from "./projection";
 import type { Rect } from "./geometry2d";
-import { distToSegment, pointInPolygon, rectContains } from "./geometry2d";
+import { distToSegment, pointInPolygon, polygonsOverlap, polylineTouchesPolygon } from "./geometry2d";
+import { itemCorners } from "./selection-frame";
 import type { ObjectId } from "../doc/model";
 import { exactStrokeEdgeDistancePx } from "./stroke-coverage";
 
@@ -81,41 +82,29 @@ export function pickAll(ordered: readonly ProjectedObject[], x: number, y: numbe
 
 export type LassoFilter = "strokes" | "all";
 
-/** Minimum fraction of a stroke's vertices that must lie inside a lasso. */
-export const LASSO_STROKE_FRACTION = 0.5;
-
 /**
- * Lasso membership:
- * - strokes: at least half of the stroke's vertices lie inside the lasso;
- * - images (only with the "all" filter): all four corners lie inside the
- *   lasso (full containment), so a small lasso drawn over a large image never
- *   grabs the image.
+ * Lasso and box selection take what the shape touches (ADR 0031), like a design tool's marquee, not only what it
+ * encloses: a stroke when any part of it is inside or crosses the edge, a turned or plain image or text when its
+ * rectangle overlaps the shape. One exception keeps a drawing over a picture safe: a shape drawn entirely inside an
+ * image or text does not select it (that is how you lasso strokes lying on media; click the media to take it).
  */
-export function lassoSelect(objects: readonly ProjectedObject[], poly: ArrayLike<number>, filter: LassoFilter): ObjectId[] {
-  if (poly.length < 6) return [];
-  const out: ObjectId[] = [];
-  for (const po of objects) {
-    if (po.obj.kind === "stroke") {
-      const q = po.q;
-      let inside = 0;
-      for (let i = 0; i < q.length; i += 2) if (pointInPolygon(q[i]!, q[i + 1]!, poly)) inside++;
-      if (inside / (q.length / 2) >= LASSO_STROKE_FRACTION) out.push(po.obj.id);
-    } else if (filter === "all") {
-      const [l, t, r, b] = po.q;
-      if (
-        pointInPolygon(l!, t!, poly) &&
-        pointInPolygon(r!, t!, poly) &&
-        pointInPolygon(r!, b!, poly) &&
-        pointInPolygon(l!, b!, poly)
-      ) {
-        out.push(po.obj.id);
-      }
-    }
-  }
-  return out;
+function touches(po: ProjectedObject, poly: ArrayLike<number>, filter: LassoFilter): boolean {
+  if (po.cover) return false;
+  if (po.obj.kind === "stroke") return polylineTouchesPolygon(po.q, poly);
+  if (filter !== "all") return false;
+  const quad = itemCorners(po).flatMap((p) => [p[0], p[1]]);
+  if (!polygonsOverlap(quad, poly)) return false;
+  for (let i = 0; i < poly.length; i += 2) if (!pointInPolygon(poly[i]!, poly[i + 1]!, quad)) return true; // some of the shape lies outside it
+  return false;
 }
 
-/** Box selection: objects whose screen bounds are fully inside the box. */
+export function lassoSelect(objects: readonly ProjectedObject[], poly: ArrayLike<number>, filter: LassoFilter): ObjectId[] {
+  if (poly.length < 6) return [];
+  return objects.filter((po) => touches(po, poly, filter)).map((po) => po.obj.id);
+}
+
+/** Box selection: the same rule with a rectangle, for every kind of object. */
 export function boxSelect(objects: readonly ProjectedObject[], box: Rect): ObjectId[] {
-  return objects.filter((po) => rectContains(box, po.box)).map((po) => po.obj.id);
+  const poly = [box.minX, box.minY, box.maxX, box.minY, box.maxX, box.maxY, box.minX, box.maxY];
+  return objects.filter((po) => touches(po, poly, "all")).map((po) => po.obj.id);
 }

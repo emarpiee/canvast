@@ -114,6 +114,7 @@ async function start(): Promise<void> {
   editor.ignoreFilling = settings.get("select.ignoreFilling");
   editor.lassoFilter = settings.get("lasso.filter");
   editor.snap = settings.get("snap.enabled");
+  editor.alignBox = settings.get("select.alignBox");
   editor.layersOpen = settings.get("ui.layersOpen");
   editor.showFps = settings.get("ui.fps");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
@@ -128,6 +129,7 @@ async function start(): Promise<void> {
     settings.set("select.ignoreFilling", editor.ignoreFilling);
     settings.set("lasso.filter", editor.lassoFilter);
     settings.set("snap.enabled", editor.snap);
+    settings.set("select.alignBox", editor.alignBox);
     settings.set("ui.layersOpen", editor.layersOpen);
     settings.set("ui.fps", editor.showFps);
     settings.set("ui.bookmarksOpen", editor.bookmarksOpen);
