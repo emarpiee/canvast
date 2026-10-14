@@ -19,7 +19,7 @@ or network connection.
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
 >
-> **v0.11.0:** strokes, images and text can be rotated with a handle above the selection (ADR 0018), a moving selection snaps to other objects with guide lines (ADR 0019), objects can be grouped, nested and re-stacked (ADR 0020), hidden or locked (ADR 0021), removed with the object eraser (ADR 0022), the canvas redraws itself if the browser resets the drawing surface (ADR 0023), a floating Layers panel lists, selects, hides, locks and reorders objects (ADR 0024), and a Bookmarks panel saves places and zooms to come back to (ADR 0025).
+> **v0.12.0:** a frame rate counter with diagnostics, adaptive quality, a decoded-image budget, big documents that open without freezing, and a grid for batch imports (Phase 3). **v0.11.0:** strokes, images and text can be rotated with a handle above the selection (ADR 0018), a moving selection snaps to other objects with guide lines (ADR 0019), objects can be grouped, nested and re-stacked (ADR 0020), hidden or locked (ADR 0021), removed with the object eraser (ADR 0022), the canvas redraws itself if the browser resets the drawing surface (ADR 0023), a floating Layers panel lists, selects, hides, locks and reorders objects (ADR 0024), and a Bookmarks panel saves places and zooms to come back to (ADR 0025).
 >
 > **v0.10.0:** pen and select options and the last view now persist across reloads (device settings, ADR 0017).
 >

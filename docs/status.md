@@ -22,7 +22,7 @@ Unverified / Committed / Next bounded task**.
 | NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
 | 1i | Settings scopes ([ADR 0017](adr/0017-settings-scopes.md)): device scope built (pen and select options persist), workspace and board scopes declared | **done** (see below) |
 | 2 | Rendering and interaction productionization: selection and transforms including **item rotation**, **snapping and guides**, layers and groups, object eraser, per-canvas cameras | **built, full suite pending**: rotating strokes, images and text ([ADR 0018](adr/0018-item-rotation.md)) snapping while moving ([ADR 0019](adr/0019-snapping-and-guides.md)) and groups with stacking order ([ADR 0020](adr/0020-groups-and-stacking.md)) done; hide and lock ([ADR 0021](adr/0021-hide-and-lock.md)) the object eraser ([ADR 0022](adr/0022-object-eraser.md)), per-canvas cameras and drawing-surface recovery ([ADR 0023](adr/0023-per-canvas-cameras-and-backend-recovery.md)) done |
-| 3 | Performance infrastructure: LOD, caches and budgets, resource lifecycle, adaptive quality, worker scheduling, stress fixtures | **in progress**: decoded-image budget ([ADR 0027](adr/0027-decoded-image-budget.md)) and adaptive quality ([ADR 0028](adr/0028-device-tiers-and-adaptive-quality.md)) the cooperative index build ([ADR 0029](adr/0029-cooperative-index-build.md)) and the batch-import grid with reduced copies ([ADR 0030](adr/0030-import-grid-and-reduced-copies.md)) done; next the tier benchmark run and the Phase 3 full-suite record |
+| 3 | Performance infrastructure: LOD, caches and budgets, resource lifecycle, adaptive quality, worker scheduling, stress fixtures | **done** (v0.12.0): decoded-image budget ([ADR 0027](adr/0027-decoded-image-budget.md)), adaptive quality ([ADR 0028](adr/0028-device-tiers-and-adaptive-quality.md)), cooperative index build ([ADR 0029](adr/0029-cooperative-index-build.md)), batch-import grid ([ADR 0030](adr/0030-import-grid-and-reduced-copies.md)), FPS counter with diagnostics; full suite 380 passed ([record](testing/full-run-phase-3.md)), tier benchmark ([record](testing/phase-3-bench.md)) |
 | 1+ | Persisted WebP thumbnails, slide view and recognisable broken assets ([plan](plans/asset-thumbnails.md)), video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, groups, smart folders and batch asset edits, collaboration | planned |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
@@ -388,7 +388,9 @@ visible strokes). Alternatives:
 
 **Phase 2 is built and the full suite has run** (34 min 50 s; 340 passed, 6 skipped, 2 failed on one test that measured the wrong thing and was fixed; see [testing/full-run-phase-2.md](testing/full-run-phase-2.md)); limits to remember: no snapping while resizing, text erased by its box, selection outline of a turned object is its bounding box.
 
-**Next bounded task:** Phase 3 (performance infrastructure).
+**Phase 3 is built and the full suite has run** (36 min 36 s; 380 passed, 6 skipped, 0 failed, [testing/full-run-phase-3.md](testing/full-run-phase-3.md)). Known gaps: one 70 ms frame when a zoom in a dense scene crosses the ADR 0012 preview bound (fix planned: build the adjacent zoom level's tiles in idle time), no document-memory budget (1M objects is about 1.1 GB), Assets view with 300 HD images is slow (Phase 4 thumbnails).
+
+**Next bounded task:** Phase 4: idle-time prebuild of the adjacent zoom level's tile set, then persisted thumbnails ([plan](plans/asset-thumbnails.md)).
 
 ## Phase 1, slice 9 — settings scopes
 
