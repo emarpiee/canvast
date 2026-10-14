@@ -142,7 +142,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
       </div>
-      <input type="file" accept="image/*,video/*" multiple hidden data-testid="import-input">
+      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="import-input">
     </div>
     <div class="toast" role="status" aria-live="polite" data-testid="toast" hidden></div>
   `;

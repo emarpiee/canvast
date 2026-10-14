@@ -1,6 +1,6 @@
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
-import { decodeVideo } from "./video";
+import { decodeAudio, decodeVideo } from "./video";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -17,7 +17,9 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
     const bmp = rec.type.startsWith("video/")
       ? (await decodeVideo(rec.blob)).bitmap
-      : await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
+      : rec.type.startsWith("audio/")
+        ? (await decodeAudio(rec.blob)).bitmap
+        : await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
     const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
     const c = document.createElement("canvas");
     c.width = Math.max(1, Math.round(bmp.width * s));

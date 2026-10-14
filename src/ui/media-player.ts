@@ -33,7 +33,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const bar = document.createElement("div");
   bar.className = "toolbar media-bar";
   bar.setAttribute("role", "toolbar");
-  bar.setAttribute("aria-label", "Video player");
+  bar.setAttribute("aria-label", "Media player");
   bar.dataset["testid"] = "media-bar";
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
@@ -76,7 +76,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const w = o.w * ppu;
     const h = o.h * ppu;
     const vp = view.viewport;
-    const visible = w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
+    const visible = o.media!.kind === "video" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
     v.style.display = visible ? "" : "none";
     if (visible) {
       v.style.left = `${s.x}px`;
@@ -99,7 +99,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     if (!cur) return;
     const o = cur;
     if (!v.paused) v.pause();
-    if (!loading) actions.setMedia(o.id, { t: v.currentTime }, "Pause video");
+    if (!loading) actions.setMedia(o.id, { t: v.currentTime }, "Pause media");
     cur = null;
     v.hidden = bar.hidden = true;
     v.removeAttribute("src");
@@ -135,7 +135,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const sync = (): void => {
     const id = editor.selection.size === 1 ? [...editor.selection][0]! : null;
     const o = id ? doc.get(id) : undefined;
-    const want = o && o.kind === "image" && o.media?.kind === "video" && !o.hidden ? o : null;
+    const want = o && o.kind === "image" && (o.media?.kind === "video" || o.media?.kind === "audio") && !o.hidden ? o : null;
     if (cur && cur.id !== want?.id) release();
     if (!want) return;
     if (!cur) {
@@ -155,7 +155,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   v.addEventListener("play", refresh);
   v.addEventListener("pause", refresh);
   v.addEventListener("ended", () => {
-    if (cur && !cur.media!.repeat) actions.setMedia(cur.id, { t: duration }, "Pause video");
+    if (cur && !cur.media!.repeat) actions.setMedia(cur.id, { t: duration }, "Pause media");
     refresh();
   });
   scrub.addEventListener("input", () => {
@@ -163,7 +163,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     refresh();
   });
   scrub.addEventListener("change", () => {
-    if (cur && v.paused) actions.setMedia(cur.id, { t: v.currentTime }, "Seek video");
+    if (cur && v.paused) actions.setMedia(cur.id, { t: v.currentTime }, "Seek media");
   });
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
@@ -174,13 +174,13 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         void v.play().catch(() => undefined);
       } else {
         v.pause();
-        actions.setMedia(cur.id, { t: v.currentTime }, "Pause video");
+        actions.setMedia(cur.id, { t: v.currentTime }, "Pause media");
       }
     } else if (cmd === "back" || cmd === "fwd") {
-      const step = settings.get("media.step.video") * (cmd === "back" ? -1 : 1);
+      const step = settings.get(cur.media!.kind === "audio" ? "media.step.audio" : "media.step.video") * (cmd === "back" ? -1 : 1);
       v.currentTime = stepTime(v.currentTime, step, duration, cur.media!.repeat);
-      if (v.paused) actions.setMedia(cur.id, { t: v.currentTime }, "Step video");
-    } else if (cmd === "repeat") actions.setMedia(cur.id, { repeat: !cur.media!.repeat }, "Repeat video");
+      if (v.paused) actions.setMedia(cur.id, { t: v.currentTime }, "Step media");
+    } else if (cmd === "repeat") actions.setMedia(cur.id, { repeat: !cur.media!.repeat }, "Repeat media");
     else if (cmd === "mute") v.muted = !v.muted;
     refresh();
   });

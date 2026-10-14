@@ -336,7 +336,7 @@ function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">, 
     pixelW: rec.pixelW,
     pixelH: rec.pixelH,
     // A video is placed paused at its start (never autoplaying), ADR 0041.
-    ...(rec.type?.startsWith("video/") ? { media: { kind: "video" as const, t: 0, repeat: false } } : {}),
+    ...(rec.type?.startsWith("video/") || rec.type?.startsWith("audio/") ? { media: { kind: rec.type.startsWith("video/") ? ("video" as const) : ("audio" as const), t: 0, repeat: false } } : {}),
   };
   return homeObject(normalizeUnit(img), doc.space) as ImageObject;
 }

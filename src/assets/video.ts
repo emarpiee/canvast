@@ -31,3 +31,28 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
     URL.revokeObjectURL(url);
   }
 }
+
+/** Size of the picture an audio file is shown as. */
+export const WAVE_W = 480;
+export const WAVE_H = 120;
+
+/** An audio file's picture (its waveform, one bar per column) and its length. */
+export async function decodeAudio(blob: Blob): Promise<{ bitmap: ImageBitmap; duration: number }> {
+  const buf = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await blob.arrayBuffer());
+  const data = buf.getChannelData(0);
+  const c = document.createElement("canvas");
+  c.width = WAVE_W;
+  c.height = WAVE_H;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#e8eef7";
+  ctx.fillRect(0, 0, WAVE_W, WAVE_H);
+  ctx.fillStyle = "#2f6fdb";
+  const per = Math.max(1, Math.floor(data.length / WAVE_W));
+  for (let x = 0; x < WAVE_W; x++) {
+    let peak = 0;
+    for (let i = x * per; i < Math.min(data.length, (x + 1) * per); i++) peak = Math.max(peak, Math.abs(data[i]!));
+    const h = Math.max(2, peak * (WAVE_H - 8));
+    ctx.fillRect(x, (WAVE_H - h) / 2, 1, h);
+  }
+  return { bitmap: await createImageBitmap(c), duration: buf.duration };
+}

@@ -4,7 +4,7 @@ import { done, idbGet, req } from "../storage/idb";
 import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
-import { decodeVideo } from "./video";
+import { decodeAudio, decodeVideo } from "./video";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -79,6 +79,7 @@ const IN_USE_MS = 1500;
 
 async function decode(blob: Blob, t = 0): Promise<CanvasImageSource & { width: number; height: number }> {
   if (blob.type.startsWith("video/")) return (await decodeVideo(blob, t)).bitmap;
+  if (blob.type.startsWith("audio/")) return (await decodeAudio(blob)).bitmap;
   if (typeof createImageBitmap === "function") {
     try {
       return await createImageBitmap(blob);
@@ -165,7 +166,7 @@ export class AssetLibrary {
    * "restored" (it had been deleted from the library and is back).
    */
   async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true): Promise<ImportOutcome> {
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
+    if (!/^(image|video|audio)\//.test(file.type)) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
@@ -183,13 +184,13 @@ export class AssetLibrary {
     let img;
     let duration: number | undefined;
     try {
-      if (file.type.startsWith("video/")) {
-        const v = await decodeVideo(file);
-        img = v.bitmap;
-        duration = v.duration;
+      if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
+        const m = file.type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
+        img = m.bitmap;
+        duration = m.duration;
       } else img = await decode(file);
     } catch {
-      throw new ImportError(file.type.startsWith("video/") ? "the file could not be decoded as a video" : "the file could not be decoded as an image");
+      throw new ImportError(`the file could not be decoded as ${file.type.startsWith("video/") ? "a video" : file.type.startsWith("audio/") ? "audio" : "an image"}`);
     }
     const record: AssetRecord = {
       hash,

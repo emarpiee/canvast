@@ -457,7 +457,7 @@ async function start(): Promise<void> {
     receive(files);
   });
   window.addEventListener("paste", (e) => {
-    const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const files = [...(e.clipboardData?.files ?? [])].filter((f) => /^(image|video|audio)\//.test(f.type));
     if (files.length) {
       e.preventDefault();
       receive(files);

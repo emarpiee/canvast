@@ -52,7 +52,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </select>
       <label class="assets-size">Size <input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.upload}<span>Import</span></button>
-      <input type="file" accept="image/*,video/*" multiple hidden data-testid="assets-import-input">
+      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="assets-import-input">
     </div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">

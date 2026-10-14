@@ -4,6 +4,7 @@
 
 Phase 6.
 
+- **Audio:** import an audio file; it is placed as its waveform with the same player (1 s steps) (ADR 0041).
 - **Videos:** import a video file; it is placed paused, drawn as its picture at the paused time, and the selected video has an on-canvas player (play, pause, step 3 s back or forward, scrubber, repeat, mute). The paused position is saved when you pause, step or seek, never while playing (ADR 0041).
 
 ## 0.14.0 — Phase 5: creative editing (2026-10-15)

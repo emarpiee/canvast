@@ -14,3 +14,7 @@
 ## Not built yet
 
 GIF (frame-index decoder) and audio instances, Extract Frame, volume level and speed, a Settings screen (Media & Playback), a keyboard shortcut for play, decoder budgets for several players (only one plays), persisted poster for lost originals, seeking exactness claims (browser seeks are approximate and the UI does not claim frame accuracy).
+
+## Update: audio
+
+An audio file imports as an image instance (`media.kind` audio) whose picture is its waveform (480×120, drawn from the decoded samples, one bar per column), so it has a thumbnail and a place on the canvas like any media. Its player is the same bar (steps use `media.step.audio`, 1 s); the video element only plays the sound and is not laid out. The picture never depends on `t`.

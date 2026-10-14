@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
-import { makeWebm } from "./video";
+import { makeWav, makeWebm } from "./video";
 
 /**
  * Phase 1, slice 2: the shared asset catalog, Assets view, usage navigation,
@@ -563,5 +563,35 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
       return Math.max(r!, g!, bl!) - Math.min(r!, g!, bl!);
     })
     .toBeGreaterThan(80);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("audio is placed as its waveform; its player steps 1 s and keeps the paused position (ADR 0041)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(3) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  expect(o!["media"]).toEqual({ kind: "audio", t: 0, repeat: false });
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  const mid = [Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2)] as const;
+  // Unselected: the waveform is drawn (its bars are blue, the card is pale).
+  await expect.poll(async () => (await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), mid))[2]! - (await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), mid))[0]!).toBeGreaterThan(60);
+  await p.keyboard.press("v");
+  await p.mouse.click(mid[0], mid[1]);
+  const bar = p.getByTestId("media-bar");
+  await expect(bar.locator(".media-time")).toHaveText("0:00 / 0:03");
+  await expect(p.locator(".media-video")).toBeHidden();
+  const t = async () => ((await objects(p))[0]!["media"] as { t: number }).t;
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect.poll(t).toBeCloseTo(1, 1);
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect.poll(t).toBeCloseTo(3, 1); // stops at the end
+  await saved(p);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await t()).toBeCloseTo(3, 1);
   expect(app.consoleErrors).toEqual([]);
 });
