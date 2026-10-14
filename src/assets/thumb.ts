@@ -1,0 +1,32 @@
+import type { AssetRecord } from "./asset-library";
+import type { ThumbRecord } from "./asset-catalog";
+
+/** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
+export const THUMB_PX = 256;
+/** Lossy quality: a thumbnail is a recognisable face, not the picture (ADR 0034). */
+const THUMB_QUALITY = 0.6;
+
+/**
+ * A lower-quality thumbnail of an original, or null when the browser cannot decode it. Decoded straight at
+ * thumbnail size (a full-size decode of each of hundreds of originals is what made the grid heavy). WebP, or JPEG
+ * where the browser cannot encode WebP.
+ */
+export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  try {
+    const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
+    const bmp = await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
+    const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bmp.width * s));
+    c.height = Math.max(1, Math.round(bmp.height * s));
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+    if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
+    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+  } catch {
+    return null; // a format createImageBitmap rejects: the card falls back to the original
+  }
+}

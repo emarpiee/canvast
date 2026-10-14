@@ -3,6 +3,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetFolder, CatalogListing } from "../assets/asset-catalog";
 import { folderPath, folderSubtree, meta } from "../assets/asset-catalog";
+import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { esc, fmtBytes } from "./format";
@@ -37,8 +38,6 @@ export interface AssetsView {
 type UsageFilter = "all" | "used" | "unused";
 type SortKey = "newest" | "name" | "size" | "uses";
 
-const THUMB_PX = 256;
-const THUMB_QUALITY = 0.6;
 
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void): AssetsView {
   root.innerHTML = `
@@ -94,27 +93,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (stored) return URL.createObjectURL(stored.blob);
         const rec = await assets.record(hash);
         if (!rec) throw new Error("missing");
-        try {
-          // Decoded straight at thumbnail size: a full-size decode of each of hundreds of originals is what made the grid heavy.
-          const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
-          const bmp = await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
-          const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
-          const c = document.createElement("canvas");
-          c.width = Math.max(1, Math.round(bmp.width * s));
-          c.height = Math.max(1, Math.round(bmp.height * s));
-          const ctx = c.getContext("2d")!;
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(bmp, 0, 0, c.width, c.height);
-          bmp.close();
-          // Lossy WebP (JPEG where the browser cannot encode it): small enough to keep for every asset.
-          let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
-          if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
-          if (blob) {
-            void session.catalog?.putThumb({ hash, blob, w: c.width, h: c.height }).catch(() => undefined);
-            return URL.createObjectURL(blob);
-          }
-        } catch {
-          // fall through to the original (e.g. a format createImageBitmap rejects)
+        const made = await makeThumb(rec);
+        if (made) {
+          void session.catalog?.putThumb(made).catch(() => undefined);
+          return URL.createObjectURL(made.blob);
         }
         return URL.createObjectURL(rec.blob);
       })();
@@ -146,6 +128,80 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void p.then((url) => URL.revokeObjectURL(url), () => undefined);
     }
   };
+
+  // ---- slide view: the original, full window; a lost one shows its thumbnail and says so
+  const slide = document.createElement("div");
+  slide.className = "slide-view";
+  slide.hidden = true;
+  slide.tabIndex = -1;
+  slide.setAttribute("role", "dialog");
+  slide.setAttribute("aria-modal", "true");
+  slide.setAttribute("aria-label", "Slide view");
+  slide.dataset["testid"] = "slide-view";
+  slide.innerHTML = `<button type="button" class="slide-nav" data-act="prev" aria-label="Previous">‹</button>
+    <figure><img alt=""><figcaption></figcaption></figure>
+    <button type="button" class="slide-nav" data-act="next" aria-label="Next">›</button>
+    <button type="button" class="slide-close" data-act="close" aria-label="Close slide view">×</button>`;
+  root.append(slide);
+  const slideImg = slide.querySelector<HTMLImageElement>("img")!;
+  const slideCaption = slide.querySelector<HTMLElement>("figcaption")!;
+  let slideHash: string | null = null;
+  let slideToken = 0;
+  let slideUrl: string | null = null;
+  const freeSlideUrl = (): void => {
+    if (slideUrl) URL.revokeObjectURL(slideUrl);
+    slideUrl = null;
+  };
+  const showSlide = async (hash: string): Promise<void> => {
+    const e = listing?.entries.find((x) => x.hash === hash);
+    if (!e) return;
+    const token = ++slideToken;
+    slideHash = hash;
+    slide.hidden = false;
+    slide.focus();
+    const label = `${e.name || "Untitled"} · ${e.pixelW}×${e.pixelH} · ${fmtBytes(e.size)}`;
+    slideCaption.textContent = label;
+    slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
+    freeSlideUrl();
+    const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
+    if (token !== slideToken) return;
+    const thumbnail = async (): Promise<void> => {
+      slideCaption.textContent = `${label} · The original is missing or damaged; showing its thumbnail.`;
+      slideImg.src = await thumbFor(hash).catch(() => "");
+    };
+    if (!rec) return void (await thumbnail());
+    slideUrl = URL.createObjectURL(rec.blob);
+    slideImg.onerror = () => void thumbnail();
+    slideImg.src = slideUrl;
+  };
+  const closeSlide = (): void => {
+    slideToken++;
+    slideHash = null;
+    slide.hidden = true;
+    slideImg.onerror = null;
+    slideImg.removeAttribute("src");
+    freeSlideUrl();
+  };
+  const stepSlide = (d: number): void => {
+    const list = filtered().map((x) => x.hash);
+    const i = list.indexOf(slideHash ?? "");
+    if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!);
+  };
+  slide.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
+    if (act === "prev") stepSlide(-1);
+    else if (act === "next") stepSlide(1);
+    else if (act === "close" || t === slide) closeSlide();
+  });
+  slide.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSlide();
+    else if (e.key === "ArrowLeft") stepSlide(-1);
+    else if (e.key === "ArrowRight") stepSlide(1);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
 
   // ---- data
   const refresh = async (): Promise<void> => {
@@ -332,7 +388,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h2>${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
         <button type="button" class="assets-icon" data-action="close" aria-label="Close details">${ICONS.x}</button>
       </div>
-      ${e?.present ? `<div class="asset-preview"><img alt="Preview of ${esc(e.name)}" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></div>` : ""}
+      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open slide view"><img alt="Preview of ${esc(e.name)}" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
       <dl>
         ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Pixels</dt><dd>${e.pixelW} × ${e.pixelH}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd>
                <dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
@@ -410,6 +466,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     switch (b.dataset["action"]) {
       case "close":
         void select(null);
+        break;
+      case "slide":
+        void showSlide(hash);
         break;
       case "show": {
         const p = places.find((x) => x.canvasId === b.dataset["canvas"]);

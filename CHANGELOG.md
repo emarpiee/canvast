@@ -4,7 +4,7 @@
 
 Phase 4.
 
-- **Asset thumbnails are kept.** The Assets view stores one small WebP thumbnail per asset the first time it shows it and reads that afterwards, so the original is never decoded to draw a card; a card whose original was lost keeps its picture, marked "Original missing" (ADR 0034).
+- **Asset thumbnails are kept, and a slide view opens the original.** A small WebP thumbnail is made for every new import in the background (and for older assets the first time they are shown) and read afterwards, so the original is never decoded to draw a card; a card whose original was lost keeps its picture, marked "Original missing"; clicking the preview in the details opens the original full window with arrow keys to step and Esc to close (ADR 0034).
 - **Zooming into a dense scene no longer hitches at the preview bound.** While the view rests, the tile sets one zoom level in and out are built in idle time, so crossing the bound swaps to a ready set instead of rendering a whole exact frame (about 70 ms at 10,000 visible objects); the 2x preview bound is unchanged (ADR 0033).
 
 ## 0.12.0 — Phase 3: performance infrastructure (2026-10-15)

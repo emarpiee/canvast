@@ -7,10 +7,12 @@
 
 Each asset gets one **lossy WebP thumbnail** (quality 0.6, longest edge at most 256 px, never enlarged; JPEG where the browser cannot encode WebP), stored in the new IndexedDB store `thumbs` (key: content hash, schema version 6) as `{ hash, blob, w, h }`.
 
-- It is made the first time the Assets view needs it (from the original, decoded straight at thumbnail size) and stored; every later view, and every other tab, reads the stored one and never touches the original.
+- It is made in the background right after a new original is imported (one at a time, so a batch import does not decode them all at once) and, for older assets that have none, the first time the Assets view needs it (from the original, decoded straight at thumbnail size); then stored; every later view, and every other tab, reads the stored one and never touches the original.
 - It is **derived data**: never hashed, never counted as the original, written only for an asset that is in the catalog (so a thumbnail never outlives a swept asset), erased with the asset by garbage collection, regenerated when missing. Any tab may write it (it is idempotent), and a failed write only means it is made again.
-- A card whose original is missing or lost keeps its thumbnail with an "Original missing" mark over its bottom edge; Place stays unavailable and the inspector explains it, as before. An asset that was never viewed has no thumbnail, so such a card shows only the mark.
+- A card whose original is missing or lost keeps its thumbnail with an "Original missing" mark over its bottom edge; Place stays unavailable and the inspector explains it, as before. An asset with no thumbnail yet (imported before this version and never viewed) shows only the mark.
 
-## Not done in this slice (plan requirements still open)
+**Slide view.** Clicking the preview in the detail panel opens the original full window (Left and Right step through the current list, Esc or the backdrop closes). Its object URL is released on every change. A lost or undecodable original shows the thumbnail with "The original is missing or damaged; showing its thumbnail."
 
-Generating the thumbnail at import time (it is made on first view, so a library imported but never opened has none), the slide view of the original, thumbnails inside `.canvast` archives, regenerating a bad stored thumbnail, and a virtualized grid. These stay in `docs/plans/asset-thumbnails.md`.
+## Not done yet (plan requirements still open)
+
+Thumbnails inside `.canvast` archives, regenerating a bad stored thumbnail, re-importing from the broken card's own button (importing the same file still restores it), and a virtualized grid. These stay in `docs/plans/asset-thumbnails.md`.

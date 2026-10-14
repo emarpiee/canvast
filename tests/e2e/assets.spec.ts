@@ -365,9 +365,27 @@ test("deleting canvases and boards removes their objects, keeps shared originals
 test("a lost original is shown as missing and is restored everywhere by importing the same file", async ({ app }) => {
   const p = app.page;
   const id = await importOnCanvas(p);
-  // Looking at the library stores a lower-quality thumbnail of the asset (derived data, ADR 0034).
-  await toAssets(p);
+  // Importing stores a lower-quality thumbnail of the asset, made in the background (derived data, ADR 0034).
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.thumbRecords())).map((t) => [t.hash, t.type, t.bytes > 0])).toEqual([[HASH, "image/webp", true]]);
+  await toAssets(p);
+  // The slide view shows the original full window, steps through the library and closes with Esc.
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: GREEN });
+  await expect(card(p, GREEN_HASH)).toHaveCount(1);
+  await card(p, HASH).click();
+  await p.getByTestId("asset-preview").click();
+  const slide = p.getByTestId("slide-view");
+  await expect(slide).toBeVisible();
+  await expect.poll(() => slide.locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  const first = await slide.locator("figcaption").textContent();
+  expect(first).not.toContain("missing");
+  await p.keyboard.press("ArrowRight");
+  await expect(slide.locator("figcaption")).not.toHaveText(first!);
+  await p.keyboard.press("Escape");
+  await expect(slide).toBeHidden();
+  await card(p, GREEN_HASH).click();
+  await p.getByTestId("asset-delete").click();
+  await p.getByTestId("confirm-ok").click();
+  await expect(card(p, GREEN_HASH)).toHaveCount(0);
   await toCanvas(p);
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), HASH);
   await p.reload();
@@ -380,6 +398,12 @@ test("a lost original is shown as missing and is restored everywhere by importin
   // The card still shows what the asset looked like, marked as missing.
   await expect.poll(() => card(p, HASH).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card(p, HASH)).toContainText("Original missing");
+  // Its slide view shows the thumbnail and says why.
+  await card(p, HASH).click();
+  await p.getByTestId("asset-preview").click();
+  await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The original is missing or damaged");
+  await expect.poll(() => p.getByTestId("slide-view").locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await p.keyboard.press("Escape");
   await card(p, HASH).click();
   await expect(p.getByTestId("asset-inspector")).toContainText("The original file is missing from storage.");
   await expect(p.getByTestId("asset-place")).toHaveCount(0);

@@ -2,7 +2,8 @@ import type { RasterSource } from "../render/draw-objects";
 import { sha256Hex } from "./sha256";
 import { done, idbGet, req } from "../storage/idb";
 import type { CatalogEntry } from "./asset-catalog";
-import { entryFromRecord } from "./asset-catalog";
+import { AssetCatalog, entryFromRecord } from "./asset-catalog";
+import { makeThumb } from "./thumb";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -215,6 +216,19 @@ export class AssetLibrary {
     if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
     else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
     await committed;
+    if (writeBytes) this.queueThumb(record);
+  }
+
+  private thumbQueue: Promise<void> = Promise.resolve();
+  /** Make the new asset's thumbnail in the background, one at a time (a big import must not decode them all at once). */
+  private queueThumb(record: AssetRecord): void {
+    const catalog = new AssetCatalog(this.db!);
+    this.thumbQueue = this.thumbQueue
+      .then(async () => {
+        const t = await makeThumb(record);
+        if (t) await catalog.putThumb(t);
+      })
+      .catch(() => undefined); // derived data: made again when the library is viewed
   }
 
   /** Decoded images held: how many, how many bytes, and the budget. */

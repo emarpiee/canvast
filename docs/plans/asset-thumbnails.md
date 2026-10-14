@@ -1,6 +1,6 @@
 # Plan: persisted WebP thumbnails, slide view, and recognisable broken assets
 
-Status: first slice built (ADR 0034: persisted thumbnails made on first view, kept for lost originals). Open: requirements 3 (slide view), thumbnail at import, archives, bad-thumbnail regeneration, virtualized grid. Extends ADR 0007, which deferred persisted thumbnails.
+Status: first slice built (ADR 0034: persisted thumbnails made on first view, kept for lost originals). Slide view and thumbnail at import built. Open: archives, bad-thumbnail regeneration, virtualized grid. Extends ADR 0007, which deferred persisted thumbnails.
 
 ## Why
 
