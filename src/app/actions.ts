@@ -6,6 +6,7 @@ import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects } from "../doc/groups";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
+import { duplicateNotice } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
 import type { ViewState } from "./view-state";
 
@@ -179,14 +180,23 @@ export async function importImages(
 ): Promise<ImageObject[]> {
   const placed: ImageObject[] = [];
   if (editor.blockEdit()) return placed;
+  const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
+  let total = 0;
   for (const file of files) {
+    total++;
     try {
-      const rec = await assets.importFile(file);
-      placed.push(placeImage(rec, doc, view, placed.length * 24, "Import image"));
+      const { record, duplicate } = await assets.importFileDetailed(file);
+      if (duplicate) seen.push({ name: record.name || file.name, duplicate });
+      placed.push(placeImage(record, doc, view, placed.length * 24, "Import image"));
     } catch (e) {
       editor.message = `Could not import ${file.name || "file"}: ${(e as Error).message}`;
       editor.changed();
     }
+  }
+  const notice = duplicateNotice(seen, total);
+  if (notice) {
+    editor.message = notice;
+    editor.changed();
   }
   return placed;
 }

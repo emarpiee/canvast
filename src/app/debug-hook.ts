@@ -102,7 +102,7 @@ export interface DebugHook {
   /** Signed px distance from a screen point to a stroke's outline (negative inside), computed exactly. */
   strokeEdgeDistance(id: string, x: number, y: number): number;
   /** Replace the document with a generated benchmark scene (no history, no save). */
-  benchLoad(scene: BenchScene): { objects: number; generateMs: number; loadMs: number; heapMB: number | null };
+  benchLoad(scene: BenchScene): Promise<{ objects: number; generateMs: number; loadMs: number; heapMB: number | null }>;
   /**
    * Render `frames` frames synchronously while panning and zooming along a
    * fixed trajectory (pan 37 px/frame in a square, zoom ±0.05 level
@@ -169,6 +169,8 @@ export interface DebugDeps {
   tiles: TileCache;
   density: DensityLayer;
   quality: QualityGovernor;
+  /** Resolves when the index of a big document has been built slice by slice. */
+  indexReady: () => Promise<void>;
 }
 
 /**
@@ -356,12 +358,13 @@ export function installDebugHook(
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? exactStrokeEdgeDistancePx(po, x, y) : Infinity;
     },
-    benchLoad: (scene) => {
+    benchLoad: async (scene) => {
       const t0 = performance.now();
       const { objects, camera } = generateBenchScene(scene);
       const t1 = performance.now();
       doc.load(objects);
       view.setWorldCamera(camera);
+      await deps.indexReady(); // benchmarks measure a complete index
       const t2 = performance.now();
       return { objects: objects.length, generateMs: t1 - t0, loadMs: t2 - t1, heapMB: heapMB() };
     },

@@ -32,3 +32,23 @@ describe("adaptive quality (ADR 0028)", () => {
     expect(pinned.level).toBe(0);
   });
 });
+
+describe("cooperative index build (ADR 0029)", () => {
+  it("inserts every object in slices that let the browser run in between, and stops when a newer build starts", async () => {
+    const { fillCooperatively } = await import("../../src/scene/spatial-index");
+    const objs = Array.from({ length: 100 }, (_, i) => ({ id: String(i) })) as never[];
+    let clock = 0;
+    const inserted: unknown[] = [];
+    let yields = 0;
+    const progress: number[] = [];
+    await fillCooperatively(objs, (o) => inserted.push(o), 100, () => true, { budgetMs: 10, now: () => clock++, yieldNow: async () => void yields++, onProgress: (d) => progress.push(d) });
+    expect(inserted).toHaveLength(100);
+    expect(yields, "several slices, not one long task").toBeGreaterThan(3);
+    expect(progress.at(-1)).toBe(100);
+    // A newer build began: the older one stops at its next yield.
+    const stale: unknown[] = [];
+    let alive = true;
+    await fillCooperatively(objs, (o) => stale.push(o), 100, () => alive, { budgetMs: 10, now: () => clock++, yieldNow: async () => void (alive = false) });
+    expect(stale.length).toBeLessThan(100);
+  });
+});

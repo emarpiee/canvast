@@ -95,6 +95,16 @@ function near(c: number[], want: number[], tol = 6): boolean {
   return c.every((v, i) => Math.abs(v - want[i]!) <= tol);
 }
 
+test("importing a file that is already in the library says so, stores no second copy and still places it", async ({ app }) => {
+  const p = app.page;
+  await importOnCanvas(p);
+  await expect(p.getByTestId("toast")).toBeHidden();
+  await importOnCanvas(p); // the same bytes again (a file renamed outside the app counts the same)
+  await expect(p.getByTestId("toast")).toContainText("already in your library");
+  expect((await listing(p)).entries.map((e) => [e.hash, e.instances])).toEqual([[HASH, 2]]);
+  expect(await stored(p)).toEqual([HASH]);
+});
+
 test("one original is shared by instances on several boards and canvases; usage is derived from them", async ({ app }) => {
   const p = app.page;
   await importOnCanvas(p);
@@ -140,7 +150,7 @@ test("one original is shared by instances on several boards and canvases; usage 
 
   // Importing the same bytes again (here, into the library only) adds no copy.
   await p.getByTestId("assets-import-input").setInputFiles({ name: "copy.png", mimeType: "image/png", buffer: BLOCKS });
-  await expect(p.getByTestId("assets-status")).toHaveText("Imported 1 file(s) into the library.");
+  await expect(p.getByTestId("assets-status")).toHaveText("“blocks.png” is already in your library: no second copy is stored.");
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
   expect(await stored(p)).toEqual([HASH]);
   expect(app.consoleErrors).toEqual([]);

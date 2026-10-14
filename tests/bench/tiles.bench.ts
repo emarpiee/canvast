@@ -25,9 +25,9 @@ for (const c of CASES) {
     for (const mode of MODES) {
       for (const tiles of [false, true]) {
         const r = await page.evaluate(
-          ([scene, frames, m, on]) => {
+          async ([scene, frames, m, on]) => {
             const h = window.__canvastDebug;
-            h.benchLoad(scene);
+            await h.benchLoad(scene);
             h.setTileCache(on);
             h.benchRun(5, m); // warm-up (and tile build for "on")
             return h.benchRun(frames, m);

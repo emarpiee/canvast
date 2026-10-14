@@ -1,5 +1,6 @@
 import type { Session, AssetPlace } from "../app/session";
 import type { AssetLibrary } from "../assets/asset-library";
+import { duplicateNotice } from "../assets/asset-library";
 import type { AssetFolder, CatalogListing } from "../assets/asset-catalog";
 import { folderPath, folderSubtree, meta } from "../assets/asset-catalog";
 import { newObjectId } from "../doc/model";
@@ -550,9 +551,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     async importFiles(files) {
       if (session.editor.blockEdit()) return;
       let n = 0;
+      const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
       for (const f of files) {
         try {
-          await assets.importFile(f);
+          const { record, duplicate } = await assets.importFileDetailed(f);
+          if (duplicate) seen.push({ name: record.name || f.name, duplicate });
           n++;
         } catch (e) {
           session.editor.message = `Could not import ${f.name || "file"}: ${(e as Error).message}`;
@@ -560,7 +563,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
       }
       if (n) {
-        session.editor.message = `Imported ${n} file(s) into the library.`;
+        const notice = duplicateNotice(seen, n);
+        session.editor.message = !notice ? `Imported ${n} file(s) into the library.` : seen.length === n ? notice : `${n - seen.length} new file(s) imported. ${notice}`;
         session.editor.changed();
       }
       await refresh();

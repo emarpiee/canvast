@@ -25,6 +25,24 @@ export const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
 
 export class ImportError extends Error {}
 
+export interface ImportOutcome {
+  record: AssetRecord;
+  /** The bytes were already in the library: "present", or "restored" from the deleted list; null for a new original. */
+  duplicate: "present" | "restored" | null;
+}
+
+/** One line for the user about files that were already in the library (null when none were). */
+export function duplicateNotice(names: ReadonlyArray<{ name: string; duplicate: "present" | "restored" }>, total: number): string | null {
+  if (!names.length) return null;
+  const restored = names.filter((n) => n.duplicate === "restored").length;
+  if (names.length === 1) {
+    const n = names[0]!;
+    const label = n.name ? `“${n.name}”` : "This image";
+    return n.duplicate === "restored" ? `${label} was in the deleted list and is back in your library.` : `${label} is already in your library: no second copy is stored.`;
+  }
+  return `${names.length} of ${total} files were already in your library: no second copies are stored${restored ? ` (${restored} restored from the deleted list)` : ""}.`;
+}
+
 interface Decoded extends RasterSource {
   readonly pixelW: number;
   readonly pixelH: number;
@@ -111,18 +129,28 @@ export class AssetLibrary {
 
   /** Import a file: hash, decode (validates it is an image), store once. */
   async importFile(file: Blob & { name?: string }): Promise<AssetRecord> {
+    return (await this.importFileDetailed(file)).record;
+  }
+
+  /**
+   * Like `importFile`, and says whether these bytes were already in the library: "present" (nothing stored again) or
+   * "restored" (it had been deleted from the library and is back).
+   */
+  async importFileDetailed(file: Blob & { name?: string }): Promise<ImportOutcome> {
     if (!file.type.startsWith("image/")) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
     const existing = await this.record(hash);
     if (existing) {
+      const entry = this.db ? await idbGet<CatalogEntry>(this.db, "assetCatalog", hash) : undefined;
+      const duplicate: ImportOutcome["duplicate"] = entry && entry.state !== "active" ? "restored" : "present";
       const had = this.decoded.has(hash);
       await this.ensureDecoded(existing);
       this.missing.delete(hash);
       if (!had) this.onReady(); // e.g. a missing original restored: redraw what showed its placeholder
       if (this.db) await this.store(existing, false);
-      return existing;
+      return { record: existing, duplicate };
     }
     let img;
     try {
@@ -147,7 +175,7 @@ export class AssetLibrary {
     this.evict();
     this.missing.delete(hash);
     this.onReady(); // redraw any placeholder of this original (a restored missing asset)
-    return record;
+    return { record, duplicate: null };
   }
 
   /**

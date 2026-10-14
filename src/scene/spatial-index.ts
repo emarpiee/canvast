@@ -432,16 +432,71 @@ export function densityQuery(index: SpatialIndex, cam: Camera, vp: Viewport, mar
   return index.density(cam, vp, marginPx);
 }
 
-/** Keep an index in sync with a document: incremental on transactions, full rebuild on load. */
-export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">): () => void {
+/** Let the browser run other tasks (input, a frame) before going on. */
+export const yieldToEventLoop = (): Promise<void> =>
+  new Promise((resolve) => {
+    const c = new MessageChannel();
+    c.port1.onmessage = () => {
+      c.port1.close();
+      resolve();
+    };
+    c.port2.postMessage(0);
+  });
+
+/**
+ * Building the index of a big document in one go blocks the page for as long as it takes (about 0.5 s per 100,000
+ * objects, 19 s for a million). Past `threshold` objects it is built in slices of `budgetMs`, with the browser free to
+ * draw and take input in between: what is indexed so far is drawn, the rest appears as the build goes on (ADR 0029).
+ */
+export interface Cooperative {
+  threshold?: number;
+  budgetMs?: number;
+  onProgress?: (done: number, total: number) => void;
+  yieldNow?: () => Promise<void>;
+  now?: () => number;
+}
+
+/** Insert `objects` slice by slice; stops quietly if `current()` says a newer build has started. */
+export async function fillCooperatively(objects: Iterable<CanvasObject>, insert: (o: CanvasObject) => void, total: number, current: () => boolean, opts: Cooperative = {}): Promise<void> {
+  const now = opts.now ?? (() => performance.now());
+  const yieldNow = opts.yieldNow ?? yieldToEventLoop;
+  const budget = opts.budgetMs ?? 8;
+  let done = 0;
+  let sliceStart = now();
+  for (const o of objects) {
+    insert(o);
+    done++;
+    if (now() - sliceStart >= budget) {
+      opts.onProgress?.(done, total);
+      await yieldNow();
+      if (!current()) return;
+      sliceStart = now();
+    }
+  }
+  opts.onProgress?.(total, total);
+}
+
+/** Keep an index in sync with a document: incremental on transactions, full rebuild on load (in slices for a big one). */
+export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">, coop?: Cooperative): (() => void) & { ready(): Promise<void> } {
   // Hidden objects are not in the index, so nothing that reads it (drawing, picking, tiles, the density preview) sees them.
   const shown = function* (): IterableIterator<CanvasObject> {
     for (const o of doc.all()) if (!o.hidden) yield o;
   };
-  index.rebuild(shown());
-  return doc.subscribe((_source, changed) => {
-    if (!changed) {
+  let epoch = 0;
+  let pending: Promise<void> | null = null;
+  const build = (): void => {
+    const mine = ++epoch;
+    if (!coop || doc.size <= (coop.threshold ?? 20_000)) {
       index.rebuild(shown());
+      return;
+    }
+    index.rebuild([]);
+    pending = fillCooperatively(shown(), (o) => index.insert(o), doc.size, () => mine === epoch, coop);
+  };
+  build();
+  const off = doc.subscribe((_source, changed) => {
+    if (!changed) {
+      build();
       return;
     }
     for (const id of changed) {
@@ -450,4 +505,13 @@ export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild
       if (o && !o.hidden) index.insert(o);
     }
   });
+  /** Resolves when no slice-by-slice build is running (the index holds every object). */
+  const ready = async (): Promise<void> => {
+    let p: Promise<void> | null;
+    do {
+      p = pending;
+      await p;
+    } while (p !== pending);
+  };
+  return Object.assign(off, { ready });
 }

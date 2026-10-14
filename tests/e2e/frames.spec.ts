@@ -1193,3 +1193,14 @@ test("adaptive quality: a lower level draws the canvas at a lower resolution and
     await p.keyboard.press("Escape");
   }
 });
+
+test("a big document is indexed in slices and ends up with every object (ADR 0029)", async ({ app }) => {
+  const p = app.page;
+  // 60,000 strokes is over the threshold for slice-by-slice indexing (20,000).
+  const load = await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 60_000 }));
+  expect(load.objects).toBe(60_000);
+  expect((await p.evaluate(() => window.__canvastDebug.indexStats())).objects, "every object is in the index when the build is done").toBe(60_000);
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), "and it draws").toBeGreaterThan(100);
+  expect(await p.evaluate(() => document.querySelector(".hud-readout")?.textContent ?? ""), "the progress message is gone").not.toContain("Indexing");
+});

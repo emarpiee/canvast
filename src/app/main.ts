@@ -89,7 +89,13 @@ async function start(): Promise<void> {
   const stats = new FrameStats();
   // The spatial index mirrors the document incrementally (changed ids only).
   const index = new FrameIndex(() => doc.space);
-  syncIndex(doc, index);
+  const indexSync = syncIndex(doc, index, {
+    onProgress: (done, total) => {
+      editor.message = done < total ? `Indexing ${total.toLocaleString()} objects… ${Math.round((100 * done) / total)}%` : "";
+      editor.changed();
+      invalidate();
+    },
+  });
   // Committed objects are drawn through a raster tile cache (ADR 0009).
   const tiles = new TileCache(
     (id) => doc.get(id),
@@ -414,7 +420,7 @@ async function start(): Promise<void> {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready() },
     );
   }
   document.documentElement.dataset["version"] = __CANVAST_VERSION__;
