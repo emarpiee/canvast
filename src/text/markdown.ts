@@ -19,6 +19,8 @@ export interface Span {
   readonly text: string;
   readonly bold: boolean;
   readonly italic: boolean;
+  /** Mention of a canvas object by stable id (`[[item:<id>|label]]`); `text` is the label and the span is never merged or styled. */
+  readonly ref?: string;
 }
 
 export interface Block {
@@ -28,6 +30,9 @@ export interface Block {
 
 /** Longest Markdown a text object may hold (characters). */
 export const MAX_MARKDOWN_LENGTH = 100_000;
+
+/** `[[item:<id>|label]]`; a plain `[` in text is always escaped, so this never matches ordinary text. */
+const MENTION = /^\[\[item:([A-Za-z0-9_-]+)\|((?:[^\]\\]|\\.)*)\]\]/;
 
 const PUNCT = /[!-/:-@[-`{-~]/;
 
@@ -78,7 +83,12 @@ function parseInline(s: string): Span[] {
   };
   for (let i = 0; i < s.length; i++) {
     const ch = s[i]!;
-    if (ch === "\\" && i + 1 < s.length && PUNCT.test(s[i + 1]!)) {
+    const m = ch === "[" ? MENTION.exec(s.slice(i)) : null;
+    if (m) {
+      flush();
+      out.push({ text: m[2]!.replace(/\\(.)/g, "$1"), bold: false, italic: false, ref: m[1]! });
+      i += m[0].length - 1;
+    } else if (ch === "\\" && i + 1 < s.length && PUNCT.test(s[i + 1]!)) {
       text += s[++i];
     } else if (ch === "*" || ch === "_") {
       let n = 1;
@@ -106,15 +116,19 @@ function parseInline(s: string): Span[] {
  * of equal style merge.
  */
 export function normalizeSpans(spans: readonly Span[]): Span[] {
-  const chars: Array<{ c: string; bold: boolean; italic: boolean }> = [];
-  for (const s of spans) for (const c of s.text.replace(/\s+/g, " ")) chars.push({ c, bold: s.bold, italic: s.italic });
+  const chars: Array<{ c: string; bold: boolean; italic: boolean; ref?: string }> = [];
+  // A mention is one unit (its whole label in `c`), so it never merges and edge trimming only sees real spaces.
+  for (const s of spans) {
+    if (s.ref !== undefined) chars.push({ c: s.text.replace(/\s+/g, " ").trim() || "?", bold: false, italic: false, ref: s.ref });
+    else for (const c of s.text.replace(/\s+/g, " ")) chars.push({ c, bold: s.bold, italic: s.italic });
+  }
   let a = 0;
   let b = chars.length;
   while (a < b && chars[a]!.c === " ") a++;
   while (b > a && chars[b - 1]!.c === " ") b--;
-  const t = chars.slice(a, b).filter((ch, i, arr) => !(ch.c === " " && arr[i - 1]?.c === " "));
+  const t = chars.slice(a, b).filter((ch, i, arr) => !(ch.c === " " && ch.ref === undefined && arr[i - 1]?.c === " " && arr[i - 1]?.ref === undefined));
   for (let i = 0; i < t.length; i++) {
-    if (t[i]!.c !== " ") continue;
+    if (t[i]!.c !== " " || t[i]!.ref !== undefined) continue;
     const prev = t[i - 1]!;
     const next = t[i + 1]!;
     t[i] = { c: " ", bold: prev.bold && next.bold, italic: prev.italic && next.italic };
@@ -122,7 +136,8 @@ export function normalizeSpans(spans: readonly Span[]): Span[] {
   const out: Span[] = [];
   for (const ch of t) {
     const last = out[out.length - 1];
-    if (last && last.bold === ch.bold && last.italic === ch.italic) out[out.length - 1] = { ...last, text: last.text + ch.c };
+    if (ch.ref !== undefined) out.push({ text: ch.c, bold: false, italic: false, ref: ch.ref });
+    else if (last && last.ref === undefined && last.bold === ch.bold && last.italic === ch.italic) out[out.length - 1] = { ...last, text: last.text + ch.c };
     else out.push({ text: ch.c, bold: ch.bold, italic: ch.italic });
   }
   return out;
@@ -149,11 +164,12 @@ export function serialize(blocks: readonly Block[]): string {
     let italic = false;
     const delim = (nb: boolean, ni: boolean): string => (bold !== nb ? "**" : "") + (italic !== ni ? "*" : "");
     spans.forEach((sp, j) => {
-      s += delim(sp.bold, sp.italic) + escapeText(sp.text, j === 0);
+      s += delim(sp.bold, sp.italic) + (sp.ref !== undefined ? `[[item:${sp.ref}|${sp.text.replace(/[\\\]]/g, "\\$&")}]]` : escapeText(sp.text, j === 0));
       bold = sp.bold;
       italic = sp.italic;
     });
     s += delim(false, false);
+    if (b.type[0] === "h") s = s.replace(/(\s)(#+)$/, (_, w: string, h: string) => w + h.replace(/#/g, "\\#")); // a closing run of # would be dropped on reading
     const list = b.type === "ul" || b.type === "ol";
     const sameList = list && out.length && blocks[i - 1]?.type === b.type;
     out.push((out.length ? (sameList ? "\n" : "\n\n") : "") + s);

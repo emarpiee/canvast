@@ -56,10 +56,11 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
   return roots;
 }
 
-function labelOf(o: CanvasObject): { icon: string; text: string; swatch?: string } {
+/** Short name of an object for lists and mention labels. */
+export function labelOf(o: CanvasObject): { icon: string; text: string; swatch?: string } {
   if (o.kind === "stroke") return { icon: ICONS.pencil, text: "Stroke", swatch: o.color };
   if (o.kind === "image") return { icon: ICONS.image, text: `Image ${o.pixelW}×${o.pixelH}` };
-  const plain = o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 28);
+  const plain = o.md.replace(/\[\[item:[^|\]]*\|((?:[^\]\\]|\\.)*)\]\]/g, "$1").replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 28);
   return { icon: ICONS.type, text: plain || "Text", swatch: o.color };
 }
 

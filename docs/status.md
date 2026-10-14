@@ -406,7 +406,9 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 4 done:** opacity slider in the Layers panel ([ADR 0024](adr/0024-layers-panel.md)); tested in `frames.spec.ts` "layers panel" (chromium, firefox).
 
-**Next bounded task:** Phase 5 (creative editing): Markdown mentions and same-board backlinks; then the Phase 5 full suite.
+**Phase 5, slice 5 done:** mentions in text, same canvas ([ADR 0039](adr/0039-mentions.md)); tested in `text.test.ts` (syntax, fuzz with mentions) and `text.spec.ts` (chromium, firefox).
+
+**Next bounded task:** Phase 5: backlinks index and panel, reveal of a mention's target, same-board other canvases in the picker, broken-link state; then the Phase 5 full suite.
 
 ## Phase 1, slice 9 — settings scopes
 

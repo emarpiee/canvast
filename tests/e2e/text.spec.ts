@@ -135,6 +135,35 @@ async function openApp(context: BrowserContext): Promise<Page> {
   return page;
 }
 
+test("@ mentions an object by stable id; the mention survives reopening and reload (ADR 0039)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 500 }, { x: 700, y: 520 }, 4);
+  const [stroke] = await objects(p);
+  await newText(p, 500, 300);
+  await p.keyboard.type("see @");
+  const pick = p.getByRole("textbox", { name: "Mention an item" });
+  await expect(pick).toBeFocused();
+  await pick.fill("stro");
+  await pick.press("Enter");
+  await p.keyboard.type("now");
+  await finish(p);
+  const md = `see [[item:${stroke!.id}|Stroke]] now`;
+  expect((await textObjects(p))[0]?.md).toBe(md);
+  // Reopen and close without edits: the Markdown is unchanged.
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), (await textObjects(p))[0]!.id))!.box;
+  await p.keyboard.press("v");
+  await p.mouse.dblclick(box.minX + 6, (box.minY + box.maxY) / 2);
+  await expect(p.getByTestId("text-editor")).toBeVisible();
+  await expect(p.locator(".text-editor .mention")).toHaveText("Stroke");
+  await finish(p);
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect((await textObjects(p))[0]?.md).toBe(md);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {
   const p1 = app.page;
   await newText(p1, 300, 300);
