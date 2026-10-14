@@ -139,11 +139,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   slide.setAttribute("aria-label", "Slide view");
   slide.dataset["testid"] = "slide-view";
   slide.innerHTML = `<button type="button" class="slide-nav" data-act="prev" aria-label="Previous">‹</button>
-    <figure><img alt=""><figcaption></figcaption></figure>
+    <figure><img alt=""><video controls hidden></video><figcaption></figcaption></figure>
     <button type="button" class="slide-nav" data-act="next" aria-label="Next">›</button>
     <button type="button" class="slide-close" data-act="close" aria-label="Close slide view">×</button>`;
   root.append(slide);
   const slideImg = slide.querySelector<HTMLImageElement>("img")!;
+  const slideMedia = slide.querySelector<HTMLVideoElement>("video")!;
   const slideCaption = slide.querySelector<HTMLElement>("figcaption")!;
   let slideHash: string | null = null;
   let slideToken = 0;
@@ -163,6 +164,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideCaption.textContent = label;
     slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
     freeSlideUrl();
+    slideMedia.pause();
+    slideMedia.hidden = true;
+    slideMedia.removeAttribute("src");
+    slideImg.hidden = false;
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
     if (token !== slideToken) return;
     const thumbnail = async (): Promise<void> => {
@@ -171,6 +176,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     if (!rec) return void (await thumbnail());
     slideUrl = URL.createObjectURL(rec.blob);
+    if (/^(video|audio)\//.test(rec.type)) {
+      // A video or audio original plays here, with the browser's own controls (an audio file shows the picture of its waveform above them).
+      slideImg.hidden = rec.type.startsWith("video/");
+      if (!slideImg.hidden) slideImg.src = await thumbFor(hash).catch(() => "");
+      slideMedia.hidden = false;
+      slideMedia.onerror = () => {
+        slideMedia.hidden = true;
+        slideImg.hidden = false;
+        void thumbnail();
+      };
+      slideMedia.src = slideUrl;
+      return;
+    }
     slideImg.onerror = () => void thumbnail();
     slideImg.src = slideUrl;
   };
@@ -180,6 +198,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slide.hidden = true;
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
+    slideMedia.pause();
+    slideMedia.removeAttribute("src");
     freeSlideUrl();
   };
   const stepSlide = (d: number): void => {

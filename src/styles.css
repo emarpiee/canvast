@@ -739,3 +739,9 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .media-settings { position: absolute; bottom: calc(100% + 6px); right: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 8px; font-size: 12px; }
 .media-settings[hidden] { display: none; }
 .media-settings input { width: 72px; }
+.media-bar { flex-direction: column; align-items: stretch; width: 400px; }
+.media-row { display: flex; align-items: center; gap: 4px; }
+.media-gap { flex: 1; }
+.media-volume { width: 84px; }
+.slide-view video { max-width: 86vw; max-height: 74vh; }
+.slide-view video[hidden], .slide-view img[hidden] { display: none; }

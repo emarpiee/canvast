@@ -530,6 +530,18 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await expect(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);
   const dur = await p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.duration);
   expect(dur).toBeGreaterThan(1);
+  // While the instance is dragged the overlay is hidden (the canvas shows it at the previewed place); afterwards it follows.
+  const overlay = p.locator("video.media-video");
+  const cx = Math.round((box.minX + box.maxX) / 2);
+  const cy = Math.round((box.minY + box.maxY) / 2);
+  await p.mouse.move(cx, cy);
+  await p.mouse.down();
+  await p.mouse.move(cx + 60, cy + 40, { steps: 4 });
+  await expect(overlay).toBeHidden();
+  await p.mouse.up();
+  await expect(overlay).toBeVisible();
+  const ob = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  expect(Math.abs((await overlay.boundingBox())!.x - ob.minX)).toBeLessThan(2);
   const t = async () => ((await objects(p))[0]!["media"] as { t: number; repeat: boolean }).t;
   // The 3 s step is longer than the video: forward stops at the end, back at the start (no repeat).
   await bar.getByRole("button", { name: "Step forward" }).click();
@@ -570,6 +582,17 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await p.getByTestId("media-bar").getByRole("button", { name: "Extract frame" }).click();
   await expect.poll(async () => (await objects(p)).length).toBe(2);
   expect((await objects(p))[1]!["media"]).toBeUndefined();
+  // Layers name the files, not "Image WxH".
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  await expect(p.getByTestId("layers-panel").locator(".layer-name")).toHaveText(["frame.png", "clip.webm"]);
+  // The slide view plays the original video (it is not "missing or damaged").
+  await toAssets(p);
+  await card(p, String((await objects(p))[0]!["assetId"])).click();
+  await p.getByTestId("asset-preview").click();
+  const slide = p.getByTestId("slide-view");
+  await expect(slide.locator("video")).toBeVisible();
+  await expect(slide.locator("figcaption")).not.toContainText("missing");
+  expect(await slide.locator("video").evaluate((v: HTMLVideoElement) => v.error)).toBeNull();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -592,6 +615,9 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   const t = async () => ((await objects(p))[0]!["media"] as { t: number }).t;
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect.poll(t).toBeCloseTo(1, 1);
+  // Volume is a real 0 to 100 control.
+  await bar.getByLabel("Volume").fill("40");
+  expect(await p.evaluate(() => document.querySelector<HTMLVideoElement>("video.media-video")!.volume)).toBeCloseTo(0.4);
   // The step is a setting (Media & Playback): a bad value is refused, a good one applies to the next press.
   await bar.getByRole("button", { name: "Media & Playback settings" }).click();
   const audioStep = bar.getByLabel("Audio step (s)");

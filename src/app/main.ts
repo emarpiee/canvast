@@ -342,6 +342,7 @@ async function start(): Promise<void> {
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     backlinksElsewhere: (id) => session.backlinksElsewhere(id),
     locateMentions: (ids) => session.locateMentions(ids),
+    assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
     reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
   });
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {

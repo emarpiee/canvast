@@ -20,6 +20,8 @@ export interface LayersActions {
   /** Texts on the board's other canvases that mention an object (stored index). */
   backlinksElsewhere(id: string): Promise<Backlink[]>;
   /** Open a canvas (null = this one) and select and frame objects there. */
+  /** The file name of an original (empty when unknown). */
+  assetName(hash: string): Promise<string>;
   reveal(canvasId: string | null, ids: readonly string[]): void;
   /** Where mentioned objects are on the board's other canvases. */
   locateMentions(ids: readonly string[]): Promise<Map<string, Backlink>>;
@@ -65,9 +67,9 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
 }
 
 /** Short name of an object for lists and mention labels. */
-export function labelOf(o: CanvasObject): { icon: string; text: string; swatch?: string } {
+export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
   if (o.kind === "stroke") return { icon: ICONS.pencil, text: "Stroke", swatch: o.color };
-  if (o.kind === "image") return { icon: ICONS.image, text: `Image ${o.pixelW}×${o.pixelH}` };
+  if (o.kind === "image") return { icon: ICONS.image, text: names?.get(o.assetId) || `Image ${o.pixelW}×${o.pixelH}` };
   const plain = plainText(o.md, 28);
   return { icon: ICONS.type, text: plain || "Text", swatch: o.color };
 }
@@ -79,6 +81,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   panel.dataset["testid"] = "layers-panel";
   host.appendChild(panel);
   const open = new Set<string>(); // expanded groups
+  // File names of the originals (the catalog is read once per original).
+  const names = new Map<string, string>();
+  const asked = new Set<string>();
   let scheduled = false;
   let dragged: string[] = [];
 
@@ -138,13 +143,24 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     panel.hidden = !editor.layersOpen;
     if (!editor.layersOpen) return;
     const all = doc.ordered();
+    for (const o of all) {
+      if (o.kind === "image" && !asked.has(o.assetId)) {
+        asked.add(o.assetId);
+        void actions.assetName(o.assetId).then((n) => {
+          if (n) {
+            names.set(o.assetId, n);
+            schedule();
+          }
+        });
+      }
+    }
     const tree = layerTree(all);
     let rows = 0;
     const row = (n: Node, depth: number): string => {
       if (rows >= MAX_ROWS) return "";
       rows++;
       const first = n.members[0]!;
-      const lab = n.group ? { icon: ICONS.group, text: `Group (${n.members.length})`, swatch: undefined } : labelOf(first);
+      const lab = n.group ? { icon: ICONS.group, text: `Group (${n.members.length})`, swatch: undefined } : labelOf(first, names);
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);

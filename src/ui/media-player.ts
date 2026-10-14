@@ -193,10 +193,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   bar.dataset["testid"] = "media-bar";
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
-  bar.innerHTML = `${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}
-    <input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position">
-    <output class="media-time">0:00 / 0:00</output>
-    ${btn("extract", ICONS.imagePlus, "Extract frame")}${btn("repeat", ICONS.repeat, "Repeat")}${btn("mute", ICONS.volume, "Mute")}${btn("settings", ICONS.settings, "Media & Playback settings")}
+  bar.innerHTML = `<div class="media-row"><input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position"><output class="media-time">0:00 / 0:00</output></div>
+    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.imagePlus, "Extract frame")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume">${btn("settings", ICONS.settings, "Media & Playback settings")}</div>
     <div class="media-settings" role="group" aria-label="Media &amp; Playback" hidden>
       <label>Video step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.video"></label>
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
@@ -209,6 +207,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const playBtn = $<HTMLButtonElement>('[data-cmd="play"]');
   const repeatBtn = $<HTMLButtonElement>('[data-cmd="repeat"]');
   const muteBtn = $<HTMLButtonElement>('[data-cmd="mute"]');
+  const volume = $<HTMLInputElement>(".media-volume");
   const extractBtn = $<HTMLButtonElement>('[data-cmd="extract"]');
 
   let cur: ImageObject | null = null;
@@ -225,7 +224,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
     playBtn.title = playing ? "Pause" : "Play";
     repeatBtn.setAttribute("aria-pressed", String(!!cur?.media?.repeat));
-    muteBtn.hidden = cur?.media?.kind === "gif";
+    muteBtn.hidden = volume.hidden = cur?.media?.kind === "gif";
+    if (document.activeElement !== volume) volume.value = String(v.muted ? 0 : settings.get("media.volume"));
     extractBtn.hidden = cur?.media?.kind === "audio";
     muteBtn.setAttribute("aria-pressed", String(v.muted));
     muteBtn.innerHTML = v.muted ? ICONS.volumeOff : ICONS.volume;
@@ -247,7 +247,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const w = o.w * ppu;
     const h = o.h * ppu;
     const vp = view.viewport;
-    const visible = eng.visual && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
+    // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
+    const visible = eng.visual && editor.preview.kind === "none" && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && s.x < vp.width && s.y < vp.height && s.x + w > 0 && s.y + h > 0;
     const el = eng.el;
     el.style.display = visible ? "" : "none";
     if (visible) {
@@ -282,6 +283,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const open = async (o: ImageObject): Promise<void> => {
     cur = o;
     eng = engines[o.media!.kind];
+    v.volume = settings.get("media.volume") / 100;
     eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
     const mine = ++loading;
     v.hidden = gc.hidden = bar.hidden = false;
@@ -328,6 +330,13 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   });
   scrub.addEventListener("change", () => {
     if (cur && eng && !eng.playing()) actions.setMedia(cur.id, { t: eng.pos() }, "Seek media");
+  });
+  // Volume is a device setting (0 to 100); sliding it to 0 mutes, anything above unmutes.
+  volume.addEventListener("input", () => {
+    const n = Number(volume.value);
+    v.muted = n === 0;
+    v.volume = n / 100;
+    settings.set("media.volume", n);
   });
   // Steps are device settings: a bad value is refused and the field shows the current one again.
   bar.addEventListener("change", (e) => {
