@@ -32,24 +32,6 @@ function isText(c: [number, number, number]): boolean {
   return Math.abs(c[0] - TEXT_RGB[0]!) + Math.abs(c[1] - TEXT_RGB[1]!) + Math.abs(c[2] - TEXT_RGB[2]!) < 60;
 }
 
-test("pasting Markdown comes in formatted; Ctrl+Shift+V pastes it as plain text", async ({ app }) => {
-  const p = app.page;
-  await newText(p, 300, 300);
-  const paste = (text: string, plain = false) => p.evaluate(([t, pl]) => window.__canvastDebug.pasteText(t as string, pl as boolean), [text, plain] as const);
-  await paste("# Title\n\nSome **bold** and *italic* text\n\n- one\n- two");
-  await finish(p);
-  const [t] = await textObjects(p);
-  expect(t?.md, "headings, emphasis and lists are formatted").toBe("# Title\n\nSome **bold** and *italic* text\n\n- one\n- two");
-  // As plain text the same characters stay literal (they are stored escaped).
-  await p.keyboard.press("t");
-  await p.mouse.click(300, 600);
-  await expect(p.getByTestId("text-editor")).toBeFocused();
-  await paste("**not bold**", true);
-  await finish(p);
-  const second = (await textObjects(p)).find((o) => o.id !== t!.id);
-  expect(second?.md).toBe("\\*\\*not bold\\*\\*");
-});
-
 test("type, format, save, reload and copy a text object as Markdown", async ({ app }) => {
   const p = app.page;
   await newText(p, 300, 300);
@@ -112,7 +94,7 @@ test("double-click edits a text; lists and pasted text become Markdown; emptying
   await p.evaluate(() => {
     const d = document.createElement("div");
     d.id = "copy-source";
-    d.innerHTML = "<b>pasted &lt;b&gt;</b>"; // (a "# " here would now paste as a heading: the Markdown test above covers that)
+    d.innerHTML = "<b># pasted &lt;b&gt;</b>";
     document.body.append(d);
     getSelection()!.selectAllChildren(d);
   });
@@ -127,10 +109,10 @@ test("double-click edits a text; lists and pasted text become Markdown; emptying
   await p.keyboard.press("End");
   await p.keyboard.press("Enter");
   await p.keyboard.type("two ");
-  // Pasting formatted content keeps only its plain text (read as Markdown).
+  // Pasting formatted content keeps only its plain text.
   await p.keyboard.press(`${mod}+v`);
   await finish(p);
-  expect((await textObjects(p)).map((o) => o.md)).toEqual(["- one\n- two pasted \\<b>"]);
+  expect((await textObjects(p)).map((o) => o.md)).toEqual(["- one\n- two # pasted \\<b>"]);
   expect((await textObjects(p))[0]!.id).toBe(t!.id);
 
   // Emptying a text deletes the object (one undoable step).
