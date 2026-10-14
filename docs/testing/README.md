@@ -52,7 +52,7 @@ To run the full length of a single test:
 | `chromium` | Default |
 | `chromium-cpu` | GPU and accelerated canvas disabled (the CPU-only tier) |
 | `chromium-dpr2` | DPR 2, touch enabled. The touch-pinch test runs only here; it is the "skipped by design" count in the other projects |
-| `firefox` | **Removed on 2026-10-14** (Electron migration). History: Firefox 157, was the project owner's main browser. Note: `performance.now()` has 1 ms resolution on `file://` in Firefox, so frame times there are whole milliseconds. See [firefox.md](firefox.md) |
+| `firefox` | **Removed on 2026-10-14** (an Electron experiment, later dropped; the project owner's call). History: Firefox 157, was the project owner's main browser. Note: `performance.now()` has 1 ms resolution on `file://` in Firefox, so frame times there are whole milliseconds. See [firefox.md](firefox.md) |
 
 ## Test logs
 
@@ -61,11 +61,10 @@ Each phase records commands, environment, measured values and defects in
 not logged unless they find something.
 
 
-## Test projects and loop counts (Electron branch)
+## Test projects and loop counts
 
 The browser projects are `chromium`, `chromium-cpu` (CPU rasterizer) and
-`chromium-dpr2` (pixel ratio 2, touch). Firefox was dropped when the app
-moved to Electron (Chromium).
+`chromium-dpr2` (pixel ratio 2, touch). The Firefox project was dropped on 2026-10-14.
 
 **Specs that run in `chromium` only** (`LOGIC_ONLY` in `playwright.config.ts`).
 They are not removed: they test storage, archives and the asset library, which

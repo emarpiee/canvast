@@ -1,6 +1,6 @@
-# Full suite on the Electron branch (2026-10-14)
+# Full suite, three Chromium projects (2026-10-14)
 
-Branch `exp/electron` at `4668645`; three Chromium projects (no Firefox), reduced loop counts (see README).
+Commit `4668645` (branch `exp/electron`, since merged); three Chromium projects (no Firefox), reduced loop counts (see README).
 
 | Item | Result |
 | --- | --- |

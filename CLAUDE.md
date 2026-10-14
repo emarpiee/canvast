@@ -2,7 +2,7 @@
 
 ## What this is
 
-canvast: an offline-first endless canvas (unbounded pan and zoom, drawing, images) that ships as **one self-contained HTML file** opened from `file://`, and as a Linux **AppImage** (Electron shell in `electron/main.cjs`; `npm run electron`, `npm run dist:appimage`, output in `release/`; `CANVAST_DEBUG=1` opens the debug panel and DevTools; F12 / Ctrl+Shift+I toggle DevTools, F5 / Ctrl+R reload). No server, no network, no runtime dependencies. TypeScript + Canvas 2D, bundled by esbuild. `README.md` describes only what exists; `docs/status.md` is the single source of truth for roadmap/status (each milestone reported as Implemented / Tested / Known failures / Unverified / Committed / Next bounded task). Design decisions live in `docs/adr/`.
+canvast: an offline-first endless canvas (unbounded pan and zoom, drawing, images) that ships as **one self-contained HTML file** opened from `file://`. No server, no network, no runtime dependencies. TypeScript + Canvas 2D, bundled by esbuild. `README.md` describes only what exists; `docs/status.md` is the single source of truth for roadmap/status (each milestone reported as Implemented / Tested / Known failures / Unverified / Committed / Next bounded task). Design decisions live in `docs/adr/`.
 
 The repo sits inside an Obsidian vault synced by Syncthing; the parent vault's CLAUDE.md does not apply to this code.
 
@@ -16,7 +16,7 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 ## Test rules
 
 - E2E opens `dist/canvast.html#debug` from `file://` and fails on any request other than `file:`/`data:`/`blob:`. Tests drive the app through `window.__canvastDebug` (`src/app/debug-hook.ts`, enabled by `#debug`).
-- The app ships as an Electron AppImage (Chromium), so the E2E projects are the three Chromium configurations (`chromium`, `chromium-cpu`, `chromium-dpr2`). Firefox was dropped from the tests on 2026-10-14; the single HTML file still opens in Firefox from `file://`, but it is no longer tested there (history: `docs/testing/firefox.md`).
+- The E2E projects are the three Chromium configurations (`chromium`, `chromium-cpu`, `chromium-dpr2`). The Firefox project was dropped on 2026-10-14 (history: `docs/testing/firefox.md`); the single HTML file is not tested in Firefox since.
 - `LIMITS` in `tests/e2e/harness.ts` were fixed before runs and are **never loosened** to make a test pass.
 - Write loop counts with `reps(full, quick)` from the harness. Don't assume a fixed zoom depth from wheel notches (DPR-dependent); use keyboard steps or measured values.
 - `app.drag` / `app.wheel` assert input starts on the canvas.

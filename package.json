@@ -2,7 +2,7 @@
   "name": "canvast",
   "version": "0.8.0",
   "private": true,
-  "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
+  "description": "canvast \u2014 an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
@@ -16,40 +16,15 @@
     "check:names": "node scripts/check-names.mjs dist/canvast.html",
     "test": "npm run typecheck && npm run test:unit && npm run test:e2e && npm run check:offline && npm run check:names",
     "test:full": "npm run typecheck && npm run test:unit && npm run test:e2e:full && npm run check:offline && npm run check:names",
-    "bench": "npm run build && playwright test -c playwright.bench.config.ts",
-    "electron": "npm run build && electron electron/main.cjs",
-    "dist:appimage": "npm run build && electron-builder --linux AppImage"
+    "bench": "npm run build && playwright test -c playwright.bench.config.ts"
   },
   "devDependencies": {
     "@expo-google-fonts/inter": "0.4.2",
     "@playwright/test": "1.64.0",
     "@types/node": "26.6.5",
-    "electron": "44.7.2",
-    "electron-builder": "26.15.3",
     "esbuild": "0.28.2",
     "lucide-static": "1.48.0",
     "typescript": "7.0.2",
     "vitest": "5.0.4"
-  },
-  "main": "electron/main.cjs",
-  "author": "emarpiee",
-  "build": {
-    "appId": "app.canvast",
-    "productName": "canvast",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "electron/main.cjs",
-      "dist/canvast.html",
-      "package.json"
-    ],
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "category": "Graphics",
-      "artifactName": "canvast-${version}-${arch}.AppImage"
-    }
   }
 }
