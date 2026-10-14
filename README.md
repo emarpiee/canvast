@@ -422,7 +422,6 @@ docs/status.md              roadmap and current status (single source of truth)
     then writes in one transaction.
   - Limit: 4 GiB and 65,535 files per archive.
 - **Not yet available:**
-  - persistent undo history;
   - incremental or multi-part backups.
 
 ## Known limitations (honest list)

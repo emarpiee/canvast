@@ -148,7 +148,6 @@ The save indicator opens a panel showing:
   UI says there is no backup.
 - **Deleting boards and canvases.** This needs the reference reconciliation
   above to be safe.
-- **Persistent undo history.**
 - Behaviour on Firefox and Safari under `file://` is unverified. Firefox may
   partition or deny IndexedDB for local files; the app then runs in memory and
   says so.

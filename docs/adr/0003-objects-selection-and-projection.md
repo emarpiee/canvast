@@ -181,8 +181,9 @@ step. Escape or `pointercancel` discards the preview.
 - **Assets** are content-addressed by SHA-256, using WebCrypto or a portable
   fallback, and their bytes are stored once. A placed image is an instance
   referencing the hash. Missing assets render as a placeholder.
-- Undo history is not persisted. Reopening restores the document and camera
-  but not the history. This is listed as a known limitation.
+- Undo history is not persisted, by decision (2026-10-14): it is the standard
+  in-session editor stack and clears when the app closes. Reopening restores
+  the document and camera but not the history.
 
 ## Deferred, with reasons
 

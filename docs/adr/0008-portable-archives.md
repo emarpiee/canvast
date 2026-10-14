@@ -139,6 +139,6 @@ archived forms are identical; the round-trip test found this.
 - **Archives compressed by other tools** are refused. Re-zipping a
   `.canvast` with compression makes it unreadable here; unzip it and use the
   original file.
-- **Not included yet:** undo history, settings, tags and folders. These
+- **Not included yet:** settings, tags and folders. Undo history is never included (it is not persisted, by decision of 2026-10-14). These
   will be added to the format when they exist; `version` will then increase,
   with a migration for version-1 archives.
