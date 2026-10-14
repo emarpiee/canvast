@@ -776,6 +776,11 @@ test("a video this browser cannot decode is still imported as a card of its own 
   expect(o!["media"]).toEqual({ kind: "video", t: 0, repeat: false });
   const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
   expect((box.maxY - box.minY) / (box.maxX - box.minX)).toBeCloseTo(1920 / 1080, 1);
+  // The card fills the instance (its play mark is at the centre), also straight after the import.
+  const sum = async (x: number, y: number) => (await p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y])).slice(0, 3).reduce((s, v) => s + v, 0);
+  const mx = Math.round((box.minX + box.maxX) / 2);
+  const my = Math.round((box.minY + box.maxY) / 2);
+  await expect.poll(async () => (await sum(mx, Math.round(my - (box.maxY - box.minY) * 0.06))) - (await sum(Math.round(box.maxX + 30), my))).toBeGreaterThan(40);
   // The card is drawn (dark, not a placeholder gap) and selecting it offers the file, not playback.
   await p.keyboard.press("v");
   await p.mouse.click(Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));

@@ -247,7 +247,7 @@ export class AssetLibrary {
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.db) await this.store(record, true);
     else this.memoryOnly.set(hash, record);
-    if (keepDecoded || Math.max(record.pixelW, record.pixelH) <= SMALL_EDGE) this.decoded.set(hash, makeSource(img));
+    if (keepDecoded || Math.max(record.pixelW, record.pixelH) <= SMALL_EDGE) this.decoded.set(hash, makeSource(img, record.pixelW));
     else (img as Partial<ImageBitmap>).close?.(); // part of a big batch: it is decoded again, reduced, when it is drawn
     this.evict();
     this.missing.delete(hash);
