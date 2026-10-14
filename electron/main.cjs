@@ -18,12 +18,14 @@ function open() {
   if (debug) win.webContents.openDevTools({ mode: "detach" });
   // Offline-first: the page never navigates away or opens windows.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  // No menu, so no menu shortcut: F12 and Ctrl+Shift+I toggle DevTools.
+  // No menu, so no menu shortcuts: F12 / Ctrl+Shift+I toggle DevTools, F5 / Ctrl+R reload.
   win.webContents.on("before-input-event", (e, i) => {
-    if (i.type === "keyDown" && (i.key === "F12" || (i.control && i.shift && i.key.toLowerCase() === "i"))) {
-      win.webContents.toggleDevTools();
-      e.preventDefault();
-    }
+    if (i.type !== "keyDown") return;
+    const k = i.key.toLowerCase();
+    if (k === "f12" || (i.control && i.shift && k === "i")) win.webContents.toggleDevTools();
+    else if (k === "f5" || (i.control && k === "r")) win.webContents.reload();
+    else return;
+    e.preventDefault();
   });
   win.webContents.on("will-navigate", (e) => e.preventDefault());
 }
