@@ -388,13 +388,13 @@ visible strokes). Alternatives:
 
 **Phase 2 is built and the full suite has run** (34 min 50 s; 340 passed, 6 skipped, 2 failed on one test that measured the wrong thing and was fixed; see [testing/full-run-phase-2.md](testing/full-run-phase-2.md)); limits to remember: no snapping while resizing, text erased by its box, selection outline of a turned object is its bounding box.
 
-**Phase 3 is built and the full suite has run** (36 min 36 s; 380 passed, 6 skipped, 0 failed, [testing/full-run-phase-3.md](testing/full-run-phase-3.md)). Known gaps: one 70 ms frame when a zoom in a dense scene crosses the ADR 0012 preview bound (fix planned: build the adjacent zoom level's tiles in idle time), no document-memory budget (1M objects is about 1.1 GB), Assets view with 300 HD images is slow (Phase 4 thumbnails).
+**Phase 3 is built and the full suite has run** (36 min 36 s; 380 passed, 6 skipped, 0 failed, [testing/full-run-phase-3.md](testing/full-run-phase-3.md)). Known gaps: one 70 ms frame when a zoom in a dense scene crosses the ADR 0012 preview bound (fix planned: build the adjacent zoom level's tiles in idle time), no document-memory budget (1M objects is about 1.1 GB), Assets view with 300 HD images was slow (fixed in Phase 4: 1,000 cards open in under 250 ms).
 
 **Phase 4, slice 1 done:** idle-time prebuild of the adjacent zoom levels' tiles ([ADR 0033](adr/0033-idle-prebuild-of-adjacent-zoom-tiles.md)); the dense-zoom hitch at the first crossing is gone, later crossings in one gesture still rebuild (not chained).
 
 **Phase 4, slices 2 and 3 done:** persisted WebP thumbnails (made at import), the slide view, and thumbnails shown also for assets whose original is lost ([ADR 0034](adr/0034-persisted-thumbnails.md)); tested in `assets.spec.ts`.
 
-**Next bounded task:** Phase 4: the rest of [the thumbnail plan](plans/asset-thumbnails.md) (archives, bad-thumbnail regeneration, virtualized grid).
+**Next bounded task:** Phase 4: the rest of [the thumbnail plan](plans/asset-thumbnails.md) (thumbnails in archives, bad-thumbnail regeneration).
 
 ## Phase 1, slice 9 — settings scopes
 
