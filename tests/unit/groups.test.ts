@@ -49,3 +49,31 @@ describe("layers panel data (ADR 0024)", () => {
     expect(tree[0]!.children.map((n) => n.id)).toEqual([c!.id, a!.id]);
   });
 });
+
+describe("import grid (ADR 0030)", () => {
+  it("lays a batch out in a roughly square grid, centred, in order, never overlapping, scaled down to fit and never up", async () => {
+    const { gridLayout } = await import("../../src/app/actions");
+    const vp = { width: 1280, height: 800 };
+    const hd = (n: number) => Array.from({ length: n }, () => ({ w: 1920, h: 1080 }));
+    const g300 = gridLayout(hd(300), vp);
+    const cols = g300.filter((c) => c.y === g300[0]!.y).length;
+    expect(cols, "13 columns by 24 rows is as square as 16:9 cells allow").toBe(13);
+    expect(Math.ceil(300 / cols)).toBe(24);
+    const right = Math.max(...g300.map((c) => c.x + c.w));
+    const bottom = Math.max(...g300.map((c) => c.y + c.h));
+    const left = Math.min(...g300.map((c) => c.x));
+    const top = Math.min(...g300.map((c) => c.y));
+    expect(bottom - top, "fits 90% of the viewport").toBeLessThanOrEqual(0.9 * 800 + 1e-6);
+    expect(right - left).toBeLessThanOrEqual(0.9 * 1280 + 1e-6);
+    expect((left + right) / 2).toBeCloseTo(640, 6);
+    expect((top + bottom) / 2).toBeCloseTo(400, 6);
+    expect(g300[1]!.x).toBeGreaterThan(g300[0]!.x + g300[0]!.w - 1e-9); // in reading order, a gap between neighbours
+    expect(g300[13]!.y).toBeGreaterThan(g300[0]!.y + g300[0]!.h - 1e-9);
+    // Four squares make a 2 x 2 grid; small images are not scaled up; images keep their aspect ratio inside a cell.
+    const sq = gridLayout([{ w: 100, h: 100 }, { w: 100, h: 100 }, { w: 100, h: 100 }, { w: 100, h: 100 }], vp);
+    expect(new Set(sq.map((c) => c.x)).size).toBe(2);
+    expect(sq[0]!.w).toBe(100);
+    const mixed = gridLayout([{ w: 200, h: 100 }, { w: 100, h: 100 }], vp);
+    expect(mixed[1]!.w / mixed[1]!.h).toBe(1);
+  });
+});

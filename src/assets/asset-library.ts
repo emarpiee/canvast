@@ -46,6 +46,7 @@ export function duplicateNotice(names: ReadonlyArray<{ name: string; duplicate: 
 interface Decoded extends RasterSource {
   readonly pixelW: number;
   readonly pixelH: number;
+  readonly scale?: number;
   /** Memory the decoded pixels take (RGBA, 4 bytes a pixel). */
   readonly bytes: number;
   /** Last time a frame asked for it (performance.now). */
@@ -60,6 +61,8 @@ interface Decoded extends RasterSource {
  * least recently used ones that no recent frame asked for are released (ADR 0027).
  */
 export const DEFAULT_DECODED_BUDGET = 384 * 2 ** 20;
+/** Key suffix of the reduced copy of an image in the decoded cache. */
+const SMALL_KEY = "@small";
 /** An image asked for within this many ms is in use and is never released. */
 const IN_USE_MS = 1500;
 
@@ -83,7 +86,14 @@ async function decode(blob: Blob): Promise<CanvasImageSource & { width: number; 
   }
 }
 
-function makeSource(img: CanvasImageSource & { width: number; height: number }): Decoded {
+/**
+ * An image drawn small (at most half of SMALL_EDGE CSS px on its longer side) is drawn from a reduced copy of this
+ * longer side, decoded straight at that size: a 1920x1080 image then costs 0.6 MB instead of 8 MB, and drawing it
+ * is faster. Only images whose longer side is above SMALL_EDGE have one (ADR 0030).
+ */
+export const SMALL_EDGE = 512;
+
+function makeSource(img: CanvasImageSource & { width: number; height: number }, fullW = img.width): Decoded {
   let scratch: HTMLCanvasElement | null = null;
   let lastKey = "";
   let lastData = new Uint8ClampedArray(0);
@@ -91,6 +101,7 @@ function makeSource(img: CanvasImageSource & { width: number; height: number }):
     source: img,
     pixelW: img.width,
     pixelH: img.height,
+    ...(img.width !== fullW ? { scale: img.width / fullW } : {}),
     bytes: img.width * img.height * 4,
     lastUsed: performance.now(),
     release() {
@@ -118,6 +129,8 @@ export class AssetLibrary {
   private readonly decoded = new Map<string, Decoded>();
   private readonly pending = new Set<string>();
   private readonly missing = new Set<string>();
+  /** Originals the browser could not decode at a reduced size. */
+  private readonly noReduced = new Set<string>();
   private readonly memoryOnly = new Map<string, AssetRecord>();
   private budget = DEFAULT_DECODED_BUDGET;
   private lastEvictCheck = 0;
@@ -223,6 +236,8 @@ export class AssetLibrary {
   forget(hash: string): void {
     this.decoded.get(hash)?.release();
     this.decoded.delete(hash);
+    this.decoded.get(hash + SMALL_KEY)?.release();
+    this.decoded.delete(hash + SMALL_KEY);
     this.missing.delete(hash);
   }
 
@@ -236,17 +251,30 @@ export class AssetLibrary {
     return this.memoryOnly.get(hash);
   }
 
-  /** Decoded source if ready; otherwise starts loading and returns null. */
-  get(hash: string): RasterSource | null {
-    const d = this.decoded.get(hash);
-    if (d) {
-      const now = performance.now();
-      d.lastUsed = now;
+  /**
+   * Decoded source if ready; otherwise starts loading and returns null. `shownPx` is how many CSS px the image's
+   * longer side takes on screen and `edge` its longer side in source pixels: a big image shown small is served from a
+   * reduced copy (made without decoding the whole image), and while the copy wanted is not ready the other one is used.
+   */
+  get(hash: string, shownPx = Infinity, edge = 0): RasterSource | null {
+    const now = performance.now();
+    const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
+    const full = this.decoded.get(hash);
+    const reduced = this.decoded.get(hash + SMALL_KEY);
+    const pick = small ? (reduced ?? full) : (full ?? reduced);
+    if (pick) {
+      pick.lastUsed = now;
       if (now - this.lastEvictCheck > 500) this.evict(now); // images that fell idle since the last load
-      return d;
     }
-    if (!this.pending.has(hash) && !this.missing.has(hash)) void this.load(hash);
-    return null;
+    const wanted = small ? reduced : full;
+    if (!wanted && !this.pending.has(hash + (small ? SMALL_KEY : "")) && !this.missing.has(hash)) void this.load(hash, small);
+    return pick ?? null;
+  }
+
+  /** Whether the copy `get` should serve for this size is ready (not a stopgap or a placeholder): tiles drawn before this must be redrawn. */
+  wantedReady(hash: string, shownPx = Infinity, edge = 0): boolean {
+    const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
+    return this.decoded.has(hash + (small ? SMALL_KEY : ""));
   }
 
   isMissing(hash: string): boolean {
@@ -260,20 +288,39 @@ export class AssetLibrary {
     }
   }
 
-  private async load(hash: string): Promise<void> {
-    this.pending.add(hash);
+  private async load(hash: string, small = false): Promise<void> {
+    const key = hash + (small ? SMALL_KEY : "");
+    this.pending.add(key);
     try {
       const rec = await this.record(hash);
       if (!rec) {
         this.missing.add(hash);
+      } else if (small && Math.max(rec.pixelW, rec.pixelH) > SMALL_EDGE) {
+        await this.ensureReduced(rec);
       } else {
         await this.ensureDecoded(rec);
       }
     } catch {
       this.missing.add(hash);
     } finally {
-      this.pending.delete(hash);
+      this.pending.delete(key);
       this.onReady();
     }
+  }
+
+  /** The reduced copy, decoded straight from the stored bytes at the smaller size. */
+  private async ensureReduced(rec: AssetRecord): Promise<void> {
+    const key = rec.hash + SMALL_KEY;
+    if (this.decoded.has(key)) return;
+    const s = SMALL_EDGE / Math.max(rec.pixelW, rec.pixelH);
+    let bmp: ImageBitmap;
+    try {
+      bmp = await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
+    } catch {
+      this.noReduced.add(rec.hash); // this browser cannot decode at a size: use the full image from now on
+      return this.ensureDecoded(rec);
+    }
+    this.decoded.set(key, makeSource(bmp, rec.pixelW));
+    this.evict();
   }
 }

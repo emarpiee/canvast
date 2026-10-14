@@ -1204,3 +1204,35 @@ test("a big document is indexed in slices and ends up with every object (ADR 002
   expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), "and it draws").toBeGreaterThan(100);
   expect(await p.evaluate(() => document.querySelector(".hud-readout")?.textContent ?? ""), "the progress message is gone").not.toContain("Indexing");
 });
+
+test("a batch import is laid out in a grid in one undo step, and big images drawn small are served from reduced copies (ADR 0030)", async ({ app }) => {
+  const p = app.page;
+  const MB = 2 ** 20;
+  const stats = () => p.evaluate(() => window.__canvastDebug.decodedStats());
+  // Six 2000 x 1200 images (9.6 MB each when decoded in full); only 12 MB of decoded pixels are allowed.
+  await p.evaluate((b) => window.__canvastDebug.setDecodedBudget(b), 12 * MB);
+  const colours: Array<[number, number, number]> = [[200, 30, 30], [30, 160, 60], [40, 70, 220], [230, 190, 20], [120, 40, 160], [20, 150, 160]];
+  const files = colours.map((c, i) => ({ name: `big${i}.png`, mimeType: "image/png", buffer: makePng(2000, 1200, () => [c[0], c[1], c[2], 255]) }));
+  await p.getByTestId("import-input").setInputFiles(files);
+  await p.waitForFunction(() => window.__canvastDebug.objects().length === 6);
+  // A grid as square as 5:3 cells allow: 2 columns by 3 rows, in the order given, no overlaps, inside the viewport.
+  const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id);
+  const boxes = [];
+  for (const id of ids) boxes.push((await boxOf(app, id))!);
+  expect(new Set(boxes.map((b) => Math.round(b.minY))).size, "three rows").toBe(3);
+  expect(new Set(boxes.map((b) => Math.round(b.minX))).size, "two columns").toBe(2);
+  expect(boxes[1]!.minX, "left to right").toBeGreaterThan(boxes[0]!.maxX);
+  expect(boxes[2]!.minY, "then the next row").toBeGreaterThan(boxes[0]!.maxY);
+  for (const b of boxes) expect(b.maxX - b.minX, "shrunk to fit, not up").toBeLessThan(2000);
+  // Each shows its own colour, drawn from a reduced copy: far less than six full decodes stay in memory.
+  for (let i = 0; i < 6; i++) {
+    const b = boxes[i]!;
+    const x = Math.round((b.minX + b.maxX) / 2);
+    const y = Math.round((b.minY + b.maxY) / 2);
+    await expect.poll(() => p.evaluate(([a, c]) => window.__canvastDebug.pixelAt(a!, c!).join(","), [x, y]), { timeout: 10_000 }).toBe(colours[i]!.join(","));
+  }
+  await expect.poll(async () => (await stats()).bytes, { timeout: 15_000 }).toBeLessThanOrEqual(12 * MB);
+  // One undo step takes the whole batch away.
+  await p.keyboard.press("Control+z");
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
+});

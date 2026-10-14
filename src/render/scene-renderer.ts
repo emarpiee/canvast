@@ -55,6 +55,9 @@ export function batchRuns(list: readonly ProjectedObject[]): Map<ProjectedObject
  * omitted). Returns true if an image was drawn as a placeholder because its
  * original is still loading (or missing).
  */
+/** How many CSS px the longer side of a projected image takes on screen. */
+const shownEdge = (po: ProjectedObject): number => (po.obj.kind === "image" ? po.proj.ppu * Math.max(po.obj.w, po.obj.h) : Infinity);
+
 export function drawObjects(
   ctx: CanvasRenderingContext2D,
   list: readonly ProjectedObject[],
@@ -89,8 +92,10 @@ export function drawObjects(
       ctx.translate(-t.vvp.width / 2, -t.vvp.height / 2);
       if (po.obj.kind === "text") drawText(ctx, t.inner, t.vvp, dpr);
       else if (po.obj.kind === "image") {
-        const src = assets.get(po.obj.assetId);
-        if (!src) pending = true;
+        const shown = shownEdge(t.inner);
+        const edge = Math.max(po.obj.pixelW, po.obj.pixelH);
+        const src = assets.get(po.obj.assetId, shown, edge);
+        if (!src || !assets.wantedReady(po.obj.assetId, shown, edge)) pending = true;
         drawImageObject(ctx, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
       }
       ctx.restore();
@@ -101,8 +106,10 @@ export function drawObjects(
     } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
     else {
-      const src = assets.get(po.obj.assetId);
-      if (!src) pending = true;
+      const shown = shownEdge(po);
+      const edge = Math.max(po.obj.pixelW, po.obj.pixelH);
+      const src = assets.get(po.obj.assetId, shown, edge);
+      if (!src || !assets.wantedReady(po.obj.assetId, shown, edge)) pending = true;
       drawImageObject(ctx, po, vp, dpr, src, theme.imagePlaceholder);
     }
   }

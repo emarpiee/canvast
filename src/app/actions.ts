@@ -127,6 +127,35 @@ export function clearFlag(doc: DocumentStore, editor: EditorState, flag: "hidden
 
 /** Largest fraction of the viewport a newly placed image may cover. */
 const PLACE_MAX_VIEWPORT_FRACTION = 0.6;
+/** Largest fraction of the viewport a batch of imported images may cover together. */
+const GRID_VIEWPORT_FRACTION = 0.9;
+/** Gap between grid cells, as a fraction of the larger cell side. */
+const GRID_GAP = 0.08;
+
+/** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
+function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+  const cam = view.camera;
+  const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
+  const c = screenToWorld(cam, view.viewport, { x, y });
+  const unit = -cam.zi;
+  const img: ImageObject = {
+    id: newObjectId(),
+    kind: "image",
+    // `c` is in the camera frame's coordinates (ADR 0014).
+    ...(view.frame === doc.space.world ? {} : { frame: view.frame }),
+    anchor: c,
+    unit,
+    z,
+    opacity: 1,
+    attachmentTargetId: null,
+    assetId: rec.hash,
+    w: wPx / f,
+    h: hPx / f,
+    pixelW: rec.pixelW,
+    pixelH: rec.pixelH,
+  };
+  return homeObject(normalizeUnit(img), doc.space) as ImageObject;
+}
 
 /**
  * Place one new instance of a stored asset at the viewport centre (shifted by
@@ -140,34 +169,54 @@ export function placeImage(
   offsetPx: number,
   label: string,
 ): ImageObject {
-  const cam = view.camera;
   const vp = view.viewport;
-  const f = 2 ** cam.zf;
   const fit = Math.min(1, (PLACE_MAX_VIEWPORT_FRACTION * vp.width) / rec.pixelW, (PLACE_MAX_VIEWPORT_FRACTION * vp.height) / rec.pixelH);
-  // Local unit = 2^-zi world = f CSS px.
-  const w = (rec.pixelW * fit) / f;
-  const h = (rec.pixelH * fit) / f;
-  const c = screenToWorld(cam, vp, { x: vp.width / 2 + offsetPx, y: vp.height / 2 + offsetPx });
-  const unit = -cam.zi;
-  const img: ImageObject = {
-    id: newObjectId(),
-    kind: "image",
-    // `c` is in the camera frame's coordinates (ADR 0014).
-    ...(view.frame === doc.space.world ? {} : { frame: view.frame }),
-    anchor: { x: D.sub(c.x, D.shift(D.fromNumber(w / 2), unit)), y: D.sub(c.y, D.shift(D.fromNumber(h / 2), unit)) },
-    unit,
-    z: doc.topZ() + 1,
-    opacity: 1,
-    attachmentTargetId: null,
-    assetId: rec.hash,
-    w,
-    h,
-    pixelW: rec.pixelW,
-    pixelH: rec.pixelH,
-  };
-  const obj = homeObject(normalizeUnit(img), doc.space) as ImageObject;
+  const w = rec.pixelW * fit;
+  const h = rec.pixelH * fit;
+  const obj = imageAt(rec, doc, view, vp.width / 2 + offsetPx - w / 2, vp.height / 2 + offsetPx - h / 2, w, h, doc.topZ() + 1);
   doc.commit(doc.transaction(label, [obj]));
   return obj;
+}
+
+/**
+ * Lay a batch of images out in a roughly square grid, centred on the viewport (ADR 0030). Cells are as large as the
+ * largest image, each image is centred in its cell, rows fill left to right in the given order, and the columns are
+ * chosen so the whole grid is about as wide as it is tall (cols = round(sqrt(n x cellH / cellW))). The grid is then
+ * scaled down, never up, to fit 90% of the viewport; every image keeps its own aspect ratio. Sizes and the result are
+ * in CSS px, results from the viewport's top-left.
+ */
+export function gridLayout(sizes: ReadonlyArray<{ w: number; h: number }>, vp: { width: number; height: number }): Array<{ x: number; y: number; w: number; h: number }> {
+  const n = sizes.length;
+  if (!n) return [];
+  const cellW = Math.max(...sizes.map((s) => s.w));
+  const cellH = Math.max(...sizes.map((s) => s.h));
+  const gap = GRID_GAP * Math.max(cellW, cellH);
+  const cols = Math.min(n, Math.max(1, Math.round(Math.sqrt((n * (cellH + gap)) / (cellW + gap)))));
+  const rows = Math.ceil(n / cols);
+  const gridW = cols * cellW + (cols - 1) * gap;
+  const gridH = rows * cellH + (rows - 1) * gap;
+  const k = Math.min(1, (GRID_VIEWPORT_FRACTION * vp.width) / gridW, (GRID_VIEWPORT_FRACTION * vp.height) / gridH);
+  const x0 = vp.width / 2 - (gridW * k) / 2;
+  const y0 = vp.height / 2 - (gridH * k) / 2;
+  return sizes.map((s, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return {
+      x: x0 + (col * (cellW + gap) + (cellW - s.w) / 2) * k,
+      y: y0 + (row * (cellH + gap) + (cellH - s.h) / 2) * k,
+      w: s.w * k,
+      h: s.h * k,
+    };
+  });
+}
+
+/** Place a batch of images in a grid as one undoable step (see gridLayout). */
+export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
+  const cells = gridLayout(recs.map((r) => ({ w: r.pixelW, h: r.pixelH })), view.viewport);
+  const z = doc.topZ();
+  const objs = recs.map((r, i) => imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i));
+  doc.commit(doc.transaction(label, objs));
+  return objs;
 }
 
 /** Import image files and place one instance of each (see placeImage). */
@@ -178,25 +227,30 @@ export async function importImages(
   view: ViewState,
   editor: EditorState,
 ): Promise<ImageObject[]> {
-  const placed: ImageObject[] = [];
-  if (editor.blockEdit()) return placed;
+  if (editor.blockEdit()) return [];
+  const list = [...files];
+  const records: AssetRecord[] = [];
   const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
-  let total = 0;
-  for (const file of files) {
-    total++;
+  let done = 0;
+  for (const file of list) {
+    done++;
     try {
       const { record, duplicate } = await assets.importFileDetailed(file);
       if (duplicate) seen.push({ name: record.name || file.name, duplicate });
-      placed.push(placeImage(record, doc, view, placed.length * 24, "Import image"));
+      records.push(record);
     } catch (e) {
       editor.message = `Could not import ${file.name || "file"}: ${(e as Error).message}`;
       editor.changed();
     }
+    if (list.length > 3) {
+      editor.message = `Importing ${done} of ${list.length}…`;
+      editor.changed();
+    }
   }
-  const notice = duplicateNotice(seen, total);
-  if (notice) {
-    editor.message = notice;
-    editor.changed();
-  }
+  // One image goes in the middle as before; several go in a grid. Either way, one undo step.
+  const placed = records.length === 1 ? [placeImage(records[0]!, doc, view, 0, "Import image")] : records.length ? placeImages(records, doc, view, `Import ${records.length} images`) : [];
+  const notice = duplicateNotice(seen, list.length);
+  editor.message = notice ?? (list.length > 3 ? `Imported ${records.length} images.` : "");
+  editor.changed();
   return placed;
 }

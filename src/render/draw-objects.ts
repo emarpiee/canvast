@@ -31,6 +31,8 @@ export interface RasterSource {
   readonly source: CanvasImageSource;
   readonly pixelW: number;
   readonly pixelH: number;
+  /** Source pixels per full-size pixel: 1 for the original, less for a reduced copy used while the image is drawn small. */
+  readonly scale?: number;
   /** Colours of an integer pixel window, for magnified drawing. */
   readPixels(x: number, y: number, w: number, h: number): Uint8ClampedArray;
 }
@@ -204,12 +206,13 @@ export function drawImageObject(
     const pxPerSrc = (p.ppu * o.w) / o.pixelW;
     if (pxPerSrc <= PIXEL_RECT_THRESHOLD) {
       // Magnified pixels stay crisp (no invented detail); minified images smooth.
+      const k = src.scale ?? 1; // a reduced copy has fewer pixels: scale the source window to it
       ctx.imageSmoothingEnabled = pxPerSrc < 2;
       ctx.imageSmoothingQuality = "high";
-      const sx0 = (localX(cl) * o.pixelW) / o.w;
-      const sy0 = (localY(ct) * o.pixelH) / o.h;
-      const sx1 = (localX(cr) * o.pixelW) / o.w;
-      const sy1 = (localY(cb) * o.pixelH) / o.h;
+      const sx0 = k * (localX(cl) * o.pixelW) / o.w;
+      const sy0 = k * (localY(ct) * o.pixelH) / o.h;
+      const sx1 = k * (localX(cr) * o.pixelW) / o.w;
+      const sy1 = k * (localY(cb) * o.pixelH) / o.h;
       ctx.drawImage(src.source, sx0, sy0, sx1 - sx0, sy1 - sy0, cl, ct, cr - cl, cb - ct);
       return;
     }

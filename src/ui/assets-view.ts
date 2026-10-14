@@ -91,7 +91,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const rec = await assets.record(hash);
         if (!rec) throw new Error("missing");
         try {
-          const bmp = await createImageBitmap(rec.blob);
+          // Decoded straight at thumbnail size: a full-size decode of each of hundreds of originals is what made the grid heavy.
+          const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
+          const bmp = await createImageBitmap(rec.blob, k < 1 ? { resizeWidth: Math.max(1, Math.round(rec.pixelW * k)), resizeHeight: Math.max(1, Math.round(rec.pixelH * k)), resizeQuality: "high" } : undefined);
           const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
           const c = document.createElement("canvas");
           c.width = Math.max(1, Math.round(bmp.width * s));
