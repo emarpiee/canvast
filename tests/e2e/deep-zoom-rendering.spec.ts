@@ -54,6 +54,7 @@ async function coverageErrors(app: App, id: string, region: { x0: number; y0: nu
 }
 
 test("zooming deep into a curvy stroke never shows holes or spill (wheel input)", async ({ app }, info) => {
+  test.setTimeout(reps(480_000, 180_000)); // 240 wheel steps with a full-frame coverage check every 4th: Firefox needs over 3 min
   const pts: Array<[number, number]> = [];
   for (let t = 0; t <= 1.0001; t += 0.02) pts.push([400 + 480 * t, 400 + 120 * Math.sin(t * 14) * Math.cos(t * 3)]);
   const s = await draw(app, pts);

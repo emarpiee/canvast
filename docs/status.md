@@ -88,9 +88,9 @@ step 6).
 
 **Committed:** v0.9.0 on `main`.
 
-**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite on the 3 Chromium projects (before Firefox was restored; the full suite with Firefox has not been run): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md).
+**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite with all four projects: 32 min 25 s, unit 130/130, E2E 301 passed, 6 skipped, 1 timeout (the Firefox curvy-stroke test needs more than 180 s in full mode; fixed, passes alone in 5.2 min); details in [testing/full-run-4-projects.md](testing/full-run-4-projects.md). Earlier run on the 3 Chromium projects: [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md).
 
-**Next bounded task:** run the full suite with Firefox (not yet run after Firefox was restored), then the next feature slice.
+**Next bounded task:** Phase 1 remainder (settings scopes), then Phase 2.
 
 ## Phase 0A — endless navigation proof
 
