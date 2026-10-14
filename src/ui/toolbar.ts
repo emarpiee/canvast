@@ -28,6 +28,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
+  { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "N" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
 

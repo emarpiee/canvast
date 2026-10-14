@@ -74,6 +74,18 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   };
   ctx.save();
   paint(ctx, o, () => {
+    if (o.note) {
+      // The card behind a note (ADR 0032): the text box plus its margin, neutral so it reads on any theme.
+      const x0 = sx(-TEXT_PAD_EM);
+      const y0 = sy(-TEXT_PAD_EM);
+      ctx.fillStyle = "rgba(128, 128, 128, 0.16)";
+      ctx.strokeStyle = "rgba(128, 128, 128, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(x0, y0, sx(lay.width + TEXT_PAD_EM) - x0, sy(lay.height + TEXT_PAD_EM) - y0);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.fillStyle = o.color;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";

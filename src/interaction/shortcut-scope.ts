@@ -9,6 +9,6 @@ export function canvasShortcutsActive(e: KeyboardEvent): boolean {
   // swallow Ctrl+Z, Delete and the tool keys.
   if (t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName))) return false;
   if (t?.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)) return false;
-  if (t?.closest?.("dialog")) return false;
+  if (t?.closest?.("dialog, .note-panel")) return false;
   return document.body.dataset["view"] !== "assets";
 }

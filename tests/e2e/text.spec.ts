@@ -82,6 +82,37 @@ test("type, format, save, reload and copy a text object as Markdown", async ({ a
   expect(app.externalRequests).toEqual([]);
 });
 
+test("a note: Note tool opens the editor panel, saves Markdown as a card, edits on double-click and survives a reload", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("n");
+  await p.mouse.click(300, 300);
+  const wysiwyg = p.locator(".note-panel .se-wrapper-wysiwyg");
+  await expect(wysiwyg).toBeFocused();
+  await p.keyboard.type("Plan #idea");
+  await p.keyboard.press(`${mod}+Enter`);
+  await expect(p.getByTestId("note-panel")).toBeHidden();
+  const [n] = await textObjects(p);
+  expect(n).toMatchObject({ note: true, md: "Plan #idea" });
+
+  // Double-click reopens it with its text and saves an edit.
+  await p.keyboard.press("v");
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), n!.id))!.box;
+  await p.mouse.dblclick(box.minX + 10, box.minY + 10);
+  await expect(wysiwyg).toHaveText("Plan #idea");
+  await p.keyboard.press("End");
+  await p.keyboard.type(" more");
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("note-panel")).toBeHidden();
+  expect((await textObjects(p))[0]).toMatchObject({ id: n!.id, note: true, md: "Plan #idea more" });
+
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect((await textObjects(p))[0]).toMatchObject({ note: true, md: "Plan #idea more" });
+  expect(app.consoleErrors).toEqual([]);
+  expect(app.externalRequests).toEqual([]);
+});
+
 test("double-click edits a text; lists and pasted text become Markdown; emptying deletes it", async ({ app }) => {
   const p = app.page;
   await newText(p, 300, 300);

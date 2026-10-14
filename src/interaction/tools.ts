@@ -131,7 +131,8 @@ type Gesture =
 
 export interface ToolHooks {
   /** Open the text editor on `target`, or on a new text object at `at`. */
-  editText(target: TextObject | null, at: WorldPoint): void;
+  /** `asNote`: a click on empty canvas with the Note tool starts a note instead of a text. */
+  editText(target: TextObject | null, at: WorldPoint, asNote?: boolean): void;
 }
 
 export function attachTools(
@@ -526,6 +527,7 @@ export function attachTools(
         startSelectPress(e, s);
         break;
       case "text":
+      case "note":
         g = { kind: "text", pointerId: e.pointerId, start: s };
         break;
       default:
@@ -688,7 +690,7 @@ export function attachTools(
         break;
       case "text":
         // Opened after the pointer is released, so the editor keeps the focus.
-        if (!cancelled && !editor.blockEdit()) hooks.editText(textAt(g.start), world(g.start));
+        if (!cancelled && !editor.blockEdit()) hooks.editText(textAt(g.start), world(g.start), editor.tool === "note");
         break;
     }
     g = { kind: "none" };
@@ -739,6 +741,7 @@ export function attachTools(
     else if (key === "l") editor.setTool("lasso");
     else if (key === "h") editor.setTool("hand");
     else if (key === "t") editor.setTool("text");
+    else if (key === "n") editor.setTool("note");
     else if (key === "e") editor.setTool("eraser");
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
