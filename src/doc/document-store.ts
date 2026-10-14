@@ -1,5 +1,6 @@
+import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId } from "./model";
-import { validateObject } from "./model";
+import { homeObject, validateObject, worldForm } from "./model";
 
 /**
  * The authoritative document: a set of canvas objects keyed by stable id.
@@ -31,6 +32,8 @@ export class DocumentStore {
   private readonly listeners = new Set<(source: ChangeSource, changed: ChangedIds) => void>();
   private sortedCache: CanvasObject[] | null = null;
   revision = 0;
+  /** Coordinate frames of this document's objects (ADR 0014); replaced on load. */
+  space = new FrameSpace();
 
   get(id: ObjectId): CanvasObject | undefined {
     return this.objects.get(id);
@@ -109,11 +112,16 @@ export class DocumentStore {
     return tx;
   }
 
-  /** Replace the whole document (snapshot load). Clears history. */
-  load(objects: readonly CanvasObject[]): void {
+  /**
+   * Replace the whole document (snapshot load), each object in the frame that suits it. Clears history.
+   * `space`: the frames the objects were stored in (they keep them); without it a new tree is made and
+   * objects in world-frame (absolute) form are re-expressed exactly.
+   */
+  load(objects: readonly CanvasObject[], space?: FrameSpace): void {
     for (const o of objects) validateObject(o);
+    this.space = space ?? new FrameSpace();
     this.objects.clear();
-    for (const o of objects) this.objects.set(o.id, o);
+    for (const o of objects) this.objects.set(o.id, homeObject(o.frame && o.frame.space !== this.space ? worldForm(o) : o, this.space));
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.emit("load", null);

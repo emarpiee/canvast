@@ -1,5 +1,5 @@
 import * as D from "../core/dyadic";
-import type { Camera, Viewport } from "../core/camera";
+import type { Camera, Viewport, WorldPoint } from "../core/camera";
 import { worldToScreen } from "../core/camera";
 import type { Landmark } from "../scene/landmarks";
 
@@ -39,6 +39,8 @@ export function renderFrame(
   dpr: number,
   theme: Theme,
   landmarks: readonly Landmark[],
+  /** The world origin in the camera's coordinates (ADR 0014: the camera may be in another frame). */
+  worldOrigin: WorldPoint = { x: D.ZERO, y: D.ZERO },
 ): RenderStats {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;
@@ -46,7 +48,7 @@ export function renderFrame(
   ctx.fillRect(0, 0, vp.width, vp.height);
 
   const gridLines = drawGrid(ctx, cam, vp, theme);
-  drawAxes(ctx, cam, vp, theme);
+  drawAxes(ctx, cam, vp, theme, worldOrigin);
   const landmarksDrawn = drawLandmarks(ctx, cam, vp, theme, landmarks);
   return { gridLines, landmarksDrawn };
 }
@@ -99,8 +101,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, them
   return lines;
 }
 
-function drawAxes(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme): void {
-  const o = worldToScreen(cam, vp, { x: D.ZERO, y: D.ZERO });
+function drawAxes(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme, origin: WorldPoint): void {
+  const o = worldToScreen(cam, vp, origin);
   ctx.strokeStyle = theme.axis;
   ctx.lineWidth = 1;
   ctx.globalAlpha = 0.55;

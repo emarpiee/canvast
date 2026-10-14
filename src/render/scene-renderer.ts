@@ -1,9 +1,11 @@
-import type { Camera, Viewport } from "../core/camera";
+import type { Viewport } from "../core/camera";
+import type { FrameCamera } from "../core/frames";
+import { cameraIn } from "../scene/frame-index";
 import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
-import { batchable, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
+import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
 import { drawText } from "./draw-text";
 
@@ -78,7 +80,11 @@ export function drawObjects(
       continue;
     }
     flush();
-    if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
+    if (po.cover) {
+      const src = po.obj.kind === "image" ? assets.get(po.obj.assetId) : null;
+      if (po.obj.kind === "image" && !src) pending = true;
+      drawCover(ctx, po, vp, src, theme.imagePlaceholder);
+    } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
     else {
       const src = assets.get(po.obj.assetId);
@@ -99,13 +105,14 @@ export function drawOverlays(
   ctx: CanvasRenderingContext2D,
   selected: readonly ProjectedObject[],
   editor: EditorState,
-  cam: Camera,
+  fc: FrameCamera,
   vp: Viewport,
   theme: SceneTheme,
 ): void {
-  // In-progress stroke, drawn through the same projection as committed ones.
-  const d = editor.draft;
-  if (d && d.points.length >= 2) {
+  // In-progress stroke, drawn through the same projection as committed ones (with the camera in its frame).
+  for (const d of [...editor.draftDone, ...(editor.draft ? [editor.draft] : [])]) {
+    const cam = cameraIn(fc, d.frame);
+    if (!cam || d.points.length < 2) continue;
     const draft: StrokeObject = {
       id: DRAFT_ID,
       kind: "stroke",

@@ -25,8 +25,9 @@ function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyad
 /**
  * Scale about a fixed world point by (kx, ky). Strokes and text require
  * kx === ky (they scale uniformly, including stroke width and font size).
+ * `keepWidth` (thickness lock): a stroke's shape scales but its line width does not.
  */
-export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number): CanvasObject {
+export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
   const anchor = {
     x: scaleCoord(o.anchor.x, fixed.x, D.fromNumber(kx), o.unit),
@@ -34,7 +35,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   };
   if (o.kind === "stroke") {
     if (kx !== ky) throw new RangeError("strokes scale uniformly");
-    return normalizeUnit({ ...o, anchor, points: o.points.map((v) => v * kx), width: o.width * kx });
+    return normalizeUnit({ ...o, anchor, points: o.points.map((v) => v * kx), width: keepWidth ? o.width : o.width * kx });
   }
   if (o.kind === "text") {
     if (kx !== ky) throw new RangeError("text scales uniformly");

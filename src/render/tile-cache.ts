@@ -2,7 +2,6 @@ import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { ProjectedObject } from "./projection";
-import { projectObject } from "./projection";
 
 /**
  * Raster tile cache for committed objects (ADR 0009, planned in ADR 0005).
@@ -60,6 +59,8 @@ interface Generation {
   /** Zoom of this tile set (preview scaling is relative to it). */
   z: number;
   center: Camera["center"];
+  /** Frame of `center` (ADR 0014). */
+  frameId: number;
   vp: Viewport;
   tiles: Map<string, Tile>;
 }
@@ -139,17 +140,33 @@ export class TileCache {
    * missing ones. Returns null when this frame must be rendered directly
    * (cache disabled, zoom changing, or a DPR that does not give whole-pixel tiles).
    */
-  draw(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, dpr: number, query: QueryVisible, drawObjects: DrawObjects, reach: Reach): TileFrame | null {
+  /**
+   * `cam` is the camera in the coordinates of frame `frameId` (ADR 0014); a
+   * change of frame starts a new tile generation. `project` projects one
+   * object with the camera in its own frame.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    cam: Camera,
+    frameId: number,
+    vp: Viewport,
+    dpr: number,
+    query: QueryVisible,
+    drawObjects: DrawObjects,
+    reach: Reach,
+    project: (o: CanvasObject, vp: Viewport) => ProjectedObject | null,
+  ): TileFrame | null {
     const td = TILE_CSS * dpr;
     if (!this.enabled || !Number.isInteger(td) || !Number.isInteger(GUARD_CSS * dpr)) return null;
-    const key = `${cam.zi}|${cam.zf}|${dpr}`;
+    const key = `${frameId}|${cam.zi}|${cam.zf}|${dpr}`;
     const stable = key === this.lastKey || this.refineNow;
     this.refineNow = false;
     this.lastKey = key;
     const z = cam.zi + cam.zf;
     const dense = this.lastFullMs > DENSE_MS;
     if (this.gen && this.gen.key !== key) {
-      const pv = !stable && dense ? this.preview(ctx, cam, vp, dpr) : null;
+      // The preview scales the last tile set: only within the same frame.
+      const pv = !stable && dense && this.gen.frameId === frameId ? this.preview(ctx, cam, vp, dpr) : null;
       if (pv) return pv;
       this.clear();
     }
@@ -157,13 +174,13 @@ export class TileCache {
       // Build tiles only once the zoom has held still for a frame; in a dense
       // scene build now (the zoom moved beyond the preview range).
       if (!stable && !dense) return null;
-      this.gen = { key, z, center: cam.center, vp, tiles: new Map() };
+      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
     }
     let off = this.offset(this.gen, cam, vp, dpr);
     if (!off) {
       // Not a whole-device-pixel move: start over at this camera.
       this.clear();
-      this.gen = { key, z, center: cam.center, vp, tiles: new Map() };
+      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
       off = { dx: 0, dy: 0 };
     }
     const g = this.gen!;
@@ -196,7 +213,7 @@ export class TileCache {
       }
       for (const id of this.dirty) {
         const o = this.getObject(id);
-        const po = o && projectObject(o, cam, infl, { keepTiny: true });
+        const po = o && project(o, infl);
         if (!po) continue;
         const e = reach(po);
         const b = { minX: po.box.minX - e, minY: po.box.minY - e, maxX: po.box.maxX + e, maxY: po.box.maxY + e };

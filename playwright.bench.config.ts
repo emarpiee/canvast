@@ -22,7 +22,5 @@ export default defineConfig({
         },
       },
     },
-    // The project owner's main browser (no heap readings: performance.memory is Chromium-only).
-    { name: "firefox", use: { browserName: "firefox" } },
   ],
 });

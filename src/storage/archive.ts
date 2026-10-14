@@ -1,5 +1,7 @@
 import type { SerializedCamera } from "../core/camera";
 import { deserializeCamera } from "../core/camera";
+import type { FrameRecord, StoredFrameView } from "../core/frames";
+import { FrameSpace, deserializeFrameCamera } from "../core/frames";
 import type { CanvasObject, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
 import type { AssetRecord } from "../assets/asset-library";
@@ -9,7 +11,7 @@ import type { AssetFolder } from "../assets/asset-catalog";
 import { entryFromRecord, folderPath, meta, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import { done, req } from "./idb";
-import type { BoardRecord, CanvasRecord, ObjectRecord, WorkspaceRecord } from "./workspace-repo";
+import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { ZipEntry, ZipInput } from "./zip";
 import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
 
@@ -17,7 +19,8 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * Portable archives (ADR 0008): a ZIP-compatible `.canvast` file.
  *
  *   manifest.json             format, version, scope, hierarchy, asset list
- *   canvases/<id>.json        { objects: SerializedObject[], view: SerializedCamera | null }
+ *   canvases/<id>.json        { objects: SerializedObject[], frames: FrameRecord[], view: StoredView | null }
+ *                             (version 1 had no frames: absolute objects, which import unchanged)
  *   assets/<sha256>           original bytes, exactly once per hash
  *
  * Export reads one consistent snapshot (a single read-only transaction),
@@ -32,7 +35,7 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * Originals are deduplicated by hash.
  */
 export const ARCHIVE_FORMAT = "canvast-archive";
-export const ARCHIVE_VERSION = 1;
+export const ARCHIVE_VERSION = 2;
 export const ARCHIVE_EXTENSION = ".canvast";
 
 export type ExportScope =
@@ -103,7 +106,7 @@ const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string): Promise<ExportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog", "meta"], "readonly");
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
   const boards: ManifestBoard[] = [];
@@ -128,10 +131,11 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
       if (!c) continue;
       const records = await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>);
-      const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<SerializedCamera | undefined>)) ?? null;
+      const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
+      const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
       for (const r of records) if (r.data.kind === "image") hashes.add(String(r.data["assetId"]));
       const file = `canvases/${c.id}.json`;
-      canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), view }) });
+      canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), frames, view }) });
       mb.canvases.push({ id: c.id, name: c.name, objectCount: records.length, file });
       objects += records.length;
     }
@@ -204,7 +208,9 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
 export interface PlannedCanvas {
   name: string;
   objects: CanvasObject[];
-  view: SerializedCamera | null;
+  view: StoredView | null;
+  /** The frames the objects and the view need (version 2 archives; empty for version 1). */
+  frames: FrameRecord[];
 }
 
 export interface ImportPlan {
@@ -294,9 +300,17 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
       const objects: CanvasObject[] = [];
       const seen = new Set<string>();
       let bad = 0;
+      const space = new FrameSpace();
+      if (Array.isArray(data["frames"]) && data["frames"].length) {
+        try {
+          space.restore(data["frames"] as FrameRecord[]);
+        } catch (e) {
+          problems.push(`The frames of “${name}” were damaged (${(e as Error).message}); objects that need them were skipped.`);
+        }
+      }
       for (const s of data["objects"] as unknown[]) {
         try {
-          const o = deserializeObject(s as SerializedObject);
+          const o = deserializeObject(s as SerializedObject, space);
           if (seen.has(o.id)) throw new Error("duplicate id");
           seen.add(o.id);
           objects.push(o);
@@ -306,16 +320,20 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
         }
       }
       if (bad) problems.push(`${bad} damaged object(s) on “${name}” were skipped.`);
-      let view: SerializedCamera | null = null;
+      let view: StoredView | null = null;
+      let viewFrame = space.world;
       if (data["view"] != null) {
         try {
-          deserializeCamera(data["view"] as SerializedCamera);
-          view = data["view"] as SerializedCamera;
+          const v = data["view"] as StoredView;
+          if (isObj(v) && "v" in v) viewFrame = deserializeFrameCamera(space, v as StoredFrameView).f;
+          else deserializeCamera(v as SerializedCamera);
+          view = v;
         } catch {
           problems.push(`The saved view of “${name}” was invalid; it will open at the origin.`);
         }
       }
-      board.canvases.push({ name, objects, view });
+      const frames = space.records([viewFrame, ...objects.flatMap((o) => (o.frame ? [o.frame] : []))]);
+      board.canvases.push({ name, objects, view, frames });
       plan.objects += objects.length;
     }
     if (board.canvases.length) plan.boards.push(board);
@@ -386,7 +404,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
  * `targetBoardId`; board and workspace archives become new boards.
  */
 export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "canvasViews", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
   const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null };
   try {
@@ -398,6 +416,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       const canvas: CanvasRecord = { id: newObjectId(), boardId, name: c.name, revision: 0, objectCount: c.objects.length, updatedAt: now };
       tx.objectStore("canvases").put(canvas);
       for (const o of c.objects) tx.objectStore("objects").put({ canvasId: canvas.id, id: o.id, data: serializeObject(o) } satisfies ObjectRecord);
+      for (const f of c.frames) tx.objectStore("frames").put({ ...f, canvasId: canvas.id } satisfies FrameStoreRecord);
       if (c.view) tx.objectStore("canvasViews").put(c.view, canvas.id);
       result.canvases++;
       result.objects += c.objects.length;

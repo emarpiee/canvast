@@ -66,6 +66,20 @@ describe("dyadic arithmetic", () => {
     }
   });
 
+  it("rounds ties toward +∞, so rounding commutes with grid-aligned shifts (frame corners)", () => {
+    const half = D.fromBigInt(1n, -1);
+    expect(D.toNumber(D.roundTo(half, 0))).toBe(1);
+    expect(D.toNumber(D.roundTo(D.neg(half), 0))).toBe(0);
+    expect(D.toNumber(D.roundTo(D.fromNumber(-1.5), 0))).toBe(-1);
+    const r = rng(5);
+    for (let i = 0; i < 500; i++) {
+      const q = Math.floor(r() * 20) - 10;
+      const a = D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 30)), q - 3); // often exact ties
+      const c = D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 20)), q); // a multiple of 2^q
+      expect(D.equals(D.roundTo(D.add(a, c), q), D.add(D.roundTo(a, q), c))).toBe(true);
+    }
+  });
+
   it("floor-divides by powers of two, including negatives", () => {
     expect(D.floorDivPow2(D.fromNumber(7), 1)).toBe(3n);
     expect(D.floorDivPow2(D.fromNumber(-7), 1)).toBe(-4n);

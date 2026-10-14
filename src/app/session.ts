@@ -1,8 +1,10 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
+import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError } from "../assets/asset-catalog";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
+import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { placeImage } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
@@ -192,17 +194,19 @@ export class Session {
   private async load(canvasId: string): Promise<void> {
     const loaded = await this.repo!.loadCanvas(canvasId);
     this.editor.select([]);
-    this.doc.load(loaded.objects);
-    let cam = HOME;
+    this.doc.load(loaded.objects, loaded.space);
+    let placed = false;
     if (loaded.camera) {
       try {
-        cam = deserializeCamera(loaded.camera);
+        if ("v" in loaded.camera) this.view.setFrameCamera(deserializeFrameCamera(loaded.space, loaded.camera));
+        else this.view.setWorldCamera(deserializeCamera(loaded.camera));
+        placed = true;
       } catch {
         // invalid saved view: start at home
       }
     }
-    this.view.setCamera(cam);
-    this.persistence.attach(canvasId, loaded.canvas.revision);
+    if (!placed) this.view.setWorldCamera(HOME);
+    this.persistence.attach(canvasId, loaded.canvas.revision, loaded.space);
     if (loaded.skipped.length) {
       this.editor.message = `Skipped ${loaded.skipped.length} damaged item(s) on "${loaded.canvas.name}".`;
       console.warn("canvast: skipped while loading", loaded.skipped);
@@ -322,8 +326,13 @@ export class Session {
   async reveal(canvasId: string, ids: readonly ObjectId[]): Promise<void> {
     await this.openCanvas(canvasId);
     const objects = ids.map((id) => this.doc.get(id)).filter((o) => o !== undefined);
-    const bounds = unionBounds(objects);
-    if (bounds) this.view.setCamera(fitRect(bounds.min, bounds.max, this.view.viewport, REVEAL_FILL, zoomLevel(this.view.camera)));
+    if (objects.length) {
+      // Frame them in the first object's frame: the others are re-expressed there exactly.
+      const f = objects[0]!.frame ?? this.doc.space.world;
+      const bounds = unionBounds(objects.map((o) => expressObjectIn(o, f)))!;
+      const fallback = zoomLevel(this.view.camera) + levelsBetween(f, this.view.frame);
+      this.view.setFrameCamera(fromLocal(f, fitRect(bounds.min, bounds.max, this.view.viewport, REVEAL_FILL, fallback)));
+    }
     this.editor.select(objects.map((o) => o.id));
   }
 

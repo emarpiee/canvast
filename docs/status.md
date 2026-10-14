@@ -19,7 +19,82 @@ Unverified / Committed / Next bounded task**.
 | 1f | Asset organization: tags, favourites, nested folders (non-exclusive), search, sidebar scopes, archive round trip | **done** (see below) |
 | 1g | Zoom preview for dense scenes: a bounded scaled preview during zoom gestures, refined to exact | **done** (see below) |
 | 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
+| NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
 | 1+ | Video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, persistent undo, groups, smart folders and batch asset edits, collaboration | planned |
+
+## Nested frames redesign (branch `exp/nested-frames`)
+
+**Implemented:** spike (`src/spike/`): frames, exact rebasing, compressed
+dives, giant jumps (capped at 2^50 levels each), term-sum point walks,
+re-homing; debug overlay, jump panel, HUD and `__spike` hook. ADR 0014
+accepted 2026-10-14. Technical reference written.
+Step 3 slice 1 (the app on frames): `src/core/frames.ts`; camera in frames
+(`ViewState`); objects carry a frame and are re-homed on load and edit;
+one spatial index per frame with the camera expressed per frame
+(`scene/frame-index.ts`); far-finer frames as density dots; gestures,
+previews, text editor, image placement, HUD (BigInt depth), dev panel and
+debug hook frame-aware; one jump up to 2^50 levels (was 10^7).
+
+**Tested:** `tests/unit/frames.test.ts` (camera bit-identical to the
+absolute system, strokes within 10^-6 px, boundary rules, depth stress, one
+test per regression found); `scripts/spike-measure.mjs` (flat frame time
+2^10 to 2^10^12, 0 px drift, fuzz 3 × 2,500 steps in both browsers, no step
+over 250 ms). Step 3 slice 1, quick suite (2026-10-14, run in a scratch
+copy so `dist/` was not rebuilt): unit 108/108; E2E 262/265, the 3
+failures being the timing-sensitive dense-scene zoom-preview tile tests
+(they fail at the same rate on `main` on this machine: 1 in 12 each);
+offline and names checks pass. After the Firefox load fix (descend,
+balanced digits, Firefox BigInt limit): unit 109/109, E2E 268/269 (one
+dense-scene tile-preview flake). New `tests/e2e/frames.spec.ts`: work at
+2^10^12, a stroke drawn while wheel-zooming across frame changes, and
+−10^12 five times then wheel, keys, drag pan and Home, in all four projects.
+
+**Step 3 slice 2 (coarse objects):** a stroke, image or text far above the
+camera is classified against the camera centre rounded to 2^-256 of its
+frame's unit (`render/coarse.ts`): it covers the view (one fill; an image
+shows the source pixel under the view), or it is skipped, at any level gap,
+in constant time. Only an edge near the view needs the exact centre, which
+stays limited to 100,000 levels (`COARSE_EXACT_MAX`). The plan's carried
+exact lines could not hold stroke edges (irrational offsets); the reference
+§7.3 says why. Tests: unit `coarse.test.ts` (8); E2E `frames.spec.ts` (3 new,
+4 projects each).
+
+**Step 4 (storage with frames):** IndexedDB schema 4 (store `frames`), objects
+and the saved view stored in frame form, archive version 2, version 1
+archives still import, unreferenced frames collected. No absolute numbers on
+the save or load path, so the 2^24-level save limit and the "view not saved
+deeper than 2^19" limit are gone (Firefox included). Old records are
+already valid (world frame = absolute form). Details: reference §8a. Tests:
+unit `frame-storage.test.ts` (4); E2E: deep work saves, reloads and travels
+in an archive, frame collection, a version 1 archive; the existing storage,
+archive and Firefox 2^10,000,000 tests pass.
+
+**Thickness lock (toolbar lock button, pen tool):** with the lock, new strokes keep the same width on the canvas at any zoom (matching the artwork); without it they keep the same width on screen. Reference §8b. The size follows the zoom for 1,000 levels either way; pen sizes are three presets plus a 0.5–128 px slider. Tests: unit `pen-width.test.ts`; E2E `frames.spec.ts` (radii exact at zoom +3, −2, ±3 again, slider sizes, drawing 40 to 10^12 levels away). Not saved with the canvas; no brush-size cursor yet.
+
+**Pen options:** stabilizer (rope 0.6–60 px), pen size follows zoom (pieces, one undo step), and on the Select tool the padlock keeps line width when resizing. Tests: unit `stabilizer.test.ts`; E2E `frames.spec.ts` (wobble hidden at home and 10^12 levels down; widths per piece; one undo; resize with and without the lock).
+
+**Colour at depth for every kind:** each kind of object has a coarse sampler (`SAMPLERS`, compile-time enforced): text keeps its colour inside a glyph at any depth, an image keeps its source pixels (also on a pixel corner, from exact term sums). New Select-tool option: ignore the object that fills the view (cannot be picked or deleted by accident). Tests: unit `coarse.test.ts` (11); E2E `frames.spec.ts` (image corner and a letter at 10^6, 10^9, 10^12 levels; the option at 30 to 10^12 levels).
+
+**Dimmed fill and Select size slider (ADR 0016):** an edge of a coarse object in the view past 100,000 levels is drawn as a dimmed approximate fill (every sampler has `approx`); the size slider on Select sets the thickness of the selected strokes. Tests: E2E `frames.spec.ts` (corner colour at 2·10^5 to 10^12 levels; slider with undo).
+
+**Step 5, the depth suite (`tests/e2e/depth-suite.spec.ts`, all four projects, 20/20 on 2026-10-14):** A1 median frame time at 2^10, 10^3, 10^6, 10^9, 10^12 within 3× the 2^10 median + 3 ms; A2 ±10^12 jumps under 100 ms; A3 rebase continuity (zoom steps across frame boundaries and round trips of 0.3 to 1000 levels, at home and 10^12 levels down) under 10^-6 px (measured 4.5·10^-13); A5 draw, select, move, resize, undo, redo, open text and type at 2^10^12 each under 100 ms (Firefox slowest: draw 68 ms); A7 heap flat over 15 dives (Chromium; Firefox has no heap figure, so object and stored-frame counts are checked there too). Limits fixed before the first run.
+
+**Known failures:** coarse landmark edges are not drawn (marked shortcut). Frames more than
+100,000 levels finer show as a dot. Loading v0.8 data with an object more
+than ~10^6 levels coarser than the world is slow (re-homing climbs one frame
+at a time). The Firefox dense-scene
+zoom-preview tile test fails on this machine on `main` too (timing, see 1g).
+
+**Quick suite (2026-10-14, scratch copy):** unit 121/121; E2E 292 passed, 3 skipped, 1 failed (the known Firefox dense-scene zoom-preview flake); offline and names checks pass.
+
+**Unverified:** the full suite on the branch (run at the end of the phase,
+step 6).
+
+**Committed:** on `exp/nested-frames`, not pushed; `main` stays v0.8.0.
+
+**Electron (2026-10-14):** `electron/main.cjs` opens `dist/canvast.html` (no menu; no network; sandboxed page); Linux AppImage via electron-builder (`npm run dist:appimage`, x86_64). The Firefox E2E project was removed; the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite (3 Chromium projects): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-electron-branch.md](testing/full-run-electron-branch.md). Unverified: the AppImage on other distros or architectures, and Windows or macOS builds.
+
+**Next bounded task:** version bump and release notes (the owner decides).
 
 ## Phase 0A — endless navigation proof
 

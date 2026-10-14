@@ -1,4 +1,7 @@
 import type { Dyadic } from "../core/dyadic";
+import type { Frame } from "../core/frames";
+import { expressExactIn, levelsBetween } from "../core/frames";
+import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
@@ -15,18 +18,23 @@ const EMPTY: ReadonlySet<ObjectId> = new Set();
  */
 export type Preview =
   | { kind: "none" }
-  | { kind: "move"; ids: readonly ObjectId[]; dx: Dyadic; dy: Dyadic }
-  | { kind: "scale"; ids: readonly ObjectId[]; fixed: WorldPoint; kx: number; ky: number }
+  /** `dx`, `dy` and `fixed` are in the units of `frame` (ADR 0014); each object gets them in its own frame. */
+  | { kind: "move"; ids: readonly ObjectId[]; frame: Frame; dx: Dyadic; dy: Dyadic }
+  | { kind: "scale"; ids: readonly ObjectId[]; frame: Frame; fixed: WorldPoint; kx: number; ky: number; keepWidth?: boolean }
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
   | { kind: "edit"; ids: readonly ObjectId[] };
 
 export interface DraftStroke {
+  /** The frame the stroke started in: its points stay there if the camera rebases mid-stroke (ADR 0014). */
+  frame: Frame;
   anchor: WorldPoint;
   unit: number;
   points: number[];
   width: number;
   color: string;
 }
+
+import type { PenLock } from "../interaction/pen-width";
 
 export const PEN_COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"] as const;
 /** Pen widths in CSS px at the zoom level where the stroke is drawn. */
@@ -40,8 +48,18 @@ export class EditorState {
   lassoFilter: LassoFilter = "strokes";
   penColor: string = PEN_COLORS[0];
   penWidthPx: number = PEN_WIDTHS[1];
+  /** Thickness lock (interaction/pen-width.ts): new strokes keep the same width on the canvas, not on screen. */
+  lock: PenLock | null = null;
+  /** Select tool: ignore an object that fills the whole view (zoomed far into it), so it cannot be picked or deleted by accident. */
+  ignoreFilling = false;
+  /** Pen stabilizer (interaction/stabilizer.ts): on/off and strength 0–100. */
+  stabilizer = { on: false, strength: 50 };
   preview: Preview = { kind: "none" };
   draft: DraftStroke | null = null;
+  /** Earlier pieces of the stroke being drawn (pen size follows zoom): finished pieces, committed with `draft` in one step. */
+  draftDone: DraftStroke[] = [];
+  /** While drawing, keep the pen's size on screen when the zoom changes (the stroke is made of pieces of different widths). */
+  followZoom = false;
   /** Screen-space lasso polygon or marquee rectangle while dragging. */
   lasso: number[] | null = null;
   marquee: { x0: number; y0: number; x1: number; y1: number } | null = null;
@@ -89,9 +107,15 @@ export class EditorState {
   previewed(o: CanvasObject): CanvasObject | null {
     const p = this.preview;
     if (p.kind === "edit" && p.ids.includes(o.id)) return null;
-    if (p.kind === "move" && p.ids.includes(o.id)) return translate(o, p.dx, p.dy);
+    if (p.kind === "move" && p.ids.includes(o.id)) {
+      // A displacement only scales between frames: exact shift.
+      const L = levelsBetween(o.frame ?? p.frame.space.world, p.frame);
+      return translate(o, D.shift(p.dx, -L), D.shift(p.dy, -L));
+    }
     if (p.kind === "scale" && p.ids.includes(o.id)) {
-      return scaleAbout(o, p.fixed, p.kx, o.kind === "image" ? p.ky : p.kx);
+      const f = o.frame ?? p.frame.space.world;
+      const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
+      return scaleAbout(o, fixed, p.kx, o.kind === "image" ? p.ky : p.kx, p.keepWidth);
     }
     return o;
   }

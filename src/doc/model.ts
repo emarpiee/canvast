@@ -1,5 +1,7 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
+import type { Frame, FrameSpace } from "../core/frames";
+import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 
@@ -15,11 +17,16 @@ import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
  * geometry stored as ordinary doubles kept well-conditioned (roughly 1..2^16
  * local units). Objects are immutable; edits replace them through
  * transactions (see document-store.ts).
+ *
+ * `anchor` and `unit` are in the units of the object's `frame` (ADR 0014);
+ * an object without `frame` is in the world frame.
  */
 export type ObjectId = string;
 
 interface ObjectBase {
   readonly id: ObjectId;
+  /** Coordinate frame of `anchor` and `unit`; absent = the world frame. */
+  readonly frame?: Frame;
   readonly anchor: WorldPoint;
   readonly unit: number;
   /** Paint order; larger is on top. */
@@ -162,13 +169,32 @@ export function validateObject(o: CanvasObject): CanvasObject {
 
 export type SerializedObject = Record<string, unknown> & { id: string; kind: string; ax: string; ay: string };
 
+/**
+ * Stored form: the anchor and unit are local to the object's frame, and
+ * `frame` names it (absent = the world frame, which is exactly the v0.8
+ * absolute form, so old records stay valid). The frame's own record is
+ * stored beside it (FrameSpace.records).
+ */
 export function serializeObject(o: CanvasObject): SerializedObject {
-  const { anchor, ...rest } = o;
+  const { anchor, frame, ...rest } = o;
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
-  return { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  const s = { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
+  return s;
 }
 
-export function deserializeObject(s: SerializedObject): CanvasObject {
+/** The object in world-frame (absolute) form, serialized: for tests, archives of version 1 and debugging. */
+export function serializeWorld(o: CanvasObject): SerializedObject {
+  return serializeObject(worldForm(o));
+}
+
+/** `space` resolves `frame` ids; without it only world-frame (absolute) records are accepted. */
+export function deserializeObject(s: SerializedObject, space?: FrameSpace): CanvasObject {
+  let frame: Frame | undefined;
+  if (s["frame"] !== undefined) {
+    frame = typeof s["frame"] === "string" ? space?.frameByUid(s["frame"]) : undefined;
+    if (!frame) throw new InvalidObjectError(`unknown frame ${String(s["frame"])}`);
+  }
   const anchor = { x: D.parse(String(s.ax)), y: D.parse(String(s.ay)) };
   const base = {
     id: String(s.id),
@@ -178,6 +204,7 @@ export function deserializeObject(s: SerializedObject): CanvasObject {
     // Snapshots written before opacity existed are fully opaque.
     opacity: (s["opacity"] ?? 1) as number,
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
+    ...(frame && frame !== frame.space.world ? { frame } : {}),
   };
   let o: CanvasObject;
   if (s.kind === "stroke") {
@@ -200,4 +227,49 @@ export function deserializeObject(s: SerializedObject): CanvasObject {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }
   return validateObject(o);
+}
+
+function extentLog2(o: CanvasObject): number {
+  const b = localBounds(o);
+  const ext = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  if (!(ext > 0)) return 0;
+  let k = Math.ceil(Math.log2(ext));
+  if (2 ** k < ext) k++; // log2 rounding just below an integer
+  return k;
+}
+
+function inFrame(o: CanvasObject, f: Frame, anchor: WorldPoint, unit: number): CanvasObject {
+  const { frame: _frame, ...rest } = o;
+  return (f === f.space.world ? { ...rest, anchor, unit } : { ...rest, frame: f, anchor, unit }) as CanvasObject;
+}
+
+/**
+ * The object in the frame that suits its size and position (core/frames.ts
+ * `rehome`), exactly: its world geometry does not change by a single bit.
+ * Objects in the world frame carry no `frame`.
+ */
+export function homeObject(o: CanvasObject, space: FrameSpace): CanvasObject {
+  const f = o.frame ?? space.world;
+  const pl = rehome(space, { f, anchor: o.anchor, unit: o.unit }, extentLog2(o));
+  return pl.f === f ? o : inFrame(o, pl.f, pl.anchor, pl.unit);
+}
+
+export const MAX_WORLD_FORM_LEVELS = 2 ** 24;
+
+/** The object in world-frame (absolute) form, exactly. Costs about the anchor's absolute size in bits. */
+export function worldForm(o: CanvasObject): CanvasObject {
+  const f = o.frame;
+  if (!f) return o;
+  const w = f.space.world;
+  const levels = levelsBetween(w, f);
+  // Absolute form: the anchor is a number of ~levels bits, so this is only for tests, debugging and version 1 archives (storage holds frames).
+  if (Math.abs(levels) > MAX_WORLD_FORM_LEVELS) throw new RangeError("objects deeper than 2^24 levels cannot be saved until storage holds frames");
+  return inFrame(o, w, expressExactIn(f.space, f, o.anchor, w), o.unit - levels);
+}
+
+/** The object expressed exactly in frame `f` (for comparing objects of different frames; cost: the path between them). */
+export function expressObjectIn(o: CanvasObject, f: Frame): CanvasObject {
+  const g = o.frame ?? f.space.world;
+  if (g === f) return o;
+  return inFrame(o, f, expressExactIn(f.space, g, o.anchor, f), o.unit + levelsBetween(g, f));
 }

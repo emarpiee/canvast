@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 3 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 4 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -13,6 +13,9 @@
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
  *   assets       key sha256        → AssetRecord              (original bytes, stored once)
  *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
+ *   frames       keyPath [canvasId, id] → FrameRecord + canvasId (nested frames, ADR 0014; v4).
+ *                                          Objects name their frame; absent = the world frame, which is
+ *                                          the absolute form of earlier versions, so old data needs no conversion.
  *
  * Legacy (version 1, read-only after migration, never deleted here):
  *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
@@ -23,7 +26,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -54,6 +57,7 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       const objects = req.transaction!.objectStore("objects");
       if (!objects.indexNames.contains("assetId")) objects.createIndex("assetId", "data.assetId");
       if (!has("assetCatalog")) db.createObjectStore("assetCatalog", { keyPath: "hash" });
+      if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
     };
     req.onsuccess = () => {
       const db = req.result;

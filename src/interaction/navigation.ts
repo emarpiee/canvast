@@ -1,5 +1,6 @@
 import { canvasShortcutsActive } from "./shortcut-scope";
-import { HOME, panBy, zoomAt } from "../core/camera";
+import { panBy, zoomAt } from "../core/camera";
+import { MAX_FRAME_JUMP, depthOf } from "../core/frames";
 import type { ScreenPoint } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 
@@ -23,24 +24,26 @@ const KEY_ZOOM_STEP = 0.5;
 const LINE_HEIGHT_PX = 16;
 
 export function zoomByStep(view: ViewState, dz: number): void {
-  const vp = view.viewport;
-  view.setCamera(zoomAt(view.camera, vp, { x: vp.width / 2, y: vp.height / 2 }, dz));
+  view.zoomBy(dz);
 }
 
 /**
  * Largest single typed/button zoom jump, in levels. This is not a zoom
- * limit (wheel, keys and auto-zoom continue past it); it only stops a typo
- * such as "1e12" from creating a trillion-bit coordinate in one step.
- * Measured on the reference machine: at 10^7 levels one zoom step takes
- * ~3 ms and the camera arithmetic per frame ~14 ms.
+ * limit (repeat the jump, or use wheel and keys, to go further): zoom
+ * counts are doubles, so beyond 2^50 a jump would no longer be exact
+ * (ADR 0014). Depth itself is unbounded.
  */
-export const MAX_JUMP_LEVELS = 10_000_000;
+export const MAX_JUMP_LEVELS = MAX_FRAME_JUMP;
+
+/** Absolute zoom level of the view (a double: exact up to 2^53 levels). */
+export function viewLevel(view: ViewState): number {
+  const d = depthOf(view.frameCamera);
+  return Number(d.levels) + d.frac;
+}
 
 /** Zoom to an absolute level, keeping the world point at the viewport centre fixed. */
 export function zoomTo(view: ViewState, level: number): void {
-  const vp = view.viewport;
-  const cam = view.camera;
-  view.setCamera(zoomAt(cam, vp, { x: vp.width / 2, y: vp.height / 2 }, level - (cam.zi + cam.zf)));
+  view.zoomBy(level - viewLevel(view));
 }
 
 /**
@@ -59,7 +62,7 @@ export function parseZoomLevel(text: string): number | null {
 }
 
 export function goHome(view: ViewState): void {
-  view.setCamera(HOME);
+  view.home();
 }
 
 export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
@@ -85,7 +88,7 @@ export function attachNavigation(el: HTMLElement, view: ViewState): () => void {
     }
     const rate = e.ctrlKey ? PINCH_ZOOM_PER_PX : WHEEL_ZOOM_PER_PX;
     const dz = Math.max(-MAX_DZ_PER_EVENT, Math.min(MAX_DZ_PER_EVENT, -dy * rate));
-    if (dz !== 0) view.setCamera(zoomAt(view.camera, view.viewport, local(e), dz));
+    if (dz !== 0) view.zoomBy(dz, local(e));
   };
 
   const onKeyDown = (e: KeyboardEvent): void => {

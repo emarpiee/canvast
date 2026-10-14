@@ -4,7 +4,7 @@ canvast is an offline-first **endless canvas**: you can pan in any direction
 and zoom in or out without hitting a boundary or a zoom stop, and you can draw,
 place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
-or network connection.
+or network connection. A Linux **AppImage** (Electron, portable, x86_64) wraps the same file: build it with `npm run dist:appimage` (output in `release/`), or try it with `npm run electron`. In the app, `CANVAST_DEBUG=1` opens the debug panel and DevTools, F12 / Ctrl+Shift+I toggle DevTools and F5 / Ctrl+R reload.
 
 > **Status: Phase 1, slice 7 — smooth zooming over dense scenes.** On top of
 > endless navigation (0A), editing at any depth (0B) and rendering that
@@ -38,7 +38,7 @@ or network connection.
 
 ### Editing (Phase 0B)
 
-- **Pen:** freehand vector strokes in 4 colours and 3 widths. A stroke is
+- **Pen:** freehand vector strokes in 4 colours, a size slider (0.5–128 px) with 3 presets, a thickness lock (new strokes keep the same width on the canvas at any zoom; on the Select tool it keeps line width when resizing), a stabilizer with adjustable strength, and "pen size follows zoom" while drawing; on the Select tool the size slider sets the thickness of the selected strokes (nested-frames branch; see ADR 0015, 0016). A stroke is
   authored at the current scale, so a 3 px line drawn 1,000 levels deep is a
   3 px line there. It stays crisp vector geometry at every magnification.
 - **Images:** import with the toolbar button, drag-and-drop, or paste. One

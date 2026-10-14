@@ -80,7 +80,7 @@ export function strokeLineWidth(po: ProjectedObject): number {
 
 /** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
 export function batchable(po: ProjectedObject): boolean {
-  return po.obj.kind === "stroke" && !po.exact && po.obj.opacity === 1;
+  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1;
 }
 
 /**
@@ -132,6 +132,41 @@ function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {
     ctx.closePath();
   }
   ctx.fill("nonzero");
+}
+
+/** Strength of an approximate (dimmed) cover relative to the exact one. */
+const DIM_ALPHA = 0.5;
+
+/**
+ * A coarse object that covers the view (render/coarse.ts): one colour over
+ * all of it, or rectangles each showing one source pixel of an image.
+ */
+
+export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, src: RasterSource | null, placeholder: string): void {
+  const cover = po.cover!;
+  paint(ctx, po.obj, () => {
+    if (cover.dim) ctx.globalAlpha *= DIM_ALPHA;
+    if (cover.rects) {
+      const margin = 1;
+      for (const r of cover.rects) {
+        const x0 = Math.max(r.x0, -margin);
+        const y0 = Math.max(r.y0, -margin);
+        const x1 = Math.min(r.x1, vp.width + margin);
+        const y1 = Math.min(r.y1, vp.height + margin);
+        if (x1 <= x0 || y1 <= y0) continue;
+        if (!src) ctx.fillStyle = placeholder;
+        else {
+          const [cr, cg, cb, ca] = src.readPixels(r.i, r.j, 1, 1) as unknown as [number, number, number, number];
+          if (ca === 0) continue;
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},${ca / 255})`;
+        }
+        ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+      return;
+    }
+    ctx.fillStyle = cover.color ?? placeholder;
+    ctx.fillRect(-1, -1, vp.width + 2, vp.height + 2);
+  });
 }
 
 /** Above this many CSS px per source pixel, pixels are drawn as exact rectangles. */

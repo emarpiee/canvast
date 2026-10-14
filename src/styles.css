@@ -127,7 +127,7 @@ html, body {
 
 .hud-debug[hidden] { display: none; }
 
-#toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: none; max-width: calc(100vw - 24px); }
+#toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); pointer-events: none; width: max-content; max-width: calc(100vw - 24px); }
 
 .toolbar {
   pointer-events: auto;
@@ -167,7 +167,9 @@ html, body {
 .toolbar button:disabled { opacity: 0.35; cursor: default; }
 .toolbar button[aria-checked="true"] { background: var(--hud-accent); color: #fff; }
 .toolbar .swatch span { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--hud-border); }
-.toolbar .swatch.is-on, .toolbar .width.is-on { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.toolbar .size { width: 84px; accent-color: var(--hud-accent); }
+.toolbar .size-out { font: 500 11px var(--font-ui); min-width: 38px; opacity: 0.8; }
+.toolbar .swatch.is-on, .toolbar .width.is-on, .toolbar .lock[aria-pressed="true"], .toolbar .stab[aria-pressed="true"], .toolbar .follow[aria-pressed="true"], .toolbar .ignore-fill[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
 .toolbar .width span { width: 16px; border-radius: 4px; background: currentColor; }
 
 .toast {
@@ -217,6 +219,9 @@ html, body {
   font: 12px var(--font-ui);
 }
 .dev-row { display: flex; gap: 3px; flex-wrap: wrap; }
+/* Twelve jump buttons in two rows: the panel stays as small as before (tests and hands rely on the canvas around it). */
+.dev-jumps { display: grid; grid-template-columns: repeat(6, 1fr); }
+.dev-jumps button { min-width: 0; padding: 3px 1px; font-size: 11px; }
 .hud-dev button, .hud-dev select {
   font: 500 12px var(--font-ui);
   color: inherit;

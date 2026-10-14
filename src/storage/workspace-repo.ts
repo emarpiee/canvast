@@ -1,4 +1,6 @@
 import type { SerializedCamera } from "../core/camera";
+import type { FrameRecord, StoredFrameView } from "../core/frames";
+import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
 import { done, idbGet, req } from "./idb";
@@ -47,6 +49,12 @@ export interface ObjectRecord {
   data: SerializedObject;
 }
 
+/** A frame of a canvas as stored (store "frames"). */
+export type FrameStoreRecord = FrameRecord & { canvasId: string };
+
+/** A saved view: frame form (schema 4) or the absolute camera of earlier versions. */
+export type StoredView = SerializedCamera | StoredFrameView;
+
 export interface CurrentMeta {
   workspaceId: string;
   boardId: string;
@@ -69,9 +77,11 @@ export class HierarchyError extends Error {}
 export interface LoadedCanvas {
   canvas: CanvasRecord;
   objects: CanvasObject[];
+  /** The frames the objects (and the saved view) live in; give it to DocumentStore.load. */
+  space: FrameSpace;
   /** Records that failed validation, with reasons; never silently repaired. */
   skipped: string[];
-  camera: SerializedCamera | null;
+  camera: StoredView | null;
 }
 
 export interface CommitResult {
@@ -242,13 +252,14 @@ export class WorkspaceRepo {
     const range = IDBKeyRange.bound([canvas.id, ""], [canvas.id, "￿"]);
     const n = await req(tx.objectStore("objects").count(range));
     tx.objectStore("objects").delete(range);
+    tx.objectStore("frames").delete(range);
     tx.objectStore("canvasViews").delete(canvas.id);
     tx.objectStore("canvases").delete(canvas.id);
     return n;
   }
 
   private async deleteTx<T>(extra: string[], body: (tx: IDBTransaction) => Promise<T>): Promise<T> {
-    const tx = this.db.transaction([...extra, "canvases", "objects", "canvasViews", "meta"], "readwrite", { durability: "strict" });
+    const tx = this.db.transaction([...extra, "canvases", "objects", "frames", "canvasViews", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     try {
       const result = await body(tx);
@@ -267,22 +278,30 @@ export class WorkspaceRepo {
 
   /** Load one canvas's objects (lazily, per canvas) and its saved camera. */
   async loadCanvas(canvasId: string): Promise<LoadedCanvas> {
-    const tx = this.db.transaction(["canvases", "objects", "canvasViews"], "readonly");
+    const tx = this.db.transaction(["canvases", "objects", "frames", "canvasViews"], "readonly");
     const canvas = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
     if (!canvas) throw new Error(`canvas ${canvasId} not found`);
     const range = IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
     const records = await req(tx.objectStore("objects").getAll(range) as IDBRequest<ObjectRecord[]>);
-    const camera = (await req(tx.objectStore("canvasViews").get(canvasId) as IDBRequest<SerializedCamera | undefined>)) ?? null;
-    const objects: CanvasObject[] = [];
+    const frames = await req(tx.objectStore("frames").getAll(range) as IDBRequest<FrameStoreRecord[]>);
+    const camera = (await req(tx.objectStore("canvasViews").get(canvasId) as IDBRequest<StoredView | undefined>)) ?? null;
     const skipped: string[] = [];
+    const space = new FrameSpace();
+    try {
+      space.restore(frames);
+    } catch (e) {
+      // Damaged frames: objects that need them are skipped below; the rest still open.
+      skipped.push(`frames: ${(e as Error).message}`);
+    }
+    const objects: CanvasObject[] = [];
     for (const r of records) {
       try {
-        objects.push(deserializeObject(r.data));
+        objects.push(deserializeObject(r.data, space));
       } catch (e) {
         skipped.push(`${r.id}: ${(e as Error).message}`);
       }
     }
-    return { canvas, objects, skipped, camera };
+    return { canvas, objects, space, skipped, camera };
   }
 
   /**
@@ -290,14 +309,15 @@ export class WorkspaceRepo {
    * revision is still `expectedRevision`. Resolves with the new revision once
    * the transaction has committed (durability "strict").
    */
-  async commit(canvasId: string, expectedRevision: number, puts: readonly CanvasObject[], deletes: readonly ObjectId[]): Promise<CommitResult> {
-    const tx = this.db.transaction(["canvases", "objects"], "readwrite", { durability: "strict" });
+  async commit(canvasId: string, expectedRevision: number, puts: readonly CanvasObject[], deletes: readonly ObjectId[], frames: readonly FrameRecord[] = []): Promise<CommitResult> {
+    const tx = this.db.transaction(["canvases", "objects", "frames"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     try {
       const canvas = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
       if (!canvas) throw new Error(`canvas ${canvasId} not found`);
       if (canvas.revision !== expectedRevision) throw new RevisionConflictError(canvasId, expectedRevision, canvas.revision);
       const objects = tx.objectStore("objects");
+      for (const f of frames) tx.objectStore("frames").put({ ...f, canvasId } satisfies FrameStoreRecord);
       for (const o of puts) objects.put({ canvasId, id: o.id, data: serializeObject(o) } satisfies ObjectRecord);
       for (const id of deletes) objects.delete([canvasId, id]);
       const count = await req(objects.count(IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"])));
@@ -321,8 +341,14 @@ export class WorkspaceRepo {
     return (await this.canvas(canvasId))?.revision;
   }
 
-  async saveCamera(canvasId: string, camera: SerializedCamera): Promise<void> {
-    const tx = this.db.transaction("canvasViews", "readwrite");
+  /**
+   * Save the view (with the frames it needs that are not stored yet) without touching the canvas revision.
+   * `dropFrames`: frames nothing refers to any more, removed in the same transaction as the new view.
+   */
+  async saveCamera(canvasId: string, camera: StoredView, frames: readonly FrameRecord[] = [], dropFrames: readonly string[] = []): Promise<void> {
+    const tx = this.db.transaction(["canvasViews", "frames"], "readwrite");
+    for (const f of frames) tx.objectStore("frames").put({ ...f, canvasId } satisfies FrameStoreRecord);
+    for (const id of dropFrames) tx.objectStore("frames").delete([canvasId, id]);
     tx.objectStore("canvasViews").put(camera, canvasId);
     await done(tx);
   }

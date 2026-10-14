@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import * as D from "../../src/core/dyadic";
 import { DocumentStore } from "../../src/doc/document-store";
 import type { CanvasObject, ImageObject, StrokeObject } from "../../src/doc/model";
-import { InvalidObjectError, deserializeObject, localBounds, newObjectId, serializeObject, validateObject } from "../../src/doc/model";
+import { InvalidObjectError, deserializeObject, localBounds, newObjectId, serializeObject, serializeWorld, validateObject } from "../../src/doc/model";
 import { localToWorld, normalizeUnit, scaleAbout, translate } from "../../src/doc/edit-ops";
 import { sha256Portable } from "../../src/assets/sha256";
 import { rng } from "./rng";
@@ -175,5 +175,31 @@ describe("serialization is canonical", () => {
     const s = serializeObject(stroke({ unit: -0 }));
     expect(Object.is(s["unit"], 0)).toBe(true);
     expect(JSON.parse(JSON.stringify(s))).toEqual(s);
+  });
+});
+
+describe("objects in frames (ADR 0014)", () => {
+  it("objects at every depth are homed into frames, then saved and loaded exactly (absolute form unchanged)", () => {
+    const r = rng(77);
+    const objs: CanvasObject[] = [];
+    for (let i = 0; i < 300; i++) {
+      const unit = Math.floor((r() - 0.5) * 6000); // ±3,000 levels: many frames up and down
+      const base = { id: newObjectId(), unit, z: i, opacity: 1, attachmentTargetId: null };
+      const anchor = { x: D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 40)), unit - 7), y: D.fromBigInt(BigInt(Math.floor((r() - 0.5) * 2 ** 40)), unit - 3) };
+      objs.push(
+        i % 3 === 0
+          ? ({ ...base, anchor, kind: "image", assetId: "a".repeat(64), w: 300, h: 200, pixelW: 8, pixelH: 6 } as ImageObject)
+          : ({ ...base, anchor, kind: "stroke", points: [0, 0, 100 * r(), 50], width: 3, color: "#1f2329" } as StrokeObject),
+      );
+    }
+    const doc = new DocumentStore();
+    doc.load(objs);
+    expect([...doc.all()].filter((o) => o.frame).length).toBeGreaterThan(250);
+    const saved = [...doc.all()].map(serializeWorld);
+    expect(saved.map((s) => JSON.stringify(s)).sort()).toEqual(objs.map((o) => JSON.stringify(serializeObject(o))).sort());
+    // Reload: the same frames are rebuilt and the absolute form round-trips.
+    const again = new DocumentStore();
+    again.load(saved.map((s) => deserializeObject(s)));
+    expect([...again.all()].map((o) => JSON.stringify(serializeWorld(o))).sort()).toEqual(saved.map((s) => JSON.stringify(s)).sort());
   });
 });

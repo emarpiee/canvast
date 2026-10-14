@@ -4,6 +4,7 @@ import type { CanvasObject, LocalBounds } from "../doc/model";
 import { localBounds } from "../doc/model";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
+import type { Cover } from "./coarse";
 
 /**
  * Projection of an object's local geometry to screen space, shared by the
@@ -115,6 +116,8 @@ export interface ProjectedObject {
    * use exact arithmetic (stroke-coverage.ts, exact image pixel edges).
    */
   readonly exact: boolean;
+  /** A coarse object covering the whole view (render/coarse.ts): drawn as one fill, with no projection. */
+  readonly cover?: Cover;
 }
 
 class Projected implements ProjectedObject {
@@ -253,4 +256,23 @@ export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: View
     q[i + 1] = oy + pts[i + 1]! * s;
   }
   return new Projected(o, box, q, radius, false, cam, vp, null);
+}
+
+/**
+ * A coarse object that covers the view (render/coarse.ts): its box is the
+ * viewport, so tiles, hit testing and selection see it like any object.
+ */
+export function coverObject(o: CanvasObject, vp: Viewport, cover: Cover): ProjectedObject {
+  const box = { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height };
+  return {
+    obj: o,
+    box,
+    q: Float64Array.of(0, 0, vp.width, vp.height),
+    radius: 0,
+    exact: false,
+    cover,
+    get proj(): Projection {
+      throw new Error("a covering object has no projection");
+    },
+  };
 }

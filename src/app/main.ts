@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { deleteSelection, importImages, redo, undo } from "./actions";
+import { deleteSelection, importImages, pruneSelection, redo, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -12,13 +12,17 @@ import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
+import { coverObject, projectObject } from "../render/projection";
 import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
-import { SpatialIndex, syncIndex } from "../scene/spatial-index";
+import { syncIndex } from "../scene/spatial-index";
+import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-index";
+import type { Frame } from "../core/frames";
+import { depthOf } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
 import { WorkspaceRepo } from "../storage/workspace-repo";
@@ -75,11 +79,11 @@ async function start(): Promise<void> {
     return;
   }
 
-  const view = new ViewState();
-  const stats = new FrameStats();
   const doc = new DocumentStore();
+  const view = new ViewState(() => doc.space);
+  const stats = new FrameStats();
   // The spatial index mirrors the document incrementally (changed ids only).
-  const index = new SpatialIndex();
+  const index = new FrameIndex(() => doc.space);
   syncIndex(doc, index);
   // Committed objects are drawn through a raster tile cache (ADR 0009).
   const tiles = new TileCache(
@@ -128,13 +132,17 @@ async function start(): Promise<void> {
     invalidate();
   });
 
+  let backdrop: ({ f: Frame } & ReturnType<typeof worldBackdrop>) | null = null;
   /** Render synchronously and return the timing breakdown. */
   const renderNow = (): FrameBreakdown => {
     const t0 = performance.now();
     const cam = view.camera;
+    const fc = view.frameCamera;
     const vp = view.viewport;
-    renderFrame(ctx, cam, vp, dpr, theme, LANDMARKS);
-    density.draw(ctx, index, cam, vp, doc.revision);
+    // Axes and landmarks are world-frame content, re-expressed in the camera frame (once per frame change).
+    if (backdrop?.f !== fc.f) backdrop = { f: fc.f, ...worldBackdrop(fc.f, LANDMARKS) };
+    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin);
+    density.draw(ctx, index.views(fc), index.dots(fc), vp, doc.revision);
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
     let runs: Map<ProjectedObject, number> | undefined;
@@ -143,23 +151,30 @@ async function start(): Promise<void> {
         ? tiles.draw(
             ctx,
             cam,
+            fc.f.id,
             vp,
             dpr,
-            (infl) => visibleObjects(doc, index, null, cam, infl),
+            (infl) => visibleObjects(doc, index, null, fc, infl),
             (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
             (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2),
+            (o, infl) => {
+              // A changed coarse object may cover any tile: drop them all.
+              if (isCoarse(fc, o.frame ?? doc.space.world)) return coverObject(o, infl, {});
+              const oc = cameraIn(fc, o.frame ?? doc.space.world);
+              return oc && projectObject(o, oc, infl, { keepTiny: true });
+            },
           )
         : null;
     let visible: ReturnType<typeof visibleObjects> | null = null;
     let t2 = performance.now();
     if (!tiled) {
-      visible = visibleObjects(doc, index, editor, cam, vp);
+      visible = visibleObjects(doc, index, editor, fc, vp);
       t2 = performance.now();
       drawObjects(ctx, visible, assets, vp, dpr, theme);
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
-    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, cam, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
-    drawOverlays(ctx, selected, editor, cam, vp, theme);
+    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
+    drawOverlays(ctx, selected, editor, fc, vp, theme);
     const t3 = performance.now();
     const b: FrameBreakdown = {
       totalMs: t3 - t0,
@@ -233,6 +248,15 @@ async function start(): Promise<void> {
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
+    depth: () => depthOf(view.frameCamera),
+    setSelectedWidth: (px) => {
+      // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.
+      const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po) => {
+        const ppu = po.cover ? 0 : po.proj.ppu;
+        return po.obj.kind === "stroke" && editor.selection.has(po.obj.id) && ppu > 0 && ppu < Infinity ? [{ ...po.obj, width: px / ppu }] : [];
+      });
+      if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Stroke thickness" : `Thickness of ${next.length} strokes`, next));
+    },
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
       if (!md.length) return;
@@ -251,7 +275,7 @@ async function start(): Promise<void> {
       editor.changed();
     },
   });
-  if (debug) mountDevPanel(document.getElementById("hud")!, view);
+  if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
   mountNavigator(document.getElementById("workspace")!, session);
 
   // Top-level views. The canvas keeps its camera, selection and history while hidden.

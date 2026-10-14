@@ -172,6 +172,16 @@ export function objectLevel(o: CanvasObject): number {
 export class SpatialIndex {
   private readonly levels = new Map<number, LevelGrid>();
   private readonly byId = new Map<ObjectId, IndexEntry>();
+  /** Ink of all objects, in index units² (for a frame seen from far above as one dot, ADR 0014). */
+  readonly total: Ink = { a: 0, r: 0, g: 0, b: 0 };
+  /** Ink-weighted sums of object anchors (index units): the dot sits at their centroid. */
+  private inkX = 0;
+  private inkY = 0;
+
+  /** Ink-weighted centre of all objects, in index units (approximate: for a dot below a pixel). */
+  get inkCentre(): { x: number; y: number } {
+    return this.total.a > 0 ? { x: this.inkX / this.total.a, y: this.inkY / this.total.a } : { x: 0, y: 0 };
+  }
 
   get size(): number {
     return this.byId.size;
@@ -184,6 +194,8 @@ export class SpatialIndex {
   clear(): void {
     this.levels.clear();
     this.byId.clear();
+    this.total.a = this.total.r = this.total.g = this.total.b = 0;
+    this.inkX = this.inkY = 0;
   }
 
   rebuild(objects: Iterable<CanvasObject>): void {
@@ -242,6 +254,11 @@ export class SpatialIndex {
   /** Add (+1) or remove (−1) an entry's ink in its cell, mid cell and coarse cell. */
   private updateInk(grid: LevelGrid, cell: IndexCell, e: IndexEntry, sign: 1 | -1): void {
     addInk(cell.ink, e.inkArea, e.inkRgb, sign);
+    const area = e.inkArea * 4 ** cell.level;
+    addInk(this.total, area, e.inkRgb, sign);
+    this.inkX += sign * area * (Number(cell.ix) + e.ax) * 2 ** cell.level;
+    this.inkY += sign * area * (Number(cell.iy) + e.ay) * 2 ** cell.level;
+    if (this.total.a === 0) this.inkX = this.inkY = 0;
     let mid = grid.mid.get(cell.midKey);
     if (!mid) grid.mid.set(cell.midKey, (mid = { ix: cell.ix >> MID_SHIFT, iy: cell.iy >> MID_SHIFT, ink: { a: 0, r: 0, g: 0, b: 0 }, count: 0 }));
     addInk(mid.ink, e.inkArea / 2 ** Number(2n * MID_SHIFT), e.inkRgb, sign);
@@ -416,7 +433,7 @@ export function densityQuery(index: SpatialIndex, cam: Camera, vp: Viewport, mar
 }
 
 /** Keep an index in sync with a document: incremental on transactions, full rebuild on load. */
-export function syncIndex(doc: DocumentStore, index: SpatialIndex): () => void {
+export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">): () => void {
   index.rebuild(doc.all());
   return doc.subscribe((_source, changed) => {
     if (!changed) {
