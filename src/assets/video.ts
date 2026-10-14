@@ -26,7 +26,7 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
     const at = Math.min(Math.max(0, t), duration);
     if (Math.abs(v.currentTime - at) > 1e-3) {
       const s = once("seeked");
-      const shown = presented(v, 600); // asked before the seek: the first picture shown after it
+      const shown = presentedNear(v, at); // asked before the seek: a picture shown after it, of about that time
       v.currentTime = at;
       await s;
       await shown;
@@ -36,6 +36,34 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
     URL.revokeObjectURL(url);
     v.remove();
   }
+}
+
+type Vfc = HTMLVideoElement & { requestVideoFrameCallback?: (cb: (now: number, md: { mediaTime: number }) => void) => number };
+
+/**
+ * Resolves with the time of a picture the element has presented that is within `tol` seconds of `target`, or null when
+ * the browser cannot say or none came within `ms`. Ask before seeking: a picture shown before the call is not reported.
+ * A picture of another time (a stale one, shown while the seek catches up) is passed over.
+ */
+export function presentedNear(v: HTMLVideoElement, target: number, tol = 0.5, ms = 700): Promise<number | null> {
+  return new Promise((res) => {
+    const rvfc = (v as Vfc).requestVideoFrameCallback;
+    if (!rvfc) return void setTimeout(() => res(null), 150);
+    let done = false;
+    const timer = setTimeout(() => {
+      done = true;
+      res(null);
+    }, ms);
+    const cb = (_now: number, md: { mediaTime: number }): void => {
+      if (done) return;
+      if (Math.abs(md.mediaTime - target) <= tol) {
+        done = true;
+        clearTimeout(timer);
+        res(md.mediaTime);
+      } else rvfc.call(v, cb);
+    };
+    rvfc.call(v, cb);
+  });
 }
 
 /** Resolves once the element has shown a new picture (where the browser says so), at most `ms` later. */

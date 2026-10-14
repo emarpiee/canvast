@@ -6,7 +6,7 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
-import { presented } from "../assets/video";
+import { presentedNear } from "../assets/video";
 import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
@@ -55,6 +55,8 @@ interface Engine {
   label(): string;
   /** The picture shown now as a PNG (null when there is none to take). */
   frame(): Promise<Blob | null>;
+  /** Settles when the last seek's picture has been presented (null: the browser cannot say). */
+  shown: Promise<number | null>;
   /** Called when the picture of a paused position is on screen (after a seek or a pause). */
   onSettled: () => void;
   /** Called when the position moved by itself (playing) and when playback ended. */
@@ -80,6 +82,8 @@ function avEngine(v: HTMLVideoElement): Engine {
         v.addEventListener("loadedmetadata", () => res(), { once: true });
         v.addEventListener("error", () => rej(new Error("this browser cannot play the file")), { once: true });
       });
+      // A file whose picture this browser cannot decode (say H.265) still loads its length and sound: it has no picture size.
+      if (e.visual && !v.videoWidth) throw new Error("this browser cannot decode the picture");
       duration = Number.isFinite(v.duration) ? v.duration : dur;
       const at = Math.min(o.media!.t, duration);
       if (Math.abs(v.currentTime - at) > 1e-3) {
@@ -102,6 +106,7 @@ function avEngine(v: HTMLVideoElement): Engine {
     len: () => duration,
     seek(p) {
       target = p;
+      e.shown = presentedNear(v, p); // asked before the seek
       v.currentTime = p;
     },
     playing: () => played && !v.paused && !v.ended,
@@ -126,6 +131,7 @@ function avEngine(v: HTMLVideoElement): Engine {
       c.getContext("2d")!.drawImage(v, 0, 0);
       return new Promise((res) => c.toBlob(res, "image/png"));
     },
+    shown: Promise.resolve(null),
     onSettled: () => undefined,
     onTick: () => undefined,
     onEnded: () => undefined,
@@ -221,6 +227,7 @@ function gifEngine(c: HTMLCanvasElement): Engine {
     step: (dir, amount, repeat) => g && show(stepFrame(idx, dir * amount, g.count, repeat)),
     label: () => `Frame ${idx + 1} / ${g?.count ?? 0}`,
     frame: () => new Promise((res) => c.toBlob(res, "image/png")),
+    shown: Promise.resolve(null),
     onSettled: () => undefined,
     onTick: () => undefined,
     onEnded: () => undefined,
@@ -376,8 +383,9 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       const v = videoOf(p);
       if (!v || p.o.media!.kind !== "video" || p.loading || p.eng.playing()) return;
       const at = p.eng.pos();
-      void presented(v).then(async () => {
+      void p.eng.shown.then(async (seen) => {
         if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
+        if (seen !== null && Math.abs(seen - at) > 0.5) console.warn(`canvast: the picture shown is from ${seen.toFixed(2)} s, wanted ${at.toFixed(2)} s`);
         const bmp = await createImageBitmap(v).catch(() => null);
         if (bmp) {
           assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
