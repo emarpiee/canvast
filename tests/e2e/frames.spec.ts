@@ -1298,8 +1298,9 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   const f0 = (await frame())!;
   expect(f0.angle).toBe(0);
   // Turn them all by a quarter by the handle above the box: the box turns with them.
-  const top: [number, number] = [(f0.corners[0][0] + f0.corners[1][0]) / 2, (f0.corners[0][1] + f0.corners[1][1]) / 2];
-  const centre: [number, number] = [(f0.corners[0][0] + f0.corners[2][0]) / 2, (f0.corners[0][1] + f0.corners[2][1]) / 2];
+  const [c0, c1, c2f] = [f0.corners[0]!, f0.corners[1]!, f0.corners[2]!];
+  const top: [number, number] = [(c0[0] + c1[0]) / 2, (c0[1] + c1[1]) / 2];
+  const centre: [number, number] = [(c0[0] + c2f[0]) / 2, (c0[1] + c2f[1]) / 2];
   await app.drag({ x: Math.round(top[0]), y: Math.round(top[1]) - 26 }, { x: Math.round(centre[0]) + 200, y: Math.round(centre[1]) }, 8);
   const f1 = (await frame())!;
   expect(f1.angle, "a quarter turn clockwise").toBeCloseTo(Math.PI / 2, 1);
