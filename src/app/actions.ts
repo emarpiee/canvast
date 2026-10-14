@@ -6,6 +6,9 @@ import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, SortKey, Unit } from "../doc/arrange";
+import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
+import type { ClipboardPayload } from "../doc/clipboard";
+import { depthOf } from "../core/frames";
 import { alignUnits, arrangeGrid, distributeUnits, gridCells } from "../doc/arrange";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -114,6 +117,118 @@ export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: La
   if (!moved.length) return; // already in place
   const label = "grid" in cmd ? `Arrange ${units.length} items in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
   doc.commit(doc.transaction(label, moved));
+  editor.changed();
+}
+
+// ---- copy, cut, paste, duplicate (ADR 0038) ------------------------------------------------
+const CLIP_KEY = "canvast.clipboard";
+let inMemory: { payload: ClipboardPayload; text: string } | null = null;
+let pastes = 0;
+/** CSS px each repeated paste (or duplicate) is moved down and right, so copies do not hide each other. */
+const PASTE_STEP_PX = 24;
+
+/** What other apps see on the clipboard: the Markdown of copied texts, else a short description. */
+const clipboardText = (objs: readonly CanvasObject[]): string => {
+  const md = objs.flatMap((o) => (o.kind === "text" ? [o.md] : []));
+  return md.length ? md.join("\n\n") : `canvast: ${objs.length} object${objs.length === 1 ? "" : "s"}`;
+};
+
+/** Put the selection on the clipboard (the event's, when copying from a copy or cut event). Returns false when nothing is selected. */
+export function copySelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent): boolean {
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  if (!objs.length) return false;
+  const depth = depthOf(view.frameCamera);
+  const payload = buildPayload(objs, view.frame, Number(depth.levels) + depth.frac);
+  const text = clipboardText(objs);
+  inMemory = { payload, text };
+  pastes = 0;
+  try {
+    // Another tab of the same browser profile can paste it too (the system clipboard only carries the text).
+    localStorage.setItem(CLIP_KEY, JSON.stringify({ payload, text }));
+  } catch {
+    // too large or storage unavailable: this tab still has it
+  }
+  e?.clipboardData?.setData("text/plain", text);
+  editor.message = `Copied ${objs.length} object${objs.length === 1 ? "" : "s"}`;
+  editor.changed();
+  return true;
+}
+
+/** Copy the selection and delete it, as one undo step for the delete. */
+export function cutSelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent): boolean {
+  if (editor.blockEdit() || !copySelection(doc, editor, view, e)) return false;
+  deleteSelection(doc, editor);
+  return true;
+}
+
+/** The clipboard this tab can paste, if the system clipboard's text is still what was copied (or is not text at all). */
+function readClipboard(systemText: string | null): ClipboardPayload | null {
+  let own = inMemory;
+  if (!own) {
+    try {
+      const s = JSON.parse(localStorage.getItem(CLIP_KEY) ?? "null") as { payload: unknown; text: string } | null;
+      const payload = s && parsePayload(JSON.stringify(s.payload));
+      if (payload) own = { payload, text: s.text };
+    } catch {
+      own = null;
+    }
+  }
+  if (!own) return null;
+  // Something else was copied since (outside canvast, or another tab's text): that is not ours to paste.
+  return systemText !== null && systemText !== "" && systemText !== own.text ? null : own.payload;
+}
+
+/** Whether canvast has objects to paste for this paste event's system clipboard text. */
+export const canPaste = (systemText: string | null): boolean => readClipboard(systemText) !== null;
+
+/**
+ * Paste the copied objects centred on the middle of the view, at the size they had on screen when copied (as one
+ * undo step); each repeat shifts them a little. They become the selection. Returns false if there is nothing to paste.
+ */
+export function pasteObjects(doc: DocumentStore, editor: EditorState, view: ViewState, systemText: string | null = null, inPlaceOffset = true): boolean {
+  if (editor.blockEdit()) return false;
+  const payload = readClipboard(systemText);
+  if (!payload) return false;
+  const cam = view.camera;
+  const vp = view.viewport;
+  const shift = PASTE_STEP_PX * pastes;
+  const at = screenToWorld(cam, vp, { x: vp.width / 2 + (inPlaceOffset ? shift : 0), y: vp.height / 2 + (inPlaceOffset ? shift : 0) });
+  const depth = depthOf(view.frameCamera);
+  try {
+    const { objects, moved } = instantiate(payload, doc.space, doc.topZ(), { frame: view.frame, at, depth: Number(depth.levels) + depth.frac });
+    doc.commit(doc.transaction(`Paste ${objects.length} object${objects.length === 1 ? "" : "s"}`, objects));
+    editor.select(objects.map((o) => o.id));
+    editor.message = moved ? "" : "Pasted in place (copied from a different space)";
+    pastes++;
+  } catch (e) {
+    if (!(e instanceof ClipboardError)) throw e;
+    editor.message = e.message;
+  }
+  editor.changed();
+  return true;
+}
+
+/** Copy and paste the selection in one step (Ctrl+D): the copy lands a little down and right of the original. */
+export function duplicateSelection(doc: DocumentStore, editor: EditorState, view: ViewState): void {
+  if (editor.blockEdit()) return;
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  if (!objs.length) return;
+  // Not through the clipboard, which keeps what was copied: the copy lands where the original is, a little offset.
+  const depth = depthOf(view.frameCamera);
+  const payload = buildPayload(objs, view.frame, Number(depth.levels) + depth.frac);
+  const cam = view.camera;
+  const centre = payload.centre;
+  const at = centre
+    ? { x: D.add(D.parse(centre[0]), D.shift(D.fromNumber(PASTE_STEP_PX / 2 ** cam.zf), -cam.zi)), y: D.add(D.parse(centre[1]), D.shift(D.fromNumber(PASTE_STEP_PX / 2 ** cam.zf), -cam.zi)) }
+    : screenToWorld(cam, view.viewport, { x: view.viewport.width / 2, y: view.viewport.height / 2 });
+  try {
+    const { objects } = instantiate(payload, doc.space, doc.topZ(), { frame: view.frame, at, depth: Number(depth.levels) + depth.frac });
+    doc.commit(doc.transaction(`Duplicate ${objects.length} object${objects.length === 1 ? "" : "s"}`, objects));
+    editor.select(objects.map((o) => o.id));
+  } catch (e) {
+    if (!(e instanceof ClipboardError)) throw e;
+    editor.message = e.message;
+  }
   editor.changed();
 }
 

@@ -402,7 +402,9 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 2 done:** four pens ([ADR 0037](adr/0037-pens.md)); tested in `pens.test.ts` and `frames.spec.ts`.
 
-**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan (Markdown-backed editing and backlinks, layers/history, cross-media copy/paste).
+**Phase 5, slice 3 done:** copy, cut, paste and duplicate ([ADR 0038](adr/0038-copy-paste-duplicate.md)); tested in `clipboard.test.ts` and `frames.spec.ts`.
+
+**Next bounded task:** Phase 5 (creative editing), next item from the engineering plan (Markdown-backed editing and backlinks, layers/history).
 
 ## Phase 1, slice 9 — settings scopes
 

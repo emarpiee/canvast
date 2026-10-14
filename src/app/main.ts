@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -431,6 +431,11 @@ async function start(): Promise<void> {
     if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
   });
   // In Assets view, files go into the library only; in Canvas view they are also placed.
+  /** Whether a clipboard event belongs to a text field (or the text editor) rather than to the canvas. */
+  const typing = (t: EventTarget | null): boolean => {
+    const el = t as HTMLElement | null;
+    return !!el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) || (el.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((el as HTMLInputElement).type)));
+  };
   const receive = (all: File[]): void => {
     // Archives are imported (after confirmation); everything else is a media import.
     for (const f of all.filter(isArchiveFile)) void runImport(session, f);
@@ -450,8 +455,15 @@ async function start(): Promise<void> {
     if (files.length) {
       e.preventDefault();
       receive(files);
-    }
+    } else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
   });
+  // Copy and cut take the selected objects (text fields and the text editor keep their own).
+  for (const kind of ["copy", "cut"] as const) {
+    document.addEventListener(kind, (e) => {
+      if (typing(e.target) || appView !== "canvas" || textEditor.isOpen) return;
+      if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e)) e.preventDefault();
+    });
+  }
   // Best-effort flush when the page is hidden; saves are already debounced to 150 ms.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {

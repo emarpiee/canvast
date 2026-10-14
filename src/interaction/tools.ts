@@ -23,7 +23,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, deleteSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, deleteSelection, duplicateSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 
 /**
@@ -735,6 +735,9 @@ export function attachTools(
       if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
       editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id));
+    } else if (mod && key === "d") {
+      e.preventDefault(); // not the browser's bookmark
+      duplicateSelection(doc, editor, view);
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);

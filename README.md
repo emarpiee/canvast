@@ -206,6 +206,7 @@ or network connection.
 | Zoom at centre | `+` / `=` and `-` (shift = 4× step) · on-screen `+` / `−` |
 | Return to origin | `0` · `Home` key · on-screen house button |
 | Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text |
+| Copy · cut · paste · duplicate the selection | `Ctrl/⌘+C` · `X` · `V` · `D` (pasted centred in the view, at its on-screen size) |
 | Edit text | Text tool click · double-click with Select · `Esc` or `Ctrl/⌘+Enter` to finish |
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Delete selection | `Delete` / `Backspace` |

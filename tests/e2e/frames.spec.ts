@@ -1452,3 +1452,50 @@ test("the pens differ: fine is one stroke, marker one translucent wide one, penc
   await expect(p.getByRole("radio", { name: "Ink pen" })).toHaveAttribute("aria-checked", "true");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("copy, cut, paste and duplicate: Ctrl+C/X/V/D on the selection, pasted at the size it had on screen, one undo step each (ADR 0038)", async ({ app }) => {
+  const p = app.page;
+  const strokes = async () => (await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ id: string }>;
+  const boxOf = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 250 }, { x: 600, y: 300 }, 6);
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Control+a");
+  const [orig] = await strokes();
+  const ob = await boxOf(orig!.id);
+  // Ctrl+D: a copy a little down and right of the original, selected, the clipboard untouched.
+  await p.keyboard.press("Control+d");
+  const afterDup = await strokes();
+  expect(afterDup).toHaveLength(2);
+  const dup = afterDup.find((o) => o.id !== orig!.id)!;
+  const db = await boxOf(dup.id);
+  expect(Math.round(db.minX - ob.minX)).toBe(24);
+  expect(Math.round(db.maxX - db.minX)).toBe(Math.round(ob.maxX - ob.minX));
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([dup.id]);
+  await p.keyboard.press("Control+z");
+  expect(await strokes()).toHaveLength(1);
+  // Ctrl+C then, after zooming in two levels, Ctrl+V: the same size on screen, centred in the view.
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Control+c");
+  await p.evaluate(() => {
+    const c = window.__canvastDebug.camera();
+    window.__canvastDebug.setCamera({ ...c, zi: c.zi + 2, pz: Math.max(c.pz, c.zi + 2) });
+  });
+  await app.frame();
+  await p.keyboard.press("Control+v");
+  const pasted = (await strokes()).find((o) => o.id !== orig!.id)!;
+  const pb = await boxOf(pasted.id);
+  expect(Math.abs(pb.maxX - pb.minX - (ob.maxX - ob.minX))).toBeLessThan(1.5);
+  const vp = await p.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+  expect(Math.abs((pb.minX + pb.maxX) / 2 - vp.w / 2)).toBeLessThan(4);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([pasted.id]);
+  await p.keyboard.press("Control+z");
+  expect(await strokes()).toHaveLength(1);
+  // Ctrl+X takes the selection away (one undo step brings it back) and it can still be pasted.
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Control+x");
+  expect(await strokes()).toHaveLength(0);
+  await p.keyboard.press("Control+v");
+  expect(await strokes()).toHaveLength(1);
+  expect(app.consoleErrors).toEqual([]);
+});
