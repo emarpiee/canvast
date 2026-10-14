@@ -59,6 +59,10 @@ interface Engine {
 function avEngine(v: HTMLVideoElement): Engine {
   let url = "";
   let duration = 0;
+  // Where the paused picture is. The element's own clock is not trusted when paused: Firefox can report a spurious end (and jump to the
+  // end) after a seek near it, which would save the end as the position while the picture shown is earlier.
+  let target = 0;
+  let played = false;
   const e: Engine = {
     el: v,
     visual: true,
@@ -74,27 +78,37 @@ function avEngine(v: HTMLVideoElement): Engine {
         v.currentTime = at;
         await seeked;
       }
+      target = at;
       v.loop = o.media!.repeat;
     },
     unload() {
+      played = false;
       v.pause();
       v.removeAttribute("src");
       v.load();
       if (url) URL.revokeObjectURL(url);
       url = "";
     },
-    pos: () => v.currentTime,
+    pos: () => (e.playing() ? v.currentTime : target),
     len: () => duration,
-    seek: (p) => void (v.currentTime = p),
-    playing: () => !v.paused && !v.ended,
-    play() {
-      if (v.currentTime >= duration - 0.05) v.currentTime = 0;
-      void v.play().catch(() => undefined);
+    seek(p) {
+      target = p;
+      v.currentTime = p;
     },
-    pause: () => v.pause(),
+    playing: () => played && !v.paused && !v.ended,
+    play() {
+      if (e.pos() >= duration - 0.05) e.seek(0);
+      played = true;
+      void v.play().catch(() => (played = false));
+    },
+    pause() {
+      if (played) target = v.currentTime;
+      played = false;
+      v.pause();
+    },
     setLoop: (on) => void (v.loop = on),
-    step: (dir, amount, repeat) => void (v.currentTime = stepTime(v.currentTime, dir * amount, duration, repeat)),
-    label: () => `${formatTime(v.currentTime)} / ${formatTime(duration)}`,
+    step: (dir, amount, repeat) => e.seek(stepTime(e.pos(), dir * amount, duration, repeat)),
+    label: () => `${formatTime(e.pos())} / ${formatTime(duration)}`,
     async frame() {
       if (!v.videoWidth || v.readyState < 2) return null;
       const c = document.createElement("canvas");
@@ -108,8 +122,22 @@ function avEngine(v: HTMLVideoElement): Engine {
   };
   v.addEventListener("timeupdate", () => e.onTick());
   v.addEventListener("play", () => e.onTick());
-  v.addEventListener("pause", () => e.onTick());
-  v.addEventListener("ended", () => e.onEnded());
+  v.addEventListener("pause", () => {
+    if (played && !v.ended) {
+      target = v.currentTime; // paused by the browser (a media key, say)
+      played = false;
+    }
+    e.onTick();
+  });
+  v.addEventListener("ended", () => {
+    if (!played) {
+      v.currentTime = target; // an end nobody played to: back to where the picture is
+      return;
+    }
+    played = false;
+    target = duration;
+    e.onEnded();
+  });
   return e;
 }
 

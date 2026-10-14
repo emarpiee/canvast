@@ -566,6 +566,22 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await bar.getByRole("button", { name: "Pause", exact: true }).click();
   await expect.poll(t).toBeGreaterThan(0.2);
   let paused = await t();
+  // The picture drawn when deselected is the paused frame the player showed (a recorded fixture changes colour all the time).
+  const liveRgb = await overlay.evaluate((v: HTMLVideoElement) => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 8;
+    const x = c.getContext("2d")!;
+    x.drawImage(v, 0, 0, 8, 8);
+    return [...x.getImageData(4, 4, 1, 1).data.slice(0, 3)];
+  });
+  await p.mouse.click(1100, 700);
+  const mid = [cx + 60, cy + 40] as const;
+  await expect.poll(async () => {
+    const px = await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), mid);
+    return liveRgb.reduce((a, v, i) => a + Math.abs(v - px[i]!), 0);
+  }).toBeLessThan(90);
+  await p.mouse.click(...mid);
+  await expect(bar).toBeVisible();
   // It keeps playing when deselected (no bar), and the bar controls it again when it is selected.
   await bar.getByRole("button", { name: "Play", exact: true }).click();
   await p.mouse.click(1100, 700);
