@@ -6,7 +6,7 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
-import { presentedNear } from "../assets/video";
+import { frameBitmap, presentedNear } from "../assets/video";
 import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
@@ -242,6 +242,8 @@ interface Player {
   loading: number;
   /** This browser could not play the file (say its codec): the bar offers only the original file. */
   failed?: boolean;
+  /** Playing was paused for a move, scale or turn of the instance and starts again when that ends. */
+  resume?: boolean;
 }
 
 export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState, assets: AssetLibrary, settings: SettingsStore, actions: MediaPlayerActions): void {
@@ -386,7 +388,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       void p.eng.shown.then(async (seen) => {
         if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
         if (seen !== null && Math.abs(seen - at) > 0.5) console.warn(`canvast: the picture shown is from ${seen.toFixed(2)} s, wanted ${at.toFixed(2)} s`);
-        const bmp = await createImageBitmap(v).catch(() => null);
+        const bmp = await frameBitmap(v).catch(() => null);
         if (bmp) {
           assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
           actions.repaint(p.o.id); // a picture already drawn from the file's own decode is replaced by this one
@@ -439,6 +441,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       }
       const prev = p.o;
       p.o = cur;
+      // Not while the instance is being moved, scaled or turned: it stops, then plays on from where it stopped.
+      if (transforming(cur.id) && p.eng.playing()) {
+        p.eng.pause();
+        p.resume = true;
+      } else if (p.resume && !transforming(cur.id)) {
+        p.resume = false;
+        p.eng.play();
+      }
       p.eng.setLoop(cur.media.repeat);
       // An undo or redo changed the paused position: follow it (never while playing).
       if (!p.eng.playing() && !p.loading && Math.abs(p.eng.pos() - cur.media.t) > 0.01 && cur.media.t !== prev.media!.t) p.eng.seek(cur.media.t);

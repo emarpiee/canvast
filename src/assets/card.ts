@@ -19,11 +19,26 @@ export async function makeCard(w: number, h: number, name: string, codec: string
   x.lineTo(c.width / 2 - u * 0.06, c.height / 2 - u * 0.06 + u * 0.1);
   x.fill();
   x.textAlign = "center";
-  x.font = `600 ${Math.max(9, u * 0.06)}px system-ui, sans-serif`;
-  const label = name.length > 34 ? `${name.slice(0, 33)}…` : name;
-  x.fillText(label, c.width / 2, c.height / 2 + u * 0.3);
+  // Text that fits the card: the name is cut with an ellipsis to the width, the details are wrapped, and everything scales with the card.
+  const room = c.width * 0.88;
+  const fit = (text: string, font: string): string => {
+    x.font = font;
+    let t = text;
+    while (t.length > 1 && x.measureText(t).width > room) t = `${t.slice(0, -2)}…`;
+    return t;
+  };
+  const nameFont = `600 ${Math.max(10, Math.min(u * 0.06, c.width * 0.07))}px system-ui, sans-serif`;
+  const detailFont = `${Math.max(9, Math.min(u * 0.045, c.width * 0.055))}px system-ui, sans-serif`;
+  x.fillStyle = "#e8ecf5";
+  x.font = nameFont;
+  const nameSize = parseFloat(nameFont.split("px")[0]!.split(" ").pop()!);
+  let y = c.height / 2 + u * 0.3;
+  x.fillText(fit(name || "Video", nameFont), c.width / 2, y);
   x.fillStyle = "#9aa4bb";
-  x.font = `${Math.max(8, u * 0.05)}px system-ui, sans-serif`;
-  x.fillText(`${codec || "Video"} · ${w}×${h} · can't be previewed in this browser`, c.width / 2, c.height / 2 + u * 0.39);
+  const detailSize = parseFloat(detailFont);
+  for (const line of [`${codec || "Video"} · ${w}×${h}`, "can't be previewed in this browser"]) {
+    y += (line === `${codec || "Video"} · ${w}×${h}` ? nameSize : detailSize) * 1.45;
+    x.fillText(fit(line, detailFont), c.width / 2, y);
+  }
   return createImageBitmap(c);
 }

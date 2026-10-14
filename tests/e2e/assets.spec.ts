@@ -593,6 +593,14 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await expect.poll(timeNow).toBeGreaterThan(t0);
   await p.mouse.click(cx + 60, cy + 40); // the instance was moved by the drag above
   await expect(bar.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  // Moving it pauses playback; releasing plays on.
+  const isPaused = () => overlay.evaluate((v: HTMLVideoElement) => v.paused);
+  await p.mouse.move(cx + 60, cy + 40);
+  await p.mouse.down();
+  await p.mouse.move(cx + 90, cy + 60, { steps: 3 });
+  await expect.poll(isPaused).toBe(true);
+  await p.mouse.up();
+  await expect.poll(isPaused).toBe(false);
   await bar.getByRole("button", { name: "Pause", exact: true }).click();
   await expect.poll(t).toBeGreaterThan(paused);
   paused = await t();

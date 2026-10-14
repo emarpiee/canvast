@@ -31,11 +31,24 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
       await s;
       await shown;
     } else await presented(v);
-    return { bitmap: await createImageBitmap(v), duration };
+    return { bitmap: await frameBitmap(v), duration };
   } finally {
     URL.revokeObjectURL(url);
     v.remove();
   }
+}
+
+/**
+ * The picture a video element shows now, as a bitmap, taken through a canvas: it is what Extract Frame saves, and in
+ * Firefox `createImageBitmap(video)` has returned an older picture than drawing the element does.
+ */
+export async function frameBitmap(v: HTMLVideoElement): Promise<ImageBitmap> {
+  if (!v.videoWidth || !v.videoHeight) throw new Error("no picture");
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  c.getContext("2d")!.drawImage(v, 0, 0);
+  return createImageBitmap(c);
 }
 
 type Vfc = HTMLVideoElement & { requestVideoFrameCallback?: (cb: (now: number, md: { mediaTime: number }) => void) => number };
