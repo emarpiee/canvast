@@ -39,6 +39,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
         ).join("")}
       </div>
+      <div class="tb-group">
+        <button type="button" data-action="import" aria-label="Import image" title="Import image">${ICONS.imagePlus}</button>
+        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
+        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
+        <button type="button" data-action="delete" aria-label="Delete selection" title="Delete selection (Del)">${ICONS.trash}</button>
+        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
+      </div>
+      <div class="tb-options-row">
       <div class="tb-group tb-options" data-for="pen text">
         ${PEN_COLORS.map(
           (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${c}"></span></button>`,
@@ -66,6 +74,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="ungroup" aria-label="Ungroup" title="Ungroup (Ctrl+Shift+G)">${ICONS.ungroup}</button>
         <button type="button" data-action="front" aria-label="Bring to front" title="Bring to front (Ctrl+])">${ICONS.bringToFront}</button>
         <button type="button" data-action="back" aria-label="Send to back" title="Send to back (Ctrl+[)">${ICONS.sendToBack}</button>
+      </div>
+      <div class="tb-group tb-options" data-for="select">
         <button type="button" data-action="hide" aria-label="Hide" title="Hide the selection (it is not drawn or picked until Show all)">${ICONS.eyeOff}</button>
         <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
         <button type="button" data-action="lock" aria-label="Lock" title="Lock the selection (drawn, but it cannot be picked until Unlock all)">${ICONS.lockKeyhole}</button>
@@ -82,12 +92,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
-      <div class="tb-group">
-        <button type="button" data-action="import" aria-label="Import image" title="Import image">${ICONS.imagePlus}</button>
-        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
-        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
-        <button type="button" data-action="delete" aria-label="Delete selection" title="Delete selection (Del)">${ICONS.trash}</button>
-        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
       </div>
       <input type="file" accept="image/*" multiple hidden data-testid="import-input">
     </div>
@@ -195,6 +199,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
     for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool);
+    // The second row holds the options of the current tool; it is gone when the tool has none.
+    const row = root.querySelector<HTMLElement>(".tb-options-row")!;
+    row.hidden = ![...row.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
     root.querySelector<HTMLButtonElement>('[data-action="delete"]')!.disabled = editor.selection.size === 0;

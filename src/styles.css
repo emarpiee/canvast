@@ -142,6 +142,11 @@ html, body {
   backdrop-filter: blur(6px);
 }
 
+/* Tools and actions on the first row; the options of the current tool on a second row, so a long set of options never grows into the top-left controls. */
+.tb-options-row { flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding-top: 4px; border-top: 1px solid var(--hud-border); }
+.tb-options-row[hidden] { display: none; }
+.tb-options-row > .tb-group { padding-left: 0; border-left: 0; }
+.tb-options-row > .tb-group:not([hidden]) ~ .tb-group:not([hidden]) { padding-left: 6px; border-left: 1px solid var(--hud-border); }
 .tb-group { display: flex; gap: 2px; align-items: center; }
 .tb-group + .tb-group { padding-left: 6px; border-left: 1px solid var(--hud-border); }
 .tb-group[hidden] { display: none; }
