@@ -38,6 +38,7 @@ import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
+import { SettingsStore } from "../settings/settings";
 
 declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
@@ -94,6 +95,23 @@ async function start(): Promise<void> {
   const density = new DensityLayer();
   doc.subscribe((_source, changed) => tiles.invalidate(changed));
   const editor = new EditorState();
+  // Device settings (ADR 0017): pen and select options come back after a reload.
+  const settings = new SettingsStore();
+  editor.penColor = settings.get("pen.color");
+  editor.penWidthPx = settings.get("pen.widthPx");
+  editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") };
+  editor.followZoom = settings.get("pen.followZoom");
+  editor.ignoreFilling = settings.get("select.ignoreFilling");
+  editor.lassoFilter = settings.get("lasso.filter");
+  editor.subscribe(() => {
+    settings.set("pen.color", editor.penColor);
+    settings.set("pen.widthPx", editor.penWidthPx);
+    settings.set("pen.stabilizer.on", editor.stabilizer.on);
+    settings.set("pen.stabilizer.strength", editor.stabilizer.strength);
+    settings.set("pen.followZoom", editor.followZoom);
+    settings.set("select.ignoreFilling", editor.ignoreFilling);
+    settings.set("lasso.filter", editor.lassoFilter);
+  });
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
   let scheduled = false;
@@ -292,11 +310,7 @@ async function start(): Promise<void> {
       invalidate();
       canvas.focus();
     }
-    try {
-      localStorage.setItem("canvast.view", v);
-    } catch {
-      // per-device convenience only
-    }
+    settings.set("ui.view", v);
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
@@ -353,13 +367,7 @@ async function start(): Promise<void> {
   resize();
   canvas.focus();
   editor.changed();
-  let lastView: string | null = null;
-  try {
-    lastView = localStorage.getItem("canvast.view");
-  } catch {
-    // unavailable: start in Canvas view
-  }
-  if (lastView === "assets") setView("assets");
+  if (settings.get("ui.view") === "assets") setView("assets");
 }
 
 void start();

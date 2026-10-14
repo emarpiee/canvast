@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 — Phase 1 slice 9: settings scopes (2026-10-14)
+
+- **Settings (ADR 0017).** Pen colour and size, stabilizer, pen size follows zoom, the select option and the lasso filter now come back after a reload, as do the last view. Settings are declared once with a scope, a validated default and an effect; damaged stored values fall back to the default. Workspace and board scopes are declared; their storage comes with their first setting.
+
 ## 0.9.0 — Nested frames (2026-10-14)
 
 Nested frames redesign (ADR 0014, 0015, 0016).

@@ -19,6 +19,8 @@ or network connection.
 > yet**; see [Roadmap and status](docs/status.md). This README describes only
 > what exists.
 >
+> **v0.10.0:** pen and select options and the last view now persist across reloads (device settings, ADR 0017).
+>
 > **v0.9.0 — nested frames:** the canvas costs the same at any depth (2^10 to
 > 2^10^12 and beyond), with pen options (size slider, thickness lock,
 > stabilizer). See the [changelog](CHANGELOG.md) and ADR 0014–0016.
@@ -532,3 +534,4 @@ reproduces on any checkout.
 | Phase 1 slice 7 — zoom preview | tiles 40/40 (4 projects); dense 10K zoom 113→5.3 ms p50 (Chromium), 125→6 ms (Firefox); 1 mutation check caught; quick E2E 233 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.7.0 sha256 `ec455d1c…f905` | see `git log` |
 | Phase 1 slice 8 — text objects | 94/94 unit (12 new); text 16/16 and extreme depth 4/4 (4 projects); 2 mutation checks caught; owner-reported hang at 2^10,000,000 fixed (1.8 s → 15 ms per frame); quick E2E 253 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.8.0 sha256 `457ea053…6fb2` | see `git log` |
 | v0.9.0 — nested frames | 130/130 unit; depth suite A1 A2 A3 A5 A7 (4 projects); quick E2E (4 projects, before the suites were trimmed) 346 passed / 3 skipped / 3 load flakes that pass alone; full E2E on 3 Chromium projects 214 passed / 4 skipped / 1 flake (fixed afterwards), 21 min 44 s; full E2E with Firefox (4 projects) 301 passed / 6 skipped / 1 timeout (fixed; passes alone), 32 min 25 s |
+| Phase 1 slice 9 — settings scopes | 134/134 unit (4 new); settings reload test in 4 projects; frames, assets, organize and storage specs in Chromium and Firefox 176 passed / 4 skipped; full suite not re-run since v0.9.0 |

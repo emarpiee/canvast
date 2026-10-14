@@ -730,3 +730,17 @@ test("size slider on Select sets the thickness of the selected strokes in one un
   await p.keyboard.press("Control+z");
   expect(await radius(id!), "each change is one undo step; two undos restore the original").toBe(r0);
 });
+
+test("pen and select options come back after a reload (device settings, ADR 0017)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen colour #2563eb" }).click();
+  await p.getByRole("button", { name: "Pen width 8 px" }).click();
+  await p.getByRole("button", { name: "Stabilizer", exact: true }).click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.keyboard.press("p");
+  await expect(p.getByRole("button", { name: "Pen colour #2563eb" })).toHaveClass(/is-on/);
+  await expect(p.getByRole("button", { name: "Pen width 8 px" })).toHaveClass(/is-on/);
+  await expect(p.getByRole("button", { name: "Stabilizer", exact: true })).toHaveAttribute("aria-pressed", "true");
+});

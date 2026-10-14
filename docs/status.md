@@ -20,6 +20,7 @@ Unverified / Committed / Next bounded task**.
 | 1g | Zoom preview for dense scenes: a bounded scaled preview during zoom gestures, refined to exact | **done** (see below) |
 | 1h | Text objects: Markdown storage, WYSIWYG editing, bundled font, exact glyph outlines at any depth | **done** (see below) |
 | NF | Nested frames redesign ([ADR 0014](adr/0014-nested-frames.md), [plan](plans/nested-frames.md), [reference](reference/nested-frames.md)): constant per-frame cost at any depth | **in progress** on `exp/nested-frames`: spike and ADR done, step 3 (core) next |
+| 1i | Settings scopes ([ADR 0017](adr/0017-settings-scopes.md)): device scope built (pen and select options persist), workspace and board scopes declared | **done** (see below) |
 | 1+ | Persisted WebP thumbnails, slide view and recognisable broken assets ([plan](plans/asset-thumbnails.md)), video/GIF/audio, Markdown notes (mentions, backlinks), adjustments, Settings, groups, smart folders and batch asset edits, collaboration | planned |
 
 ## Nested frames redesign (branch `exp/nested-frames`)
@@ -351,6 +352,20 @@ the largest measured performance gap (about 59 ms per frame at 3K–7.7K
 visible strokes). Alternatives:
 - asset organization (tags, folders, collections);
 - a density preview for sub-pixel content.
+
+## Phase 1, slice 9 — settings scopes
+
+**Implemented:** `src/settings/settings.ts` ([ADR 0017](adr/0017-settings-scopes.md)): every setting declared once with a scope, a validated default and an effect; device scope stored in `localStorage` (pen colour and size, stabilizer on and strength, pen size follows zoom, ignore the filling object, lasso filter, last view); damaged stored values fall back to the default; the old stand-alone last-view key is adopted once. Workspace and board scopes are declared; their storage (schema 5, archive 3) comes with the first setting that needs it.
+
+**Tested:** unit `settings.test.ts` (4: defaults, rejection, reset, damaged values, legacy key, no storage; 134/134 in all); E2E `frames.spec.ts` "pen and select options come back after a reload" (4 projects); `frames`, `assets`, `organize` and `storage` specs in Chromium and Firefox: 176 passed, 4 skipped (10.5 min).
+
+**Known failures:** none.
+
+**Unverified:** the full suite after this slice (last full run: v0.9.0, `testing/full-run-4-projects.md`); workspace and board storage (not built).
+
+**Committed:** v0.10.0 on `main`.
+
+**Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
 ## Phase 1, slice 8 — text objects
 
