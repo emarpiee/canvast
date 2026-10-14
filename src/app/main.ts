@@ -40,7 +40,6 @@ import { mountAssetsView } from "../ui/assets-view";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
-import { mountNoteEditor } from "../ui/note-editor";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
 import { SettingsStore } from "../settings/settings";
@@ -312,15 +311,7 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor);
-  const noteEditor = mountNoteEditor(host, view, doc, editor);
-  attachTools(canvas, view, doc, index, editor, {
-    editText: (t, at, asNote) => {
-      textEditor.commit();
-      noteEditor.commit();
-      if (t ? t.note : asNote) noteEditor.open(t, at);
-      else textEditor.open(t, at);
-    },
-  });
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at) });
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);

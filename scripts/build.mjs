@@ -31,22 +31,6 @@ const result = await build({
   logLevel: "warning",
 });
 
-// The note editor (ADR 0032) ships as inert text and is only run when the first note opens.
-const sun = await build({
-  entryPoints: [resolve(root, "scripts/sun-entry.js")],
-  bundle: true,
-  format: "iife",
-  target: ["es2020"],
-  platform: "browser",
-  minify: true,
-  write: false,
-  loader: { ".svg": "text", ".css": "text" },
-  logLevel: "warning",
-});
-const inert = (t) => t.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
-const sunJs = inert(sun.outputFiles[0].text);
-const sunCss = inert(await readFile(resolve(root, "node_modules/suneditor/dist/suneditor.min.css"), "utf8"));
-
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
 const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
@@ -57,14 +41,11 @@ const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
 const notices =
   `<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
-  `SunEditor (suneditor ${(await pkgOf("suneditor")).version}, note editor)\n${await licence("suneditor/LICENSE.txt")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)
   .replace("/*__CANVAST_SCRIPT__*/", () => script)
-  .replace("/*__CANVAST_SUN_JS__*/", () => sunJs)
-  .replace("/*__CANVAST_SUN_CSS__*/", () => sunCss)
   .replace("<html", () => `${notices}<html`);
 
 const out = resolve(root, "dist", debug ? "canvast-debug.html" : "canvast.html");

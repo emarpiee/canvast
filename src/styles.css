@@ -660,29 +660,3 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .layer:hover .layer-btn[aria-pressed="false"] { opacity: 0.9; }
 .layers-empty, .layers-note { padding: 10px; opacity: 0.6; margin: 0; }
 @media (max-width: 640px) { #side-panels { top: 110px; width: min(268px, calc(100vw - 24px)); } }
-
-/* Notes (ui/note-editor.ts, ADR 0032). */
-#canvas[data-tool="note"] { cursor: crosshair; }
-.note-panel {
-  position: absolute;
-  z-index: 20;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(720px, 92vw);
-  height: min(70vh, 560px);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(6px);
-}
-.note-panel[hidden] { display: none; }
-.note-host { flex: 1; min-height: 0; }
-.note-host .sun-editor { height: 100%; }
-.note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--hud-fg); }
-.note-actions span { margin-right: auto; opacity: 0.6; }

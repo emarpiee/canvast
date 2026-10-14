@@ -83,8 +83,6 @@ export interface TextObject extends ObjectBase {
   /** Body font size (1 em) in local units. */
   readonly size: number;
   readonly color: string;
-  /** A note (ADR 0032): a text drawn as a card whose Markdown is edited in the note editor and kept as written. */
-  readonly note?: true;
 }
 
 export type CanvasObject = StrokeObject | ImageObject | TextObject;
@@ -317,7 +315,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: s["note"] === true ? String(s["md"]) : canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["note"] === true ? { note: true as const } : {}) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

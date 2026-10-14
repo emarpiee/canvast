@@ -8,7 +8,7 @@ import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 

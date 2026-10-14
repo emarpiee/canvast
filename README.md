@@ -177,11 +177,6 @@ or network connection.
   to inspect it. Do not re-compress it, because canvast only reads its own
   uncompressed archives.
 
-### Notes (Phase 3)
-
-- **Note tool** (`N`): click on the canvas to write a Markdown note in a panel; select text for the formatting toolbar (headings, bold, italic, strike, lists, quote, code, rule, tables, links). The note is a card on the canvas that moves, turns, groups and layers like a text; double-click it to edit. Tables and code blocks show as plain Markdown on the card.
-- `#tags` are kept as written; searching by tag comes in Phase 5.
-
 ### Text (Phase 1)
 
 - **Text tool** (`T`): click on the canvas and type. With the Select tool,
@@ -211,7 +206,6 @@ or network connection.
 | Zoom at centre | `+` / `=` and `-` (shift = 4× step) · on-screen `+` / `−` |
 | Return to origin | `0` · `Home` key · on-screen house button |
 | Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text |
-| New note · edit a note | `N`, click · double-click with Select · `Ctrl/⌘+Enter` or `Esc` saves (ADR 0032) |
 | Edit text | Text tool click · double-click with Select · `Esc` or `Ctrl/⌘+Enter` to finish |
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Delete selection | `Delete` / `Backspace` |
