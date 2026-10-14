@@ -12,7 +12,10 @@ function open() {
     backgroundColor: "#ffffff",
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.loadFile(page);
+  // CANVAST_DEBUG=1: the #debug panel and hook (as in the tests), plus DevTools.
+  const debug = process.env.CANVAST_DEBUG === "1";
+  win.loadFile(page, debug ? { hash: "debug" } : undefined);
+  if (debug) win.webContents.openDevTools({ mode: "detach" });
   // Offline-first: the page never navigates away or opens windows.
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (e) => e.preventDefault());
