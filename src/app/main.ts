@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, deleteSelection, groupSelection, importImages, pruneSelection, redo, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, clearFlag, deleteSelection, groupSelection, importImages, pruneSelection, redo, setFlag, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -269,6 +269,8 @@ async function start(): Promise<void> {
     redo: () => redo(doc, editor),
     deleteSelection: () => deleteSelection(doc, editor),
     groupSelection: () => groupSelection(doc, editor),
+    setFlag: (flag) => setFlag(doc, editor, flag),
+    clearFlag: (flag) => clearFlag(doc, editor, flag),
     ungroupSelection: () => ungroupSelection(doc, editor),
     arrangeSelection: (to) => arrangeSelection(doc, editor, to),
     depth: () => depthOf(view.frameCamera),

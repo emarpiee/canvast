@@ -936,3 +936,49 @@ test("groups: picking one member picks the group, it moves as one, nests, enters
   await p.mouse.click(500, 450);
   expect((await sel()).sort()).toEqual([a, b, c].sort());
 });
+
+test("hide and lock: a hidden object is not drawn or picked, a locked one is drawn but cannot be picked; both undo, save, and come back with the Show all and Unlock all buttons (ADR 0021)", async ({ app }) => {
+  const p = app.page;
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection());
+  const ink = () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  const none = await ink();
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 300 }, { x: 800, y: 300 }, 6);
+  const drawn = await ink();
+  expect(drawn).toBeGreaterThan(none);
+  await p.keyboard.press("v");
+  await p.mouse.click(600, 300);
+  await p.getByRole("button", { name: "Hide", exact: true }).click();
+  await app.frame();
+  expect(await ink(), "not drawn").toBe(none);
+  expect(await sel(), "not selected").toEqual([]);
+  await p.mouse.click(600, 300);
+  expect(await sel(), "not picked").toEqual([]);
+  await p.keyboard.press("Control+z");
+  await app.frame();
+  expect(await ink(), "undo brings it back").toBe(drawn);
+  await p.getByRole("button", { name: "Hide", exact: true }).click(); // nothing selected: no change
+  await p.mouse.click(600, 300);
+  await p.getByRole("button", { name: "Hide", exact: true }).click();
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await app.frame();
+  expect(await ink(), "still hidden after a reload").toBe(none);
+  await p.getByRole("button", { name: "Show all hidden" }).click();
+  await app.frame();
+  expect(await ink()).toBe(drawn);
+  // Locked: drawn, but a click, a box and select-all all miss it.
+  await p.mouse.click(600, 300);
+  await p.getByRole("button", { name: "Lock", exact: true }).click();
+  await p.mouse.click(600, 300);
+  expect(await sel()).toEqual([]);
+  await app.drag({ x: 350, y: 250 }, { x: 850, y: 350 }, 6);
+  expect(await sel(), "a box around it does not take it").toEqual([]);
+  await p.keyboard.press("Control+a");
+  expect(await sel(), "select all skips it").toEqual([]);
+  expect(await ink(), "still drawn").toBe(drawn);
+  await p.getByRole("button", { name: "Unlock all" }).click();
+  await p.mouse.click(600, 300);
+  expect((await sel()).length).toBe(1);
+});

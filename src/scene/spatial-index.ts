@@ -434,16 +434,20 @@ export function densityQuery(index: SpatialIndex, cam: Camera, vp: Viewport, mar
 
 /** Keep an index in sync with a document: incremental on transactions, full rebuild on load. */
 export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">): () => void {
-  index.rebuild(doc.all());
+  // Hidden objects are not in the index, so nothing that reads it (drawing, picking, tiles, the density preview) sees them.
+  const shown = function* (): IterableIterator<CanvasObject> {
+    for (const o of doc.all()) if (!o.hidden) yield o;
+  };
+  index.rebuild(shown());
   return doc.subscribe((_source, changed) => {
     if (!changed) {
-      index.rebuild(doc.all());
+      index.rebuild(shown());
       return;
     }
     for (const id of changed) {
       index.remove(id);
       const o = doc.get(id);
-      if (o) index.insert(o);
+      if (o && !o.hidden) index.insert(o);
     }
   });
 }

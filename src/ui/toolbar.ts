@@ -16,6 +16,8 @@ export interface ToolbarActions {
   groupSelection(): void;
   ungroupSelection(): void;
   arrangeSelection(to: "front" | "back"): void;
+  setFlag(flag: "hidden" | "locked"): void;
+  clearFlag(flag: "hidden" | "locked"): void;
   /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
   setSelectedWidth(px: number): void;
 }
@@ -63,6 +65,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="ungroup" aria-label="Ungroup" title="Ungroup (Ctrl+Shift+G)">${ICONS.ungroup}</button>
         <button type="button" data-action="front" aria-label="Bring to front" title="Bring to front (Ctrl+])">${ICONS.bringToFront}</button>
         <button type="button" data-action="back" aria-label="Send to back" title="Send to back (Ctrl+[)">${ICONS.sendToBack}</button>
+        <button type="button" data-action="hide" aria-label="Hide" title="Hide the selection (it is not drawn or picked until Show all)">${ICONS.eyeOff}</button>
+        <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
+        <button type="button" data-action="lock" aria-label="Lock" title="Lock the selection (drawn, but it cannot be picked until Unlock all)">${ICONS.lockKeyhole}</button>
+        <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
         <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
@@ -139,6 +145,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
     else if (d["action"] === "delete") actions.deleteSelection();
+    else if (d["action"] === "hide") actions.setFlag("hidden");
+    else if (d["action"] === "lock") actions.setFlag("locked");
+    else if (d["action"] === "show-all") actions.clearFlag("hidden");
+    else if (d["action"] === "unlock-all") actions.clearFlag("locked");
     else if (d["action"] === "group") actions.groupSelection();
     else if (d["action"] === "ungroup") actions.ungroupSelection();
     else if (d["action"] === "front" || d["action"] === "back") actions.arrangeSelection(d["action"]);

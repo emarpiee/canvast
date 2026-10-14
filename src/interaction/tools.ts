@@ -153,8 +153,10 @@ export function attachTools(
     const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
     return editor.ignoreFilling ? all.filter((po) => !fillsView(po)) : all;
   };
+  /** What a click, lasso or box can take: locked objects are drawn but cannot be picked (ADR 0021). */
+  const unlocked = (list: readonly ProjectedObject[]): ProjectedObject[] => list.filter((po) => !po.obj.locked);
   const textAt = (s: ScreenPoint): TextObject | null =>
-    (pickAll(visible(), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
+    (pickAll(unlocked(visible()), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
 
   /**
    * Select what the user picked, widened to whole groups (at the level they are working at).
@@ -291,7 +293,7 @@ export function attachTools(
         }
       }
     }
-    const hits = pickAll(vis, s.x, s.y);
+    const hits = pickAll(unlocked(vis), s.x, s.y);
     let target: CanvasObject | null = hits[0]?.obj ?? null;
     if (e.altKey && hits.length > 1) {
       cycleIndex = (cycleIndex + 1) % hits.length;
@@ -548,7 +550,7 @@ export function attachTools(
       case "lasso": {
         const poly = editor.lasso!;
         editor.lasso = null;
-        if (!cancelled) pick(lassoSelect(visible(), poly, editor.lassoFilter), e.shiftKey);
+        if (!cancelled) pick(lassoSelect(unlocked(visible()), poly, editor.lassoFilter), e.shiftKey);
         break;
       }
       case "press": {
@@ -577,7 +579,7 @@ export function attachTools(
         editor.marquee = null;
         if (!cancelled) {
           const box = { minX: Math.min(m.x0, m.x1), minY: Math.min(m.y0, m.y1), maxX: Math.max(m.x0, m.x1), maxY: Math.max(m.y0, m.y1) };
-          pick(boxSelect(visible(), box), g.additive);
+          pick(boxSelect(unlocked(visible()), box), g.additive);
         }
         break;
       }
@@ -599,7 +601,7 @@ export function attachTools(
     if (effectiveTool() !== "select" || editor.readOnly) return;
     const s = local(e);
     // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
-    const hit = pickAll(visible(), s.x, s.y)[0]?.obj;
+    const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
     if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {
       editor.entered = hit.groups.slice(0, editor.entered.length + 1);
       editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
@@ -621,7 +623,7 @@ export function attachTools(
     } else if (mod && key === "y") {
       if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
-      editor.select(doc.ordered().map((o) => o.id));
+      editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id));
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);

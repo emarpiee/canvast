@@ -27,8 +27,12 @@ import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
 import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
+import eye from "lucide-static/icons/eye.svg";
+import eyeOff from "lucide-static/icons/eye-off.svg";
 import group from "lucide-static/icons/group.svg";
 import lock from "lucide-static/icons/lock.svg";
+import lockKeyhole from "lucide-static/icons/lock-keyhole.svg";
+import lockKeyholeOpen from "lucide-static/icons/lock-keyhole-open.svg";
 import sendToBack from "lucide-static/icons/send-to-back.svg";
 import ungroup from "lucide-static/icons/ungroup.svg";
 import magnet from "lucide-static/icons/magnet.svg";
@@ -79,6 +83,10 @@ export const ICONS = {
   waves: clean(waves),
   lock: clean(lock),
   group: clean(group),
+  eye: clean(eye),
+  eyeOff: clean(eyeOff),
+  lockKeyhole: clean(lockKeyhole),
+  lockKeyholeOpen: clean(lockKeyholeOpen),
   ungroup: clean(ungroup),
   bringToFront: clean(bringToFront),
   sendToBack: clean(sendToBack),

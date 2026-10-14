@@ -67,6 +67,33 @@ export function arrangeSelection(doc: DocumentStore, editor: EditorState, to: "f
   editor.changed();
 }
 
+/** Hide or lock the selected objects (they leave the selection: hidden ones cannot be seen, locked ones cannot be picked). */
+export function setFlag(doc: DocumentStore, editor: EditorState, flag: "hidden" | "locked"): void {
+  if (editor.blockEdit()) return;
+  const objs = selected(doc, editor);
+  if (!objs.length) return;
+  doc.commit(doc.transaction(flag === "hidden" ? "Hide" : "Lock", objs.map((o) => ({ ...o, [flag]: true }) as CanvasObject)));
+  editor.select([]);
+}
+
+/** Show every hidden object, or unlock every locked one. */
+export function clearFlag(doc: DocumentStore, editor: EditorState, flag: "hidden" | "locked"): void {
+  if (editor.blockEdit()) return;
+  const flagged = doc.ordered().filter((o) => o[flag]);
+  if (!flagged.length) return;
+  doc.commit(
+    doc.transaction(
+      flag === "hidden" ? "Show all" : "Unlock all",
+      flagged.map((o) => {
+        const { [flag]: _gone, ...rest } = o;
+        return rest as CanvasObject;
+      }),
+    ),
+  );
+  editor.message = `${flag === "hidden" ? "Showed" : "Unlocked"} ${flagged.length} object${flagged.length === 1 ? "" : "s"}`;
+  editor.changed();
+}
+
 /** Largest fraction of the viewport a newly placed image may cover. */
 const PLACE_MAX_VIEWPORT_FRACTION = 0.6;
 
