@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { deleteSelection, importImages, redo, undo } from "./actions";
+import { deleteSelection, importImages, pruneSelection, redo, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -265,7 +265,7 @@ async function start(): Promise<void> {
       editor.changed();
     },
   });
-  if (debug) mountDevPanel(document.getElementById("hud")!, view);
+  if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
   mountNavigator(document.getElementById("workspace")!, session);
 
   // Top-level views. The canvas keeps its camera, selection and history while hidden.

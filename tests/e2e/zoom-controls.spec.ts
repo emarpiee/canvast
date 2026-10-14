@@ -89,3 +89,23 @@ test("dev panel: jump buttons and auto-zoom (keeps running while drawing; stops 
   expect(out.zi + out.zf).toBeLessThan(stopped.zi + stopped.zf);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("dev panel: Clear canvas deletes every object, is saved, and Ctrl+Z brings them back", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 300 }, { x: 600, y: 350 }, 5);
+  await app.drag({ x: 400, y: 500 }, { x: 600, y: 550 }, 5);
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(2);
+  await p.getByRole("button", { name: "Clear canvas" }).click();
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.objects())).toEqual([]);
+  await p.keyboard.press("Control+z");
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(2);
+  await p.keyboard.press("Control+y");
+  expect(await p.evaluate(() => window.__canvastDebug.objects())).toEqual([]);
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect(await p.evaluate(() => window.__canvastDebug.objects())).toEqual([]);
+});
