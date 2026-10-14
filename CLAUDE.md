@@ -16,7 +16,7 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 ## Test rules
 
 - E2E opens `dist/canvast.html#debug` from `file://` and fails on any request other than `file:`/`data:`/`blob:`. Tests drive the app through `window.__canvastDebug` (`src/app/debug-hook.ts`, enabled by `#debug`).
-- The E2E projects are the three Chromium configurations (`chromium`, `chromium-cpu`, `chromium-dpr2`). The Firefox project was dropped on 2026-10-14 (history: `docs/testing/firefox.md`); the single HTML file is not tested in Firefox since.
+- Firefox is the owner's main browser: it is a first-class E2E project, not an afterthought. The projects are `chromium`, `chromium-cpu`, `chromium-dpr2` and `firefox`.
 - `LIMITS` in `tests/e2e/harness.ts` were fixed before runs and are **never loosened** to make a test pass.
 - Write loop counts with `reps(full, quick)` from the harness. Don't assume a fixed zoom depth from wheel notches (DPR-dependent); use keyboard steps or measured values.
 - `app.drag` / `app.wheel` assert input starts on the canvas.

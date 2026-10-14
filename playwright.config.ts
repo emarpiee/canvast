@@ -25,5 +25,7 @@ export default defineConfig({
       use: { browserName: "chromium", launchOptions: { args: ["--disable-gpu", "--disable-gpu-compositing", "--disable-accelerated-2d-canvas"] } },
     },
     { name: "chromium-dpr2", testIgnore: LOGIC_ONLY, use: { browserName: "chromium", deviceScaleFactor: 2, hasTouch: true } },
+    // The project owner's main browser. file:// storage and input differ from Chromium.
+    { name: "firefox", use: { browserName: "firefox" } },
   ],
 });
