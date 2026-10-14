@@ -59,3 +59,37 @@ To run the full length of a single test:
 Each phase records commands, environment, measured values and defects in
 `docs/testing/phase-*.md`. Full-suite results go there. Quick-suite runs are
 not logged unless they find something.
+
+
+## Test projects and loop counts (Electron branch)
+
+The browser projects are `chromium`, `chromium-cpu` (CPU rasterizer) and
+`chromium-dpr2` (pixel ratio 2, touch). Firefox was dropped when the app
+moved to Electron (Chromium).
+
+**Specs that run in `chromium` only** (`LOGIC_ONLY` in `playwright.config.ts`).
+They are not removed: they test storage, archives and the asset library, which
+do not depend on the rasterizer or the pixel ratio. Until now they also ran in
+`chromium-cpu` and `chromium-dpr2`.
+
+| Spec | What it covers |
+| --- | --- |
+| `storage.spec.ts` | Workspace, boards, canvases, saving, two-tab writer lease |
+| `archive.spec.ts` | `.canvast` exports and imports, backups |
+| `assets.spec.ts` | Asset catalog, sharing, garbage collection, Show |
+| `organize.spec.ts` | Tags, favourites, folders in the asset library |
+
+**Loop counts** (`reps(full, quick)`; before → now):
+
+| Loop | Full | Quick |
+| --- | --- | --- |
+| Wheel zoom notches (`navigation`) | 1200 → 480 | 240 → 120 |
+| Pan depth notches | 720 → 240 | 120 (same) |
+| Pan drags per leg | 40 → 16 | 8 → 4 |
+| Pinch (ctrl+wheel) | 300 → 120 | 60 (same) |
+| Curvy stroke zoom steps (`deep-zoom-rendering`) | 240 (same) | 120 → 90 (60 did not reach the exact path at pixel ratio 2) |
+| Image key presses | 750 → 300 | 150 (same) |
+
+The 1,200-notch coverage moved into one full-suite test in `chromium` only
+("very long wheel zoom": 2,000 notches in and 2,000 out, about 3.5 min).
+The old counts are kept here for reference.

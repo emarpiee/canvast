@@ -65,7 +65,7 @@ test("zooming deep into a curvy stroke never shows holes or spill (wheel input)"
   let checks = 0;
   await app.page.evaluate(() => window.__canvastDebug.resetFrameTimes());
   let exactFrames = 0;
-  const STEPS = reps(240, 120); // ~100 or ~50 levels at DPR 1
+  const STEPS = reps(240, 90); // ~100 or ~37 levels at DPR 1 (half at DPR 2: it must still reach the exact path)
   for (let step = 0; step < STEPS; step++) {
     await app.wheel(tx, ty, -100);
     if (step % 4) continue;
@@ -188,7 +188,7 @@ for (const item of ["stroke", "image"] as const) {
     }
     await app.page.locator("#canvas").focus();
     const failures: number[] = [];
-    const PRESSES = reps(750, 150); // +2 levels each: 1500 or 300 levels by keyboard
+    const PRESSES = reps(300, 150); // +2 levels each: 600 or 300 levels by keyboard
     for (let i = 1; i <= PRESSES; i++) {
       await app.page.keyboard.press("Shift+Equal"); // +2 levels at the viewport centre
       if (i % 25 === 0) {

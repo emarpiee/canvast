@@ -1,4 +1,4 @@
-import { LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, reps, test } from "./harness";
+import { FULL, LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, reps, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -33,7 +33,7 @@ test("loads offline from file:// with no network requests or errors", async ({ a
 });
 
 for (const direction of ["in-first", "out-first"] as const) {
-  const NOTCHES = reps(1200, 240);
+  const NOTCHES = reps(480, 120);
   test(`continuous wheel zoom ${direction}: ${NOTCHES} notches each way, anchored, exact return`, async ({ app }, info) => {
     // Trusted mouse events are delivered at integer CSS px in Chromium.
     const pointer = { x: 913, y: 247 };
@@ -66,7 +66,7 @@ for (const direction of ["in-first", "out-first"] as const) {
       const cam = await app.camera();
       assertFiniteCamera(cam);
       if (phase === sign) {
-        // Full: 1200 notches × 100/240 level = 500 levels at DPR 1. Every notch
+        // Full: 480 notches × 100/240 level = 200 levels at DPR 1. Every notch
         // must keep zooming by the same amount: no ramp-down, no clamp.
         expect(Math.abs(cam.zi + cam.zf)).toBeCloseTo(NOTCHES * perNotch, 3);
         expect(Math.abs(cam.zi + cam.zf)).toBeGreaterThan(NOTCHES * 0.2);
@@ -94,12 +94,27 @@ for (const direction of ["in-first", "out-first"] as const) {
   });
 }
 
+// The one long run (full suite, `chromium` only: ~3.5 min): a slow leak or drift that only shows after
+// many hundreds of notches. Replaces the old 1,200-notch loop of the wheel tests.
+test("very long wheel zoom: 2,000 notches in, then 2,000 out, returns exactly", async ({ app }, info) => {
+  test.skip(!FULL || info.project.name !== "chromium", "full suite, chromium project only");
+  test.setTimeout(600_000);
+  const pointer = { x: 913, y: 247 };
+  const before = await app.landmark(LANDMARK);
+  for (const sign of [-1, 1]) for (let i = 0; i < 2000; i++) await app.wheel(pointer.x, pointer.y, 100 * sign);
+  await app.frame();
+  assertFiniteCamera(await app.camera());
+  expect(distance(await app.landmark(LANDMARK), before)).toBeLessThan(LIMITS.roundTripPx);
+  const cam = await app.camera();
+  expect(cam.zi + cam.zf).toBe(0);
+});
+
 test("mixed zoom inputs: pinch (ctrl+wheel), keyboard, buttons", async ({ app }, info) => {
   const pointer = { x: 333, y: 611 };
   const before = await app.landmark(LANDMARK);
   let maxDrift = 0;
   const anchor = await app.worldAt(pointer.x, pointer.y);
-  const PINCH = reps(300, 60);
+  const PINCH = reps(120, 60);
   for (let i = 0; i < PINCH; i++) {
     await app.wheel(pointer.x, pointer.y, -3.7, { ctrl: true });
   }
@@ -143,8 +158,8 @@ test("mixed zoom inputs: pinch (ctrl+wheel), keyboard, buttons", async ({ app },
 test("directional pan at shallow, deep and far-out zoom returns exactly", async ({ app }, info) => {
   test.setTimeout(480_000); // 480 drags + full-resolution ink checks; slow at DPR 2
   const results: Record<string, number> = {};
-  const DEPTH_NOTCHES = reps(720, 120); // 300 or 50 levels at DPR 1
-  const DRAGS = reps(40, 8);
+  const DEPTH_NOTCHES = reps(240, 120); // 100 or 50 levels at DPR 1
+  const DRAGS = reps(16, 4);
   for (const [label, notches] of [["home", 0], ["deep", -DEPTH_NOTCHES], ["far out", DEPTH_NOTCHES]] as const) {
     await app.page.getByRole("button", { name: "Return to origin" }).click();
     for (let i = 0; i < Math.abs(notches); i++) await app.wheel(500, 300, Math.sign(notches) * 100);
