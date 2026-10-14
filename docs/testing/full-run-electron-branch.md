@@ -9,7 +9,7 @@ Branch `exp/electron` at `4668645`; three Chromium projects (no Firefox), reduce
 | Unit | 130/130 |
 | E2E | 214 passed, 4 skipped, 1 failed |
 | Offline and names checks | Pass (run separately after the E2E failure; `npm` stopped at the failed step) |
-| Failure | `tiles.spec.ts:249` dense scenes: zooming more than one level from the tile set renders exactly, in `chromium-cpu`. Known timing flake (also fails on `main`); re-run alone, 4 of 5 passed. Not fixed. |
+| Failure | `tiles.spec.ts:249` dense scenes: zooming more than one level from the tile set renders exactly, in `chromium-cpu`. Known timing flake (also fails on `main`); re-run alone, 4 of 5 passed. Fixed afterwards (see below). |
 
 Test-body time per project (sum of per-test times; the rest of the wall time is page loads and startup):
 
@@ -30,3 +30,11 @@ Slowest tests:
 | Curvy stroke zoom (`deep-zoom-rendering`) | 47 s | 47 s | n/a |
 
 Estimate before the run: about 23 min. Measured: 21 min 44 s.
+
+## Tiles flake fixed
+
+The zoom-preview tests in `tiles.spec.ts` raced the app: they read the tile stats in a second page call, after the
+~150 ms refine frame could already have replaced the preview, and the "edit during a preview" test let a frame render
+the edit into the tiles before it zoomed (a preview of that set is then legitimate). `zoomBy` now returns the stats
+from the same page call, and the edit test makes the edit and the zoom in one call. Before: that test failed 3 of 15
+runs in `chromium-dpr2` alone. After: 108/108 passed (the three dense-scene tests, 12 repeats, 3 projects, 2.8 min).
