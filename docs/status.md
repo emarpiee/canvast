@@ -412,7 +412,9 @@ visible strokes). Alternatives:
 
 **Phase 5 complete (v0.14.0):** full suite recorded in [full-run-phase-5.md](testing/full-run-phase-5.md). Not built: relink of missing mentions, blend modes, layer renaming (undo/redo stays in-session by design).
 
-**Next bounded task:** Phase 6 (multimedia).
+**Phase 6, slice 1 done:** videos as image instances with a paused position and an on-canvas player ([ADR 0041](adr/0041-video-players.md)); tested in `media.test.ts` and `assets.spec.ts` "a video is placed" (chromium, firefox; one unexplained failure in the first of about 19 runs, not reproduced).
+
+**Next bounded task:** Phase 6: audio instances, then GIF (own frame decoder), Extract Frame, Settings screen for the steps.
 
 ## Phase 1, slice 9 — settings scopes
 

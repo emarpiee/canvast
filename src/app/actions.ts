@@ -1,7 +1,7 @@
 import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ImageObject } from "../doc/model";
+import type { CanvasObject, ImageObject, MediaState } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit, placeAbove, restack } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
@@ -268,6 +268,16 @@ export function setOpacityOn(doc: DocumentStore, editor: EditorState, ids: reado
   doc.commit(doc.transaction("Set opacity", objs.map((o) => ({ ...o, opacity }))));
 }
 
+/** Change a media instance's paused position or repeat mode (one undo step); a no-op when nothing changes. */
+export function setMedia(doc: DocumentStore, editor: EditorState, id: string, patch: Partial<Pick<MediaState, "t" | "repeat">>, label = "Media"): void {
+  if (editor.blockEdit()) return;
+  const o = doc.get(id);
+  if (!o || o.kind !== "image" || !o.media) return;
+  const media = { ...o.media, ...patch };
+  if (media.t === o.media.t && media.repeat === o.media.repeat) return;
+  doc.commit(doc.transaction(label, [{ ...o, media }]));
+}
+
 /** Move objects in front of `above` in the paint order (the Layers panel's drag). */
 export function moveAbove(doc: DocumentStore, editor: EditorState, ids: readonly string[], aboveId: string): void {
   if (editor.blockEdit()) return;
@@ -305,7 +315,7 @@ const GRID_VIEWPORT_FRACTION = 0.9;
 const GRID_GAP = 0.08;
 
 /** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
-function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
   const cam = view.camera;
   const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
   const c = screenToWorld(cam, view.viewport, { x, y });
@@ -325,6 +335,8 @@ function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, doc: Docu
     h: hPx / f,
     pixelW: rec.pixelW,
     pixelH: rec.pixelH,
+    // A video is placed paused at its start (never autoplaying), ADR 0041.
+    ...(rec.type?.startsWith("video/") ? { media: { kind: "video" as const, t: 0, repeat: false } } : {}),
   };
   return homeObject(normalizeUnit(img), doc.space) as ImageObject;
 }
@@ -335,7 +347,7 @@ function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, doc: Docu
  * Placing does not select it or touch any existing object.
  */
 export function placeImage(
-  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">,
+  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">,
   doc: DocumentStore,
   view: ViewState,
   offsetPx: number,
@@ -370,7 +382,7 @@ export function gridLayout(sizes: ReadonlyArray<{ w: number; h: number }>, vp: {
 }
 
 /** Place a batch of images in a grid as one undoable step (see gridLayout). */
-export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
+export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
   const cells = gridLayout(recs.map((r) => ({ w: r.pixelW, h: r.pixelH })), view.viewport);
   const z = doc.topZ();
   const objs = recs.map((r, i) => imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i));

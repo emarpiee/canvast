@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
+import { makeWebm } from "./video";
 
 /**
  * Phase 1, slice 2: the shared asset catalog, Assets view, usage navigation,
@@ -509,4 +510,58 @@ test("two tabs: a canvas deleted by the writer moves the reader off it; the read
   expect((await objects(p2)).length).toBe(1);
   expect((await sess(p2)).tree![0]!.canvases.map((c) => c.name)).toEqual(["Canvas 1"]);
   await p2.close();
+});
+
+test("a video is placed paused; its player steps, repeats, plays and keeps the paused position through undo and reload (ADR 0041)", async ({ app }) => {
+  const p = app.page;
+  const webm = await makeWebm(p, 2);
+  await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: webm });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  expect(o!["media"]).toEqual({ kind: "video", t: 0, repeat: false });
+  // Select it: the player appears with the video's length.
+  await p.keyboard.press("v");
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  await p.mouse.click((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
+  const bar = p.getByTestId("media-bar");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);
+  const dur = await p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.duration);
+  expect(dur).toBeGreaterThan(1);
+  const t = async () => ((await objects(p))[0]!["media"] as { t: number; repeat: boolean }).t;
+  // The 3 s step is longer than the video: forward stops at the end, back at the start (no repeat).
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect.poll(t).toBeCloseTo(dur, 1);
+  await bar.getByRole("button", { name: "Step back" }).click();
+  await expect.poll(t).toBe(0);
+  // With repeat the overshoot wraps round.
+  await bar.getByRole("button", { name: "Repeat" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect.poll(t).toBeCloseTo(3 % dur, 1);
+  // Undo puts the paused position back, and the player follows.
+  await p.keyboard.press("Control+z");
+  await expect.poll(t).toBe(0);
+  // Play, then pause: the position moved and is written once, on pause.
+  await p.evaluate(() => window.__canvastDebug.flushSave());
+  const before = await p.evaluate(() => window.__canvastDebug.session().revision);
+  await bar.getByRole("button", { name: "Play" }).click();
+  await expect.poll(() => p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.currentTime)).toBeGreaterThan(0.2);
+  expect(await p.evaluate(() => window.__canvastDebug.session().revision), "playing writes nothing").toBe(before);
+  await bar.getByRole("button", { name: "Pause" }).click();
+  await expect.poll(t).toBeGreaterThan(0.2);
+  const paused = await t();
+  await saved(p);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(((await objects(p))[0]!["media"] as { t: number }).t).toBe(paused);
+  // Unselected, the canvas draws the picture at the paused time (not a placeholder).
+  const b2 = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  await expect
+    .poll(async () => {
+      const [r, g, bl] = await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [Math.round((b2.minX + b2.maxX) / 2), Math.round((b2.minY + b2.maxY) / 2)]);
+      return Math.max(r!, g!, bl!) - Math.min(r!, g!, bl!);
+    })
+    .toBeGreaterThan(80);
+  expect(app.consoleErrors).toEqual([]);
 });

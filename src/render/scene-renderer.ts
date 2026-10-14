@@ -7,6 +7,7 @@ import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
 import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { StrokeObject } from "../doc/model";
+import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
@@ -96,23 +97,25 @@ export function drawObjects(
       if (po.obj.kind === "text") drawText(ctx, t.inner, t.vvp, dpr);
       else if (po.obj.kind === "image") {
         const shown = shownEdge(t.inner);
-        const edge = Math.max(po.obj.pixelW, po.obj.pixelH);
-        const src = assets.get(po.obj.assetId, shown, edge);
-        if (!src || !assets.wantedReady(po.obj.assetId, shown, edge)) pending = true;
+        const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
+        const key = rasterKey(po.obj);
+        const src = assets.get(key, shown, edge);
+        if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
         drawImageObject(ctx, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
       }
       ctx.restore();
     } else if (po.cover) {
-      const src = po.obj.kind === "image" ? assets.get(po.obj.assetId) : null;
+      const src = po.obj.kind === "image" ? assets.get(rasterKey(po.obj)) : null;
       if (po.obj.kind === "image" && !src) pending = true;
       drawCover(ctx, po, vp, src, theme.imagePlaceholder);
     } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
     else {
       const shown = shownEdge(po);
-      const edge = Math.max(po.obj.pixelW, po.obj.pixelH);
-      const src = assets.get(po.obj.assetId, shown, edge);
-      if (!src || !assets.wantedReady(po.obj.assetId, shown, edge)) pending = true;
+      const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
+      const key = rasterKey(po.obj);
+      const src = assets.get(key, shown, edge);
+      if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
       drawImageObject(ctx, po, vp, dpr, src, theme.imagePlaceholder);
     }
   }

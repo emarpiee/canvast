@@ -62,6 +62,15 @@ export interface StrokeObject extends ObjectBase {
   readonly color: string;
 }
 
+/** Per-instance state of a video, GIF or audio placed from the library (ADR 0041). Absent on plain images. */
+export interface MediaState {
+  readonly kind: "video" | "gif" | "audio";
+  /** Paused position: seconds for video and audio, a frame index for a GIF. Playback never writes it; pausing does. */
+  readonly t: number;
+  /** Start again at the end instead of stopping. */
+  readonly repeat: boolean;
+}
+
 export interface ImageObject extends ObjectBase {
   readonly kind: "image";
   /** Content hash (SHA-256 hex) of the shared source asset. */
@@ -72,6 +81,12 @@ export interface ImageObject extends ObjectBase {
   /** Intrinsic pixel size of the source, for pixel-accurate magnification. */
   readonly pixelW: number;
   readonly pixelH: number;
+  readonly media?: MediaState;
+}
+
+/** Key of the decoded picture an image object draws: the poster of a video at its paused time, else the asset itself. */
+export function rasterKey(o: ImageObject): string {
+  return o.media && o.media.t > 0 ? `${o.assetId}#${Math.round(o.media.t * 1000)}` : o.assetId;
 }
 
 export interface TextObject extends ObjectBase {
@@ -245,6 +260,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.w, "w");
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
+    if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean")) throw new InvalidObjectError("bad media state");
   } else if (o.kind === "text") {
     if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
     positive(o.w, "w");
@@ -314,6 +330,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       h: s["h"] as number,
       pixelW: s["pixelW"] as number,
       pixelH: s["pixelH"] as number,
+      ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.

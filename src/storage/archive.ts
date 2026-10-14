@@ -368,7 +368,7 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
       problems.push(`Asset “${label}” has an invalid or repeated content hash and was skipped.`);
       continue;
     }
-    if (!e || !type.startsWith("image/") || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
+    if (!e || !(type.startsWith("image/") || type.startsWith("video/")) || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
       problems.push(`Asset “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
     }

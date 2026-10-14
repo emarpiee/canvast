@@ -4,6 +4,7 @@ import { done, idbGet, req } from "../storage/idb";
 import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
+import { decodeVideo } from "./video";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -19,6 +20,8 @@ export interface AssetRecord {
   pixelH: number;
   blob: Blob;
   importedAt: number;
+  /** Video and audio: length in seconds. */
+  duration?: number;
 }
 
 /** Largest accepted import, to fail fast instead of exhausting memory. */
@@ -74,7 +77,8 @@ const QUEUE_STALE_MS = 1500;
 /** An image asked for within this many ms is in use and is never released. */
 const IN_USE_MS = 1500;
 
-async function decode(blob: Blob): Promise<CanvasImageSource & { width: number; height: number }> {
+async function decode(blob: Blob, t = 0): Promise<CanvasImageSource & { width: number; height: number }> {
+  if (blob.type.startsWith("video/")) return (await decodeVideo(blob, t)).bitmap;
   if (typeof createImageBitmap === "function") {
     try {
       return await createImageBitmap(blob);
@@ -161,7 +165,7 @@ export class AssetLibrary {
    * "restored" (it had been deleted from the library and is back).
    */
   async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true): Promise<ImportOutcome> {
-    if (!file.type.startsWith("image/")) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
@@ -177,10 +181,15 @@ export class AssetLibrary {
       return { record: existing, duplicate };
     }
     let img;
+    let duration: number | undefined;
     try {
-      img = await decode(file);
+      if (file.type.startsWith("video/")) {
+        const v = await decodeVideo(file);
+        img = v.bitmap;
+        duration = v.duration;
+      } else img = await decode(file);
     } catch {
-      throw new ImportError("the file could not be decoded as an image");
+      throw new ImportError(file.type.startsWith("video/") ? "the file could not be decoded as a video" : "the file could not be decoded as an image");
     }
     const record: AssetRecord = {
       hash,
@@ -191,6 +200,7 @@ export class AssetLibrary {
       pixelH: img.height,
       blob: new Blob([bytes], { type: file.type }),
       importedAt: Date.now(),
+      ...(duration !== undefined ? { duration } : {}),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.db) await this.store(record, true);
@@ -264,10 +274,12 @@ export class AssetLibrary {
 
   /** Drop the decoded copy of an erased original (after garbage collection). */
   forget(hash: string): void {
-    this.decoded.get(hash)?.release();
-    this.decoded.delete(hash);
-    this.decoded.get(hash + SMALL_KEY)?.release();
-    this.decoded.delete(hash + SMALL_KEY);
+    for (const k of [...this.decoded.keys()]) {
+      if (k === hash || k.startsWith(hash + "#") || k === hash + SMALL_KEY) {
+        this.decoded.get(k)?.release();
+        this.decoded.delete(k);
+      }
+    }
     this.missing.delete(hash);
   }
 
@@ -311,9 +323,11 @@ export class AssetLibrary {
     return this.missing.has(hash);
   }
 
-  private async ensureDecoded(rec: AssetRecord): Promise<void> {
-    if (!this.decoded.has(rec.hash)) {
-      this.decoded.set(rec.hash, makeSource(await decode(rec.blob)));
+  /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */
+  private async ensureDecoded(rec: AssetRecord, key = rec.hash): Promise<void> {
+    if (!this.decoded.has(key)) {
+      const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
+      this.decoded.set(key, makeSource(await decode(rec.blob, ms / 1000)));
       this.evict();
     }
   }
@@ -361,13 +375,13 @@ export class AssetLibrary {
   private async load(hash: string, small = false): Promise<void> {
     const key = hash + (small ? SMALL_KEY : "");
     try {
-      const rec = await this.record(hash);
+      const rec = await this.record(hash.split("#")[0]!);
       if (!rec) {
         this.missing.add(hash);
       } else if (small && Math.max(rec.pixelW, rec.pixelH) > SMALL_EDGE) {
         await this.ensureReduced(rec);
       } else {
-        await this.ensureDecoded(rec);
+        await this.ensureDecoded(rec, hash);
       }
     } catch {
       this.missing.add(hash);

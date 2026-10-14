@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setFlagOn, setOpacityOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -32,6 +32,7 @@ import { mountNavigator } from "../ui/navigator";
 import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
 import { mountLayersPanel } from "../ui/layers-panel";
+import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
 import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
 import { BookmarkList, captureThumb } from "./bookmarks";
@@ -334,6 +335,7 @@ async function start(): Promise<void> {
   side.id = "side-panels";
   host.appendChild(side);
   mountBookmarksPanel(side, editor, new BookmarkList(session, view, doc), () => captureThumb(canvas));
+  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label) });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
@@ -455,7 +457,7 @@ async function start(): Promise<void> {
     receive(files);
   });
   window.addEventListener("paste", (e) => {
-    const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (files.length) {
       e.preventDefault();
       receive(files);

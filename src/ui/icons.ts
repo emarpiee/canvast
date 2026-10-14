@@ -1,4 +1,11 @@
 // Lucide icons (ISC license, see THIRD_PARTY_NOTICES.md), inlined at build time.
+import play from "lucide-static/icons/play.svg";
+import pause from "lucide-static/icons/pause.svg";
+import rewind from "lucide-static/icons/rewind.svg";
+import fastForward from "lucide-static/icons/fast-forward.svg";
+import repeat from "lucide-static/icons/repeat.svg";
+import volume2 from "lucide-static/icons/volume-2.svg";
+import volumeX from "lucide-static/icons/volume-x.svg";
 import hand from "lucide-static/icons/hand.svg";
 import pointer from "lucide-static/icons/mouse-pointer-2.svg";
 import pencil from "lucide-static/icons/pencil.svg";
@@ -64,6 +71,13 @@ function clean(svg: string): string {
 }
 
 export const ICONS = {
+  play: clean(play),
+  pause: clean(pause),
+  rewind: clean(rewind),
+  fastForward: clean(fastForward),
+  repeat: clean(repeat),
+  volume: clean(volume2),
+  volumeOff: clean(volumeX),
   hand: clean(hand),
   pointer: clean(pointer),
   pencil: clean(pencil),

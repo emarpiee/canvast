@@ -728,3 +728,10 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .layout-head { padding: 6px 8px 2px; font-size: 11px; font-weight: 600; opacity: 0.6; text-transform: uppercase; }
 .layout-menu button { display: block; width: 100%; text-align: left; padding: 6px 8px; border: 0; background: none; color: var(--hud-fg); font: inherit; border-radius: 6px; cursor: pointer; }
 .layout-menu button:hover { background: rgba(127, 127, 127, 0.18); }
+
+/* On-canvas video player (ui/media-player.ts) */
+.media-video { position: absolute; pointer-events: none; z-index: 3; background: #000; object-fit: fill; }
+.media-video[hidden], .media-bar[hidden] { display: none; }
+.media-bar { position: absolute; transform: translateX(-50%); width: 360px; max-width: calc(100% - 24px); display: flex; align-items: center; gap: 4px; z-index: 6; flex-wrap: nowrap; }
+.media-scrub { flex: 1; min-width: 0; }
+.media-time { font: 500 11px var(--font-ui); white-space: nowrap; opacity: 0.8; }
