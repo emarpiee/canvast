@@ -12,7 +12,7 @@ import { radiansFromAngle } from "../core/angle";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
-import { layoutObject, layoutText } from "../text/layout";
+import { layoutText } from "../text/layout";
 import { TEXT_FONT_FAMILY } from "../render/draw-text";
 import { ICONS } from "./icons";
 import { esc } from "./format";
@@ -74,23 +74,6 @@ export interface TextEditor {
   readonly isOpen: boolean;
 }
 
-/** Zoom so the text is at a readable size, with its top-left corner in view. */
-export function zoomToEdit(view: ViewState, doc: DocumentStore, o: TextObject): void {
-  const of = o.frame ?? doc.space.world;
-  const cam = cameraIn(view.frameCamera, of) ?? { zi: -Infinity, zf: 0 };
-  const px = Math.log2(o.size) + o.unit + cam.zi + cam.zf;
-  if (px >= Math.log2(MIN_EDIT_PX) && px <= Math.log2(MAX_EDIT_PX)) return;
-  const level = Math.log2(NEW_TEXT_PX / o.size) - o.unit;
-  const zi = Math.floor(level);
-  const zf = level - zi;
-  const vp = view.viewport;
-  const l = layoutObject(o);
-  const dx = Math.min((o.w / o.size) * NEW_TEXT_PX, vp.width - 64) / 2;
-  const dy = Math.min(l.height * NEW_TEXT_PX, vp.height - 160) / 2;
-  const off = (px: number): D.Dyadic => D.shift(D.fromNumber(px / 2 ** zf), -zi);
-  view.setFrameCamera(fromLocal(of, lookAt({ x: D.add(o.anchor.x, off(dx)), y: D.add(o.anchor.y, off(dy)) }, zi, zf)));
-}
-
 export function mountTextEditor(host: HTMLElement, view: ViewState, doc: DocumentStore, editor: EditorState): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
@@ -138,6 +121,23 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     bar.style.top = `${Math.max(4, s.y - 48)}px`;
   };
 
+  /** Zoom so the text is at a readable size, with its top-left corner in view. */
+  const zoomToEdit = (o: TextObject): void => {
+    const of = o.frame ?? doc.space.world;
+    const cam = cameraIn(view.frameCamera, of) ?? { zi: -Infinity, zf: 0 };
+    const px = Math.log2(o.size) + o.unit + cam.zi + cam.zf;
+    if (px >= Math.log2(MIN_EDIT_PX) && px <= Math.log2(MAX_EDIT_PX)) return;
+    const level = Math.log2(NEW_TEXT_PX / o.size) - o.unit;
+    const zi = Math.floor(level);
+    const zf = level - zi;
+    const vp = view.viewport;
+    const l = layoutText(o.md, o.w / o.size);
+    const dx = Math.min((o.w / o.size) * NEW_TEXT_PX, vp.width - 64) / 2;
+    const dy = Math.min(l.height * NEW_TEXT_PX, vp.height - 160) / 2;
+    const off = (px: number): D.Dyadic => D.shift(D.fromNumber(px / 2 ** zf), -zi);
+    view.setFrameCamera(fromLocal(of, lookAt({ x: D.add(o.anchor.x, off(dx)), y: D.add(o.anchor.y, off(dy)) }, zi, zf)));
+  };
+
   const close = (): void => {
     target = null; // first: hiding the focused box fires focusout (and commit) synchronously
     box.hidden = bar.hidden = true;
@@ -173,7 +173,7 @@ export function mountTextEditor(host: HTMLElement, view: ViewState, doc: Documen
     if (editor.blockEdit()) return;
     const cam = view.camera;
     if (t) {
-      zoomToEdit(view, doc, t);
+      zoomToEdit(t);
       target = t;
       isNew = false;
       editor.preview = { kind: "edit", ids: [t.id] };

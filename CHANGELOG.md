@@ -4,7 +4,7 @@
 
 Phase 3 (performance infrastructure).
 
-- **Notes:** a Note tool (N) puts a Markdown card on the canvas, edited in place with a selection toolbar (headings, bold, italic, lists, quote, code, rule, tables, links); a note moves, turns, groups and layers like a text. The editor ships inside the file and runs only when the first note opens; the file grew from 733 to 1556 KiB (ADR 0032). Pasting into the Text tool is plain text again.
+- **Notes:** a Note tool (N) puts a Markdown card on the canvas, edited in a panel with a selection toolbar (headings, bold, italic, lists, quote, code, rule, tables, links); a note moves, turns, groups and layers like a text. The editor ships inside the file and runs only when the first note opens; the file grew from 733 to 1556 KiB (ADR 0032). Pasting into the Text tool is plain text again.
 - **Fixes:** Shift-rotating to a 15 degree step no longer snaps back to the starting angle (a step is not a whole number of angle units, and the document refused it); corner handles show a resize cursor along the diagonal they point along; a change the document refuses no longer leaves a preview on screen.
 - **The selection box is always drawn** (also in the axis-aligned mode), and the cursor turns into a rotate arrow where a press would turn the selection.
 - **Selection:** each selected item is outlined by its own turned rectangle and a group box turns with items that share a rotation (a button switches to the axis-aligned box); a selection can be turned from just outside a corner as well as from the handle (which stays in view); a marquee or lasso takes what it touches, except a shape drawn entirely inside an image; undo, redo and the tool keys work after using a slider (ADR 0031).
