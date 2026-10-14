@@ -92,3 +92,7 @@ do not depend on the rasterizer or the pixel ratio. Until now they also ran in
 The 1,200-notch coverage moved into one full-suite test in `chromium` only
 ("very long wheel zoom": 2,000 notches in and 2,000 out, about 3.5 min).
 The old counts are kept here for reference.
+
+## WebKit (Safari)
+
+Not tested, by decision of the project owner (2026-10-14): it would add about 10 to 15 minutes to the full suite (estimated; never run here) and is planned for after production, with the Phase 8 compatibility work (a `webkit` Playwright project, ideally with a run on real Safari). Until then Safari and every iPhone browser are unverified.

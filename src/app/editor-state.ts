@@ -55,6 +55,8 @@ export class EditorState {
   lock: PenLock | null = null;
   /** The floating Layers panel is open (ui/layers-panel.ts). */
   layersOpen = false;
+  /** The floating Bookmarks panel is open (ui/bookmarks-panel.ts). */
+  bookmarksOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */

@@ -940,12 +940,13 @@ test("groups: picking one member picks the group, it moves as one, nests, enters
 test("hide and lock: a hidden object is not drawn or picked, a locked one is drawn but cannot be picked; both undo, save, and come back with the Show all and Unlock all buttons (ADR 0021)", async ({ app }) => {
   const p = app.page;
   const sel = () => p.evaluate(() => window.__canvastDebug.selection());
-  const ink = () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  // One pixel in the middle of the stroke: drawn or not (a count of all inked pixels moves with tile and direct drawing).
+  const ink = () => p.evaluate(() => window.__canvastDebug.pixelAt(600, 300).join(","));
   const none = await ink();
   await p.keyboard.press("p");
   await app.drag({ x: 400, y: 300 }, { x: 800, y: 300 }, 6);
   const drawn = await ink();
-  expect(drawn).toBeGreaterThan(none);
+  expect(drawn).not.toBe(none);
   await p.keyboard.press("v");
   await p.mouse.click(600, 300);
   await p.getByRole("button", { name: "Hide", exact: true }).click();
@@ -964,7 +965,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await app.frame();
-  expect(await ink(), "still hidden after a reload").toBe(none);
+  await expect.poll(ink, { message: "still hidden after a reload (the canvas is painted again once the saved canvas has loaded)" }).toBe(none);
   await p.getByRole("button", { name: "Show all hidden" }).click();
   await app.frame();
   expect(await ink()).toBe(drawn);
@@ -1058,13 +1059,14 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   await expect(rows.nth(0)).toHaveAttribute("data-key", ids[2]!); // front first
   await expect(rows.nth(2)).toHaveAttribute("data-key", ids[0]!);
   // Click selects; the eye hides (and unselects), the lock locks.
-  const ink = () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
-  const withAll = await ink(); // measured with nothing selected: selection outlines add ink
+  // One pixel in the middle of the second stroke (a count of all inked pixels moves with tile and direct drawing).
+  const ink = () => p.evaluate(() => window.__canvastDebug.pixelAt(500, 350).join(","));
+  const withAll = await ink();
   await rows.nth(1).click();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([ids[1]]);
   await rows.nth(1).getByRole("button", { name: /^Hide / }).click();
   await app.frame();
-  expect(await ink(), "the hidden stroke is not drawn").toBeLessThan(withAll);
+  expect(await ink(), "the hidden stroke is not drawn").not.toBe(withAll);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
   await rows.nth(1).getByRole("button", { name: /^Show / }).click();
   await app.frame();
@@ -1088,4 +1090,53 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.getByTestId("layers-panel")).toBeVisible();
+});
+
+test("bookmarks: save the current place and zoom, go back to it exactly (a trillion levels down too), rename, delete, and keep them across a reload and frame clean-up (ADR 0025)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.getByTestId("bookmarks-panel");
+  await expect(panel).toBeHidden();
+  await p.getByRole("button", { name: "Bookmarks panel" }).click();
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("li.bookmark")).toHaveCount(0);
+  // Bookmark 1: home. Bookmark 2: far in, off the origin.
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await p.evaluate(() => window.__canvastDebug.jump(1e12));
+  await p.keyboard.press("h");
+  await app.drag({ x: 700, y: 300 }, { x: 400, y: 500 }, 6);
+  const deepCam = await app.camera();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  const rows = panel.locator("li.bookmark");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0).locator(".bookmark-name")).toHaveText("Bookmark 1");
+  await expect(rows.nth(1).locator(".bookmark-name")).toHaveText("Bookmark 2");
+  await expect(rows.nth(1).locator("img.bookmark-thumb")).toHaveCount(1);
+  // Go home and back: the camera comes back exactly.
+  await rows.nth(0).locator(".bookmark-name").click();
+  await app.frame();
+  expect(await app.camera()).toEqual({ cx: "0p0", cy: "0p0", zi: 0, zf: 0, pz: 0 });
+  await rows.nth(1).locator(".bookmark-name").click();
+  await app.frame();
+  expect(await app.camera()).toEqual(deepCam);
+  expect(await p.evaluate(() => window.__canvastDebug.depth())).toBe("1000000000000");
+  // Rename.
+  await rows.nth(1).locator(".bookmark-name").dblclick();
+  await p.keyboard.type("Far corner");
+  await p.keyboard.press("Enter");
+  await expect(rows.nth(1).locator(".bookmark-name")).toHaveText("Far corner");
+  // Survives frame clean-up and a reload.
+  await p.evaluate(() => window.__canvastDebug.collectFrames());
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.keyboard.press("Home");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await app.frame();
+  const after = p.getByTestId("bookmarks-panel").locator("li.bookmark");
+  await expect(after).toHaveCount(2);
+  await after.nth(1).locator(".bookmark-name").click();
+  await app.frame();
+  expect(await app.camera()).toEqual(deepCam);
+  // Delete.
+  await p.getByTestId("bookmarks-panel").getByRole("button", { name: "Delete Bookmark 1" }).click();
+  await expect(after).toHaveCount(1);
 });

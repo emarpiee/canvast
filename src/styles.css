@@ -614,12 +614,11 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .text-format { position: absolute; flex-wrap: nowrap; }
 
 /* Floating Layers panel (ui/layers-panel.ts) */
+#side-panels { position: absolute; top: 64px; right: 12px; width: 268px; max-height: calc(100% - 140px); display: flex; flex-direction: column; gap: 8px; pointer-events: none; z-index: 5; }
+#side-panels > * { pointer-events: auto; }
 .layers-panel {
-  position: absolute;
-  top: 64px;
-  right: 12px;
-  width: 268px;
-  max-height: calc(100% - 140px);
+  position: static;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--hud-bg);
@@ -630,6 +629,11 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
   z-index: 5;
 }
 .layers-panel[hidden] { display: none; }
+.bookmark { display: flex; align-items: center; gap: 8px; padding: 3px 2px 3px 3px; border-radius: 6px; cursor: pointer; }
+.bookmark:hover { background: var(--hud-border); }
+.bookmark-thumb { width: 64px; height: 40px; border-radius: 4px; background: var(--hud-border); object-fit: cover; flex: none; }
+.bookmark-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookmark input { flex: 1; min-width: 0; font: inherit; }
 .layers-panel header { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 6px 10px; border-bottom: 1px solid var(--hud-border); }
 .layers-panel h2 { margin: 0; font: 600 12px var(--font-ui); }
 .layers-count { opacity: 0.55; font-weight: 500; margin-left: 4px; }
@@ -647,4 +651,4 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .layer-btn[aria-pressed="false"] { opacity: 0.45; }
 .layer:hover .layer-btn[aria-pressed="false"] { opacity: 0.9; }
 .layers-empty, .layers-note { padding: 10px; opacity: 0.6; margin: 0; }
-@media (max-width: 640px) { .layers-panel { top: 110px; width: min(268px, calc(100vw - 24px)); } }
+@media (max-width: 640px) { #side-panels { top: 110px; width: min(268px, calc(100vw - 24px)); } }

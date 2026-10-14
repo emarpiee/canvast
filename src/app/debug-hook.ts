@@ -140,7 +140,7 @@ export interface DebugHook {
    */
   forceCatalogState(hash: string, state: "active" | "deleted"): Promise<void>;
   /** Stored objects (serialized, sorted by id) and saved view of a canvas. */
-  canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null }>;
+  canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null; bookmarks: Array<{ name: string; view: SerializedCamera }> }>;
   /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
   removeAssetBytes(hash: string): Promise<void>;
   /** Text most recently copied by canvast (Copy Markdown). */
@@ -452,7 +452,8 @@ export function installDebugHook(
       const loaded = await session.repo!.loadCanvas(canvasId);
       // The hook speaks absolute (world-frame) coordinates.
       const view = loaded.camera && ("v" in loaded.camera ? serializeCamera(toAbsoluteCamera(loaded.space, deserializeFrameCamera(loaded.space, loaded.camera))) : loaded.camera);
-      return { objects: loaded.objects.map(serializeWorld).sort((a, b) => (a.id < b.id ? -1 : 1)), view };
+      const bookmarks = loaded.bookmarks.map((b) => ({ name: b.name, view: serializeCamera(toAbsoluteCamera(loaded.space, deserializeFrameCamera(loaded.space, b.view))) }));
+      return { objects: loaded.objects.map(serializeWorld).sort((a, b) => (a.id < b.id ? -1 : 1)), view, bookmarks };
     },
     removeAssetBytes: async (hash) => {
       const tx = session.repo!.db.transaction("assets", "readwrite");

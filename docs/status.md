@@ -90,7 +90,7 @@ step 6).
 
 **Committed:** v0.9.0 on `main`.
 
-**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite with all four projects: 32 min 25 s, unit 130/130, E2E 301 passed, 6 skipped, 1 timeout (the Firefox curvy-stroke test needs more than 180 s in full mode; fixed, passes alone in 5.2 min); details in [testing/full-run-4-projects.md](testing/full-run-4-projects.md). Earlier run on the 3 Chromium projects: [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md).
+**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite with all four projects: 32 min 25 s, unit 130/130, E2E 301 passed, 6 skipped, 1 timeout (the Firefox curvy-stroke test needs more than 180 s in full mode; fixed, passes alone in 5.2 min); details in [testing/full-run-4-projects.md](testing/full-run-4-projects.md). Earlier run on the 3 Chromium projects: [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md). An Electron AppImage was tried and shelved the same day ([ADR 0026](adr/0026-electron-appimage-tried-and-shelved.md)).
 
 **Next bounded task:** Phase 1 remainder (settings scopes), then Phase 2.
 
@@ -382,9 +382,11 @@ visible strokes). Alternatives:
 
 **Layers panel (owner request):** `ui/layers-panel.ts`: floating, hideable (device setting `ui.layersOpen`, default hidden), tree of objects and groups front to back with eye, lock, select and drag to reorder. [ADR 0024](adr/0024-layers-panel.md). Tested: unit (`placeAbove`, `layerTree`); E2E `frames.spec.ts` "layers panel".
 
-**Phase 2 is built.** Per the owner, the full suite runs now (it has not run since v0.9.0), on his signal; limits to remember: no snapping while resizing, text erased by its box, selection outline of a turned object is its bounding box.
+**Bookmarks (owner request):** `storage/bookmarks.ts`, `app/bookmarks.ts`, `ui/bookmarks-panel.ts`; per-canvas named saved views in frame form (exact at any depth), thumbnail, storage schema 5, kept by frame clean-up, carried in archives. [ADR 0025](adr/0025-view-bookmarks.md). Tested: E2E `frames.spec.ts` "bookmarks" (save, go exactly at 10^12 levels, rename, delete, clean-up and reload) and the archive round-trip test now carries a bookmark 1,600 levels in. Not built: camera flight, shortcut, view history.
 
-**Next bounded task:** the full suite, then Phase 3 (performance infrastructure).
+**Phase 2 is built and the full suite has run** (34 min 50 s; 340 passed, 6 skipped, 2 failed on one test that measured the wrong thing and was fixed; see [testing/full-run-phase-2.md](testing/full-run-phase-2.md)); limits to remember: no snapping while resizing, text erased by its box, selection outline of a turned object is its bounding box.
+
+**Next bounded task:** Phase 3 (performance infrastructure).
 
 ## Phase 1, slice 9 — settings scopes
 

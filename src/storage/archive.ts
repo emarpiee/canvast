@@ -11,6 +11,8 @@ import type { AssetFolder } from "../assets/asset-catalog";
 import { entryFromRecord, folderPath, meta, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import { done, req } from "./idb";
+import type { Bookmark } from "./bookmarks";
+import { readBookmarks } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { ZipEntry, ZipInput } from "./zip";
 import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
@@ -107,7 +109,7 @@ const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string): Promise<ExportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "assets", "assetCatalog", "meta"], "readonly");
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
   const boards: ManifestBoard[] = [];
@@ -134,9 +136,10 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       const records = await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>);
       const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
       const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
+      const marks = readBookmarks(((await req(tx.objectStore("bookmarks").get(cid) as IDBRequest<{ items?: unknown } | undefined>)) ?? {}).items);
       for (const r of records) if (r.data.kind === "image") hashes.add(String(r.data["assetId"]));
       const file = `canvases/${c.id}.json`;
-      canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), frames, view }) });
+      canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), frames, view, ...(marks.length ? { bookmarks: marks } : {}) }) });
       mb.canvases.push({ id: c.id, name: c.name, objectCount: records.length, file });
       objects += records.length;
     }
@@ -210,8 +213,9 @@ export interface PlannedCanvas {
   name: string;
   objects: CanvasObject[];
   view: StoredView | null;
-  /** The frames the objects and the view need (version 2 archives; empty for version 1). */
+  /** The frames the objects, the view and the bookmarks need (version 2 archives; empty for version 1). */
   frames: FrameRecord[];
+  bookmarks: Bookmark[];
 }
 
 export interface ImportPlan {
@@ -333,8 +337,20 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
           problems.push(`The saved view of “${name}” was invalid; it will open at the origin.`);
         }
       }
-      const frames = space.records([viewFrame, ...objects.flatMap((o) => (o.frame ? [o.frame] : []))]);
-      board.canvases.push({ name, objects, view, frames });
+      // Bookmarks (version 3): keep the ones whose frame and view are valid.
+      const bookmarks: Bookmark[] = [];
+      let lostMarks = 0;
+      for (const b of readBookmarks(data["bookmarks"])) {
+        try {
+          deserializeFrameCamera(space, b.view);
+          bookmarks.push(b);
+        } catch {
+          lostMarks++;
+        }
+      }
+      if (lostMarks || (Array.isArray(data["bookmarks"]) && bookmarks.length + lostMarks < data["bookmarks"].length)) problems.push(`Some bookmarks of “${name}” were damaged and were skipped.`);
+      const frames = space.records([viewFrame, ...bookmarks.flatMap((b) => space.frameByUid(b.view.frame) ?? []), ...objects.flatMap((o) => (o.frame ? [o.frame] : []))]);
+      board.canvases.push({ name, objects, view, frames, bookmarks });
       plan.objects += objects.length;
     }
     if (board.canvases.length) plan.boards.push(board);
@@ -405,7 +421,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
  * `targetBoardId`; board and workspace archives become new boards.
  */
 export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
   const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null };
   try {
@@ -419,6 +435,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       for (const o of c.objects) tx.objectStore("objects").put({ canvasId: canvas.id, id: o.id, data: serializeObject(o) } satisfies ObjectRecord);
       for (const f of c.frames) tx.objectStore("frames").put({ ...f, canvasId: canvas.id } satisfies FrameStoreRecord);
       if (c.view) tx.objectStore("canvasViews").put(c.view, canvas.id);
+      if (c.bookmarks.length) tx.objectStore("bookmarks").put({ canvasId: canvas.id, items: c.bookmarks });
       result.canvases++;
       result.objects += c.objects.length;
       result.firstCanvasId ??= canvas.id;

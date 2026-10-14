@@ -206,7 +206,7 @@ export class Session {
       }
     }
     if (!placed) this.view.setWorldCamera(HOME);
-    this.persistence.attach(canvasId, loaded.canvas.revision, loaded.space);
+    this.persistence.attach(canvasId, loaded.canvas.revision, loaded.space, loaded.bookmarks);
     if (loaded.skipped.length) {
       this.editor.message = `Skipped ${loaded.skipped.length} damaged item(s) on "${loaded.canvas.name}".`;
       console.warn("canvast: skipped while loading", loaded.skipped);

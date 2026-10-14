@@ -13,6 +13,7 @@
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
  *   assets       key sha256        → AssetRecord              (original bytes, stored once)
  *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
+ *   bookmarks    keyPath "canvasId" → { canvasId, items: Bookmark[] }  (named saved views, ADR 0025; v5)
  *   frames       keyPath [canvasId, id] → FrameRecord + canvasId (nested frames, ADR 0014; v4).
  *                                          Objects name their frame; absent = the world frame, which is
  *                                          the absolute form of earlier versions, so old data needs no conversion.
@@ -26,7 +27,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -58,6 +59,7 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       if (!objects.indexNames.contains("assetId")) objects.createIndex("assetId", "data.assetId");
       if (!has("assetCatalog")) db.createObjectStore("assetCatalog", { keyPath: "hash" });
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
+      if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });
     };
     req.onsuccess = () => {
       const db = req.result;

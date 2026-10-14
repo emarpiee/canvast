@@ -1,5 +1,7 @@
 import type { SerializedCamera } from "../core/camera";
 import type { FrameRecord, StoredFrameView } from "../core/frames";
+import type { Bookmark } from "./bookmarks";
+import { readBookmarks } from "./bookmarks";
 import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
@@ -82,6 +84,7 @@ export interface LoadedCanvas {
   /** Records that failed validation, with reasons; never silently repaired. */
   skipped: string[];
   camera: StoredView | null;
+  bookmarks: Bookmark[];
 }
 
 export interface CommitResult {
@@ -254,12 +257,13 @@ export class WorkspaceRepo {
     tx.objectStore("objects").delete(range);
     tx.objectStore("frames").delete(range);
     tx.objectStore("canvasViews").delete(canvas.id);
+    tx.objectStore("bookmarks").delete(canvas.id);
     tx.objectStore("canvases").delete(canvas.id);
     return n;
   }
 
   private async deleteTx<T>(extra: string[], body: (tx: IDBTransaction) => Promise<T>): Promise<T> {
-    const tx = this.db.transaction([...extra, "canvases", "objects", "frames", "canvasViews", "meta"], "readwrite", { durability: "strict" });
+    const tx = this.db.transaction([...extra, "canvases", "objects", "frames", "canvasViews", "bookmarks", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     try {
       const result = await body(tx);
@@ -278,13 +282,14 @@ export class WorkspaceRepo {
 
   /** Load one canvas's objects (lazily, per canvas) and its saved camera. */
   async loadCanvas(canvasId: string): Promise<LoadedCanvas> {
-    const tx = this.db.transaction(["canvases", "objects", "frames", "canvasViews"], "readonly");
+    const tx = this.db.transaction(["canvases", "objects", "frames", "canvasViews", "bookmarks"], "readonly");
     const canvas = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
     if (!canvas) throw new Error(`canvas ${canvasId} not found`);
     const range = IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
     const records = await req(tx.objectStore("objects").getAll(range) as IDBRequest<ObjectRecord[]>);
     const frames = await req(tx.objectStore("frames").getAll(range) as IDBRequest<FrameStoreRecord[]>);
     const camera = (await req(tx.objectStore("canvasViews").get(canvasId) as IDBRequest<StoredView | undefined>)) ?? null;
+    const saved = await req(tx.objectStore("bookmarks").get(canvasId) as IDBRequest<{ items?: unknown } | undefined>);
     const skipped: string[] = [];
     const space = new FrameSpace();
     try {
@@ -301,7 +306,7 @@ export class WorkspaceRepo {
         skipped.push(`${r.id}: ${(e as Error).message}`);
       }
     }
-    return { canvas, objects, space, skipped, camera };
+    return { canvas, objects, space, skipped, camera, bookmarks: readBookmarks(saved?.items) };
   }
 
   /**
@@ -339,6 +344,15 @@ export class WorkspaceRepo {
   /** Read back a canvas revision (used to report "verified"). */
   async revision(canvasId: string): Promise<number | undefined> {
     return (await this.canvas(canvasId))?.revision;
+  }
+
+  /** Save a canvas's bookmarks with the frames they need that are not stored yet (same rules as the view). */
+  async saveBookmarks(canvasId: string, items: readonly Bookmark[], frames: readonly FrameRecord[] = [], dropFrames: readonly string[] = []): Promise<void> {
+    const tx = this.db.transaction(["bookmarks", "frames"], "readwrite");
+    for (const f of frames) tx.objectStore("frames").put({ ...f, canvasId } satisfies FrameStoreRecord);
+    for (const id of dropFrames) tx.objectStore("frames").delete([canvasId, id]);
+    tx.objectStore("bookmarks").put({ canvasId, items });
+    await done(tx);
   }
 
   /**

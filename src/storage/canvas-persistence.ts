@@ -3,6 +3,7 @@ import { serializeFrameCamera } from "../core/frames";
 import type { ViewState } from "../app/view-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId } from "../doc/model";
+import type { Bookmark } from "./bookmarks";
 import type { CommitResult } from "./workspace-repo";
 import { RevisionConflictError, WorkspaceRepo } from "./workspace-repo";
 
@@ -52,6 +53,8 @@ export class CanvasPersistence {
   private inFlight: Promise<void> | null = null;
   private writable = true;
   private readonly listeners = new Set<() => void>();
+  /** This canvas's bookmarks (ADR 0025); their frames are kept like the view's. */
+  bookmarks: Bookmark[] = [];
   /** Called after each verified commit (used to notify read-only tabs). */
   onCommitted: ((canvasId: string, revision: number) => void) | null = null;
 
@@ -80,7 +83,8 @@ export class CanvasPersistence {
   }
 
   /** Bind to a freshly loaded canvas. Pending changes must be flushed first. */
-  attach(canvasId: string, revision: number, space: FrameSpace): void {
+  attach(canvasId: string, revision: number, space: FrameSpace, bookmarks: Bookmark[] = []): void {
+    this.bookmarks = bookmarks;
     this.canvasId = canvasId;
     this.revision = revision;
     this.dirty.clear();
@@ -180,8 +184,26 @@ export class CanvasPersistence {
 
   /** Stored frames that no object, the view or the world frame's chain needs. */
   private unreferenced(view: Frame): string[] {
-    const keep = new Set(this.doc.space.records([view, ...[...this.doc.all()].flatMap((o) => (o.frame ? [o.frame] : []))]).map((r) => r.id));
+    const keep = new Set(this.doc.space.records([view, ...this.bookmarkFrames(), ...[...this.doc.all()].flatMap((o) => (o.frame ? [o.frame] : []))]).map((r) => r.id));
     return [...this.stored.keys()].filter((id) => !keep.has(id));
+  }
+
+  private bookmarkFrames(): Frame[] {
+    return this.bookmarks.flatMap((b) => this.doc.space.frameByUid(b.view.frame) ?? []);
+  }
+
+  /** Replace this canvas's bookmarks and save them (with the frames they need). Resolves when stored. */
+  async saveBookmarks(items: Bookmark[]): Promise<void> {
+    this.bookmarks = items;
+    if (!this.repo || !this.canvasId || !this.writable || this.doc.space !== this.space) return;
+    try {
+      const frames = this.changedFrames(this.bookmarkFrames());
+      await this.repo.saveBookmarks(this.canvasId, items, frames);
+      for (const r of frames) this.stored.set(r.id, signature(r));
+      this.written += frames.length;
+    } catch {
+      // A failed save of bookmarks is reported by the panel's own state on the next change.
+    }
   }
 
   /** `collect`: clean up unreferenced frames now (tests); otherwise only after GC_AFTER frames were written. */

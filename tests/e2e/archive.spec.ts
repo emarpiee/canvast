@@ -120,6 +120,11 @@ async function buildWorkspace(p: Page): Promise<void> {
   // A stroke drawn 1,600 levels in, at an off-origin position.
   await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "123456789p-1590", cy: "-98765p-1590", zi: 1600, zf: 0.25, pz: 1600 }));
   await stroke(p, 640, 400);
+  // A bookmark 1,600 levels in (its frame must be kept, exported and imported with the canvas).
+  await p.getByRole("button", { name: "Bookmarks panel" }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await expect(p.getByTestId("bookmarks-panel").locator("li.bookmark")).toHaveCount(1);
+  await p.getByRole("button", { name: "Hide the Bookmarks panel" }).click();
   await openMenu(p);
   await p.getByRole("button", { name: "+ Canvas" }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
