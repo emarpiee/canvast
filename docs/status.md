@@ -92,7 +92,7 @@ step 6).
 
 **Committed:** v0.9.0 on `main`.
 
-**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite on the 3 Chromium projects (before Firefox was restored; the full suite with Firefox has not been run): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md). An Electron AppImage was tried and removed again the same day (only the single HTML file ships).
+**Test suites (2026-10-14):** the suites were made cheaper (logic specs in `chromium` only, smaller loops, one full-only 2,000-notch run). Full suite on the 3 Chromium projects (before Firefox was restored; the full suite with Firefox has not been run): 21 min 44 s, unit 130/130, E2E 214 passed, 1 failed (the tiles zoom-preview race, since fixed); details in [testing/full-run-3-chromium.md](testing/full-run-3-chromium.md).
 
 **Next bounded task:** run the full suite with Firefox (not yet run after Firefox was restored), then the next feature slice.
 

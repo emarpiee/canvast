@@ -52,7 +52,7 @@ To run the full length of a single test:
 | `chromium` | Default |
 | `chromium-cpu` | GPU and accelerated canvas disabled (the CPU-only tier) |
 | `chromium-dpr2` | DPR 2, touch enabled. The touch-pinch test runs only here; it is the "skipped by design" count in the other projects |
-| `firefox` | Firefox 157 (the project owner's main browser; removed for a few hours on 2026-10-14 during an Electron experiment and restored). Note: `performance.now()` has 1 ms resolution on `file://` in Firefox, so frame times there are whole milliseconds. See [firefox.md](firefox.md) |
+| `firefox` | Firefox 157 (the project owner's main browser; briefly removed from the tests on 2026-10-14 and restored). Note: `performance.now()` has 1 ms resolution on `file://` in Firefox, so frame times there are whole milliseconds. See [firefox.md](firefox.md) |
 
 ## Test logs
 
