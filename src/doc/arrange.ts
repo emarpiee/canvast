@@ -14,9 +14,11 @@ export interface Unit {
   objects: readonly CanvasObject[];
   /** Name for sorting: a file name, the first words of a text; empty for a stroke. */
   name: string;
+  /** When the unit's image was added to the library (ms); absent for text and strokes, which sort after dated ones. */
+  date?: number;
 }
 
-export type SortKey = "name-asc" | "name-desc" | "size" | "type" | "stack";
+export type SortKey = "name-asc" | "name-desc" | "date" | "size" | "type" | "stack";
 export type AlignKey = "left" | "centre" | "right" | "top" | "middle" | "bottom";
 
 interface Box {
@@ -53,6 +55,7 @@ export function sortUnits(units: readonly Unit[], key: SortKey): Unit[] {
   const cmp: Record<SortKey, (a: Unit, b: Unit) => number> = {
     "name-asc": (a, b) => byName(a, b, 1),
     "name-desc": (a, b) => byName(a, b, -1),
+    date: (a, b) => (a.date !== undefined && b.date !== undefined ? b.date - a.date : a.date !== undefined ? -1 : b.date !== undefined ? 1 : 0),
     size: (a, b) => area(b) - area(a),
     type: (a, b) => TYPE_ORDER[a.objects[0]!.kind] - TYPE_ORDER[b.objects[0]!.kind] || byName(a, b, 1),
     stack: () => 0,

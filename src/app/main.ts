@@ -348,11 +348,12 @@ async function start(): Promise<void> {
     arrangeSelection: (to) => arrangeSelection(doc, editor, to),
     layoutSelection: async (cmd) => {
       // Sorting by name needs the file names of the selected images (the document only has their hashes).
-      const names = new Map<string, string>();
-      if ("grid" in cmd && cmd.grid.startsWith("name") && session.catalog) {
+      const names = new Map<string, { name: string; date: number }>();
+      if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
         for (const o of doc.ordered()) {
           if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
-          names.set(o.assetId, (await session.catalog.entry(o.assetId).catch(() => undefined))?.name ?? "");
+          const e = await session.catalog.entry(o.assetId).catch(() => undefined);
+          names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
         }
       }
       layoutSelection(doc, editor, cmd, names);

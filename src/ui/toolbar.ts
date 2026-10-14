@@ -41,6 +41,7 @@ const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: strin
     items: [
       { id: "grid:name-asc", label: "By name, A to Z" },
       { id: "grid:name-desc", label: "By name, Z to A" },
+      { id: "grid:date", label: "By date added, newest first" },
       { id: "grid:size", label: "By size, largest first" },
       { id: "grid:type", label: "By type" },
       { id: "grid:stack", label: "In stacking order" },

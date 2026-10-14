@@ -72,10 +72,10 @@ export function arrangeSelection(doc: DocumentStore, editor: EditorState, to: "f
 
 export type LayoutCommand = { grid: SortKey } | { align: AlignKey } | { distribute: "x" | "y" };
 
-const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z to A", size: "by size", type: "by type", stack: "in stacking order" };
+const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z to A", date: "by date added", size: "by size", type: "by type", stack: "in stacking order" };
 
 /** The selection as units (a group at the level being worked at, else one object) in one frame, without locked ones. */
-function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, string>): Unit[] | string {
+function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, { name: string; date: number }>): Unit[] | string {
   const objs = selected(doc, editor).filter((o) => !o.locked);
   if (new Set(objs.map((o) => o.frame?.id ?? 0)).size > 1) return "These items are in different spaces; arrange them one space at a time.";
   const level = editor.entered.length;
@@ -84,15 +84,19 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
     const k = unitKey(o, level);
     (byUnit.get(k) ?? byUnit.set(k, []).get(k)!).push(o);
   }
-  const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId) ?? "") : o.kind === "text" ? o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : "");
-  return [...byUnit.values()].map((objects) => ({ objects, name: nameOf(objects[0]!) }));
+  const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId)?.name ?? "") : o.kind === "text" ? o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : "");
+  return [...byUnit.values()].map((objects) => {
+    const first = objects[0]!;
+    const date = first.kind === "image" ? names.get(first.assetId)?.date : undefined;
+    return { objects, name: nameOf(first), ...(date !== undefined ? { date } : {}) };
+  });
 }
 
 /**
  * Arrange the selection in a grid, or align or distribute it, as one undoable step of exact translations. `names`
- * maps an image's content hash to its file name (for sorting by name).
+ * maps an image's content hash to its file name and when it was added (for sorting by name or date).
  */
-export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: LayoutCommand, names: ReadonlyMap<string, string> = new Map()): void {
+export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: LayoutCommand, names: ReadonlyMap<string, { name: string; date: number }> = new Map()): void {
   if (editor.blockEdit()) return;
   const units = layoutUnits(doc, editor, names);
   if (typeof units === "string") {

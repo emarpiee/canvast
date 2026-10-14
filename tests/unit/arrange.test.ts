@@ -68,6 +68,8 @@ describe("arrange, align and distribute", () => {
     const s = unit({ ...box(0, 0, 5, 5, 2), kind: "stroke", points: [0, 0, 5, 5], width: 1, color: "#000000" } as unknown as CanvasObject, "");
     expect(sortUnits([s, a, b], "name-asc").map((u) => u.name)).toEqual(["a.png", "b.png", ""]);
     expect(sortUnits([s, a, b], "name-desc").map((u) => u.name)).toEqual(["b.png", "a.png", ""]);
+    const dated = [{ ...a, date: 100 }, { ...b, date: 200 }, s];
+    expect(sortUnits(dated, "date").map((u) => u.name)).toEqual(["a.png", "b.png", ""]); // newest first, undated last
     expect(sortUnits([a, b], "size").map((u) => u.name)).toEqual(["a.png", "b.png"]);
     expect(sortUnits([s, a, b], "type").map((u) => u.name)).toEqual(["a.png", "b.png", ""]);
   });
