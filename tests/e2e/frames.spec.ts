@@ -1016,3 +1016,29 @@ test("object eraser: a fast swipe takes what the brush crosses once, whole group
   await app.drag({ x: 900, y: 200 }, { x: 900, y: 520 }, 3);
   expect(await count()).toBe(1);
 });
+
+test("backend recovery: after the drawing surface is lost and restored the picture, the camera and editing come back (ADR 0023)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 300 }, { x: 800, y: 340 }, 6);
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  await app.frame();
+  const cam = await app.camera();
+  const ink = await p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  expect(ink).toBeGreaterThan(100);
+  // The browser's own events, fired by hand (a real loss cannot be forced from a test).
+  const prevented = await p.evaluate(() => {
+    const c = document.getElementById("canvas")!;
+    const lost = new Event("contextlost", { cancelable: true });
+    c.dispatchEvent(lost);
+    c.dispatchEvent(new Event("contextrestored"));
+    return lost.defaultPrevented;
+  });
+  expect(prevented, "the loss is acknowledged so the browser may restore the surface").toBe(true);
+  await app.frame();
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), "the same picture").toBe(ink);
+  expect(await app.camera(), "the same view").toEqual(cam);
+  await app.drag({ x: 400, y: 500 }, { x: 800, y: 540 }, 6); // and editing still works
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(2);
+});

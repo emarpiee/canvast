@@ -256,6 +256,19 @@ async function start(): Promise<void> {
   });
 
   view.subscribe(invalidate);
+  // Backend recovery (ADR 0023): if the browser takes the 2D drawing surface away (a GPU reset, memory pressure), keep the
+  // document and the camera, drop every cached raster (tiles are canvases of their own and may be lost with it), and redraw.
+  canvas.addEventListener("contextlost", (e) => {
+    e.preventDefault(); // allows the browser to restore the context
+    editor.message = "The browser reset the drawing surface; redrawing.";
+    editor.changed();
+  });
+  canvas.addEventListener("contextrestored", () => {
+    tiles.clear();
+    editor.message = "";
+    editor.changed();
+    invalidate();
+  });
   doc.subscribe(invalidate);
   editor.subscribe(() => {
     canvas.dataset["tool"] = editor.tool;
