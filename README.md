@@ -179,7 +179,7 @@ or network connection.
 
 ### Notes (Phase 3)
 
-- **Note tool** (`N`): click on the canvas to write a Markdown note in a panel; select text for the formatting toolbar (headings, bold, italic, strike, lists, quote, code, rule, tables, links). The note is a card on the canvas that moves, turns, groups and layers like a text; double-click it to edit. Tables and code blocks show as plain Markdown on the card.
+- **Note tool** (`N`): click on the canvas to write a Markdown note in place on the canvas; select text for the formatting toolbar (headings, bold, italic, strike, lists, quote, code, rule, tables, links). The note is a card on the canvas that moves, turns, groups and layers like a text; double-click it to edit. Tables and code blocks show as plain Markdown on the card.
 - `#tags` are kept as written; searching by tag comes in Phase 5.
 
 ### Text (Phase 1)
