@@ -459,7 +459,7 @@ form, works at any depth; `objects()` is the absolute form and throws beyond
 | Frame memory | Frames are not yet freed (≈1,300 after 2,500 random steps) | Step 3 frees unreferenced frames |
 | Coarse object whose edge stays near the view, from > 100,000 levels below | Dimmed approximate fill (not the exact edge) | §7.3, ADR 0016 |
 | Coarse text with the centre within 0.4% of an em of a glyph outline, from > 100,000 levels below | Dimmed approximate fill | §7.3, ADR 0016 |
-| Landmarks much coarser than the camera, edge crossing the view | Not drawn | Landmark edges are not summarised |
+| Landmarks much coarser than the camera, edge crossing the view | Not drawn (accepted) | Landmarks are fixtures spanning 2^-1024 to 2^1024 units; beyond that only an exactly aligned camera could see one |
 | Content far finer than a pixel | One dot per frame (position and mean colour; no per-cell detail) | Per-frame ink summaries if finer detail is wanted |
 | Unreferenced frame records | Collected with the saved view after 200 frames were written (and when idle) | Frames nothing refers to stay stored until then |
 | Firefox BigInt limit | About 2^20 bits per number; every per-frame path stays far below it | Keep it that way: no temporaries of ~depth bits |

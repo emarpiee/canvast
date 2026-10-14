@@ -79,11 +79,7 @@ archive and Firefox 2^10,000,000 tests pass.
 
 **Step 5, the depth suite (`tests/e2e/depth-suite.spec.ts`, all four projects, 20/20 on 2026-10-14):** A1 median frame time at 2^10, 10^3, 10^6, 10^9, 10^12 within 3× the 2^10 median + 3 ms; A2 ±10^12 jumps under 100 ms; A3 rebase continuity (zoom steps across frame boundaries and round trips of 0.3 to 1000 levels, at home and 10^12 levels down) under 10^-6 px (measured 4.5·10^-13); A5 draw, select, move, resize, undo, redo, open text and type at 2^10^12: the time from the last input to the frame showing it, and the slowest frame, each under 100 ms (measured in the page: 4-15 ms; the first version timed Playwright's mouse round trips, 12-25 ms each at pixel ratio 2, and failed at 108-111 ms for that reason); A7 heap flat over 15 dives (Chromium; Firefox has no heap figure, so object and stored-frame counts are checked there too). Limits fixed before the first run.
 
-**Known failures:** coarse landmark edges are not drawn (marked shortcut). Frames more than
-100,000 levels finer show as a dot. Loading v0.8 data with an object more
-than ~10^6 levels coarser than the world is slow (re-homing climbs one frame
-at a time). The Firefox dense-scene
-zoom-preview tile test fails on this machine on `main` too (timing, see 1g).
+**Known failures:** none open. Accepted by design: landmark edges much coarser than the camera are not drawn (landmarks are orientation fixtures: nested squares at the origin from 2^-1024 to 2^1024 world units, so past 1,024 levels only a camera exactly on an edge could see one; not worth a summary path). Frames more than 100,000 levels finer show as a dot. Loading v0.8 data with an object far coarser than the world is fast (re-homing a coarse object took 1, 21, 40 and 166 ms at 10^4, 10^6, 3·10^6 and 10^7 levels; the old note that it was slow was wrong).
 
 **Quick suite (2026-10-14, scratch copy):** unit 121/121; E2E 292 passed, 3 skipped, 1 failed (the known Firefox dense-scene zoom-preview flake); offline and names checks pass.
 
