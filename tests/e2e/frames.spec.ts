@@ -1303,7 +1303,7 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   await app.drag({ x: Math.round(top[0]), y: Math.round(top[1]) - 26 }, { x: Math.round(centre[0]) + 200, y: Math.round(centre[1]) }, 8);
   const f1 = (await frame())!;
   expect(f1.angle, "a quarter turn clockwise").toBeCloseTo(Math.PI / 2, 1);
-  expect(Math.abs(f1.corners[1][0] - f1.corners[0][0]), "its top edge now runs down the screen").toBeLessThan(2);
+  expect(Math.abs(f1.corners[1]![0] - f1.corners[0]![0]), "its top edge now runs down the screen").toBeLessThan(2);
   const turned = await rots();
   expect(turned.every((r) => r === turned[0] && r > 0), "all four turned by the same angle").toBe(true);
   // The box can be axis-aligned instead.
