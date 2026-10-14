@@ -1,10 +1,13 @@
 /** What a video file is: its picture at time `t` (clamped to its length) and its length. */
 export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBitmap; duration: number }> {
   const url = URL.createObjectURL(blob);
+  const v = document.createElement("video");
   try {
-    const v = document.createElement("video");
     v.muted = true;
     v.preload = "auto";
+    // In the page (faint, tiny, ignoring the pointer): some browsers present no new picture after a seek for an element nobody can see.
+    v.style.cssText = "position:fixed;left:0;top:0;width:16px;height:16px;opacity:0.01;pointer-events:none";
+    document.body.append(v);
     const once = (ev: string): Promise<void> =>
       new Promise((res, rej) => {
         v.addEventListener(ev, () => res(), { once: true });
@@ -26,10 +29,21 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
       v.currentTime = at;
       await s;
     }
+    await presented(v);
     return { bitmap: await createImageBitmap(v), duration };
   } finally {
     URL.revokeObjectURL(url);
+    v.remove();
   }
+}
+
+/** Resolves once the element has shown a new picture (where the browser says so), at most `ms` later. */
+export function presented(v: HTMLVideoElement, ms = 150): Promise<void> {
+  return new Promise((res) => {
+    const done = (): void => res();
+    setTimeout(done, ms);
+    (v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => void }).requestVideoFrameCallback?.(done);
+  });
 }
 
 /** Size of the picture an audio file is shown as. */

@@ -6,6 +6,8 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
+import { presented } from "../assets/video";
+import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
 import { projectObject } from "../render/projection";
@@ -51,6 +53,8 @@ interface Engine {
   label(): string;
   /** The picture shown now as a PNG (null when there is none to take). */
   frame(): Promise<Blob | null>;
+  /** Called when the picture of a paused position is on screen (after a seek or a pause). */
+  onSettled: () => void;
   /** Called when the position moved by itself (playing) and when playback ended. */
   onTick: () => void;
   onEnded: () => void;
@@ -117,9 +121,13 @@ function avEngine(v: HTMLVideoElement): Engine {
       c.getContext("2d")!.drawImage(v, 0, 0);
       return new Promise((res) => c.toBlob(res, "image/png"));
     },
+    onSettled: () => undefined,
     onTick: () => undefined,
     onEnded: () => undefined,
   };
+  v.addEventListener("seeked", () => {
+    if (!played) e.onSettled();
+  });
   v.addEventListener("timeupdate", () => e.onTick());
   v.addEventListener("play", () => e.onTick());
   v.addEventListener("pause", () => {
@@ -127,6 +135,7 @@ function avEngine(v: HTMLVideoElement): Engine {
       target = v.currentTime; // paused by the browser (a media key, say)
       played = false;
     }
+    if (!played && !v.ended) e.onSettled();
     e.onTick();
   });
   v.addEventListener("ended", () => {
@@ -207,6 +216,7 @@ function gifEngine(c: HTMLCanvasElement): Engine {
     step: (dir, amount, repeat) => g && show(stepFrame(idx, dir * amount, g.count, repeat)),
     label: () => `Frame ${idx + 1} / ${g?.count ?? 0}`,
     frame: () => new Promise((res) => c.toBlob(res, "image/png")),
+    onSettled: () => undefined,
     onTick: () => undefined,
     onEnded: () => undefined,
   };
@@ -347,6 +357,17 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     eng.el.style.display = "none"; // shown once it holds the paused picture: never the first frame for a moment
     host.append(eng.el);
     eng.onTick = () => p === sel && refresh();
+    // The canvas draws a paused video from a decode of the file; what the player really showed is better: keep that picture instead.
+    eng.onSettled = () => {
+      const v = videoOf(p);
+      if (!v || p.o.media!.kind !== "video" || p.loading || p.eng.playing()) return;
+      const at = p.eng.pos();
+      void presented(v).then(async () => {
+        if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
+        const bmp = await createImageBitmap(v).catch(() => null);
+        if (bmp) assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
+      });
+    };
     eng.onEnded = () => {
       if (!p.o.media!.repeat) actions.setMedia(p.o.id, { t: p.eng.len() }, "Pause media");
       if (p !== sel) release(p);

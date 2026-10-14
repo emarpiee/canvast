@@ -214,7 +214,11 @@ export class AssetLibrary {
         }
       }
     } catch {
-      throw new ImportError(`the file could not be decoded as ${file.type.startsWith("video/") ? "a video" : file.type.startsWith("audio/") ? "audio" : "an image"}`);
+      throw new ImportError(
+        file.type.startsWith("video/")
+          ? "the file could not be decoded as a video: this browser cannot play its format (often H.265/HEVC, which Chrome on Linux lacks). Try another browser, or convert it to H.264 or VP9"
+          : `the file could not be decoded as ${file.type.startsWith("audio/") ? "audio" : "an image"}`,
+      );
     }
     const record: AssetRecord = {
       hash,
@@ -298,6 +302,14 @@ export class AssetLibrary {
     }
   }
 
+  /** Put a picture under a decoded key: what a player showed when it paused, so the canvas draws exactly that. */
+  setPoster(key: string, bmp: ImageBitmap): void {
+    this.decoded.get(key)?.release();
+    this.decoded.set(key, makeSource(bmp));
+    this.evict();
+    this.onReady();
+  }
+
   /** Drop the decoded copy of an erased original (after garbage collection). */
   forget(hash: string): void {
     for (const k of [...this.decoded.keys()]) {
@@ -353,7 +365,12 @@ export class AssetLibrary {
   private async ensureDecoded(rec: AssetRecord, key = rec.hash): Promise<void> {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
-      this.decoded.set(key, makeSource(await decode(rec.blob, ms)));
+      const img = await decode(rec.blob, ms);
+      if (this.decoded.has(key)) {
+        (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins
+        return;
+      }
+      this.decoded.set(key, makeSource(img));
       this.evict();
     }
   }
