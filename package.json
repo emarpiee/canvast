@@ -2,7 +2,7 @@
   "name": "canvast",
   "version": "0.8.0",
   "private": true,
-  "description": "canvast \u2014 an offline-first endless canvas that ships as a single HTML file",
+  "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
