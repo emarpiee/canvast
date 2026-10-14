@@ -390,7 +390,9 @@ visible strokes). Alternatives:
 
 **Phase 3 is built and the full suite has run** (36 min 36 s; 380 passed, 6 skipped, 0 failed, [testing/full-run-phase-3.md](testing/full-run-phase-3.md)). Known gaps: one 70 ms frame when a zoom in a dense scene crosses the ADR 0012 preview bound (fix planned: build the adjacent zoom level's tiles in idle time), no document-memory budget (1M objects is about 1.1 GB), Assets view with 300 HD images is slow (Phase 4 thumbnails).
 
-**Next bounded task:** Phase 4: idle-time prebuild of the adjacent zoom level's tile set, then persisted thumbnails ([plan](plans/asset-thumbnails.md)).
+**Phase 4, slice 1 done:** idle-time prebuild of the adjacent zoom levels' tiles ([ADR 0033](adr/0033-idle-prebuild-of-adjacent-zoom-tiles.md)); the dense-zoom hitch at the first crossing is gone, later crossings in one gesture still rebuild (not chained).
+
+**Next bounded task:** Phase 4: persisted thumbnails ([plan](plans/asset-thumbnails.md)).
 
 ## Phase 1, slice 9 — settings scopes
 

@@ -257,6 +257,16 @@ test("dense scenes: zooming more than one level from the tile set renders exactl
   const rebuilt = await renderedDuring(p, () => zoomBy(p, 0.5)); // 1.25 levels from the set
   expect(rebuilt).toBeGreaterThan(0);
   expect((await stats(p)).last?.preview).toBe(false);
+
+  // Once the view rests, the levels one in and one out are built in idle time (ADR 0033): crossing the same bound
+  // then swaps to a ready set, with no tile rendered in the zoom frames, and the exact picture still follows.
+  await expect.poll(async () => { const s = await stats(p); return s.ahead >= 2 * (s.last?.tiles ?? Infinity); }, { timeout: 15_000 }).toBe(true);
+  const first = await zoomBy(p, 0.75);
+  const crossed = await zoomBy(p, 0.5); // 1.25 levels from the set it started from
+  expect(crossed.last).toMatchObject({ preview: true, rendered: 0 });
+  expect(crossed.renderedTotal - first.renderedTotal).toBe(0);
+  await expect.poll(async () => (await stats(p)).last?.preview, { timeout: 3000 }).toBe(false);
+  expectSamePicture(await compare(p), "after refine from a prebuilt set");
 });
 
 test("sparse scenes and deep zoom never use the preview: every zoom frame is exact", async ({ app }) => {

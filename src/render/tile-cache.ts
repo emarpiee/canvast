@@ -46,6 +46,17 @@ const GUARD_CSS = 8;
 const DENSE_MS = 12; // default; the quality governor lowers it (app/quality.ts)
 const PREVIEW_MAX_LEVELS = 1;
 const REFINE_MS = 150;
+/**
+ * Idle-time prebuild (ADR 0033): once the view has rested this long in a dense scene, the tile sets one zoom level in
+ * and one out are built in slices of at most SLICE_MS, so crossing the preview bound swaps to a ready set instead of
+ * rendering one whole exact frame.
+ */
+const IDLE_MS = 200;
+const SLICE_MS = 6;
+const AHEAD_LEVELS = [1, -1] as const;
+
+/** What the prebuild needs to render the tile set `dz` levels from the current one (null: not possible there). */
+export type AheadSource = (dz: number) => { cam: Camera; query: QueryVisible; draw: DrawObjects } | null;
 
 /** Objects drawn into one tile, and whether any image in it was still loading. */
 interface Tile {
@@ -63,6 +74,8 @@ interface Generation {
   frameId: number;
   vp: Viewport;
   tiles: Map<string, Tile>;
+  /** For a set built ahead of time: how to render its remaining tiles. */
+  ahead?: { cam: Camera; query: QueryVisible; draw: DrawObjects };
 }
 
 export interface TileFrame {
@@ -100,6 +113,12 @@ export class TileCache {
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   private refineNow = false;
   private gen: Generation | null = null;
+  /** Prebuilt sets one zoom level in (+1) and out (-1) from `gen`. */
+  private readonly ahead = new Map<number, Generation>();
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private aheadArgs: { source: AheadSource; vp: Viewport; dpr: number; reach: Reach } | null = null;
+  /** Build the neighbouring zoom levels in idle time (turned off on the lower quality levels). */
+  idleBuild = true;
   private lastKey = "";
   private readonly dirty = new Set<ObjectId>();
   private readonly pool: HTMLCanvasElement[] = [];
@@ -114,17 +133,36 @@ export class TileCache {
   clear(): void {
     if (this.gen) for (const t of this.gen.tiles.values()) this.release(t);
     this.gen = null;
+    this.dropAhead();
     this.dirty.clear();
+  }
+
+  private dropAhead(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    for (const g of this.ahead.values()) for (const t of g.tiles.values()) this.release(t);
+    this.ahead.clear();
+  }
+
+  /** Tiles held by the prebuilt sets (diagnostics and tests). */
+  get aheadTiles(): number {
+    let n = 0;
+    for (const g of this.ahead.values()) n += g.tiles.size;
+    return n;
   }
 
   /** Objects changed (null: the whole document was replaced). Their tiles re-render on the next frame. */
   invalidate(changed: ReadonlySet<ObjectId> | null): void {
     if (!changed) this.clear();
-    else if (this.gen) for (const id of changed) this.dirty.add(id);
+    else {
+      this.dropAhead(); // an edit makes the prebuilt sets wrong
+      if (this.gen) for (const id of changed) this.dirty.add(id);
+    }
   }
 
   /** An image finished loading: re-render tiles that showed a placeholder. */
   dropPending(): void {
+    this.dropAhead();
     if (!this.gen) return;
     for (const [k, t] of this.gen.tiles) {
       if (!t.pending) continue;
@@ -157,7 +195,10 @@ export class TileCache {
     drawObjects: DrawObjects,
     reach: Reach,
     project: (o: CanvasObject, vp: Viewport) => ProjectedObject | null,
+    ahead?: AheadSource,
   ): TileFrame | null {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
     const td = TILE_CSS * dpr;
     if (!this.enabled || !Number.isInteger(td) || !Number.isInteger(GUARD_CSS * dpr)) return null;
     const key = `${frameId}|${cam.zi}|${cam.zf}|${dpr}`;
@@ -168,8 +209,15 @@ export class TileCache {
     const dense = this.lastFullMs > this.denseMs;
     if (this.gen && this.gen.key !== key) {
       // The preview scales the last tile set: only within the same frame.
-      const pv = !stable && dense && this.gen.frameId === frameId ? this.preview(ctx, cam, vp, dpr) : null;
+      const preview = !stable && dense && this.gen.frameId === frameId;
+      const pv = preview ? this.preview(ctx, cam, vp, dpr) : null;
       if (pv) return pv;
+      // Beyond the bound: a prebuilt set within one level takes over (the old set becomes its neighbour).
+      const next = preview && !this.dirty.size ? this.takeAhead(z) : null;
+      if (next) {
+        const pv2 = this.preview(ctx, cam, vp, dpr);
+        if (pv2) return pv2;
+      }
       this.clear();
     }
     if (!this.gen) {
@@ -189,19 +237,8 @@ export class TileCache {
     const { dx, dy } = off;
     const m = TILE_CSS; // query margin: every tile touching the viewport lies within it
     const infl: Viewport = { width: vp.width + 2 * m, height: vp.height + 2 * m };
-    const devW = Math.ceil(vp.width * dpr);
-    const devH = Math.ceil(vp.height * dpr);
-    const i0 = Math.floor(-dx / td);
-    const i1 = Math.floor((devW - 1 - dx) / td);
-    const j0 = Math.floor(-dy / td);
-    const j1 = Math.floor((devH - 1 - dy) / td);
-    const gd = GUARD_CSS * dpr; // guard in device px (an integer whenever td is)
-    // Rendered tile rect (with guard) in the inflated viewport's CSS coordinates.
-    const rect = (i: number, j: number): { l: number; t: number; r: number; b: number } => {
-      const l = (i * td + dx) / dpr + m - GUARD_CSS;
-      const t = (j * td + dy) / dpr + m - GUARD_CSS;
-      return { l, t, r: l + TILE_CSS + 2 * GUARD_CSS, b: t + TILE_CSS + 2 * GUARD_CSS };
-    };
+    const { i0, i1, j0, j1 } = this.range(dx, dy, vp, dpr);
+    const gd = GUARD_CSS * dpr;
 
     if (this.dirty.size) {
       // Drop tiles that showed a changed object, or that its new state overlaps.
@@ -242,35 +279,9 @@ export class TileCache {
         if (!g.tiles.has(`${i},${j}`)) missing.push([i, j]);
       }
     }
-    let visible = 0;
     const buildStart = performance.now();
-    if (missing.length) {
-      const list = query(infl);
-      visible = list.length;
-      for (const [i, j] of missing) {
-        const r = rect(i, j);
-        const mine = list.filter((po) => {
-          const e = reach(po);
-          return po.box.maxX + e >= r.l && po.box.minX - e <= r.r && po.box.maxY + e >= r.t && po.box.minY - e <= r.b;
-        });
-        const tile: Tile = { canvas: null, ids: new Set(mine.map((po) => po.obj.id)), pending: false };
-        if (mine.length) {
-          const canvas = this.pool.pop() ?? document.createElement("canvas");
-          const size = td + 2 * gd;
-          if (canvas.width !== size) canvas.width = size;
-          if (canvas.height !== size) canvas.height = size;
-          const tctx = canvas.getContext("2d")!;
-          tctx.setTransform(1, 0, 0, 1, 0, 0);
-          tctx.globalAlpha = 1;
-          tctx.clearRect(0, 0, size, size);
-          // Inflated CSS coords → this tile's device pixels (all offsets are whole device pixels).
-          tctx.setTransform(dpr, 0, 0, dpr, -(i * td + dx) - m * dpr + gd, -(j * td + dy) - m * dpr + gd);
-          tile.pending = drawObjects(tctx, mine, list, infl);
-          tile.canvas = canvas;
-        }
-        g.tiles.set(`${i},${j}`, tile);
-      }
-    }
+    this.renderedTotal += missing.length;
+    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, Infinity).visible : 0;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -291,9 +302,126 @@ export class TileCache {
         g.tiles.delete(k);
       }
     }
-    this.renderedTotal += missing.length;
     if (missing.length === needed.length && needed.length) this.lastFullMs = performance.now() - buildStart;
+    if (ahead && this.idleBuild && this.lastFullMs > this.denseMs && !this.refineTimer) {
+      this.aheadArgs = { source: ahead, vp, dpr, reach };
+      this.idleTimer = setTimeout(() => this.stepAhead(), IDLE_MS);
+    }
     return { tiles: needed.length, rendered: missing.length, visible, preview: false };
+  }
+
+  /** The tile range of a set seen from a camera offset by (dx, dy) device px. */
+  private range(dx: number, dy: number, vp: Viewport, dpr: number): { i0: number; i1: number; j0: number; j1: number } {
+    const td = TILE_CSS * dpr;
+    return {
+      i0: Math.floor(-dx / td),
+      i1: Math.floor((Math.ceil(vp.width * dpr) - 1 - dx) / td),
+      j0: Math.floor(-dy / td),
+      j1: Math.floor((Math.ceil(vp.height * dpr) - 1 - dy) / td),
+    };
+  }
+
+  /**
+   * Render the `missing` tiles of `g` (seen from a camera offset by dx, dy device px), stopping after `budgetMs`
+   * once at least one is done. Returns how many were built and how many objects the query found.
+   */
+  private buildTiles(
+    g: Generation,
+    missing: ReadonlyArray<[number, number]>,
+    dx: number,
+    dy: number,
+    vp: Viewport,
+    dpr: number,
+    query: QueryVisible,
+    drawObjects: DrawObjects,
+    reach: Reach,
+    budgetMs: number,
+  ): { built: number; visible: number } {
+    const td = TILE_CSS * dpr;
+    const gd = GUARD_CSS * dpr; // guard in device px (an integer whenever td is)
+    const m = TILE_CSS; // query margin: every tile touching the viewport lies within it
+    const infl: Viewport = { width: vp.width + 2 * m, height: vp.height + 2 * m };
+    const start = performance.now();
+    const list = query(infl);
+    let built = 0;
+    for (const [i, j] of missing) {
+      if (built && performance.now() - start > budgetMs) break;
+      built++;
+      // Rendered tile rect (with guard) in the inflated viewport's CSS coordinates.
+      const l = (i * td + dx) / dpr + m - GUARD_CSS;
+      const t = (j * td + dy) / dpr + m - GUARD_CSS;
+      const r = { l, t, r: l + TILE_CSS + 2 * GUARD_CSS, b: t + TILE_CSS + 2 * GUARD_CSS };
+      const mine = list.filter((po) => {
+        const e = reach(po);
+        return po.box.maxX + e >= r.l && po.box.minX - e <= r.r && po.box.maxY + e >= r.t && po.box.minY - e <= r.b;
+      });
+      const tile: Tile = { canvas: null, ids: new Set(mine.map((po) => po.obj.id)), pending: false };
+      if (mine.length) {
+        const canvas = this.pool.pop() ?? document.createElement("canvas");
+        const size = td + 2 * gd;
+        if (canvas.width !== size) canvas.width = size;
+        if (canvas.height !== size) canvas.height = size;
+        const tctx = canvas.getContext("2d")!;
+        tctx.setTransform(1, 0, 0, 1, 0, 0);
+        tctx.globalAlpha = 1;
+        tctx.clearRect(0, 0, size, size);
+        // Inflated CSS coords → this tile's device pixels (all offsets are whole device pixels).
+        tctx.setTransform(dpr, 0, 0, dpr, -(i * td + dx) - m * dpr + gd, -(j * td + dy) - m * dpr + gd);
+        tile.pending = drawObjects(tctx, mine, list, infl);
+        tile.canvas = canvas;
+      }
+      g.tiles.set(`${i},${j}`, tile);
+    }
+    return { built, visible: list.length };
+  }
+
+  /** One idle slice: build some tiles of the next prebuilt set, and schedule the next slice while any remain. */
+  private stepAhead(): void {
+    this.idleTimer = null;
+    const a = this.aheadArgs;
+    const cur = this.gen;
+    if (!a || !cur || this.dirty.size || !this.idleBuild) return;
+    for (const dz of AHEAD_LEVELS) {
+      let g = this.ahead.get(dz);
+      if (!g) {
+        const src = a.source(dz);
+        if (!src) continue;
+        g = {
+          key: `${cur.frameId}|${src.cam.zi}|${src.cam.zf}|${a.dpr}`,
+          z: src.cam.zi + src.cam.zf,
+          center: src.cam.center,
+          frameId: cur.frameId,
+          vp: a.vp,
+          tiles: new Map(),
+          ahead: src,
+        };
+        this.ahead.set(dz, g);
+      }
+      const { i0, i1, j0, j1 } = this.range(0, 0, a.vp, a.dpr);
+      const missing: Array<[number, number]> = [];
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (!g.tiles.has(`${i},${j}`)) missing.push([i, j]);
+      if (!missing.length) continue;
+      const src = g.ahead!;
+      this.buildTiles(g, missing, 0, 0, a.vp, a.dpr, src.query, src.draw, a.reach, SLICE_MS);
+      this.idleTimer = setTimeout(() => this.stepAhead(), 0);
+      return;
+    }
+  }
+
+  /** Make the prebuilt set within one level of zoom `z` the current set; the old one becomes its neighbour. */
+  private takeAhead(z: number): Generation | null {
+    const old = this.gen!;
+    for (const dz of AHEAD_LEVELS) {
+      const g = this.ahead.get(dz);
+      if (!g || !g.tiles.size || Math.abs(g.z - z) > PREVIEW_MAX_LEVELS) continue;
+      this.ahead.delete(dz);
+      this.dropAhead();
+      delete g.ahead;
+      this.gen = g;
+      this.ahead.set(-dz, old);
+      return g;
+    }
+    return null;
   }
 
   /**

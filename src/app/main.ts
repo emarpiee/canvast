@@ -22,7 +22,7 @@ import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
 import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-index";
 import type { Frame } from "../core/frames";
-import { depthOf } from "../core/frames";
+import { depthOf, localCamera, normalize } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
 import { WorkspaceRepo } from "../storage/workspace-repo";
@@ -141,6 +141,7 @@ async function start(): Promise<void> {
   // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
   const quality = new QualityGovernor((level) => {
     tiles.denseMs = DENSE_MS[level];
+    tiles.idleBuild = level === 0;
     resize();
   });
   // In debug mode (the tests) the level changes only when asked to, so a slow machine cannot change what a test measures.
@@ -214,6 +215,21 @@ async function start(): Promise<void> {
               if (isCoarse(fc, o.frame ?? doc.space.world)) return coverObject(o, infl, {});
               const oc = cameraIn(fc, o.frame ?? doc.space.world);
               return oc && projectObject(o, oc, infl, { keepTiny: true });
+            },
+            // Idle-time prebuild of the zoom levels around this one (ADR 0033), in the same frame.
+            (dz) => {
+              const fc2 = normalize(fc.f.space, { ...fc, z: fc.z + dz });
+              if (fc2.f !== fc.f) return null;
+              let lastAll: readonly ProjectedObject[] | null = null;
+              let lastRuns: Map<ProjectedObject, number> | undefined;
+              return {
+                cam: localCamera(fc2),
+                query: (infl) => visibleObjects(doc, index, null, fc2, infl),
+                draw: (c, list, all, infl) => {
+                  if (all !== lastAll) lastRuns = batchRuns((lastAll = all));
+                  return drawObjects(c, list, assets, infl, dpr, theme, lastRuns);
+                },
+              };
             },
           )
         : null;
