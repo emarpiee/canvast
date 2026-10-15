@@ -430,6 +430,8 @@ visible strokes). Alternatives:
 
 **Phase 7, slice 1 (Settings view, [ADR 0048](adr/0048-settings-view.md)):** third top-level view with six tabs, rows from the declared settings with scope and reset, settings-to-editor sync, theme (system, light, dark). Tested: unit `settings-view.test.ts` (2); E2E `settings.spec.ts` (chromium, firefox: tabs, shortcuts off, a row reaches the pen, reset, theme and background pixel, reload, Storage tab); archive, assets, organize, frames and text specs in chromium. Found and fixed on the way: the Layers rename could start from a press on another canvas. Not built: see the ADR. **Next bounded task:** a shortcut list and rebinding, or an accessibility pass.
 
+**Phase 7, slice 2 (shortcuts, [ADR 0049](adr/0049-shortcuts.md)):** rebindable tool keys, the shortcut list, `?`. Tested: unit `settings-view.test.ts` (3); E2E `settings.spec.ts` "shortcuts" (chromium, firefox); frames, text and editing specs in chromium (51). **Next bounded task:** accessibility pass, appearance options (text size, reduced motion, high contrast), then contextual tools.
+
 **Phase 6 is complete (v0.15.0):** full suite in [full-run-phase-6.md](testing/full-run-phase-6.md): 411 passed, 6 skipped, 1 failed (the intermittent Firefox hole check above). **Next bounded task:** Phase 7; ask before pushing (Phases 5 and 6 are local).
 
 ## Phase 1, slice 9 — settings scopes

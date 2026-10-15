@@ -133,6 +133,8 @@ type Gesture =
 export interface ToolHooks {
   /** Open the text editor on `target`, or on a new text object at `at`. */
   editText(target: TextObject | null, at: WorldPoint): void;
+  /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
+  toolForKey(key: string): Tool | undefined;
 }
 
 export function attachTools(
@@ -750,12 +752,7 @@ export function attachTools(
         spaceDown = true;
         el.classList.add("is-hand");
       }
-    } else if (key === "v") editor.setTool("select");
-    else if (key === "p") editor.setTool("pen");
-    else if (key === "l") editor.setTool("lasso");
-    else if (key === "h") editor.setTool("hand");
-    else if (key === "t") editor.setTool("text");
-    else if (key === "e") editor.setTool("eraser");
+    } else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool

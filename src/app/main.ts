@@ -39,6 +39,7 @@ import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
+import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
@@ -361,7 +362,7 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6));
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at) });
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k) });
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);
@@ -470,6 +471,12 @@ async function start(): Promise<void> {
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"));
+  // Tool buttons say which key picks them (the keys can be changed in Settings).
+  const updateToolTitles = (): void => {
+    const keys = toolKeys(settings);
+    for (const t of TOOL_ORDER) document.querySelector<HTMLElement>(`[data-tool="${t}"]`)?.setAttribute("title", `${TOOL_NAME[t]} (${keys[t].toUpperCase()})`);
+  };
+  updateToolTitles();
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, () => setView("canvas"));
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
   settings.subscribe((key) => {
@@ -494,11 +501,21 @@ async function start(): Promise<void> {
         tiles.clear();
         invalidate();
         return;
-      default: return;
+      default:
+        if (key.startsWith("key.")) updateToolTitles();
+        return;
     }
     editor.changed();
   });
   mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
+
+  // "?" opens the shortcut list (not while typing).
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault();
+    if (appView !== "settings") setView("settings");
+    settingsView.show("shortcuts");
+  });
 
   // Drag-and-drop and paste import.
   window.addEventListener("dragover", (e) => {

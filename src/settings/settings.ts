@@ -27,6 +27,7 @@ export interface Def<T> {
 const oneOf = <T extends string>(...allowed: T[]) => (v: unknown): T | undefined => (allowed.includes(v as T) ? (v as T) : undefined);
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 const range = (lo: number, hi: number) => (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
+const letter = (v: unknown): string | undefined => (typeof v === "string" && /^[a-z]$/.test(v) ? v : undefined);
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
 
 export const SETTINGS = {
@@ -51,6 +52,12 @@ export const SETTINGS = {
   "media.step.audio": { scope: "device", default: 1, validate: range(0.1, 600), effect: "immediate" } as Def<number>,
   "media.step.gif": { scope: "device", default: 1, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "ui.theme": { scope: "device", default: "system", validate: oneOf("system", "light", "dark"), effect: "immediate" } as Def<"system" | "light" | "dark">,
+  "key.hand": { scope: "device", default: "h", validate: letter, effect: "immediate" } as Def<string>,
+  "key.select": { scope: "device", default: "v", validate: letter, effect: "immediate" } as Def<string>,
+  "key.pen": { scope: "device", default: "p", validate: letter, effect: "immediate" } as Def<string>,
+  "key.lasso": { scope: "device", default: "l", validate: letter, effect: "immediate" } as Def<string>,
+  "key.text": { scope: "device", default: "t", validate: letter, effect: "immediate" } as Def<string>,
+  "key.eraser": { scope: "device", default: "e", validate: letter, effect: "immediate" } as Def<string>,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

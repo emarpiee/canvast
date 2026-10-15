@@ -1,5 +1,6 @@
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
 import { SETTINGS } from "../settings/settings";
+import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolKeys, toolUsing } from "../settings/shortcuts";
 import { esc } from "./format";
 
 /**
@@ -70,6 +71,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Appearance",
     rows: [{ key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } }],
   },
+  { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
 ];
@@ -87,7 +89,7 @@ function controlHtml(row: Row, id: string): string {
 }
 
 /** Mount the view into `root`; returns what main needs to show and hide it. */
-export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void): { show(): void; hide(): void } {
+export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void): { show(tab?: string): void; hide(): void } {
   const tabsHtml = SETTINGS_TABS.map((t) => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}</button>`).join("");
   const panelsHtml = SETTINGS_TABS.map((t) => {
     const body = t.rows
@@ -100,6 +102,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default">Reset</button></div>`;
           })
           .join("")
+      : t.id === "shortcuts"
+        ? `<div class="set-info set-keys"><p>Tool keys are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
+           <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3>Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl>`).join("")}</div>`
       : t.id === "storage"
         ? `<div class="set-info" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
            <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Use an export from the workspace menu to keep a copy.</p></div>`
@@ -144,9 +149,27 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     }
   };
 
+  /** The tool whose key is being changed, waiting for a letter. */
+  let capturing: (typeof TOOL_ORDER)[number] | null = null;
+  const renderKeys = (): void => {
+    const host = root.querySelector<HTMLElement>("[data-tool-keys]");
+    if (!host) return;
+    const keys = toolKeys(settings);
+    host.innerHTML = TOOL_ORDER.map((t) => {
+      const def = SETTINGS[TOOL_KEY_SETTING[t]].default;
+      return `<div class="set-row set-keyrow"><span class="set-label">${esc(TOOL_NAME[t])}</span>
+        <div class="set-control"><kbd class="set-key">${capturing === t ? "press a letter…" : esc(keys[t].toUpperCase())}</kbd><button type="button" class="set-reset" data-change-key="${t}" aria-label="Change the key for ${esc(TOOL_NAME[t])}">Change</button></div>
+        <span class="set-scope">This device</span><button type="button" class="set-reset" data-reset="${TOOL_KEY_SETTING[t]}" aria-label="Reset the key for ${esc(TOOL_NAME[t])} to its default"${keys[t] === def ? " disabled" : ""}>Reset</button></div>`;
+    }).join("");
+  };
+  const keyNote = (text: string): void => {
+    const n = root.querySelector<HTMLElement>("[data-key-note]");
+    if (n) n.textContent = text;
+  };
   const all = SETTINGS_TABS.flatMap((t) => t.rows ?? []);
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   const refresh = (): void => {
+    renderKeys();
     for (const r of all) {
       const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-set="${r.key}"]`);
       if (!el) continue;
@@ -183,11 +206,41 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     const t = e.target as HTMLElement;
     const tab = t.closest<HTMLElement>("[data-tab]");
     if (tab) return select(tab.dataset["tab"]!);
+    const change = t.closest<HTMLElement>("[data-change-key]");
+    if (change) {
+      capturing = change.dataset["changeKey"] as (typeof TOOL_ORDER)[number];
+      keyNote("");
+      renderKeys();
+      root.querySelector<HTMLElement>(`[data-change-key="${capturing}"]`)?.focus();
+      return;
+    }
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
     if (t.closest("[data-done]")) onClose();
   });
   root.addEventListener("keydown", (e) => {
+    if (capturing) {
+      // Any key is for the key being chosen: a letter sets it, Escape cancels, everything else is refused with a reason.
+      const tool = capturing;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Tab" || e.key === "Shift") return;
+      capturing = null;
+      const letter = e.key.length === 1 ? e.key.toLowerCase() : "";
+      if (e.key === "Escape") keyNote("");
+      else if (!/^[a-z]$/.test(letter) || e.ctrlKey || e.metaKey || e.altKey) keyNote("A tool key is one plain letter, a to z.");
+      else {
+        const other = toolUsing(settings, letter, tool);
+        if (other) keyNote(`${letter.toUpperCase()} is already the key for ${TOOL_NAME[other]}. Change that one first.`);
+        else {
+          settings.set(TOOL_KEY_SETTING[tool], letter);
+          keyNote(`${TOOL_NAME[tool]} is now ${letter.toUpperCase()}.`);
+        }
+      }
+      renderKeys();
+      root.querySelector<HTMLElement>(`[data-change-key="${tool}"]`)?.focus();
+      return;
+    }
     const tab = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
     if (tab && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End")) {
       const i = tabs.indexOf(tab as HTMLButtonElement);
@@ -205,10 +258,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
   select(current);
   refresh();
   return {
-    show() {
+    show(tab?: string) {
       root.hidden = false;
       refresh();
-      select(current);
+      select(tab && tabs.some((t) => t.dataset["tab"] === tab) ? tab : current);
       root.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
     },
     hide() {

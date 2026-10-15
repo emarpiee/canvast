@@ -64,3 +64,45 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   await expect(p.locator("#settings-view [data-used]")).toHaveText(/MB|GB|unknown/);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("shortcuts: tool keys can be changed and are refused when taken; the list opens with ? (ADR 0049)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.locator("#settings-view");
+  const tool = () => p.evaluate(() => window.__canvastDebug.tool());
+  // "?" opens the list on the Shortcuts tab; the fixed shortcuts are there.
+  await p.keyboard.press("?");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("#set-panel-shortcuts")).toBeVisible();
+  await expect(panel.locator("#set-panel-shortcuts")).toContainText("Ctrl+Z");
+  // Pen to K: K works on the canvas, P no longer does, the button says K. A letter that is taken is refused.
+  await panel.getByRole("button", { name: "Change the key for Pen" }).click();
+  await p.keyboard.press("k");
+  await expect(panel.locator("[data-key-note]")).toContainText("Pen is now K");
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await p.keyboard.press("k");
+  await expect(panel.locator("[data-key-note]")).toContainText("already the key for Pen");
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await p.keyboard.press("5");
+  await expect(panel.locator("[data-key-note]")).toContainText("one plain letter");
+  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (K)");
+  await p.keyboard.press("v");
+  expect(await tool()).toBe("select");
+  await p.keyboard.press("p");
+  expect(await tool(), "the old key no longer picks the pen").toBe("select");
+  await p.keyboard.press("k");
+  expect(await tool()).toBe("pen");
+  // Kept after a reload; Reset puts P back.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.keyboard.press("v");
+  await p.keyboard.press("k");
+  expect(await tool()).toBe("pen");
+  await p.keyboard.press("?");
+  await panel.getByRole("button", { name: "Reset the key for Pen to its default" }).click();
+  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await p.keyboard.press("v");
+  await p.keyboard.press("p");
+  expect(await tool()).toBe("pen");
+  expect(app.consoleErrors).toEqual([]);
+});
