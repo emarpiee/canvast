@@ -6,7 +6,7 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
-import { frameBitmap, isFlat, presented, presentedNear } from "../assets/video";
+import { pictureNow, presented, presentedNear } from "../assets/video";
 import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
@@ -55,6 +55,8 @@ interface Engine {
   label(): string;
   /** The picture shown now as a PNG (null when there is none to take). */
   frame(): Promise<Blob | null>;
+  /** The picture shown now, as a bitmap, taken whichever way works in this browser (null: none, or none to take). */
+  snap(): Promise<ImageBitmap | null>;
   /** Settles when the last seek's picture has been presented (null: the browser cannot say). */
   shown: Promise<number | null>;
   /** Called when the picture of a paused position is on screen (after a seek or a pause). */
@@ -66,6 +68,7 @@ interface Engine {
 
 function avEngine(v: HTMLVideoElement): Engine {
   let url = "";
+  let file: Blob | null = null;
   let duration = 0;
   // Where the paused picture is. The element's own clock is not trusted when paused: Firefox can report a spurious end (and jump to the
   // end) after a seek near it, which would save the end as the position while the picture shown is earlier.
@@ -76,6 +79,7 @@ function avEngine(v: HTMLVideoElement): Engine {
     visual: true,
     async load(o, blob, dur) {
       url = URL.createObjectURL(blob);
+      file = blob;
       v.muted = false;
       v.src = url;
       await new Promise<void>((res, rej) => {
@@ -128,8 +132,8 @@ function avEngine(v: HTMLVideoElement): Engine {
     step: (dir, amount, repeat) => e.seek(stepTime(e.pos(), dir * amount, duration, repeat)),
     label: () => `${formatTime(e.pos())} / ${formatTime(duration)}`,
     async frame() {
-      if (!v.videoWidth || v.readyState < 2) return null;
-      const bmp = await frameBitmap(v).catch(() => null);
+      if (!file || !v.videoWidth || v.readyState < 2) return null;
+      const bmp = await pictureNow(v, file, e.pos());
       if (!bmp) return null;
       const c = document.createElement("canvas");
       c.width = bmp.width;
@@ -137,6 +141,9 @@ function avEngine(v: HTMLVideoElement): Engine {
       c.getContext("2d")!.drawImage(bmp, 0, 0);
       bmp.close();
       return new Promise((res) => c.toBlob(res, "image/png"));
+    },
+    async snap() {
+      return file && v.videoWidth ? pictureNow(v, file, e.pos()) : null;
     },
     shown: Promise.resolve(null),
     onSettled: () => undefined,
@@ -234,6 +241,7 @@ function gifEngine(c: HTMLCanvasElement): Engine {
     step: (dir, amount, repeat) => g && show(stepFrame(idx, dir * amount, g.count, repeat)),
     label: () => `Frame ${idx + 1} / ${g?.count ?? 0}`,
     frame: () => new Promise((res) => c.toBlob(res, "image/png")),
+    snap: async () => null,
     shown: Promise.resolve(null),
     onSettled: () => undefined,
     onTick: () => undefined,
@@ -398,9 +406,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       void p.eng.shown.then(async (seen) => {
         if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
         if (seen !== null && Math.abs(seen - at) > 0.5) console.warn(`canvast: the picture shown is from ${seen.toFixed(2)} s, wanted ${at.toFixed(2)} s`);
-        const bmp = await frameBitmap(v).catch(() => null);
-        if (bmp && isFlat(bmp)) bmp.close(); // flat: the browser drew nothing; keep the picture the canvas already has
-        else if (bmp) {
+        const bmp = await p.eng.snap().catch(() => null); // null: nothing better than the picture the canvas already has
+        if (bmp) {
           assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
           actions.repaint(p.o.id); // a picture already drawn from the file's own decode is replaced by this one
         }

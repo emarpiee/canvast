@@ -15,13 +15,13 @@ export interface VideoProbe {
 const CONTAINERS = new Set(["moov", "trak", "mdia", "minf", "stbl"]);
 const CODECS: Record<string, string> = { avc1: "H.264", avc3: "H.264", hvc1: "H.265", hev1: "H.265", av01: "AV1", vp09: "VP9", vp08: "VP8", mp4v: "MPEG-4" };
 
-interface Box {
+export interface Box {
   type: string;
   start: number;
   end: number;
 }
 
-function boxes(b: Uint8Array, from: number, to: number): Box[] {
+export function boxes(b: Uint8Array, from: number, to: number): Box[] {
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   const out: Box[] = [];
   let p = from;

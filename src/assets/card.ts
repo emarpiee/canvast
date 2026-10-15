@@ -1,5 +1,5 @@
 /** The picture of a video this browser cannot decode: a card of the video's own shape saying what it is (ADR 0045). */
-export async function makeCard(w: number, h: number, name: string, codec: string): Promise<ImageBitmap> {
+export async function makeCard(w: number, h: number, name: string, codec: string, why = ""): Promise<ImageBitmap> {
   const k = Math.min(1, 640 / Math.max(w, h));
   const c = document.createElement("canvas");
   c.width = Math.max(2, Math.round(w * k));
@@ -36,7 +36,7 @@ export async function makeCard(w: number, h: number, name: string, codec: string
   x.fillText(fit(name || "Video", nameFont), c.width / 2, y);
   x.fillStyle = "#9aa4bb";
   const detailSize = parseFloat(detailFont);
-  for (const line of [`${codec || "Video"} · ${w}×${h}`, "can't be previewed in this browser"]) {
+  for (const line of [`${codec || "Video"} · ${w}×${h}`, "can't be previewed in this browser", ...(why ? [why] : [])]) {
     y += (line === `${codec || "Video"} · ${w}×${h}` ? nameSize : detailSize) * 1.45;
     x.fillText(fit(line, detailFont), c.width / 2, y);
   }

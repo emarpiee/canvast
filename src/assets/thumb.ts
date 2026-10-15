@@ -26,7 +26,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
               if (e instanceof BlankPictureError) return e.result.bitmap;
               throw e;
             }
-            return makeCard(pr.w, pr.h, rec.name, pr.codec); // a video this browser cannot decode: its card
+            return makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : ""); // a video this browser cannot decode: its card
           },
         )
       : rec.type.startsWith("audio/")

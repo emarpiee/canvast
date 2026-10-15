@@ -1,3 +1,5 @@
+import { decodeMp4Frame } from "./mp4-frames";
+
 /** A picture that is one flat colour (or nothing at all): what some browsers hand back when they cannot draw a video's frame. */
 export function isFlat(b: ImageBitmap): boolean {
   const c = document.createElement("canvas");
@@ -16,13 +18,41 @@ export function isFlat(b: ImageBitmap): boolean {
  * It carries the flat picture, for a file that cannot be shown as a card instead.
  */
 export class BlankPictureError extends Error {
-  constructor(readonly result: { bitmap: ImageBitmap; duration: number }) {
+  constructor(
+    readonly result: { bitmap: ImageBitmap; duration: number },
+    /** Why the picture could not be taken another way either (shown on the card). */
+    readonly why = "",
+  ) {
     super("this browser draws no picture for the video");
   }
 }
 
+/** Set once a video element's picture came back flat: later pictures go the other way first. */
+let elementBlank = false;
+
 /** What a video file is: its picture at time `t` (clamped to its length) and its length. */
 export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBitmap; duration: number }> {
+  if (elementBlank) {
+    try {
+      return await decodeMp4Frame(blob, t);
+    } catch {
+      // not an MP4 this browser decodes through WebCodecs: the element, as before
+    }
+  }
+  try {
+    return await decodeWithElement(blob, t);
+  } catch (e) {
+    if (!(e instanceof BlankPictureError)) throw e;
+    elementBlank = true;
+    try {
+      return await decodeMp4Frame(blob, t);
+    } catch (w) {
+      throw new BlankPictureError(e.result, w instanceof Error ? w.message : String(w));
+    }
+  }
+}
+
+async function decodeWithElement(blob: Blob, t: number): Promise<{ bitmap: ImageBitmap; duration: number }> {
   const url = URL.createObjectURL(blob);
   const v = document.createElement("video");
   try {
@@ -58,7 +88,7 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
     if (isFlat(bitmap)) {
       // A real flat frame (a black start) or a browser that draws nothing: other times tell them apart.
       let alive = false;
-      for (const f of [0.1, 0.3, 0.6]) {
+      for (const f of elementBlank ? [] : [0.1, 0.3, 0.6]) {
         if (!(duration > 0)) break;
         const s = once("seeked");
         v.currentTime = duration * f;
@@ -176,4 +206,17 @@ export async function decodeAudio(blob: Blob): Promise<{ bitmap: ImageBitmap; du
     ctx.fillRect(x, (WAVE_H - h) / 2, 1, h);
   }
   return { bitmap: await createImageBitmap(c), duration: buf.duration };
+}
+
+/** The picture a video element shows now, whichever way works here: the element, else (MP4) the file's own frame at `t`. */
+export async function pictureNow(v: HTMLVideoElement, blob: Blob, t: number): Promise<ImageBitmap | null> {
+  const b = elementBlank ? null : await frameBitmap(v).catch(() => null);
+  if (b && !isFlat(b)) return b;
+  // Flat: a real flat frame, or a browser that draws nothing. The file's own frame tells; where it cannot be decoded that way, keep the element's.
+  const f = await decodeMp4Frame(blob, t).then((r) => r.bitmap, () => null);
+  if (f) {
+    b?.close();
+    return f;
+  }
+  return b ?? (elementBlank ? await frameBitmap(v).catch(() => null) : null);
 }
