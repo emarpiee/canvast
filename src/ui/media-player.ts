@@ -557,7 +557,15 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       for (const i of box.querySelectorAll<HTMLInputElement>("[data-step]")) i.value = String(settings.get(i.dataset["step"] as SettingKey));
     } else if (cmd === "extract") {
       const id = o.id;
-      void eng.frame().then((png) => png && actions.extract(id, png));
+      // The picture may not be presented yet (a seek just landed, the machine is busy): try a few times instead of doing nothing.
+      void (async () => {
+        for (let i = 0; i < 4; i++) {
+          if (!players.get(id) || players.get(id)!.eng !== eng) return;
+          const png = await eng.frame().catch(() => null);
+          if (png) return actions.extract(id, png);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      })();
     }
     refresh();
   });

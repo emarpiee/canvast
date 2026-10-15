@@ -233,11 +233,30 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     if (commit) actions.rename(r.key, r.value);
     render();
   };
-  panel.addEventListener("dblclick", (e) => {
+  // Two quick presses on the same name start a rename. Not `dblclick`: the first press selects the row, the panel redraws its rows, and
+  // Firefox does not dispatch `dblclick` on elements replaced between the two clicks.
+  let lastPress: { key: string; at: number } | null = null;
+  let startRename: { key: string; value: string } | null = null;
+  let renameOpenedAt = 0;
+  panel.addEventListener("pointerdown", (e) => {
+    startRename = null;
     const name = (e.target as HTMLElement).closest(".layer-name");
     const li = name?.closest<HTMLElement>("li.layer");
     if (!name || !li) return;
-    renaming = { key: li.dataset["key"]!, value: name.textContent ?? "" };
+    const key = li.dataset["key"]!;
+    const now = performance.now();
+    if (lastPress && lastPress.key === key && now - lastPress.at < 500) {
+      lastPress = null;
+      // Started when this press ends: focusing now would be undone by the press's own focus change.
+      startRename = { key, value: name.textContent ?? "" };
+    } else lastPress = { key, at: now };
+  });
+  // Not on `click`: Firefox sends none when the rows were redrawn between press and release.
+  panel.addEventListener("pointerup", () => {
+    if (!startRename) return;
+    renaming = startRename;
+    startRename = null;
+    renameOpenedAt = performance.now();
     render();
   });
   panel.addEventListener("keydown", (e) => {
@@ -247,7 +266,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     else if (e.key === "Escape") endRename(false);
   });
   panel.addEventListener("focusout", (e) => {
-    if ((e.target as HTMLElement).matches("[data-rename]")) endRename(true);
+    const input = e.target as HTMLInputElement;
+    if (!input.matches("[data-rename]")) return;
+    // The press that opened the box can still move focus away a moment later (Firefox): take it back instead of ending the edit.
+    if (performance.now() - renameOpenedAt < 250 && input.isConnected) {
+      setTimeout(() => input.isConnected && input.focus(), 0);
+      return;
+    }
+    endRename(true);
   });
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;

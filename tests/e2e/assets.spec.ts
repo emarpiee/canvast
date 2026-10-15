@@ -515,22 +515,24 @@ test("two tabs: a canvas deleted by the writer moves the reader off it; the read
 });
 
 test("a video is placed paused; its player steps, repeats, plays and keeps the paused position through undo and reload (ADR 0041)", async ({ app }) => {
+  // Decoding video under load (other workers) takes longer than the default 5 s wait.
+  const expectSlow = expect.configure({ timeout: 20_000 });
   const p = app.page;
   const webm = await makeWebm(p, 2);
   await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: webm });
-  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await expectSlow.poll(async () => (await objects(p)).length).toBe(1);
   await saved(p);
   const [o] = await objects(p);
-  expect(o!["media"]).toEqual({ kind: "video", t: 0, repeat: false });
+  expectSlow(o!["media"]).toEqual({ kind: "video", t: 0, repeat: false });
   // Select it: the player appears with the video's length.
   await p.keyboard.press("v");
   const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
   await p.mouse.click((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
   const bar = p.getByTestId("media-bar");
-  await expect(bar).toBeVisible();
-  await expect(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);
+  await expectSlow(bar).toBeVisible();
+  await expectSlow(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);
   const dur = await p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.duration);
-  expect(dur).toBeGreaterThan(1);
+  expectSlow(dur).toBeGreaterThan(1);
   // While the instance is dragged the overlay is hidden (the canvas shows it at the previewed place); afterwards it follows.
   const overlay = p.locator("video.media-video");
   const cx = Math.round((box.minX + box.maxX) / 2);
@@ -538,34 +540,34 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await p.mouse.move(cx, cy);
   await p.mouse.down();
   await p.mouse.move(cx + 60, cy + 40, { steps: 4 });
-  await expect(overlay).toBeHidden();
-  await expect(bar).toBeHidden(); // the bar would stay behind
+  await expectSlow(overlay).toBeHidden();
+  await expectSlow(bar).toBeHidden(); // the bar would stay behind
   await p.mouse.up();
-  await expect(overlay).toBeVisible();
-  await expect(bar).toBeVisible();
+  await expectSlow(overlay).toBeVisible();
+  await expectSlow(bar).toBeVisible();
   const ob = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
-  expect(Math.abs((await overlay.boundingBox())!.x - ob.minX)).toBeLessThan(2);
+  expectSlow(Math.abs((await overlay.boundingBox())!.x - ob.minX)).toBeLessThan(2);
   const t = async () => ((await objects(p))[0]!["media"] as { t: number; repeat: boolean }).t;
   // The 3 s step is longer than the video: forward stops at the end, back at the start (no repeat).
   await bar.getByRole("button", { name: "Step forward" }).click();
-  await expect.poll(t).toBeCloseTo(dur, 1);
+  await expectSlow.poll(t).toBeCloseTo(dur, 1);
   await bar.getByRole("button", { name: "Step back" }).click();
-  await expect.poll(t).toBe(0);
+  await expectSlow.poll(t).toBe(0);
   // With repeat the overshoot wraps round.
   await bar.getByRole("button", { name: "Repeat" }).click();
   await bar.getByRole("button", { name: "Step forward" }).click();
-  await expect.poll(t).toBeCloseTo(3 % dur, 1);
+  await expectSlow.poll(t).toBeCloseTo(3 % dur, 1);
   // Undo puts the paused position back, and the player follows.
   await p.keyboard.press("Control+z");
-  await expect.poll(t).toBe(0);
+  await expectSlow.poll(t).toBe(0);
   // Play, then pause: the position moved and is written once, on pause.
   await p.evaluate(() => window.__canvastDebug.flushSave());
   const before = await p.evaluate(() => window.__canvastDebug.session().revision);
   await bar.getByRole("button", { name: "Play", exact: true }).click();
-  await expect.poll(() => p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.currentTime)).toBeGreaterThan(0.2);
-  expect(await p.evaluate(() => window.__canvastDebug.session().revision), "playing writes nothing").toBe(before);
+  await expectSlow.poll(() => p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.currentTime)).toBeGreaterThan(0.2);
+  expectSlow(await p.evaluate(() => window.__canvastDebug.session().revision), "playing writes nothing").toBe(before);
   await bar.getByRole("button", { name: "Pause", exact: true }).click();
-  await expect.poll(t).toBeGreaterThan(0.2);
+  await expectSlow.poll(t).toBeGreaterThan(0.2);
   let paused = await t();
   // The picture drawn when deselected is the paused frame the player showed (a recorded fixture changes colour all the time).
   const liveRgb = await overlay.evaluate((v: HTMLVideoElement) => {
@@ -577,15 +579,15 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   });
   await p.mouse.click(1100, 700);
   const mid = [cx + 60, cy + 40] as const;
-  await expect.poll(async () => {
+  await expectSlow.poll(async () => {
     const px = await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x, y), mid);
     return liveRgb.reduce((a, v, i) => a + Math.abs(v - px[i]!), 0);
   }).toBeLessThan(90);
   await p.mouse.click(...mid);
-  await expect(bar).toBeVisible();
+  await expectSlow(bar).toBeVisible();
   // Selected again, the player opens on that same paused frame (not a stale or later one).
-  await expect(overlay).toBeVisible();
-  await expect(overlay).toHaveCSS("opacity", "1");
+  await expectSlow(overlay).toBeVisible();
+  await expectSlow(overlay).toHaveCSS("opacity", "1");
   const reopened = await overlay.evaluate((v: HTMLVideoElement) => {
     const c = document.createElement("canvas");
     c.width = c.height = 8;
@@ -593,32 +595,32 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
     x.drawImage(v, 0, 0, 8, 8);
     return [...x.getImageData(4, 4, 1, 1).data.slice(0, 3)];
   });
-  expect(liveRgb.reduce((a, v, i) => a + Math.abs(v - reopened[i]!), 0)).toBeLessThan(90);
+  expectSlow(liveRgb.reduce((a, v, i) => a + Math.abs(v - reopened[i]!), 0)).toBeLessThan(90);
   // It keeps playing when deselected (no bar), and the bar controls it again when it is selected.
   await bar.getByRole("button", { name: "Play", exact: true }).click();
   await p.mouse.click(1100, 700);
-  await expect(bar).toBeHidden();
+  await expectSlow(bar).toBeHidden();
   const timeNow = () => overlay.evaluate((v: HTMLVideoElement) => (v.paused ? -1 : v.currentTime));
   const t0 = await timeNow();
-  expect(t0).toBeGreaterThanOrEqual(0);
-  await expect.poll(timeNow).toBeGreaterThan(t0);
+  expectSlow(t0).toBeGreaterThanOrEqual(0);
+  await expectSlow.poll(timeNow).toBeGreaterThan(t0);
   await p.mouse.click(cx + 60, cy + 40); // the instance was moved by the drag above
-  await expect(bar.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await expectSlow(bar.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   // Moving it pauses playback; releasing plays on.
   const isPaused = () => overlay.evaluate((v: HTMLVideoElement) => v.paused);
   await p.mouse.move(cx + 60, cy + 40);
   await p.mouse.down();
   await p.mouse.move(cx + 90, cy + 60, { steps: 3 });
-  await expect.poll(isPaused).toBe(true);
+  await expectSlow.poll(isPaused).toBe(true);
   await p.mouse.up();
-  await expect.poll(isPaused).toBe(false);
+  await expectSlow.poll(isPaused).toBe(false);
   await bar.getByRole("button", { name: "Pause", exact: true }).click();
-  await expect.poll(t).toBeGreaterThan(paused);
+  await expectSlow.poll(t).toBeGreaterThan(paused);
   paused = await t();
   await saved(p);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  expect(((await objects(p))[0]!["media"] as { t: number }).t).toBe(paused);
+  expectSlow(((await objects(p))[0]!["media"] as { t: number }).t).toBe(paused);
   // Unselected, the canvas draws the picture at the paused time (not a placeholder).
   const b2 = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
   await expect
@@ -631,30 +633,31 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await p.keyboard.press("v");
   await p.mouse.click(Math.round((b2.minX + b2.maxX) / 2), Math.round((b2.minY + b2.maxY) / 2));
   // The video layer appears only once it holds the paused picture (never the first frame for a moment), and the bar stays outside the picture.
-  await expect(overlay).toBeVisible();
-  expect(await overlay.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeCloseTo(paused, 1);
+  await expectSlow(overlay).toBeVisible();
+  await expectSlow(overlay, "transparent until it holds the paused picture").toHaveCSS("opacity", "1");
+  expectSlow(await overlay.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeCloseTo(paused, 1);
   const bb = (await p.getByTestId("media-bar").boundingBox())!;
   const pb = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
-  expect(bb.y >= pb.maxY || bb.y + bb.height <= pb.minY, "the player does not cover the picture").toBe(true);
+  expectSlow(bb.y >= pb.maxY || bb.y + bb.height <= pb.minY, "the player does not cover the picture").toBe(true);
   await p.getByTestId("media-bar").getByRole("button", { name: "Extract frame" }).click();
-  await expect.poll(async () => (await objects(p)).length).toBe(2);
-  expect((await objects(p))[1]!["media"]).toBeUndefined();
+  await expectSlow.poll(async () => (await objects(p)).length).toBe(2);
+  expectSlow((await objects(p))[1]!["media"]).toBeUndefined();
   // Layers name the files, not "Image WxH".
   await p.getByRole("button", { name: "Layers panel" }).click();
-  await expect(p.getByTestId("layers-panel").locator(".layer-name")).toHaveText(["frame.png", "clip.webm"]);
+  await expectSlow(p.getByTestId("layers-panel").locator(".layer-name")).toHaveText(["frame.png", "clip.webm"]);
   // The slide view plays the original video (it is not "missing or damaged").
   await toAssets(p);
   await card(p, String((await objects(p))[0]!["assetId"])).click();
   await p.getByTestId("asset-preview").click();
   const slide = p.getByTestId("slide-view");
-  await expect(slide.locator("video")).toBeVisible();
-  await expect(slide.locator("figcaption")).not.toContainText("missing");
-  expect(await slide.locator("video").evaluate((v: HTMLVideoElement) => v.error)).toBeNull();
+  await expectSlow(slide.locator("video")).toBeVisible();
+  await expectSlow(slide.locator("figcaption")).not.toContainText("missing");
+  expectSlow(await slide.locator("video").evaluate((v: HTMLVideoElement) => v.error)).toBeNull();
   // Switching from the video to a GIF leaves nothing of the video's player behind, and back.
   await p.keyboard.press("Escape");
   await toCanvas(p);
   await p.getByTestId("import-input").setInputFiles({ name: "tiny.gif", mimeType: "image/gif", buffer: Buffer.from(encodeGif(8, 8, [[255, 0, 0], [0, 0, 255]], [0, 1].map((c) => ({ w: 8, h: 8, pixels: Array(64).fill(c) })))) });
-  await expect.poll(async () => (await objects(p)).length).toBe(3);
+  await expectSlow.poll(async () => (await objects(p)).length).toBe(3);
   const [vid, , gifObj] = await objects(p);
   const centre = async (id: string) => {
     const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
@@ -662,14 +665,14 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   };
   const row = (id: string) => p.getByTestId("layers-panel").locator(`li.layer[data-key="${id}"]`);
   await row(vid!.id).click();
-  await expect(p.locator("video.media-video")).toBeVisible();
+  await expectSlow(p.locator("video.media-video")).toBeVisible();
   await row(gifObj!.id).click();
-  await expect(p.locator("canvas.media-video")).toBeVisible();
-  await expect(p.locator("video.media-video")).toBeHidden();
+  await expectSlow(p.locator("canvas.media-video")).toBeVisible();
+  await expectSlow(p.locator("video.media-video")).toBeHidden();
   await row(vid!.id).click();
-  await expect(p.locator("video.media-video")).toBeVisible();
-  await expect(p.locator("canvas.media-video")).toBeHidden();
-  expect(app.consoleErrors).toEqual([]);
+  await expectSlow(p.locator("video.media-video")).toBeVisible();
+  await expectSlow(p.locator("canvas.media-video")).toBeHidden();
+  expectSlow(app.consoleErrors).toEqual([]);
 });
 
 test("audio is placed as its waveform; its player steps 1 s and keeps the paused position (ADR 0041)", async ({ app }) => {
