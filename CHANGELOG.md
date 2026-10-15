@@ -4,7 +4,7 @@
 
 ## 0.16.0 — Phase 7: professional UX (2026-10-16)
 
-Phase 7. Full suite: see [testing/full-run-phase-7.md](docs/testing/full-run-phase-7.md).
+Phase 7. Full suite: unit 176/176, E2E 428 passed, 6 skipped, 0 failed, 39 min 43 s ([testing/full-run-phase-7.md](docs/testing/full-run-phase-7.md)).
 
 - **Collaboration tab (Settings)** states that collaboration is off; the arrow keys stay on the view tab list when a view opens.
 
