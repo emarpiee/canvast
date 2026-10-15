@@ -18,7 +18,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --canvas-bg: #16181d;
     --canvas-grid: #c9ced8;
     --canvas-axis: #fb923c;
@@ -33,6 +33,25 @@
     --hud-border: rgba(230, 232, 236, 0.14);
     --hud-accent: #60a5fa;
   }
+}
+
+/* Chosen in Settings > Appearance (ui.theme); "system" leaves the attribute off. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas-bg: #16181d;
+  --canvas-grid: #c9ced8;
+  --canvas-axis: #fb923c;
+  --canvas-landmark: #60a5fa;
+  --canvas-landmark-label: #bfdbfe;
+  --canvas-selection: #60a5fa;
+  --canvas-handle-fill: #16181d;
+  --canvas-lasso: #93c5fd;
+  --canvas-image-placeholder: #3a3d45;
+  --hud-bg: rgba(28, 31, 38, 0.88);
+  --hud-fg: #e6e8ec;
+  --hud-border: rgba(230, 232, 236, 0.14);
+  --hud-accent: #60a5fa;
 }
 
 * { box-sizing: border-box; }
@@ -394,7 +413,7 @@ html, body {
 .view-switch button[aria-selected="true"] { background: var(--hud-accent); color: #fff; }
 .view-switch button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 
-body[data-view="assets"] #canvas-host { visibility: hidden; }
+body[data-view="assets"] #canvas-host, body[data-view="settings"] #canvas-host { visibility: hidden; }
 
 #assets-view {
   position: fixed;
@@ -752,3 +771,38 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .media-volume { width: 84px; }
 .slide-view video { max-width: 86vw; max-height: 74vh; }
 .slide-view video[hidden], .slide-view img[hidden] { display: none; }
+
+/* Settings view (ui/settings-view.ts). */
+#settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: 60px 16px 0; background: var(--canvas-bg); font: 13px/1.4 var(--font-ui); }
+#settings-view[hidden] { display: none; }
+.set-head { display: flex; align-items: center; gap: 12px; max-width: 960px; width: 100%; margin: 0 auto 12px; }
+.set-title { margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+.set-done { font: 500 13px var(--font-ui); color: inherit; height: 32px; padding: 0 12px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer; }
+.set-done:hover, .set-reset:hover:not(:disabled) { border-color: var(--hud-accent); }
+.set-body { display: flex; gap: 20px; max-width: 960px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
+.set-tabs { display: flex; flex-direction: column; gap: 2px; width: 210px; flex: none; }
+.set-tabs button { text-align: left; font: inherit; color: inherit; padding: 8px 12px; background: none; border: 0; border-radius: 6px; cursor: pointer; }
+.set-tabs button:hover { background: var(--hud-border); }
+.set-tabs button[aria-selected="true"] { background: var(--hud-accent); color: #fff; }
+.set-panels { flex: 1; min-width: 0; overflow: auto; padding-bottom: 40px; }
+.set-panels h2 { margin: 4px 0 12px; font-size: 15px; }
+.set-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px 100px 60px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hud-border); }
+.set-row label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set-help { opacity: 0.65; font-size: 12px; }
+.set-control { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.set-control input[type="range"] { flex: 1; min-width: 0; }
+.set-control output { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
+.set-control select { width: 100%; font: inherit; color: inherit; height: 30px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 6px; }
+.set-scope { font-size: 11px; opacity: 0.6; }
+.set-reset { font: inherit; font-size: 12px; color: inherit; height: 26px; background: none; border: 1px solid var(--hud-border); border-radius: 6px; cursor: pointer; }
+.set-reset:disabled { opacity: 0.35; cursor: default; }
+.set-info { max-width: 640px; }
+.set-info dl { display: grid; grid-template-columns: 200px 1fr; gap: 6px 12px; }
+.set-info dt { opacity: 0.7; }
+.set-info dd { margin: 0; }
+#settings-view button:focus-visible, #settings-view input:focus-visible, #settings-view select:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+@media (max-width: 720px) {
+  .set-body { flex-direction: column; }
+  .set-tabs { width: auto; flex-direction: row; flex-wrap: wrap; }
+  .set-row { grid-template-columns: 1fr; gap: 6px; }
+}

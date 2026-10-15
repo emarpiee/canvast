@@ -237,6 +237,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   // Firefox does not dispatch `dblclick` on elements replaced between the two clicks.
   let lastPress: { key: string; at: number } | null = null;
   let startRename: { key: string; value: string } | null = null;
+  // A press on another canvas (or before a document was loaded) never counts as the first press of a double press.
+  doc.subscribe((source) => {
+    if (source === "load") lastPress = null;
+  });
   let renameOpenedAt = 0;
   panel.addEventListener("pointerdown", (e) => {
     startRename = null;

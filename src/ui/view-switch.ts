@@ -1,9 +1,9 @@
 import { ICONS } from "./icons";
 
-export type AppView = "canvas" | "assets";
+export type AppView = "canvas" | "assets" | "settings";
 
 /**
- * The top-level switch between Canvas view and Assets view: two buttons
+ * The top-level switch between Canvas view and Assets view: three buttons
  * that act as tabs. Left/Right arrows move between them, as in a tab list.
  */
 export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void): (v: AppView) => void {
@@ -11,6 +11,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
     <div class="view-switch" role="tablist" aria-label="View">
       <button type="button" role="tab" data-view="canvas" data-testid="view-canvas" title="Canvas view">${ICONS.infinity}<span>Canvas</span></button>
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Assets view">${ICONS.images}<span>Assets</span></button>
+      <button type="button" role="tab" data-view="settings" data-testid="view-settings" title="Settings">${ICONS.settings}<span>Settings</span></button>
     </div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const set = (v: AppView): void => {

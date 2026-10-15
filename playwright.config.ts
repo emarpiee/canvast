@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test";
 // with the inspection hook enabled through the URL hash (#debug).
 // Logic and storage specs behave the same in every Chromium configuration: they run in `chromium` only.
 // The other two keep the specs that depend on the rasterizer or the pixel ratio (docs/testing/README.md).
-const LOGIC_ONLY = ["**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts"];
+const LOGIC_ONLY = ["**/settings.spec.ts", "**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",

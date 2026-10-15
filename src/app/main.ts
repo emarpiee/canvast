@@ -38,6 +38,7 @@ import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
 import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
+import { mountSettingsView } from "../ui/settings-view";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
@@ -152,6 +153,13 @@ async function start(): Promise<void> {
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
   });
+  // Theme chosen in Settings (ui.theme): "system" leaves the attribute off so the operating system decides.
+  const applyThemeAttribute = (): void => {
+    const t = settings.get("ui.theme");
+    if (t === "system") delete document.documentElement.dataset["theme"];
+    else document.documentElement.dataset["theme"] = t;
+  };
+  applyThemeAttribute();
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
   // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
@@ -443,21 +451,53 @@ async function start(): Promise<void> {
   const assetsRoot = document.getElementById("assets-view")!;
   const setView = (v: AppView): void => {
     if (v === appView) return;
+    const was = appView;
     appView = v;
     document.body.dataset["view"] = v;
     markTab(v);
     host.inert = v !== "canvas";
+    if (was === "assets") assetsView.hide();
+    if (was === "settings") settingsView.hide();
     if (v === "assets") assetsView.show();
+    else if (v === "settings") settingsView.show();
     else {
-      assetsView.hide();
       invalidate();
       canvas.focus();
     }
-    settings.set("ui.view", v);
+    // The Settings view is not remembered: a reload opens the canvas or the Assets view.
+    if (v !== "settings") settings.set("ui.view", v);
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"));
+  const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, () => setView("canvas"));
+  // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
+  settings.subscribe((key) => {
+    switch (key) {
+      case "pen.color": editor.penColor = settings.get(key); break;
+      case "pen.widthPx": editor.penWidthPx = settings.get(key); break;
+      case "pen.kind": editor.penKind = settings.get(key); break;
+      case "pen.stabilizer.on":
+      case "pen.stabilizer.strength": editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") }; break;
+      case "pen.followZoom": editor.followZoom = settings.get(key); break;
+      case "select.ignoreFilling": editor.ignoreFilling = settings.get(key); break;
+      case "lasso.filter": editor.lassoFilter = settings.get(key); break;
+      case "snap.enabled": editor.snap = settings.get(key); break;
+      case "select.alignBox": editor.alignBox = settings.get(key); break;
+      case "eraser.diameterPx": editor.eraserPx = settings.get(key); break;
+      case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
+      case "ui.fps": editor.showFps = settings.get(key); break;
+      case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
+      case "ui.theme":
+        applyThemeAttribute();
+        theme = readTheme(document.documentElement);
+        tiles.clear();
+        invalidate();
+        return;
+      default: return;
+    }
+    editor.changed();
+  });
   mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
 
   // Drag-and-drop and paste import.
