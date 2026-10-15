@@ -583,6 +583,17 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   }).toBeLessThan(90);
   await p.mouse.click(...mid);
   await expect(bar).toBeVisible();
+  // Selected again, the player opens on that same paused frame (not a stale or later one).
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveCSS("opacity", "1");
+  const reopened = await overlay.evaluate((v: HTMLVideoElement) => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 8;
+    const x = c.getContext("2d")!;
+    x.drawImage(v, 0, 0, 8, 8);
+    return [...x.getImageData(4, 4, 1, 1).data.slice(0, 3)];
+  });
+  expect(liveRgb.reduce((a, v, i) => a + Math.abs(v - reopened[i]!), 0)).toBeLessThan(90);
   // It keeps playing when deselected (no bar), and the bar controls it again when it is selected.
   await bar.getByRole("button", { name: "Play", exact: true }).click();
   await p.mouse.click(1100, 700);

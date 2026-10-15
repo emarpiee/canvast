@@ -88,7 +88,32 @@ export async function frameBitmap(v: HTMLVideoElement): Promise<ImageBitmap> {
   c.width = v.videoWidth;
   c.height = v.videoHeight;
   c.getContext("2d")!.drawImage(v, 0, 0);
-  return createImageBitmap(c);
+  const first = await createImageBitmap(c);
+  if (!isFlat(first)) return first;
+  // Drawing the element left it flat (Firefox on Android does): the other ways to take its picture, the first that shows something.
+  const VF = (globalThis as { VideoFrame?: new (src: CanvasImageSource) => CanvasImageSource & { close(): void } }).VideoFrame;
+  const ways: Array<() => Promise<ImageBitmap>> = [
+    () => createImageBitmap(v),
+    async () => {
+      if (!VF) throw new Error("no VideoFrame");
+      const f = new VF(v);
+      try {
+        return await createImageBitmap(f as unknown as ImageBitmap);
+      } finally {
+        f.close();
+      }
+    },
+  ];
+  for (const way of ways) {
+    const b = await way().catch(() => null);
+    if (!b) continue;
+    if (!isFlat(b)) {
+      first.close();
+      return b;
+    }
+    b.close();
+  }
+  return first;
 }
 
 type Vfc = HTMLVideoElement & { requestVideoFrameCallback?: (cb: (now: number, md: { mediaTime: number }) => void) => number };

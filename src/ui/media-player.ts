@@ -6,7 +6,7 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
-import { frameBitmap, isFlat, presentedNear } from "../assets/video";
+import { frameBitmap, isFlat, presented, presentedNear } from "../assets/video";
 import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
@@ -91,6 +91,7 @@ function avEngine(v: HTMLVideoElement): Engine {
         v.currentTime = at;
         await seeked;
       }
+      await presented(v, 200); // the sought picture on screen before the layer shows
       target = at;
       v.loop = o.media!.repeat;
     },
@@ -116,19 +117,25 @@ function avEngine(v: HTMLVideoElement): Engine {
       void v.play().catch(() => (played = false));
     },
     pause() {
-      if (played) target = v.currentTime;
+      const was = played;
       played = false;
       v.pause();
+      // While playing, `currentTime` is the sound's clock and the frame on screen is a frame after it (Firefox): a seek to it later
+      // (a reselect, a reload) would show another frame than the one paused on. Seeking to it now puts the frame it shows on screen.
+      if (was) e.seek(v.currentTime);
     },
     setLoop: (on) => void (v.loop = on),
     step: (dir, amount, repeat) => e.seek(stepTime(e.pos(), dir * amount, duration, repeat)),
     label: () => `${formatTime(e.pos())} / ${formatTime(duration)}`,
     async frame() {
       if (!v.videoWidth || v.readyState < 2) return null;
+      const bmp = await frameBitmap(v).catch(() => null);
+      if (!bmp) return null;
       const c = document.createElement("canvas");
-      c.width = v.videoWidth;
-      c.height = v.videoHeight;
-      c.getContext("2d")!.drawImage(v, 0, 0);
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext("2d")!.drawImage(bmp, 0, 0);
+      bmp.close();
       return new Promise((res) => c.toBlob(res, "image/png"));
     },
     shown: Promise.resolve(null),
@@ -143,8 +150,8 @@ function avEngine(v: HTMLVideoElement): Engine {
   v.addEventListener("play", () => e.onTick());
   v.addEventListener("pause", () => {
     if (played && !v.ended) {
-      target = v.currentTime; // paused by the browser (a media key, say)
-      played = false;
+      played = false; // paused by the browser (a media key, say)
+      e.seek(v.currentTime);
     }
     if (!played && !v.ended) e.onSettled();
     e.onTick();
@@ -333,9 +340,12 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     // One that is not selected has nothing to show or control once it is out of view: it stops (its position is kept).
     if (!inView && p !== sel) return release(p);
     // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
-    const visible = p.eng.visual && !p.loading && !p.failed && !transforming(o.id) && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && inView;
+    // While it loads it stays in the page but transparent: Firefox presents no new picture after a seek for an element nobody can see,
+    // so the paused frame it opens on would be a stale one.
+    const visible = p.eng.visual && !p.failed && !transforming(o.id) && w <= MAX_OVERLAY_PX && h <= MAX_OVERLAY_PX && inView;
     const el = p.eng.el;
     el.style.display = visible ? "" : "none";
+    el.style.opacity = p.loading ? "0" : "";
     if (visible) {
       el.style.left = `${s.x}px`;
       el.style.top = `${s.y}px`;
@@ -417,6 +427,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         p.loading = 0;
         p.failed = true; // keeps the card; the bar offers the original file
         refresh();
+        positionAll(); // hides the layer it showed (transparent) while loading
       }
       return;
     }
