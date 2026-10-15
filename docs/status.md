@@ -422,6 +422,8 @@ visible strokes). Alternatives:
 
 **Phase 6, slice 5 done (media pictures, [ADR 0046](adr/0046-video-pictures-and-paused-frame.md)):** a paused video reopens on the frame it was paused on (Firefox desktop, fixed and confirmed by the owner); pictures of a video are taken by drawing the element, `createImageBitmap`, `VideoFrame`, then an MP4 frame decoded with WebCodecs (`mp4-frames.ts`); a flat picture is never stored. Tested in `assets.spec.ts` (chromium, firefox: video, flat-picture import, undecodable card); the WebCodecs path was checked by hand in Firefox 152 with H.264 files (B-frames, rotation), not in the suite (Playwright browsers cannot decode MP4).
 
+**Phase 6, slice 6:** the mention picker and mention labels name an image by its file name (found by typing it), not "Image W×H"; tested in `text.spec.ts` "backlinks" (chromium, firefox).
+
 **Known failures (Phase 6):** Firefox on Android with H.265 phone videos: the canvas shows the card with the reason, Extract Frame gives nothing, playing from the player works. Not reproducible without the device. Accepted for now. One unexplained failure of the "a video is placed" firefox test in about 6 runs after the pause change (passed 3 of 3 on rerun, not reproduced). The Firefox paused-frame mismatch on desktop is fixed.
 
 **Next bounded task:** when the owner finishes testing, the Phase 6 full suite, v0.15.0, then ask before pushing (Phases 5 and 6 are local).

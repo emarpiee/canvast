@@ -312,6 +312,10 @@ export class Session {
     return true;
   }
 
+  private async assetFileName(hash: string): Promise<string> {
+    return (await this.catalog?.entry(hash).catch(() => undefined))?.name ?? "";
+  }
+
   private boardCanvases(): CanvasRecord[] {
     return this.tree?.boards.find((b) => b.board.id === this.current?.boardId)?.canvases ?? [];
   }
@@ -321,8 +325,16 @@ export class Session {
     if (!this.repo || !this.current) return [];
     await this.persistence.flush();
     const others = this.boardCanvases().filter((c) => c.id !== this.current!.canvasId);
+    const q = query.trim().toLowerCase();
     const hits = await this.repo.findMentionable(new Set(others.map((c) => c.id)), query, limit);
-    return hits.map((h) => ({ ...h, canvasName: others.find((c) => c.id === h.canvasId)!.name }));
+    const out: Backlink[] = [];
+    for (const h of hits) {
+      if (out.length >= limit) break;
+      const label = h.assetId ? (await this.assetFileName(h.assetId)) || h.label : h.label;
+      if (h.assetId && !label.toLowerCase().includes(q)) continue;
+      out.push({ canvasId: h.canvasId, id: h.id, label, canvasName: others.find((c) => c.id === h.canvasId)!.name });
+    }
+    return out;
   }
 
   /** Where objects mentioned by a text are on the board's other canvases; a missing id is not on the board. */
@@ -335,7 +347,7 @@ export class Session {
       const r = await this.repo.locate(others.map((c) => c.id), id);
       if (!r) continue;
       const d = r.data;
-      const label = d["kind"] === "text" ? plainText(String(d["md"]), 28) || "Text" : d["kind"] === "image" ? `Image ${String(d["pixelW"])}×${String(d["pixelH"])}` : "Stroke";
+      const label = d["kind"] === "text" ? plainText(String(d["md"]), 28) || "Text" : d["kind"] === "image" ? (await this.assetFileName(String(d["assetId"]))) || `Image ${String(d["pixelW"])}×${String(d["pixelH"])}` : "Stroke";
       out.set(id, { canvasId: r.canvasId, canvasName: others.find((c) => c.id === r.canvasId)!.name, id, label });
     }
     return out;

@@ -1,6 +1,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
+import { blockyFixture } from "./png";
 
 /**
  * Slice 1h: text objects. Content is checked as stored canonical Markdown
@@ -178,6 +179,9 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   await p.keyboard.press("Enter");
   await finish(p);
   const [t1] = await textObjects(p);
+  await p.getByTestId("import-input").setInputFiles({ name: "sky-ref.png", mimeType: "image/png", buffer: blockyFixture() });
+  await expect.poll(async () => (await objects(p)).length).toBe(3);
+  await p.keyboard.press("Escape");
   const row = (id: string) => panel.locator(`li.layer[data-key="${id}"]`);
   // Target lists the text that mentions it; the text lists its target, which can be revealed.
   await p.keyboard.press("v");
@@ -192,6 +196,11 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   await expect(nav).toHaveText("Board 1 › Canvas 2");
   await newText(p, 500, 300);
   await p.keyboard.type("see @");
+  await p.getByRole("textbox", { name: "Mention an item" }).fill("note");
+  await expect(p.getByRole("option", { name: /note.*Canvas 1/ })).toBeVisible();
+  // An image on another canvas is found and labelled by its file name, not its size.
+  await p.getByRole("textbox", { name: "Mention an item" }).fill("sky-ref");
+  await expect(p.getByRole("option", { name: /sky-ref\.png.*Canvas 1/ })).toBeVisible();
   await p.getByRole("textbox", { name: "Mention an item" }).fill("note");
   await expect(p.getByRole("option", { name: /note.*Canvas 1/ })).toBeVisible();
   await p.keyboard.press("Enter");

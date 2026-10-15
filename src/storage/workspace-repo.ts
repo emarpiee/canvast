@@ -354,9 +354,9 @@ export class WorkspaceRepo {
   }
 
   /** Texts and images on the given canvases whose name contains `query` (case-insensitive), at most `limit`; read with cursors, never all at once. */
-  async findMentionable(canvasIds: ReadonlySet<string>, query: string, limit: number): Promise<Array<{ canvasId: string; id: ObjectId; label: string }>> {
+  async findMentionable(canvasIds: ReadonlySet<string>, query: string, limit: number): Promise<Array<{ canvasId: string; id: ObjectId; label: string; assetId?: string }>> {
     const q = query.trim().toLowerCase();
-    const out: Array<{ canvasId: string; id: ObjectId; label: string }> = [];
+    const out: Array<{ canvasId: string; id: ObjectId; label: string; assetId?: string }> = [];
     for (const kind of ["text", "image"]) {
       const idx = this.db.transaction("objects").objectStore("objects").index("kind");
       await new Promise<void>((res, rej) => {
@@ -367,14 +367,19 @@ export class WorkspaceRepo {
           if (!cur || out.length >= limit) return res();
           const r = cur.value as ObjectRecord;
           if (canvasIds.has(r.canvasId)) {
-            const label = kind === "text" ? plainText(String(r.data["md"]), 28) : `Image ${String(r.data["pixelW"])}×${String(r.data["pixelH"])}`;
-            if (label.toLowerCase().includes(q)) out.push({ canvasId: r.canvasId, id: r.id, label: label || "Text" });
+            if (kind === "image") {
+              // Images are named by their file, which only the catalog knows: the caller filters by name.
+              out.push({ canvasId: r.canvasId, id: r.id, label: `Image ${String(r.data["pixelW"])}×${String(r.data["pixelH"])}`, assetId: String(r.data["assetId"]) });
+            } else {
+              const label = plainText(String(r.data["md"]), 28);
+              if (label.toLowerCase().includes(q)) out.push({ canvasId: r.canvasId, id: r.id, label: label || "Text" });
+            }
           }
           cur.continue();
         };
       });
     }
-    return out.slice(0, limit);
+    return out;
   }
 
   /** The record of an object on one of the given canvases, if any. */
