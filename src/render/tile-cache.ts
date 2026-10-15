@@ -213,7 +213,7 @@ export class TileCache {
       const pv = preview ? this.preview(ctx, cam, vp, dpr) : null;
       if (pv) return pv;
       // Beyond the bound: a prebuilt set within one level takes over (the old set becomes its neighbour).
-      const next = preview && !this.dirty.size ? this.takeAhead(z) : null;
+      const next = preview && !this.dirty.size ? this.takeAhead(z, cam, vp, dpr) : null;
       if (next) {
         const pv2 = this.preview(ctx, cam, vp, dpr);
         if (pv2) return pv2;
@@ -408,12 +408,14 @@ export class TileCache {
     }
   }
 
-  /** Make the prebuilt set within one level of zoom `z` the current set; the old one becomes its neighbour. */
-  private takeAhead(z: number): Generation | null {
+  /** Make the prebuilt set within one level of zoom `z` that covers the view the current set; the old one becomes its neighbour. */
+  private takeAhead(z: number, cam: Camera, vp: Viewport, dpr: number): Generation | null {
     const old = this.gen!;
     for (const dz of AHEAD_LEVELS) {
       const g = this.ahead.get(dz);
       if (!g || !g.tiles.size || Math.abs(g.z - z) > PREVIEW_MAX_LEVELS) continue;
+      // A set deeper than the camera is scaled down and leaves a border of bare background (zooming in): take the other one.
+      if (!this.covers(g, cam, vp, dpr)) continue;
       this.ahead.delete(dz);
       this.dropAhead();
       delete g.ahead;
@@ -422,6 +424,30 @@ export class TileCache {
       return g;
     }
     return null;
+  }
+
+  /** Whether the tiles of `g`, scaled to this camera, reach every edge of the viewport. */
+  private covers(g: Generation, cam: Camera, vp: Viewport, dpr: number): boolean {
+    const dz = cam.zi + cam.zf - g.z;
+    const s = 2 ** dz;
+    const f = 2 ** cam.zf;
+    const ox = (vp.width / 2 + D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f) * dpr - (g.vp.width / 2) * dpr * s;
+    const oy = (vp.height / 2 + D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f) * dpr - (g.vp.height / 2) * dpr * s;
+    if (!Number.isFinite(ox) || !Number.isFinite(oy)) return false;
+    let i0 = Infinity;
+    let i1 = -Infinity;
+    let j0 = Infinity;
+    let j1 = -Infinity;
+    for (const k of g.tiles.keys()) {
+      const [i, j] = k.split(",").map(Number) as [number, number];
+      i0 = Math.min(i0, i);
+      i1 = Math.max(i1, i);
+      j0 = Math.min(j0, j);
+      j1 = Math.max(j1, j);
+    }
+    const td = TILE_CSS * dpr * s;
+    const slack = 1;
+    return ox + i0 * td <= slack && oy + j0 * td <= slack && ox + (i1 + 1) * td >= vp.width * dpr - slack && oy + (j1 + 1) * td >= vp.height * dpr - slack;
   }
 
   /**
@@ -452,7 +478,10 @@ export class TileCache {
       if (!t.canvas) continue;
       const [i, j] = k.split(",").map(Number) as [number, number];
       // Tiles are positioned in the set's frame (at its own camera, tile i starts at i·td).
-      ctx.drawImage(t.canvas, gd, gd, td, td, ox + i * td * s, oy + j * td * s, td * s, td * s);
+      // Whole device pixels, shared by neighbours (rounded outwards), so scaling leaves no hairline seams between tiles.
+      const x0 = Math.floor(ox + i * td * s);
+      const y0 = Math.floor(oy + j * td * s);
+      ctx.drawImage(t.canvas, gd, gd, td, td, x0, y0, Math.ceil(ox + (i + 1) * td * s) - x0, Math.ceil(oy + (j + 1) * td * s) - y0);
       n++;
     }
     ctx.restore();

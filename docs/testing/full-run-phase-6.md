@@ -20,7 +20,9 @@ Version 0.15.0 (Phase 6: media, plus the gaps closed in ADR 0047), four projects
 | Re-run alone, 2 times, full mode | v0.15.0 candidate | 1 failed (140 holes, level 35), 1 passed |
 | Re-run alone, 4 times, full mode | `0fd1f4c`, before any of the gap work | 1 failed (140 holes, level 12), 3 passed |
 
-The hole count is 140 every time and the zoom level differs, so it is a rendering defect of Firefox's zoom path (not a timeout). It is **not fixed**; it stays open as the next bounded task (see `docs/status.md`).
+Cause, found with a diagnostic copy of the test that snapshotted the canvas and the tile statistics inside the sampling call: the frame was a **zoom preview** (`preview: true`). While zooming in with slow frames, the prebuilt neighbour tile set one level deeper than the camera took over, scaled down to about 0.53, and left a strip of bare background (x below about 90 px) uncovered. The 140 holes are that strip (4 sample columns by 35 rows). Faint seams between scaled tiles were visible too. It depends on frame timing, which is why it appears under load and was there before Phase 6.
+
+**Fixed after this run** (not covered by the numbers above): `takeAhead` only takes a prebuilt set that covers the whole viewport at the current zoom, and preview tiles are drawn on whole device pixels. Check: 4 of 4 runs of the diagnostic copy and 4 of 4 runs of the real test (full mode, Firefox, 4 at once) pass, where the diagnostic copy failed 3 of 4 before; `tiles.spec` and `density.spec` pass in chromium and firefox (26 tests). The full suite was **not** run again.
 
 ## Earlier starts
 
