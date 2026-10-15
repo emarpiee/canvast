@@ -46,11 +46,24 @@ interface ObjectBase {
   readonly rot?: number;
   /** The groups containing this object, outermost first (doc/groups.ts, ADR 0020); absent = not grouped. */
   readonly groups?: readonly string[];
+  /** Layer name shown in the Layers panel (ADR 0047); absent = the automatic label. */
+  readonly name?: string;
+  /** Names of the groups this object is in, by group id (ADR 0047); absent = none named. */
+  readonly groupNames?: Readonly<Record<string, string>>;
+  /** How the object's paint mixes with what is behind it (ADR 0047); absent = normal. */
+  readonly blend?: BlendMode;
   /** Not drawn, picked or indexed while true (ADR 0021); absent = shown. */
   readonly hidden?: boolean;
   /** Drawn, but cannot be picked, selected or edited while true (ADR 0021); absent = unlocked. */
   readonly locked?: boolean;
 }
+
+/** Blend modes offered (the canvas's `globalCompositeOperation` names); absent on an object = normal. */
+export const BLEND_MODES = ["multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion"] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+/** Longest layer or group name kept. */
+export const MAX_NAME_LENGTH = 80;
 
 export interface StrokeObject extends ObjectBase {
   readonly kind: "stroke";
@@ -249,6 +262,9 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (!(finite(o.opacity, "opacity") > 0 && o.opacity <= 1)) throw new InvalidObjectError("opacity must be in (0, 1]");
   if (o.attachmentTargetId !== null) throw new InvalidObjectError("attachment is not supported yet");
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
+  if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
+  if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
+  if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
@@ -314,6 +330,9 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
     ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}),
     ...(s["groups"] !== undefined ? { groups: s["groups"] as string[] } : {}),
+    ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
+    ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
+    ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
     ...(s["locked"] === true ? { locked: true as const } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),

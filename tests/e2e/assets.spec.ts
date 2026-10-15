@@ -713,6 +713,28 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("audio that is playing carries on after it leaves the view (ADR 0044)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(8) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));
+  await p.getByTestId("media-bar").getByRole("button", { name: "Play", exact: true }).click();
+  await p.mouse.click(1100, 700); // deselect: it plays on
+  const time = () => p.evaluate(() => { const v = document.querySelector<HTMLVideoElement>("video.media-video"); return v && !v.paused ? v.currentTime : -1; });
+  await expect.poll(time).toBeGreaterThan(0);
+  // Pan far away: the audio is out of view and still plays (a video would stop).
+  await p.evaluate(() => window.__canvastDebug.setCamera({ ...window.__canvastDebug.camera(), cx: "100000p0" }));
+  await app.frame();
+  const t0 = await time();
+  expect(t0).toBeGreaterThan(0);
+  await expect.poll(time).toBeGreaterThan(t0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("an animated GIF steps by frame: placed paused, stepped, wrapped, played and drawn at its paused frame (ADR 0042)", async ({ app }) => {
   const p = app.page;
   const W = 120;

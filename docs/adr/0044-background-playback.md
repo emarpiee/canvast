@@ -13,4 +13,4 @@
 
 ## Not built
 
-Playing audio after it leaves the view (it stops like video, as the plan asks), a global "pause all" control, playing media continuing across a canvas switch (switching canvases stops it with its position saved).
+(Audio that is playing now continues out of view: ADR 0047.) A global "pause all" control, playing media continuing across a canvas switch (switching canvases stops it with its position saved).

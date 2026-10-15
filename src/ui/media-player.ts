@@ -346,7 +346,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const bb = projectObject(o, cam, vp, { keepTiny: true })?.box ?? { minX: s.x, maxX: s.x + w, minY: s.y, maxY: s.y + h };
     const inView = bb.maxX > 0 && bb.maxY > 0 && bb.minX < vp.width && bb.minY < vp.height;
     // One that is not selected has nothing to show or control once it is out of view: it stops (its position is kept).
-    if (!inView && p !== sel) return release(p);
+    // Audio that is playing carries on: there is no picture to lose and it costs no video decoder (ADR 0044).
+    if (!inView && p !== sel && !(p.o.media?.kind === "audio" && p.eng.playing())) return release(p);
     // While the instance is being moved, scaled or turned the canvas draws it at the previewed place: the overlay would lag behind.
     // While it loads it stays in the page but transparent: Firefox presents no new picture after a seek for an element nobody can see,
     // so the paused frame it opens on would be a stale one.

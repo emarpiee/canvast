@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { renderFrame } from "../render/canvas2d-renderer";
@@ -105,6 +105,19 @@ async function start(): Promise<void> {
   // Content too small to draw individually is shown as a density preview (ADR 0010).
   const density = new DensityLayer();
   doc.subscribe((_source, changed) => tiles.invalidate(changed));
+  // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.
+  const blended = new Set<string>();
+  doc.subscribe((_source, changed) => {
+    if (changed === null) {
+      blended.clear();
+      for (const o of doc.all()) if (o.blend) blended.add(o.id);
+      return;
+    }
+    for (const id of changed) {
+      if (doc.get(id)?.blend) blended.add(id);
+      else blended.delete(id);
+    }
+  });
   const editor = new EditorState();
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
@@ -202,8 +215,18 @@ async function start(): Promise<void> {
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
     let runs: Map<ProjectedObject, number> | undefined;
+    let blendShown = false;
+    for (const id of blended) {
+      const o = doc.get(id);
+      if (!o || o.hidden) continue;
+      const oc = cameraIn(fc, o.frame ?? doc.space.world);
+      if (isCoarse(fc, o.frame ?? doc.space.world) || (oc && projectObject(o, oc, vp, { keepTiny: true }))) {
+        blendShown = true;
+        break;
+      }
+    }
     const tiled =
-      editor.preview.kind === "none"
+      editor.preview.kind === "none" && !blendShown
         ? tiles.draw(
             ctx,
             cam,
@@ -340,6 +363,10 @@ async function start(): Promise<void> {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
+    setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
+    rename: (key, name) => renameLayer(doc, editor, key, name),
+    relink: (textId, oldId, newId, label) => relinkMentionOn(doc, editor, textId, oldId, newId, label),
+    mentionable: (query) => session.mentionableElsewhere(query, 6),
     backlinksElsewhere: (id) => session.backlinksElsewhere(id),
     locateMentions: (ids) => session.locateMentions(ids),
     assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",

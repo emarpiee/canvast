@@ -182,6 +182,7 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   await p.getByTestId("import-input").setInputFiles({ name: "sky-ref.png", mimeType: "image/png", buffer: blockyFixture() });
   await expect.poll(async () => (await objects(p)).length).toBe(3);
   await p.keyboard.press("Escape");
+  const imgId = (await objects(p)).find((o) => o.kind === "image")!.id;
   const row = (id: string) => panel.locator(`li.layer[data-key="${id}"]`);
   // Target lists the text that mentions it; the text lists its target, which can be revealed.
   await p.keyboard.press("v");
@@ -224,6 +225,14 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   await row(stroke!.id).click();
   await p.keyboard.press("Delete");
   await row(t1!.id).click();
+  await expect(panel.locator(".layers-links .broken")).toHaveCount(1);
+  // Relink the missing item to the image: the text now mentions it and nothing is missing.
+  await panel.getByRole("button", { name: "Relink" }).click();
+  await panel.getByRole("textbox", { name: "Find an item to relink" }).fill("sky");
+  await panel.locator(`[data-relink-pick="${imgId}"]`).click();
+  await expect(panel.locator(".layers-links .broken")).toHaveCount(0);
+  expect((await textObjects(p)).find((t) => t.id === t1!.id)!.md).toContain(`[[item:${imgId}|`);
+  await p.keyboard.press("Control+z");
   await expect(panel.locator(".layers-links .broken")).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });

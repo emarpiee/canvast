@@ -410,7 +410,7 @@ visible strokes). Alternatives:
 
 **Phase 5, slice 6 done:** backlinks, board-wide picker, missing-target state, storage v7 ([ADR 0040](adr/0040-backlinks.md)); tested in `text.spec.ts` "backlinks" (chromium, firefox) and storage, archive and assets specs (chromium, unchanged results).
 
-**Phase 5 complete (v0.14.0):** full suite recorded in [full-run-phase-5.md](testing/full-run-phase-5.md). Not built: relink of missing mentions, blend modes, layer renaming (undo/redo stays in-session by design).
+**Phase 5 complete (v0.14.0):** full suite recorded in [full-run-phase-5.md](testing/full-run-phase-5.md). Relink of missing mentions, blend modes and layer renaming were built in Phase 6 (ADR 0047); undo/redo stays in-session by design.
 
 **Phase 6, slice 1 done:** videos as image instances with a paused position and an on-canvas player ([ADR 0041](adr/0041-video-players.md)); tested in `media.test.ts` and `assets.spec.ts` "a video is placed" (chromium, firefox; one unexplained failure in the first of about 19 runs, not reproduced).
 
@@ -423,6 +423,8 @@ visible strokes). Alternatives:
 **Phase 6, slice 5 done (media pictures, [ADR 0046](adr/0046-video-pictures-and-paused-frame.md)):** a paused video reopens on the frame it was paused on (Firefox desktop, fixed and confirmed by the owner); pictures of a video are taken by drawing the element, `createImageBitmap`, `VideoFrame`, then an MP4 frame decoded with WebCodecs (`mp4-frames.ts`); a flat picture is never stored. Tested in `assets.spec.ts` (chromium, firefox: video, flat-picture import, undecodable card); the WebCodecs path was checked by hand in Firefox 152 with H.264 files (B-frames, rotation), not in the suite (Playwright browsers cannot decode MP4).
 
 **Phase 6, slice 6:** the mention picker and mention labels name an image by its file name (found by typing it), not "Image W×H"; tested in `text.spec.ts` "backlinks" (chromium, firefox).
+
+**Phase 6, slice 7 (gaps closed, [ADR 0047](adr/0047-blend-modes-layer-names-relink.md)):** blend modes, layer and group names, relink of missing mentions, audio playing out of view. Tested: `frames.spec.ts` "layers panel" (blend changes pixels, undo, rename object and group, reload), `text.spec.ts` "backlinks" (relink and undo), `assets.spec.ts` "audio that is playing carries on" (chromium, firefox). Not built: see the ADR.
 
 **Known failures (Phase 6):** Firefox on Android with H.265 phone videos: the canvas shows the card with the reason, Extract Frame gives nothing, playing from the player works. Not reproducible without the device. Accepted for now. One unexplained failure of the "a video is placed" firefox test in about 6 runs after the pause change (passed 3 of 3 on rerun, not reproduced). The Firefox paused-frame mismatch on desktop is fixed.
 

@@ -163,6 +163,12 @@ export function mentionIds(md: string): string[] {
   return [...ids];
 }
 
+/** The text with every mention of `oldId` pointing at `newId` instead, shown as `label` (relinking a missing item, ADR 0047). */
+export function relinkMention(md: string, oldId: string, newId: string, label: string): string {
+  const blocks = parse(md).map((b) => ({ ...b, spans: b.spans.map((sp) => (sp.ref === oldId ? { ...sp, ref: newId, text: label || "Item" } : sp)) }));
+  return serialize(blocks);
+}
+
 export function serialize(blocks: readonly Block[]): string {
   const out: string[] = [];
   let n = 0;

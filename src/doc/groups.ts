@@ -45,8 +45,11 @@ export function ungroupObjects(objects: readonly CanvasObject[], level: number):
   for (const o of objects) {
     if (!o.groups || o.groups.length <= level) continue;
     const path = o.groups.filter((_, i) => i !== level);
-    const { groups: _old, ...rest } = o;
-    out.push((path.length ? { ...rest, groups: path } : rest) as CanvasObject);
+    const { groups: _old, groupNames, ...rest } = o;
+    const gone = o.groups[level]!;
+    const { [gone]: _name, ...names } = groupNames ?? {};
+    const kept = Object.keys(names).length ? { groupNames: names } : {};
+    out.push((path.length ? { ...rest, ...kept, groups: path } : { ...rest, ...kept }) as CanvasObject);
   }
   return out;
 }

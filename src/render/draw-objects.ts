@@ -41,14 +41,17 @@ function viewRect(vp: Viewport, margin: number): Rect {
   return { minX: -margin, minY: -margin, maxX: vp.width + margin, maxY: vp.height + margin };
 }
 
-/** Apply per-object paint state (opacity today; blend mode is the next field here). */
+/** Apply per-object paint state: opacity and blend mode (ADR 0047). */
 export function paint(ctx: CanvasRenderingContext2D, o: CanvasObject, body: () => void): void {
   const prevAlpha = ctx.globalAlpha;
+  const prevOp = ctx.globalCompositeOperation;
   ctx.globalAlpha = prevAlpha * o.opacity;
+  if (o.blend) ctx.globalCompositeOperation = o.blend;
   try {
     body();
   } finally {
     ctx.globalAlpha = prevAlpha;
+    ctx.globalCompositeOperation = prevOp;
   }
 }
 
@@ -82,7 +85,7 @@ export function strokeLineWidth(po: ProjectedObject): number {
 
 /** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
 export function batchable(po: ProjectedObject): boolean {
-  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1;
+  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1 && !po.obj.blend;
 }
 
 /**

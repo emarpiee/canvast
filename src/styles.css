@@ -671,6 +671,13 @@ dialog.confirm p { margin: 0 0 8px; overflow-wrap: anywhere; }
 .layers-links li.broken { color: #b00020; }
 .layers-opacity { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; }
 .layers-opacity input { flex: 1; min-width: 0; }
+.layers-links li.broken button, .layers-links li.relink button { font-size: 12px; }
+.layers-links li.relink { display: flex; flex-wrap: wrap; gap: 4px; }
+.layers-links li.relink input { flex: 1; min-width: 0; }
+.layers-links li.relink ul { flex-basis: 100%; }
+.layers-blend { display: flex; align-items: center; gap: 6px; padding: 6px 8px 0; font-size: 12px; }
+.layers-blend select { flex: 1; min-width: 0; text-transform: capitalize; }
+.layer-rename { flex: 1; min-width: 0; font: inherit; }
 .layers-panel ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
 .layer { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 2px 0 calc(2px + var(--depth, 0) * 14px); border-radius: 6px; cursor: default; }
 .layer:hover { background: var(--hud-border); }

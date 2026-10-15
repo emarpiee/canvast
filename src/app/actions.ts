@@ -1,8 +1,9 @@
 import * as D from "../core/dyadic";
+import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ImageObject, MediaState } from "../doc/model";
-import { homeObject, newObjectId } from "../doc/model";
+import type { BlendMode, CanvasObject, ImageObject, MediaState } from "../doc/model";
+import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
 import { normalizeUnit, placeAbove, restack, translate } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, SortKey, Unit } from "../doc/arrange";
@@ -266,6 +267,58 @@ export function setOpacityOn(doc: DocumentStore, editor: EditorState, ids: reado
   const objs = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && o.opacity !== opacity);
   if (!objs.length) return;
   doc.commit(doc.transaction("Set opacity", objs.map((o) => ({ ...o, opacity }))));
+}
+
+/** Set the blend mode of specific objects (null = normal); one undo step (ADR 0047). */
+export function setBlendOn(doc: DocumentStore, editor: EditorState, ids: readonly string[], blend: BlendMode | null): void {
+  if (editor.blockEdit()) return;
+  const objs = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && (o.blend ?? null) !== blend);
+  if (!objs.length) return;
+  doc.commit(
+    doc.transaction(
+      "Set blend mode",
+      objs.map((o) => {
+        const { blend: _b, ...rest } = o;
+        return (blend ? { ...rest, blend } : rest) as CanvasObject;
+      }),
+    ),
+  );
+}
+
+/** Point the mentions of a missing item in a text at another item; one undo step (ADR 0047). */
+export function relinkMentionOn(doc: DocumentStore, editor: EditorState, textId: string, oldId: string, newId: string, label: string): void {
+  if (editor.blockEdit()) return;
+  const t = doc.get(textId);
+  if (!t || t.kind !== "text" || oldId === newId) return;
+  const md = relinkMention(t.md, oldId, newId, label);
+  if (md === t.md) return;
+  doc.commit(doc.transaction("Relink mention", [{ ...t, md }]));
+}
+
+/** Name a layer (an object id) or a group (a group id); an empty name goes back to the automatic label. One undo step (ADR 0047). */
+export function renameLayer(doc: DocumentStore, editor: EditorState, key: string, name: string): void {
+  if (editor.blockEdit()) return;
+  const clean = name.trim().slice(0, MAX_NAME_LENGTH);
+  const one = doc.get(key);
+  if (one) {
+    if ((one.name ?? "") === clean) return;
+    const { name: _n, ...rest } = one;
+    doc.commit(doc.transaction("Rename layer", [(clean ? { ...rest, name: clean } : rest) as CanvasObject]));
+    return;
+  }
+  const members = doc.ordered().filter((o) => o.groups?.includes(key));
+  if (!members.length || members.every((o) => (o.groupNames?.[key] ?? "") === clean)) return;
+  doc.commit(
+    doc.transaction(
+      "Rename group",
+      members.map((o) => {
+        const { groupNames, ...rest } = o;
+        const { [key]: _old, ...others } = groupNames ?? {};
+        const next = clean ? { ...others, [key]: clean } : others;
+        return (Object.keys(next).length ? { ...rest, groupNames: next } : rest) as CanvasObject;
+      }),
+    ),
+  );
 }
 
 /** Change a media instance's paused position or repeat mode (one undo step); a no-op when nothing changes. */

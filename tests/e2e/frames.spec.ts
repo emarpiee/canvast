@@ -1090,14 +1090,47 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(await opacityOf()).toBeCloseTo(0.4);
   await p.keyboard.press("Control+z");
   expect(await opacityOf()).toBe(1);
+  // Blend mode (ADR 0047): set from the panel, one undo step, kept with the object.
+  const field = (id: string, k: string) => p.evaluate(([i, key]) => window.__canvastDebug.objects().find((o) => o.id === i)![key!], [id, k] as const);
+  const before = await ink();
+  await panel.locator("[data-blend]").selectOption("difference");
+  await app.frame();
+  expect(await ink(), "the blend mode changes the pixels (the view is drawn directly, not from tiles)").not.toBe(before);
+  await panel.locator("[data-blend]").selectOption("multiply");
+  expect(await field(ids[1]!, "blend")).toBe("multiply");
+  await app.frame();
+  await p.keyboard.press("Control+z");
+  expect(await field(ids[1]!, "blend"), "undo is one step").toBe("difference");
+  await p.keyboard.press("Control+y");
+  expect(await field(ids[1]!, "blend")).toBe("multiply");
+  // Rename a layer by double-clicking its name; an empty name goes back to the automatic one.
+  await rows.nth(1).locator(".layer-name").dblclick();
+  await panel.locator("[data-rename]").fill("sky line");
+  await p.keyboard.press("Enter");
+  await expect(rows.nth(1).locator(".layer-name")).toHaveText("sky line");
+  expect(await field(ids[1]!, "name")).toBe("sky line");
+  // Group two layers and name the group.
+  await rows.nth(0).click();
+  await rows.nth(2).click({ modifiers: ["Shift"] });
+  await p.getByRole("button", { name: "Group", exact: true }).click();
+  const group = panel.locator('li.layer[data-group="true"]');
+  await group.locator(".layer-name").dblclick();
+  await panel.locator("[data-rename]").fill("pair");
+  await p.keyboard.press("Enter");
+  await expect(group.locator(".layer-name")).toHaveText("pair");
   // Hide the panel with its close button; the state is kept after a reload.
   await panel.getByRole("button", { name: "Hide the Layers panel" }).click();
   await expect(panel).toBeHidden();
   await p.getByRole("button", { name: "Layers panel" }).click();
   await expect(panel).toBeVisible();
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.getByTestId("layers-panel")).toBeVisible();
+  const kept = p.getByTestId("layers-panel");
+  await expect(kept.locator(".layer-name", { hasText: "sky line" })).toHaveCount(1);
+  await expect(kept.locator(".layer-name", { hasText: "pair" })).toHaveCount(1);
+  expect(await p.evaluate((id) => window.__canvastDebug.objects().find((o) => o.id === id)!["blend"], ids[1]!)).toBe("multiply");
 });
 
 test("bookmarks: save the current place and zoom, go back to it exactly (a trillion levels down too), rename, delete, and keep them across a reload and frame clean-up (ADR 0025)", async ({ app }) => {
