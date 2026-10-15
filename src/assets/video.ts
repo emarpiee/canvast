@@ -218,5 +218,9 @@ export async function pictureNow(v: HTMLVideoElement, blob: Blob, t: number): Pr
     b?.close();
     return f;
   }
-  return b ?? (elementBlank ? await frameBitmap(v).catch(() => null) : null);
+  if (elementBlank) {
+    b?.close();
+    return null; // this browser draws nothing for the element: a flat picture would only blank the canvas
+  }
+  return b;
 }

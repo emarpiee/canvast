@@ -213,7 +213,7 @@ export class AssetLibrary {
             img = e.result.bitmap; // nothing better to show than the flat picture
             duration = e.result.duration;
           } else {
-            img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec, e instanceof BlankPictureError ? e.why : "");
+            img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
             duration = pr.duration;
             size = { w: pr.w, h: pr.h };
           }
@@ -391,7 +391,7 @@ export class AssetLibrary {
         if (!pr) {
           if (!(e instanceof BlankPictureError)) throw e;
           img = e.result.bitmap;
-        } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : "");
+        } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
       }
       if (this.decoded.has(key)) {
         (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins

@@ -36,8 +36,22 @@ export async function makeCard(w: number, h: number, name: string, codec: string
   x.fillText(fit(name || "Video", nameFont), c.width / 2, y);
   x.fillStyle = "#9aa4bb";
   const detailSize = parseFloat(detailFont);
-  for (const line of [`${codec || "Video"} · ${w}×${h}`, "can't be previewed in this browser", ...(why ? [why] : [])]) {
-    y += (line === `${codec || "Video"} · ${w}×${h}` ? nameSize : detailSize) * 1.45;
+  const head = `${codec || "Video"} · ${w}×${h}`;
+  y += nameSize * 1.45;
+  x.fillText(fit(head, detailFont), c.width / 2, y);
+  // The reason, when there is one, wrapped on words (it is what tells why a picture could not be taken).
+  x.font = detailFont;
+  const lines: string[] = ["can't be previewed in this browser"];
+  let cur = "";
+  for (const word of why.split(/\s+/).filter(Boolean)) {
+    if (cur && x.measureText(`${cur} ${word}`).width > room) {
+      lines.push(cur);
+      cur = word;
+    } else cur = cur ? `${cur} ${word}` : word;
+  }
+  if (cur) lines.push(cur);
+  for (const line of lines.slice(0, 5)) {
+    y += detailSize * 1.45;
     x.fillText(fit(line, detailFont), c.width / 2, y);
   }
   return createImageBitmap(c);
