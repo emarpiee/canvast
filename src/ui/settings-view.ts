@@ -69,7 +69,12 @@ export const SETTINGS_TABS: readonly Tab[] = [
   {
     id: "appearance",
     label: "Appearance",
-    rows: [{ key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } }],
+    rows: [
+      { key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } },
+      { key: "ui.textScale", label: "Interface size", help: "Scales the toolbars, panels and views (not the canvas).", control: { kind: "select", options: [["90", "90%"], ["100", "100%"], ["115", "115%"], ["130", "130%"], ["150", "150%"]] } },
+      { key: "ui.contrast", label: "Contrast", help: "High contrast: stronger text and borders in the interface.", control: { kind: "select", options: [["normal", "Normal"], ["high", "High"]] } },
+      { key: "ui.motion", label: "Motion", help: "System follows your operating system's reduce-motion setting.", control: { kind: "select", options: [["system", "System"], ["reduce", "Reduce"], ["full", "Full"]] } },
+    ],
   },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },

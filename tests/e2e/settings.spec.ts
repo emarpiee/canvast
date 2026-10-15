@@ -106,3 +106,36 @@ test("shortcuts: tool keys can be changed and are refused when taken; the list o
   expect(await tool()).toBe("pen");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("appearance: interface size, contrast and motion apply at once, persist, and the tools never sit under the view tabs (ADR 0050)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.locator("#settings-view");
+  const root = p.locator("html");
+  const clear = async () => {
+    const [nav, tools] = await Promise.all([p.locator("#nav").boundingBox(), p.locator("#toolbar > .toolbar").boundingBox()]);
+    return tools!.x >= nav!.x + nav!.width - 1 || tools!.y >= nav!.y + nav!.height - 1;
+  };
+  expect(await clear(), "100%: the tools are clear of the view tabs").toBe(true);
+  await p.getByTestId("view-settings").click();
+  await panel.getByRole("tab", { name: "Appearance" }).click();
+  await panel.getByLabel("Interface size", { exact: true }).selectOption("150");
+  await panel.getByLabel("Contrast", { exact: true }).selectOption("high");
+  await panel.getByLabel("Motion", { exact: true }).selectOption("reduce");
+  await expect(root).toHaveAttribute("data-contrast", "high");
+  await expect(root).toHaveAttribute("data-motion", "reduce");
+  expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
+  // The whole view grows (the tab list is wider than at 100%).
+  expect((await panel.locator(".set-tabs").boundingBox())!.width).toBeGreaterThan(250);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(root).toHaveAttribute("data-contrast", "high");
+  expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
+  expect(await clear(), "150%: the tools are clear of the view tabs").toBe(true);
+  // Back to the defaults leaves no attribute behind.
+  await p.getByTestId("view-settings").click();
+  await panel.getByRole("tab", { name: "Appearance" }).click();
+  for (const key of ["ui.textScale", "ui.contrast", "ui.motion"]) await panel.getByRole("button", { name: new RegExp(`Reset ${{ "ui.textScale": "Interface size", "ui.contrast": "Contrast", "ui.motion": "Motion" }[key]} `) }).click();
+  await expect(root).not.toHaveAttribute("data-contrast", /.*/);
+  await expect(root).not.toHaveAttribute("data-motion", /.*/);
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -58,6 +58,9 @@ export const SETTINGS = {
   "key.lasso": { scope: "device", default: "l", validate: letter, effect: "immediate" } as Def<string>,
   "key.text": { scope: "device", default: "t", validate: letter, effect: "immediate" } as Def<string>,
   "key.eraser": { scope: "device", default: "e", validate: letter, effect: "immediate" } as Def<string>,
+  "ui.textScale": { scope: "device", default: "100", validate: oneOf("90", "100", "115", "130", "150"), effect: "immediate" } as Def<"90" | "100" | "115" | "130" | "150">,
+  "ui.contrast": { scope: "device", default: "normal", validate: oneOf("normal", "high"), effect: "immediate" } as Def<"normal" | "high">,
+  "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "full"), effect: "immediate" } as Def<"system" | "reduce" | "full">,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

@@ -160,6 +160,17 @@ async function start(): Promise<void> {
     if (t === "system") delete document.documentElement.dataset["theme"];
     else document.documentElement.dataset["theme"] = t;
   };
+  // Interface size, contrast and motion (Settings > Appearance): attributes and a variable on the root, read by the stylesheet.
+  const applyAppearance = (): void => {
+    const root = document.documentElement;
+    root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
+    if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
+    else delete root.dataset["contrast"];
+    const m = settings.get("ui.motion");
+    if (m === "system") delete root.dataset["motion"];
+    else root.dataset["motion"] = m;
+  };
+  applyAppearance();
   applyThemeAttribute();
   let theme = readTheme(document.documentElement);
   let dpr = window.devicePixelRatio || 1;
@@ -448,6 +459,13 @@ async function start(): Promise<void> {
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
   mountNavigator(document.getElementById("workspace")!, session);
 
+  // The tools start where the view tabs and the workspace menu end (stylesheet: --nav-w).
+  const navBox = document.getElementById("nav")!;
+  const measureNav = (): void => document.documentElement.style.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
+  new ResizeObserver(measureNav).observe(navBox);
+  window.addEventListener("resize", measureNav);
+  measureNav();
+
   // Top-level views. The canvas keeps its camera, selection and history while hidden.
   const assetsRoot = document.getElementById("assets-view")!;
   const setView = (v: AppView): void => {
@@ -495,6 +513,11 @@ async function start(): Promise<void> {
       case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
       case "ui.fps": editor.showFps = settings.get(key); break;
       case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
+      case "ui.textScale":
+      case "ui.contrast":
+      case "ui.motion":
+        applyAppearance();
+        return;
       case "ui.theme":
         applyThemeAttribute();
         theme = readTheme(document.documentElement);

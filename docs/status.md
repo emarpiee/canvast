@@ -432,6 +432,8 @@ visible strokes). Alternatives:
 
 **Phase 7, slice 2 (shortcuts, [ADR 0049](adr/0049-shortcuts.md)):** rebindable tool keys, the shortcut list, `?`. Tested: unit `settings-view.test.ts` (3); E2E `settings.spec.ts` "shortcuts" (chromium, firefox); frames, text and editing specs in chromium (51). **Next bounded task:** accessibility pass, appearance options (text size, reduced motion, high contrast), then contextual tools.
 
+**Phase 7, slice 3 (accessibility and appearance, [ADR 0050](adr/0050-accessibility-and-appearance.md)):** audit test of accessible names, landmarks and focus; header first in tab order; toolbar starts after the view tabs; interface size, contrast and motion settings. Tested: E2E `a11y.spec.ts` (2) and `settings.spec.ts` "appearance" in chromium and firefox; frames, text, editing, assets, organize, archive, storage, density, tiles and zoom-controls specs in chromium (100). **Next bounded task:** contextual tools (a selection action bar), then the Phase 7 full suite.
+
 **Phase 6 is complete (v0.15.0):** full suite in [full-run-phase-6.md](testing/full-run-phase-6.md): 411 passed, 6 skipped, 1 failed (the intermittent Firefox hole check above). **Next bounded task:** Phase 7; ask before pushing (Phases 5 and 6 are local).
 
 ## Phase 1, slice 9 — settings scopes
