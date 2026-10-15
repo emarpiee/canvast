@@ -5,6 +5,7 @@ import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
 import type { PenKind } from "../interaction/pens";
 import { ICONS } from "./icons";
+import { swatchBackground } from "../render/ink";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
 export interface ToolbarActions {
@@ -70,12 +71,12 @@ const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: strin
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
-    <div class="toolbar" role="toolbar" aria-label="Tools">
-      <div class="tb-group" role="radiogroup" aria-label="Tool">
-        ${TOOLS.map(
-          (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
-        ).join("")}
-      </div>
+    <div class="rail" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
+      ${TOOLS.map(
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
+      ).join("")}
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="Actions and options">
       <div class="tb-group">
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
@@ -88,7 +89,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-options-row">
       <div class="tb-group tb-options" data-for="pen text">
         ${PEN_COLORS.map(
-          (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${c}"></span></button>`,
+          (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${swatchBackground(c)}"></span></button>`,
         ).join("")}
       </div>
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">

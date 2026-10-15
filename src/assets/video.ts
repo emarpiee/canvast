@@ -207,9 +207,9 @@ export async function decodeAudio(blob: Blob): Promise<{ bitmap: ImageBitmap; du
   c.width = WAVE_W;
   c.height = WAVE_H;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#e8eef7";
+  ctx.fillStyle = "oklch(0.947 0.014 258)";
   ctx.fillRect(0, 0, WAVE_W, WAVE_H);
-  ctx.fillStyle = "#2f6fdb";
+  ctx.fillStyle = "oklch(0.561 0.178 260)";
   const per = Math.max(1, Math.floor(data.length / WAVE_W));
   for (let x = 0; x < WAVE_W; x++) {
     let peak = 0;

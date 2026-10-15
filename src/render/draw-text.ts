@@ -1,3 +1,4 @@
+import { paintColor } from "./ink";
 import * as D from "../core/dyadic";
 import type { Viewport } from "../core/camera";
 import type { ImageObject, TextObject } from "../doc/model";
@@ -74,7 +75,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   };
   ctx.save();
   paint(ctx, o, () => {
-    ctx.fillStyle = o.color;
+    ctx.fillStyle = paintColor(o.color);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     ctx.beginPath();
@@ -268,7 +269,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
   const R = RASTER_EM_PX;
   const pixelW = Math.ceil((g.adv / line.scale + 2 * pad) * R);
   const pixelH = Math.ceil(LINE_HEIGHT * R);
-  const key = `${g.cp}|${g.bold}|${g.italic}|${o.color}|${pixelW}`;
+  const key = `${g.cp}|${g.bold}|${g.italic}|${paintColor(o.color)}|${pixelW}`;
   let src = rasters.get(key);
   if (!src) {
     if (rasters.size > 256) rasters.clear();
@@ -276,7 +277,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
     c.width = pixelW;
     c.height = pixelH;
     const r = c.getContext("2d", { willReadFrequently: true })!;
-    r.fillStyle = o.color;
+    r.fillStyle = paintColor(o.color);
     r.font = `${g.bold ? "bold " : ""}${R}px ${FALLBACK_FONT_FAMILY}`;
     r.translate(pad * R, ((line.baseline - line.top) / line.scale) * R);
     if (g.italic) r.transform(1, 0, -SKEW, 1, 0, 0);

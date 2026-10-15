@@ -160,7 +160,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideHash = hash;
     slide.hidden = false;
     slide.focus();
-    const label = `${e.name || "Untitled"} · ${e.pixelW}×${e.pixelH} · ${fmtBytes(e.size)}`;
+    const label = `${e.name || "Untitled"}, ${e.pixelW} × ${e.pixelH} px, ${fmtBytes(e.size)}`;
     slideCaption.textContent = label;
     slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
     freeSlideUrl();
@@ -171,7 +171,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
     if (token !== slideToken) return;
     const thumbnail = async (): Promise<void> => {
-      slideCaption.textContent = `${label} · The original is missing or damaged; showing its thumbnail.`;
+      slideCaption.textContent = `${label}. The original is missing or damaged; showing its thumbnail.`;
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
@@ -245,7 +245,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   const kindOf = (type: string): string => (type.split("/")[1] ?? type).toUpperCase();
   const usesText = (instances: number, canvases: number): string =>
-    instances === 0 ? "Unused" : `${instances} use${instances === 1 ? "" : "s"} · ${canvases} canvas${canvases === 1 ? "" : "es"}`;
+    instances === 0 ? "Unused" : `Used ${instances} time${instances === 1 ? "" : "s"} on ${canvases} canvas${canvases === 1 ? "" : "es"}`;
 
   const searchWords = (q: string): string[] => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   /** Search words (name, type, hash start, tags; `#tag` is exact) and the usage filter: what a smart folder saves. */
@@ -296,7 +296,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <span class="asset-thumb"><img alt="" class="${small.trim()}" data-hash="${e.hash}">${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}</span>
         <span class="asset-name">${meta(e).favorite ? `<span class="asset-star" aria-label="Favourite">★</span> ` : ""}${esc(e.name || "Untitled")}</span>
         ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : ""}
-        <span class="asset-meta">${e.pixelW}×${e.pixelH} · ${esc(kindOf(e.type))} · ${fmtBytes(e.size)}</span>
+        <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span><span class="asset-meta">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
         <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
       </button>`;
     });

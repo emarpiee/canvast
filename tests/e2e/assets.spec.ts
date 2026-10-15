@@ -113,7 +113,7 @@ test("one original is shared by instances on several boards and canvases; usage 
   await importOnCanvas(p);
   await toAssets(p);
   await expect(card(p, HASH)).toHaveCount(1);
-  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("1 use · 1 canvas");
+  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 1 time on 1 canvas");
 
   // A second instance on the same canvas, one on Canvas 2, one on Board 2.
   await card(p, HASH).click();
@@ -131,7 +131,7 @@ test("one original is shared by instances on several boards and canvases; usage 
   expect(l.entries.map((e) => [e.hash, e.instances, e.canvases, e.present])).toEqual([[HASH, 4, 3, true]]);
   expect(await stored(p)).toEqual([HASH]);
   await toAssets(p);
-  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("4 uses · 3 canvases");
+  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 4 times on 3 canvases");
   await card(p, HASH).click();
   const rows = p.getByTestId("asset-places").locator("li");
   await expect(rows).toHaveText([/Board 1 › Canvas 1\s*2/, /Board 1 › Canvas 2\s*1/, /Board 2 › Canvas 1\s*1/]);
@@ -148,7 +148,7 @@ test("one original is shared by instances on several boards and canvases; usage 
   await p.keyboard.press("Delete");
   await saved(p);
   await toAssets(p);
-  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("3 uses · 2 canvases");
+  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 3 times on 2 canvases");
   expect(await stored(p)).toEqual([HASH]);
 
   // Importing the same bytes again (here, into the library only) adds no copy.
@@ -249,7 +249,7 @@ test("deleting from the library erases only unused originals, and undo history k
     .poll(async () => (await p.evaluate(() => window.__canvastDebug.catalogEntries())).map((e) => [e.hash, e.state]))
     .toEqual([[HASH, "active"]]);
   await toAssets(p);
-  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("1 use · 1 canvas");
+  await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 1 time on 1 canvas");
 
   // Delete the instance and the asset again; once the history is cleared (switching canvas), it is erased.
   await toCanvas(p);

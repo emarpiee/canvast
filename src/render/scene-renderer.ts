@@ -18,6 +18,11 @@ export interface SceneTheme {
   handleFill: string;
   lasso: string;
   imagePlaceholder: string;
+  /** Eraser brush and its touched boxes. */
+  danger: string;
+  dangerWash: string;
+  /** Snap guide lines. */
+  guide: string;
 }
 
 export const HANDLE_SIZE_PX = 9;
@@ -140,8 +145,8 @@ export function drawOverlays(
   if (editor.tool === "eraser" && editor.eraser) {
     ctx.save();
     for (const b of editor.eraser.boxes) {
-      ctx.fillStyle = "rgba(220, 38, 38, 0.18)";
-      ctx.strokeStyle = "#dc2626";
+      ctx.fillStyle = theme.dangerWash;
+      ctx.strokeStyle = theme.danger;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 3]);
       ctx.fillRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
@@ -149,7 +154,7 @@ export function drawOverlays(
     }
     if (editor.eraser.at) {
       ctx.setLineDash([]);
-      ctx.strokeStyle = "#dc2626";
+      ctx.strokeStyle = theme.danger;
       ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.arc(editor.eraser.at.x, editor.eraser.at.y, editor.eraserPx / 2, 0, Math.PI * 2);
@@ -160,7 +165,7 @@ export function drawOverlays(
   // Snap guides: where the moving selection lines up with another object.
   if (editor.guides) {
     ctx.save();
-    ctx.strokeStyle = "#d946ef";
+    ctx.strokeStyle = theme.guide;
     ctx.lineWidth = 1;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();

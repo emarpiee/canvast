@@ -47,11 +47,12 @@ import { isArchiveFile, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
 import { SettingsStore } from "../settings/settings";
+import { setThemeInk } from "../render/ink";
 
 declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
 
-function readTheme(el: HTMLElement): Theme & SceneTheme {
+function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
   const css = getComputedStyle(el);
   const v = (name: string): string => css.getPropertyValue(name).trim();
   return {
@@ -64,6 +65,10 @@ function readTheme(el: HTMLElement): Theme & SceneTheme {
     handleFill: v("--canvas-handle-fill"),
     lasso: v("--canvas-lasso"),
     imagePlaceholder: v("--canvas-image-placeholder"),
+    ink: v("--canvas-ink"),
+    danger: v("--canvas-danger"),
+    dangerWash: v("--canvas-danger-wash"),
+    guide: v("--canvas-guide"),
   };
 }
 
@@ -174,6 +179,7 @@ async function start(): Promise<void> {
   applyAppearance();
   applyThemeAttribute();
   let theme = readTheme(document.documentElement);
+  setThemeInk(theme.ink);
   let dpr = window.devicePixelRatio || 1;
   // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
   const quality = new QualityGovernor((level) => {
@@ -348,6 +354,7 @@ async function start(): Promise<void> {
   new ResizeObserver(resize).observe(host);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
+    setThemeInk(theme.ink);
     tiles.clear();
     invalidate();
   });
@@ -481,8 +488,16 @@ async function start(): Promise<void> {
 
   // The tools start where the view tabs and the workspace menu end (stylesheet: --nav-w).
   const navBox = document.getElementById("nav")!;
-  const measureNav = (): void => document.documentElement.style.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
+  const barBox = document.getElementById("toolbar")!;
+  const measureNav = (): void => {
+    const root = document.documentElement.style;
+    root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
+    // Side panels start below the toolbar, however many rows it wraps to.
+    const bar = barBox.querySelector<HTMLElement>(".toolbar")?.getBoundingClientRect();
+    root.setProperty("--bar-bottom", `${Math.ceil(bar ? bar.bottom : 64)}px`);
+  };
   new ResizeObserver(measureNav).observe(navBox);
+  new ResizeObserver(measureNav).observe(barBox);
   window.addEventListener("resize", measureNav);
   measureNav();
 
@@ -541,6 +556,7 @@ async function start(): Promise<void> {
       case "ui.theme":
         applyThemeAttribute();
         theme = readTheme(document.documentElement);
+        setThemeInk(theme.ink);
         tiles.clear();
         invalidate();
         return;
