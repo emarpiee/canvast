@@ -431,6 +431,12 @@ docs/status.md              roadmap and current status (single source of truth)
 
 ## Known limitations (honest list)
 
+- **Video pictures in Firefox on Android.** With H.265 phone videos the
+  canvas shows a card (with the reason) instead of the picture, and Extract
+  Frame gives nothing; playing from the player works
+  ([ADR 0046](docs/adr/0046-video-pictures-and-paused-frame.md)). Firefox
+  on desktop and Chrome on Android are not affected.
+
 - **Precision budget (camera).** Zooming out more than 4,096 levels beyond
   the deepest point and back in no longer returns to the exact sub-pixel
   spot. It still lands within 2^-96 px at the coarse scale.
