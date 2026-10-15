@@ -827,3 +827,11 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }
 }
+
+/* Selection action bar (ui/context-bar.ts). */
+.ctx-bar { position: absolute; z-index: 4; display: flex; gap: 2px; padding: 3px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 8px; backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); }
+.ctx-bar[hidden] { display: none; }
+.ctx-bar button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; color: inherit; background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.ctx-bar button[hidden] { display: none; }
+.ctx-bar button:hover { background: var(--hud-border); }
+.ctx-bar button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

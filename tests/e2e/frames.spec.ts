@@ -1112,7 +1112,7 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   // Group two layers and name the group.
   await rows.nth(0).click();
   await rows.nth(2).click({ modifiers: ["Shift"] });
-  await p.getByRole("button", { name: "Group", exact: true }).click();
+  await p.locator("#toolbar").getByRole("button", { name: "Group", exact: true }).click();
   const group = panel.locator('li.layer[data-group="true"]');
   await group.locator(".layer-name").dblclick();
   await panel.locator("[data-rename]").fill("pair");

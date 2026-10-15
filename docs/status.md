@@ -434,6 +434,8 @@ visible strokes). Alternatives:
 
 **Phase 7, slice 3 (accessibility and appearance, [ADR 0050](adr/0050-accessibility-and-appearance.md)):** audit test of accessible names, landmarks and focus; header first in tab order; toolbar starts after the view tabs; interface size, contrast and motion settings. Tested: E2E `a11y.spec.ts` (2) and `settings.spec.ts` "appearance" in chromium and firefox; frames, text, editing, assets, organize, archive, storage, density, tiles and zoom-controls specs in chromium (100). **Next bounded task:** contextual tools (a selection action bar), then the Phase 7 full suite.
 
+**Phase 7, slice 4 (contextual tools, [ADR 0051](adr/0051-selection-action-bar.md)):** the selection action bar. Tested: E2E `editing.spec.ts` "selection action bar" (chromium, firefox); frames and editing specs in chromium and firefox (92); text, assets, organize, archive, density, tiles, settings and a11y specs in chromium. **Next bounded task:** a Phase 7 pass against its exit gate (view switching, settings, theme, accessibility tests), then the Phase 7 full suite and v0.16.0.
+
 **Phase 6 is complete (v0.15.0):** full suite in [full-run-phase-6.md](testing/full-run-phase-6.md): 411 passed, 6 skipped, 1 failed (the intermittent Firefox hole check above). **Next bounded task:** Phase 7; ask before pushing (Phases 5 and 6 are local).
 
 ## Phase 1, slice 9 — settings scopes

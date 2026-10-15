@@ -786,6 +786,11 @@ export function attachTools(
   };
   el.addEventListener("lostpointercapture", onLostCapture);
   el.addEventListener("dblclick", onDoubleClick);
+  // Moving onto a bar or panel over the canvas ends the hover (the resize cursor must not stay on the canvas).
+  const onLeave = (): void => {
+    delete el.dataset["hover"];
+  };
+  el.addEventListener("pointerleave", onLeave);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", () => {
@@ -799,6 +804,7 @@ export function attachTools(
     el.removeEventListener("pointercancel", onPointerUp);
     el.removeEventListener("lostpointercapture", onLostCapture);
     el.removeEventListener("dblclick", onDoubleClick);
+    el.removeEventListener("pointerleave", onLeave);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
   };

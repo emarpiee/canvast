@@ -337,3 +337,49 @@ test("delete, undo delete, and invalid imports are reported without corrupting t
   await expect(app.page.getByRole("status")).toContainText("could not be decoded");
   expect(await objects(app)).toEqual([s]);
 });
+
+test("selection action bar: follows the selection, hides while moving and for non-selecting tools, and acts (ADR 0051)", async ({ app }) => {
+  const p = app.page;
+  const bar = p.getByTestId("context-bar");
+  await expect(bar).toBeHidden();
+  await key(app, "p");
+  await app.drag({ x: 500, y: 450 }, { x: 700, y: 470 }, 4);
+  await app.drag({ x: 500, y: 520 }, { x: 700, y: 540 }, 4);
+  expect(await objects(app)).toHaveLength(2);
+  await key(app, "v");
+  const [a, b] = await objects(app);
+  const click = async (id: string) => {
+    const s = (await screenOfObject(app, id))!;
+    await p.mouse.click(Math.round((s.box.minX + s.box.maxX) / 2), Math.round((s.box.minY + s.box.maxY) / 2));
+  };
+  await click(a!.id);
+  await expect(bar).toBeVisible();
+  // Below the selection, and clear of it.
+  const sel = (await screenOfObject(app, a!.id))!.box;
+  const bb = (await bar.boundingBox())!;
+  expect(bb.y).toBeGreaterThanOrEqual(sel.maxY);
+  await expect(bar.getByRole("button", { name: "Group" })).toBeHidden(); // one object
+  // It follows a pan.
+  const y0 = bb.y;
+  await key(app, "ArrowUp");
+  await app.frame();
+  await expect.poll(async () => (await bar.boundingBox())!.y).not.toBe(y0);
+  await key(app, "ArrowDown");
+  // Not for tools that do not select.
+  await key(app, "h");
+  await expect(bar).toBeHidden();
+  await key(app, "v");
+  await expect(bar).toBeVisible();
+  // Two objects: Group appears and works; Duplicate adds; Delete removes.
+  await p.keyboard.press("Control+a");
+  await expect(bar.getByRole("button", { name: "Group" })).toBeVisible();
+  await bar.getByRole("button", { name: "Group" }).click();
+  expect((await objects(app)).every((o) => Array.isArray(o["groups"]))).toBe(true);
+  await expect(bar.getByRole("button", { name: "Ungroup" })).toBeVisible();
+  await bar.getByRole("button", { name: "Duplicate" }).click();
+  expect(await objects(app)).toHaveLength(4);
+  await bar.getByRole("button", { name: "Delete selection" }).click();
+  expect(await objects(app)).toHaveLength(2);
+  await expect(bar).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});

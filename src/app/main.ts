@@ -39,6 +39,7 @@ import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
+import { mountContextBar } from "../ui/context-bar";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
@@ -303,6 +304,7 @@ async function start(): Promise<void> {
   };
 
   let appView: AppView = "canvas";
+  let contextUpdate: () => void = () => undefined;
   const draw = (): void => {
     scheduled = false;
     // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
@@ -310,6 +312,7 @@ async function start(): Promise<void> {
       const ms = renderNow().totalMs;
       stats.record(ms);
       quality.record(ms);
+      contextUpdate();
     }
     const waiters = frameWaiters;
     frameWaiters = [];
@@ -458,6 +461,23 @@ async function start(): Promise<void> {
   });
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
   mountNavigator(document.getElementById("workspace")!, session);
+
+  // The selection action bar follows the selection box (updated after each drawn frame).
+  const contextBar = mountContextBar(
+    host,
+    editor,
+    doc,
+    {
+      duplicate: () => duplicateSelection(doc, editor, view),
+      group: () => groupSelection(doc, editor),
+      ungroup: () => ungroupSelection(doc, editor),
+      arrange: (to) => arrangeSelection(doc, editor, to),
+      setFlag: (flag) => setFlag(doc, editor, flag),
+      deleteSelection: () => deleteSelection(doc, editor),
+    },
+    () => appView !== "canvas" || textEditor.isOpen,
+  );
+  contextUpdate = contextBar.update;
 
   // The tools start where the view tabs and the workspace menu end (stylesheet: --nav-w).
   const navBox = document.getElementById("nav")!;
