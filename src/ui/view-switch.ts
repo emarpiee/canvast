@@ -32,6 +32,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
     const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
     next.focus();
     onSelect(next.dataset["view"] as AppView);
+    next.focus(); // the view that opens may take focus; the arrow keys stay on the tab list, as in any tab list
     e.preventDefault();
     e.stopPropagation();
   });

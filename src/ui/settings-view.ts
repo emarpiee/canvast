@@ -79,6 +79,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
+  { id: "collaboration", label: "Collaboration" },
 ];
 
 const fmt = (n: number): string => String(Math.round(n * 100) / 100);
@@ -113,8 +114,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       : t.id === "storage"
         ? `<div class="set-info" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
            <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Use an export from the workspace menu to keep a copy.</p></div>`
+        : t.id === "collaboration"
+          ? `<div class="set-info"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
+           <p>When it is added it will be opt-in for each workspace, with named roles, and everything will keep working offline. Until then, share work with an export from the workspace menu.</p></div>`
         : `<div class="set-info"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
-           <p>Nothing you draw, import or write leaves this browser unless you export it yourself.</p><p>Collaboration is not enabled.</p></div>`;
+           <p>Nothing you draw, import or write leaves this browser unless you export it yourself.</p></div>`;
     return `<section role="tabpanel" id="set-panel-${t.id}" aria-labelledby="set-tab-${t.id}" data-panel="${t.id}" hidden><h2>${esc(t.label)}</h2>${body}</section>`;
   }).join("");
   root.innerHTML = `<div class="set-head"><h1 class="set-title">Settings</h1><button type="button" class="set-done" data-done>Back to canvas</button></div>

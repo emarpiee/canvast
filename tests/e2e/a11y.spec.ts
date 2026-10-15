@@ -35,7 +35,7 @@ test("every visible control has an accessible name, in each view and with the pa
   await p.getByTestId("view-assets").click();
   expect(await unnamed(p), "assets view").toEqual([]);
   await p.getByTestId("view-settings").click();
-  for (const tab of ["Drawing and selection", "Media and playback", "Performance", "Appearance", "Shortcuts", "Storage", "Privacy"]) {
+  for (const tab of ["Drawing and selection", "Media and playback", "Performance", "Appearance", "Shortcuts", "Storage", "Privacy", "Collaboration"]) {
     await p.locator("#settings-view").getByRole("tab", { name: tab }).click();
     expect(await unnamed(p), `settings: ${tab}`).toEqual([]);
   }

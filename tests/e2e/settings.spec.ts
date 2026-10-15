@@ -139,3 +139,30 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await expect(root).not.toHaveAttribute("data-motion", /.*/);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("view tabs: arrow keys move between Canvas, Assets and Settings; Assets is remembered over a reload, Settings is not (ADR 0048)", async ({ app }) => {
+  const p = app.page;
+  const view = () => p.evaluate(() => window.__canvastDebug.appView());
+  await p.getByTestId("view-canvas").focus();
+  await p.keyboard.press("ArrowRight");
+  expect(await view()).toBe("assets");
+  await expect(p.getByTestId("view-assets")).toHaveAttribute("aria-selected", "true");
+  await p.keyboard.press("ArrowRight");
+  expect(await view()).toBe("settings");
+  await expect(p.getByTestId("view-settings")).toHaveAttribute("aria-selected", "true");
+  await p.keyboard.press("ArrowRight"); // wraps to the first tab
+  expect(await view()).toBe("canvas");
+  await p.keyboard.press("ArrowLeft"); // and back round
+  expect(await view()).toBe("settings");
+  await p.locator("#settings-view").getByRole("tab", { name: "Collaboration" }).click();
+  await expect(p.locator("#set-panel-collaboration")).toContainText("Collaboration is off");
+  await p.getByTestId("view-assets").click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await view(), "Assets is reopened").toBe("assets");
+  await p.getByTestId("view-settings").click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await view(), "Settings is not reopened (the view before it is)").not.toBe("settings");
+  expect(app.consoleErrors).toEqual([]);
+});

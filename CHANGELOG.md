@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Phase 7.
+## 0.16.0 — Phase 7: professional UX (2026-10-16)
+
+Phase 7. Full suite: see [testing/full-run-phase-7.md](docs/testing/full-run-phase-7.md).
+
+- **Collaboration tab (Settings)** states that collaboration is off; the arrow keys stay on the view tab list when a view opens.
 
 - **Selection action bar (ADR 0051):** next to the selection: duplicate, group, ungroup, front, back, lock, hide, delete. The resize cursor no longer sticks when the pointer leaves the canvas onto a bar or panel.
 
