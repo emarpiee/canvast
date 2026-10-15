@@ -13,6 +13,15 @@ export function isFlat(b: ImageBitmap): boolean {
   return true;
 }
 
+/** The colour (RGBA) of a bitmap averaged down to one pixel. */
+function meanColour(b: ImageBitmap): number[] {
+  const c = document.createElement("canvas");
+  c.width = c.height = 1;
+  const x = c.getContext("2d", { willReadFrequently: true })!;
+  x.drawImage(b, 0, 0, 1, 1);
+  return [...x.getImageData(0, 0, 1, 1).data];
+}
+
 /**
  * The picture came back flat at every time tried: this browser draws nothing for the video (seen in Firefox on Android).
  * It carries the flat picture, for a file that cannot be shown as a card instead.
@@ -95,7 +104,10 @@ async function decodeWithElement(blob: Blob, t: number): Promise<{ bitmap: Image
         await s;
         await presented(v, 300);
         const other = await frameBitmap(v);
-        alive = !isFlat(other);
+        // Alive when another time shows something else: a picture that is not flat, or another flat colour (a solid-colour video).
+        const a = meanColour(bitmap);
+        const o = meanColour(other);
+        alive = !isFlat(other) || a.some((v, i) => Math.abs(v - o[i]!) > 12);
         other.close();
         if (alive) break;
       }
