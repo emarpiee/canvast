@@ -774,6 +774,22 @@ test("an animated GIF steps by frame: placed paused, stepped, wrapped, played an
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a browser that draws nothing for a video still imports it (the flat picture is kept, not an error)", async ({ app }) => {
+  const p = app.page;
+  const webm = await makeWebm(p, 2);
+  // What Firefox on Android does: drawing a video element leaves the canvas empty.
+  await p.evaluate(() => {
+    const draw = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, img: CanvasImageSource, ...a: number[]) {
+      if (img instanceof HTMLVideoElement) return;
+      return (draw as (...x: unknown[]) => void).call(this, img, ...a);
+    } as typeof draw;
+  });
+  await p.getByTestId("import-input").setInputFiles({ name: "blank.webm", mimeType: "video/webm", buffer: webm });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a video this browser cannot decode is still imported as a card of its own shape, with the original available to save (ADR 0045)", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("import-input").setInputFiles({ name: "hevc.mp4", mimeType: "video/mp4", buffer: makeFakeMp4(1080, 1920, 7) });

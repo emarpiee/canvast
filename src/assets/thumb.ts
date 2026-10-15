@@ -1,6 +1,6 @@
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
-import { decodeAudio, decodeVideo } from "./video";
+import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
 import { makeCard } from "./card";
 
@@ -22,7 +22,10 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
           (v) => v.bitmap,
           async (e) => {
             const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
-            if (!pr) throw e;
+            if (!pr) {
+              if (e instanceof BlankPictureError) return e.result.bitmap;
+              throw e;
+            }
             return makeCard(pr.w, pr.h, rec.name, pr.codec); // a video this browser cannot decode: its card
           },
         )

@@ -1,3 +1,26 @@
+/** A picture that is one flat colour (or nothing at all): what some browsers hand back when they cannot draw a video's frame. */
+export function isFlat(b: ImageBitmap): boolean {
+  const c = document.createElement("canvas");
+  c.width = c.height = 8;
+  const x = c.getContext("2d", { willReadFrequently: true })!;
+  x.drawImage(b, 0, 0, 8, 8);
+  const d = x.getImageData(0, 0, 8, 8).data;
+  for (let i = 4; i < d.length; i += 4) {
+    if (Math.abs(d[i]! - d[0]!) > 3 || Math.abs(d[i + 1]! - d[1]!) > 3 || Math.abs(d[i + 2]! - d[2]!) > 3 || Math.abs(d[i + 3]! - d[3]!) > 3) return false;
+  }
+  return true;
+}
+
+/**
+ * The picture came back flat at every time tried: this browser draws nothing for the video (seen in Firefox on Android).
+ * It carries the flat picture, for a file that cannot be shown as a card instead.
+ */
+export class BlankPictureError extends Error {
+  constructor(readonly result: { bitmap: ImageBitmap; duration: number }) {
+    super("this browser draws no picture for the video");
+  }
+}
+
 /** What a video file is: its picture at time `t` (clamped to its length) and its length. */
 export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBitmap; duration: number }> {
   const url = URL.createObjectURL(blob);
@@ -31,7 +54,24 @@ export async function decodeVideo(blob: Blob, t = 0): Promise<{ bitmap: ImageBit
       await s;
       await shown;
     } else await presented(v);
-    return { bitmap: await frameBitmap(v), duration };
+    let bitmap = await frameBitmap(v);
+    if (isFlat(bitmap)) {
+      // A real flat frame (a black start) or a browser that draws nothing: other times tell them apart.
+      let alive = false;
+      for (const f of [0.1, 0.3, 0.6]) {
+        if (!(duration > 0)) break;
+        const s = once("seeked");
+        v.currentTime = duration * f;
+        await s;
+        await presented(v, 300);
+        const other = await frameBitmap(v);
+        alive = !isFlat(other);
+        other.close();
+        if (alive) break;
+      }
+      if (!alive && duration > 0) throw new BlankPictureError({ bitmap, duration });
+    }
+    return { bitmap, duration };
   } finally {
     URL.revokeObjectURL(url);
     v.remove();

@@ -4,7 +4,7 @@ import { done, idbGet, req } from "../storage/idb";
 import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
-import { decodeAudio, decodeVideo } from "./video";
+import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeCard } from "./card";
@@ -208,10 +208,15 @@ export class AssetLibrary {
         } catch (e) {
           // A video this browser cannot decode is still kept (for another browser or player), as a card of its own shape.
           const pr = file.type.startsWith("video/") ? probeMp4(new Uint8Array(bytes)) : null;
-          if (!pr) throw e;
-          img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec);
-          duration = pr.duration;
-          size = { w: pr.w, h: pr.h };
+          if (!pr) {
+            if (!(e instanceof BlankPictureError)) throw e;
+            img = e.result.bitmap; // nothing better to show than the flat picture
+            duration = e.result.duration;
+          } else {
+            img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec);
+            duration = pr.duration;
+            size = { w: pr.w, h: pr.h };
+          }
         }
       } else img = await decode(file);
       if (file.type === "image/gif") {
@@ -383,8 +388,10 @@ export class AssetLibrary {
       } catch (e) {
         if (!rec.type.startsWith("video/")) throw e;
         const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
-        if (!pr) throw e;
-        img = await makeCard(pr.w, pr.h, rec.name, pr.codec);
+        if (!pr) {
+          if (!(e instanceof BlankPictureError)) throw e;
+          img = e.result.bitmap;
+        } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec);
       }
       if (this.decoded.has(key)) {
         (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins

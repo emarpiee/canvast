@@ -6,7 +6,7 @@ import type { ImageObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { formatTime, stepFrame, stepTime } from "../doc/media";
 import { GifFrames } from "../assets/gif";
-import { frameBitmap, presentedNear } from "../assets/video";
+import { frameBitmap, isFlat, presentedNear } from "../assets/video";
 import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
@@ -389,7 +389,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         if (!players.has(p.o.id) || p.eng.playing() || Math.abs(p.eng.pos() - at) > 1e-3) return;
         if (seen !== null && Math.abs(seen - at) > 0.5) console.warn(`canvast: the picture shown is from ${seen.toFixed(2)} s, wanted ${at.toFixed(2)} s`);
         const bmp = await frameBitmap(v).catch(() => null);
-        if (bmp) {
+        if (bmp && isFlat(bmp)) bmp.close(); // flat: the browser drew nothing; keep the picture the canvas already has
+        else if (bmp) {
           assets.setPoster(rasterKey({ ...p.o, media: { ...p.o.media!, t: at } }), bmp);
           actions.repaint(p.o.id); // a picture already drawn from the file's own decode is replaced by this one
         }
