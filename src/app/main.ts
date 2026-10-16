@@ -46,7 +46,7 @@ import { installMenuKeys } from "../ui/more-menu";
 import { confirmDialog } from "../ui/confirm";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
-import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey, toolKeys } from "../settings/shortcuts";
+import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
@@ -144,6 +144,7 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
+  releaseStepKeys(settings); // a tool key set to W A S D before they became the step keys goes back to its own letter (ADR 0072)
   // Developer tools (the panel, the diagnostics, the test hook): on for a session with #debug at the end of the address (the tests use
   // this), or always once switched on in Settings > Develop (applies after a reload). There is no separate debug build.
   const debug = location.hash.includes("debug") || settings.get("dev.tools");

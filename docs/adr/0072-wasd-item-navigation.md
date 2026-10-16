@@ -10,4 +10,4 @@ Accepted (v0.17.0). Replaces the Ctrl+Arrow key of ADR 0058; the way items are p
 - Settings > Navigation still sets how the next item is chosen (nearest in view, anywhere, by layer) and what the view does on arriving.
 
 ## Consequences
-A tool key set to W, A, S or D earlier (by hand, before this change) loses to the step key until it is changed.
+A tool key set to W, A, S or D earlier is taken back at start-up (`releaseStepKeys`): that tool returns to its own default letter and the step key keeps W, A, S, D.

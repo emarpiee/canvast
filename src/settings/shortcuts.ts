@@ -55,6 +55,22 @@ export const KEY_ROWS: ReadonlyArray<{ setting: SettingKey; name: string; group:
   ...NAV_ORDER.map((d) => ({ setting: NAV_KEY_SETTING[d], name: NAV_NAME[d], group: "Step to the next item" })),
 ];
 
+/**
+ * A tool key an earlier version let the person set to one of the step keys (W A S D) is taken back: the step key is the one that works
+ * (ADR 0072), so the tool goes back to its own default letter and the two never share a key. Returns the tools that were reset.
+ */
+export function releaseStepKeys(settings: SettingsStore): Tool[] {
+  const steps = new Set(NAV_ORDER.map((d) => settings.get(NAV_KEY_SETTING[d])));
+  const freed: Tool[] = [];
+  for (const t of TOOL_ORDER) {
+    if (steps.has(settings.get(TOOL_KEY_SETTING[t]) as string)) {
+      settings.reset(TOOL_KEY_SETTING[t]);
+      freed.push(t);
+    }
+  }
+  return freed;
+}
+
 /** What already uses `letter` (a tool or a step), apart from the key `except`: its name, for the conflict message. */
 export function keyOwner(settings: SettingsStore, letter: string, except: SettingKey): string | undefined {
   return KEY_ROWS.find((r) => r.setting !== except && settings.get(r.setting) === letter)?.name;
