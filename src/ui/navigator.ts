@@ -1,6 +1,7 @@
 import type { Session } from "../app/session";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
+import { placeMenu } from "./more-menu";
 import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-ui";
 import { ICONS } from "./icons";
 
@@ -91,6 +92,10 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
          <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.upload}<span>Import a file…</span></button>
          <input type="file" accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
        </section>`;
+    // The row's actions float over the page like every other menu, kept inside the window.
+    const pop = menu.querySelector<HTMLElement>(".nav-actions");
+    const opener = menu.querySelector<HTMLElement>('.nav-more[aria-expanded="true"]');
+    if (pop && opener) placeMenu(pop, opener);
     const input = menu.querySelector<HTMLInputElement>(".nav-rename");
     if (input) {
       input.focus();

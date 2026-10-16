@@ -115,6 +115,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
 
   const close = (): void => {
     if (root.hidden) return;
+    input.blur(); // a hidden box can keep the focus until the next frame, and it would swallow the next key
     root.hidden = true;
     token++;
   };

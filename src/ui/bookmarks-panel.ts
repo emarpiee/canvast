@@ -2,6 +2,7 @@ import type { EditorState } from "../app/editor-state";
 import type { BookmarkList } from "../app/bookmarks";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { moreButton, openMoreMenu } from "./more-menu";
 
 /**
  * Floating Bookmarks panel (ADR 0025, 0065): named places on the canvas, each a card with its picture. Add saves the current view with
@@ -36,11 +37,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
           ${b.thumb ? `<img class="bookmark-thumb" alt="" src="${b.thumb}">` : '<span class="bookmark-thumb"></span>'}
           <span class="bookmark-text"><span class="bookmark-name" title="Double-click to rename">${esc(b.name)}</span><span class="bookmark-meta">${esc(when(b.at))}</span></span>
         </div>
-        <span class="bookmark-actions">
-          <button type="button" class="layer-btn" data-rename aria-label="Rename ${esc(b.name)}" title="Rename">${ICONS.pencil}</button>
-          <button type="button" class="layer-btn" data-update aria-label="Update ${esc(b.name)} to the current view" title="Update to the current view and its picture">${ICONS.refresh}</button>
-          <button type="button" class="layer-btn" data-del aria-label="Delete ${esc(b.name)}" title="Delete">${ICONS.trash2}</button>
-        </span>
+        ${moreButton(`More actions for bookmark ${b.name}`, "data-bm-more")}
       </li>`,
       )
       .join("");
@@ -103,15 +100,27 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       editor.changed();
     } else if (t.closest("[data-add]")) {
       void list.add(capture());
-    } else if (li && t.closest("[data-del]")) {
-      void list.remove(li.dataset["id"]!);
-    } else if (li && t.closest("[data-rename]")) {
-      startRename(li);
-    } else if (li && t.closest("[data-update]")) {
-      void list.update(li.dataset["id"]!, capture()).then(() => {
-        editor.message = "Bookmark updated to this view.";
-        editor.changed();
-      });
+    } else if (li && t.closest("[data-bm-more]")) {
+      const id = li.dataset["id"]!;
+      const name = li.querySelector(".bookmark-name")?.textContent ?? "bookmark";
+      openMoreMenu(
+        t.closest<HTMLElement>("[data-bm-more]")!,
+        [
+          { label: "Rename", icon: ICONS.pencil, aria: `Rename ${name}`, run: () => startRename(li) },
+          {
+            label: "Update to the current view",
+            icon: ICONS.refresh,
+            aria: `Update ${name} to the current view`,
+            run: () =>
+              void list.update(id, capture()).then(() => {
+                editor.message = "Bookmark updated to this view.";
+                editor.changed();
+              }),
+          },
+          { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
+        ],
+        `Actions for bookmark ${name}`,
+      );
     } else if (li && !t.closest(".bookmark input") && t.closest(".bookmark-go")) {
       go(li);
     }

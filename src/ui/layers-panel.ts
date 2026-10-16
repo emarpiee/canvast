@@ -156,7 +156,13 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const tagRow = `<div class="layers-tags" data-testid="canvas-tags"><span class="layers-tags-label">Tags</span><div class="tag-chips">${on
       .map((t) => `<span class="tag-chip">#${esc(t)}<button type="button" data-untag-canvas="${esc(t)}" aria-label="Remove tag ${esc(t)} from the selection">×</button></span>`)
       .join("")}<input class="tag-input" data-canvas-tag-input list="canvas-tag-suggest" placeholder="${sel.length ? "Add a tag" : "Select items to tag"}" aria-label="Add a tag to the selection" maxlength="64" value="${esc(tagDraft)}" ${sel.length ? "" : "disabled"}><datalist id="canvas-tag-suggest">${here.map((t) => `<option value="${esc(t)}">`).join("")}</datalist></div></div>`;
-    return `${tagRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
+    const allHidden = sel.every((o) => o.hidden);
+    const allLocked = sel.every((o) => o.locked);
+    const actionsRow = `<div class="layers-do" role="group" aria-label="Selected layers">
+      <button type="button" data-do="rename"${sel.length === 1 ? "" : " disabled"} title="Rename the selected layer (double-click its name too)">${ICONS.pencil}<span>Rename</span></button>
+      <button type="button" data-do="hide" title="Hide the selection">${allHidden ? ICONS.eye : ICONS.eyeOff}<span>${allHidden ? "Show" : "Hide"}</span></button>
+      <button type="button" data-do="lock" title="Lock the selection: it is drawn, but cannot be picked">${allLocked ? ICONS.lockKeyholeOpen : ICONS.lockKeyhole}<span>${allLocked ? "Unlock" : "Lock"}</span></button></div>`;
+    return `${actionsRow}${tagRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
   };
 
   // Links of the one selected object (ADR 0040): texts that mention it, and what a selected text mentions.
@@ -234,7 +240,20 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       }
     }
     let rows = 0;
-    const row = (n: Node, depth: number): string => {
+    /**
+     * The guide lines of a row: for each level above it a vertical line under that level's chevron (only while the branch goes on), and for
+     * its own level a line that ends at the row's middle with a short tick into the row when it is the last of its group. The lines stop
+     * at the last item of the group, so a group never looks as if it covered what follows it.
+     */
+    const guides = (depth: number, last: boolean, conts: readonly boolean[]): string => {
+      if (depth === 0) return "";
+      const parts: string[] = [];
+      for (let j = 0; j < depth - 1; j++) if (conts[j]) parts.push(`<i class="tg" style="--l:${j}"></i>`);
+      parts.push(`<i class="tg tg-own${last ? " is-last" : ""}" style="--l:${depth - 1}"></i>`);
+      return `<span class="tree" aria-hidden="true">${parts.join("")}</span>`;
+    };
+    /** `last`: the last item of its group; `conts`: for each ancestor below the top, whether its own branch goes on below it (its guide line continues). */
+    const row = (n: Node, depth: number, last: boolean, conts: readonly boolean[]): string => {
       if (rows >= limit) return "";
       rows++;
       const first = n.members[0]!;
@@ -245,15 +264,12 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
       const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
-        <button type="button" class="layer-twist" data-twist ${n.group ? "" : "disabled tabindex=-1"} aria-label="${expanded ? "Collapse" : "Expand"}">${n.group ? (expanded ? ICONS.chevronDown : ICONS.chevronRight) : ""}</button>
+        ${guides(depth, last, conts)}${n.group ? `<button type="button" class="layer-twist" data-twist aria-label="${expanded ? "Collapse" : "Expand"}">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</button>` : ""}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
         ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${n.members.length} item(s) inside">${n.members.length}</span>` : ""}`}
-        <span class="layer-actions">
-        <button type="button" class="layer-btn" data-eye aria-pressed="${hidden}" aria-label="${hidden ? "Show" : "Hide"} ${esc(lab.text)}" title="${hidden ? "Show" : "Hide"}">${hidden ? ICONS.eyeOff : ICONS.eye}</button>
-        <button type="button" class="layer-btn" data-lock aria-pressed="${locked}" aria-label="${locked ? "Unlock" : "Lock"} ${esc(lab.text)}" title="${locked ? "Unlock" : "Lock"}">${locked ? ICONS.lockKeyhole : ICONS.lockKeyholeOpen}</button>
-        </span>
+        ${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}
       </li>`;
-      return head + (expanded ? n.children.map((c) => row(c, depth + 1)).join("") : "");
+      return head + (expanded ? n.children.map((c, i) => row(c, depth + 1, i === n.children.length - 1, depth >= 1 ? [...conts, !last] : conts)).join("") : "");
     };
     // Filtering lists the matching items flat, front first (a group matches by its name or any of its groups' names).
     const q = filter.trim().toLowerCase();
@@ -263,7 +279,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
           .filter((o) => `${labelOf(o, names).text} ${(o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ")}`.toLowerCase().includes(q))
           .map((o): Node => ({ id: o.id, group: false, members: [o], children: [], z: o.z }))
       : tree;
-    const list = shownTree.map((n) => row(n, 0)).join("");
+    const list = shownTree.map((n) => row(n, 0, false, [])).join("");
     panel.innerHTML = `
       <header><h2>Layers <span class="layers-count">${all.length}</span></h2>
         <span class="layers-tools">
@@ -463,6 +479,18 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       render();
       return;
     }
+    const doBtn = t.closest<HTMLButtonElement>("[data-do]");
+    if (doBtn && !doBtn.disabled) {
+      const sel = selectedObjs();
+      const ids = sel.map((o) => o.id);
+      if (doBtn.dataset["do"] === "rename" && sel.length === 1) {
+        const o = sel[0]!;
+        renaming = { key: o.id, value: labelOf(o, names).text };
+        render();
+      } else if (doBtn.dataset["do"] === "hide") actions.setFlagOn(ids, "hidden", !sel.every((o) => o.hidden));
+      else if (doBtn.dataset["do"] === "lock") actions.setFlagOn(ids, "locked", !sel.every((o) => o.locked));
+      return;
+    }
     const untag = t.closest<HTMLElement>("[data-untag-canvas]");
     if (untag) {
       actions.tag([...editor.selection], { remove: [untag.dataset["untagCanvas"]!] });
@@ -502,6 +530,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     if (!li) return;
     const key = li.dataset["key"]!;
     const objs = members(key);
+
     if (t.closest("[data-twist]")) {
       if (open.has(key)) open.delete(key);
       else open.add(key);

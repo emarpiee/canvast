@@ -26,6 +26,10 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 - **No redundant, out-of-scope or unnecessary tests.** Before writing a test, check that no existing test already proves the same thing and that it checks the change at hand (not unrelated behaviour). Add a test only for new logic, a reported bug, or a rule that has no test yet; one test per behaviour. A fix or small change is covered by extending the nearest existing test, not by a new file or a copy of an old test. Do not add tests "for completeness" or to cover code that did not change. If a requested change needs no new test, say so and move on.
 - `npm run check:names` (`scripts/check-names.mjs`) fails if certain external reference-product names (base64-encoded in the script) appear in any first-party file. Don't name other canvas/reference apps in code, docs or commits.
 
+## UI rules
+
+- **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
+
 ## Architecture (big picture)
 
 - **Exact world coordinates** (ADR 0001): positions are `Dyadic` numbers (BigInt mantissa · 2^exponent, `src/core/dyadic.ts`); the camera (`src/core/camera.ts`) is a centre plus an integer-quantized log2 zoom, so zoom/pan are exactly reversible at any depth. Never introduce plain-float world coordinates; convert to doubles only relative to the camera/cell for drawing.

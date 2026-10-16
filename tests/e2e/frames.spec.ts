@@ -33,6 +33,12 @@ function timer(app: App): { timed: (fn: () => Promise<void>) => Promise<void>; s
   };
 }
 
+/** The app's one "more actions" pattern: the row's ⋯ button, then an item of the menu it opens. */
+async function chooseMore(p: import("@playwright/test").Page, row: import("@playwright/test").Locator, more: RegExp | string, item: RegExp | string): Promise<void> {
+  await row.getByRole("button", { name: more }).click();
+  await p.getByRole("menuitem", { name: item }).click();
+}
+
 test("at 2^10^12 (reached by a jump) drawing, selecting, moving, undo, redo and panning stay fast and exact", async ({ app }, info) => {
   const p = app.page;
   const { timed, steps } = timer(app);
@@ -974,7 +980,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.getByTestId("context-bar").getByRole("button", { name: "Lock selection" }).click();
   await p.mouse.click(600, 300);
   expect(await sel()).toEqual([]);
-  await app.drag({ x: 350, y: 250 }, { x: 850, y: 350 }, 6);
+  await app.drag({ x: 480, y: 250 }, { x: 850, y: 350 }, 6); // (clear of the developer panel at the top left)
   expect(await sel(), "a box around it does not take it").toEqual([]);
   await p.keyboard.press("Control+a");
   expect(await sel(), "select all skips it").toEqual([]);
@@ -1064,14 +1070,15 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   const withAll = await ink();
   await rows.nth(1).click();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([ids[1]]);
-  await rows.nth(1).getByRole("button", { name: /^Hide / }).click();
+  await panel.locator('[data-do="hide"]').click(); // the selection settings: hide, lock, rename for everything selected
   await app.frame();
   expect(await ink(), "the hidden stroke is not drawn").not.toBe(withAll);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
   await rows.nth(1).getByRole("button", { name: /^Show / }).click();
   await app.frame();
   expect(await ink()).toBe(withAll);
-  await rows.nth(0).getByRole("button", { name: /^Lock / }).click();
+  await rows.nth(0).click();
+  await panel.locator('[data-do="lock"]').click();
   await p.keyboard.press("v");
   await p.mouse.click(500, 450);
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "a locked layer is not picked on the canvas").toEqual([]);
@@ -1165,14 +1172,17 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await p.keyboard.type("Far corner");
   await p.keyboard.press("Enter");
   await expect(rows.nth(1).locator(".bookmark-name")).toHaveText("Far corner");
-  // Nothing is cut off at the panel's edge: all three buttons lie inside it.
+  // Nothing is cut off at the panel's edge: the ⋯ button lies inside it, and its menu has Rename, Update and Delete (the app's one pattern).
   const pbox = (await panel.boundingBox())!;
-  for (const name of [/^Rename/, /^Update/, /^Delete/]) {
-    const bb = (await rows.nth(0).getByRole("button", { name }).boundingBox())!;
-    expect(bb.x + bb.width, `${name} inside the panel`).toBeLessThanOrEqual(pbox.x + pbox.width - 4);
-  }
+  await rows.nth(0).hover();
+  const mb = (await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).boundingBox())!;
+  expect(mb.x + mb.width).toBeLessThanOrEqual(pbox.x + pbox.width - 4);
+  await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).click();
+  await expect(p.getByRole("menuitem")).toHaveText(["Rename", "Update to the current view", "Delete"]);
+  await p.keyboard.press("Escape");
+  await expect(p.getByRole("menu")).toHaveCount(0);
   // Rename with the button (no double-click needed), and the card shows when it was saved.
-  await rows.nth(0).getByRole("button", { name: "Rename Bookmark 1" }).click();
+  await chooseMore(p, rows.nth(0), /^More actions for bookmark/, "Rename Bookmark 1");
   await p.keyboard.type("Home");
   await p.keyboard.press("Enter");
   await expect(rows.nth(0).locator(".bookmark-name")).toHaveText("Home");
@@ -1188,7 +1198,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await app.frame();
   const moved = await app.camera();
   expect(moved).not.toEqual({ cx: "0p0", cy: "0p0", zi: 0, zf: 0, pz: 0 });
-  await rows.nth(0).getByRole("button", { name: "Update Home to the current view" }).click();
+  await chooseMore(p, rows.nth(0), /^More actions for bookmark/, "Update Home to the current view");
   await expect(rows.nth(0).locator("img.bookmark-thumb")).not.toHaveAttribute("src", thumb0!);
   await p.keyboard.press("0");
   await app.frame();
@@ -1208,7 +1218,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await app.frame();
   expect(await app.camera()).toEqual(deepCam);
   // Delete.
-  await p.getByTestId("bookmarks-panel").getByRole("button", { name: "Delete Home" }).click();
+  await chooseMore(p, after.nth(0), /^More actions for bookmark/, "Delete Home");
   await expect(after).toHaveCount(1);
 });
 
@@ -1700,7 +1710,7 @@ test("medium screen (800 px wide): the tool options get their own row under the 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("bookmarks on a phone (360 px): each card shows its Rename, Update and Delete at once, large enough to touch, inside the panel (ADR 0065)", async ({ app }) => {
+test("bookmarks on a phone (360 px): each card has its ⋯ button, always shown, large enough to touch and inside the panel; the name keeps its room (ADR 0065, 0068)", async ({ app }) => {
   const p = app.page;
   await p.setViewportSize({ width: 360, height: 700 });
   await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
@@ -1709,16 +1719,19 @@ test("bookmarks on a phone (360 px): each card shows its Rename, Update and Dele
   const card = panel.locator("li.bookmark").first();
   await expect(card).toBeVisible();
   const pb = (await panel.boundingBox())!;
-  for (const name of [/^Rename/, /^Update/, /^Delete/]) {
-    const b = card.getByRole("button", { name });
-    await expect(b).toHaveCSS("opacity", "1");
-    const bb = (await b.boundingBox())!;
-    expect(bb.width).toBeGreaterThanOrEqual(34);
-    expect(bb.height).toBeGreaterThanOrEqual(34);
-    expect(bb.x + bb.width).toBeLessThanOrEqual(pb.x + pb.width + 1);
-  }
+  const more = card.getByRole("button", { name: /^More actions for bookmark/ });
+  await expect(more).toHaveCSS("opacity", "1");
+  const bb = (await more.boundingBox())!;
+  expect(bb.width).toBeGreaterThanOrEqual(34);
+  expect(bb.height).toBeGreaterThanOrEqual(34);
+  expect(bb.x + bb.width).toBeLessThanOrEqual(pb.x + pb.width + 1);
   const name = (await card.locator(".bookmark-name").boundingBox())!;
-  expect(name.width, "the name keeps room").toBeGreaterThan(50);
+  expect(name.width, "the name keeps room").toBeGreaterThan(80);
+  // The menu lies inside the window.
+  await more.click();
+  const menu = (await p.getByRole("menu").boundingBox())!;
+  expect(menu.x).toBeGreaterThanOrEqual(0);
+  expect(menu.x + menu.width).toBeLessThanOrEqual(360);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -1783,5 +1796,69 @@ test("Layers panel selection: Ctrl toggles a row, Shift takes the range from the
   await rows.nth(2).click({ modifiers: ["Control"] });
   await rows.nth(5).click({ modifiers: ["Control", "Shift"] });
   expect((await ids()).sort()).toEqual([keys[0]!, keys[2]!, keys[3]!, keys[4]!, keys[5]!].sort());
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Layers: Hide, Lock and Rename sit with the selection's other settings and act on everything selected (ADR 0066)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  for (let i = 0; i < 6; i++) await app.drag({ x: 480 + (i % 3) * 90, y: 400 + Math.floor(i / 3) * 110 }, { x: 520 + (i % 3) * 90, y: 430 + Math.floor(i / 3) * 110 }, 3);
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const panel = p.getByTestId("layers-panel");
+  const rows = panel.locator("li.layer");
+  await expect(rows).toHaveCount(6);
+  const hiddenCount = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o["hidden"] === true).length);
+  const lockedCount = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o["locked"] === true).length);
+  // Several rows selected: lock them all with one press; rename is for one only.
+  await rows.nth(0).click();
+  await rows.nth(1).click({ modifiers: ["Control"] });
+  await rows.nth(2).click({ modifiers: ["Control"] });
+  await expect(panel.locator('[data-do="rename"]')).toBeDisabled();
+  await panel.locator('[data-do="lock"]').click();
+  await expect.poll(lockedCount).toBe(3);
+  // Hide two more in one press.
+  await rows.nth(3).click();
+  await rows.nth(4).click({ modifiers: ["Control"] });
+  await panel.locator('[data-do="hide"]').click();
+  await expect.poll(hiddenCount).toBe(2);
+  // A hidden or locked row shows its state in the row, and pressing it undoes it.
+  await expect(panel.getByRole("button", { name: /^Show / })).toHaveCount(2);
+  await expect(panel.getByRole("button", { name: /^Unlock / })).toHaveCount(3);
+  await panel.getByRole("button", { name: /^Unlock / }).first().click();
+  await expect.poll(lockedCount).toBe(2);
+  // One selected row: Rename starts the rename.
+  await rows.nth(5).click();
+  await panel.locator('[data-do="rename"]').click();
+  await panel.locator("[data-rename]").fill("last one");
+  await p.keyboard.press("Enter");
+  await expect(panel.locator("li.layer .layer-name", { hasText: "last one" })).toHaveCount(1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Layers: a group's guide line runs under its chevron and stops at its last member, so it never looks as if it covered what follows (ADR 0066)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  for (let i = 0; i < 6; i++) await app.drag({ x: 480 + (i % 3) * 90, y: 400 + Math.floor(i / 3) * 110 }, { x: 520 + (i % 3) * 90, y: 430 + Math.floor(i / 3) * 110 }, 3);
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const panel = p.getByTestId("layers-panel");
+  const rows = panel.locator("li.layer");
+  await expect(rows).toHaveCount(6);
+  await rows.nth(0).click();
+  await rows.nth(1).click({ modifiers: ["Control"] });
+  await rows.nth(2).click({ modifiers: ["Control"] });
+  await p.keyboard.press("Control+g");
+  await expect(panel.locator("li.layer.is-group")).toHaveCount(1);
+  await expect(panel.locator(".tg-own")).toHaveCount(3); // one guide per member
+  await expect(panel.locator(".tg-own.is-last"), "only the last member ends the line").toHaveCount(1);
+  // Rows after the group carry no guide at all.
+  await expect(panel.locator("li.layer").last().locator(".tg")).toHaveCount(0);
+  // The line ends at the last member's middle: its box does not reach the bottom of the row.
+  const last = panel.locator(".tg-own.is-last");
+  const li = last.locator("xpath=ancestor::li[1]");
+  const lb = (await last.boundingBox())!;
+  const ib = (await li.boundingBox())!;
+  expect(lb.y + lb.height).toBeLessThan(ib.y + ib.height - 4);
   expect(app.consoleErrors).toEqual([]);
 });

@@ -42,6 +42,7 @@ import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
 import { mountContextBar } from "../ui/context-bar";
+import { installMenuKeys } from "../ui/more-menu";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
@@ -402,6 +403,7 @@ async function start(): Promise<void> {
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   const bookmarkList = new BookmarkList(session, view, doc);
+  installMenuKeys();
   const focusCycle = createFocusCycle(doc, view, editor, () => true);
   const canvasSearch = mountCanvasSearch(host, {
     doc,
