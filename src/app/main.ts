@@ -44,6 +44,7 @@ import { mountSettingsView } from "../ui/settings-view";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { confirmDialog } from "../ui/confirm";
+import { mountTagsPanel } from "../ui/tags-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
@@ -159,6 +160,7 @@ async function start(): Promise<void> {
   editor.alignBox = settings.get("select.alignBox");
   editor.layersOpen = settings.get("ui.layersOpen");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
+  editor.tagsOpen = settings.get("ui.tagsOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
   editor.subscribe(() => {
@@ -174,6 +176,7 @@ async function start(): Promise<void> {
     settings.set("select.alignBox", editor.alignBox);
     settings.set("ui.layersOpen", editor.layersOpen);
     settings.set("ui.bookmarksOpen", editor.bookmarksOpen);
+    settings.set("ui.tagsOpen", editor.tagsOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
   });
@@ -439,14 +442,6 @@ async function start(): Promise<void> {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOrder: (order, label) => setStackOrder(doc, editor, order, label),
-    tag: (ids, change) => void tagObjects(doc, editor, ids, change),
-    renameTag: (from, to) => void session.changeCanvasTag(from, to),
-    deleteTag: (tag) =>
-      void confirmDialog({
-        title: `Delete the tag “${tag}” from every canvas?`,
-        lines: ["The items stay. On this canvas Undo brings it back; on the other canvases it cannot be undone."],
-        confirmLabel: "Delete tag",
-      }).then((ok) => (ok ? session.changeCanvasTag(tag, null) : 0)),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),
@@ -456,6 +451,16 @@ async function start(): Promise<void> {
     locateMentions: (ids) => session.locateMentions(ids),
     assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
     reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
+  });
+  const tagsPanel = mountTagsPanel(side, editor, doc, {
+    tag: (ids, change) => void tagObjects(doc, editor, ids, change),
+    renameTag: (from, to) => void session.changeCanvasTag(from, to),
+    deleteTag: (tag) =>
+      void confirmDialog({
+        title: `Delete the tag “${tag}” from every canvas?`,
+        lines: ["The items stay. On this canvas Undo brings it back; on the other canvases it cannot be undone."],
+        confirmLabel: "Delete tag",
+      }).then((ok) => (ok ? session.changeCanvasTag(tag, null) : 0)),
   });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
@@ -542,9 +547,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       resetProportions: () => void resetProportions(doc, editor),
       resettable: () => resettable(doc, editor),
       tag: () => {
-        editor.layersOpen = true;
+        editor.tagsOpen = true;
         editor.changed();
-        requestAnimationFrame(() => document.querySelector<HTMLInputElement>("[data-canvas-tag-input]")?.focus());
+        requestAnimationFrame(() => tagsPanel.focusAdd());
       },
       group: () => groupSelection(doc, editor),
       ungroup: () => ungroupSelection(doc, editor),

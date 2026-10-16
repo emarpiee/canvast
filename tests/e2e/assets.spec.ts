@@ -1478,12 +1478,13 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("in-canvas tags: rename and delete a tag on every canvas, from a Layers chip or the Assets sidebar (ADR 0070)", async ({ app }) => {
+test("in-canvas tags: rename and delete a tag on every canvas, from the Tags panel or the Assets sidebar (ADR 0070, 0076)", async ({ app }) => {
   const p = app.page;
   const tagsOf = async (id: string) => ((await objects(p)) as Array<{ id: string; tags?: string[] }>).find((o) => o.id === id)?.tags;
   const tagIt = async (id: string, text: string): Promise<void> => {
     if (!(await p.getByTestId("layers-panel").isVisible())) await p.getByRole("button", { name: "Layers panel", exact: true }).click();
     await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${id}"]`).click();
+    if (!(await p.getByTestId("tags-panel").isVisible())) await p.getByRole("button", { name: "Tags panel", exact: true }).click();
     await p.getByLabel("Add a tag to the selection").fill(text);
     await p.keyboard.press("Enter");
     await expect.poll(() => tagsOf(id)).toBeTruthy();
@@ -1496,7 +1497,7 @@ test("in-canvas tags: rename and delete a tag on every canvas, from a Layers chi
   await tagIt(second, "sky");
   await openCanvas(p, /Canvas 1/, "Board 1 › Canvas 1");
   await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${first}"]`).click();
-  // The chip's menu renames the tag on this canvas and on the other one.
+  // The tag's ⋯ menu in the Tags panel renames it on this canvas and on the other one.
   await p.getByRole("button", { name: "More actions for tag Sky" }).click();
   await p.getByRole("menuitem", { name: "Rename tag Sky" }).click();
   const box = p.getByLabel("New name for tag Sky on every canvas");
@@ -1510,6 +1511,9 @@ test("in-canvas tags: rename and delete a tag on every canvas, from a Layers chi
   await p.keyboard.press("Control+Shift+z");
   await expect.poll(() => tagsOf(first)).toEqual(["cloud", "keep"]);
   await saved(p);
+  // The panel lists the tags of this canvas with their counts; pressing one selects its items.
+  await p.getByRole("button", { name: "Select the 1 item tagged keep" }).click();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([first]);
   await openCanvas(p, /Canvas 2/, "Board 1 › Canvas 2");
   await expect.poll(() => tagsOf(second)).toEqual(["cloud"]);
   // The Assets sidebar lists one canvas tag now; its menu renames it again and deletes it.
@@ -1538,10 +1542,11 @@ test("in-canvas tags: tag items on the canvas, list them across the workspace, a
   const p = app.page;
   const objs = () => p.evaluate(() => window.__canvastDebug.objects()) as Promise<Array<Record<string, unknown>>>;
   const id = await importOnCanvas(p);
-  // Tag the selected item from the Layers panel (they belong to this instance, not to the library).
+  // Tag the selected item from the Tags panel (they belong to this instance, not to the library).
   await p.getByRole("button", { name: "Layers panel", exact: true }).click();
-  const tagBox = p.getByLabel("Add a tag to the selection");
   await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${id}"]`).click();
+  await p.getByRole("button", { name: "Tags panel", exact: true }).click();
+  const tagBox = p.getByLabel("Add a tag to the selection");
   await expect(tagBox).toBeEnabled();
   await tagBox.fill("ABC, shot-2");
   await p.keyboard.press("Enter");

@@ -42,6 +42,7 @@ export const SETTINGS = {
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.tagsOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.bookmarksOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.layersOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "select.alignBox": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,

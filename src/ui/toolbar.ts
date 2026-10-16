@@ -86,6 +86,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group">
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (/ name, # tag, @ bookmark)">${ICONS.search}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
+        <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
         <button type="button" data-action="import" aria-label="Import image" title="Import image, video or audio">${ICONS.imagePlus}</button>
       </div>
@@ -189,6 +190,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["bookmarks"] !== undefined) {
       editor.bookmarksOpen = !editor.bookmarksOpen;
       editor.changed();
+    } else if (d["tags"] !== undefined) {
+      editor.tagsOpen = !editor.tagsOpen;
+      editor.changed();
     } else if (d["layers"] !== undefined) {
       editor.layersOpen = !editor.layersOpen;
       editor.changed();
@@ -242,6 +246,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
+    root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
     root.querySelector<HTMLElement>("[data-align-box]")!.setAttribute("aria-pressed", String(editor.alignBox));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));

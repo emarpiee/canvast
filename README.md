@@ -204,6 +204,7 @@ or network connection.
 
 ### Working on the canvas (Phases 2 to 7)
 
+- **Tags panel:** tag the selection, see every tag of the canvas with its count, press one to select its items, and rename or delete a tag on every canvas.
 - **Layers and groups:** objects can be grouped and nested, hidden, locked,
   renamed, re-stacked, given an opacity and a blend mode, and rotated. The
   Layers panel lists them with sort, filter, guide lines for groups and
