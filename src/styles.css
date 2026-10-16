@@ -1267,7 +1267,7 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .cols-move button svg { width: 16px; height: 16px; }
 .cols-move button:hover:not(:disabled) { background: var(--hud-hover); }
 .cols-move button:disabled { opacity: 0.3; cursor: default; }
-.viewer img.is-file { image-rendering: auto; max-width: 240px !important; max-height: 300px !important; }
+.viewer img.is-file { image-rendering: auto; max-width: min(800px, 90%) !important; max-height: min(600px, 80%) !important; }
 
 /* Viewer zoom: a small control over the picture (the wheel, a pinch, a drag and the keys do the work); the picture is moved with a transform. */
 .viewer-zoom { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); backdrop-filter: blur(8px); }
@@ -1838,3 +1838,10 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 
 /* The bottom-right controls in three groups: what is shown, zoom, and where to go. */
 .hud-controls .hud-sep { align-self: stretch; flex: none; width: 1px; margin: var(--sp-2) var(--sp-1); background: var(--hud-border); }
+
+/* The file extension chip (ADR 0078): on library cards of pictures, video and audio, and in the details of every asset. */
+.ext-chip { display: inline-flex; align-items: center; padding: 0 var(--sp-3); font: var(--weight-bold) var(--text-xs)/1.7 var(--font-ui); letter-spacing: 0.02em; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-xs); text-transform: uppercase; }
+.asset-thumb { position: relative; }
+.asset-thumb .ext-chip { position: absolute; left: var(--sp-3); bottom: var(--sp-3); opacity: 0.92; }
+.asset-facts .ext-chip { align-self: center; }
+.asset-file { padding: var(--sp-4); background: color-mix(in oklch, var(--hud-accent) 10%, transparent); border-radius: var(--r-md); }

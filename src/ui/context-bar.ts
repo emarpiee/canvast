@@ -22,6 +22,10 @@ export interface ContextActions {
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean };
   /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
+  /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
+  fileSelection(): { hash: string; open: boolean } | null;
+  downloadFile(): void;
+  openFile(): void;
   hasLibraryItems(): boolean;
   showInLibrary(): void;
   /** Open the Tags panel on the box for the selection. */
@@ -55,6 +59,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("ungroup", ICONS.ungroup, "Ungroup") +
     btn("tag", ICONS.tag, "Tag the selection") +
     btn("library", ICONS.library, "Show in the library") +
+    btn("download", ICONS.download, "Download the original file") +
+    btn("open", ICONS.externalLink, "Open in a new tab") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
     btn("layout", ICONS.blocks, "Arrange and align") +
@@ -134,6 +140,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
+      case "download": actions.downloadFile(); break;
+      case "open": actions.openFile(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
@@ -164,6 +172,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("layout").hidden = sel.length < 2;
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
+    const file = actions.fileSelection();
+    q("download").hidden = !file;
+    q("open").hidden = !file?.open;
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
     if (sel.length < 2) closeMenu();

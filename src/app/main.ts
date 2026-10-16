@@ -1,4 +1,6 @@
 import { ViewState } from "./view-state";
+import { isCard } from "../assets/file-kind";
+import { downloadOriginal, fileActionsOf, openOriginalInTab } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
 import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
@@ -536,6 +538,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   mountNavigator(document.getElementById("workspace")!, session);
 
+  const fileKinds = new Map<string, { card: boolean; open: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   const contextBar = mountContextBar(
     host,
@@ -550,6 +553,29 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         editor.tagsOpen = true;
         editor.changed();
         requestAnimationFrame(() => tagsPanel.focusAdd());
+      },
+      fileSelection: () => {
+        const ids = [...editor.selection];
+        const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
+        if (o?.kind !== "image") return null;
+        if (!fileKinds.has(o.assetId)) {
+          fileKinds.set(o.assetId, { card: false, open: false });
+          void session.catalog?.entry(o.assetId).then((e) => {
+            if (!e) return;
+            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen });
+            contextBar.update();
+          });
+        }
+        const k = fileKinds.get(o.assetId)!;
+        return k.card ? { hash: o.assetId, open: k.open } : null;
+      },
+      downloadFile: () => {
+        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
+        if (o?.kind === "image") void downloadOriginal(assets, o.assetId);
+      },
+      openFile: () => {
+        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
+        if (o?.kind === "image") void openOriginalInTab(assets, o.assetId);
       },
       hasLibraryItems: () => [...editor.selection].some((id) => doc.get(id)?.kind === "image"),
       showInLibrary: () => {
@@ -737,7 +763,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     receive(files);
   });
   window.addEventListener("paste", (e) => {
-    const files = [...(e.clipboardData?.files ?? [])].filter((f) => /^(image|video|audio)\//.test(f.type));
+    const files = [...(e.clipboardData?.files ?? [])];
     if (files.length) {
       e.preventDefault();
       receive(files);

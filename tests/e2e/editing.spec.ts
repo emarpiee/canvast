@@ -340,8 +340,10 @@ test("delete, undo delete, and invalid imports are reported without corrupting t
   await app.page
     .getByTestId("import-input")
     .setInputFiles({ name: "not-an-image.png", mimeType: "image/png", buffer: Buffer.from("definitely not a png") });
-  await expect(app.page.getByTestId("toast")).toContainText("could not be decoded");
-  expect(await objects(app)).toEqual([s]);
+  // A picture the browser cannot read is not refused: it is kept and shown as a card (ADR 0078).
+  await expect(app.page.getByTestId("toast")).toContainText("no preview");
+  expect((await objects(app)).map((o) => o.id)).toContain(s.id);
+  expect((await objects(app)).length).toBe(2);
 });
 
 test("selection action bar: follows the selection, hides while moving and for non-selecting tools, and acts (ADR 0051)", async ({ app }) => {

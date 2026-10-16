@@ -21,7 +21,7 @@ or network connection.
 >
 > **v0.17.0 in short:** a redesigned Assets view (gallery, viewer with the canvas
 > player's controls, multi-select, one folder per asset, renamable tags, a
-> plain ZIP by kind or folder, whole-workspace export and import); in-canvas
+> plain ZIP by file type (a folder per extension) or by folder, whole-workspace export and import); in-canvas
 > tags; search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`) and
 > boolean search (ADR 0069); stepping with W A S D and `Alt`; Side-handle
 > resize; `Alt`+drag to copy; a Layers panel with sort, guides, Ctrl/Shift
@@ -250,6 +250,7 @@ or network connection.
 | Export / import | storage panel (click the save indicator): **Export workspace backup**, **Import archive…** · menu **Export** per board or canvas · drop a `.canvast` file on the page |
 | Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
+| Import any file | the Import button, drag and drop or paste: pictures, video and audio show as themselves; any other file (3D model, document, ...) is kept as a card with its extension, and can be downloaded |
 | Show a picture in the library | select it, then the library button in the selection bar: the Assets view opens with its original picked |
 | Zen mode | the leaf button beside Home, or `Z` (rebind in Settings > Shortcuts): the floating bars and panels fade out and show again while the pointer is over them (ADR 0075) |
 | Settings | **Settings** view: tabs, scopes, reset, theme (system, light, dark), rebindable tool keys, `?` for the shortcut list, interface size, contrast and motion |

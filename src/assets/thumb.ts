@@ -2,7 +2,8 @@ import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
-import { makeCard } from "./card";
+import { makeCard, makeFileCard } from "./card";
+import { describeFile, isCard, isMediaType } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -15,9 +16,15 @@ const THUMB_QUALITY = 0.6;
  * where the browser cannot encode WebP.
  */
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  const card = async (): Promise<ImageBitmap> => {
+    const d = describeFile(rec.name, rec.type);
+    return makeFileCard(rec.name, d.chip, d.category, rec.size, 1, isMediaType(rec.type) ? "This browser cannot read it" : undefined);
+  };
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
-    const bmp = rec.type.startsWith("video/")
+    const bmp = isCard(rec)
+      ? await card()
+      : rec.type.startsWith("video/")
       ? await decodeVideo(rec.blob).then(
           (v) => v.bitmap,
           async (e) => {
@@ -44,6 +51,18 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
   } catch {
-    return null; // a format createImageBitmap rejects: the card falls back to the original
+    // A format the browser rejects: the file card (it is what the library and the canvas show for it too).
+    try {
+      const bmp = await card();
+      const c = document.createElement("canvas");
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext("2d")!.drawImage(bmp, 0, 0);
+      bmp.close();
+      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+      return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+    } catch {
+      return null;
+    }
   }
 }

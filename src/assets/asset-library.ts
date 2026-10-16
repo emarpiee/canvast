@@ -7,7 +7,8 @@ import { makeThumb } from "./thumb";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
-import { makeCard } from "./card";
+import { FILE_CARD_H, FILE_CARD_W, makeCard, makeFileCard } from "./card";
+import { describeFile, isCard, isMediaType } from "./file-kind";
 
 /**
  * Shared, content-addressed source files. A placed image is an *instance*
@@ -25,6 +26,8 @@ export interface AssetRecord {
   importedAt: number;
   /** Video, audio and animated GIF: length in seconds. */
   duration?: number;
+  /** Kept as a card: the browser cannot show this file (ADR 0078). Always set for files that are not pictures, video or audio. */
+  card?: boolean;
   /** Animated GIF: number of frames (absent on a still GIF and on one imported before frames were read). */
   frames?: number;
 }
@@ -180,8 +183,8 @@ export class AssetLibrary {
    * "restored" (it had been deleted from the library and is back).
    */
   async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true): Promise<ImportOutcome> {
-    if (!/^(image|video|audio)\//.test(file.type)) throw new ImportError(`unsupported file type "${file.type || "unknown"}"`);
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
+    const type = file.type || "application/octet-stream";
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
     const existing = await this.record(hash);
@@ -195,59 +198,69 @@ export class AssetLibrary {
       if (this.db) await this.store(existing, false);
       return { record: existing, duplicate };
     }
-    let img;
+    let img!: CanvasImageSource & { width: number; height: number };
     let duration: number | undefined;
     let frames: number | undefined;
     let size: { w: number; h: number } | undefined;
-    try {
-      if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
-        try {
-          const m = file.type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
-          img = m.bitmap;
-          duration = m.duration;
-        } catch (e) {
-          // A video this browser cannot decode is still kept (for another browser or player), as a card of its own shape.
-          const pr = file.type.startsWith("video/") ? probeMp4(new Uint8Array(bytes)) : null;
-          if (!pr) {
-            if (!(e instanceof BlankPictureError)) throw e;
-            img = e.result.bitmap; // nothing better to show than the flat picture
-            duration = e.result.duration;
-          } else {
-            img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
-            duration = pr.duration;
-            size = { w: pr.w, h: pr.h };
+    // Anything the browser cannot show (a 3D model, a document, a picture or sound of a format it cannot read) is kept as it is
+    // and shown as a card with its extension, name and kind (ADR 0078).
+    let carded = false;
+    const asCard = async (note?: string): Promise<void> => {
+      carded = true;
+      const d = describeFile(file.name ?? "", type);
+      img = await makeFileCard(file.name ?? "", d.chip, d.category, file.size, 1, note);
+      size = { w: FILE_CARD_W, h: FILE_CARD_H };
+      duration = undefined;
+    };
+    if (!isMediaType(type)) await asCard();
+    else {
+      try {
+        if (type.startsWith("video/") || type.startsWith("audio/")) {
+          try {
+            const m = type.startsWith("video/") ? await decodeVideo(file) : await decodeAudio(file);
+            img = m.bitmap;
+            duration = m.duration;
+          } catch (e) {
+            // A video this browser cannot decode is still kept (for another browser or player), as a card of its own shape.
+            const pr = type.startsWith("video/") ? probeMp4(new Uint8Array(bytes)) : null;
+            if (!pr) {
+              if (!(e instanceof BlankPictureError)) throw e;
+              img = e.result.bitmap; // nothing better to show than the flat picture
+              duration = e.result.duration;
+            } else {
+              img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
+              duration = pr.duration;
+              size = { w: pr.w, h: pr.h };
+            }
+          }
+        } else img = await decode(file);
+        if (type === "image/gif") {
+          try {
+            const g = new GifFrames(new Uint8Array(bytes));
+            if (g.count > 1) {
+              frames = g.count;
+              duration = g.duration;
+            }
+          } catch {
+            // shown as a still
           }
         }
-      } else img = await decode(file);
-      if (file.type === "image/gif") {
-        try {
-          const g = new GifFrames(new Uint8Array(bytes));
-          if (g.count > 1) {
-            frames = g.count;
-            duration = g.duration;
-          }
-        } catch {
-          // shown as a still
-        }
+      } catch {
+        await asCard(`This browser cannot read it as ${type.startsWith("video/") ? "a video" : type.startsWith("audio/") ? "audio" : "a picture"}`);
       }
-    } catch {
-      throw new ImportError(
-        file.type.startsWith("video/")
-          ? "the file could not be decoded as a video: this browser cannot play its format (often H.265/HEVC, which Chrome on Linux lacks). Try another browser, or convert it to H.264 or VP9"
-          : `the file could not be decoded as ${file.type.startsWith("audio/") ? "audio" : "an image"}`,
-      );
     }
     const record: AssetRecord = {
       hash,
-      type: file.type,
+      type,
       size: file.size,
       name: file.name ?? "",
       pixelW: size?.w ?? img.width,
       pixelH: size?.h ?? img.height,
-      blob: new Blob([bytes], { type: file.type }),
+      blob: new Blob([bytes], { type }),
       importedAt: Date.now(),
       ...(duration !== undefined ? { duration } : {}),
       ...(frames !== undefined ? { frames } : {}),
+      ...(carded ? { card: true } : {}),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.db) await this.store(record, true);
@@ -383,15 +396,21 @@ export class AssetLibrary {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
+      const card = (): Promise<ImageBitmap> => {
+        const d = describeFile(rec.name, rec.type);
+        return makeFileCard(rec.name, d.chip, d.category, rec.size, 1, isMediaType(rec.type) ? "This browser cannot read it" : undefined);
+      };
       try {
-        img = await decode(rec.blob, ms);
+        img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
-        if (!rec.type.startsWith("video/")) throw e;
-        const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
-        if (!pr) {
-          if (!(e instanceof BlankPictureError)) throw e;
-          img = e.result.bitmap;
-        } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
+        if (!rec.type.startsWith("video/")) img = await card();
+        else {
+          const pr = probeMp4(new Uint8Array(await rec.blob.arrayBuffer()));
+          if (!pr) {
+            if (!(e instanceof BlankPictureError)) img = await card();
+            else img = e.result.bitmap;
+          } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
+        }
       }
       if (this.decoded.has(key)) {
         (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins

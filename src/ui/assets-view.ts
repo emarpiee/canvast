@@ -1,4 +1,7 @@
 import type { Session, AssetPlace } from "../app/session";
+import { chipOf, describeFile, isCard } from "../assets/file-kind";
+import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "../assets/card";
+import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
@@ -69,8 +72,6 @@ const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "type", "size", "folder", 
 /** A column's track in the list's grid: a fixed width, or a share of the room left over (never narrower than its minimum). */
 const trackOf = (c: (typeof COLUMNS)[number]): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
 
-/** The default preview of a file that is not media: a plain sheet with a folded corner. */
-const FILE_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150"><path d="M20 8h56l32 32v100a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8z" fill="#cfd8d6"/><path d="M76 8v24a8 8 0 0 0 8 8h24z" fill="#9fb0ad"/><rect x="28" y="70" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="88" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="106" width="40" height="6" rx="3" fill="#9fb0ad"/></svg>`;
 
 type UsageFilter = "all" | "used" | "unused";
 type SortKey = "newest" | "name" | "size" | "uses";
@@ -112,7 +113,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.fileInput}<span>Import</span></button>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the assets you picked, as a slideshow">${ICONS.play}</button>
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="assets-import-input">
+      <input type="file" multiple hidden data-testid="assets-import-input">
     </div>
     <div class="assets-columns" role="dialog" aria-label="List columns" data-testid="columns-panel" hidden></div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
@@ -623,12 +624,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
-    if (!/^(image|video|audio)\//.test(rec.type)) {
-      // Not media: the default preview, a plain file picture, and what it is.
+    if (isCard(rec)) {
+      // Not something the browser can show: its card, large, and what it is (ADR 0078).
+      const d = describeFile(rec.name, rec.type);
+      const bmp = await makeFileCard(rec.name, d.chip, d.category, rec.size, 2);
+      const c = document.createElement("canvas");
+      c.width = bmp.width;
+      c.height = bmp.height;
+      c.getContext("2d")!.drawImage(bmp, 0, 0);
+      bmp.close();
+      const png = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+      if (token !== slideToken) return;
+      slideUrl = png ? URL.createObjectURL(png) : null;
       slideImg.className = "is-file";
       slideImg.removeAttribute("style");
-      slideImg.src = `data:image/svg+xml;utf8,${encodeURIComponent(FILE_PICTURE)}`;
-      slideCaption.textContent = `${label}. This kind of file has no preview.`;
+      slideImg.src = slideUrl ?? "";
+      slideCaption.textContent = `${label}. No preview for this kind of file: ${d.todo}`;
       slideCaption.classList.add("is-note");
       armShow();
       return;
@@ -840,7 +851,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     render();
   };
 
-  const kindOf = (type: string): string => (type.split("/")[1] ?? type).toUpperCase();
   const usesText = (instances: number, canvases: number): string =>
     instances === 0 ? "Unused" : `Used ${instances} time${instances === 1 ? "" : "s"} on ${canvases} canvas${canvases === 1 ? "" : "es"}`;
 
@@ -906,13 +916,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb"><img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"></span>
+        <span class="asset-thumb"><img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}">${!isCard(e) ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>` : ""}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
-          <span class="asset-kind">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
-          <span class="asset-type">${esc(kindOf(e.type))}</span>
+          <span class="asset-kind">${esc(chipOf(e.name, e.type))}, ${fmtBytes(e.size)}</span>
+          <span class="asset-type">${esc(chipOf(e.name, e.type))}</span>
           <span class="asset-size">${fmtBytes(e.size)}</span>
           <span class="asset-folder">${esc(meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "")}</span>
           <span class="asset-fav">${meta(e).favorite ? "★ Favourite" : ""}</span>
@@ -947,7 +957,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ? cards.join("") + missing.join("")
       : listing.entries.length
         ? `<p class="assets-empty">No assets match.</p>`
-        : `<p class="assets-empty">No assets yet. Import images here, or drop them on a canvas.</p>`;
+        : `<p class="assets-empty">No assets yet. Import files here (any type), or drop them on a canvas.</p>`;
     grid.style.setProperty("--thumb", `${sizeInput.value}px`);
     // The cards are only drawn again when something about them changed: picking, opening and typing leave them (and the pictures) alone.
     if (html !== lastGridHtml) {
@@ -1229,9 +1239,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : ""
       }
       <div class="asset-facts">
-        ${e ? `<span>${e.pixelW} × ${e.pixelH} px</span><span>${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>` : ""}
+        ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
         <span data-testid="asset-usage">${usesText(instances, e?.canvases ?? m!.canvases)}</span>
       </div>
+      ${e && isCard(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The original file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
@@ -1243,6 +1254,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </dl>
       </details>
       <div class="asset-actions">
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download original</span></button>` : ""}
+        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in a new tab</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove its ${instances} instance(s) from their canvases first.</p>` : ""}` : ""}
@@ -1528,6 +1541,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void session.organize((c) => c.updateMeta(hash, { removeTags: [tag] }));
         break;
       }
+      case "download":
+        void downloadOriginal(assets, hash);
+        break;
+      case "open-tab":
+        void openOriginalInTab(assets, hash);
+        break;
       case "export":
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;

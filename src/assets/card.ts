@@ -56,3 +56,62 @@ export async function makeCard(w: number, h: number, name: string, codec: string
   }
   return createImageBitmap(c);
 }
+
+/**
+ * The picture of a file the browser cannot show (ADR 0078): a card with the extension on a chip, the name, what it is and its size.
+ * `scale` makes it larger for the viewer; the stored size is always 400 × 300.
+ */
+export const FILE_CARD_W = 400;
+export const FILE_CARD_H = 300;
+export async function makeFileCard(name: string, chip: string, category: string, bytes: number, scale = 1, note = "No preview for this kind of file yet"): Promise<ImageBitmap> {
+  const W = FILE_CARD_W;
+  const H = FILE_CARD_H;
+  const c = document.createElement("canvas");
+  c.width = Math.round(W * scale);
+  c.height = Math.round(H * scale);
+  const x = c.getContext("2d")!;
+  x.scale(scale, scale);
+  x.fillStyle = "oklch(0.254 0.028 269)";
+  x.fillRect(0, 0, W, H);
+  x.strokeStyle = "oklch(1 0 0 / 0.1)";
+  x.lineWidth = 2;
+  x.strokeRect(1, 1, W - 2, H - 2);
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  // The extension chip: the thing to read first.
+  const text = chip.slice(0, 8);
+  const chipFont = `700 ${text.length > 5 ? 38 : 52}px system-ui, sans-serif`;
+  x.font = chipFont;
+  const tw = x.measureText(text).width;
+  const cw = Math.max(120, tw + 56);
+  const ch = 84;
+  const cx = (W - cw) / 2;
+  const cy = 46;
+  x.fillStyle = "oklch(0.72 0.1 178)";
+  x.beginPath();
+  x.roundRect(cx, cy, cw, ch, 20);
+  x.fill();
+  x.fillStyle = "oklch(0.2 0.03 269)";
+  x.fillText(text, W / 2, cy + ch / 2 + 2);
+  // Text that fits: the name is cut with an ellipsis.
+  const fit = (t: string, font: string, room: number): string => {
+    x.font = font;
+    let r = t;
+    while (r.length > 1 && x.measureText(r).width > room) r = `${r.slice(0, -2)}…`;
+    return r;
+  };
+  const nameFont = "600 22px system-ui, sans-serif";
+  x.fillStyle = "oklch(0.943 0.013 267)";
+  x.font = nameFont;
+  x.fillText(fit(name || "Untitled", nameFont, W * 0.88), W / 2, 168);
+  const size = bytes < 1024 ? `${bytes} B` : bytes < 1048576 ? `${(bytes / 1024).toFixed(1)} KB` : bytes < 1073741824 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1073741824).toFixed(2)} GB`;
+  const metaFont = "16px system-ui, sans-serif";
+  x.fillStyle = "oklch(0.718 0.035 267)";
+  x.font = metaFont;
+  x.fillText(fit(`${category} · ${size}`, metaFont, W * 0.88), W / 2, 202);
+  const noteFont = "14px system-ui, sans-serif";
+  x.fillStyle = "oklch(0.62 0.03 267)";
+  x.font = noteFont;
+  x.fillText(fit(note, noteFont, W * 0.88), W / 2, 258);
+  return createImageBitmap(c);
+}

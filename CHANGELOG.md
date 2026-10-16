@@ -2,6 +2,9 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Any file can be imported (ADR 0078): what the browser cannot show (a 3D model, a document, an unreadable picture) is kept as a card with its extension chip, name and kind, placed on the canvas like a picture, with Download original and (PDF, text) Open in a new tab in the library and the selection bar.
+- The plain ZIP "by file type" makes a folder per extension (item.obj in obj).
+
 - Closing the canvas search with a press on the canvas no longer clears the items just selected there (ADR 0071).
 
 - Show in the library: a selection-bar button takes the selected pictures to the Assets view, picked, with the search and filters cleared (ADR 0077).

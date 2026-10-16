@@ -30,6 +30,8 @@ export interface CatalogEntry {
   pixelW: number;
   pixelH: number;
   importedAt: number;
+  /** Kept as a card: the browser cannot show this file (ADR 0078). */
+  card?: boolean;
   state: CatalogState;
   deletedAt: number | null;
   /** Organization (ADR 0011). Absent on entries written before v0.6.0: read through `meta()`. */
@@ -164,6 +166,7 @@ export function entryFromRecord(r: AssetRecord): CatalogEntry {
     pixelW: r.pixelW,
     pixelH: r.pixelH,
     importedAt: r.importedAt,
+    ...(r.card ? { card: true } : {}),
     state: "active",
     deletedAt: null,
     tags: [],

@@ -88,9 +88,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
-        <button type="button" data-action="import" aria-label="Import image" title="Import image, video or audio">${ICONS.imagePlus}</button>
+        <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
       </div>
-      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="import-input">
+      <input type="file" multiple hidden data-testid="import-input">
     </div>
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">

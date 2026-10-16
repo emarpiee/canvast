@@ -172,6 +172,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       pixelW: r.pixelW,
       pixelH: r.pixelH,
       importedAt: r.importedAt,
+      ...(r.card ? { card: true } : {}),
       file,
       tags: m.tags,
       favorite: m.favorite,
@@ -363,12 +364,12 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
     const hash = String(a["hash"]);
     const label = str(a["name"], "") || hash.slice(0, 12);
     const e = typeof a["file"] === "string" ? entries.get(a["file"]) : undefined;
-    const type = str(a["type"], "");
+    const type = str(a["type"], "") || "application/octet-stream";
     if (!HASH_RE.test(hash) || valid.has(hash)) {
       problems.push(`Asset “${label}” has an invalid or repeated content hash and was skipped.`);
       continue;
     }
-    if (!e || !/^(image|video|audio)\//.test(type) || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
+    if (!e || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
       problems.push(`Asset “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
     }
@@ -387,6 +388,7 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
       pixelH: a["pixelH"] as number,
       blob: new Blob([bytes], { type }),
       importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
+      ...(a["card"] === true ? { card: true } : {}),
     });
     const org = readOrganization(a, label, problems);
     if (org) plan.organization.set(hash, org);

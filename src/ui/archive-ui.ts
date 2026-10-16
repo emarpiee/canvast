@@ -53,8 +53,8 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
     title: "Export the files as a ZIP",
     lines: ["Every file keeps its original name. Choose how they are grouped inside the ZIP."],
     choices: [
-      { value: "type", label: "By kind", help: "Folders Images, Videos, Audio, PDFs, Text and Other." },
-      { value: "folder", label: "By my folders", help: "The folders you made in the Assets view; files with no folder go in the folder of their kind." },
+      { value: "type", label: "By file type", help: "A folder for each extension: item.obj goes in obj, photo.png in png. Files with no extension go in other." },
+      { value: "folder", label: "By my folders", help: "The folders you made in the Assets view; files with no folder go in the folder of their file type." },
     ],
     confirmLabel: "Export ZIP",
   });

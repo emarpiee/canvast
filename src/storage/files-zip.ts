@@ -1,4 +1,5 @@
 import type { AssetRecord } from "../assets/asset-library";
+import { extOf } from "../assets/file-kind";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { folderPath, meta } from "../assets/asset-catalog";
 import { req } from "./idb";
@@ -9,7 +10,7 @@ import { writeZip } from "./zip";
 
 /**
  * A plain ZIP of the original files (not a `.canvast` archive): ordinary files under their own names, grouped in folders, that any
- * tool can open. Two ways to group them: by kind (Images, Videos, Audio, PDFs, Text, Other) or by the folder each asset is filed in
+ * tool can open. Two ways to group them: by file type (a folder for each extension: png, mp4, obj, ...) or by the folder each asset is filed in
  * inside the app (an asset with no folder goes in the folder of its kind).
  */
 export type FilesLayout = "type" | "folder";
@@ -23,15 +24,10 @@ export interface FilesZipResult {
   paths: string[];
 }
 
-/** The folder name for a kind of file. */
-export function kindFolder(type: string, name: string): string {
-  const t = type.toLowerCase();
-  if (t.startsWith("image/")) return "Images";
-  if (t.startsWith("video/")) return "Videos";
-  if (t.startsWith("audio/")) return "Audio";
-  if (t === "application/pdf" || /\.pdf$/i.test(name)) return "PDFs";
-  if (t.startsWith("text/") || /\.(txt|md|markdown|csv|json)$/i.test(name)) return "Text";
-  return "Other";
+/** The folder name for a file: its extension in lower case ("obj" for item.obj), or "other" when the name has none. */
+export function kindFolder(_type: string, name: string): string {
+  const ext = extOf(name).toLowerCase();
+  return ext || "other";
 }
 
 /** A name safe on every file system, keeping the original wording. */

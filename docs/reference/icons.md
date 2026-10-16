@@ -34,6 +34,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `eraser` | Object eraser |
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
+| `download` | Download original (library details and selection bar) |
+| `external-link` | Open in a new tab |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |

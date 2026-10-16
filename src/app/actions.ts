@@ -1,4 +1,5 @@
 import { normalizeTags } from "../assets/asset-catalog";
+import { isCard } from "../assets/file-kind";
 import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
@@ -583,7 +584,7 @@ export async function extractFrame(doc: DocumentStore, editor: EditorState, asse
   editor.select([placed.id]);
 }
 
-/** Import image files and place one instance of each (see placeImage). */
+/** Import files (any type: pictures, video and audio show as themselves, anything else as a card, ADR 0078) and place one instance of each (see placeImage). */
 export async function importImages(
   files: Iterable<File>,
   assets: AssetLibrary,
@@ -611,10 +612,13 @@ export async function importImages(
     }
   }
   // One image goes in the middle as before; several go in a grid. Either way, one undo step.
-  const placed = records.length === 1 ? [placeImage(records[0]!, doc, view, 0, "Import image")] : records.length ? placeImages(records, doc, view, `Import ${records.length} images`) : [];
+  const placed = records.length === 1 ? [placeImage(records[0]!, doc, view, 0, "Import file")] : records.length ? placeImages(records, doc, view, `Import ${records.length} files`) : [];
   const notice = duplicateNotice(seen, list.length);
   editor.progressDone.add("import");
-  editor.message = notice ?? (list.length > 3 ? `Imported ${records.length} images.` : "");
+  // A file the app cannot show is kept as a card: say so once, and what to do.
+  const cards = records.filter((r) => isCard(r));
+  const cardNote = !cards.length ? "" : cards.length === 1 ? `“${cards[0]!.name || "File"}” has no preview here, so it shows as a card. Select it to download it.` : `${cards.length} files have no preview here and show as cards. Select one to download it.`;
+  editor.message = notice ?? (cardNote || (list.length > 3 ? `Imported ${records.length} files.` : ""));
   editor.changed();
   return placed;
 }

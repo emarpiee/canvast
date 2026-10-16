@@ -336,7 +336,7 @@ test("picking an item always shows its properties, even after the panel button h
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
 });
 
-test("the workspace menu exports the whole workspace as a backup or as plain files (by kind or by folder) and imports a file (ADR 0057)", async ({ app, browser }) => {
+test("the workspace menu exports the whole workspace as a backup or as plain files (by file type or by folder) and imports a file (ADR 0057)", async ({ app, browser }) => {
   const p = app.page;
   await libraryWithTwo(p);
   await newFolder(p, "Refs");
@@ -355,10 +355,10 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
     const entries = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
     return [...entries.keys()].sort();
   };
-  // By kind: every file under its own name in a folder for its kind.
-  expect(await zipPaths(/By kind/)).toEqual(["Images/blocks.png", "Images/green.png"]);
+  // By file type: every file under its own name in a folder named for its extension.
+  expect(await zipPaths(/By file type/)).toEqual(["png/blocks.png", "png/green.png"]);
   // By my folders: the filed one goes to its folder, the other to the folder of its kind.
-  expect(await zipPaths(/By my folders/)).toEqual(["Images/green.png", "Refs/blocks.png"]);
+  expect(await zipPaths(/By my folders/)).toEqual(["Refs/blocks.png", "png/green.png"]);
   // A backup of the whole workspace, imported into a fresh profile from the same menu.
   await crumb.click();
   const [bk] = await Promise.all([p.waitForEvent("download"), p.getByTestId("nav-export-workspace").click()]);
