@@ -55,8 +55,8 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
   const list = root.querySelector<HTMLElement>("ul")!;
-  const PLACEHOLDER: Record<Mode, string> = { name: "File, layer or text name", tag: "Tag of a picture", bookmark: "Bookmark name" };
-  const EMPTY: Record<Mode, string> = { name: "Type a name to search this canvas.", tag: "Type a tag to find pictures with it.", bookmark: "Type a bookmark name, or leave it empty to list them." };
+  const PLACEHOLDER: Record<Mode, string> = { name: "File, layer or text name", tag: "Tag of an item", bookmark: "Bookmark name" };
+  const EMPTY: Record<Mode, string> = { name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
   let mode: Mode = "name";
   const setMode = (m: Mode): void => {
     mode = m;
@@ -82,9 +82,9 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       for (const o of objs) {
         const lab = labelOf(o, names);
         if (mode === "tag") {
-          if (o.kind !== "image") continue;
-          const t = tags.get(o.assetId) ?? [];
-          const hit = t.filter((x) => !q || x.toLowerCase().includes(q));
+          // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
+          const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
+          const hit = [...new Map(t.filter((x) => !q || x.toLowerCase().includes(q)).map((x) => [x.toLowerCase(), x] as const)).values()];
           if (!hit.length) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: hit.map((x) => `#${x}`).join(" "), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else {

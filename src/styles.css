@@ -1445,3 +1445,14 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .hud-readout { max-width: calc(100vw - 8 * var(--ctl)); overflow: hidden; }
   .cs { top: calc(var(--bar-bottom, 56px) + 8px); }
 }
+
+/* In-canvas tags in the Layers panel (ADR 0062) */
+.layers-tags { display: grid; gap: 4px; padding: 6px 8px 0; font-size: 12px; }
+.layers-tags-label { color: var(--hud-muted); }
+.layers-tags .tag-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.layers-tags .tag-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 3px 1px 8px; border-radius: 999px; background: var(--hud-hover); }
+.layers-tags .tag-chip button { width: 18px; height: 18px; padding: 0; font: inherit; color: inherit; background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
+.layers-tags .tag-input { flex: 1; min-width: 80px; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--hud-border); padding: 2px 0; outline: 0; }
+.layers-tags .tag-input:focus { border-bottom-color: var(--hud-accent); }
+.tag-chip.is-suggest { padding: 2px 10px; font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px dashed var(--hud-muted); cursor: pointer; }
+.tag-chip.is-suggest:hover:not(:disabled) { background: var(--hud-hover); border-style: solid; }

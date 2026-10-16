@@ -1399,3 +1399,68 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(box).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("in-canvas tags: tag items on the canvas, list them across the workspace, add them to the asset, and choose to carry library tags when placing (ADR 0062)", async ({ app }) => {
+  const p = app.page;
+  const objs = () => p.evaluate(() => window.__canvastDebug.objects()) as Promise<Array<Record<string, unknown>>>;
+  const id = await importOnCanvas(p);
+  // Tag the selected item from the Layers panel (they belong to this instance, not to the library).
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const tagBox = p.getByLabel("Add a tag to the selection");
+  await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${id}"]`).click();
+  await expect(tagBox).toBeEnabled();
+  await tagBox.fill("ABC, shot-2");
+  await p.keyboard.press("Enter");
+  await expect.poll(async () => (await objs()).find((o) => o["id"] === id)?.["tags"]).toEqual(["ABC", "shot-2"]);
+  await expect(p.getByTestId("canvas-tags")).toContainText("#ABC");
+  // Removing one, then undoing it.
+  await p.getByRole("button", { name: "Remove tag shot-2 from the selection" }).click();
+  await expect.poll(async () => (await objs()).find((o) => o["id"] === id)?.["tags"]).toEqual(["ABC"]);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await objs()).find((o) => o["id"] === id)?.["tags"]).toEqual(["ABC", "shot-2"]);
+  // The search by tag finds it by its in-canvas tag.
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("#");
+  await p.getByRole("combobox", { name: "Search the canvas" }).pressSequentially("abc");
+  await expect(p.getByTestId("canvas-search").getByRole("option")).toHaveCount(1);
+  await p.keyboard.press("Escape");
+  await saved(p);
+  // Assets view: the workspace-wide list of in-canvas tags, separate from the library's tags.
+  await toAssets(p);
+  const ctags = p.getByTestId("canvas-tag-list");
+  await expect(ctags.getByRole("button", { name: /#ABC/ })).toBeVisible();
+  await expect(p.getByTestId("tag-list")).not.toContainText("#ABC");
+  await ctags.getByRole("button", { name: /#ABC/ }).click();
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await card(p, HASH).click();
+  // The properties list the canvas tags the asset does not have; choosing one adds it to the asset.
+  const suggest = p.getByTestId("asset-canvas-tags");
+  await expect(suggest.getByRole("button", { name: /Add the tag ABC/ })).toBeVisible();
+  await expect(suggest.getByRole("button", { name: /Add the tag shot-2/ })).toBeVisible();
+  await suggest.getByRole("button", { name: /Add the tag ABC/ }).click();
+  await expect(p.getByTestId("asset-tags")).toContainText("#ABC");
+  await expect(suggest.getByRole("button", { name: /Add the tag ABC/ })).toHaveCount(0);
+  // Placing a picture that has library tags asks; "with" carries them over, cancel places nothing.
+  await p.getByRole("button", { name: /^All assets/ }).click();
+  await card(p, HASH).click();
+  const before = (await objs()).length;
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("choose-cancel").click();
+  await app.frame();
+  expect((await objs()).length).toBe(before);
+  await p.getByTestId("asset-place").click();
+  await p.getByRole("radio", { name: /Place without tags/ }).check();
+  await p.getByTestId("choose-ok").click();
+  await expect.poll(async () => (await objs()).length).toBe(before + 1);
+  const plain = (await objs()).find((o) => o["id"] !== id && o["kind"] === "image")!;
+  expect(plain["tags"]).toBeUndefined();
+  await toAssets(p);
+  await card(p, HASH).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByRole("radio", { name: /Place with their tags/ }).check();
+  await p.getByTestId("choose-ok").click();
+  await expect.poll(async () => (await objs()).length).toBe(before + 2);
+  const tagged = (await objs()).filter((o) => o["kind"] === "image" && Array.isArray(o["tags"]) && (o["tags"] as string[]).includes("ABC"));
+  expect(tagged.length, "the original instance and the new one").toBe(2);
+  expect(app.consoleErrors).toEqual([]);
+});

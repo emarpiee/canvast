@@ -10,6 +10,7 @@ import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
 import { hasAlpha } from "./alpha";
+import { chooseDialog } from "./confirm";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -216,6 +217,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = "all";
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
+  /** In-canvas tags across the workspace (ADR 0062), and those carried by instances of the open asset. */
+  let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
+  let assetCanvasTags: string[] = [];
   /** The row whose "more" menu is open in the sidebar. */
   let sideMenu: { kind: "folder" | "smart" | "tag"; id: string } | null = null;
   /** On a narrow screen the sidebar is a strip that opens on demand. */
@@ -683,7 +687,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const h of [...picked]) if (!known.has(h)) picked.delete(h);
     if (selected && !known.has(selected)) selected = [...picked].pop() ?? null;
     places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
+    canvasTags = await session.canvasTagIndex().catch(() => canvasTags);
+    assetCanvasTags = selected && picked.size <= 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
     if (gen !== generation) return;
+    if (scope.startsWith("ctag:") && !canvasTags.has(scope.slice(5))) scope = "all";
     render();
   };
 
@@ -714,6 +721,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope === "unfiled") return m.folderIds.length === 0;
       if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
       if (scope.startsWith("tag:")) return m.tags.some((t) => t.toLowerCase() === scope.slice(4));
+      if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
       return true;
     };
     const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
@@ -869,6 +877,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
       if (scope.startsWith("smart:")) return listing!.smart.find((x) => `smart:${x.id}` === scope)?.name ?? "Smart folder";
       if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
+      if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
       return "Library";
     })();
     side.dataset["open"] = String(sideOpen);
@@ -930,6 +939,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                       }),
                 )
                 .join("") || `<li class="side-empty">No tags yet. Add them in the details.</li>`
+            }
+          </ul>`,
+        )}
+        ${section(
+          "ctags",
+          "Canvas tags",
+          "",
+          `<ul class="tag-cloud" data-testid="canvas-tag-list">
+            ${
+              [...canvasTags]
+                .sort((a, b) => a[1].label.localeCompare(b[1].label))
+                .map(([k, c]) =>
+                  item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, { cls: "is-tag is-canvas-tag" }).replace("<button ", `<button title="On ${c.objects} item(s) across ${c.canvases.size} canvas(es); ${c.assets.size} from the library" `),
+                )
+                .join("") || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
           </ul>`,
         )}
@@ -1079,6 +1103,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <input class="tag-input" data-testid="asset-tag-input" placeholder="Add a tag" aria-label="Add a tag" title="Type a tag and press Enter" maxlength="64"${dis}>
         </div>
       </section>
+      ${(() => {
+        // Tags put on this picture's instances on canvases (in-canvas tags) that the asset itself does not have yet.
+        const extra = assetCanvasTags.filter((t) => !m.tags.some((x) => x.toLowerCase() === t.toLowerCase()));
+        return extra.length
+          ? `<section class="asset-sec"><h3>Tags used on canvases</h3>
+              <p class="asset-note">Added to this picture on a canvas, not in the library. Choose one to add it to the library tags.</p>
+              <div class="tag-chips" data-testid="asset-canvas-tags">${extra.map((t) => `<button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t)}" aria-label="Add the tag ${esc(t)} to this asset"${dis}>+ #${esc(t)}</button>`).join("")}</div>
+            </section>`
+          : "";
+      })()}
       <section class="asset-sec">
         <h3>Folder</h3>
         ${
@@ -1142,6 +1176,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     selecting = picked.size > 0 && (how !== "one" || selecting);
     if (how === "one" && picked.size <= 1) selecting = false;
     places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
+    assetCanvasTags = selected && picked.size === 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
     markPicked();
     renderInspector();
   };
@@ -1150,6 +1185,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     selected = filtered()[filtered().length - 1]?.hash ?? selected;
     selecting = true;
     places = [];
+    assetCanvasTags = [];
     markPicked();
     renderInspector();
   };
@@ -1246,8 +1282,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "place-all": {
         const ok = group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present));
-        showCanvas();
-        void session.placeAssets(ok);
+        void askPlaceTags(ok).then((withTags) => {
+          if (withTags === null) return;
+          showCanvas();
+          void session.placeAssets(ok, withTags);
+        });
         break;
       }
       case "favorite-all": {
@@ -1297,8 +1336,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "place":
-        showCanvas();
-        void session.placeAsset(hash);
+        void askPlaceTags([hash]).then((withTags) => {
+          if (withTags === null) return;
+          showCanvas();
+          void session.placeAsset(hash, withTags);
+        });
         break;
       case "place-menu":
         openPlaceMenu(b, [hash]);
@@ -1307,6 +1349,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // The button shows the stored state it would change; set the opposite explicitly.
         const on = b.getAttribute("aria-pressed") !== "true";
         void session.organize((c) => c.updateMeta(hash, { favorite: on }));
+        break;
+      }
+      case "adopt-tag": {
+        const tag = b.dataset["tag"]!;
+        void session.organize((c) => c.updateMeta(hash, { addTags: [tag] }));
         break;
       }
       case "untag": {
@@ -1386,6 +1433,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     true,
   );
 
+  /**
+   * Before placing pictures that have library tags: ask whether the placed items should carry those tags as in-canvas tags
+   * (ADR 0062). Returns true (with tags), false (without), or null when cancelled; false at once when none has tags.
+   */
+  const askPlaceTags = async (hashes: readonly string[]): Promise<boolean | null> => {
+    const tagged = hashes.map((h) => listing?.entries.find((x) => x.hash === h)).filter((e): e is CatalogListing["entries"][number] => !!e && meta(e).tags.length > 0);
+    if (!tagged.length) return false;
+    const names = [...new Set(tagged.flatMap((e) => meta(e).tags))].slice(0, 6).map((t) => `#${t}`).join(" ");
+    const answer = await chooseDialog({
+      title: "Put their tags on the canvas too?",
+      lines: [`${tagged.length === 1 ? "This picture has" : `${tagged.length} of these pictures have`} library tags (${names}). In-canvas tags label the placed items on the canvas and are separate from the library's tags.`],
+      choices: [
+        { value: "with", label: "Place with their tags", help: "Each placed item gets its picture's tags as in-canvas tags." },
+        { value: "without", label: "Place without tags", help: "The items are placed untagged." },
+      ],
+      confirmLabel: "Place",
+    });
+    return answer === null ? null : answer === "with";
+  };
+
   // ---- "Place on…": an existing canvas, a new canvas in a board, or a new board
   const placeMenu = root.querySelector<HTMLElement>(".place-menu")!;
   let placing: string[] = [];
@@ -1426,10 +1493,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!b) return;
     const hashes = placing;
     closePlaceMenu();
-    showCanvas();
     const kind = b.dataset["pm"];
     const target = kind === "canvas" ? { canvasId: b.dataset["id"]! } : kind === "new-canvas" ? { newCanvasIn: b.dataset["id"]! } : ({ newBoard: true } as const);
-    void session.placeAssetsOn(hashes, target);
+    void askPlaceTags(hashes).then((withTags) => {
+      if (withTags === null) return;
+      showCanvas();
+      void session.placeAssetsOn(hashes, target, withTags);
+    });
   });
   document.addEventListener("pointerdown", (e) => {
     if (!placeMenu.hidden && !(e.target as HTMLElement).closest?.(".place-menu, [data-action$='-menu']")) closePlaceMenu();

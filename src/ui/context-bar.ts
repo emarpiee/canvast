@@ -14,6 +14,8 @@ import { LAYOUT_MENU } from "./toolbar";
  */
 export interface ContextActions {
   duplicate(): void;
+  /** Open the Layers panel on the tag box for the selection. */
+  tag(): void;
   group(): void;
   ungroup(): void;
   arrange(to: "front" | "back"): void;
@@ -38,6 +40,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("duplicate", ICONS.copy, "Duplicate") +
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
+    btn("tag", ICONS.tag, "Tag the selection") +
     btn("layout", ICONS.layoutGrid, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
@@ -101,6 +104,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           menu.querySelector<HTMLElement>("button")?.focus();
         }
         break;
+      case "tag": actions.tag(); break;
       case "duplicate": actions.duplicate(); break;
       case "group": actions.group(); break;
       case "ungroup": actions.ungroup(); break;

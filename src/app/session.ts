@@ -400,27 +400,71 @@ export class Session {
     this.editor.select(objects.map((o) => o.id));
   }
 
+  /**
+   * Every in-canvas tag in the workspace (ADR 0062), read from the objects' "tags" index: the tag as first spelled, how many objects
+   * carry it, which canvases, and which library assets those objects are instances of.
+   */
+  async canvasTagIndex(): Promise<Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>> {
+    const out = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
+    if (!this.repo) return out;
+    await this.persistence.flush();
+    const tx = this.repo.db.transaction("objects", "readonly");
+    await new Promise<void>((resolve, reject) => {
+      const cur = tx.objectStore("objects").index("tags").openCursor();
+      cur.onsuccess = () => {
+        const c = cur.result;
+        if (!c) return resolve();
+        const rec = c.value as { canvasId: string; data: { assetId?: string; tags?: string[] } };
+        const label = (rec.data.tags ?? []).find((t) => t.toLowerCase() === String(c.key).toLowerCase()) ?? String(c.key);
+        const k = String(c.key).toLowerCase();
+        const e = out.get(k) ?? { label, objects: 0, canvases: new Set<string>(), assets: new Set<string>() };
+        e.objects++;
+        e.canvases.add(rec.canvasId);
+        if (rec.data.assetId) e.assets.add(rec.data.assetId);
+        out.set(k, e);
+        c.continue();
+      };
+      cur.onerror = () => reject(cur.error);
+    });
+    return out;
+  }
+
+  /** The in-canvas tags carried by instances of one library asset, anywhere in the workspace. */
+  async canvasTagsOfAsset(hash: string): Promise<string[]> {
+    if (!this.repo) return [];
+    await this.persistence.flush();
+    const rows = await new Promise<Array<{ data: { tags?: string[] } }>>((resolve, reject) => {
+      const r = this.repo!.db.transaction("objects", "readonly").objectStore("objects").index("assetId").getAll(hash);
+      r.onsuccess = () => resolve(r.result as Array<{ data: { tags?: string[] } }>);
+      r.onerror = () => reject(r.error);
+    });
+    const seen = new Map<string, string>();
+    for (const row of rows) for (const t of row.data.tags ?? []) if (!seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }
+
   /** Place a new instance of a library asset at the centre of the open canvas. */
-  async placeAsset(hash: string): Promise<ObjectId | null> {
+  async placeAsset(hash: string, withTags = false): Promise<ObjectId | null> {
     if (this.editor.blockEdit() || !this.assets) return null;
     const rec = await this.assets.record(hash);
     if (!rec) {
       this.tell("The original of this asset is missing, so it cannot be placed.");
       return null;
     }
-    return placeImage(rec, this.doc, this.view, 0, "Place asset").id;
+    const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
+    return placeImage(rec, this.doc, this.view, 0, "Place asset", tags).id;
   }
 
   /**
    * Place library assets on a chosen canvas: an existing one, a new canvas in a board, or a new board. The canvas is opened first, so
    * the pictures land there; one undo step on that canvas. Returns how many were placed.
    */
-  async placeAssetsOn(hashes: readonly string[], target: { canvasId: string } | { newCanvasIn: string } | { newBoard: true }): Promise<number> {
+  async placeAssetsOn(hashes: readonly string[], target: { canvasId: string } | { newCanvasIn: string } | { newBoard: true }, withTags = false): Promise<number> {
     if (this.editor.blockEdit()) return 0;
     if ("canvasId" in target) await this.openCanvas(target.canvasId);
     else if ("newCanvasIn" in target) await this.newCanvas(target.newCanvasIn);
     else await this.newBoard();
-    const n = await this.placeAssets(hashes);
+    const n = await this.placeAssets(hashes, withTags);
     const cur = this.current;
     const board = this.tree?.boards.find((b) => b.board.id === cur?.boardId);
     const canvas = board?.canvases.find((c) => c.id === cur?.canvasId);
@@ -429,16 +473,18 @@ export class Session {
   }
 
   /** Place several library assets on the open canvas, in a grid, as one undo step. Returns how many were placed. */
-  async placeAssets(hashes: readonly string[]): Promise<number> {
+  async placeAssets(hashes: readonly string[], withTags = false): Promise<number> {
     if (this.editor.blockEdit() || !this.assets) return 0;
+    const tagsOf = new Map<string, readonly string[]>();
+    if (withTags) for (const h of hashes) tagsOf.set(h, (await this.catalog?.entry(h).catch(() => undefined))?.tags ?? []);
     const recs = [];
     for (const h of hashes) {
       const rec = await this.assets.record(h);
       if (rec) recs.push(rec);
     }
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the originals are missing and were not placed.`);
-    if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place asset");
-    else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} assets`);
+    if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place asset", tagsOf.get(recs[0]!.hash) ?? []);
+    else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} assets`, tagsOf);
     return recs.length;
   }
 

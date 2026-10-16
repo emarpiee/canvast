@@ -1,3 +1,4 @@
+import { normalizeTags } from "../assets/asset-catalog";
 import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
@@ -365,6 +366,29 @@ export function setStackOrder(doc: DocumentStore, editor: EditorState, order: re
   editor.changed();
 }
 
+/**
+ * Add or remove in-canvas tags (ADR 0062) on objects: one undo step. Tags are tidied the same way as library tags (spaces collapsed,
+ * a leading # dropped, case-insensitive duplicates merged). Returns how many objects changed.
+ */
+export function tagObjects(doc: DocumentStore, editor: EditorState, ids: readonly string[], change: { add?: readonly string[]; remove?: readonly string[] }): number {
+  if (editor.blockEdit()) return 0;
+  const add = normalizeTags(change.add ?? []);
+  const drop = new Set((change.remove ?? []).map((t) => t.replace(/^#+/, "").trim().toLowerCase()));
+  const changed: CanvasObject[] = [];
+  for (const id of ids) {
+    const o = doc.get(id);
+    if (!o) continue;
+    const next = normalizeTags([...(o.tags ?? []).filter((t) => !drop.has(t.toLowerCase())), ...add]);
+    if (next.length === (o.tags ?? []).length && next.every((t, i) => t === o.tags![i])) continue;
+    const { tags: _old, ...rest } = o;
+    changed.push((next.length ? { ...rest, tags: next } : rest) as CanvasObject);
+  }
+  if (!changed.length) return 0;
+  doc.commit(doc.transaction(add.length ? "Add tags" : "Remove tag", changed));
+  editor.changed();
+  return changed.length;
+}
+
 /** Show every hidden object, or unlock every locked one. */
 export function clearFlag(doc: DocumentStore, editor: EditorState, flag: "hidden" | "locked"): void {
   if (editor.blockEdit()) return;
@@ -435,12 +459,14 @@ export function placeImage(
   view: ViewState,
   offsetPx: number,
   label: string,
+  tags: readonly string[] = [],
 ): ImageObject {
   const vp = view.viewport;
   const fit = Math.min(1, (PLACE_MAX_VIEWPORT_FRACTION * vp.width) / rec.pixelW, (PLACE_MAX_VIEWPORT_FRACTION * vp.height) / rec.pixelH);
   const w = rec.pixelW * fit;
   const h = rec.pixelH * fit;
-  const obj = imageAt(rec, doc, view, vp.width / 2 + offsetPx - w / 2, vp.height / 2 + offsetPx - h / 2, w, h, doc.topZ() + 1);
+  const placed = imageAt(rec, doc, view, vp.width / 2 + offsetPx - w / 2, vp.height / 2 + offsetPx - h / 2, w, h, doc.topZ() + 1);
+  const obj = tags.length ? ({ ...placed, tags: normalizeTags(tags) } as ImageObject) : placed;
   doc.commit(doc.transaction(label, [obj]));
   return obj;
 }
@@ -465,10 +491,21 @@ export function gridLayout(sizes: ReadonlyArray<{ w: number; h: number }>, vp: {
 }
 
 /** Place a batch of images in a grid as one undoable step (see gridLayout). */
-export function placeImages(recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">>, doc: DocumentStore, view: ViewState, label: string): ImageObject[] {
+export function placeImages(
+  recs: ReadonlyArray<Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">>,
+  doc: DocumentStore,
+  view: ViewState,
+  label: string,
+  /** In-canvas tags to put on each placed instance, by the original's hash. */
+  tagsOf: ReadonlyMap<string, readonly string[]> = new Map(),
+): ImageObject[] {
   const cells = gridLayout(recs.map((r) => ({ w: r.pixelW, h: r.pixelH })), view.viewport);
   const z = doc.topZ();
-  const objs = recs.map((r, i) => imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i));
+  const objs = recs.map((r, i) => {
+    const o = imageAt(r, doc, view, cells[i]!.x, cells[i]!.y, cells[i]!.w, cells[i]!.h, z + 1 + i);
+    const tags = tagsOf.get(r.hash) ?? [];
+    return tags.length ? ({ ...o, tags: normalizeTags(tags) } as ImageObject) : o;
+  });
   doc.commit(doc.transaction(label, objs));
   return objs;
 }

@@ -52,6 +52,8 @@ interface ObjectBase {
   readonly groupNames?: Readonly<Record<string, string>>;
   /** How the object's paint mixes with what is behind it (ADR 0047); absent = normal. */
   readonly blend?: BlendMode;
+  /** In-canvas tags (ADR 0062): labels of this instance, separate from an asset's library tags; absent = none. */
+  readonly tags?: readonly string[];
   /** Not drawn, picked or indexed while true (ADR 0021); absent = shown. */
   readonly hidden?: boolean;
   /** Drawn, but cannot be picked, selected or edited while true (ADR 0021); absent = unlocked. */
@@ -61,6 +63,10 @@ interface ObjectBase {
 /** Blend modes offered (the canvas's `globalCompositeOperation` names); absent on an object = normal. */
 export const BLEND_MODES = ["multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion"] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
+
+/** Most in-canvas tags on one object, and the longest one. */
+export const MAX_OBJECT_TAGS = 50;
+export const MAX_TAG_LENGTH = 64;
 
 /** Longest layer or group name kept. */
 export const MAX_NAME_LENGTH = 80;
@@ -265,6 +271,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
+  if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && t === t.trim() && !t.startsWith("#")))) throw new InvalidObjectError("bad tags");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
@@ -333,6 +340,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
+    ...(Array.isArray(s["tags"]) && s["tags"].length ? { tags: s["tags"] as string[] } : {}),
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
     ...(s["locked"] === true ? { locked: true as const } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),

@@ -5,7 +5,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -425,6 +425,7 @@ async function start(): Promise<void> {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOrder: (order, label) => setStackOrder(doc, editor, order, label),
+    tag: (ids, change) => void tagObjects(doc, editor, ids, change),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),
@@ -507,6 +508,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     doc,
     {
       duplicate: () => duplicateSelection(doc, editor, view),
+      tag: () => {
+        editor.layersOpen = true;
+        editor.changed();
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>("[data-canvas-tag-input]")?.focus());
+      },
       group: () => groupSelection(doc, editor),
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),

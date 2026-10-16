@@ -20,6 +20,8 @@ export interface LayersActions {
   moveAbove(ids: readonly string[], aboveId: string): void;
   /** Put the stacking order in name order (ADR 0059); only the order changes, never a position. `order` is front to back. */
   setOrder(order: readonly string[], label: string): void;
+  /** Add or remove in-canvas tags on objects (ADR 0062). */
+  tag(ids: readonly string[], change: { add?: readonly string[]; remove?: readonly string[] }): void;
   setOpacity(ids: readonly string[], opacity: number): void;
   /** Blend mode of objects (null = normal), ADR 0047. */
   setBlend(ids: readonly string[], blend: BlendMode | null): void;
@@ -109,6 +111,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   host.appendChild(panel);
   const open = new Set<string>(); // expanded groups
   let sortOpen = false;
+  /** The tag being typed survives a redraw of the panel. */
+  let tagDraft = "";
+  let refocusTag = false;
   let lastSelection = "";
   /** Groups the panel has already listed: a group seen for the first time (just made) opens. */
   const seenGroups = new Set<string>();
@@ -129,7 +134,12 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const pct = Math.round((sel[0]?.opacity ?? 1) * 100);
     const blend = sel[0]?.blend ?? "";
     const modes = ["", ...BLEND_MODES].map((m) => `<option value="${m}"${m === blend ? " selected" : ""}>${m ? m.replace(/-/g, " ") : "normal"}</option>`).join("");
-    return `<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
+    const on = [...new Map(sel.flatMap((o) => o.tags ?? []).map((t) => [t.toLowerCase(), t] as const)).values()];
+    const here = [...new Map(doc.ordered().flatMap((o) => o.tags ?? []).map((t) => [t.toLowerCase(), t] as const)).values()].filter((t) => !on.some((x) => x.toLowerCase() === t.toLowerCase()));
+    const tagRow = `<div class="layers-tags" data-testid="canvas-tags"><span class="layers-tags-label">Tags</span><div class="tag-chips">${on
+      .map((t) => `<span class="tag-chip">#${esc(t)}<button type="button" data-untag-canvas="${esc(t)}" aria-label="Remove tag ${esc(t)} from the selection">×</button></span>`)
+      .join("")}<input class="tag-input" data-canvas-tag-input list="canvas-tag-suggest" placeholder="${sel.length ? "Add a tag" : "Select items to tag"}" aria-label="Add a tag to the selection" maxlength="64" value="${esc(tagDraft)}" ${sel.length ? "" : "disabled"}><datalist id="canvas-tag-suggest">${here.map((t) => `<option value="${esc(t)}">`).join("")}</datalist></div></div>`;
+    return `${tagRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
   };
 
   // Links of the one selected object (ADR 0040): texts that mention it, and what a selected text mentions.
@@ -182,6 +192,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     panel.hidden = !editor.layersOpen;
     if (!editor.layersOpen) return;
     // A name being typed is not redrawn under the cursor (a redraw would end the edit).
+    if (document.activeElement?.matches?.("[data-canvas-tag-input]") && panel.contains(document.activeElement)) {
+      if (tagDraft) return; // a tag being typed is not redrawn under the cursor
+      refocusTag = true; // the box is redrawn (the selection changed) and keeps the focus
+    }
     if ((renaming && panel.querySelector("[data-rename]")) || (relinking && panel.querySelector("[data-relink-q]"))) return;
     const all = doc.ordered();
     for (const o of all) {
@@ -196,12 +210,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       }
     }
     const tree = layerTree(all);
-    // A newly selected item deep in groups is shown: its groups open (once per selection, so they can still be closed).
-    const selKey = [...editor.selection].sort().join(",");
-    if (selKey !== lastSelection) {
-      lastSelection = selKey;
-      for (const id of editor.selection) for (const g of doc.get(id)?.groups ?? []) open.add(g);
-    }
     for (const g of new Set(all.flatMap((o) => o.groups ?? []))) {
       if (!seenGroups.has(g)) {
         seenGroups.add(g);
@@ -241,6 +249,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       <div class="layers-links" data-links>${linksHtml()}</div>
       ${footer()}
       ${rows >= MAX_ROWS ? `<p class="layers-note">Showing the front ${MAX_ROWS} rows.</p>` : ""}`;
+    if (refocusTag) {
+      refocusTag = false;
+      panel.querySelector<HTMLInputElement>("[data-canvas-tag-input]")?.focus();
+    }
     if (relinking) panel.querySelector<HTMLInputElement>("[data-relink-q]")?.focus();
     if (renaming) {
       const input = panel.querySelector<HTMLInputElement>("[data-rename]");
@@ -256,8 +268,19 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       requestAnimationFrame(render);
     }
   };
+  // A newly selected item deep in groups is shown: its groups open (once per selection, so they can still be closed). Noted on every
+  // change of the selection, not at drawing time, so a quick deselect and reselect is never missed.
+  const noteSelection = (): void => {
+    const selKey = [...editor.selection].sort().join(",");
+    if (selKey === lastSelection) return;
+    lastSelection = selKey;
+    for (const id of editor.selection) for (const g of doc.get(id)?.groups ?? []) open.add(g);
+  };
   doc.subscribe(schedule);
-  editor.subscribe(schedule);
+  editor.subscribe(() => {
+    noteSelection();
+    schedule();
+  });
   render();
 
   const members = (key: string): CanvasObject[] => {
@@ -303,6 +326,23 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     render();
   });
   panel.addEventListener("keydown", (e) => {
+    const tagInput = e.target as HTMLInputElement;
+    if (tagInput.matches?.("[data-canvas-tag-input]")) {
+      e.stopPropagation(); // typing a tag never reaches the canvas shortcuts
+      if (e.key === "Enter") {
+        const add = tagInput.value.split(",");
+        tagDraft = "";
+        refocusTag = true;
+        if (add.join("").trim()) actions.tag([...editor.selection], { add });
+        else render();
+        e.preventDefault();
+      } else if (e.key === "Escape") {
+        tagDraft = "";
+        tagInput.blur();
+        render();
+      }
+      return;
+    }
     if (!(e.target as HTMLElement).matches("[data-rename]")) return;
     e.stopPropagation();
     if (e.key === "Enter") endRename(true);
@@ -334,6 +374,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
         out.insertAdjacentHTML("beforeend", list.map((b) => item(b.id, b.label, b.canvasName)).join(""));
       });
     }
+    if (t.matches("[data-canvas-tag-input]")) tagDraft = t.value;
     if (t.matches("[data-opacity]")) t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
   });
   // `change` fires once, when the slider is released: one undo step per drag.
@@ -368,6 +409,11 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     if (t.closest("[data-relink-cancel]")) {
       relinking = null;
       render();
+      return;
+    }
+    const untag = t.closest<HTMLElement>("[data-untag-canvas]");
+    if (untag) {
+      actions.tag([...editor.selection], { remove: [untag.dataset["untagCanvas"]!] });
       return;
     }
     if (t.closest("[data-sort-toggle]")) {
