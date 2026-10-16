@@ -1651,3 +1651,21 @@ test("phone layout (360 px wide): the bars stack in rows, the tools sit below th
   for (const b of [dock, options, rail, panel]) expect(b.x + b.width, "inside the screen").toBeLessThanOrEqual(360);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("medium screen (800 px wide): the tool options get their own row under the tabs and the dock, and nothing overlaps (ADR 0061)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 800, height: 600 });
+  await p.keyboard.press("v");
+  await app.frame();
+  const rect = (sel: string) => p.locator(sel).first().boundingBox();
+  const nav = (await rect("#nav"))!;
+  const dock = (await rect("#toolbar > .dock"))!;
+  const options = (await rect("#toolbar > .toolbar"))!;
+  const rail = (await rect("#toolbar > .rail"))!;
+  const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  for (const [name, a, b] of [["nav/dock", nav, dock], ["nav/options", nav, options], ["dock/options", dock, options], ["options/rail", options, rail]] as const) expect(overlap(a, b), `${name} overlap`).toBe(false);
+  expect(options.y, "the options are on the second row").toBeGreaterThanOrEqual(nav.y + nav.height - 1);
+  expect(options.height, "one row, not a tall box").toBeLessThan(70);
+  expect(options.x + options.width).toBeLessThanOrEqual(800);
+  expect(app.consoleErrors).toEqual([]);
+});

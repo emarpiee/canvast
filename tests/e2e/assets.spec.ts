@@ -1538,3 +1538,69 @@ test("viewer edges: a click on the invisible left or right side goes to the prev
   await expect(pos).toHaveText("1 of 3");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("small screens: the details panel is resizable by its grip (drag, arrow keys, double-click to reset, remembered), and the viewer's picture is centred with the zoom control in the bar (ADR 0061)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 360, height: 780 });
+  await toAssets(p);
+  for (let i = 0; i < 3; i++) await p.getByTestId("assets-import-input").setInputFiles({ name: `s-${i}.png`, mimeType: "image/png", buffer: makePng(60 + i * 9, 40, (x, y) => [(x * 5 + i * 50) % 256, (y * 6) % 256, 150, 255]) });
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  await p.getByTestId("asset-card").first().click();
+  const sheet = p.getByTestId("asset-inspector");
+  const grip = p.getByTestId("sheet-grip");
+  await expect(grip).toBeVisible();
+  const h0 = (await sheet.boundingBox())!.height;
+  const g = (await grip.boundingBox())!;
+  await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2 - 120, { steps: 6 });
+  await p.mouse.up();
+  const h1 = (await sheet.boundingBox())!.height;
+  expect(h1, "dragging up makes it taller").toBeGreaterThan(h0 + 80);
+  expect(h1).toBeLessThanOrEqual(780 * 0.88 + 2);
+  await grip.focus();
+  await p.keyboard.press("ArrowDown");
+  expect((await sheet.boundingBox())!.height, "the arrow keys step it").toBeLessThan(h1 - 30);
+  const h2 = (await sheet.boundingBox())!.height;
+  // Remembered over a reload, and a double-click goes back to the default.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await p.getByTestId("asset-card").first().click();
+  await expect(sheet).toBeVisible();
+  expect(Math.abs((await sheet.boundingBox())!.height - h2)).toBeLessThan(3);
+  await grip.dblclick();
+  expect(Math.abs((await sheet.boundingBox())!.height - h0)).toBeLessThan(3);
+  // The viewer: the picture is centred in the stage (equal room above and below) and the zoom control sits in the bar, off the picture.
+  await p.getByTestId("asset-card").first().dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
+  const img = viewer.locator("figure img");
+  await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  const ib = (await img.boundingBox())!;
+  expect(Math.abs(ib.y - stage.y - (stage.y + stage.height - ib.y - ib.height)), "equal room above and below").toBeLessThan(2);
+  const zoom = (await viewer.locator(".viewer-zoom").boundingBox())!;
+  const bar = (await viewer.locator(".viewer-bar").boundingBox())!;
+  expect(zoom.y).toBeGreaterThanOrEqual(bar.y - 1);
+  expect(zoom.y + zoom.height).toBeLessThanOrEqual(stage.y + stage.height + bar.height + 1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Ctrl+F searches the canvas (or the library in the Assets view); Ctrl+Shift+F goes to the library's search from anywhere", async ({ app }) => {
+  const p = app.page;
+  const canvasBox = p.getByRole("combobox", { name: "Search the canvas" });
+  await p.keyboard.press("Control+f");
+  await expect(canvasBox).toBeFocused();
+  await p.keyboard.press("Escape");
+  await expect(canvasBox).toBeHidden();
+  await p.keyboard.press("Control+Shift+f");
+  await expect(p.getByTestId("assets-search")).toBeFocused();
+  expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("assets");
+  // In the library Ctrl+F is the same search box again, even after focus has gone elsewhere.
+  await p.getByTestId("assets-search").fill("abc");
+  await p.getByTestId("view-assets").focus();
+  await p.keyboard.press("Control+f");
+  await expect(p.getByTestId("assets-search")).toBeFocused();
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -34,6 +34,8 @@ import type { SettingsStore } from "../settings/settings";
 export interface AssetsView {
   show(): void;
   hide(): void;
+  /** Put the cursor in the library's search box (closing the viewer if it is open). */
+  focusSearch(): void;
   /** Import files into the library only (no placement). */
   importFiles(files: File[]): Promise<void>;
 }
@@ -92,11 +94,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
-            <div class="viewer-zoom" role="group" aria-label="Zoom">
-              <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (-)">${ICONS.minus}</button>
-              <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
-              <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
-            </div>
             <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
@@ -106,6 +103,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             </div>
             <div class="viewer-film" role="listbox" aria-label="Library, in this order"></div>
             <div class="viewer-tools">
+            <div class="viewer-zoom" role="group" aria-label="Zoom">
+              <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (-)">${ICONS.minus}</button>
+              <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
+              <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
+            </div>
               <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.play}<span>Slideshow</span></button>
               <button type="button" class="vbtn" data-act="fullscreen" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
               <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
@@ -121,6 +123,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </div>
         </div>
       </div>
+      <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
     </div>
     <div class="place-menu" role="menu" aria-label="Place on" data-testid="place-menu" hidden></div>`;
@@ -160,7 +163,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[] } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [] };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; sheetH: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], sheetH: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -171,6 +174,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const order = saved.order.filter((c, i, a) => known.has(c) && a.indexOf(c) === i);
       ui.order = [...order, ...DEFAULT_COLUMN_ORDER.filter((c) => !order.includes(c))];
     }
+    if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.hidden)) ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
   } catch {
@@ -200,6 +204,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     ui.order.forEach((c, i) => body.style.setProperty(`--o-${c}`, String(i + 1)));
     for (const c of DEFAULT_COLUMN_ORDER) body.classList.toggle(`hide-${c}`, ui.hidden.includes(c));
     body.style.setProperty("--cols", ["56px", ...shown.map((c) => COLUMNS.find((x) => x.id === c)!.width)].join(" "));
+    if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
+    else body.style.removeProperty("--sheet-h");
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
   };
@@ -1467,6 +1473,41 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return answer === null ? null : answer === "with";
   };
 
+  // ---- the details panel's height on small screens: drag the grip (or use the arrow keys); double-click goes back to the default
+  const grip = root.querySelector<HTMLElement>(".sheet-grip")!;
+  const sheetRange = (): { min: number; max: number } => ({ min: 120, max: Math.round(window.innerHeight * 0.88) });
+  const setSheet = (h: number | null, save: boolean): void => {
+    const { min, max } = sheetRange();
+    ui.sheetH = h === null ? null : Math.max(min, Math.min(max, Math.round(h)));
+    if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
+    else body.style.removeProperty("--sheet-h");
+    grip.setAttribute("aria-valuenow", String(ui.sheetH ?? inspector.offsetHeight));
+    if (save) saveUi();
+  };
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = inspector.offsetHeight;
+    grip.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent): void => setSheet(startH + (startY - ev.clientY), false);
+    const up = (): void => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+      grip.removeEventListener("pointercancel", up);
+      saveUi();
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+    grip.addEventListener("pointercancel", up);
+  });
+  grip.addEventListener("dblclick", () => setSheet(null, true));
+  grip.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    setSheet(inspector.offsetHeight + (e.key === "ArrowUp" ? 48 : -48), true);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
   // ---- "Place on…": an existing canvas, a new canvas in a board, or a new board
   const placeMenu = root.querySelector<HTMLElement>(".place-menu")!;
   let placing: string[] = [];
@@ -1839,6 +1880,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void refresh();
       if (viewer.hidden) search.focus();
       else viewer.focus();
+    },
+    focusSearch() {
+      if (!viewer.hidden) closeSlide();
+      search.focus();
+      search.select();
     },
     hide() {
       visible = false;

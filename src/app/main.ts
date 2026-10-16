@@ -566,6 +566,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
+  // Ctrl+F searches what you are looking at (the canvas, or the library in the Assets view); Ctrl+Shift+F goes to the library's search
+  // from anywhere. The browser's own find is not used for these.
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "f") return;
+    if (document.querySelector("dialog[open]") || appView === "settings") return;
+    e.preventDefault();
+    if (e.shiftKey || appView === "assets") {
+      setView("assets");
+      assetsView.focusSearch();
+    } else canvasSearch.open("/");
+  });
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
     const keys = toolKeys(settings);

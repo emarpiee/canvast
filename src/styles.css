@@ -1463,8 +1463,9 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .assets-body:not(.is-list) .assets-grid::after { display: none; }
   .assets-body:not(.is-list) .asset-cell { flex: none; min-width: 0; aspect-ratio: 1; }
   .assets-body:not(.is-list) .asset-card img { object-fit: cover; }
-  .assets-body .asset-inspector { background: var(--canvas-bg); position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; flex: none; max-height: 58vh; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; box-shadow: var(--hud-lift); }
-  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details) .assets-scroll { padding-bottom: 58vh; }
+  .assets-body .asset-inspector { background: var(--canvas-bg); position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; flex: none; height: var(--sheet-h, auto); max-height: var(--sheet-h, 58vh); padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; box-shadow: var(--hud-lift); }
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details) .assets-scroll { padding-bottom: calc(var(--sheet-h, 58vh) + 12px); }
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { position: fixed; z-index: 9; left: 0; right: 0; bottom: calc(var(--sheet-h, 58vh) - 14px); }
   .assets-body.is-viewing .asset-inspector { display: none; }
   .assets-body.is-viewing .viewer { position: absolute; inset: 0; top: 0; }
   #assets-view:has(.assets-body.is-viewing) { padding-top: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + 8px); }
@@ -1483,3 +1484,37 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer { --edge-w: 15; }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
 .viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
+
+/* ---- Viewer: zoom control in the bar, the picture centred on every side; adjustable details on small screens ---- */
+.viewer figure img, .viewer figure video, .viewer.no-bar figure img, .viewer.no-bar figure video, .viewer-checker { inset: 16px; }
+.viewer-zoom { position: static; display: inline-flex; flex: none; padding: 2px; background: var(--v-hover); border: 0; backdrop-filter: none; }
+.viewer.no-bar .viewer-zoom { opacity: 1; }
+.viewer-edge { bottom: 0; }
+.viewer-stage .viewer-zoom-pct { min-width: 48px; }
+.sheet-grip { display: none; flex: none; height: 14px; cursor: ns-resize; touch-action: none; place-items: center; }
+.sheet-grip span { width: 44px; height: 4px; border-radius: 4px; background: var(--hud-muted); opacity: 0.6; }
+.sheet-grip:hover span, .sheet-grip:focus-visible span { opacity: 1; background: var(--hud-accent); }
+.sheet-grip:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
+@media (max-width: 900px) {
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details) .sheet-grip { display: grid; }
+  .asset-inspector { height: var(--sheet-h, auto); max-height: var(--sheet-h, 44vh); }
+}
+@media (max-width: 640px) {
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { display: grid; }
+  .assets-body.is-viewing .sheet-grip { display: none; }
+}
+
+/* ---- Medium screens (ADR 0061): the tool options get their own row under the tabs and the dock instead of squeezing between them ---- */
+@media (min-width: 641px) and (max-width: 1180px) {
+  :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
+  #toolbar { top: calc(var(--edge) + var(--row) + var(--near)); left: var(--edge); right: var(--edge); justify-content: center; }
+  #toolbar > .toolbar { max-width: 100%; }
+  #toolbar > .rail { top: max(calc(50vh / var(--ui-scale, 1)), calc((var(--bar-bottom, 110px) + 160px) / var(--ui-scale, 1))); }
+}
+/* Phones: the options are one row that scrolls sideways instead of wrapping into a tall box. */
+@media (max-width: 640px) {
+  #toolbar > .toolbar { overflow: hidden; }
+  .tb-options-row { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding-bottom: 0; }
+  .tb-options-row::-webkit-scrollbar { display: none; }
+  .tb-options-row > .tb-group { flex: none; }
+}

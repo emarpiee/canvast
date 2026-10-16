@@ -50,6 +50,8 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "Arrow keys", does: "Pan (Shift: further)" },
       { keys: "Ctrl+Arrow keys", does: "Step the selection to the next item (the way is set in Settings > Navigation)" },
       { keys: "Alt (press and release)", does: "Bring the selection into view" },
+      { keys: "Ctrl+F", does: "Search the canvas (in the Assets view: the library)" },
+      { keys: "Ctrl+Shift+F", does: "Go to the Assets view and search the library" },
       { keys: "/", does: "Search the canvas by file or layer name" },
       { keys: "#", does: "Search the canvas by tag" },
       { keys: "@", does: "Search the canvas for a bookmark" },
