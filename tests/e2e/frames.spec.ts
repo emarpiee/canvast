@@ -1627,3 +1627,27 @@ test("copy, cut, paste and duplicate: Ctrl+C/X/V/D on the selection, pasted at t
   expect(await strokes()).toHaveLength(1);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("phone layout (360 px wide): the bars stack in rows, the tools sit below them, and the panels sit beside the tools, none overlapping (ADR 0061)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 360, height: 780 });
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await app.frame();
+  const rect = (sel: string) => p.locator(sel).first().boundingBox();
+  const nav = (await rect("#nav .view-switch"))!;
+  const crumb = (await rect(".nav-crumb"))!;
+  const dock = (await rect("#toolbar > .dock"))!;
+  const options = (await rect("#toolbar > .toolbar"))!;
+  const rail = (await rect("#toolbar > .rail"))!;
+  const panel = (await rect("#side-panels > *"))!;
+  const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  expect(overlap(nav, crumb), "tabs and workspace menu share a row").toBe(false);
+  expect(crumb.x + crumb.width).toBeLessThanOrEqual(360);
+  for (const [name, a, b] of [["nav/dock", nav, dock], ["crumb/dock", crumb, dock], ["dock/options", dock, options], ["options/rail", options, rail], ["dock/rail", dock, rail], ["panel/rail", panel, rail], ["panel/dock", panel, dock], ["panel/options", panel, options]] as const) {
+    expect(overlap(a, b), `${name} overlap`).toBe(false);
+  }
+  for (const b of [dock, options, rail, panel]) expect(b.x + b.width, "inside the screen").toBeLessThanOrEqual(360);
+  expect(app.consoleErrors).toEqual([]);
+});

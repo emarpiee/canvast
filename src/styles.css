@@ -1418,3 +1418,25 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .cs-empty { padding: 12px; color: var(--hud-muted); }
 .cs-hint { margin: 0; padding: 6px 12px; font-size: 11px; color: var(--hud-muted); border-top: 1px solid var(--hud-border); }
 .cs-hint kbd { font: inherit; padding: 0 5px; background: var(--hud-hover); border-radius: 4px; }
+
+/* ---- Phones (ADR 0061): the bars stack in rows instead of overlapping, the tools stay clear of them, panels sit beside the tools ---- */
+@media (max-width: 640px) {
+  :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
+  /* Row 1: the view tabs and the workspace menu share the width. */
+  #nav { right: var(--edge); }
+  #workspace { flex: 1; min-width: 0; }
+  #workspace .nav { display: block; }
+  .nav-crumb { width: 100%; max-width: none; text-align: left; }
+  .nav-menu { width: min(340px, calc(100vw - 2 * var(--edge))); }
+  /* Row 2: the dock, spread across the width. */
+  #toolbar > .dock { top: calc((var(--edge) + var(--row) + var(--near)) / var(--ui-scale, 1)); left: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
+  /* Row 3: the options of the tool, full width. */
+  #toolbar { top: calc(var(--edge) + 2 * (var(--row) + var(--near))); left: var(--edge); right: var(--edge); justify-content: stretch; }
+  #toolbar > .toolbar { width: 100%; max-width: none; }
+  /* The tools sit below the rows, never under them; the panels go to their right. */
+  #toolbar > .rail { top: max(calc(50vh / var(--ui-scale, 1)), calc((var(--bar-bottom, 140px) + 160px) / var(--ui-scale, 1))); }
+  #side-panels { left: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + var(--near) + 4px); right: var(--edge); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
+  /* The readout and the view controls keep to the bottom edge, the readout narrower. */
+  .hud-readout { max-width: calc(100vw - 8 * var(--ctl)); overflow: hidden; }
+  .cs { top: calc(var(--bar-bottom, 56px) + 8px); }
+}
