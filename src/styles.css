@@ -1579,3 +1579,12 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .bookmarks-panel .layers-empty svg { width: 14px; height: 14px; vertical-align: -2px; }
 @media (hover: hover) { .bookmarks-panel .bookmark-actions { opacity: 0; } .bookmarks-panel .bookmark:hover .bookmark-actions, .bookmarks-panel .bookmark:focus-within .bookmark-actions { opacity: 1; } }
 @media (max-width: 640px) { .bookmarks-panel .bookmark-thumb { width: 60px; height: 40px; } .bookmark-actions .layer-btn { width: 36px; height: 36px; } .bookmarks-panel .bookmark-actions { opacity: 1; } }
+
+/* Bookmarks: the buttons never take room from the name. On a mouse they float over the card's right side on hover or focus; on touch
+   (and small screens) they are a row of their own under the picture and name. */
+.bookmarks-panel .bookmark { position: relative; flex-wrap: wrap; }
+.bookmarks-panel .bookmark-actions { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); padding: 2px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: 999px; box-shadow: var(--hud-lift); }
+.bookmarks-panel .bookmark-actions .layer-btn { border-radius: 50%; }
+@media (hover: none), (max-width: 640px) {
+  .bookmarks-panel .bookmark-actions { position: static; transform: none; flex: 1 0 100%; justify-content: flex-end; padding: 0; background: none; border: 0; box-shadow: none; opacity: 1; }
+}
