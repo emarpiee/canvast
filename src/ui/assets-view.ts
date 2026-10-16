@@ -157,7 +157,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[] } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN] };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[] } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [] };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -168,6 +168,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const order = saved.order.filter((c, i, a) => known.has(c) && a.indexOf(c) === i);
       ui.order = [...order, ...DEFAULT_COLUMN_ORDER.filter((c) => !order.includes(c))];
     }
+    if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.hidden)) ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
   } catch {
     // unreadable: shown
@@ -213,6 +214,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = "all";
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
+  /** The row whose "more" menu is open in the sidebar. */
+  let sideMenu: { kind: "folder" | "smart" | "tag"; id: string } | null = null;
+  /** On a narrow screen the sidebar is a strip that opens on demand. */
+  const narrow = window.matchMedia("(max-width: 900px)");
+  let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
 
@@ -786,9 +792,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       else tagCounts.set(k, { label: t, n: 1 });
     }
     const ro = session.readOnly;
-    const item = (key: string, label: string, n: number, depth = 0, extra = ""): string =>
-      `<li class="side-row" style="--depth:${depth}"><button type="button" class="side-item${scope === key ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key}">
-        <span class="side-label">${label}</span><span class="side-n">${n}</span></button>${extra}</li>`;
+    const kindWord = { folder: "folder", smart: "smart folder", tag: "tag" } as const;
+    /** A row's "more" button and, when open, its labelled menu (Rename, Delete and so on): one button instead of a row of them. */
+    const more = (kind: "folder" | "smart" | "tag", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
+      if (ro) return "";
+      const open = sideMenu?.kind === kind && sideMenu.id === id;
+      return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>${
+        open
+          ? `<div class="side-menu" role="menu" aria-label="Actions for ${kindWord[kind]} ${esc(name)}">${items
+              .map((i) => `<button type="button" role="menuitem" class="${i.danger ? "is-danger" : ""}" ${i.attr} data-id="${esc(id)}" data-key="${esc(id)}" aria-label="${esc(i.aria)}">${i.icon}<span>${i.label}</span></button>`)
+              .join("")}</div>`
+          : ""
+      }`;
+    };
+    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string } = {}): string =>
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key}">
+        ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
     const subtreeCount = (id: string): number => {
@@ -801,64 +820,109 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         .map((f) =>
           naming?.kind === "rename" && naming.id === f.id
             ? nameInput(f.name, `New name for folder ${f.name}`)
-            : item(
-                `folder:${f.id}`,
-                esc(f.name),
-                subtreeCount(f.id),
+            : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
                 depth,
-                ro ? "" : `<button type="button" class="side-mini" data-folder-action="new" data-id="${f.id}" aria-label="New folder inside ${esc(f.name)}" title="New subfolder">+</button>
-                 <button type="button" class="side-mini" data-folder-action="rename" data-id="${f.id}" aria-label="Rename folder ${esc(f.name)}" title="Rename">Rename</button>
-                 <button type="button" class="side-mini" data-folder-action="delete" data-id="${f.id}" aria-label="Delete folder ${esc(f.name)}" title="Delete folder">Delete</button>`,
-              ) +
+                icon: ICONS.folder,
+                extra: more("folder", f.id, f.name, [
+                  { attr: 'data-folder-action="new"', label: "New subfolder", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
+                  { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename folder ${f.name}` },
+                  { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
+                ]),
+              }) +
               (naming?.kind === "new" && naming.parent === f.id ? nameInput("", `Name of the new folder inside ${f.name}`) : "") +
               tree(f.id, depth + 1),
         )
         .join("");
+    /** A section with a header that folds it away (remembered on this device) and an optional add button. */
+    const section = (id: string, title: string, add: string, body: string): string => {
+      const closed = ui.closed.includes(id);
+      return `<section class="side-sec${closed ? " is-closed" : ""}" data-sec="${id}">
+        <div class="side-head"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
+        ${closed ? "" : body}</section>`;
+    };
+    const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.plus}</button>`);
+    const smartReady = !!(search.value.trim() || usageSel.value !== "all");
+    const scopeName = ((): string => {
+      if (scope === "all") return "All assets";
+      if (scope === "favorites") return "Favourites";
+      if (scope === "unfiled") return "Unfiled";
+      if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
+      if (scope.startsWith("smart:")) return listing!.smart.find((x) => `smart:${x.id}` === scope)?.name ?? "Smart folder";
+      if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
+      return "Library";
+    })();
+    side.dataset["open"] = String(sideOpen);
     side.innerHTML = `
-      <ul class="side-list">
-        ${item("all", "All assets", entries.length)}
-        ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length)}
-        ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length)}
-      </ul>
-      <div class="side-head"><h2>Folders</h2>${ro ? "" : `<button type="button" class="side-mini" data-folder-action="new" data-id="" data-testid="folder-new" aria-label="New folder">+ Folder</button>`}</div>
-      <ul class="side-list" data-testid="folder-tree">
-        ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-        ${tree(null, 0) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
-      </ul>
-      <div class="side-head"><h2>Smart folders</h2>${ro ? "" : `<button type="button" class="side-mini" data-smart-action="new" data-testid="smart-new" aria-label="Save the current search as a smart folder"${search.value.trim() || usageSel.value !== "all" ? "" : " disabled"}>+ Save search</button>`}</div>
-      <ul class="side-list" data-testid="smart-list">
-        ${naming?.kind === "new-smart" ? nameInput("", "Name of the new smart folder") : ""}
-        ${listing.smart
-          .map((sf) =>
-            naming?.kind === "rename-smart" && naming.id === sf.id
-              ? nameInput(sf.name, `New name for smart folder ${sf.name}`)
-              : item(
-                  `smart:${sf.id}`,
-                  esc(sf.name),
-                  entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage)).length,
-                  0,
-                  ro ? "" : `<button type="button" class="side-mini" data-smart-action="rename" data-id="${sf.id}" aria-label="Rename smart folder ${esc(sf.name)}">Rename</button>
-                   <button type="button" class="side-mini" data-smart-action="delete" data-id="${sf.id}" aria-label="Delete smart folder ${esc(sf.name)}">Delete</button>`,
-                ),
-          )
-          .join("") || (naming ? "" : `<li class="side-empty">Type a search, then save it here.</li>`)}
-      </ul>
-      <div class="side-head"><h2>Tags</h2></div>
-      <ul class="side-list" data-testid="tag-list">
-        ${[...tagCounts].sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([k, c]) =>
-            naming?.kind === "rename-tag" && naming.key === k
-              ? nameInput(c.label, `New name for tag ${c.label}`)
-              : item(
-                  `tag:${k}`,
-                  `#${esc(c.label)}`,
-                  c.n,
-                  0,
-                  ro ? "" : `<button type="button" class="side-mini" data-tag-action="rename" data-key="${esc(k)}" aria-label="Rename tag ${esc(c.label)}">Rename</button>
-                   <button type="button" class="side-mini" data-tag-action="delete" data-key="${esc(k)}" aria-label="Delete tag ${esc(c.label)}">Delete</button>`,
-                ),
-          )
-          .join("") || `<li class="side-empty">No tags yet.</li>`}
-      </ul>`;
+      <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.layers}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
+      <div class="side-body">
+        <ul class="side-list side-views">
+          ${item("all", "All assets", entries.length, { icon: ICONS.images })}
+          ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
+          ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
+        </ul>
+        ${section(
+          "folders",
+          "Folders",
+          addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
+          `<ul class="side-list" data-testid="folder-tree">
+            ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
+            ${tree(null, 0) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
+          </ul>`,
+        )}
+        ${section(
+          "smart",
+          "Smart folders",
+          addBtn('data-smart-action="new" data-testid="smart-new"', "Save the current search as a smart folder", smartReady ? "" : " disabled"),
+          `<ul class="side-list" data-testid="smart-list">
+            ${naming?.kind === "new-smart" ? nameInput("", "Name of the new smart folder") : ""}
+            ${listing.smart
+              .map((sf) =>
+                naming?.kind === "rename-smart" && naming.id === sf.id
+                  ? nameInput(sf.name, `New name for smart folder ${sf.name}`)
+                  : item(`smart:${sf.id}`, esc(sf.name), entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage)).length, {
+                      icon: ICONS.sparkles,
+                      extra: more("smart", sf.id, sf.name, [
+                        { attr: 'data-smart-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename smart folder ${sf.name}` },
+                        { attr: 'data-smart-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete smart folder ${sf.name}`, danger: true },
+                      ]),
+                    }),
+              )
+              .join("") || (naming ? "" : `<li class="side-empty">Search for something, then press + to keep it here.</li>`)}
+          </ul>`,
+        )}
+        ${section(
+          "tags",
+          "Tags",
+          "",
+          `<ul class="tag-cloud" data-testid="tag-list">
+            ${
+              [...tagCounts]
+                .sort((a, b) => a[1].label.localeCompare(b[1].label))
+                .map(([k, c]) =>
+                  naming?.kind === "rename-tag" && naming.key === k
+                    ? nameInput(c.label, `New name for tag ${c.label}`)
+                    : item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
+                        cls: "is-tag",
+                        extra: more("tag", k, c.label, [
+                          { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename tag ${c.label}` },
+                          { attr: 'data-tag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
+                        ]),
+                      }),
+                )
+                .join("") || `<li class="side-empty">No tags yet. Add them in the details.</li>`
+            }
+          </ul>`,
+        )}
+      </div>`;
+    // The menu floats over the page (the sidebar scrolls and would clip it), kept inside the window.
+    const pop = side.querySelector<HTMLElement>(".side-menu");
+    const anchor = side.querySelector<HTMLElement>('[data-side-more][aria-expanded="true"]');
+    if (pop && anchor) {
+      const r = anchor.getBoundingClientRect();
+      const w = pop.offsetWidth;
+      pop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
+      pop.style.top = `${Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 2)}px`;
+    }
     const input = side.querySelector<HTMLInputElement>(".side-name");
     if (input) {
       input.focus();
@@ -1278,6 +1342,30 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.hasAttribute("data-side-toggle")) {
+      sideOpen = !sideOpen;
+      renderSide();
+      return;
+    }
+    if (b.dataset["secToggle"]) {
+      const id = b.dataset["secToggle"];
+      ui.closed = ui.closed.includes(id) ? ui.closed.filter((x) => x !== id) : [...ui.closed, id];
+      saveUi();
+      renderSide();
+      return;
+    }
+    if (b.hasAttribute("data-side-more")) {
+      const kind = b.dataset["kind"] as "folder" | "smart" | "tag";
+      const id = b.dataset["id"]!;
+      sideMenu = sideMenu?.kind === kind && sideMenu.id === id ? null : { kind, id };
+      renderSide();
+      side.querySelector<HTMLElement>(sideMenu ? ".side-menu button" : `[data-side-more][data-id="${CSS.escape(id)}"]`)?.focus();
+      return;
+    }
+    if (b.getAttribute("role") === "menuitem") {
+      sideMenu = null; // an action was chosen: the menu closes
+      renderSide();
+    }
     if (b.dataset["tagAction"]) {
       const key = b.dataset["key"]!;
       const label = [...side.querySelectorAll<HTMLElement>(`[data-scope="tag:${CSS.escape(key)}"] .side-label`)][0]?.textContent?.replace(/^#/, "") ?? key;
@@ -1297,6 +1385,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["scope"]) {
       scope = b.dataset["scope"];
+      if (narrow.matches) sideOpen = false; // a choice on a small screen folds the list away
+      sideMenu = null;
       const sf = scope.startsWith("smart:") ? listing?.smart.find((x) => `smart:${x.id}` === scope) : undefined;
       if (sf) {
         search.value = sf.search;
@@ -1343,6 +1433,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
     }
   });
+  document.addEventListener("pointerdown", (e) => {
+    if (sideMenu && !(e.target as HTMLElement).closest?.(".side-menu, .side-more")) {
+      // Only the menu goes: re-drawing the list now would replace the very button being pressed and lose its click.
+      sideMenu = null;
+      side.querySelector(".side-menu")?.remove();
+      side.querySelector('[data-side-more][aria-expanded="true"]')?.setAttribute("aria-expanded", "false");
+    }
+  });
+  narrow.addEventListener("change", () => {
+    sideOpen = !narrow.matches;
+    renderSide();
+  });
   side.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
     if (!input.classList.contains("side-name") || !naming) return;
@@ -1381,7 +1483,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && (selected || picked.size)) {
+    if (e.key === "Escape" && sideMenu) {
+      const was = sideMenu;
+      sideMenu = null;
+      renderSide();
+      side.querySelector<HTMLElement>(`[data-side-more][data-id="${CSS.escape(was.id)}"]`)?.focus();
+      e.stopPropagation();
+    } else if (e.key === "Escape" && (selected || picked.size)) {
       void select(null);
       e.stopPropagation();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -1405,6 +1513,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (target?.closest?.("dialog, " + TYPING)) return;
     if (e.altKey) return;
     if (e.key === "Escape") {
+      if (sideMenu) {
+        sideMenu = null;
+        renderSide();
+        return;
+      }
       if (!colPop.hidden) return void closeColumns();
       cursor = null;
       if (!(selected || picked.size)) return;

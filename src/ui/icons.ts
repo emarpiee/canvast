@@ -18,6 +18,11 @@ import redo from "lucide-static/icons/redo-2.svg";
 import trash from "lucide-static/icons/trash-2.svg";
 import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
+import folderIcon from "lucide-static/icons/folder.svg";
+import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
+import folderXIcon from "lucide-static/icons/folder-x.svg";
+import sparklesIcon from "lucide-static/icons/sparkles.svg";
+import tagIcon from "lucide-static/icons/tag.svg";
 import minus from "lucide-static/icons/minus.svg";
 import infinity from "lucide-static/icons/infinity.svg";
 import images from "lucide-static/icons/images.svg";
@@ -124,6 +129,11 @@ export const ICONS = {
   trash: clean(trash),
   house: clean(house),
   plus: clean(plus),
+  folder: clean(folderIcon),
+  folderPlus: clean(folderPlusIcon),
+  folderX: clean(folderXIcon),
+  sparkles: clean(sparklesIcon),
+  tag: clean(tagIcon),
   minus: clean(minus),
   infinity: clean(infinity),
   images: clean(images),

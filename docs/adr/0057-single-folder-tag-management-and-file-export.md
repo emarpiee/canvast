@@ -13,3 +13,7 @@ Status: accepted (owner request, 2026-10-16)
 ## Tests
 
 `tests/unit/files-zip.test.ts` (names, kinds, collisions); `organize.spec.ts`: single folder, tag rename and delete (and smart folder following), details always shown, workspace menu export by kind and by folder and import into a fresh profile; `assets.spec.ts` "picking several" (Move all).
+
+## Amendment: sidebar redesign
+
+The Assets sidebar was a flat list with Rename/Delete text buttons beside every row (cluttered, and unusable on a phone). Now: icon rows for the three fixed views; sections (Folders, Smart folders, Tags) with a folding header (`ui.closed`, kept on this device) and a **+** icon; one **More** button per row opening a fixed-position labelled menu (kept inside the window; Escape closes only it; a press elsewhere removes only the menu so the press's own click is not lost); tags as wrapping chips; at 900 px and narrower the sidebar is a strip showing the current choice that opens on demand and folds after a choice.

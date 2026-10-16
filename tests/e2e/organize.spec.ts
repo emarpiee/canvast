@@ -41,8 +41,14 @@ async function addTags(p: Page, hash: string, text: string): Promise<void> {
   await p.getByTestId("asset-tag-input").press("Enter");
 }
 
+/** Open a sidebar row's More menu and choose one of its actions (the sidebar keeps one "more" button per row, not a row of buttons). */
+async function sideAct(p: Page, kind: "folder" | "smart folder" | "tag", name: string, action: string): Promise<void> {
+  await p.getByRole("button", { name: `More actions for ${kind} ${name}`, exact: true }).click();
+  await p.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
 async function newFolder(p: Page, name: string, parent?: string): Promise<void> {
-  if (parent) await p.getByRole("button", { name: `New folder inside ${parent}` }).click();
+  if (parent) await sideAct(p, "folder", parent, `New folder inside ${parent}`);
   else await p.getByTestId("folder-new").click();
   await p.getByTestId("folder-name-input").fill(name);
   await p.getByTestId("folder-name-input").press("Enter");
@@ -95,7 +101,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await smartItem.click();
   await expect(p.getByTestId("assets-search")).toHaveValue("#ref");
   await expect(cards(p)).toHaveCount(1);
-  await p.getByRole("button", { name: "Rename smart folder Refs" }).click();
+  await sideAct(p, "smart folder", "Refs", "Rename smart folder Refs");
   await p.getByTestId("folder-name-input").fill("Reference");
   await p.keyboard.press("Enter");
   await expect(smartItem).toHaveText(/Reference/);
@@ -115,7 +121,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
   await expect(p.getByTestId("smart-list")).toContainText("Reference");
-  await p.getByRole("button", { name: "Delete smart folder Reference" }).click();
+  await sideAct(p, "smart folder", "Reference", "Delete smart folder Reference");
   await expect(p.getByTestId("smart-list")).not.toContainText("Reference");
   expect(app.consoleErrors).toEqual([]);
 });
@@ -146,19 +152,19 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());
 
   // Rename.
-  await p.getByRole("button", { name: "Rename folder Hands" }).click();
+  await sideAct(p, "folder", "Hands", "Rename folder Hands");
   await p.getByTestId("folder-name-input").fill("Palms");
   await p.getByTestId("folder-name-input").press("Enter");
   await expect(side(p, /^Palms/)).toBeVisible();
   // An empty name is refused with a message, and nothing changes.
-  await p.getByRole("button", { name: "Rename folder Palms" }).click();
+  await sideAct(p, "folder", "Palms", "Rename folder Palms");
   await p.getByTestId("folder-name-input").fill("   ");
   await p.getByTestId("folder-name-input").press("Enter");
   await expect(p.getByTestId("assets-status")).toHaveText("A folder needs a name.");
   await expect(side(p, /^Palms/)).toBeVisible();
 
   // Delete Refs (with Palms inside): confirmed; both assets stay, now unfiled.
-  await p.getByRole("button", { name: "Delete folder Refs" }).click();
+  await sideAct(p, "folder", "Refs", "Delete folder Refs");
   await expect(p.getByTestId("confirm-dialog")).toContainText("stay in the library");
   await p.getByTestId("confirm-ok").click();
   await expect(p.getByTestId("folder-tree")).toContainText("No folders yet.");
@@ -241,7 +247,7 @@ test("tags can be renamed and deleted for the whole library; saved searches foll
   await p.getByTestId("folder-name-input").fill("Refs");
   await p.keyboard.press("Enter");
   // Rename: every asset that had it has the new name; renaming onto an existing tag merges.
-  await p.getByRole("button", { name: "Rename tag ref" }).click();
+  await sideAct(p, "tag", "ref", "Rename tag ref");
   await p.getByTestId("folder-name-input").fill("reference");
   await p.keyboard.press("Enter");
   await expect(tagRow("reference")).toContainText("2");
@@ -250,13 +256,13 @@ test("tags can be renamed and deleted for the whole library; saved searches foll
   await p.locator('[data-testid="smart-list"] .side-item').click();
   await expect(p.getByTestId("assets-search")).toHaveValue("#reference");
   await expect(cards(p)).toHaveCount(2);
-  await p.getByRole("button", { name: "Rename tag colour" }).click();
+  await sideAct(p, "tag", "colour", "Rename tag colour");
   await p.getByTestId("folder-name-input").fill("hands");
   await p.keyboard.press("Enter");
   await expect(tagRow("hands")).toContainText("2");
   await expect(tagRow("colour")).toHaveCount(0);
   // Delete: taken off every asset, the assets stay.
-  await p.getByRole("button", { name: "Delete tag hands" }).click();
+  await sideAct(p, "tag", "hands", "Delete tag hands");
   await expect(p.getByTestId("confirm-dialog")).toContainText("assets stay");
   await p.getByTestId("confirm-ok").click();
   await expect(tagRow("hands")).toHaveCount(0);
@@ -326,5 +332,43 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await expect(cards(q)).toHaveCount(2);
   await expect(q.getByTestId("folder-tree").getByRole("button", { name: /^Refs/ })).toHaveCount(1);
   await context.close();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("sidebar: one More menu per row (Escape closes only it, one click elsewhere still works), sections fold and are remembered, and on a phone the list is a strip that opens on demand", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await newFolder(p, "Refs");
+  await pick(p, HASH);
+  const more = p.getByRole("button", { name: "More actions for folder Refs", exact: true });
+  await more.click();
+  await expect(p.getByRole("menuitem")).toHaveCount(3); // New subfolder, Rename, Delete
+  await p.keyboard.press("Escape");
+  await expect(p.getByRole("menu")).toHaveCount(0);
+  await expect(card(p, HASH), "Escape closed the menu only").toHaveAttribute("aria-pressed", "true");
+  // With a menu open, one click on another row both closes it and does that row's action.
+  await more.click();
+  await side(p, /^Favourites/).click();
+  await expect(p.getByRole("menu")).toHaveCount(0);
+  await expect(side(p, /^Favourites/)).toHaveAttribute("aria-current", "true");
+  // A section folds away and stays folded over a reload.
+  await p.getByRole("button", { name: "Folders", exact: true }).click();
+  await expect(p.getByTestId("folder-tree")).toHaveCount(0);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("folder-tree")).toHaveCount(0);
+  await p.getByRole("button", { name: "Folders", exact: true }).click();
+  await expect(p.getByTestId("folder-tree")).toBeVisible();
+  // Small screen: a strip naming the current choice; opening it shows the lists; choosing folds it again.
+  await p.setViewportSize({ width: 390, height: 800 });
+  const strip = p.locator(".side-collapse");
+  await expect(strip).toBeVisible();
+  await expect(p.locator(".side-body")).toBeHidden();
+  await strip.click();
+  await expect(p.locator(".side-body")).toBeVisible();
+  await side(p, /^Unfiled/).click();
+  await expect(p.locator(".side-body")).toBeHidden();
+  await expect(strip).toContainText("Library: Unfiled");
   expect(app.consoleErrors).toEqual([]);
 });
