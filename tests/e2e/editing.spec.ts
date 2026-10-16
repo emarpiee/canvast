@@ -876,3 +876,23 @@ test("Alt after selecting another item focuses that item (the cycle goes on only
   }
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a selection being moved is drawn a little see-through, and back to its own opacity once released (ADR 0073)", async ({ app }) => {
+  const p = app.page;
+  await penStroke(app, [[300, 450], [500, 450]]);
+  await key(app, "v");
+  const px = (y: number) => p.evaluate((yy) => window.__canvastDebug.pixelAt(400, yy), y);
+  await p.mouse.move(400, 450);
+  await p.mouse.down();
+  await p.mouse.move(400, 510, { steps: 6 });
+  await app.frame();
+  const during = await px(510);
+  await p.mouse.up();
+  await app.frame();
+  const after = await px(510);
+  // The same screen spot: lighter against the background while dragging than once the stroke is committed there.
+  expect(Math.abs(during[0] - after[0]) + Math.abs(during[1] - after[1]) + Math.abs(during[2] - after[2])).toBeGreaterThan(20);
+  expect((await objects(app)).length).toBe(1); // and nothing about the stroke itself changed
+  expect(Number((await objects(app))[0]!["opacity"] ?? 1)).toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- A selection being moved, turned or stretched is drawn see-through (up to 200 objects; ADR 0073).
+
 - Stepping between items uses W A S D instead of Ctrl+Arrow; the four keys are rebindable in Settings > Shortcuts (ADR 0072).
 
 - The library search matches the canvas search: help, clear button, All/Name/Tag ways, recent searches; smart folders save the way (ADR 0071).

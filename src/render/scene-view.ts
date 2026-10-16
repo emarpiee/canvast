@@ -2,12 +2,16 @@ import type { Viewport } from "../core/camera";
 import type { FrameCamera } from "../core/frames";
 import type { DocumentStore } from "../doc/document-store";
 import type { EditorState } from "../app/editor-state";
-import type { ObjectId } from "../doc/model";
+import type { CanvasObject, ObjectId } from "../doc/model";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
 import { cellFrame, coverObject, projectEntry, projectObject } from "./projection";
 import { approxCoarse, classifyCoarse } from "./coarse";
+
+/** How see-through a moving selection looks, and the largest selection that gets it (above that, drawing it one by one would slow the drag). */
+export const GHOST_OPACITY = 0.6;
+export const GHOST_MAX = 200;
 
 export interface VisibleStats {
   levelsVisited: number;
@@ -67,8 +71,12 @@ export function visibleObjects(
   }
   for (const id of previewIds) {
     const o = doc.get(id);
-    const shown = o && editor!.previewed(o);
-    if (!shown) continue;
+    const moved = o && editor!.previewed(o);
+    if (!moved) continue;
+    // While an object is moved, turned or stretched it is shown a little see-through, so what is behind it stays readable (ADR 0073).
+    // Only the picture on screen: the committed object keeps its own opacity. A see-through stroke is drawn on its own, so a very large
+    // selection stays opaque: it would lose the batching that keeps a drag at full frame rate.
+    const shown = previewIds.size <= GHOST_MAX ? ({ ...moved, opacity: moved.opacity * GHOST_OPACITY } as CanvasObject) : moved;
     const cam = cameraIn(fc, shown.frame ?? doc.space.world);
     const po = cam && projectObject(shown, cam, vp);
     if (po) out.push(po);
