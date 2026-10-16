@@ -13,6 +13,7 @@ const ROWS: readonly { keys: string; does: string; example: string }[] = [
   { keys: "NOT · ! · -", does: "leave out", example: "cat -dog" },
   { keys: "( )", does: "group", example: "(red OR blue) cat" },
   { keys: '" "', does: "a phrase as typed", example: '"red cat"' },
+  { keys: ".ext", does: "a file type", example: ".png OR .jpg" },
 ];
 
 export function searchHelpButton(): string {

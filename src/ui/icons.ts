@@ -28,7 +28,6 @@ import chevronsUpDown from "lucide-static/icons/chevrons-up-down.svg";
 import folderIcon from "lucide-static/icons/folder.svg";
 import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
 import folderXIcon from "lucide-static/icons/folder-x.svg";
-import sparklesIcon from "lucide-static/icons/sparkles.svg";
 import leafIcon from "lucide-static/icons/leaf.svg";
 import imageDownIcon from "lucide-static/icons/image-down.svg";
 import externalLinkIcon from "lucide-static/icons/external-link.svg";
@@ -40,7 +39,6 @@ import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
 import splineIcon from "lucide-static/icons/spline.svg";
 import circleOffIcon from "lucide-static/icons/circle-off.svg";
 import circleHelpIcon from "lucide-static/icons/circle-help.svg";
-import listFilterPlusIcon from "lucide-static/icons/list-filter-plus.svg";
 import frameIcon from "lucide-static/icons/frame.svg";
 import squareStackIcon from "lucide-static/icons/square-stack.svg";
 import blocksIcon from "lucide-static/icons/blocks.svg";
@@ -174,7 +172,6 @@ export const ICONS = {
   folder: clean(folderIcon),
   folderPlus: clean(folderPlusIcon),
   folderX: clean(folderXIcon),
-  sparkles: clean(sparklesIcon),
   leaf: clean(leafIcon),
   imageDown: clean(imageDownIcon),
   externalLink: clean(externalLinkIcon),
@@ -186,7 +183,6 @@ export const ICONS = {
   spline: clean(splineIcon),
   circleOff: clean(circleOffIcon),
   circleHelp: clean(circleHelpIcon),
-  listFilterPlus: clean(listFilterPlusIcon),
   frame: clean(frameIcon),
   squareStack: clean(squareStackIcon),
   blocks: clean(blocksIcon),

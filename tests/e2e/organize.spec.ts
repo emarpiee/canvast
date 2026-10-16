@@ -42,7 +42,7 @@ async function addTags(p: Page, hash: string, text: string): Promise<void> {
 }
 
 /** Open a sidebar row's More menu and choose one of its actions (the sidebar keeps one "more" button per row, not a row of buttons). */
-async function sideAct(p: Page, kind: "folder" | "smart folder" | "tag", name: string, action: string): Promise<void> {
+async function sideAct(p: Page, kind: "folder" | "tag", name: string, action: string): Promise<void> {
   await p.getByRole("button", { name: `More actions for ${kind} ${name}`, exact: true }).click();
   await p.getByRole("menuitem", { name: action, exact: true }).click();
 }
@@ -134,23 +134,24 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await pop.getByRole("tab", { name: "All" }).click();
   await searchFor("", 2);
 
-  // A smart folder saves a search (ADR 0035): it counts its matches, applies them when clicked, and can be renamed.
-  await expect(p.getByTestId("smart-new")).toBeDisabled();
-  await searchFor("#ref", 1);
-  await p.getByTestId("smart-new").click();
-  await p.getByTestId("folder-name-input").fill("Refs");
-  await p.keyboard.press("Enter");
-  const smartItem = p.locator('[data-testid="smart-list"] .side-item');
-  await expect(smartItem).toHaveText(/Refs\s*1/);
-  await searchFor("", 2);
-  await smartItem.click();
-  await expect(p.getByTestId("assets-search")).toHaveValue("#ref");
+  // File types (ADR 0082): one chip per extension in the library, with its count; pressing one shows those files, pressing it again lets go.
+  const types = p.getByTestId("type-list");
+  await expect(types).toContainText(".PNG");
+  await expect(types.getByRole("button", { name: /^\.PNG/ })).toContainText("2");
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "robot.glb", mimeType: "model/gltf-binary", buffer: Buffer.from("glTF-demo-bytes") });
+  await expect(cards(p)).toHaveCount(3);
+  await expect(types.getByRole("button", { name: /^\.GLB/ })).toContainText("1");
+  await types.getByRole("button", { name: /^\.GLB/ }).click();
   await expect(cards(p)).toHaveCount(1);
-  await sideAct(p, "smart folder", "Refs", "Rename smart folder Refs");
-  await p.getByTestId("folder-name-input").fill("Reference");
-  await p.keyboard.press("Enter");
-  await expect(smartItem).toHaveText(/Reference/);
-  await searchFor("", 2);
+  await types.getByRole("button", { name: /^\.GLB/ }).click();
+  await expect(cards(p)).toHaveCount(3);
+  // A word that starts with a dot is a file type in the search, and combines like any other word.
+  await searchFor(".png", 2);
+  await searchFor(".glb", 1);
+  await searchFor(".png OR .glb", 3);
+  await searchFor(".png -#ref", 1);
+  await searchFor(".jpg", 0);
+  await searchFor("", 3);
 
   // Removing a tag.
   await card(p, HASH).click();
@@ -165,9 +166,6 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-tags")).toHaveText(/#Hands/);
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
-  await expect(p.getByTestId("smart-list")).toContainText("Reference");
-  await sideAct(p, "smart folder", "Reference", "Delete smart folder Reference");
-  await expect(p.getByTestId("smart-list")).not.toContainText("Reference");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -279,28 +277,22 @@ test("a read-only tab sees the writer's changes and cannot edit organization", a
   await p2.close();
 });
 
-test("tags can be renamed and deleted for the whole library; saved searches follow a rename (ADR 0057)", async ({ app }) => {
+test("tags can be renamed and deleted for the whole library (ADR 0057)", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);
   await addTags(p, HASH, "hands, ref");
   await addTags(p, GREEN_HASH, "ref, colour");
   const tagRow = (name: string) => p.getByTestId("tag-list").getByRole("button", { name: new RegExp(`^#${name}\\b`) });
   await expect(tagRow("ref")).toContainText("2");
-  // A smart folder that searches the tag.
-  await p.getByTestId("assets-search").fill("#ref");
-  await p.getByTestId("smart-new").click();
-  await p.getByTestId("folder-name-input").fill("Refs");
-  await p.keyboard.press("Enter");
   // Rename: every asset that had it has the new name; renaming onto an existing tag merges.
   await sideAct(p, "tag", "ref", "Rename tag ref");
   await p.getByTestId("folder-name-input").fill("reference");
   await p.keyboard.press("Enter");
   await expect(tagRow("reference")).toContainText("2");
   await expect(tagRow("ref")).toHaveCount(0);
-  await p.getByTestId("assets-search").fill("");
-  await p.locator('[data-testid="smart-list"] .side-item').click();
-  await expect(p.getByTestId("assets-search")).toHaveValue("#reference");
+  await p.getByTestId("assets-search").fill("#reference");
   await expect(cards(p)).toHaveCount(2);
+  await p.getByTestId("assets-search").fill("");
   await sideAct(p, "tag", "colour", "Rename tag colour");
   await p.getByTestId("folder-name-input").fill("hands");
   await p.keyboard.press("Enter");

@@ -61,7 +61,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `layout-grid` | Thumbnails |
 | `layout-list` | List |
 | `leaf` | Zen mode |
-| `list-filter-plus` | Save the current search as a smart folder |
 | `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
 | `library` | Show in the library (selection bar) |
 | `lock` | Lock thickness |

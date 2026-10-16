@@ -98,7 +98,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const hay = `${lab.text} ${groupName} ${noteOf(o)}`.toLowerCase();
           const tagHit = (w: string): boolean => own.some((x) => x.toLowerCase().includes(w));
           const exact = (w: string): boolean => own.some((x) => x.toLowerCase() === w);
-          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? exact(term.text.slice(1)) : hay.includes(term.text) || tagHit(term.text)))) continue;
+          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? exact(term.text.slice(1)) : term.text.length > 1 && term.text.startsWith(".") ? lab.text.toLowerCase().endsWith(term.text) : hay.includes(term.text) || tagHit(term.text)))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: own.length ? own.map((x) => `#${x}`).join(" ") : noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else if (mode === "tag") {
           // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
@@ -112,7 +112,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
         } else {
           const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
           const hay = `${lab.text} ${groupName}`.toLowerCase();
-          if (!evalQuery(q, (t) => hay.includes(t.text))) continue;
+          if (!evalQuery(q, (t) => (t.text.length > 1 && t.text.startsWith(".") ? lab.text.toLowerCase().endsWith(t.text) : hay.includes(t.text)))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         }
         if (out.length >= MAX_RESULTS) break;

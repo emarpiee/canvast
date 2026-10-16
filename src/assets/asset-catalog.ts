@@ -102,18 +102,6 @@ export function folderPath(folders: readonly AssetFolder[], id: string): string[
 }
 
 const FOLDERS_KEY = "assetFolders";
-const SMART_KEY = "assetSmartFolders";
-
-/** A saved search of the library (ADR 0035): the words typed in the search box and the usage filter. */
-export interface SmartFolder {
-  id: string;
-  name: string;
-  search: string;
-  usage: "all" | "used" | "unused";
-  /** The way of the search (ADR 0071); absent = all (name, type, hash and tags). */
-  way?: "name" | "tag";
-}
-const MAX_SEARCH = 200;
 
 export interface Usage {
   /** Stored image instances that reference the asset, across all canvases. */
@@ -130,7 +118,6 @@ export interface CatalogListing {
   /** Entries deleted by the user but still retained (needed by undo history). */
   pendingDeletion: number;
   folders: AssetFolder[];
-  smart: SmartFolder[];
 }
 
 export interface AssetLocation {
@@ -204,6 +191,7 @@ export class AssetCatalog {
     const KEY = "thumbVersion";
     const tx = this.db.transaction(["meta", "thumbs", "assetCatalog"], "readwrite");
     const committed = done(tx);
+    tx.objectStore("meta").delete("assetSmartFolders"); // smart folders were removed (ADR 0082)
     const v = await req(tx.objectStore("meta").get(KEY) as IDBRequest<number | undefined>);
     if ((v ?? 1) < 2) {
       const ok = /^(image\/(png|jpeg|webp|gif|avif|bmp)|video\/|audio\/)/;
@@ -251,7 +239,6 @@ export class AssetCatalog {
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: entries.filter((e) => e.state === "deleted").length,
       folders,
-      smart: ((await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
     };
   }
 
@@ -296,19 +283,13 @@ export class AssetCatalog {
     const [target] = normalizeTags([to]);
     if (!target) throw new CatalogInputError("a tag needs a name");
     const key = from.toLowerCase();
-    return this.write(["assetCatalog", "meta"], async (tx) => {
+    return this.write(["assetCatalog"], async (tx) => {
       const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
       let n = 0;
       for (const e of all) {
         if (e.state !== "active" || !(e.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
         tx.objectStore("assetCatalog").put({ ...e, tags: normalizeTags((e.tags ?? []).map((t) => (t.toLowerCase() === key ? target : t))) });
         n++;
-      }
-      const smart = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
-      const word = new RegExp(`(^|[\\s(!&|^-])#${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=[\\s)&|^]|$)`, "gi");
-      if (smart.some((x) => word.test(x.search))) {
-        word.lastIndex = 0;
-        tx.objectStore("meta").put(smart.map((x) => ({ ...x, search: x.search.replace(word, `$1#${target}`) })), SMART_KEY);
       }
       return n;
     });
@@ -329,29 +310,6 @@ export class AssetCatalog {
     });
   }
 
-  async saveSmart(id: string, name: string, search: string, usage: SmartFolder["usage"], way?: SmartFolder["way"]): Promise<void> {
-    await this.write(["meta"], async (tx) => {
-      const all = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
-      if (search.length > MAX_SEARCH) throw new CatalogInputError(`a saved search can be at most ${MAX_SEARCH} characters`);
-      if (!search.trim() && usage === "all") throw new CatalogInputError("a saved search needs a search or a usage filter");
-      tx.objectStore("meta").put([...all, { id, name: folderName(name), search: search.trim(), usage, ...(way ? { way } : {}) }], SMART_KEY);
-    });
-  }
-  async renameSmart(id: string, name: string): Promise<void> {
-    await this.write(["meta"], async (tx) => {
-      const all = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
-      const s = all.find((x) => x.id === id);
-      if (!s) throw new CatalogInputError("that smart folder no longer exists");
-      s.name = folderName(name);
-      tx.objectStore("meta").put(all, SMART_KEY);
-    });
-  }
-  async deleteSmart(id: string): Promise<void> {
-    await this.write(["meta"], async (tx) => {
-      const all = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
-      tx.objectStore("meta").put(all.filter((x) => x.id !== id), SMART_KEY);
-    });
-  }
   async createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder> {
     return this.write(["meta"], async (tx) => {
       const folders = await this.readFolders(tx);

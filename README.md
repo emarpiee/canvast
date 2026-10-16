@@ -9,7 +9,7 @@ or network connection.
 > **Status: v0.17.0, UI polish after Phase 7 (professional UX).** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
 > Canvases model with safe incremental saving, a shared Assets library with
-> tags, folders and smart folders, `.canvast` archives and plain ZIP export,
+> tags, folders and file types, `.canvast` archives and plain ZIP export,
 > text, groups, hide and lock, snapping, rotation, four pens, videos, audio
 > and GIFs with an on-canvas player, a Settings view, accessibility options and
 > search with AND, OR, XOR and NOT. **Not done:** non-destructive editing
@@ -240,7 +240,7 @@ or network connection.
 | Step to the next item | `W` `A` `S` `D` (rebind in Settings > Shortcuts; Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
 | Bring the selection into view | `Alt` pressed and released alone; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
 | Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
-| Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library, smart folders and canvas search; ADR 0069) |
+| Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library and canvas search; ADR 0069) · `.png` a file type (ADR 0082) |
 | Select several layers | `Ctrl`+click toggles · `Shift`+click selects a range · `Ctrl+Shift`+click adds a range |
 | Viewer (Assets) | `F` shows or hides the controls · arrows or edge clicks move between pictures · wheel zooms · drag pans |
 | Row actions | the ⋯ button on a bookmark, folder, tag or navigator row opens a menu (Up/Down/Home/End, `Esc` closes) |

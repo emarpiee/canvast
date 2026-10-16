@@ -1,6 +1,6 @@
 import type { Session, AssetPlace } from "../app/session";
 import { storeFrame } from "../app/frames";
-import { chipOf, describeFile, isCard } from "../assets/file-kind";
+import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
 import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "../assets/card";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
@@ -265,11 +265,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
   let assetCanvasTags: string[] = [];
   /** The row whose "more" menu is open in the sidebar. */
-  let sideMenu: { kind: "folder" | "smart" | "tag" | "ctag"; id: string } | null = null;
+  let sideMenu: { kind: "folder" | "tag" | "ctag"; id: string } | null = null;
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
 
   // ---- thumbnails: generated lazily from the stored original, kept in memory only
@@ -864,13 +864,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const searchWords = (q: string): Query | null => parseQuery(q).query;
   /**
    * The search (ADR 0069, 0071): a word matches the name, type, start of the hash or a tag (All), only the name (Name) or only the tags (Tag);
-   * `#tag` is an exact tag in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter: what a smart folder saves.
+   * `#tag` is an exact tag and `.png` an exact file type, in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter.
    */
   const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter, how: Way = way): boolean => {
     const tags = meta(e).tags.map((t) => t.toLowerCase());
     const name = e.name.toLowerCase();
     const words_ok = evalQuery(query, ({ text: w }) => {
       if (w.startsWith("#")) return tags.includes(w.slice(1));
+      // `.png` is the file type: a word that starts with a dot matches files with that extension (a lone dot: files that have one).
+      if (w.startsWith(".")) return w.length > 1 ? chipOf(e.name, e.type).toLowerCase() === w.slice(1) : extOf(e.name) !== "";
       const inTags = tags.some((t) => t.includes(w));
       if (how === "tag") return inTags;
       if (how === "name") return name.includes(w);
@@ -889,6 +891,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope === "favorites") return m.favorite;
       if (scope === "unfiled") return m.folderIds.length === 0;
       if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
+      if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
       if (scope.startsWith("tag:")) return m.tags.some((t) => t.toLowerCase() === scope.slice(4));
       if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
       return true;
@@ -908,7 +911,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- rendering
   let lastGridHtml = "";
   const render = (): void => {
-    root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value; // set by a smart folder too
+    root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
     if (!listing) return;
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
@@ -993,10 +996,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (c) c.n++;
       else tagCounts.set(k, { label: t, n: 1 });
     }
+    // The file types in the workspace: one chip per extension, with how many files have it.
+    const typeCounts = new Map<string, number>();
+    for (const e of entries) {
+      const k = chipOf(e.name, e.type).toLowerCase();
+      typeCounts.set(k, (typeCounts.get(k) ?? 0) + 1);
+    }
     const ro = session.readOnly;
-    const kindWord = { folder: "folder", smart: "smart folder", tag: "tag", ctag: "canvas tag" } as const;
+    const kindWord = { folder: "folder", tag: "tag", ctag: "canvas tag" } as const;
     /** A row's "more" button and, when open, its labelled menu (Rename, Delete and so on): one button instead of a row of them. */
-    const more = (kind: "folder" | "smart" | "tag" | "ctag", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
+    const more = (kind: "folder" | "tag" | "ctag", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
       if (ro) return "";
       const open = sideMenu?.kind === kind && sideMenu.id === id;
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>${
@@ -1042,14 +1051,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="side-head"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
         ${closed ? "" : body}</section>`;
     };
-    const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${/smart/i.test(label) ? ICONS.listFilterPlus : ICONS.folderPlus}</button>`);
-    const smartReady = !!(search.value.trim() || usageSel.value !== "all");
+    const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
     const scopeName = ((): string => {
       if (scope === "all") return "All assets";
       if (scope === "favorites") return "Favourites";
       if (scope === "unfiled") return "Unfiled";
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
-      if (scope.startsWith("smart:")) return listing!.smart.find((x) => `smart:${x.id}` === scope)?.name ?? "Smart folder";
+      if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
       if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
       if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
       return "Library";
@@ -1073,24 +1081,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </ul>`,
         )}
         ${section(
-          "smart",
-          "Smart folders",
-          addBtn('data-smart-action="new" data-testid="smart-new"', "Save the current search as a smart folder", smartReady ? "" : " disabled"),
-          `<ul class="side-list" data-testid="smart-list">
-            ${naming?.kind === "new-smart" ? nameInput("", "Name of the new smart folder") : ""}
-            ${listing.smart
-              .map((sf) =>
-                naming?.kind === "rename-smart" && naming.id === sf.id
-                  ? nameInput(sf.name, `New name for smart folder ${sf.name}`)
-                  : item(`smart:${sf.id}`, esc(sf.name), entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage, sf.way ?? "all")).length, {
-                      icon: ICONS.sparkles,
-                      extra: more("smart", sf.id, sf.name, [
-                        { attr: 'data-smart-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename smart folder ${sf.name}` },
-                        { attr: 'data-smart-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete smart folder ${sf.name}`, danger: true },
-                      ]),
-                    }),
-              )
-              .join("") || (naming ? "" : `<li class="side-empty">Search for something, then press + to keep it here.</li>`)}
+          "types",
+          "File types",
+          "",
+          `<ul class="tag-cloud type-cloud" data-testid="type-list">
+            ${
+              [...typeCounts]
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .map(([k, n]) => item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them" `))
+                .join("") || `<li class="side-empty">No files yet.</li>`
+            }
           </ul>`,
         )}
         ${section(
@@ -1756,7 +1756,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.hasAttribute("data-side-more")) {
-      const kind = b.dataset["kind"] as "folder" | "smart" | "tag" | "ctag";
+      const kind = b.dataset["kind"] as "folder" | "tag" | "ctag";
       const id = b.dataset["id"]!;
       sideMenu = sideMenu?.kind === kind && sideMenu.id === id ? null : { kind, id };
       renderSide();
@@ -1803,13 +1803,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.dataset["scope"]) {
-      // Choosing the one already chosen lets go of it (back to all assets); a smart folder takes its search with it.
+      // Choosing the one already chosen lets go of it (back to all assets).
       const next = b.dataset["scope"];
       if (next === scope && next !== "all") {
-        if (next.startsWith("smart:")) {
-          search.value = "";
-          usageSel.value = "all";
-        }
         scope = "all";
         sideMenu = null;
         render();
@@ -1818,31 +1814,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       scope = next;
       if (narrow.matches) sideOpen = false; // a choice on a small screen folds the list away
       sideMenu = null;
-      const sf = scope.startsWith("smart:") ? listing?.smart.find((x) => `smart:${x.id}` === scope) : undefined;
-      if (sf) {
-        setWay(sf.way ?? "all");
-        search.value = sf.search;
-        usageSel.value = sf.usage;
-      }
       render();
       return;
     }
     const id = b.dataset["id"] ?? "";
-    switch (b.dataset["smartAction"]) {
-      case "new":
-        naming = { kind: "new-smart" };
-        renderSide();
-        return;
-      case "rename":
-        naming = { kind: "rename-smart", id };
-        renderSide();
-        return;
-      case "delete":
-        void session.organize((c) => c.deleteSmart(id)).then(() => {
-          if (scope === `smart:${id}`) scope = "all";
-        });
-        return;
-    }
     const f = listing?.folders.find((x) => x.id === id);
     switch (b.dataset["folderAction"]) {
       case "new":
@@ -1902,17 +1877,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if (changed && scope === `ctag:${n.key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
           renderSide();
         });
-      } else if (n.kind === "new-smart") {
-        const id = newObjectId();
-        const q = search.value;
-        const u = usageSel.value as UsageFilter;
-        const w = way === "all" ? undefined : way;
-        void session.organize((c) => c.saveSmart(id, name, q, u, w)).then((ok) => {
-          if (ok) scope = `smart:${id}`;
-          else renderSide();
-        });
-      } else if (n.kind === "rename-smart") void session.organize((c) => c.renameSmart(n.id, name)).then(() => renderSide());
-      else if (n.kind === "new") {
+      } else if (n.kind === "new") {
         const id = newObjectId();
         void session.organize((c) => c.createFolder(name, n.parent, id)).then((ok) => {
           if (!ok) renderSide();
@@ -2118,7 +2083,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (search.value.trim() && filtered().length) rememberSearch(ASSETS_RECENT, search.value, way);
   };
   const searchChanged = (): void => {
-    if (scope.startsWith("smart:")) scope = "all"; // the query is no longer the saved one
     paintSearchUi();
     render();
   };
@@ -2168,7 +2132,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   grid.addEventListener("click", rememberNow);
   for (const el of [search, usageSel, sortSel]) {
     el.addEventListener("input", () => {
-      if (el !== sortSel && scope.startsWith("smart:")) scope = "all"; // the query is no longer the saved one
       render();
     });
   }

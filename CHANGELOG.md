@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Smart folders are removed. The Assets sidebar has **File types** instead: a chip per extension in the library with its count (press one to show those files). A word starting with a dot searches by file type (`.png`, `.png OR .glb`) in the library and canvas searches (ADR 0082).
+
 - Screenshot button and Settings > Screenshot: WebP (or PNG, JPEG) saved to the library's Screenshots folder, named board-canvas-date-time, with options for the pattern, a transparent background, the interface, the area, tags, folder, name template and the clipboard (ADR 0080).
 - The extension chip on library cards shows only while a card is pointed at, focused or picked, at the top right. An SVG shows its real picture again (a stored thumbnail made by the previous build is dropped once). Opening the Assets view no longer puts the focus in the search box; only Ctrl+Shift+F does.
 

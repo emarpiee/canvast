@@ -1447,6 +1447,11 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(2);
   await box.fill("png -sky");
   await expect(results.getByRole("option")).toHaveCount(1);
+  // A word that starts with a dot is a file type here too (ADR 0082).
+  await box.fill(".png");
+  await expect(results.getByRole("option")).toHaveCount(2);
+  await box.fill(".jpg");
+  await expect(results.getByRole("option")).toHaveCount(0);
   await box.fill("bookmark");
   await expect(results.getByRole("option", { name: /Bookmark 1/ })).toBeVisible();
   // Check boxes: the checked results are the canvas selection; the search stays open and nothing moves.
