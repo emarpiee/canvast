@@ -1372,7 +1372,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(1);
   await expect(results.getByRole("option", { name: /blocks\.png/ })).toBeVisible();
   await p.keyboard.press("Enter");
-  await expect(box).toBeHidden();
+  await expect(box).toBeVisible(); // choosing a result does not close the search; Escape or a press outside does
   expect(await selection()).toEqual([id]);
   // "#": by tag; only the tagged picture matches, and a tag nobody has finds nothing.
   await p.keyboard.press("Escape");
@@ -1386,10 +1386,10 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await box.fill("/.png");
   await expect(box).toHaveValue(".png");
   await expect(results.getByRole("option")).toHaveCount(2);
-  await p.keyboard.press("Shift+Enter");
+  await p.keyboard.press("Shift+Enter"); // checks every result
   expect((await selection()).length).toBe(2);
+  await expect(box).toBeVisible();
   // AND, OR, XOR, NOT work here too (ADR 0069): by name, and over a picture's whole tag list.
-  await p.keyboard.press("/");
   await box.fill("/blocks OR green");
   await expect(results.getByRole("option")).toHaveCount(2);
   await box.fill("/.png -green");
@@ -1407,6 +1407,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(0);
   // "@": bookmarks. Save one, move away, and go back by name.
   await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await expect(box).toBeHidden(); // a press outside closes it
   await p.getByRole("button", { name: "Add bookmark" }).click();
   await expect(p.getByTestId("bookmarks-panel")).toContainText("Bookmark 1");
   const at = await p.evaluate(() => window.__canvastDebug.camera());
@@ -1423,7 +1424,9 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(at);
   // The dock button opens it too, and the box never lets its keys reach the canvas (a "p" does not pick the pen).
   await p.getByRole("button", { name: "Search the canvas" }).click();
-  // It starts on All: names, tags, groups and bookmarks together, and the words combine across them (ADR 0069).
+  await expect(box).toHaveValue("mark"); // the last search is kept until the person clears it
+  await results.getByRole("tab", { name: "All" }).click();
+  // The All way: names, tags, groups and bookmarks together, and the words combine across them (ADR 0069).
   await expect(results.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
   await box.fill("sky");
   await expect(results.getByRole("option")).toHaveCount(1); // the tag
@@ -1436,7 +1439,38 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(1);
   await box.fill("bookmark");
   await expect(results.getByRole("option", { name: /Bookmark 1/ })).toBeVisible();
+  // Check boxes: the checked results are the canvas selection; the search stays open and nothing moves.
+  await box.fill(".png");
+  const rows = results.getByRole("option");
+  await results.getByLabel("Select all shown").setChecked(false); // an earlier step left them selected
+  expect((await selection()).length).toBe(0);
+  await rows.nth(0).getByRole("checkbox").check();
+  expect((await selection()).length).toBe(1);
+  await rows.nth(1).getByRole("checkbox").check();
+  expect((await selection()).length).toBe(2);
+  await expect(results).toContainText("2 selected");
+  await results.getByLabel("Select all shown").uncheck();
+  expect((await selection()).length).toBe(0);
+  await expect(box).toBeVisible();
+  // Searches that found something and were used are remembered, and can be reused, removed or cleared.
   await box.fill("");
+  const recent = p.getByTestId("search-recent");
+  await expect(recent).toContainText(".png");
+  await recent.getByRole("button", { name: ".png", exact: true }).click();
+  await expect(box).toHaveValue(".png");
+  await box.fill("nothing-here-at-all");
+  await box.fill("");
+  await expect(recent).not.toContainText("nothing-here-at-all"); // a search that found nothing is not kept
+  const chips = recent.locator(".cs-chip");
+  const had = await chips.count(); // the same words are kept once per way (All, Name)
+  await recent.getByRole("button", { name: /^Remove .png from recent/ }).first().click();
+  await expect(chips).toHaveCount(had - 1);
+  await box.fill("blocks");
+  await rows.first().getByRole("checkbox").check();
+  await results.getByRole("button", { name: "Clear the search" }).click();
+  await expect(box).toHaveValue("");
+  await recent.getByRole("button", { name: "Clear recent" }).click();
+  await expect(recent).toBeHidden();
   await p.keyboard.press("p");
   expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");
   await p.keyboard.press("Escape");

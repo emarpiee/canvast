@@ -1762,3 +1762,23 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .search-help p { margin: var(--sp-3) 0 0; color: var(--hud-muted); font-size: var(--text-xs); }
 .layers-tags .tag-chip .tag-chip-name { width: auto; height: 18px; padding: 0 var(--sp-1); font: inherit; border-radius: var(--r-pill); }
 .layers-tags .tag-chip .tag-chip-name:hover { background: var(--hud-hover); }
+
+/* Canvas search: checkboxes, recent searches, clear button (ADR 0071). */
+.cs-check { flex: none; width: var(--icon-md); height: var(--icon-md); margin: 0; accent-color: var(--hud-accent); cursor: pointer; }
+.cs-clear { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.cs-clear:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.cs-clear[hidden] { display: none; }
+.cs-clear svg { width: var(--icon-md); height: var(--icon-md); }
+.cs-recent { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--hud-border); }
+.cs-recent[hidden], .cs-bar[hidden] { display: none; }
+.cs-recent-title { color: var(--hud-muted); font-size: var(--text-xs); padding-right: var(--sp-2); }
+.cs-chip { display: inline-flex; align-items: center; max-width: 100%; background: var(--hud-hover); border-radius: var(--r-pill); }
+.cs-chip button, .cs-clear-all { font: inherit; font-size: var(--text-sm); color: inherit; background: transparent; border: 0; cursor: pointer; }
+.cs-chip button:first-child { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-4); border-radius: var(--r-pill); }
+.cs-chip button:last-child { width: var(--icon-xl); height: var(--icon-xl); color: var(--hud-muted); border-radius: 50%; }
+.cs-chip button:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.cs-clear-all { color: var(--hud-muted); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-pill); }
+.cs-clear-all:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.cs-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); padding: var(--sp-3) var(--sp-6); color: var(--hud-muted); border-bottom: 1px solid var(--hud-border); }
+.cs-bar label { display: inline-flex; align-items: center; gap: var(--sp-4); cursor: pointer; }
+.cs-row[aria-selected="true"] { background: var(--hud-hover); }

@@ -46,15 +46,17 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.setAttribute("aria-label", "Search the canvas");
   root.hidden = true;
   root.innerHTML = `
-    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false">${searchHelpButton()}</div>
+    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>${searchHelpButton()}</div>
     <div class="cs-modes" role="tablist" aria-label="Search by">
       <button type="button" role="tab" data-m="all">All</button>
       <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
       <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
       <button type="button" role="tab" data-m="bookmark"><kbd>@</kbd>Bookmark</button>
     </div>
-    <ul id="cs-list" role="listbox" aria-label="Results"></ul>
-    <p class="cs-hint"><kbd>Enter</kbd> go to it · <kbd>Shift+Enter</kbd> select all · <kbd>Esc</kbd> close</p>`;
+    <div class="cs-recent" data-testid="search-recent" hidden></div>
+    <div class="cs-bar" hidden><label><input type="checkbox" class="cs-check" data-all> <span>Select all shown</span></label><span class="cs-count" aria-live="polite"></span></div>
+    <ul id="cs-list" role="listbox" aria-label="Results" aria-multiselectable="true"></ul>
+    <p class="cs-hint"><kbd>Enter</kbd> go to it · <kbd>Ctrl+Enter</kbd> check · <kbd>Shift+Enter</kbd> check all · <kbd>Esc</kbd> close</p>`;
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");
@@ -125,10 +127,64 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   };
   const noteOf = (o: CanvasObject): string => (o.kind === "image" ? "Picture" : o.kind === "text" ? "Text" : "Stroke") + (o.groups?.length ? " · in a group" : "");
 
+  const clearBtn = root.querySelector<HTMLButtonElement>(".cs-clear")!;
+  const recentBox = root.querySelector<HTMLElement>(".cs-recent")!;
+  const bar = root.querySelector<HTMLElement>(".cs-bar")!;
+  const allBox = bar.querySelector<HTMLInputElement>("[data-all]")!;
+  const count = bar.querySelector<HTMLElement>(".cs-count")!;
+
+  // Recent successful searches (ADR 0071): kept on this device, only those that found something and were used.
+  const HISTORY_KEY = "canvast.search.recent";
+  const MAX_HISTORY = 12;
+  const PREFIX: Record<Mode, string> = { all: "", name: "/ ", tag: "# ", bookmark: "@ " };
+  type Recent = { q: string; m: Mode };
+  const loadHistory = (): Recent[] => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]") as unknown;
+      return Array.isArray(raw) ? (raw as Recent[]).filter((r) => r && typeof r.q === "string" && ["all", "name", "tag", "bookmark"].includes(r.m)).slice(0, MAX_HISTORY) : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveHistory = (h: Recent[]): void => {
+    try {
+      if (h.length) localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+      else localStorage.removeItem(HISTORY_KEY);
+    } catch {
+      // storage unavailable: history is a convenience
+    }
+  };
+  /** Remember the current search; called when the person acts on a result, never for an empty or fruitless search. */
+  const remember = (): void => {
+    const q = input.value.trim();
+    if (!q || !results.length) return;
+    saveHistory([{ q, m: mode }, ...loadHistory().filter((r) => !(r.q === q && r.m === mode))].slice(0, MAX_HISTORY));
+  };
+
+  const idsOf = (r: Result): string[] => r.ids ?? [];
+  const isChecked = (r: Result): boolean => idsOf(r).length > 0 && idsOf(r).every((id) => deps.editor.selection.has(id));
+
+  const paintRecent = (): void => {
+    const h = input.value.trim() ? [] : loadHistory();
+    recentBox.hidden = !h.length;
+    recentBox.innerHTML = h.length
+      ? `<span class="cs-recent-title">Recent</span>${h
+          .map((r, i) => `<span class="cs-chip"><button type="button" data-recent="${i}" title="Search again">${esc(PREFIX[r.m] + r.q)}</button><button type="button" data-forget="${i}" aria-label="Remove ${esc(r.q)} from recent searches" title="Remove">×</button></span>`)
+          .join("")}<button type="button" class="cs-clear-all" data-forget-all>Clear recent</button>`
+      : "";
+  };
+
   const paint = (): void => {
+    clearBtn.hidden = !input.value;
+    paintRecent();
+    const pickable = results.filter((r) => idsOf(r).length);
+    bar.hidden = !pickable.length;
+    allBox.checked = pickable.length > 0 && pickable.every(isChecked);
+    allBox.indeterminate = !allBox.checked && pickable.some(isChecked);
+    count.textContent = deps.editor.selection.size ? `${deps.editor.selection.size} selected` : "";
     list.innerHTML = results.length
       ? results
-          .map((r, i) => `<li role="option" id="cs-${i}" data-i="${i}" aria-selected="${i === active}" class="cs-row${i === active ? " is-active" : ""}"><span class="cs-icon">${r.icon}</span><span class="cs-label">${esc(r.label)}</span><span class="cs-note">${esc(r.note)}</span></li>`)
+          .map((r, i) => `<li role="option" id="cs-${i}" data-i="${i}" aria-selected="${isChecked(r)}" class="cs-row${i === active ? " is-active" : ""}">${idsOf(r).length ? `<input type="checkbox" class="cs-check" tabindex="-1" data-check aria-label="Select ${esc(r.label)}"${isChecked(r) ? " checked" : ""}>` : ""}<span class="cs-icon">${r.icon}</span><span class="cs-label">${esc(r.label)}</span><span class="cs-note">${esc(r.note)}</span></li>`)
           .join("")
       : `<li class="cs-empty" role="presentation">${input.value.trim() ? "Nothing matches." : EMPTY[mode]}</li>`;
     if (results.length) input.setAttribute("aria-activedescendant", `cs-${active}`);
@@ -142,19 +198,39 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     root.hidden = true;
     token++;
   };
-  const go = (r: Result | undefined, all = false): void => {
+  /** Go to a result: select just it and bring it into view. The search stays open (it closes only on a press outside or Escape). */
+  const go = (r: Result | undefined): void => {
     if (!r) return;
+    remember();
     if (r.bookmark) {
       deps.bookmarks.go(r.bookmark);
-      close();
+      paint();
       return;
     }
-    const picked = all ? results.flatMap((x) => x.ids ?? []) : (r.ids ?? []);
+    const picked = idsOf(r);
     if (!picked.length) return;
-    deps.editor.entered = all ? [] : (r.entered ?? []);
+    deps.editor.entered = r.entered ?? [];
     deps.editor.select(picked);
     deps.focus(picked);
-    close();
+    paint();
+  };
+  /** Check or uncheck results: the checked results are the canvas selection, so a box adds or takes off one item and nothing moves. */
+  const toggle = (rs: readonly Result[], on: boolean): void => {
+    const ids = rs.flatMap(idsOf);
+    if (!ids.length) return;
+    const now = new Set(deps.editor.selection);
+    for (const id of ids) on ? now.add(id) : now.delete(id);
+    deps.editor.entered = [];
+    deps.editor.select(now);
+    if (on) remember();
+    paint();
+  };
+  /** Bring everything checked into view. */
+  const showChecked = (): void => {
+    const ids = [...deps.editor.selection];
+    if (!ids.length) return;
+    remember();
+    deps.focus(ids);
   };
 
   input.addEventListener("input", () => {
@@ -185,7 +261,14 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       paint();
       e.preventDefault();
     } else if (e.key === "Enter") {
-      go(results[active], e.shiftKey);
+      if (e.shiftKey) {
+        toggle(results, true); // check every result
+        showChecked();
+      } else if (e.ctrlKey || e.metaKey) {
+        const r = results[active];
+        if (r) toggle([r], !isChecked(r));
+      } else if (deps.editor.selection.size > 1 && results.some(isChecked)) showChecked();
+      else go(results[active]);
       e.preventDefault();
     } else if (e.key === "Backspace" && !input.value && mode !== "all") {
       setMode("all"); // nothing left to delete: back to searching everything
@@ -196,7 +279,46 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   });
   list.addEventListener("click", (e) => {
     const li = (e.target as HTMLElement).closest<HTMLElement>("[data-i]");
-    if (li) go(results[Number(li.dataset["i"])]);
+    if (!li) return;
+    const r = results[Number(li.dataset["i"])];
+    active = Number(li.dataset["i"]);
+    if ((e.target as HTMLElement).closest("[data-check]")) {
+      if (r) toggle([r], !isChecked(r));
+    } else go(r);
+    input.focus();
+  });
+  allBox.addEventListener("change", () => {
+    toggle(results, allBox.checked);
+    input.focus();
+  });
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    active = 0;
+    compute();
+    input.focus();
+  });
+  recentBox.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    const h = loadHistory();
+    const pick = t.closest<HTMLElement>("[data-recent]");
+    const forget = t.closest<HTMLElement>("[data-forget]");
+    if (pick) {
+      const r = h[Number(pick.dataset["recent"])];
+      if (!r) return;
+      setMode(r.m);
+      input.value = r.q;
+      active = 0;
+      compute();
+      input.focus();
+    } else if (forget) {
+      saveHistory(h.filter((_, i) => i !== Number(forget.dataset["forget"])));
+      paintRecent();
+      input.focus();
+    } else if (t.closest("[data-forget-all]")) {
+      saveHistory([]);
+      paintRecent();
+      input.focus();
+    }
   });
   document.addEventListener("pointerdown", (e) => {
     if (!root.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest(".search-help")) close();
@@ -205,14 +327,15 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   return {
     open(prefix = "") {
       root.hidden = false;
-      setMode(prefix === "#" ? "tag" : prefix === "@" ? "bookmark" : prefix === "/" ? "name" : "all");
-      input.value = "";
+      // The last search stays as it was (the person clears it); a key like "/" only changes the way.
+      if (prefix) setMode(prefix === "#" ? "tag" : prefix === "@" ? "bookmark" : "name");
       active = 0;
       const my = ++token;
       names = new Map();
       tags = new Map();
       compute();
       input.focus();
+      input.select(); // typing replaces the kept search; an arrow key keeps it
       // The file names and tags live in the library; they are read once per original and the list is redrawn when they arrive.
       const hashes = new Set<string>();
       for (const o of deps.doc.ordered()) if (o.kind === "image") hashes.add(o.assetId);
