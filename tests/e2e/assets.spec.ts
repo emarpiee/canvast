@@ -1522,6 +1522,79 @@ test("Show in the library: the selection bar takes the selected pictures' origin
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("tags follow Obsidian's rules: formatted as typed, nested tags are found by their parent, and old tags are formatted once on start (ADR 0084)", async ({ app }) => {
+  const p = app.page;
+  const objs = () => p.evaluate(() => window.__canvastDebug.objects()) as Promise<Array<Record<string, unknown>>>;
+  const id = await importOnCanvas(p);
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${id}"]`).click();
+  await p.getByRole("button", { name: "Tags panel", exact: true }).click();
+  await p.getByLabel("Add a tag to the selection").fill("My Tag!, project/design, 1984");
+  await p.keyboard.press("Enter");
+  await expect.poll(async () => (await objs()).find((o) => o["id"] === id)?.["tags"]).toEqual(["My-Tag", "project/design", "tag-1984"]);
+  await expect(p.getByTestId("toast")).toContainText("was saved as #My-Tag");
+  // The parent finds what is nested under it.
+  await p.keyboard.press("Escape");
+  await p.locator("#canvas").focus();
+  await p.keyboard.press("Control+f");
+  const box = p.getByRole("combobox", { name: "Search the canvas" });
+  await box.fill("#project");
+  await expect(p.getByTestId("canvas-search").getByRole("option")).toHaveCount(1);
+  await box.fill("#proj");
+  await expect(p.getByTestId("canvas-search").getByRole("option")).toHaveCount(0); // a whole tag, not a part of one
+  await p.keyboard.press("Escape");
+  // A library tag is formatted too.
+  await toAssets(p);
+  await card(p, HASH).click();
+  await p.getByTestId("asset-tag-input").fill("Big Idea");
+  await p.keyboard.press("Enter");
+  await expect(p.getByTestId("asset-tags")).toContainText("#Big-Idea");
+  await p.getByTestId("assets-search").fill("#big-idea");
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.getByTestId("assets-search").fill("");
+  // Tags stored in an older form (spaces, punctuation) are formatted once at start-up, in the library and on the canvases.
+  await p.getByTestId("view-canvas").click();
+  await saved(p);
+  await p.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open("canvast");
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(["objects", "assetCatalog", "meta"], "readwrite");
+          const objects = tx.objectStore("objects");
+          objects.openCursor().onsuccess = (e) => {
+            const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+            if (!c) return;
+            const rec = c.value as { data: { tags?: string[] } };
+            if (rec.data.tags) c.update({ ...rec, data: { ...rec.data, tags: ["Old Tag!", "plain"] } });
+            c.continue();
+          };
+          tx.objectStore("assetCatalog").openCursor().onsuccess = (e) => {
+            const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+            if (!c) return;
+            c.update({ ...(c.value as object), tags: ["Lib Tag?"] });
+            c.continue();
+          };
+          tx.objectStore("meta").delete("tagFormat");
+          tx.objectStore("meta").delete("objectTagFormat");
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+  );
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect.poll(async () => (await objs()).find((o) => o["id"] === id)?.["tags"]).toEqual(["Old-Tag", "plain"]);
+  const lib = await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.tags));
+  expect(lib).toEqual([["Lib-Tag"]]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("in-canvas tags: rename and delete a tag on every canvas, from the Tags panel or the Assets sidebar (ADR 0070, 0076)", async ({ app }) => {
   const p = app.page;
   const tagsOf = async (id: string) => ((await objects(p)) as Array<{ id: string; tags?: string[] }>).find((o) => o.id === id)?.tags;
@@ -1920,7 +1993,7 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   expect(frame.name).toMatch(/^my-anim_frame\d+\.webp$/);
   expect(frame.type).toBe("image/webp");
   expect(frame.folder).toBe("Stills");
-  expect(frame.tags.sort()).toEqual(["My Anim", "client x", "ref"].sort());
+  expect(frame.tags.sort()).toEqual(["My-Anim", "client-x", "ref"].sort());
   expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0); // not placed
   expect(app.consoleErrors).toEqual([]);
 });

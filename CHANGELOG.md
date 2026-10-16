@@ -2,6 +2,9 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Tags follow Obsidian's rules: letters, numbers, _ - and / (nested), no spaces, not all digits; whatever is typed is formatted to fit (with a notice), `#project` finds `project/design` too, renaming a parent renames its children, and tags stored in an older form are formatted once at start-up (ADR 0084).
+- File types: the count no longer disappears while a chip is pointed at.
+
 - Search suggestions: chips under both search boxes complete the word being typed (file types after a dot, tags after a hash, operators after a word; Tab takes the first); the placeholders no longer repeat the tabs (ADR 0083).
 - Canvas tags say which canvas they are on (the picture's details and the sidebar tooltip). The board pill is shorter (board 6 em, canvas 10 em).
 

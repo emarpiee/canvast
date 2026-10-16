@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { extOf } from "../assets/file-kind";
 import { CANVAS_RECENT, rememberSearch } from "../search/history";
@@ -100,7 +101,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
           const hay = `${lab.text} ${groupName} ${noteOf(o)}`.toLowerCase();
           const tagHit = (w: string): boolean => own.some((x) => x.toLowerCase().includes(w));
-          const exact = (w: string): boolean => own.some((x) => x.toLowerCase() === w);
+          const exact = (w: string): boolean => own.some((x) => tagIsOrUnder(x, w));
           if (!evalQuery(q, (term) => (term.text.startsWith("#") ? exact(term.text.slice(1)) : term.text.length > 1 && term.text.startsWith(".") ? lab.text.toLowerCase().endsWith(term.text) : hay.includes(term.text) || tagHit(term.text)))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: own.length ? own.map((x) => `#${x}`).join(" ") : noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else if (mode === "tag") {
@@ -109,7 +110,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const all = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
           // A term matches when some tag contains it; NOT and XOR then apply to the item's whole tag list.
           // A `#word` is an exact tag; a plain word is part of a tag (the same as in the library).
-          if (!all.length || !evalQuery(q, (term) => all.some((x) => (term.text.startsWith("#") ? x.toLowerCase() === term.text.slice(1) : x.toLowerCase().includes(term.text))))) continue;
+          if (!all.length || !evalQuery(q, (term) => all.some((x) => (term.text.startsWith("#") ? tagIsOrUnder(x, term.text.slice(1)) : x.toLowerCase().includes(term.text))))) continue;
           const hit = all;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: hit.map((x) => `#${x}`).join(" "), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else {

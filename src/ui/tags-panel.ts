@@ -89,6 +89,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
           ${sel.length ? "" : `<p class="tags-hint">Select items on the canvas to tag them.</p>`}
           <div class="tag-chips">${chips}<input class="tag-input" data-tag-add list="tags-suggest" placeholder="${sel.length ? "Add a tag" : "Select items to tag"}" aria-label="Add a tag to the selection" maxlength="64" ${sel.length ? "" : "disabled"}><datalist id="tags-suggest">${free.map(([, e]) => `<option value="${esc(e.label)}">`).join("")}</datalist></div>
           ${suggest ? `<div class="tag-chips tags-suggest">${suggest}</div>` : ""}
+          <p class="tags-rules">Tags use letters, numbers, <code>_</code> <code>-</code> and <code>/</code> (<code>project/design</code> is nested). No spaces.</p>
         </section>
         <section class="tags-canvas" aria-label="Tags on this canvas">
           <h3>On this canvas</h3>

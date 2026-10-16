@@ -181,6 +181,9 @@ export class Session {
     await this.lease.acquire();
     this.persistence.setWritable(!this.readOnly);
     void this.catalog?.healThumbs().catch(() => undefined);
+    // Tags stored in an older form are formatted first (ADR 0084), before any canvas is read.
+    await this.catalog?.healTags().catch(() => undefined);
+    await this.repo.formatStoredTags().catch(() => undefined);
     this.editor.readOnly = this.readOnly;
     this.startup = await ensureWorkspace(this.repo);
     this.current = this.startup.current;

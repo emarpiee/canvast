@@ -1,4 +1,5 @@
 import type { Session, AssetPlace } from "../app/session";
+import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
@@ -872,7 +873,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tags = meta(e).tags.map((t) => t.toLowerCase());
     const name = e.name.toLowerCase();
     const words_ok = evalQuery(query, ({ text: w }) => {
-      if (w.startsWith("#")) return tags.includes(w.slice(1));
+      if (w.startsWith("#")) return tags.some((t) => tagIsOrUnder(t, w.slice(1))); // a tag and the tags nested under it
       // `.png` is the file type: a word that starts with a dot matches files with that extension (a lone dot: files that have one).
       if (w.startsWith(".")) return w.length > 1 ? chipOf(e.name, e.type).toLowerCase() === w.slice(1) : extOf(e.name) !== "";
       const inTags = tags.some((t) => t.includes(w));
@@ -894,7 +895,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope === "unfiled") return m.folderIds.length === 0;
       if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
       if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
-      if (scope.startsWith("tag:")) return m.tags.some((t) => t.toLowerCase() === scope.slice(4));
+      if (scope.startsWith("tag:")) return m.tags.some((t) => tagIsOrUnder(t, scope.slice(4)));
       if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
       return true;
     };
@@ -1579,6 +1580,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const add = input.value.split(",");
     input.value = ""; // consumed; the re-render must not restore it
     if (!add.join("").trim()) return;
+    const note = tagFormatNote(add);
+    if (note) {
+      session.editor.message = note;
+      session.editor.changed();
+    }
     // One asset, or every picked one.
     const group = input.classList.contains("bulk-tag-input") ? [...picked] : [selected];
     void session

@@ -1,4 +1,5 @@
 import type { ObjectId } from "../doc/model";
+import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import { done, req } from "../storage/idb";
 import type { AssetRecord } from "./asset-library";
 
@@ -55,23 +56,12 @@ export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; fold
 
 export class CatalogInputError extends Error {}
 
-const MAX_TAG = 64;
 const MAX_TAGS = 100;
 const MAX_FOLDER_NAME = 120;
 
-/** Trim, collapse spaces, drop empties and case-insensitive duplicates (first spelling wins). */
+/** Format tags the way Obsidian does (ADR 0084) and drop repeats that differ only in case (the first spelling wins). */
 export function normalizeTags(tags: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of tags) {
-    const t = raw.replace(/\s+/g, " ").trim().replace(/^#+/, "");
-    if (!t) continue;
-    if (t.length > MAX_TAG) throw new CatalogInputError(`a tag can be at most ${MAX_TAG} characters`);
-    const k = t.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(t);
-  }
+  const out = formatTags(tags);
   if (out.length > MAX_TAGS) throw new CatalogInputError(`an asset can have at most ${MAX_TAGS} tags`);
   return out;
 }
@@ -202,6 +192,29 @@ export class AssetCatalog {
     await committed;
   }
 
+  /** Tags stored in an older form (spaces, punctuation) are formatted once the way Obsidian writes them (ADR 0084). */
+  async healTags(): Promise<void> {
+    const tx = this.db.transaction(["assetCatalog", "meta"], "readwrite");
+    const committed = done(tx);
+    const v = await req(tx.objectStore("meta").get("tagFormat") as IDBRequest<number | undefined>);
+    if ((v ?? 0) < 1) {
+      const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+      for (const e of all) {
+        const tags = e.tags ?? [];
+        if (!tags.length) continue;
+        let next: string[];
+        try {
+          next = formatTags(tags);
+        } catch {
+          next = tags;
+        }
+        if (next.length !== tags.length || next.some((t, i) => t !== tags[i])) tx.objectStore("assetCatalog").put({ ...e, tags: next });
+      }
+      tx.objectStore("meta").put(1, "tagFormat");
+    }
+    await committed;
+  }
+
   /** Store a thumbnail. Derived data, so any tab may write it, and a failure only means it is made again next time. */
   async putThumb(rec: ThumbRecord): Promise<void> {
     const tx = this.db.transaction(["thumbs", "assetCatalog"], "readwrite");
@@ -280,15 +293,16 @@ export class AssetCatalog {
    * name the tag follow. Returns how many assets changed.
    */
   async renameTag(from: string, to: string): Promise<number> {
-    const [target] = normalizeTags([to]);
+    const target = formatTag(to);
     if (!target) throw new CatalogInputError("a tag needs a name");
     const key = from.toLowerCase();
     return this.write(["assetCatalog"], async (tx) => {
       const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
       let n = 0;
       for (const e of all) {
-        if (e.state !== "active" || !(e.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
-        tx.objectStore("assetCatalog").put({ ...e, tags: normalizeTags((e.tags ?? []).map((t) => (t.toLowerCase() === key ? target : t))) });
+        // The tag and the tags nested under it (project/design) are renamed together, as in Obsidian.
+        if (e.state !== "active" || !(e.tags ?? []).some((t) => tagIsOrUnder(t, key))) continue;
+        tx.objectStore("assetCatalog").put({ ...e, tags: normalizeTags((e.tags ?? []).map((t) => renamedTag(t, key, target) ?? t)) });
         n++;
       }
       return n;

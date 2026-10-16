@@ -1,4 +1,5 @@
 import * as D from "../core/dyadic";
+import { formatTags, isTag } from "./tags";
 import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
@@ -271,7 +272,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
-  if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && t === t.trim() && !t.startsWith("#")))) throw new InvalidObjectError("bad tags");
+  if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && isTag(t)))) throw new InvalidObjectError("bad tags");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
@@ -340,7 +341,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
-    ...(Array.isArray(s["tags"]) && s["tags"].length ? { tags: s["tags"] as string[] } : {}),
+    ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
     ...(s["locked"] === true ? { locked: true as const } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),

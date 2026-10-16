@@ -1,4 +1,5 @@
 import { normalizeTags } from "../assets/asset-catalog";
+import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { isCard } from "../assets/file-kind";
 import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
@@ -374,6 +375,11 @@ export function setStackOrder(doc: DocumentStore, editor: EditorState, order: re
  */
 export function tagObjects(doc: DocumentStore, editor: EditorState, ids: readonly string[], change: { add?: readonly string[]; remove?: readonly string[] }): number {
   if (editor.blockEdit()) return 0;
+  const note = tagFormatNote(change.add ?? []);
+  if (note) {
+    editor.message = note;
+    editor.changed();
+  }
   const add = normalizeTags(change.add ?? []);
   const drop = new Set((change.remove ?? []).map((t) => t.replace(/^#+/, "").trim().toLowerCase()));
   const changed: CanvasObject[] = [];
@@ -396,8 +402,8 @@ export function changeTagOnCanvas(doc: DocumentStore, editor: EditorState, key: 
   if (editor.blockEdit()) return 0;
   const changed: CanvasObject[] = [];
   for (const o of doc.ordered()) {
-    if (!(o.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
-    const next = normalizeTags((o.tags ?? []).flatMap((t) => (t.toLowerCase() !== key ? [t] : target ? [target] : [])));
+    if (!(o.tags ?? []).some((t) => tagIsOrUnder(t, key))) continue;
+    const next = normalizeTags((o.tags ?? []).flatMap((t) => (tagIsOrUnder(t, key) ? (target ? [renamedTag(t, key, target)!] : []) : [t])));
     const { tags: _old, ...rest } = o;
     changed.push((next.length ? { ...rest, tags: next } : rest) as CanvasObject);
   }

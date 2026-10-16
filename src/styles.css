@@ -1402,7 +1402,7 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .tag-cloud { gap: var(--sp-2) var(--sp-2); }
 .tag-cloud .side-row { position: relative; display: inline-flex; }
 .tag-cloud .side-more { position: absolute; right: 2px; top: 50%; width: 20px; height: 20px; margin: 0; transform: translateY(-50%); background: var(--hud-bg); border-radius: var(--r-pill); }
-.tag-cloud .side-row:hover .side-n, .tag-cloud .side-row:focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
+.tag-cloud .side-row:not(.is-type):hover .side-n, .tag-cloud .side-row:not(.is-type):focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
 @media (hover: none) { .tag-cloud .side-item { padding-right: var(--sp-11); } .tag-cloud .side-more { opacity: 1; } }
 
 /* ---- The viewer follows the theme (a light or dark ground, bars and overlays); see-through pictures sit on a chequered ground ---- */
@@ -1876,3 +1876,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .asset-ctags { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
 .asset-ctags li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); }
 .tag-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); font-size: var(--text-xs); }
+
+.tags-rules { margin: var(--sp-3) 0 0; color: var(--hud-muted); font-size: var(--text-xs); }
+.tags-rules code { font: inherit; padding: 0 var(--sp-1); background: var(--hud-hover); border-radius: var(--r-2xs); }

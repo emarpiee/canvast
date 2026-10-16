@@ -40,7 +40,7 @@ test("Settings > Screenshot: format, name, folder, tags and area are used; the p
   await expect.poll(async () => (await names(p)).length).toBe(1);
   const [shot] = await names(p);
   expect(shot).toMatchObject({ name: "shot-canvas_1.png", type: "image/png", folder: "Shots" });
-  expect(shot!.tags).toEqual(["screenshot", "Board 1"]);
+  expect(shot!.tags).toEqual(["screenshot", "Board-1"]);
   // A transparent, pattern-free screenshot has no pixel of the background: the picture is made from a cleared canvas.
   expect(app.consoleErrors).toEqual([]);
 });

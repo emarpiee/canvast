@@ -1,4 +1,5 @@
 import type { SerializedCamera } from "../core/camera";
+import { formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import type { FrameRecord, StoredFrameView } from "../core/frames";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
@@ -368,14 +369,15 @@ export class WorkspaceRepo {
           const c = cur.result;
           if (!c) return resolve();
           const rec = c.value as ObjectRecord;
-          if (String(c.key).toLowerCase() === key && rec.canvasId !== skip) hits.push(rec);
+          if (tagIsOrUnder(String(c.key), key) && rec.canvasId !== skip && !hits.includes(rec)) hits.push(rec);
           c.continue();
         };
         cur.onerror = () => reject(cur.error);
       });
       const touched = new Set<string>();
       for (const rec of hits) {
-        const tags = ((rec.data as { tags?: string[] }).tags ?? []).map((t) => (t.toLowerCase() === key && target ? target : t)).filter((t) => t.toLowerCase() !== key || target);
+        // The tag and the tags nested under it are renamed together (or removed together).
+        const tags = ((rec.data as { tags?: string[] }).tags ?? []).flatMap((t) => (tagIsOrUnder(t, key) ? (target ? [renamedTag(t, key, target)!] : []) : [t]));
         const seen = new Set<string>();
         const next = tags.filter((t) => !seen.has(t.toLowerCase()) && !!seen.add(t.toLowerCase()));
         const { tags: _old, ...rest } = rec.data as SerializedObject & { tags?: string[] };
@@ -388,6 +390,45 @@ export class WorkspaceRepo {
       }
       await committed;
       return { canvases: [...touched], objects: hits.length };
+    } catch (e) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      await committed.catch(() => undefined);
+      throw e;
+    }
+  }
+
+  /** Object tags stored in an older form are formatted once the way Obsidian writes them (ADR 0084); the touched canvases get a new revision. */
+  async formatStoredTags(): Promise<void> {
+    const tx = this.db.transaction(["objects", "canvases", "meta"], "readwrite");
+    const committed = done(tx);
+    try {
+      const v = await req(tx.objectStore("meta").get("objectTagFormat") as IDBRequest<number | undefined>);
+      if ((v ?? 0) < 1) {
+        const rows = await req(tx.objectStore("objects").index("tags").getAll() as IDBRequest<ObjectRecord[]>);
+        const touched = new Set<string>();
+        const seen = new Set<string>();
+        for (const rec of rows) {
+          const key = `${rec.canvasId}/${rec.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const old = (rec.data as { tags?: string[] }).tags ?? [];
+          const next = formatTags(old.filter((t) => typeof t === "string")).slice(0, 50);
+          if (next.length === old.length && next.every((t, i) => t === old[i])) continue;
+          const { tags: _t, ...rest } = rec.data as SerializedObject & { tags?: string[] };
+          tx.objectStore("objects").put({ ...rec, data: (next.length ? { ...rest, tags: next } : rest) as SerializedObject });
+          touched.add(rec.canvasId);
+        }
+        for (const id of touched) {
+          const canvas = await req(tx.objectStore("canvases").get(id) as IDBRequest<CanvasRecord | undefined>);
+          if (canvas) tx.objectStore("canvases").put({ ...canvas, revision: canvas.revision + 1 });
+        }
+        tx.objectStore("meta").put(1, "objectTagFormat");
+      }
+      await committed;
     } catch (e) {
       try {
         tx.abort();
