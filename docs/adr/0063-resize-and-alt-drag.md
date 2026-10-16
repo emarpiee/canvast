@@ -11,3 +11,5 @@ Status: accepted (owner request, 2026-10-16)
 - **Not done:** free stretching of strokes and text; resize handles for turned boxes' sides.
 
 **Resetting:** *Reset rotation* removes the turn of the selected items about each one's own middle (exact: turning by the opposite angle); *Reset proportions* gives an upright stretched picture its pixel aspect ratio back, keeping its width and its middle. Both are buttons in the selection bar, shown only when something selected can be reset, and one undo step each. Strokes and text are never stretched, so they have nothing to reset but their turn.
+
+**Amendment:** with the proportions kept (Shift, or anything that cannot be stretched) the edges end up where the proportional size puts them, which is not where the pointer is; the snap looks at those edges (the nearer of the two that is within reach holds, and the size follows from it).

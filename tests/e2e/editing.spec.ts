@@ -796,3 +796,41 @@ test("Alt fit-to-view uses what is near and visible at this zoom: items far away
   expect(box.maxX - box.minX, "still a clear size, not a speck").toBeGreaterThan(40);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("resize with Shift snaps the edge the proportions give, not the pointer (the pointer may be far past the line) (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const img = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(4));
+  await app.frame();
+  await key(app, "v");
+  const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
+  const b0 = await boxOf(img.id);
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
+  const w = b0.maxX - b0.minX;
+  const h = b0.maxY - b0.minY;
+  // A wall 60 px right of the picture's right edge.
+  const wall = await penStroke(app, [[b0.maxX + 60, b0.minY - 40], [b0.maxX + 60, b0.maxY + 200]]);
+  await key(app, "v");
+  const wb = await boxOf(wall.id);
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
+  expect(await selection(app)).toEqual([img.id]);
+  const corner = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners[2]!;
+  // Pulled straight right with Shift, the corner moves along the diagonal: its right edge travels w^2 / (w^2 + h^2) of the pointer. Aim the
+  // edge 3 px short of the wall, which leaves the pointer far (tens of px) past it.
+  const share = (w * w) / (w * w + h * h);
+  const shift = wb.minX - 3 - b0.maxX;
+  const d = shift / share;
+  expect(d - (wb.minX - b0.maxX), "the pointer ends well past the wall").toBeGreaterThan(20);
+  await p.keyboard.down("Shift");
+  await p.mouse.move(corner[0], corner[1]);
+  await p.mouse.down();
+  await p.mouse.move(corner[0] + d / 2, corner[1], { steps: 4 });
+  await p.mouse.move(corner[0] + d, corner[1], { steps: 4 });
+  await p.mouse.up();
+  await p.keyboard.up("Shift");
+  await app.frame();
+  const b1 = await boxOf(img.id);
+  expect(Math.abs(b1.maxX - wb.minX), "the right edge is on the wall").toBeLessThan(0.6);
+  expect(Math.abs((b1.maxX - b1.minX) / (b1.maxY - b1.minY) - w / h), "proportions kept").toBeLessThan(0.02);
+  expect(app.consoleErrors).toEqual([]);
+});

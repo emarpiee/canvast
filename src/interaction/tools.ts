@@ -496,36 +496,52 @@ export function attachTools(
     const proportional = mods.shift || !gs.free;
     const moveX = gs.edge !== "n" && gs.edge !== "s";
     const moveY = gs.edge !== "e" && gs.edge !== "w";
-    // The dragged edge (not the pointer) is what lines up: it sits where the pointer is, less the offset it was grabbed at.
-    let px = s.x - gs.grab.x;
-    let py = s.y - gs.grab.y;
+    // The dragged edge (not the pointer) is what lines up: it sits where the pointer is, less the offset it was grabbed at, and with the
+    // proportions kept it is wherever the proportional size puts it (not where the pointer is).
+    const px = s.x - gs.grab.x;
+    const py = s.y - gs.grab.y;
     editor.guides = null;
-    let snapped: "x" | "y" | null = null;
-    const sn = gs.snap;
-    if (sn && !mods.noSnap) {
-      const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
-      const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
-      // Proportional: only the nearer line can hold, the other follows from the ratio.
-      if (proportional && hx && hy) (hx.dist <= hy.dist ? (px = sn.tx[hx.target]![hx.line]!, (snapped = "x")) : (py = sn.ty[hy.target]![hy.line]!, (snapped = "y")));
-      else {
-        if (hx) (px = sn.tx[hx.target]![hx.line]!, (snapped = "x"));
-        if (hy) (py = sn.ty[hy.target]![hy.line]!, (snapped = snapped === "x" && proportional ? "x" : "y"));
-      }
-      if (hx && (!proportional || snapped === "x")) editor.guides = { x: px };
-      if (hy && (!proportional || snapped === "y")) editor.guides = { ...editor.guides, y: py };
-    }
+    const sn = gs.snap && !mods.noSnap ? gs.snap : null;
     let kx = sx !== 0 ? (px - fixed.x) / sx : 1;
     let ky = sy !== 0 ? (py - fixed.y) / sy : 1;
     if (proportional) {
       let k: number;
       if (gs.edge) k = gs.edge === "n" || gs.edge === "s" ? ky : kx;
-      else if (snapped === "x") k = kx;
-      else if (snapped === "y") k = ky;
       else k = (sx * (px - fixed.x) + sy * (py - fixed.y)) / (sx * sx + sy * sy || 1); // along the diagonal, so the corner tracks the pointer
+      if (sn) {
+        // Where the edges end up at this size, and the nearer of the two that is within reach holds: the size follows from it.
+        const ex = fixed.x + k * sx;
+        const ey = fixed.y + k * sy;
+        const hx = moveX && sx !== 0 ? bestSnap([ex, ex, ex], sn.tx) : null;
+        const hy = moveY && sy !== 0 ? bestSnap([ey, ey, ey], sn.ty) : null;
+        if (hx && (!hy || hx.dist <= hy.dist)) {
+          const t = sn.tx[hx.target]![hx.line]!;
+          k = (t - fixed.x) / sx;
+          editor.guides = { x: t };
+        } else if (hy) {
+          const t = sn.ty[hy.target]![hy.line]!;
+          k = (t - fixed.y) / sy;
+          editor.guides = { y: t };
+        }
+      }
       kx = ky = k;
     } else {
       if (!moveX) kx = 1;
       if (!moveY) ky = 1;
+      if (sn) {
+        const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
+        const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
+        if (hx && sx !== 0) {
+          const t = sn.tx[hx.target]![hx.line]!;
+          kx = (t - fixed.x) / sx;
+          editor.guides = { x: t };
+        }
+        if (hy && sy !== 0) {
+          const t = sn.ty[hy.target]![hy.line]!;
+          ky = (t - fixed.y) / sy;
+          editor.guides = { ...editor.guides, y: t };
+        }
+      }
     }
     return { kx: Math.max(MIN_SCALE, kx), ky: Math.max(MIN_SCALE, ky), fixed };
   };
