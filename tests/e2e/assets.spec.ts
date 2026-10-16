@@ -920,6 +920,9 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(picked()).toHaveCount(1);
   await expect(viewer).toBeHidden();
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
+  // One picked item shows its details only: the other cards keep their checkboxes hidden until a second one is picked.
+  await expect(p.locator(".assets-grid.has-picks")).toHaveCount(0);
+  await expect(cards.nth(1).locator("xpath=..").locator(".asset-check")).toHaveCSS("opacity", "0");
   await cards.nth(2).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(2);
   await cards.nth(0).click({ modifiers: ["Control"] });
@@ -1259,5 +1262,41 @@ test("viewer zoom: the wheel zooms at the pointer, a drag pans, a double-click t
   await expect(pct).not.toHaveText("Fit");
   await viewer.getByRole("button", { name: "Zoom out" }).click();
   await expect(pct).toHaveText("Fit");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Place on…: the open canvas, another existing canvas, a new canvas in a board, or a new board (ADR 0059)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: GREEN });
+  await card(p, GREEN_HASH).click();
+  const crumb = p.locator(".nav-crumb");
+  const count = () => p.evaluate(() => window.__canvastDebug.objects().length);
+  // A new canvas in Board 1: it opens and holds the picture; the first canvas stays empty.
+  await p.getByTestId("asset-place-menu").click();
+  await p.getByRole("menuitem", { name: /New canvas in Board 1/ }).click();
+  await expect(crumb).toHaveText("Board 1 › Canvas 2");
+  await expect.poll(count).toBe(1);
+  // Back in the library: an existing canvas (the first), listed with what it holds.
+  await toAssets(p);
+  await card(p, GREEN_HASH).click();
+  await p.getByTestId("asset-place-menu").click();
+  await expect(p.getByRole("menuitem", { name: /Canvas 2.*open now/ })).toBeVisible();
+  await p.getByRole("menuitem", { name: /^Canvas 1/ }).click();
+  await expect(crumb).toHaveText("Board 1 › Canvas 1");
+  await expect.poll(count).toBe(1);
+  // A new board with a canvas.
+  await toAssets(p);
+  await card(p, GREEN_HASH).click();
+  await p.getByTestId("asset-place-menu").click();
+  await p.getByRole("menuitem", { name: /New board with a canvas/ }).click();
+  await expect(crumb).toHaveText("Board 2 › Canvas 1");
+  await expect.poll(count).toBe(1);
+  // Escape closes the menu without placing.
+  await toAssets(p);
+  await card(p, GREEN_HASH).click();
+  await p.getByTestId("asset-place-menu").click();
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("place-menu")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

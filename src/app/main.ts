@@ -4,7 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -410,6 +410,7 @@ async function start(): Promise<void> {
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
+    setOrder: (order, label) => setStackOrder(doc, editor, order, label),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),

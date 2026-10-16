@@ -342,6 +342,29 @@ export function moveAbove(doc: DocumentStore, editor: EditorState, ids: readonly
   editor.changed();
 }
 
+/**
+ * Put the whole stacking order in the given order (front to back), e.g. a name sort from the Layers panel. Only `z` changes: no
+ * position, size or group is touched. One undo step.
+ */
+export function setStackOrder(doc: DocumentStore, editor: EditorState, order: readonly string[], label: string): void {
+  if (editor.blockEdit()) return;
+  const byId = new Map(doc.ordered().map((o) => [o.id, o] as const));
+  const back = [...order].reverse().filter((id) => byId.has(id));
+  const changed: CanvasObject[] = [];
+  back.forEach((id, z) => {
+    const o = byId.get(id)!;
+    if (o.z !== z) changed.push({ ...o, z });
+  });
+  if (!changed.length) {
+    editor.message = "Already in that order";
+    editor.changed();
+    return;
+  }
+  doc.commit(doc.transaction(label, changed));
+  editor.message = `${label} (${changed.length} changed)`;
+  editor.changed();
+}
+
 /** Show every hidden object, or unlock every locked one. */
 export function clearFlag(doc: DocumentStore, editor: EditorState, flag: "hidden" | "locked"): void {
   if (editor.blockEdit()) return;

@@ -61,7 +61,7 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
             "board",
             board.id,
             board.name,
-            `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.layers}</span><span class="nav-board-name">${esc(board.name)}</span>
+            `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.layers}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
              ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board")}`,
           );
           const items = canvases

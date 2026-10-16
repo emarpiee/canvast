@@ -411,6 +411,23 @@ export class Session {
     return placeImage(rec, this.doc, this.view, 0, "Place asset").id;
   }
 
+  /**
+   * Place library assets on a chosen canvas: an existing one, a new canvas in a board, or a new board. The canvas is opened first, so
+   * the pictures land there; one undo step on that canvas. Returns how many were placed.
+   */
+  async placeAssetsOn(hashes: readonly string[], target: { canvasId: string } | { newCanvasIn: string } | { newBoard: true }): Promise<number> {
+    if (this.editor.blockEdit()) return 0;
+    if ("canvasId" in target) await this.openCanvas(target.canvasId);
+    else if ("newCanvasIn" in target) await this.newCanvas(target.newCanvasIn);
+    else await this.newBoard();
+    const n = await this.placeAssets(hashes);
+    const cur = this.current;
+    const board = this.tree?.boards.find((b) => b.board.id === cur?.boardId);
+    const canvas = board?.canvases.find((c) => c.id === cur?.canvasId);
+    if (n && board && canvas) this.tell(`Placed ${n} on ${board.board.name} › ${canvas.name}.`);
+    return n;
+  }
+
   /** Place several library assets on the open canvas, in a grid, as one undo step. Returns how many were placed. */
   async placeAssets(hashes: readonly string[]): Promise<number> {
     if (this.editor.blockEdit() || !this.assets) return 0;

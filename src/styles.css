@@ -1269,3 +1269,72 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .assets-side[data-open="false"] .side-body { display: none; }
   .assets-side[data-open="true"] .side-body { max-height: 40vh; overflow: auto; margin-top: 6px; }
 }
+
+/* ---- Layers panel (ADR 0059): indentation guides, group rows, sort bar ---- */
+.layers-panel .layer { position: relative; padding-left: calc(4px + var(--depth, 0) * 16px); }
+.layers-panel .layer::before { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: calc(var(--depth, 0) * 16px); pointer-events: none;
+  background-image: repeating-linear-gradient(to right, transparent 0, transparent 7px, color-mix(in oklch, var(--hud-fg) 22%, transparent) 7px, color-mix(in oklch, var(--hud-fg) 22%, transparent) 8px, transparent 8px, transparent 16px); }
+.layers-panel .layer.is-group { font-weight: 600; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); }
+.layers-panel .layer.is-group.is-selected { background: var(--hud-accent); }
+.layers-panel .layer.is-group .layer-icon { opacity: 0.9; }
+.layers-panel .layer:not(.is-group) .layer-name { font-weight: 400; }
+.layer-count { flex: none; min-width: 18px; padding: 0 6px; font-size: 11px; font-weight: 500; line-height: 16px; text-align: center; border-radius: 999px; background: color-mix(in oklch, var(--hud-fg) 12%, transparent); }
+.layer.is-selected .layer-count { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
+.layers-tools { display: inline-flex; gap: 2px; }
+.layers-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--hud-border); font-size: 12px; }
+.layers-sort span { color: var(--hud-muted); }
+.layers-sort button { font: inherit; padding: 3px 10px; color: inherit; background: var(--hud-hover); border: 0; border-radius: 999px; cursor: pointer; }
+.layers-sort button:hover { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.layers-sort small { flex-basis: 100%; color: var(--hud-muted); }
+
+/* ---- Place on… (split button and menu) ---- */
+.split { display: inline-flex; flex: 1; min-width: 0; }
+.split > .assets-btn:first-child { flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split > .assets-btn.is-icon { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; width: 32px; }
+.place-menu { position: fixed; z-index: 40; width: 260px; max-height: min(70vh, 460px); overflow: auto; display: grid; gap: 2px; padding: 6px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.place-menu[hidden] { display: none; }
+.pm-title { margin: 2px 8px 4px; font-size: 12px; color: var(--hud-muted); }
+.pm-board { display: grid; gap: 1px; padding: 4px 0; border-top: 1px solid var(--hud-border); }
+.pm-board h3 { display: flex; align-items: center; gap: 6px; margin: 2px 8px 2px; font-size: 12px; font-weight: 600; color: var(--hud-muted); }
+.pm-board h3 svg { width: 14px; height: 14px; }
+.place-menu button { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.place-menu button:hover, .place-menu button:focus-visible { background: var(--hud-hover); }
+.pm-mark { width: 16px; flex: none; display: inline-flex; }
+.pm-mark svg { width: 14px; height: 14px; }
+.pm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-menu small { color: var(--hud-muted); }
+.place-menu .pm-new { color: var(--hud-accent); }
+.place-menu .pm-new svg { width: 14px; height: 14px; flex: none; }
+.place-menu .pm-new-board { border-top: 1px solid var(--hud-border); border-radius: 0 0 var(--r-sm) var(--r-sm); }
+
+/* ---- Workspace menu (ADR 0059): boards are cards, canvases hang under a guide line, "new board" is not "new canvas" ---- */
+.nav-menu { width: 340px; display: grid; gap: 8px; padding: 8px; max-height: min(80vh, 640px); overflow: auto; }
+.nav-menu > .nav-board { padding: 4px 4px 6px; background: color-mix(in oklch, var(--hud-fg) 5%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
+.nav-menu > .nav-board + .nav-board { margin-top: 0; border-top: 1px solid var(--hud-border); padding-top: 4px; }
+.nav-menu .nav-board-head { min-height: calc(var(--ctl) - 2px); padding: 0 2px 0 8px; }
+.nav-menu .nav-board-name { font-weight: 650; }
+.nav-menu .nav-board-n { flex: none; font-size: 11px; color: var(--hud-muted); }
+.nav-menu .nav-canvases { margin: 0 0 0 16px; padding: 0 0 0 8px; border-left: 2px solid color-mix(in oklch, var(--hud-fg) 18%, transparent); gap: 1px; }
+.nav-menu .nav-canvas-row { border-radius: var(--r-sm); }
+.nav-menu .nav-canvas.is-active { color: var(--hud-accent); }
+.nav-menu .nav-canvas-row:has(.is-active) { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); }
+.nav-menu .nav-count { font-size: 11px; }
+/* "+ New canvas": a quiet line under the board's canvases */
+.nav-menu .nav-board > .nav-add { width: auto; margin: 2px 0 0 24px; min-height: 28px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--hud-muted); font-size: 12px; display: inline-flex; }
+.nav-menu .nav-board > .nav-add:hover { color: var(--hud-fg); background: var(--hud-hover); }
+/* "+ New board": a button of its own, apart from the boards */
+.nav-menu .nav-add-board { width: 100%; margin: 0; min-height: var(--ctl); justify-content: center; font-weight: 600; color: var(--hud-accent); border: 1px solid color-mix(in oklch, var(--hud-accent) 55%, transparent); background: transparent; border-radius: var(--r-lg); }
+.nav-menu .nav-add-board:hover { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); border-color: var(--hud-accent); color: var(--hud-accent); }
+.nav-menu .nav-ws { margin-top: 0; padding: 8px 4px 0; }
+.nav-menu .nav-ws h3 { padding: 0 4px; }
+
+/* ---- Tags as chips: on cards, in the list and in the sidebar ---- */
+.asset-tags { display: flex; gap: 4px; overflow: hidden; }
+.tag-pill { flex: none; max-width: 100%; padding: 1px 8px; font-size: 11px; line-height: 16px; border-radius: 999px; overflow: hidden; text-overflow: ellipsis; background: oklch(1 0 0 / 0.16); color: oklch(0.97 0.005 190); }
+.assets-body.is-list .tag-pill { background: var(--hud-hover); color: var(--hud-fg); }
+/* The sidebar's tag chips sit close together; the row's More button floats over the chip's count instead of taking room. */
+.tag-cloud { gap: 4px 4px; }
+.tag-cloud .side-row { position: relative; display: inline-flex; }
+.tag-cloud .side-more { position: absolute; right: 2px; top: 50%; width: 20px; height: 20px; margin: 0; transform: translateY(-50%); background: var(--hud-bg); border-radius: 999px; }
+.tag-cloud .side-row:hover .side-n, .tag-cloud .side-row:focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
+@media (hover: none) { .tag-cloud .side-item { padding-right: 28px; } .tag-cloud .side-more { opacity: 1; } }

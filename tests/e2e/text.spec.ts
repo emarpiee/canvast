@@ -356,3 +356,55 @@ test("the text box shows the default ink in a readable colour on the dark canvas
   expect(light, "light enough to read on the dark canvas").toBeGreaterThan(0.7);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Layers panel: sort by name (A to Z, Z to A; a group by its name, then what is inside), nothing moves, groups show guides and open for a selected member (ADR 0059)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.getByTestId("layers-panel");
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  const words = ["pear", "apple", "kiwi"];
+  for (const [i, w] of words.entries()) {
+    await newText(p, 300 + (i % 2) * 400, 400 + Math.floor(i / 2) * 200);
+    await p.keyboard.type(w);
+    await finish(p);
+  }
+  const names = () => panel.locator("li.layer .layer-name").allTextContents();
+  const where = async () => (await textObjects(p)).map((o) => `${o.id}:${o.ax}:${o.ay}`).sort();
+  // Group pear and kiwi (a group is named by its own name, here the automatic "Group").
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  const all = await textObjects(p);
+  const idOf = (w: string) => all.find((o) => String(o.md).includes(w))!.id;
+  await panel.locator(`li.layer[data-key="${idOf("pear")}"]`).click();
+  await panel.locator(`li.layer[data-key="${idOf("kiwi")}"]`).click({ modifiers: ["Control"] });
+  await p.keyboard.press("Control+g");
+  const before = await where();
+  // Newest in front: kiwi, apple, pear are what the panel lists first (the group is at the top with its members).
+  // The new group opened with its members selected; fold everything, then open it all again.
+  await panel.getByRole("button", { name: "Collapse all groups" }).click();
+  expect(await names()).toHaveLength(2);
+  await panel.getByRole("button", { name: "Expand all groups" }).click();
+  await panel.getByRole("button", { name: "Sort the layers by name" }).click();
+  await panel.getByRole("button", { name: "A to Z" }).click();
+  expect(await names()).toEqual(["apple", "Group (2)", "kiwi", "pear"]);
+  await panel.getByRole("button", { name: "Sort the layers by name" }).click();
+  await panel.getByRole("button", { name: "Z to A" }).click();
+  expect(await names()).toEqual(["Group (2)", "pear", "kiwi", "apple"]);
+  expect(await where(), "no position changed").toEqual(before);
+  // The group row has a count and its members are drawn indented under guide lines.
+  await expect(panel.locator("li.layer.is-group .layer-count")).toHaveText("2");
+  const depth = await panel.locator(`li.layer[data-key="${idOf("kiwi")}"]`).evaluate((e) => getComputedStyle(e, "::before").width);
+  expect(parseFloat(depth)).toBeGreaterThan(10);
+  // Undo puts the old order back.
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
+  await expect.poll(names).toEqual(["Group (2)", "kiwi", "pear", "apple"]);
+  // A group closed by hand opens again when one of its members is selected on the canvas.
+  await panel.getByRole("button", { name: "Collapse all groups" }).click();
+  expect(await names()).toHaveLength(2);
+  await p.keyboard.press("Escape");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
+  const s = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), idOf("kiwi")))!.box;
+  await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+  await expect.poll(names).toContain("kiwi");
+  expect(app.consoleErrors).toEqual([]);
+});

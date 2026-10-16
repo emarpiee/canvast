@@ -120,7 +120,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
       </div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
-    </div>`;
+    </div>
+    <div class="place-menu" role="menu" aria-label="Place on" data-testid="place-menu" hidden></div>`;
   const body = root.querySelector<HTMLElement>(".assets-body")!;
   const viewer = root.querySelector<HTMLElement>(".viewer")!;
   const film = root.querySelector<HTMLElement>(".viewer-film")!;
@@ -731,7 +732,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-kind">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
           <span class="asset-added">${new Date(e.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
-          ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
+          ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
         </span>
       </button>
       ${check(e.hash, name)}
@@ -950,7 +951,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </div>
       <div class="asset-quick">
         <button type="button" class="assets-btn is-icon" data-action="favorite-all" data-testid="bulk-favorite" aria-pressed="${allFav}" aria-label="${allFav ? "Remove all from favourites" : "Add all to favourites"}" title="${allFav ? "Remove all from favourites" : "Add all to favourites"}"${dis}>${ICONS.star}</button>
-        <button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable} on canvas</span></button>
+        <span class="split"><button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable} on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-all-menu" data-testid="bulk-place-menu"${placeable ? "" : " disabled"}${dis} aria-haspopup="menu" aria-label="Place them on another canvas or a new one" title="Place them on another canvas or a new one">${ICONS.chevronDown}</button></span>
       </div>
       <div class="asset-facts"><span>${fmtBytes(bytes)} in all</span><span>${unused} of ${n} not used on any canvas</span></div>
       <section class="asset-sec">
@@ -1013,7 +1014,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         e
           ? `<div class="asset-quick">
                <button type="button" class="assets-btn is-icon" data-action="favorite" data-testid="asset-favorite" aria-pressed="${fav}" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" title="${fav ? "Remove from favourites" : "Add to favourites"}"${session.readOnly ? " disabled" : ""}>${ICONS.star}</button>
-               ${e.present ? `<button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro} title="Place on ${esc(where)}">${ICONS.mapPin}<span>Place on canvas</span></button>` : ""}
+               ${e.present ? `<span class="split"><button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro} title="Place on ${esc(where)}">${ICONS.mapPin}<span>Place on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-menu" data-testid="asset-place-menu"${ro} aria-haspopup="menu" aria-label="Place on another canvas or a new one" title="Place on another canvas or a new one">${ICONS.chevronDown}</button></span>` : ""}
              </div>`
           : ""
       }
@@ -1081,7 +1082,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const markPicked = (): void => {
     for (const c of grid.querySelectorAll<HTMLElement>(".asset-card")) c.setAttribute("aria-pressed", String(picked.has(c.dataset["hash"]!)));
     for (const c of grid.querySelectorAll<HTMLInputElement>(".asset-check")) c.checked = picked.has(c.dataset["hash"]!);
-    grid.classList.toggle("has-picks", picked.size > 0);
+    // Every card shows its checkbox only once several are being picked; one plain click just opens that item's details.
+    grid.classList.toggle("has-picks", picked.size > 1 || (selecting && picked.size > 0));
   };
   /** Pick: one (a plain click), add or remove one (Ctrl, Cmd or the checkbox), or a range from the last pick (Shift). */
   const select = async (hash: string | null, how: "one" | "toggle" | "range" | "add-range" = "one"): Promise<void> => {
@@ -1220,6 +1222,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "clear":
         void select(null);
         break;
+      case "place-all-menu":
+        openPlaceMenu(b, group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)));
+        break;
       case "place-all": {
         const ok = group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present));
         showCanvas();
@@ -1275,6 +1280,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "place":
         showCanvas();
         void session.placeAsset(hash);
+        break;
+      case "place-menu":
+        openPlaceMenu(b, [hash]);
         break;
       case "favorite": {
         // The button shows the stored state it would change; set the opposite explicitly.
@@ -1336,6 +1344,61 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (id === undefined || !selected) return;
     const hash = selected;
     void session.organize((c) => put(c, hash, id));
+  });
+
+  // ---- "Place on…": an existing canvas, a new canvas in a board, or a new board
+  const placeMenu = root.querySelector<HTMLElement>(".place-menu")!;
+  let placing: string[] = [];
+  const closePlaceMenu = (): void => {
+    placeMenu.hidden = true;
+    placing = [];
+  };
+  const openPlaceMenu = (anchor: HTMLElement, hashes: string[]): void => {
+    const tree = session.tree;
+    if (!tree || !hashes.length) return;
+    placing = hashes;
+    const cur = session.current;
+    const n = hashes.length;
+    placeMenu.innerHTML =
+      `<p class="pm-title">Place ${n === 1 ? "it" : `these ${n}`} on</p>` +
+      tree.boards
+        .map(
+          ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
+            <h3>${ICONS.layers}<span>${esc(board.name)}</span></h3>
+            ${canvases
+              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "open now" : c.objectCount ? `${c.objectCount} objects` : "empty"}</small></button>`)
+              .join("")}
+            <button type="button" role="menuitem" class="pm-new" data-pm="new-canvas" data-id="${board.id}">${ICONS.plus}<span>New canvas in ${esc(board.name)}</span></button>
+          </section>`,
+        )
+        .join("") +
+      `<button type="button" role="menuitem" class="pm-new pm-new-board" data-pm="new-board">${ICONS.plus}<span>New board with a canvas</span></button>`;
+    placeMenu.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    const w = placeMenu.offsetWidth;
+    const h = placeMenu.offsetHeight;
+    placeMenu.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
+    placeMenu.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, r.bottom + 4))}px`;
+    placeMenu.querySelector<HTMLElement>("button")?.focus();
+  };
+  placeMenu.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pm]");
+    if (!b) return;
+    const hashes = placing;
+    closePlaceMenu();
+    showCanvas();
+    const kind = b.dataset["pm"];
+    const target = kind === "canvas" ? { canvasId: b.dataset["id"]! } : kind === "new-canvas" ? { newCanvasIn: b.dataset["id"]! } : ({ newBoard: true } as const);
+    void session.placeAssetsOn(hashes, target);
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!placeMenu.hidden && !(e.target as HTMLElement).closest?.(".place-menu, [data-action$='-menu']")) closePlaceMenu();
+  });
+  placeMenu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closePlaceMenu();
+      e.stopPropagation();
+    }
   });
 
   // ---- sidebar: scope, folders

@@ -18,6 +18,8 @@ import { swatchBackground } from "../render/ink";
 export interface LayersActions {
   setFlagOn(ids: readonly string[], flag: "hidden" | "locked", on: boolean): void;
   moveAbove(ids: readonly string[], aboveId: string): void;
+  /** Put the stacking order in name order (ADR 0059); only the order changes, never a position. `order` is front to back. */
+  setOrder(order: readonly string[], label: string): void;
   setOpacity(ids: readonly string[], opacity: number): void;
   /** Blend mode of objects (null = normal), ADR 0047. */
   setBlend(ids: readonly string[], blend: BlendMode | null): void;
@@ -76,6 +78,20 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
   return roots;
 }
 
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/**
+ * The objects front to back after sorting the panel by name: items by their name (a group by its own name, and its members after it,
+ * each sorted the same way, so a group stays together). "asc" puts A in front (at the top of the panel).
+ */
+export function sortedByName(objects: readonly CanvasObject[], names: ReadonlyMap<string, string>, dir: "asc" | "desc"): CanvasObject[] {
+  const label = (n: Node): string => (n.group ? (n.members[0]!.groupNames?.[n.id] ?? "Group") : labelOf(n.members[0]!, names).text);
+  const sign = dir === "asc" ? 1 : -1;
+  const walk = (nodes: readonly Node[]): CanvasObject[] =>
+    [...nodes].sort((a, b) => sign * collator.compare(label(a), label(b))).flatMap((n) => (n.group ? walk(n.children) : n.members));
+  return walk(layerTree(objects));
+}
+
 /** Short name of an object for lists and mention labels. */
 export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
   if (o.name) return { icon: o.kind === "stroke" ? ICONS.pencil : o.kind === "image" ? ICONS.image : ICONS.type, text: o.name, ...(o.kind !== "image" ? { swatch: o.color } : {}) };
@@ -92,6 +108,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   panel.dataset["testid"] = "layers-panel";
   host.appendChild(panel);
   const open = new Set<string>(); // expanded groups
+  let sortOpen = false;
+  let lastSelection = "";
+  /** Groups the panel has already listed: a group seen for the first time (just made) opens. */
+  const seenGroups = new Set<string>();
   // File names of the originals (the catalog is read once per original).
   const names = new Map<string, string>();
   const asked = new Set<string>();
@@ -176,6 +196,18 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       }
     }
     const tree = layerTree(all);
+    // A newly selected item deep in groups is shown: its groups open (once per selection, so they can still be closed).
+    const selKey = [...editor.selection].sort().join(",");
+    if (selKey !== lastSelection) {
+      lastSelection = selKey;
+      for (const id of editor.selection) for (const g of doc.get(id)?.groups ?? []) open.add(g);
+    }
+    for (const g of new Set(all.flatMap((o) => o.groups ?? []))) {
+      if (!seenGroups.has(g)) {
+        seenGroups.add(g);
+        if (editor.selection.size && all.some((o) => editor.selection.has(o.id) && o.groups?.includes(g))) open.add(g);
+      }
+    }
     let rows = 0;
     const row = (n: Node, depth: number): string => {
       if (rows >= MAX_ROWS) return "";
@@ -187,10 +219,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const locked = n.members.every((m) => m.locked);
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
-      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
+      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
         <button type="button" class="layer-twist" data-twist ${n.group ? "" : "disabled tabindex=-1"} aria-label="${expanded ? "Collapse" : "Expand"}">${n.group ? (expanded ? ICONS.chevronDown : ICONS.chevronRight) : ""}</button>
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
-        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="Double-click to rename">${esc(lab.text)}</span>`}
+        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${esc(lab.text)}</span>${n.group ? `<span class="layer-count" title="${n.members.length} item(s) inside">${n.members.length}</span>` : ""}`}
         <button type="button" class="layer-btn" data-eye aria-pressed="${hidden}" aria-label="${hidden ? "Show" : "Hide"} ${esc(lab.text)}" title="${hidden ? "Show" : "Hide"}">${hidden ? ICONS.eyeOff : ICONS.eye}</button>
         <button type="button" class="layer-btn" data-lock aria-pressed="${locked}" aria-label="${locked ? "Unlock" : "Lock"} ${esc(lab.text)}" title="${locked ? "Unlock" : "Lock"}">${locked ? ICONS.lockKeyhole : ICONS.lockKeyholeOpen}</button>
       </li>`;
@@ -198,7 +230,13 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     };
     const list = tree.map((n) => row(n, 0)).join("");
     panel.innerHTML = `
-      <header><h2>Layers <span class="layers-count">${all.length}</span></h2><button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button></header>
+      <header><h2>Layers <span class="layers-count">${all.length}</span></h2>
+        <span class="layers-tools">
+          <button type="button" class="layer-btn" data-sort-toggle aria-pressed="${sortOpen}" aria-expanded="${sortOpen}" aria-label="Sort the layers by name" title="Sort the layers by name">${ICONS.arrowDownAZ}</button>
+          <button type="button" class="layer-btn" data-fold-all aria-label="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}" title="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}">${tree.some((n) => n.group && !open.has(n.id)) ? ICONS.chevronsUpDown : ICONS.chevronsDownUp}</button>
+          <button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button>
+        </span></header>
+      ${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}
       <ul role="tree" aria-label="Objects, front to back">${list || '<li class="layers-empty">Nothing on this canvas yet.</li>'}</ul>
       <div class="layers-links" data-links>${linksHtml()}</div>
       ${footer()}
@@ -329,6 +367,26 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
     if (t.closest("[data-relink-cancel]")) {
       relinking = null;
+      render();
+      return;
+    }
+    if (t.closest("[data-sort-toggle]")) {
+      sortOpen = !sortOpen;
+      render();
+      return;
+    }
+    const sortBtn = t.closest<HTMLElement>("[data-sort]");
+    if (sortBtn) {
+      const dir = sortBtn.dataset["sort"] === "desc" ? "desc" : "asc";
+      actions.setOrder(sortedByName(doc.ordered(), names, dir).map((o) => o.id), `Sort layers by name, ${dir === "asc" ? "A to Z" : "Z to A"}`);
+      sortOpen = false;
+      render();
+      return;
+    }
+    if (t.closest("[data-fold-all]")) {
+      const groups = new Set(doc.ordered().flatMap((o) => o.groups ?? []));
+      if ([...groups].some((g) => !open.has(g))) for (const g of groups) open.add(g);
+      else open.clear();
       render();
       return;
     }
