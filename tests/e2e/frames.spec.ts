@@ -1084,7 +1084,7 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect((await z())[ids[0]!]!, "undo puts it back").toBeLessThan((await z())[ids[1]!]!);
   // Opacity slider acts on the selection, one undo step per release.
   const opacityOf = () => p.evaluate((id) => window.__canvastDebug.objects().find((o) => o.id === id)!["opacity"] as number, ids[1]!);
-  await expect(panel.locator("[data-opacity]")).toBeDisabled();
+  await expect(panel.locator("[data-opacity]"), "nothing selected: no settings to show").toHaveCount(0);
   await rows.nth(1).click();
   await panel.locator("[data-opacity]").fill("40");
   expect(await opacityOf()).toBeCloseTo(0.4);
@@ -1719,5 +1719,40 @@ test("bookmarks on a phone (360 px): each card shows its Rename, Update and Dele
   }
   const name = (await card.locator(".bookmark-name").boundingBox())!;
   expect(name.width, "the name keeps room").toBeGreaterThan(50);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("panels stack without squeezing each other; many layers get a filter, the list scrolls, and the selection settings show only with a selection (ADR 0066)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  for (let i = 0; i < 18; i++) await app.drag({ x: 480 + (i % 6) * 90, y: 380 + Math.floor(i / 6) * 110 }, { x: 520 + (i % 6) * 90, y: 410 + Math.floor(i / 6) * 110 }, 3);
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const bookmarks = p.getByTestId("bookmarks-panel");
+  const layers = p.getByTestId("layers-panel");
+  const bb = (await bookmarks.boundingBox())!;
+  const lb = (await layers.boundingBox())!;
+  expect(bb.height, "the bookmarks panel keeps its card").toBeGreaterThan(90);
+  expect(lb.height, "the layers panel keeps a usable list").toBeGreaterThan(180);
+  expect(lb.y, "stacked, not overlapping").toBeGreaterThanOrEqual(bb.y + bb.height - 1);
+  const vh = p.viewportSize()!.height;
+  expect(lb.y + lb.height, "clear of the bottom controls").toBeLessThan(vh - 60);
+  await expect(layers.locator("[data-opacity]")).toHaveCount(0);
+  // The filter narrows the list; Escape clears it.
+  const filter = layers.getByRole("searchbox", { name: "Filter the layers by name" });
+  await expect(filter).toBeVisible();
+  await filter.fill("zzz");
+  await expect(layers.getByText("No layer has that name.")).toBeVisible();
+  await filter.fill("stroke");
+  await expect(layers.locator("li.layer")).toHaveCount(18);
+  await p.keyboard.press("Escape");
+  await expect(filter).toHaveValue("");
+  // A selection brings the settings under the list.
+  await layers.locator("li.layer").first().click();
+  await expect(layers.locator("[data-opacity]")).toBeVisible();
+  const list = (await layers.locator('ul[role="tree"]').boundingBox())!;
+  expect(list.height).toBeGreaterThan(100);
   expect(app.consoleErrors).toEqual([]);
 });

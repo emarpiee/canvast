@@ -1588,3 +1588,24 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 @media (hover: none), (max-width: 640px) {
   .bookmarks-panel .bookmark-actions { position: static; transform: none; flex: 1 0 100%; justify-content: flex-end; padding: 0; background: none; border: 0; box-shadow: none; opacity: 1; }
 }
+
+/* ---- Panels stack (ADR 0066): neither squeezes the other away; the Layers list scrolls and the selection settings sit under it ---- */
+#side-panels { max-height: calc(100% - var(--bar-bottom, 56px) - 96px); }
+.layers-panel { overflow: hidden; }
+#side-panels > .bookmarks-panel { flex: 0 1 auto; max-height: 36%; min-height: 96px; }
+.bookmarks-panel > ul { overflow-y: auto; min-height: 0; }
+#side-panels > .layers-panel:not(.bookmarks-panel) { flex: 1 1 auto; min-height: 180px; }
+.layers-panel > ul[role="tree"] { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.layers-panel > header, .layers-panel > .layers-filter, .layers-panel > .layers-sort, .layers-panel > .layers-links, .layers-panel > label, .layers-panel > .layers-tags { flex: none; }
+.layers-filter { padding: 6px 8px 2px; }
+.layers-filter input { width: 100%; box-sizing: border-box; height: 30px; padding: 0 10px; font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); border: 1px solid var(--hud-border); border-radius: 999px; outline: 0; }
+.layers-filter input:focus { border-color: var(--hud-accent); }
+.layers-more-row { list-style: none; padding: 4px 0; }
+.layers-more-row button { width: 100%; height: 30px; font: inherit; color: var(--hud-accent); background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.layers-more-row button:hover { background: var(--hud-hover); }
+/* The eye and the lock stay quiet until a row is pointed at or selected, unless the item is hidden or locked (touch screens always show them). */
+@media (hover: hover) {
+  .layer .layer-btn[aria-pressed="false"] { opacity: 0; }
+  .layer:hover .layer-btn[aria-pressed="false"], .layer:focus-within .layer-btn[aria-pressed="false"], .layer.is-selected .layer-btn[aria-pressed="false"] { opacity: 0.8; }
+}
+@media (hover: none), (max-width: 640px) { .layer .layer-btn[aria-pressed="false"] { opacity: 0.7; } }

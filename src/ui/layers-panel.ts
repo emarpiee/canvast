@@ -111,6 +111,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   host.appendChild(panel);
   const open = new Set<string>(); // expanded groups
   let sortOpen = false;
+  /** Filter by name (shown once there are many layers) and how many rows are drawn so far. */
+  let filter = "";
+  let limit = MAX_ROWS;
+  let refocusFilter = false;
   /** The tag being typed survives a redraw of the panel. */
   let tagDraft = "";
   let refocusTag = false;
@@ -131,6 +135,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   /** Opacity of the selection (the first object's when they differ). */
   const footer = (): string => {
     const sel = selectedObjs();
+    if (!sel.length) return ""; // nothing selected: nothing to set (the panel is all list)
     const pct = Math.round((sel[0]?.opacity ?? 1) * 100);
     const blend = sel[0]?.blend ?? "";
     const modes = ["", ...BLEND_MODES].map((m) => `<option value="${m}"${m === blend ? " selected" : ""}>${m ? m.replace(/-/g, " ") : "normal"}</option>`).join("");
@@ -218,7 +223,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
     let rows = 0;
     const row = (n: Node, depth: number): string => {
-      if (rows >= MAX_ROWS) return "";
+      if (rows >= limit) return "";
       rows++;
       const first = n.members[0]!;
       const lab = n.group ? { icon: ICONS.group, text: first.groupNames?.[n.id] ?? `Group (${n.members.length})`, swatch: undefined } : labelOf(first, names);
@@ -236,7 +241,15 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       </li>`;
       return head + (expanded ? n.children.map((c) => row(c, depth + 1)).join("") : "");
     };
-    const list = tree.map((n) => row(n, 0)).join("");
+    // Filtering lists the matching items flat, front first (a group matches by its name or any of its groups' names).
+    const q = filter.trim().toLowerCase();
+    const shownTree: Node[] = q
+      ? [...all]
+          .sort((a, b) => b.z - a.z || (a.id < b.id ? 1 : -1))
+          .filter((o) => `${labelOf(o, names).text} ${(o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ")}`.toLowerCase().includes(q))
+          .map((o): Node => ({ id: o.id, group: false, members: [o], children: [], z: o.z }))
+      : tree;
+    const list = shownTree.map((n) => row(n, 0)).join("");
     panel.innerHTML = `
       <header><h2>Layers <span class="layers-count">${all.length}</span></h2>
         <span class="layers-tools">
@@ -244,11 +257,20 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
           <button type="button" class="layer-btn" data-fold-all aria-label="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}" title="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}">${tree.some((n) => n.group && !open.has(n.id)) ? ICONS.chevronsUpDown : ICONS.chevronsDownUp}</button>
           <button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button>
         </span></header>
+      ${all.length > 12 || filter ? `<div class="layers-filter"><input type="search" data-layers-filter placeholder="Filter ${all.length} layers by name" aria-label="Filter the layers by name" autocomplete="off" value="${esc(filter)}"></div>` : ""}
       ${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}
-      <ul role="tree" aria-label="Objects, front to back">${list || '<li class="layers-empty">Nothing on this canvas yet.</li>'}</ul>
+      <ul role="tree" aria-label="Objects, front to back">${list || `<li class="layers-empty">${q ? "No layer has that name." : "Nothing on this canvas yet."}</li>`}${rows >= limit ? `<li class="layers-more-row"><button type="button" data-more>Show ${MAX_ROWS} more rows</button></li>` : ""}</ul>
       <div class="layers-links" data-links>${linksHtml()}</div>
       ${footer()}
-      ${rows >= MAX_ROWS ? `<p class="layers-note">Showing the front ${MAX_ROWS} rows.</p>` : ""}`;
+`;
+    if (refocusFilter) {
+      refocusFilter = false;
+      const f = panel.querySelector<HTMLInputElement>("[data-layers-filter]");
+      if (f) {
+        f.focus();
+        f.setSelectionRange(f.value.length, f.value.length);
+      }
+    }
     if (refocusTag) {
       refocusTag = false;
       panel.querySelector<HTMLInputElement>("[data-canvas-tag-input]")?.focus();
@@ -326,6 +348,16 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     render();
   });
   panel.addEventListener("keydown", (e) => {
+    const filterInput = e.target as HTMLInputElement;
+    if (filterInput.matches?.("[data-layers-filter]")) {
+      e.stopPropagation();
+      if (e.key === "Escape" && filter) {
+        filter = "";
+        refocusFilter = true;
+        render();
+      }
+      return;
+    }
     const tagInput = e.target as HTMLInputElement;
     if (tagInput.matches?.("[data-canvas-tag-input]")) {
       e.stopPropagation(); // typing a tag never reaches the canvas shortcuts
@@ -374,6 +406,12 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
         out.insertAdjacentHTML("beforeend", list.map((b) => item(b.id, b.label, b.canvasName)).join(""));
       });
     }
+    if (t.matches("[data-layers-filter]")) {
+      filter = t.value;
+      limit = MAX_ROWS;
+      refocusFilter = true;
+      render();
+    }
     if (t.matches("[data-canvas-tag-input]")) tagDraft = t.value;
     if (t.matches("[data-opacity]")) t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
   });
@@ -414,6 +452,11 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const untag = t.closest<HTMLElement>("[data-untag-canvas]");
     if (untag) {
       actions.tag([...editor.selection], { remove: [untag.dataset["untagCanvas"]!] });
+      return;
+    }
+    if (t.closest("[data-more]")) {
+      limit += MAX_ROWS;
+      render();
       return;
     }
     if (t.closest("[data-sort-toggle]")) {
