@@ -30,6 +30,7 @@ import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
 import folderXIcon from "lucide-static/icons/folder-x.svg";
 import sparklesIcon from "lucide-static/icons/sparkles.svg";
 import leafIcon from "lucide-static/icons/leaf.svg";
+import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
 import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
@@ -172,6 +173,7 @@ export const ICONS = {
   folderX: clean(folderXIcon),
   sparkles: clean(sparklesIcon),
   leaf: clean(leafIcon),
+  library: clean(libraryIcon),
   panelBottomClose: clean(panelBottomCloseIcon),
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),

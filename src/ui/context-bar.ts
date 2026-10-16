@@ -21,7 +21,10 @@ export interface ContextActions {
   resetProportions(): void;
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean };
-  /** Open the Layers panel on the tag box for the selection. */
+  /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
+  hasLibraryItems(): boolean;
+  showInLibrary(): void;
+  /** Open the Tags panel on the box for the selection. */
   tag(): void;
   group(): void;
   ungroup(): void;
@@ -51,6 +54,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
     btn("tag", ICONS.tag, "Tag the selection") +
+    btn("library", ICONS.library, "Show in the library") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
     btn("layout", ICONS.blocks, "Arrange and align") +
@@ -129,6 +133,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         }
         break;
       case "tag": actions.tag(); break;
+      case "library": actions.showInLibrary(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
@@ -158,6 +163,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
     q("layout").hidden = sel.length < 2;
     const reset = actions.resettable();
+    q("library").hidden = !actions.hasLibraryItems();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
     if (sel.length < 2) closeMenu();

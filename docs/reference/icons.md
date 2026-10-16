@@ -58,6 +58,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `leaf` | Zen mode |
 | `list-filter-plus` | Save the current search as a smart folder |
 | `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
+| `library` | Show in the library (selection bar) |
 | `lock` | Lock thickness |
 | `lock-keyhole` | Lock the selection: it is drawn, but cannot be pic; Lock selection |
 | `lock-keyhole-open` | Unlock all |

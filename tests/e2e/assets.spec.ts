@@ -1478,6 +1478,33 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Show in the library: the selection bar takes the selected pictures' originals to the Assets view, picked, with any search cleared (ADR 0077)", async ({ app }) => {
+  const p = app.page;
+  await importOnCanvas(p);
+  await importOnCanvas(p, GREEN, "green.png");
+  await p.locator("#canvas").focus();
+  await p.keyboard.press("Control+a");
+  const show = p.getByRole("button", { name: "Show in the library" });
+  await expect(show).toBeVisible();
+  // With nothing selected the bar, and so the button, is gone.
+  await p.keyboard.press("Escape");
+  await expect(show).toBeHidden();
+  await p.keyboard.press("Control+a");
+  // Something is searched in the library first; the reveal clears it so the originals are in the list.
+  await toAssets(p);
+  await p.getByTestId("assets-search").fill("zzz-nothing");
+  await expect(p.getByTestId("asset-card")).toHaveCount(0);
+  await p.getByTestId("view-canvas").click();
+  await p.keyboard.press("Control+a");
+  await show.click();
+  expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("assets");
+  await expect(p.getByTestId("assets-search")).toHaveValue("");
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  await expect(p.getByTestId("asset-card").first()).toHaveAttribute("aria-pressed", "true");
+  await expect(p.getByTestId("asset-card").nth(1)).toHaveAttribute("aria-pressed", "true");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("in-canvas tags: rename and delete a tag on every canvas, from the Tags panel or the Assets sidebar (ADR 0070, 0076)", async ({ app }) => {
   const p = app.page;
   const tagsOf = async (id: string) => ((await objects(p)) as Array<{ id: string; tags?: string[] }>).find((o) => o.id === id)?.tags;

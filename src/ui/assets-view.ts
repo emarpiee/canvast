@@ -44,6 +44,8 @@ export interface AssetsView {
   hide(): void;
   /** Put the cursor in the library's search box (closing the viewer if it is open). */
   focusSearch(): void;
+  /** Show these originals: leave the viewer, clear the search and filters, pick them and scroll to the first (ADR 0077). */
+  reveal(hashes: readonly string[]): Promise<void>;
   /** Import files into the library only (no placement). */
   importFiles(files: File[]): Promise<void>;
 }
@@ -2170,6 +2172,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void refresh();
       if (viewer.hidden) search.focus();
       else viewer.focus();
+    },
+    async reveal(hashes) {
+      if (!viewer.hidden) closeSlide();
+      // Show everything, so the originals are in the list whatever was searched or filtered before.
+      search.value = "";
+      usageSel.value = "all";
+      setWay("all");
+      scope = "all";
+      paintSearchUi();
+      await refresh();
+      const known = new Set(listing?.entries.map((e) => e.hash));
+      const have = hashes.filter((h) => known.has(h));
+      picked.clear();
+      for (const h of have) picked.add(h);
+      selected = have[have.length - 1] ?? null;
+      anchor = selected;
+      places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
+      render();
+      markPicked();
+      renderInspector();
+      if (have[0]) grid.querySelector<HTMLElement>(`[data-hash="${CSS.escape(have[0])}"]`)?.scrollIntoView({ block: "center" });
+      if (have.length < hashes.length) status.textContent = `${hashes.length - have.length} of the selected items are not in the library any more.`;
     },
     focusSearch() {
       if (!viewer.hidden) closeSlide();

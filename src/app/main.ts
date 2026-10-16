@@ -551,6 +551,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         editor.changed();
         requestAnimationFrame(() => tagsPanel.focusAdd());
       },
+      hasLibraryItems: () => [...editor.selection].some((id) => doc.get(id)?.kind === "image"),
+      showInLibrary: () => {
+        const hashes = [...new Set([...editor.selection].map((id) => doc.get(id)).flatMap((o) => (o?.kind === "image" ? [o.assetId] : [])))];
+        if (!hashes.length) return;
+        setView("assets");
+        void assetsView.reveal(hashes);
+      },
       group: () => groupSelection(doc, editor),
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),
