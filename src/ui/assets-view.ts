@@ -1,4 +1,5 @@
 import type { Session, AssetPlace } from "../app/session";
+import { evalQuery, parseQuery, type Query } from "../search/query";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetFolder, CatalogListing } from "../assets/asset-catalog";
@@ -76,7 +77,7 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
-      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
+      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly. AND OR XOR NOT, - and ( ) combine words: red OR blue, cat -dog" aria-label="Search assets">
       <span class="assets-count" data-testid="assets-count"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
@@ -825,11 +826,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const usesText = (instances: number, canvases: number): string =>
     instances === 0 ? "Unused" : `Used ${instances} time${instances === 1 ? "" : "s"} on ${canvases} canvas${canvases === 1 ? "" : "es"}`;
 
-  const searchWords = (q: string): string[] => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  /** Search words (name, type, hash start, tags; `#tag` is exact) and the usage filter: what a smart folder saves. */
-  const matchesQuery = (e: CatalogListing["entries"][number], words: readonly string[], usage: UsageFilter): boolean => {
+  const searchWords = (q: string): Query | null => parseQuery(q).query;
+  /** The search (name, type, hash start, tags; `#tag` is exact; AND, OR, XOR, NOT as in ADR 0069) and the usage filter: what a smart folder saves. */
+  const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter): boolean => {
     const tags = meta(e).tags.map((t) => t.toLowerCase());
-    const words_ok = words.every((w) =>
+    const words_ok = evalQuery(query, ({ text: w }) =>
       w.startsWith("#")
         ? tags.includes(w.slice(1))
         : e.name.toLowerCase().includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || tags.some((t) => t.includes(w)),

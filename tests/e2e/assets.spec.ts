@@ -1388,6 +1388,14 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(2);
   await p.keyboard.press("Shift+Enter");
   expect((await selection()).length).toBe(2);
+  // AND, OR, XOR, NOT work here too (ADR 0069): by name, and over a picture's whole tag list.
+  await p.keyboard.press("/");
+  await box.fill("/blocks OR green");
+  await expect(results.getByRole("option")).toHaveCount(2);
+  await box.fill("/.png -green");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await box.fill("#sky XOR sky");
+  await expect(results.getByRole("option")).toHaveCount(0);
   // "@": bookmarks. Save one, move away, and go back by name.
   await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
   await p.getByRole("button", { name: "Add bookmark" }).click();

@@ -282,7 +282,7 @@ export class AssetCatalog {
         n++;
       }
       const smart = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
-      const word = new RegExp(`(^|\\s)#${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`, "gi");
+      const word = new RegExp(`(^|[\\s(!&|^-])#${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=[\\s)&|^]|$)`, "gi");
       if (smart.some((x) => word.test(x.search))) {
         word.lastIndex = 0;
         tx.objectStore("meta").put(smart.map((x) => ({ ...x, search: x.search.replace(word, `$1#${target}`) })), SMART_KEY);

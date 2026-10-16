@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Search takes AND, OR, XOR, NOT, `-`, brackets and "phrases" in the library, smart folders and the canvas search (ADR 0069).
+
 - Shared ⋯ More menu for bookmarks, navigator and sidebar; Layers Rename/Hide/Lock moved to the selection settings with elbow guide lines (ADR 0068).
 - Design tokens for all CSS colour, text, spacing and radius, enforced by `npm run check:tokens` (ADR 0068).
 - Fix: Ctrl+Shift+F could miss when the canvas search had just closed.

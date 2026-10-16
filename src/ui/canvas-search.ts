@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { evalQuery, parseQuery } from "../search/query";
 import type { BookmarkList } from "../app/bookmarks";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject } from "../doc/model";
@@ -70,11 +71,12 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   let token = 0;
 
   const compute = (): void => {
-    const q = input.value.trim().toLowerCase();
+    const q = parseQuery(input.value).query;
     const out: Result[] = [];
     if (mode === "bookmark") {
       for (const b of deps.bookmarks.items) {
-        if (q && !b.name.toLowerCase().includes(q)) continue;
+        const bn = b.name.toLowerCase();
+        if (!evalQuery(q, (t) => bn.includes(t.text.replace(/^#/, "")))) continue;
         out.push({ key: `b:${b.id}`, icon: ICONS.bookmark, label: b.name, note: "Bookmark", bookmark: b.id });
       }
     } else {
@@ -84,13 +86,15 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
         if (mode === "tag") {
           // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
           const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
-          const hit = [...new Map(t.filter((x) => !q || x.toLowerCase().includes(q)).map((x) => [x.toLowerCase(), x] as const)).values()];
-          if (!hit.length) continue;
+          const all = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
+          // A term matches when some tag contains it; NOT and XOR then apply to the item's whole tag list.
+          if (!all.length || !evalQuery(q, (term) => all.some((x) => x.toLowerCase().includes(term.text.replace(/^#/, ""))))) continue;
+          const hit = all;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: hit.map((x) => `#${x}`).join(" "), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else {
           const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
           const hay = `${lab.text} ${groupName}`.toLowerCase();
-          if (q && !hay.includes(q)) continue;
+          if (!evalQuery(q, (t) => hay.includes(t.text))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         }
         if (out.length >= MAX_RESULTS) break;

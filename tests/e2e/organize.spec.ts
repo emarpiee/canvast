@@ -91,6 +91,13 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await searchFor("#ref", 1);
   await searchFor("#re", 0);
   await searchFor("png colour", 1);
+  // AND, OR, XOR, NOT and brackets (ADR 0069); an unreadable query is read as plain words.
+  await searchFor("hand OR png", 2);
+  await searchFor("hand AND png", 1);
+  await searchFor("hand XOR png", 1);
+  await searchFor("png -#ref", 1);
+  await searchFor("NOT (hand OR colour)", 0);
+  await searchFor("(hand", 1);
   await searchFor("", 2);
 
   // A smart folder saves a search (ADR 0035): it counts its matches, applies them when clicked, and can be renamed.
