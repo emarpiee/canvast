@@ -96,12 +96,14 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     <div class="hud-controls" role="toolbar" aria-label="Navigation">
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
+      <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
+      <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
+      <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.maximize}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
-      <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>
   `;

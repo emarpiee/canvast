@@ -1835,3 +1835,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .tag-row:hover .more-btn, .tag-row:focus-within .more-btn, .tag-row .more-btn[aria-expanded="true"] { opacity: 1; }
 .tag-row .tag-input { margin: var(--sp-2) var(--sp-5); }
 @media (hover: none), (max-width: 640px) { .tag-row .more-btn { opacity: 1; } }
+
+/* The bottom-right controls in three groups: what is shown, zoom, and where to go. */
+.hud-controls .hud-sep { align-self: stretch; flex: none; width: 1px; margin: var(--sp-2) var(--sp-1); background: var(--hud-border); }
