@@ -1464,3 +1464,38 @@ test("in-canvas tags: tag items on the canvas, list them across the workspace, a
   expect(tagged.length, "the original instance and the new one").toBe(2);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("phone layout (360 px wide): the gallery is two columns, the details are a bottom sheet, and the viewer has the whole screen (ADR 0061)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 360, height: 780 });
+  await toAssets(p);
+  for (let i = 0; i < 4; i++) {
+    const png = makePng(80 + i * 8, 60, (x, y) => [(x * 5 + i * 40) % 256, (y * 6) % 256, 120, 255]);
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `item-${i}.png`, mimeType: "image/png", buffer: png });
+  }
+  const cards = p.getByTestId("asset-card");
+  await expect(cards).toHaveCount(4);
+  const [a, b, c] = [await cards.nth(0).boundingBox(), await cards.nth(1).boundingBox(), await cards.nth(2).boundingBox()];
+  expect(Math.abs(a!.y - b!.y), "two on a row").toBeLessThan(2);
+  expect(c!.y, "the third starts a new row").toBeGreaterThan(a!.y + a!.height - 2);
+  expect(a!.width, "each about half the width").toBeLessThan(180);
+  expect(a!.x + a!.width).toBeLessThanOrEqual(b!.x);
+  // One tap shows the details as a sheet at the bottom edge, inside the screen.
+  await cards.nth(0).click();
+  const sheet = p.getByTestId("asset-inspector");
+  await expect(sheet).toBeVisible();
+  const box = (await sheet.boundingBox())!;
+  expect(Math.abs(box.y + box.height - 780)).toBeLessThan(2);
+  expect(box.height).toBeLessThanOrEqual(780 * 0.58 + 2);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(360);
+  // The viewer: the picture fills the screen under the tabs, with no sheet over it.
+  await cards.nth(0).dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  await expect(sheet).toBeHidden();
+  const v = (await viewer.boundingBox())!;
+  expect(v.height).toBeGreaterThan(500);
+  expect(v.x + v.width).toBeLessThanOrEqual(360);
+  expect(app.consoleErrors).toEqual([]);
+});

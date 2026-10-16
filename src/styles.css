@@ -1456,3 +1456,21 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .layers-tags .tag-input:focus { border-bottom-color: var(--hud-accent); }
 .tag-chip.is-suggest { padding: 2px 10px; font: inherit; font-size: 12px; color: inherit; background: transparent; border: 1px dashed var(--hud-muted); cursor: pointer; }
 .tag-chip.is-suggest:hover:not(:disabled) { background: var(--hud-hover); border-style: solid; }
+
+/* ---- Phones, Assets view (ADR 0061): two columns, details as a bottom sheet, the viewer given the whole screen ---- */
+@media (max-width: 640px) {
+  .assets-body:not(.is-list) .assets-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .assets-body:not(.is-list) .assets-grid::after { display: none; }
+  .assets-body:not(.is-list) .asset-cell { flex: none; min-width: 0; aspect-ratio: 1; }
+  .assets-body:not(.is-list) .asset-card img { object-fit: cover; }
+  .assets-body .asset-inspector { background: var(--canvas-bg); position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; flex: none; max-height: 58vh; padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; box-shadow: var(--hud-lift); }
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details) .assets-scroll { padding-bottom: 58vh; }
+  .assets-body.is-viewing .asset-inspector { display: none; }
+  .assets-body.is-viewing .viewer { position: absolute; inset: 0; top: 0; }
+  #assets-view:has(.assets-body.is-viewing) { padding-top: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + 8px); }
+  /* The viewer takes the screen under the tabs: the library bar steps aside, its controls wrap in two rows. */
+  #assets-view:has(.assets-body.is-viewing) .assets-bar { display: none; }
+  .viewer-bar { flex-wrap: wrap; gap: 4px 8px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .viewer-tools { flex-wrap: wrap; justify-content: flex-end; flex: 1; }
+  .viewer-pos { min-width: 0; padding: 0 4px; }
+}
