@@ -1474,3 +1474,12 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .viewer-tools { flex-wrap: wrap; justify-content: flex-end; flex: 1; }
   .viewer-pos { min-width: 0; padding: 0 4px; }
 }
+
+/* The viewer's invisible edges (click: previous or next) and the caption, shown only when it carries a note */
+.viewer-edge { position: absolute; top: 0; bottom: 56px; z-index: 1; width: calc(var(--edge-w, 15) * 1%); cursor: pointer; }
+.viewer-edge.is-prev { left: 0; }
+.viewer-edge.is-next { right: 0; }
+.viewer.is-zoomed .viewer-edge, .viewer.is-actual .viewer-edge { display: none; }
+.viewer { --edge-w: 15; }
+.viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
+.viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }

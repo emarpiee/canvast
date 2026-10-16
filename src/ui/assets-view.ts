@@ -91,7 +91,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="assets-main">
         <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
-          <div class="viewer-stage"><span class="viewer-progress" hidden></span>
+          <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <div class="viewer-zoom" role="group" aria-label="Zoom">
               <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (-)">${ICONS.minus}</button>
               <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
@@ -501,6 +501,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else markFilm();
     const label = `${e.name || "Untitled"}, ${e.pixelW} × ${e.pixelH} px, ${fmtBytes(e.size)}`;
     slideCaption.textContent = label;
+    slideCaption.classList.remove("is-note"); // the file name is in the details; the caption shows only a note
     slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
     // A small original is not stretched across the page into a blur: it is shown up to three times its own size, centred.
     slideImg.style.maxWidth = `${e.pixelW * 3}px`;
@@ -516,6 +517,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (token !== slideToken) return;
     const thumbnail = async (): Promise<void> => {
       slideCaption.textContent = `${label}. The original is missing or damaged; showing its thumbnail.`;
+      slideCaption.classList.add("is-note");
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
@@ -525,6 +527,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.removeAttribute("style");
       slideImg.src = `data:image/svg+xml;utf8,${encodeURIComponent(FILE_PICTURE)}`;
       slideCaption.textContent = `${label}. This kind of file has no preview.`;
+      slideCaption.classList.add("is-note");
       armShow();
       return;
     }
@@ -568,6 +571,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // Back in the library the card of the asset that was open is in view.
     if (was) grid.querySelector<HTMLElement>(`.asset-card[data-hash="${was}"]`)?.scrollIntoView({ block: "nearest" });
   };
+  // The invisible edges of the viewer: a click on the left or right side goes to the previous or next asset (the width is a setting).
+  const applyEdge = (): void => void viewer.style.setProperty("--edge-w", String(settings.get("assets.edgeWidth")));
+  applyEdge();
+  for (const edge of viewer.querySelectorAll<HTMLElement>(".viewer-edge")) {
+    edge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      stepSlide(edge.dataset["edge"] === "prev" ? -1 : 1);
+    });
+    for (const type of ["pointerdown", "dblclick"]) edge.addEventListener(type, (e) => e.stopPropagation());
+  }
   const stepSlide = (d: number): void => {
     const list = viewList().map((x) => x.hash);
     const i = list.indexOf(slideHash ?? "");
@@ -612,6 +625,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   // The time per slide is a setting (Settings > Media and playback); a change applies to the slide on screen.
   settings.subscribe((key) => {
+    if (key === "assets.edgeWidth") applyEdge();
     if (key === "assets.slideSeconds") armShow();
   });
   /** Open the viewer on one asset and start the slideshow; `only` limits it to a picked set. */

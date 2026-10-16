@@ -1499,3 +1499,42 @@ test("phone layout (360 px wide): the gallery is two columns, the details are a 
   expect(v.x + v.width).toBeLessThanOrEqual(360);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("viewer edges: a click on the invisible left or right side goes to the previous or next asset, the width is a setting, and the file name is not floated over the picture (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  for (let i = 0; i < 3; i++) {
+    const png = makePng(60 + i * 8, 40, (x, y) => [(x * 5 + i * 60) % 256, (y * 6) % 256, 140, 255]);
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `edge-${i}.png`, mimeType: "image/png", buffer: png });
+  }
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  await p.getByTestId("asset-card").first().dblclick();
+  const viewer = p.getByTestId("slide-view");
+  const pos = viewer.locator(".viewer-pos");
+  await expect(pos).toHaveText("1 of 3");
+  const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
+  const y = stage.y + stage.height / 2;
+  // Right edge: next; left edge: back; the middle does nothing (and a double-click there still zooms).
+  await p.mouse.click(stage.x + stage.width - 20, y);
+  await expect(pos).toHaveText("2 of 3");
+  await p.mouse.click(stage.x + 20, y);
+  await expect(pos).toHaveText("1 of 3");
+  await p.mouse.click(stage.x + stage.width / 2, y);
+  await app.frame();
+  await expect(pos).toHaveText("1 of 3");
+  // There are no buttons to see: the edges are plain areas, and the caption is not drawn over the picture.
+  await expect(viewer.locator(".viewer-edge").first()).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  expect((await viewer.locator("figcaption").boundingBox())!.width).toBeLessThanOrEqual(1);
+  // Width 0 turns them off.
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "assets.edgeWidth": 0 })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await p.getByTestId("asset-card").first().dblclick();
+  await expect(pos).toHaveText("1 of 3");
+  const s2 = (await viewer.locator(".viewer-stage").boundingBox())!;
+  await p.mouse.click(s2.x + s2.width - 20, s2.y + s2.height / 2);
+  await app.frame();
+  await expect(pos).toHaveText("1 of 3");
+  expect(app.consoleErrors).toEqual([]);
+});
