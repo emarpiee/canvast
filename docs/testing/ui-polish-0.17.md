@@ -1,6 +1,6 @@
 # v0.17.0 test record (UI, assets and canvas tools)
 
-Run per slice on Chromium (and the new tests on Firefox), as the cadence rule says; **the full suite has not been run since v0.16.0** (Phase 7: 428 passed). Run it once before the next push or before Phase 8 begins.
+Run per slice on Chromium (and the new tests on Firefox), as the cadence rule says; **the full suite has not been run since v0.16.0** (Phase 7: 428 passed). Run it once, last, after all the planned work is done (owner, 2026-10-17).
 
 | Area | Specs that cover it | Last result |
 | --- | --- | --- |
