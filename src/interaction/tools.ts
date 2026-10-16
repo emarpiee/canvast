@@ -143,6 +143,8 @@ type Gesture =
       frame: Frame;
       fixedWorld: WorldPoint;
       start: ScreenPoint;
+      /** Where on the handle the pointer took hold: the edge follows the pointer with this offset, and it is the edge that snaps. */
+      grab: ScreenPoint;
       /** The box's middle (Alt resizes about it) and, for a side handle, which side. */
       centre: ScreenPoint;
       edge: Edge | null;
@@ -384,6 +386,7 @@ export function attachTools(
           frame: view.frame,
           fixedWorld: world({ x: h.fixed[0], y: h.fixed[1] }),
           start: { x: h.at[0], y: h.at[1] },
+          grab: { x: s.x - h.at[0], y: s.y - h.at[1] },
           centre: { x: sel.frame.centre[0], y: sel.frame.centre[1] },
           edge: h.edge,
           free,
@@ -493,8 +496,9 @@ export function attachTools(
     const proportional = mods.shift || !gs.free;
     const moveX = gs.edge !== "n" && gs.edge !== "s";
     const moveY = gs.edge !== "e" && gs.edge !== "w";
-    let px = s.x;
-    let py = s.y;
+    // The dragged edge (not the pointer) is what lines up: it sits where the pointer is, less the offset it was grabbed at.
+    let px = s.x - gs.grab.x;
+    let py = s.y - gs.grab.y;
     editor.guides = null;
     let snapped: "x" | "y" | null = null;
     const sn = gs.snap;

@@ -617,6 +617,15 @@ test("resize, Figma style: corners and sides follow the pointer; Shift keeps the
   await drag(handle2, [wb.minX - 3 - 12, handle2[1]]);
   await drag([(await frame())[1]![0], ((await frame())[1]![1] + (await frame())[2]![1]) / 2], [wb.minX - 3, handle2[1]], ["Control"]);
   expect(Math.abs((await boxOf(img.id)).maxX - (wb.minX - 3)), "Ctrl: exactly where the pointer is").toBeLessThan(1.5);
+  // It is the dragged EDGE that snaps, not the pointer: grabbed 4 px inside the handle, with the pointer 7 px short of the wall the edge
+  // is 3 px short of it and lands on it (a pointer-based snap would be out of reach and leave it 3 px short).
+  let f = await frame();
+  const h3: [number, number] = [f[1]![0], (f[1]![1] + f[2]![1]) / 2];
+  await drag([h3[0] - 4, h3[1]], [h3[0] - 40, h3[1]], ["Control"]);
+  f = await frame();
+  const h4: [number, number] = [f[1]![0], (f[1]![1] + f[2]![1]) / 2];
+  await drag([h4[0] - 4, h4[1]], [wb.minX - 7, h4[1]]);
+  expect(Math.abs((await boxOf(img.id)).maxX - wb.minX), "the edge, not the pointer, snapped").toBeLessThan(0.6);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -757,5 +766,30 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   const after = await box();
   expect(Math.abs((after.minX + after.maxX) / 2 - (mid1.minX + mid1.maxX) / 2), "turned about its middle").toBeLessThan(1);
   await expect(unrotate).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Alt fit-to-view uses what is near and visible at this zoom: items far away at the same zoom are left out, never an empty view (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const a = await penStroke(app, [[500, 300], [580, 340]]);
+  // A second stroke about 30 windows to the right (Shift+Right pans half a window).
+  for (let i = 0; i < 60; i++) await key(app, "Shift+ArrowRight");
+  await app.frame();
+  await penStroke(app, [[600, 400], [680, 440]]);
+  await key(app, "0");
+  await app.frame();
+  await key(app, "v");
+  const s = (await screenOfObject(app, a.id))!.box;
+  await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+  expect(await selection(app)).toEqual([a.id]);
+  for (let i = 0; i < 2; i++) {
+    await p.keyboard.down("Alt");
+    await p.keyboard.up("Alt");
+    await app.frame();
+  }
+  const box = (await screenOfObject(app, a.id))!.box;
+  expect(box.minX).toBeGreaterThanOrEqual(0);
+  expect(box.maxX).toBeLessThanOrEqual(1280);
+  expect(box.maxX - box.minX, "still a clear size, not a speck").toBeGreaterThan(40);
   expect(app.consoleErrors).toEqual([]);
 });

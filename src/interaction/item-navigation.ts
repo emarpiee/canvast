@@ -227,20 +227,53 @@ export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: Edi
 }
 
 /**
- * Fit the view to everything that can be seen at this zoom: the items that are not hidden and are neither too small to see nor far
- * larger than the window (the same rule as the "nearest in view" way of stepping). Returns false when there is nothing to fit.
+ * Fit the view to everything that counts as visible at this zoom (the second tap of Alt, the "fit everything" button).
+ *  - With a selection: the selected items and every other item that is legible (4 px up to 16 windows), within a factor of 8 of the
+ *    selection's size, and not more than 12 selection-sizes away. That is what "at this zoom" means: the same depth, and near, however
+ *    far the view has zoomed in on the selection. Items far off or of a very different size stay out.
+ *  - With nothing selected: the items near the window (within 3 window-widths of it) that are legible and at most 4 windows large.
+ * Returns false when there is nothing to fit.
  */
-export function fitAllVisible(doc: DocumentStore, view: ViewState): boolean {
+export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: EditorState): boolean {
   const vp = view.viewport;
-  const near: CanvasObject[] = [];
+  const cam = view.camera;
+  interface Px {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    size: number;
+  }
+  const pxBox = (b: { min: WorldPoint; max: WorldPoint }): Px => {
+    const a = worldToScreen(cam, vp, b.min);
+    const c = worldToScreen(cam, vp, b.max);
+    const minX = Math.min(a.x, c.x);
+    const maxX = Math.max(a.x, c.x);
+    const minY = Math.min(a.y, c.y);
+    const maxY = Math.max(a.y, c.y);
+    return { minX, maxX, minY, maxY, size: Math.max(maxX - minX, maxY - minY) };
+  };
+  const picked = editor ? doc.ordered().filter((o) => editor.selection.has(o.id)) : [];
+  const anchorWorld = picked.length ? boxIn(view, picked) : null;
+  const anchor = anchorWorld ? pxBox(anchorWorld) : null;
+  const near: CanvasObject[] = [...picked];
+  const reachX = 3 * vp.width;
+  const reachY = 3 * vp.height;
   for (const o of doc.ordered()) {
-    if (o.hidden) continue;
-    const b = boxIn(view, [o]);
-    if (!b) continue;
-    const a = worldToScreen(view.camera, vp, b.min);
-    const c = worldToScreen(view.camera, vp, b.max);
-    const px = Math.max(Math.abs(c.x - a.x), Math.abs(c.y - a.y));
-    if (px >= MIN_SEEN_PX && px <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height)) near.push(o);
+    if (o.hidden || (editor && editor.selection.has(o.id))) continue;
+    const w = boxIn(view, [o]);
+    if (!w) continue;
+    const b = pxBox(w);
+    if (anchor) {
+      if (!(b.size >= MIN_SEEN_PX && b.size <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height))) continue;
+      if (b.size > anchor.size * 8 || b.size < anchor.size / 8) continue;
+      const gap = Math.hypot(Math.max(0, anchor.minX - b.maxX, b.minX - anchor.maxX), Math.max(0, anchor.minY - b.maxY, b.minY - anchor.maxY));
+      if (gap > 12 * anchor.size) continue;
+    } else {
+      if (!(b.size >= MIN_SEEN_PX && b.size <= 4 * Math.max(vp.width, vp.height))) continue;
+      if (b.maxX < -reachX || b.minX > vp.width + reachX || b.maxY < -reachY || b.minY > vp.height + reachY) continue;
+    }
+    near.push(o);
   }
   const bounds = boxIn(view, near);
   if (!bounds) return false;
@@ -259,7 +292,7 @@ export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: Ed
     last = { kind, cam: here() };
   };
   const all = (): void => {
-    if (fitAllVisible(doc, view)) remember("all");
+    if (fitAllVisible(doc, view, editor)) remember("all");
     else {
       editor.message = "Nothing to fit at this zoom.";
       editor.changed();
