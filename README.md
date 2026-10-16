@@ -23,7 +23,7 @@ or network connection.
 > player's controls, multi-select, one folder per asset, renamable tags, a
 > plain ZIP by kind or folder, whole-workspace export and import); in-canvas
 > tags; search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`) and
-> boolean search (ADR 0069); stepping with `Ctrl+Arrow` and `Alt`; Side-handle
+> boolean search (ADR 0069); stepping with W A S D and `Alt`; Side-handle
 > resize; `Alt`+drag to copy; a Layers panel with sort, guides, Ctrl/Shift
 > selection and Rename, Hide and Lock for the selection; a shared ⋯ More menu;
 > design tokens for every colour, size, space and radius (ADR 0068); one HTML
@@ -211,7 +211,7 @@ or network connection.
 - **Snapping, arranging and clipboard:** a moving selection snaps to other
   objects with guide lines; align, distribute, copy, cut, paste and
   duplicate; `Alt`+drag copies.
-- **Navigation aids:** `Ctrl+Arrow` steps to the next item, `Alt` brings the
+- **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Alt` brings the
   selection into view, bookmarks save places and zooms, the canvas search finds
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
 - **Media:** videos, audio and GIFs play on the canvas with a player; a frame
@@ -236,7 +236,7 @@ or network connection.
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
-| Step to the next item | `Ctrl+Arrow` (Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
+| Step to the next item | `W` `A` `S` `D` (rebind in Settings > Shortcuts; Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
 | Bring the selection into view | `Alt` pressed and released alone; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
 | Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
 | Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library, smart folders and canvas search; ADR 0069) |
@@ -370,7 +370,7 @@ src/
   doc/                      also groups, arrange, clipboard, media (video, audio, GIF)
   search/query.ts           AND, OR, XOR, NOT query parser and evaluator (ADR 0069)
   settings/                 declared settings with scopes, rebindable shortcuts
-  interaction/              also snapping, pens, item navigation (Ctrl+Arrow), shortcut scopes
+  interaction/              also snapping, pens, item navigation (W A S D), shortcut scopes
   ui/                       toolbar, text editor overlay, view switch, workspace navigator, Assets view (gallery,
                             viewer), Layers and Bookmarks panels, canvas search, Settings view, shared ⋯ More
                             menu, media player, confirmation dialog, storage panel, dev panel, Lucide icons

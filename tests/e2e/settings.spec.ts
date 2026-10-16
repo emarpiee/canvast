@@ -81,6 +81,15 @@ test("shortcuts: tool keys can be changed and are refused when taken; the list o
   await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
   await p.keyboard.press("k");
   await expect(panel.locator("[data-key-note]")).toContainText("already the key for Pen");
+  // The keys that step between items (W A S D) are changed the same way, and share the conflict check with the tools.
+  await expect(panel.getByRole("button", { name: "Change the key for Step up" })).toBeVisible();
+  await panel.getByRole("button", { name: "Change the key for Step up" }).click();
+  await p.keyboard.press("d");
+  await expect(panel.locator("[data-key-note]")).toContainText("already the key for Step right");
+  await panel.getByRole("button", { name: "Change the key for Step up" }).click();
+  await p.keyboard.press("i");
+  await expect(panel.locator("[data-key-note]")).toContainText("Step up is now I");
+  await panel.getByRole("button", { name: "Reset the key for Step up to its default" }).click();
   await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
   await p.keyboard.press("5");
   await expect(panel.locator("[data-key-note]")).toContainText("one plain letter");

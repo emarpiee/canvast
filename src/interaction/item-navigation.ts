@@ -11,7 +11,7 @@ import type { EditorState } from "../app/editor-state";
 import type { ViewState } from "../app/view-state";
 
 /**
- * Stepping between items with Ctrl+arrow (ADR 0058). Three ways to pick the next item:
+ * Stepping between items with W A S D, or the keys set in Settings > Shortcuts (ADR 0058, 0072). Three ways to pick the next item:
  *  - "view":     the nearest item in the direction, measured on the screen; items too small to see (too deep) or far larger than the
  *                window (too high) are ignored, so the step stays among what can be seen at this zoom.
  *  - "anywhere": the nearest item in the direction by position alone, at any depth and size.

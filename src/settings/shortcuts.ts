@@ -1,4 +1,5 @@
 import type { Tool } from "../app/editor-state";
+import type { NavDir } from "../interaction/item-navigation";
 import type { SettingKey, SettingsStore } from "./settings";
 
 /**
@@ -37,6 +38,28 @@ export function toolUsing(settings: SettingsStore, letter: string, except?: Tool
   return TOOL_ORDER.find((t) => t !== except && settings.get(TOOL_KEY_SETTING[t]) === letter);
 }
 
+/** The keys that step the selection to the next item (ADR 0058, 0072): plain letters, W A S D at first, changeable like the tool keys. */
+export const NAV_ORDER: readonly NavDir[] = ["up", "left", "down", "right"];
+export const NAV_NAME: Record<NavDir, string> = { up: "Step up", left: "Step left", down: "Step down", right: "Step right" };
+export const NAV_KEY_SETTING: Record<NavDir, SettingKey> = { up: "key.navUp", left: "key.navLeft", down: "key.navDown", right: "key.navRight" };
+
+/** The direction a plain key steps in, if any. */
+export function navForKey(settings: SettingsStore, key: string): NavDir | undefined {
+  const k = key.toLowerCase();
+  return NAV_ORDER.find((d) => settings.get(NAV_KEY_SETTING[d]) === k);
+}
+
+/** Every rebindable key, in the order Settings lists them. */
+export const KEY_ROWS: ReadonlyArray<{ setting: SettingKey; name: string; group: string }> = [
+  ...TOOL_ORDER.map((t) => ({ setting: TOOL_KEY_SETTING[t], name: TOOL_NAME[t], group: "Tools" })),
+  ...NAV_ORDER.map((d) => ({ setting: NAV_KEY_SETTING[d], name: NAV_NAME[d], group: "Step to the next item" })),
+];
+
+/** What already uses `letter` (a tool or a step), apart from the key `except`: its name, for the conflict message. */
+export function keyOwner(settings: SettingsStore, letter: string, except: SettingKey): string | undefined {
+  return KEY_ROWS.find((r) => r.setting !== except && settings.get(r.setting) === letter)?.name;
+}
+
 export interface FixedShortcut {
   readonly keys: string;
   readonly does: string;
@@ -48,7 +71,7 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
     group: "Navigation",
     items: [
       { keys: "Arrow keys", does: "Pan (Shift: further)" },
-      { keys: "Ctrl+Arrow keys", does: "Step the selection to the next item (the way is set in Settings > Navigation)" },
+      { keys: "W A S D (changeable above)", does: "Step the selection to the next item up, left, down or right (the way is set in Settings > Navigation)" },
       { keys: "Alt (press and release)", does: "Bring the selection into view; again: fit everything visible at this zoom" },
       { keys: "Ctrl+F", does: "Search the canvas (in the Assets view: the library)" },
       { keys: "Ctrl+Shift+F", does: "Go to the Assets view and search the library" },

@@ -170,7 +170,9 @@ export interface ToolHooks {
   editText(target: TextObject | null, at: WorldPoint): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
-  /** Ctrl+arrow: step the selection to a neighbouring item (ADR 0058). */
+  /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
+  navForKey(key: string): NavDir | undefined;
+  /** Step the selection to a neighbouring item. */
   navigate(dir: NavDir): void;
   /** Alt: bring the selection into view. */
   focusSelection(): void;
@@ -832,15 +834,12 @@ export function attachTools(
   // ---- keyboard ----------------------------------------------------------
   /** Alt pressed and released on its own (no other key or pointer in between) brings the selection into view. */
   let altAlone = false;
-  const ARROWS: Record<string, NavDir> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!canvasShortcutsActive(e)) return;
     altAlone = e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
-    if (mod && !e.altKey && ARROWS[e.key]) {
-      hooks.navigate(ARROWS[e.key]!);
-    } else if (mod && key === "z") {
+    if (mod && key === "z") {
       if (g.kind !== "none") return;
       if (e.shiftKey) redo(doc, editor);
       else undo(doc, editor);
@@ -865,7 +864,8 @@ export function attachTools(
         spaceDown = true;
         el.classList.add("is-hand");
       }
-    } else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
+    } else if (hooks.navForKey(key)) hooks.navigate(hooks.navForKey(key)!);
+    else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
     else if (e.key === "Escape") {
       if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool

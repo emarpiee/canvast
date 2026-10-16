@@ -46,7 +46,7 @@ import { installMenuKeys } from "../ui/more-menu";
 import { confirmDialog } from "../ui/confirm";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
-import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
+import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
@@ -416,7 +416,7 @@ async function start(): Promise<void> {
     },
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
   });
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k),
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k), navForKey: (k) => navForKey(settings, k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
     focusSelection: () => focusCycle.tap(),
     openSearch: (prefix) => canvasSearch.open(prefix),

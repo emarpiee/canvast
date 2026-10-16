@@ -59,6 +59,11 @@ export const SETTINGS = {
   "key.lasso": { scope: "device", default: "l", validate: letter, effect: "immediate" } as Def<string>,
   "key.text": { scope: "device", default: "t", validate: letter, effect: "immediate" } as Def<string>,
   "key.eraser": { scope: "device", default: "e", validate: letter, effect: "immediate" } as Def<string>,
+  // Stepping the selection between items (ADR 0058, 0072): W A S D by default.
+  "key.navUp": { scope: "device", default: "w", validate: letter, effect: "immediate" } as Def<string>,
+  "key.navLeft": { scope: "device", default: "a", validate: letter, effect: "immediate" } as Def<string>,
+  "key.navDown": { scope: "device", default: "s", validate: letter, effect: "immediate" } as Def<string>,
+  "key.navRight": { scope: "device", default: "d", validate: letter, effect: "immediate" } as Def<string>,
   "ui.hue": { scope: "device", default: 178, validate: range(0, 360), effect: "immediate" } as Def<number>,
   "ui.vivid": { scope: "device", default: 100, validate: range(0, 150), effect: "immediate" } as Def<number>,
   "ui.pattern": { scope: "device", default: "grid", validate: oneOf("grid", "dots", "scale", "none"), effect: "immediate" } as Def<"grid" | "dots" | "scale" | "none">,

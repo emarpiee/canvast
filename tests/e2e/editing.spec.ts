@@ -390,7 +390,7 @@ test("selection action bar: follows the selection, hides while moving and for no
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Arrow steps the selection between items (nearest in view, by layer) and frames each; Alt alone brings the selection into view (ADR 0058)", async ({ app }) => {
+test("W A S D step the selection between items (nearest in view, by layer) and frames each; Alt alone brings the selection into view (ADR 0058)", async ({ app }) => {
   const p = app.page;
   // Three strokes in a row, drawn left to right (so the right-most is on top).
   await key(app, "p");
@@ -404,14 +404,14 @@ test("Ctrl+Arrow steps the selection between items (nearest in view, by layer) a
   await click(a!.id);
   expect(await selection(app)).toEqual([a!.id]);
   // Nearest in view (the default): right, right, then back left; at the end of the row nothing changes.
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await expect.poll(() => selection(app)).toEqual([c!.id]);
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await app.frame();
   expect(await selection(app)).toEqual([c!.id]);
-  await key(app, "Control+ArrowLeft");
+  await key(app, "a");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
   // The stepped-to item is framed: its middle is the window's middle.
   await app.frame();
@@ -445,21 +445,21 @@ test("Ctrl+Arrow steps the selection between items (nearest in view, by layer) a
   await key(app, "Escape");
   expect(await selection(app)).toEqual([]);
   // Nothing selected: the first step lands on the top-most layer; then down the order and back up.
-  await key(app, "Control+ArrowUp");
+  await key(app, "w");
   await expect.poll(() => selection(app)).toEqual([c!.id]);
-  await key(app, "Control+ArrowDown");
+  await key(app, "s");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
-  await key(app, "Control+ArrowDown");
+  await key(app, "s");
   await expect.poll(() => selection(app)).toEqual([a!.id]);
-  await key(app, "Control+ArrowDown");
+  await key(app, "s");
   await app.frame();
   expect(await selection(app), "nothing below the bottom layer").toEqual([a!.id]);
-  await key(app, "Control+ArrowUp");
+  await key(app, "w");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom, 'nearest anywhere' does not (ADR 0058)", async ({ app }) => {
+test("W A S D: 'nearest in view' skips an item too small to see at this zoom, 'nearest anywhere' does not (ADR 0058)", async ({ app }) => {
   const p = app.page;
   // A big stroke B, then a tiny one A drawn 8 levels deeper right beside the middle of B; back to the first zoom.
   await key(app, "p");
@@ -478,7 +478,7 @@ test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom,
     expect(await selection(app)).toEqual([b!.id]);
   };
   await pick();
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await app.frame();
   expect(await selection(app), "the tiny item is skipped").toEqual([b!.id]);
   // The same step with the setting "anywhere" reaches it.
@@ -488,12 +488,12 @@ test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom,
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "v");
   await pick();
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await expect.poll(() => selection(app)).toEqual([a!.id]);
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level' only moves the view (ADR 0058)", async ({ app }) => {
+test("W A S D on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level' only moves the view (ADR 0058)", async ({ app }) => {
   const p = app.page;
   await key(app, "p");
   for (const x of [300, 440]) await app.drag({ x, y: 450 }, { x: x + 60, y: 470 }, 4);
@@ -507,7 +507,7 @@ test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom le
   };
   const zoom0 = await level();
   await pick(a!.id);
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
   const focused = await level();
   expect(focused.zi + focused.zf, "focus zoomed in on the item").toBeGreaterThan(zoom0.zi + zoom0.zf + 0.5);
@@ -519,7 +519,7 @@ test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom le
   await app.frame();
   await pick(a!.id);
   const before = await level();
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await expect.poll(() => selection(app)).toEqual([b!.id]);
   await app.frame();
   const after = await level();
@@ -529,7 +529,7 @@ test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom le
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Arrow, nearest in view: an item far from the selected one (many of its sizes away) or of a very different size is not a neighbour; 'anywhere' still reaches it (ADR 0058)", async ({ app }) => {
+test("W A S D, nearest in view: an item far from the selected one (many of its sizes away) or of a very different size is not a neighbour; 'anywhere' still reaches it (ADR 0058)", async ({ app }) => {
   const p = app.page;
   await key(app, "p");
   // A small stroke; one far to the right (about 8 of its own sizes away); one close; one very large but near.
@@ -542,7 +542,7 @@ test("Ctrl+Arrow, nearest in view: an item far from the selected one (many of it
     await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
   };
   await pick(a!.id);
-  await key(app, "Control+ArrowRight");
+  await key(app, "d");
   await app.frame();
   expect(await selection(app), "too far to be a neighbour").toEqual([a!.id]);
   expect(await p.evaluate(() => window.__canvastDebug.camera())).toBeTruthy();

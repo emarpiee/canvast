@@ -1,6 +1,6 @@
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
 import { SETTINGS } from "../settings/settings";
-import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolKeys, toolUsing } from "../settings/shortcuts";
+import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
 import { esc } from "./format";
 
 /**
@@ -64,8 +64,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "navigation",
     label: "Navigation",
     rows: [
-      { key: "nav.mode", label: "Next item (Ctrl+Arrow)", help: "How Ctrl+Arrow steps from the selected item to the next. Nearest in view: the nearest item you can see at this zoom (items too small or far larger than the window are skipped). Nearest anywhere: the nearest by position, at any zoom or depth. By layer: up and down the stacking order, top-most first.", control: { kind: "select", options: [["view", "Nearest in view"], ["anywhere", "Nearest anywhere"], ["layer", "By layer"]] } },
-      { key: "nav.arrive", label: "On arriving at an item", help: "What the view does when Ctrl+Arrow (or a search) takes you to an item. Focus on it: zoom so the item fills the window. Keep the zoom level: only move the view so the item is in the middle.", control: { kind: "select", options: [["focus", "Focus on the item"], ["keep", "Keep the zoom level"]] } },
+      { key: "nav.mode", label: "Next item (W A S D)", help: "How the step keys (W A S D, changeable in Shortcuts) step from the selected item to the next. Nearest in view: the nearest item you can see at this zoom (items too small or far larger than the window are skipped). Nearest anywhere: the nearest by position, at any zoom or depth. By layer: up and down the stacking order, top-most first.", control: { kind: "select", options: [["view", "Nearest in view"], ["anywhere", "Nearest anywhere"], ["layer", "By layer"]] } },
+      { key: "nav.arrive", label: "On arriving at an item", help: "What the view does when a step key (or a search) takes you to an item. Focus on it: zoom so the item fills the window. Keep the zoom level: only move the view so the item is in the middle.", control: { kind: "select", options: [["focus", "Focus on the item"], ["keep", "Keep the zoom level"]] } },
     ],
   },
   {
@@ -135,7 +135,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
       : t.id === "shortcuts"
-        ? `<div class="set-info set-keys"><p>Tool keys are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
+        ? `<div class="set-info set-keys"><p>Tool keys and the keys that step to the next item are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
            <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3>Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl>`).join("")}</div>`
       : t.id === "storage"
         ? `<div class="set-info" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
@@ -185,17 +185,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     }
   };
 
-  /** The tool whose key is being changed, waiting for a letter. */
-  let capturing: (typeof TOOL_ORDER)[number] | null = null;
+  /** The key being changed, waiting for a letter. */
+  let capturing: SettingKey | null = null;
   const renderKeys = (): void => {
     const host = root.querySelector<HTMLElement>("[data-tool-keys]");
     if (!host) return;
-    const keys = toolKeys(settings);
-    host.innerHTML = TOOL_ORDER.map((t) => {
-      const def = SETTINGS[TOOL_KEY_SETTING[t]].default;
-      return `<div class="set-row set-keyrow"><span class="set-label">${esc(TOOL_NAME[t])}</span>
-        <div class="set-control"><kbd class="set-key">${capturing === t ? "press a letter…" : esc(keys[t].toUpperCase())}</kbd><button type="button" class="set-reset" data-change-key="${t}" aria-label="Change the key for ${esc(TOOL_NAME[t])}">Change</button></div>
-        <span class="set-scope">This device</span><button type="button" class="set-reset" data-reset="${TOOL_KEY_SETTING[t]}" aria-label="Reset the key for ${esc(TOOL_NAME[t])} to its default"${keys[t] === def ? " disabled" : ""}>Reset</button></div>`;
+    let group = "";
+    host.innerHTML = KEY_ROWS.map((r) => {
+      const def = SETTINGS[r.setting].default as string;
+      const cur = settings.get(r.setting) as string;
+      const head = r.group !== group ? `<h4>${esc(r.group)}</h4>` : "";
+      group = r.group;
+      return `${head}<div class="set-row set-keyrow"><span class="set-label">${esc(r.name)}</span>
+        <div class="set-control"><kbd class="set-key">${capturing === r.setting ? "press a letter…" : esc(cur.toUpperCase())}</kbd><button type="button" class="set-reset" data-change-key="${r.setting}" aria-label="Change the key for ${esc(r.name)}">Change</button></div>
+        <span class="set-scope">This device</span><button type="button" class="set-reset" data-reset="${r.setting}" aria-label="Reset the key for ${esc(r.name)} to its default"${cur === def ? " disabled" : ""}>Reset</button></div>`;
     }).join("");
   };
   const keyNote = (text: string): void => {
@@ -247,7 +250,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
     const change = t.closest<HTMLElement>("[data-change-key]");
     if (change) {
-      capturing = change.dataset["changeKey"] as (typeof TOOL_ORDER)[number];
+      capturing = change.dataset["changeKey"] as SettingKey;
       keyNote("");
       renderKeys();
       root.querySelector<HTMLElement>(`[data-change-key="${capturing}"]`)?.focus();
@@ -273,24 +276,25 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     (e) => {
       if (!capturing || root.hidden) return;
       // Any key is for the key being chosen: a letter sets it, Escape cancels, everything else is refused with a reason.
-      const tool = capturing;
+      const setting = capturing;
+      const name = KEY_ROWS.find((r) => r.setting === setting)!.name;
       e.preventDefault();
       e.stopPropagation();
       if (e.key === "Tab" || e.key === "Shift") return;
       capturing = null;
       const letter = e.key.length === 1 ? e.key.toLowerCase() : "";
       if (e.key === "Escape") keyNote("");
-      else if (!/^[a-z]$/.test(letter) || e.ctrlKey || e.metaKey || e.altKey) keyNote("A tool key is one plain letter, a to z.");
+      else if (!/^[a-z]$/.test(letter) || e.ctrlKey || e.metaKey || e.altKey) keyNote("A key here is one plain letter, a to z.");
       else {
-        const other = toolUsing(settings, letter, tool);
-        if (other) keyNote(`${letter.toUpperCase()} is already the key for ${TOOL_NAME[other]}. Change that one first.`);
+        const other = keyOwner(settings, letter, setting);
+        if (other) keyNote(`${letter.toUpperCase()} is already the key for ${other}. Change that one first.`);
         else {
-          settings.set(TOOL_KEY_SETTING[tool], letter);
-          keyNote(`${TOOL_NAME[tool]} is now ${letter.toUpperCase()}.`);
+          settings.set(setting, letter);
+          keyNote(`${name} is now ${letter.toUpperCase()}.`);
         }
       }
       renderKeys();
-      root.querySelector<HTMLElement>(`[data-change-key="${tool}"]`)?.focus();
+      root.querySelector<HTMLElement>(`[data-change-key="${setting}"]`)?.focus();
     },
     true,
   );
