@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { APP_URL, expect, test } from "./harness";
 
 /** The Settings view (ADR 0048): tabs, rows that write the shared store, scope and reset, theme, and what is remembered. */
 
@@ -248,5 +248,28 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
   await panel.getByRole("tab", { name: "Appearance" }).click();
   await panel.getByRole("button", { name: /Reset Theme colour/ }).click();
   expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe("178");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Settings > Develop switches the developer tools on and off for every session; there is one HTML file (ADR 0067)", async ({ app }) => {
+  const p = app.page;
+  const plain = APP_URL.replace("#debug", "");
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Develop" }).click();
+  const toggle = p.getByRole("checkbox", { name: "Developer tools" });
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await expect(p.getByText("Reload to apply the change.")).toBeVisible();
+  // Without #debug on the address the tools are on now: the panel is there and the hook is installed.
+  await p.goto(plain);
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(p.getByTestId("debug-panel")).toBeVisible();
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Develop" }).click();
+  await p.getByRole("checkbox", { name: "Developer tools" }).uncheck();
+  await p.goto(plain);
+  await p.waitForFunction(() => document.documentElement.dataset["version"] !== undefined);
+  expect(await p.evaluate(() => typeof window.__canvastDebug)).toBe("undefined");
+  await expect(p.getByTestId("debug-panel")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

@@ -227,24 +227,26 @@ export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: Edi
 }
 
 /**
- * Fit the view to everything that counts as visible at this zoom (the second tap of Alt, the "fit everything" button).
- *  - With a selection: the selected items and every other item that is legible (4 px up to 16 windows), within a factor of 8 of the
- *    selection's size, and not more than 12 selection-sizes away. That is what "at this zoom" means: the same depth, and near, however
- *    far the view has zoomed in on the selection. Items far off or of a very different size stay out.
- *  - With nothing selected: the items near the window (within 3 window-widths of it) that are legible and at most 4 windows large.
- * Returns false when there is nothing to fit.
+ * Fit the view to as much as it can show legibly (the second tap of Alt, the "fit everything" button): the widest fit at which nothing
+ * becomes a speck. Candidates are the items that are legible now (4 px up to 16 windows) and, with a selection, within a factor of 64 of
+ * its size; they are taken nearest first (to the selection, or to the middle of the window) and each is added while, after the fit, every
+ * included item is still at least 4 px on screen, the selection (if any) at least 14 px, and nothing is more than 40 windows away. So the
+ * scope grows as far as the sizes allow and stops before the view would zoom out to nothing. Returns false when there is nothing to fit.
  */
 export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: EditorState): boolean {
   const vp = view.viewport;
   const cam = view.camera;
-  interface Px {
+  interface Cand {
+    o: CanvasObject;
     minX: number;
     maxX: number;
     minY: number;
     maxY: number;
     size: number;
+    dist: number;
+    picked: boolean;
   }
-  const pxBox = (b: { min: WorldPoint; max: WorldPoint }): Px => {
+  const px = (b: { min: WorldPoint; max: WorldPoint }): Omit<Cand, "o" | "dist" | "picked"> => {
     const a = worldToScreen(cam, vp, b.min);
     const c = worldToScreen(cam, vp, b.max);
     const minX = Math.min(a.x, c.x);
@@ -255,27 +257,43 @@ export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: Edit
   };
   const picked = editor ? doc.ordered().filter((o) => editor.selection.has(o.id)) : [];
   const anchorWorld = picked.length ? boxIn(view, picked) : null;
-  const anchor = anchorWorld ? pxBox(anchorWorld) : null;
-  const near: CanvasObject[] = [...picked];
-  const reachX = 3 * vp.width;
-  const reachY = 3 * vp.height;
+  const anchor = anchorWorld ? px(anchorWorld) : null;
+  const maxSize = MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height);
+  const reach = 40 * Math.max(vp.width, vp.height);
+  const cands: Cand[] = [];
   for (const o of doc.ordered()) {
-    if (o.hidden || (editor && editor.selection.has(o.id))) continue;
+    if (o.hidden) continue;
     const w = boxIn(view, [o]);
     if (!w) continue;
-    const b = pxBox(w);
-    if (anchor) {
-      if (!(b.size >= MIN_SEEN_PX && b.size <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height))) continue;
-      if (b.size > anchor.size * 8 || b.size < anchor.size / 8) continue;
-      const gap = Math.hypot(Math.max(0, anchor.minX - b.maxX, b.minX - anchor.maxX), Math.max(0, anchor.minY - b.maxY, b.minY - anchor.maxY));
-      if (gap > 12 * anchor.size) continue;
-    } else {
-      if (!(b.size >= MIN_SEEN_PX && b.size <= 4 * Math.max(vp.width, vp.height))) continue;
-      if (b.maxX < -reachX || b.minX > vp.width + reachX || b.maxY < -reachY || b.minY > vp.height + reachY) continue;
+    const b = px(w);
+    const isPicked = !!editor && editor.selection.has(o.id);
+    if (!isPicked) {
+      if (!(b.size >= MIN_SEEN_PX && b.size <= maxSize)) continue;
+      if (anchor && (b.size > anchor.size * 64 || b.size < anchor.size / 64)) continue;
     }
-    near.push(o);
+    const dist = anchor
+      ? Math.hypot(Math.max(0, anchor.minX - b.maxX, b.minX - anchor.maxX), Math.max(0, anchor.minY - b.maxY, b.minY - anchor.maxY))
+      : Math.hypot((b.minX + b.maxX) / 2 - vp.width / 2, (b.minY + b.maxY) / 2 - vp.height / 2);
+    if (dist > reach) continue;
+    cands.push({ o, ...b, dist, picked: isPicked });
   }
-  const bounds = boxIn(view, near);
+  // The selection first, then nearest first.
+  cands.sort((x, y) => Number(y.picked) - Number(x.picked) || x.dist - y.dist);
+  const included: Cand[] = [];
+  let u = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  let smallest = Infinity;
+  for (const c of cands) {
+    const next = { minX: Math.min(u.minX, c.minX), maxX: Math.max(u.maxX, c.maxX), minY: Math.min(u.minY, c.minY), maxY: Math.max(u.maxY, c.maxY) };
+    const scale = Math.min((0.9 * vp.width) / Math.max(1e-9, next.maxX - next.minX), (0.9 * vp.height) / Math.max(1e-9, next.maxY - next.minY));
+    const small = Math.min(smallest, c.size);
+    const keepsAnchor = !anchor || (anchor.size * scale >= 14);
+    // The first items (the selection) are always in; a later one must not shrink anything below legibility.
+    if (included.length && !c.picked && (small * scale < MIN_SEEN_PX || !keepsAnchor)) break;
+    included.push(c);
+    u = next;
+    smallest = small;
+  }
+  const bounds = boxIn(view, included.map((c) => c.o));
   if (!bounds) return false;
   view.setFrameCamera(fromLocal(view.frame, fitRect(bounds.min, bounds.max, vp, 0.9, zoomLevel(view.camera))));
   return true;
@@ -286,10 +304,11 @@ export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: Edit
  * A press with nothing selected fits everything. The cycle only continues while the view is where it left it.
  */
 export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: EditorState, zoomOnSelection: () => boolean): { tap(): void; fit(kind: "selection" | "all"): void } {
-  let last: { kind: "selection" | "all"; cam: string } | null = null;
+  let last: { kind: "selection" | "all"; cam: string; sel: string } | null = null;
+  const selKey = (): string => [...editor.selection].sort().join(",");
   const here = (): string => JSON.stringify(serializeFrameCamera(view.frameCamera));
   const remember = (kind: "selection" | "all"): void => {
-    last = { kind, cam: here() };
+    last = { kind, cam: here(), sel: selKey() };
   };
   const all = (): void => {
     if (fitAllVisible(doc, view, editor)) remember("all");
@@ -305,7 +324,9 @@ export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: Ed
   };
   return {
     tap() {
-      const same = last !== null && last.cam === here();
+      // The cycle goes on only while the view is where it was left AND the same things are selected: a different selection is a new
+      // focus (select another item, tap Alt: the view goes to that one, not out to everything).
+      const same = last !== null && last.cam === here() && last.sel === selKey();
       if (!editor.selection.size) return all();
       if (same && last!.kind === "selection") return all();
       return selection();

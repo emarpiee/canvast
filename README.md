@@ -241,7 +241,7 @@ Prerequisites: Node.js ≥ 22 (developed on 26.4) and npm.
 ```sh
 npm ci                     # install pinned dev dependencies
 npm run build              # → dist/canvast.html (production, minified)
-npm run build:debug        # → dist/canvast-debug.html (source maps, debug panel)
+# There is one file only. Developer tools (the debug panel, diagnostics, test hook) are Settings > Develop, or #debug on the address.
 ```
 
 Open `dist/canvast.html` directly in a browser, by double-clicking it or with

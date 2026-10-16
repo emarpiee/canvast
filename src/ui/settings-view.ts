@@ -94,6 +94,13 @@ export const SETTINGS_TABS: readonly Tab[] = [
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
   { id: "collaboration", label: "Collaboration" },
+  {
+    id: "develop",
+    label: "Develop",
+    rows: [
+      { key: "dev.tools", label: "Developer tools", help: "Shows the developer panel (camera numbers, frame times, jump and auto-zoom buttons) and the diagnostics under the frame-rate readout, and keeps the adaptive quality from changing so measurements stay the same. Applies after reloading. An address ending in #debug turns it on for one session.", control: { kind: "toggle" } },
+    ],
+  },
 ];
 
 const fmt = (n: number): string => String(Math.round(n * 100) / 100);
@@ -122,7 +129,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default">Reset</button></div>`;
           })
-          .join("")
+          .join("") +
+        (t.id === "develop"
+          ? `<div class="set-info" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
+             <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
+          : "")
       : t.id === "shortcuts"
         ? `<div class="set-info set-keys"><p>Tool keys are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
            <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3>Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl>`).join("")}</div>`
@@ -244,6 +255,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     }
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
+    if (t.closest("[data-reload]")) location.reload();
     if (t.closest("[data-done]")) onClose();
   });
   /** Stop waiting for a letter (focus moved away, another tab, or the view closed): nothing changes. */
@@ -295,6 +307,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       e.stopPropagation();
       onClose();
     }
+  });
+  settings.subscribe((key) => {
+    if (key === "dev.tools") root.querySelector<HTMLElement>("[data-dev-note]")!.hidden = false;
   });
   settings.subscribe(refresh);
   select(current);

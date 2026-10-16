@@ -1111,7 +1111,7 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(await field(ids[1]!, "name")).toBe("sky line");
   // Group two layers and name the group.
   await rows.nth(0).click();
-  await rows.nth(2).click({ modifiers: ["Shift"] });
+  await rows.nth(2).click({ modifiers: ["Control"] }); // Ctrl adds a row (Shift takes a range)
   await p.getByTestId("context-bar").getByRole("button", { name: "Group", exact: true }).click();
   const group = panel.locator('li.layer[data-group="true"]');
   await group.locator(".layer-name").dblclick();
@@ -1754,5 +1754,34 @@ test("panels stack without squeezing each other; many layers get a filter, the l
   await expect(layers.locator("[data-opacity]")).toBeVisible();
   const list = (await layers.locator('ul[role="tree"]').boundingBox())!;
   expect(list.height).toBeGreaterThan(100);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Layers panel selection: Ctrl toggles a row, Shift takes the range from the last one clicked, Ctrl+Shift adds a range (ADR 0066)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  for (let i = 0; i < 8; i++) await app.drag({ x: 480 + (i % 4) * 90, y: 380 + Math.floor(i / 4) * 110 }, { x: 520 + (i % 4) * 90, y: 410 + Math.floor(i / 4) * 110 }, 3);
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const rows = p.getByTestId("layers-panel").locator("li.layer");
+  const ids = () => p.evaluate(() => window.__canvastDebug.selection());
+  await expect(rows).toHaveCount(8);
+  const keys = await rows.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset["key"]!));
+  await rows.nth(1).click();
+  expect(await ids()).toEqual([keys[1]!]);
+  await rows.nth(3).click({ modifiers: ["Control"] });
+  expect((await ids()).sort()).toEqual([keys[1]!, keys[3]!].sort());
+  await rows.nth(1).click({ modifiers: ["Control"] }); // out again
+  expect(await ids()).toEqual([keys[3]!]);
+  // Shift: the range from the last row clicked (3, picked alone) to this one (6), as listed.
+  await rows.nth(3).click();
+  await rows.nth(6).click({ modifiers: ["Shift"] });
+  expect((await ids()).sort()).toEqual([keys[3]!, keys[4]!, keys[5]!, keys[6]!].sort());
+  // A plain click starts over; Ctrl+Shift adds a range to what is selected.
+  await rows.nth(0).click();
+  expect(await ids()).toEqual([keys[0]!]);
+  await rows.nth(2).click({ modifiers: ["Control"] });
+  await rows.nth(5).click({ modifiers: ["Control", "Shift"] });
+  expect((await ids()).sort()).toEqual([keys[0]!, keys[2]!, keys[3]!, keys[4]!, keys[5]!].sort());
   expect(app.consoleErrors).toEqual([]);
 });

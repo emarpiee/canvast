@@ -1609,3 +1609,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .layer:hover .layer-btn[aria-pressed="false"], .layer:focus-within .layer-btn[aria-pressed="false"], .layer.is-selected .layer-btn[aria-pressed="false"] { opacity: 0.8; }
 }
 @media (hover: none), (max-width: 640px) { .layer .layer-btn[aria-pressed="false"] { opacity: 0.7; } }
+
+/* Layer names cut in the middle, so frame_0003.png and frame_0004.png can be told apart in a narrow row */
+.layers-panel .layer-name { display: flex; min-width: 0; }
+.layers-panel .layer-name .n-start { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layers-panel .layer-name .n-end { flex: none; white-space: pre; }

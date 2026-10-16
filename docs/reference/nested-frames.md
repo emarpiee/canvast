@@ -429,7 +429,7 @@ object classified as covering the view (`cover`), or one whose body is under
 the view centre and all four corners (`fillsView` in `interaction/tools.ts`).
 A stroke that is only a band across the screen stays selectable. Off by default.
 
-**Debug (`#debug` or `canvast-debug.html`).** The dev panel has jump buttons
+**Debug (`#debug` on the address, or Settings > Develop > Developer tools).** The dev panel has jump buttons
 (±10 to ±10^12), auto-zoom (keeps running while drawing; stops with its
 button, the wheel or Escape) and **Clear** (one undoable transaction). The
 debug hook (`window.__canvastDebug`, `app/debug-hook.ts`) adds, for tests:

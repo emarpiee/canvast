@@ -834,3 +834,45 @@ test("resize with Shift snaps the edge the proportions give, not the pointer (th
   expect(Math.abs((b1.maxX - b1.minX) / (b1.maxY - b1.minY) - w / h), "proportions kept").toBeLessThan(0.02);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Alt after selecting another item focuses that item (the cycle goes on only for the same selection) (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  // Two strokes close together: after focusing on the first, the second is still on screen to click.
+  const a = await penStroke(app, [[560, 400], [600, 430]]);
+  const b = await penStroke(app, [[640, 400], [680, 430]]);
+  await key(app, "v");
+  const alt = async () => {
+    await p.keyboard.down("Alt");
+    await p.keyboard.up("Alt");
+    await app.frame();
+  };
+  const pick = async (id: string) => {
+    const s = (await screenOfObject(app, id))!.box;
+    await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+    expect(await selection(app)).toEqual([id]);
+  };
+  const box = async (id: string) => (await screenOfObject(app, id))!.box;
+  await pick(a.id);
+  await alt(); // focus on a: it fills the view
+  const ba = await box(a.id);
+  expect(ba.maxX - ba.minX).toBeGreaterThan(400);
+  const bb = await screenOfObject(app, b.id);
+  // Pick b if it is on screen (it is beside a); the next Alt focuses b, it does not fit everything.
+  if (bb && bb.box.minX >= 0 && bb.box.maxX <= 1280) {
+    await pick(b.id);
+    await alt();
+    const nb = await box(b.id);
+    expect(nb.maxX - nb.minX, "b is focused: it fills the view").toBeGreaterThan(400);
+    expect(Math.abs((nb.minX + nb.maxX) / 2 - 640), "and is in the middle").toBeLessThan(60);
+  } else {
+    // b is off screen at this zoom: select it by its layer row instead.
+    await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+    await p.getByTestId("layers-panel").locator(`li.layer[data-key="${b.id}"]`).click();
+    expect(await selection(app)).toEqual([b.id]);
+    await alt();
+    const nb = await box(b.id);
+    expect(nb.maxX - nb.minX, "b is focused: it fills the view").toBeGreaterThan(400);
+    expect(Math.abs((nb.minX + nb.maxX) / 2 - 640), "and is in the middle").toBeLessThan(60);
+  }
+  expect(app.consoleErrors).toEqual([]);
+});

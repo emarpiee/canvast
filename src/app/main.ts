@@ -53,7 +53,6 @@ import { installTextFont } from "../text/inter";
 import { SettingsStore } from "../settings/settings";
 import { setThemeInk } from "../render/ink";
 
-declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
 
 function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
@@ -97,7 +96,6 @@ const SAVE_TEXT: Record<SaveState, string> = {
 };
 
 async function start(): Promise<void> {
-  const debug = __CANVAST_DEBUG__ || location.hash.includes("debug");
   const host = document.getElementById("canvas-host")!;
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -144,6 +142,9 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
+  // Developer tools (the panel, the diagnostics, the test hook): on for a session with #debug at the end of the address (the tests use
+  // this), or always once switched on in Settings > Develop (applies after a reload). There is no separate debug build.
+  const debug = location.hash.includes("debug") || settings.get("dev.tools");
   editor.penColor = settings.get("pen.color");
   editor.penWidthPx = settings.get("pen.widthPx");
   editor.penKind = settings.get("pen.kind");

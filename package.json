@@ -6,8 +6,7 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "node scripts/build.mjs --mode=production",
-    "build:debug": "node scripts/build.mjs --mode=debug",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:unit": "vitest run",
     "test:e2e": "npm run build && playwright test",

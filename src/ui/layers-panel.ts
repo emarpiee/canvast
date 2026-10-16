@@ -94,6 +94,16 @@ export function sortedByName(objects: readonly CanvasObject[], names: ReadonlyMa
   return walk(layerTree(objects));
 }
 
+/**
+ * A name for a narrow row: the end is kept apart so that, when the name is cut, it is cut in the middle ("dark-s01e01-frame_…0003.png")
+ * and the part that tells similar names apart (a number, an extension) stays visible. The text of the two parts is the whole name.
+ */
+export function splitName(text: string): string {
+  const keep = 9;
+  if (text.length <= keep + 5) return esc(text);
+  return `<span class="n-start">${esc(text.slice(0, -keep))}</span><span class="n-end">${esc(text.slice(-keep))}</span>`;
+}
+
 /** Short name of an object for lists and mention labels. */
 export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
   if (o.name) return { icon: o.kind === "stroke" ? ICONS.pencil : o.kind === "image" ? ICONS.image : ICONS.type, text: o.name, ...(o.kind !== "image" ? { swatch: o.color } : {}) };
@@ -111,6 +121,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   host.appendChild(panel);
   const open = new Set<string>(); // expanded groups
   let sortOpen = false;
+  /** The row a Shift-click takes its range from: the last one clicked. */
+  let anchorKey: string | null = null;
   /** Filter by name (shown once there are many layers) and how many rows are drawn so far. */
   let filter = "";
   let limit = MAX_ROWS;
@@ -235,7 +247,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
         <button type="button" class="layer-twist" data-twist ${n.group ? "" : "disabled tabindex=-1"} aria-label="${expanded ? "Collapse" : "Expand"}">${n.group ? (expanded ? ICONS.chevronDown : ICONS.chevronRight) : ""}</button>
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
-        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${esc(lab.text)}</span>${n.group ? `<span class="layer-count" title="${n.members.length} item(s) inside">${n.members.length}</span>` : ""}`}
+        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${n.members.length} item(s) inside">${n.members.length}</span>` : ""}`}
         <button type="button" class="layer-btn" data-eye aria-pressed="${hidden}" aria-label="${hidden ? "Show" : "Hide"} ${esc(lab.text)}" title="${hidden ? "Show" : "Hide"}">${hidden ? ICONS.eyeOff : ICONS.eye}</button>
         <button type="button" class="layer-btn" data-lock aria-pressed="${locked}" aria-label="${locked ? "Unlock" : "Lock"} ${esc(lab.text)}" title="${locked ? "Unlock" : "Lock"}">${locked ? ICONS.lockKeyhole : ICONS.lockKeyholeOpen}</button>
       </li>`;
@@ -498,7 +510,23 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.every((o) => o.locked));
     } else {
       editor.entered = [];
-      editor.select(objs.filter((o) => !o.hidden).map((o) => o.id), e.shiftKey || e.ctrlKey || e.metaKey);
+      const ids = objs.filter((o) => !o.hidden).map((o) => o.id);
+      const rowKeys = [...panel.querySelectorAll<HTMLElement>("li.layer")].map((l) => l.dataset["key"]!);
+      if (e.shiftKey && anchorKey && rowKeys.includes(anchorKey) && rowKeys.includes(key)) {
+        // Shift: every row from the last one clicked to this one, as shown (Ctrl+Shift adds them to what is selected).
+        const a = rowKeys.indexOf(anchorKey);
+        const b = rowKeys.indexOf(key);
+        const range = rowKeys.slice(Math.min(a, b), Math.max(a, b) + 1).flatMap((k) => members(k).filter((o) => !o.hidden).map((o) => o.id));
+        editor.select(e.ctrlKey || e.metaKey ? [...editor.selection, ...range] : range);
+      } else if (e.ctrlKey || e.metaKey) {
+        // Ctrl or Cmd: this row in or out of the selection.
+        const all = ids.length > 0 && ids.every((id) => editor.selection.has(id));
+        editor.select(all ? [...editor.selection].filter((id) => !ids.includes(id)) : [...editor.selection, ...ids]);
+        anchorKey = key;
+      } else {
+        editor.select(ids);
+        anchorKey = key;
+      }
     }
   });
 
