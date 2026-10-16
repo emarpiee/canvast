@@ -106,7 +106,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-bm-more]")!,
         [
-          { label: "Rename", icon: ICONS.pencil, aria: `Rename ${name}`, run: () => startRename(li) },
+          { label: "Rename", icon: ICONS.textCursorInput, aria: `Rename ${name}`, run: () => startRename(li) },
           {
             label: "Update to the current view",
             icon: ICONS.refresh,

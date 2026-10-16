@@ -66,7 +66,7 @@ const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
   { cmd: "p", icon: ICONS.pilcrow, label: "Body text" },
   { cmd: "ul", icon: ICONS.list, label: "Bulleted list" },
   { cmd: "ol", icon: ICONS.listOrdered, label: "Numbered list" },
-  { cmd: "copy", icon: ICONS.copy, label: "Copy Markdown" },
+  { cmd: "copy", icon: ICONS.clipboardCopy, label: "Copy Markdown" },
   { cmd: "done", icon: ICONS.check, label: "Done (Esc)" },
 ];
 

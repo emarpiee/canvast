@@ -104,8 +104,8 @@ export function splitName(text: string): string {
 
 /** Short name of an object for lists and mention labels. */
 export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
-  if (o.name) return { icon: o.kind === "stroke" ? ICONS.pencil : o.kind === "image" ? ICONS.image : ICONS.type, text: o.name, ...(o.kind !== "image" ? { swatch: o.color } : {}) };
-  if (o.kind === "stroke") return { icon: ICONS.pencil, text: "Stroke", swatch: o.color };
+  if (o.name) return { icon: o.kind === "stroke" ? ICONS.spline : o.kind === "image" ? ICONS.image : ICONS.type, text: o.name, ...(o.kind !== "image" ? { swatch: o.color } : {}) };
+  if (o.kind === "stroke") return { icon: ICONS.spline, text: "Stroke", swatch: o.color };
   if (o.kind === "image") return { icon: ICONS.image, text: names?.get(o.assetId) || `Image ${o.pixelW}×${o.pixelH}` };
   const plain = plainText(o.md, 28);
   return { icon: ICONS.type, text: plain || "Text", swatch: o.color };
@@ -149,7 +149,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const allHidden = sel.every((o) => o.hidden);
     const allLocked = sel.every((o) => o.locked);
     const actionsRow = `<div class="layers-do" role="group" aria-label="Selected layers">
-      <button type="button" data-do="rename"${sel.length === 1 ? "" : " disabled"} title="Rename the selected layer (double-click its name too)">${ICONS.pencil}<span>Rename</span></button>
+      <button type="button" data-do="rename"${sel.length === 1 ? "" : " disabled"} title="Rename the selected layer (double-click its name too)">${ICONS.textCursorInput}<span>Rename</span></button>
       <button type="button" data-do="hide" title="Hide the selection">${allHidden ? ICONS.eye : ICONS.eyeOff}<span>${allHidden ? "Show" : "Hide"}</span></button>
       <button type="button" data-do="lock" title="Lock the selection: it is drawn, but cannot be picked">${allLocked ? ICONS.lockKeyholeOpen : ICONS.lockKeyhole}<span>${allLocked ? "Unlock" : "Lock"}</span></button></div>`;
     return `${actionsRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;

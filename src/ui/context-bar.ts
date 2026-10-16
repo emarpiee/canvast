@@ -53,7 +53,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("tag", ICONS.tag, "Tag the selection") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
-    btn("layout", ICONS.layoutGrid, "Arrange and align") +
+    btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
     btn("lock", ICONS.lockKeyhole, "Lock selection") +

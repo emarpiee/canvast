@@ -16,7 +16,7 @@ const ROWS: readonly { keys: string; does: string; example: string }[] = [
 ];
 
 export function searchHelpButton(): string {
-  return `<button type="button" class="search-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="How to combine search words" title="How to combine search words (AND, OR, XOR, NOT)">${ICONS.info}</button>`;
+  return `<button type="button" class="search-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="How to combine search words" title="How to combine search words (AND, OR, XOR, NOT)">${ICONS.circleHelp}</button>`;
 }
 
 let current: { card: HTMLElement; anchor: HTMLElement } | null = null;

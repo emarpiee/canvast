@@ -27,7 +27,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
   bar.innerHTML = `<div class="media-row"><input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position"><output class="media-time">0:00 / 0:00</output></div>
-    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.imagePlus, "Extract frame to the open canvas: places this frame as a picture there and keeps it in the library")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume"></div>`;
+    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.camera, "Extract frame to the open canvas: places this frame as a picture there and keeps it in the library")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume"></div>`;
   host.append(bar);
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");

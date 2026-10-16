@@ -11,7 +11,7 @@ import { ICONS } from "../ui/icons";
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
 const MODES: readonly InfoMode[] = ["simple", "more", "technical", "hidden"];
 const MODE_LABEL: Record<InfoMode, string> = { simple: "Simple", more: "More", technical: "Technical", hidden: "Hidden" };
-const MODE_ICON: Record<InfoMode, string> = { simple: ICONS.info, more: ICONS.list, technical: ICONS.activity, hidden: ICONS.eyeOff };
+const MODE_ICON: Record<InfoMode, string> = { simple: ICONS.info, more: ICONS.listPlus, technical: ICONS.activity, hidden: ICONS.circleOff };
 
 /** The zoom as a magnification a person reads: 1.33×, 250×, 10^300× (and 0.25× when zoomed out). */
 export function friendlyZoom(levels: bigint, frac: number): string {
@@ -47,7 +47,7 @@ function plainSave(state: string): string {
 export type CanvasPattern = "grid" | "dots" | "scale" | "none";
 const PATTERNS: readonly CanvasPattern[] = ["grid", "dots", "scale", "none"];
 const PATTERN_LABEL: Record<CanvasPattern, string> = { grid: "Grid", dots: "Dots", scale: "Multi-scale grid", none: "None" };
-const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots: ICONS.gripIcon, scale: ICONS.layoutGrid, none: ICONS.squareIcon };
+const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots: ICONS.gripIcon, scale: ICONS.grid2x2, none: ICONS.squareIcon };
 
 export interface HudStatus {
   /** Show a short message to the user. */
@@ -102,7 +102,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
-      <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.maximize}</button>
+      <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.frame}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>

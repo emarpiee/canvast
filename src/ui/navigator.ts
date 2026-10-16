@@ -47,9 +47,9 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
         ${
           open
             ? `<div class="nav-actions" role="menu" aria-label="Actions for ${kind} ${esc(name)}">
-                 <button type="button" role="menuitem" data-action="rename-${kind}" data-id="${id}" aria-label="Rename ${kind} ${esc(name)}">${ICONS.pencil}<span>Rename</span></button>
-                 <button type="button" role="menuitem" data-action="export-${kind}" data-id="${id}" aria-label="Export ${kind} ${esc(name)}">${ICONS.download}<span>Export to a file</span></button>
-                 <button type="button" role="menuitem" data-action="export-files-${kind}" data-id="${id}" aria-label="Export the files of ${kind} ${esc(name)} as a ZIP">${ICONS.download}<span>Export files as ZIP</span></button>
+                 <button type="button" role="menuitem" data-action="rename-${kind}" data-id="${id}" aria-label="Rename ${kind} ${esc(name)}">${ICONS.textCursorInput}<span>Rename</span></button>
+                 <button type="button" role="menuitem" data-action="export-${kind}" data-id="${id}" aria-label="Export ${kind} ${esc(name)}">${ICONS.fileOutput}<span>Export to a file</span></button>
+                 <button type="button" role="menuitem" data-action="export-files-${kind}" data-id="${id}" aria-label="Export the files of ${kind} ${esc(name)} as a ZIP">${ICONS.fileArchive}<span>Export files as ZIP</span></button>
                  <button type="button" role="menuitem" class="is-danger" data-action="delete-${kind}" data-id="${id}" aria-label="Delete ${kind} ${esc(name)}"${canDelete ? "" : ` disabled title="${why}"`}>${ICONS.trash2}<span>Delete</span></button>
                </div>`
             : ""
@@ -62,7 +62,7 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
             "board",
             board.id,
             board.name,
-            `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.layers}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
+            `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
              ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board")}`,
           );
           const items = canvases
@@ -87,9 +87,9 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
       `<button type="button" class="nav-add nav-add-board" data-action="new-board">+ New board</button>
        <section class="nav-ws" aria-label="The whole workspace">
          <h3>Whole workspace “${esc(tree.workspace.displayName)}”</h3>
-         <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.download}<span>Export a backup (.canvast)</span></button>
-         <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.download}<span>Export all files as ZIP</span></button>
-         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.upload}<span>Import a file…</span></button>
+         <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.hardDriveDownload}<span>Export a backup (.canvast)</span></button>
+         <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
+         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.fileInput}<span>Import a file…</span></button>
          <input type="file" accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
        </section>`;
     // The row's actions float over the page like every other menu, kept inside the window.

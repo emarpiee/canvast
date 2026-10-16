@@ -30,6 +30,29 @@ import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
 import folderXIcon from "lucide-static/icons/folder-x.svg";
 import sparklesIcon from "lucide-static/icons/sparkles.svg";
 import leafIcon from "lucide-static/icons/leaf.svg";
+import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
+import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
+import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
+import splineIcon from "lucide-static/icons/spline.svg";
+import circleOffIcon from "lucide-static/icons/circle-off.svg";
+import circleHelpIcon from "lucide-static/icons/circle-help.svg";
+import listFilterPlusIcon from "lucide-static/icons/list-filter-plus.svg";
+import frameIcon from "lucide-static/icons/frame.svg";
+import squareStackIcon from "lucide-static/icons/square-stack.svg";
+import blocksIcon from "lucide-static/icons/blocks.svg";
+import moveDiagonalIcon from "lucide-static/icons/move-diagonal.svg";
+import panelLeftIcon from "lucide-static/icons/panel-left.svg";
+import shapesIcon from "lucide-static/icons/shapes.svg";
+import fileInputIcon from "lucide-static/icons/file-input.svg";
+import fileOutputIcon from "lucide-static/icons/file-output.svg";
+import fileArchiveIcon from "lucide-static/icons/file-archive.svg";
+import hardDriveDownloadIcon from "lucide-static/icons/hard-drive-download.svg";
+import presentationIcon from "lucide-static/icons/presentation.svg";
+import clipboardCopyIcon from "lucide-static/icons/clipboard-copy.svg";
+import layoutListIcon from "lucide-static/icons/layout-list.svg";
+import listPlusIcon from "lucide-static/icons/list-plus.svg";
+import grid2x2Icon from "lucide-static/icons/grid-2x2.svg";
+import cameraIcon from "lucide-static/icons/camera.svg";
 import tagIcon from "lucide-static/icons/tag.svg";
 import minus from "lucide-static/icons/minus.svg";
 import infinity from "lucide-static/icons/infinity.svg";
@@ -149,6 +172,29 @@ export const ICONS = {
   folderX: clean(folderXIcon),
   sparkles: clean(sparklesIcon),
   leaf: clean(leafIcon),
+  panelBottomClose: clean(panelBottomCloseIcon),
+  panelBottomOpen: clean(panelBottomOpenIcon),
+  textCursorInput: clean(textCursorInputIcon),
+  spline: clean(splineIcon),
+  circleOff: clean(circleOffIcon),
+  circleHelp: clean(circleHelpIcon),
+  listFilterPlus: clean(listFilterPlusIcon),
+  frame: clean(frameIcon),
+  squareStack: clean(squareStackIcon),
+  blocks: clean(blocksIcon),
+  moveDiagonal: clean(moveDiagonalIcon),
+  panelLeft: clean(panelLeftIcon),
+  shapes: clean(shapesIcon),
+  fileInput: clean(fileInputIcon),
+  fileOutput: clean(fileOutputIcon),
+  fileArchive: clean(fileArchiveIcon),
+  hardDriveDownload: clean(hardDriveDownloadIcon),
+  presentation: clean(presentationIcon),
+  clipboardCopy: clean(clipboardCopyIcon),
+  layoutList: clean(layoutListIcon),
+  listPlus: clean(listPlusIcon),
+  grid2x2: clean(grid2x2Icon),
+  camera: clean(cameraIcon),
   tag: clean(tagIcon),
   minus: clean(minus),
   infinity: clean(infinity),

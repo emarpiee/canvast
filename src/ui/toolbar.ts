@@ -48,7 +48,7 @@ export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label
       { id: "grid:date", label: "By date added, newest first", icon: ICONS.calendarDays },
       { id: "grid:size", label: "By size, largest first", icon: ICONS.rulerIcon },
       { id: "grid:type", label: "By type", icon: ICONS.fileType },
-      { id: "grid:stack", label: "In stacking order", icon: ICONS.layers2 },
+      { id: "grid:stack", label: "In stacking order", icon: ICONS.chevronsUpDown },
     ],
   },
   {
@@ -127,12 +127,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
       <div class="tb-group tb-options" data-for="select text">
-        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
+        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.clipboardCopy}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
         <span class="size-out" data-eraser-out></span>
-        <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.group}</button>
+        <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.shapes}</button>
       </div>
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>

@@ -104,10 +104,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
       <div class="assets-layout" role="group" aria-label="Layout">
         <button type="button" class="assets-btn is-icon" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
-        <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.list}</button>
+        <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
       </div>
-      <label class="assets-size" title="Thumbnail size">${ICONS.images}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
-      <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.upload}<span>Import</span></button>
+      <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
+      <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.fileInput}<span>Import</span></button>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the assets you picked, as a slideshow">${ICONS.play}</button>
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="assets-import-input">
@@ -134,18 +134,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
               <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
             </div>
-              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.play}<span>Slideshow</span></button>
+              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.presentation}<span>Slideshow</span></button>
               <button type="button" class="vbtn" data-act="fullscreen" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
               <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
               <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
               <button type="button" class="vbtn" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronDown}</button>
+              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.panelBottomClose}</button>
               <button type="button" class="vbtn" data-act="close" aria-label="Close slide view" title="Back to the library (Esc)">${ICONS.x}</button>
             </div>
           </div>
           <div class="viewer-handle" hidden>
             <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
-            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.chevronUp}</button>
+            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.panelBottomOpen}</button>
           </div>
         </div>
       </div>
@@ -746,7 +746,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     playBtn.setAttribute("aria-pressed", String(on));
     playBtn.setAttribute("aria-label", on ? "Pause the slideshow" : "Start the slideshow");
     playBtn.title = on ? "Pause the slideshow (Space)" : "Start the slideshow (Space)";
-    playBtn.innerHTML = `${on ? ICONS.pause : ICONS.play}<span>${on ? "Pause" : "Slideshow"}</span>`;
+    playBtn.innerHTML = `${on ? ICONS.pause : ICONS.presentation}<span>${on ? "Pause" : "Slideshow"}</span>`;
     if (on) {
       if (eng === avEng) avEng.play();
       armShow();
@@ -1010,7 +1010,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                 icon: ICONS.folder,
                 extra: more("folder", f.id, f.name, [
                   { attr: 'data-folder-action="new"', label: "New subfolder", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
-                  { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename folder ${f.name}` },
+                  { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
                   { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
                 ]),
               }) +
@@ -1025,7 +1025,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="side-head"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
         ${closed ? "" : body}</section>`;
     };
-    const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.plus}</button>`);
+    const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${/smart/i.test(label) ? ICONS.listFilterPlus : ICONS.folderPlus}</button>`);
     const smartReady = !!(search.value.trim() || usageSel.value !== "all");
     const scopeName = ((): string => {
       if (scope === "all") return "All assets";
@@ -1039,7 +1039,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     })();
     side.dataset["open"] = String(sideOpen);
     side.innerHTML = `
-      <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.layers}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
+      <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
       <div class="side-body">
         <ul class="side-list side-views">
           ${item("all", "All assets", entries.length, { icon: ICONS.images })}
@@ -1068,7 +1068,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                   : item(`smart:${sf.id}`, esc(sf.name), entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage, sf.way ?? "all")).length, {
                       icon: ICONS.sparkles,
                       extra: more("smart", sf.id, sf.name, [
-                        { attr: 'data-smart-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename smart folder ${sf.name}` },
+                        { attr: 'data-smart-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename smart folder ${sf.name}` },
                         { attr: 'data-smart-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete smart folder ${sf.name}`, danger: true },
                       ]),
                     }),
@@ -1090,7 +1090,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                     : item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
                         cls: "is-tag",
                         extra: more("tag", k, c.label, [
-                          { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename tag ${c.label}` },
+                          { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
                           { attr: 'data-tag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
                         ]),
                       }),
@@ -1113,7 +1113,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                     : item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
                         cls: "is-tag is-canvas-tag",
                         extra: more("ctag", k, c.label, [
-                          { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename canvas tag ${c.label}` },
+                          { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
                           { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
                         ]),
                       }).replace("<button ", `<button title="On ${c.objects} item(s) across ${c.canvases.size} canvas(es); ${c.assets.size} from the library" `),
@@ -1175,9 +1175,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
       </section>
       <div class="asset-actions">
-        <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.play}<span>Slideshow of these</span></button>
-        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.download}<span>Export ${placeable} files as ZIP</span></button>
-        <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.upload}<span>Export ${placeable} as archive</span></button>
+        <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
+        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${placeable} files as ZIP</span></button>
+        <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
         <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
         ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first.</p>` : ""}
       </div>`;
@@ -1241,7 +1241,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </dl>
       </details>
       <div class="asset-actions">
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.upload}<span>Export as archive</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove its ${instances} instance(s) from their canvases first.</p>` : ""}` : ""}
       </div>`;
@@ -1673,7 +1673,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       tree.boards
         .map(
           ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
-            <h3>${ICONS.layers}<span>${esc(board.name)}</span></h3>
+            <h3>${ICONS.squareStack}<span>${esc(board.name)}</span></h3>
             ${canvases
               .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "open now" : c.objectCount ? `${c.objectCount} objects` : "empty"}</small></button>`)
               .join("")}
