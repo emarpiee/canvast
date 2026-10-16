@@ -48,6 +48,8 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
     group: "Navigation",
     items: [
       { keys: "Arrow keys", does: "Pan (Shift: further)" },
+      { keys: "Ctrl+Arrow keys", does: "Step the selection to the next item (the way is set in Settings > Navigation)" },
+      { keys: "Alt (press and release)", does: "Bring the selection into view" },
       { keys: "+ and -", does: "Zoom in and out (Shift: bigger steps)" },
       { keys: "0 or Home", does: "Return to the origin" },
       { keys: "Space (hold) and drag", does: "Pan with any tool" },

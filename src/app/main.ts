@@ -7,6 +7,7 @@ import { EditorState } from "./editor-state";
 import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
+import { focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
@@ -397,7 +398,10 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k) });
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k),
+    navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.zoom")),
+    focusSelection: () => focusObjects(doc, view, [...editor.selection], settings.get("nav.zoom")),
+  });
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);

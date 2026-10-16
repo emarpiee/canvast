@@ -383,3 +383,105 @@ test("selection action bar: follows the selection, hides while moving and for no
   await expect(bar).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Ctrl+Arrow steps the selection between items (nearest in view, by layer) and frames each; Alt alone brings the selection into view (ADR 0058)", async ({ app }) => {
+  const p = app.page;
+  // Three strokes in a row, drawn left to right (so the right-most is on top).
+  await key(app, "p");
+  for (const x of [300, 600, 900]) await app.drag({ x, y: 450 }, { x: x + 80, y: 470 }, 4);
+  await key(app, "v");
+  const [a, b, c] = await objects(app);
+  const click = async (id: string) => {
+    const s = (await screenOfObject(app, id))!;
+    await p.mouse.click(Math.round((s.box.minX + s.box.maxX) / 2), Math.round((s.box.minY + s.box.maxY) / 2));
+  };
+  await click(a!.id);
+  expect(await selection(app)).toEqual([a!.id]);
+  // Nearest in view (the default): right, right, then back left; at the end of the row nothing changes.
+  await key(app, "Control+ArrowRight");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  await key(app, "Control+ArrowRight");
+  await expect.poll(() => selection(app)).toEqual([c!.id]);
+  await key(app, "Control+ArrowRight");
+  await app.frame();
+  expect(await selection(app)).toEqual([c!.id]);
+  await key(app, "Control+ArrowLeft");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  // The stepped-to item is framed: its middle is the window's middle.
+  await app.frame();
+  const sb = (await screenOfObject(app, b!.id))!.box;
+  const vp = p.viewportSize()!;
+  expect(Math.abs((sb.minX + sb.maxX) / 2 - vp.width / 2)).toBeLessThan(60);
+  // Alt on its own frames the selection again after the view was moved away.
+  for (let i = 0; i < 4; i++) await key(app, "ArrowLeft");
+  await app.frame();
+  const away = (await screenOfObject(app, b!.id))!.box;
+  expect(Math.abs((away.minX + away.maxX) / 2 - vp.width / 2)).toBeGreaterThan(150);
+  await p.keyboard.down("Alt");
+  await p.keyboard.up("Alt");
+  await app.frame();
+  const back = (await screenOfObject(app, b!.id))!.box;
+  expect(Math.abs((back.minX + back.maxX) / 2 - vp.width / 2)).toBeLessThan(60);
+  // Alt with a click or another key is not a "bring into view".
+  for (let i = 0; i < 4; i++) await key(app, "ArrowLeft");
+  await app.frame();
+  await p.keyboard.down("Alt");
+  await key(app, "ArrowLeft");
+  await p.keyboard.up("Alt");
+  await app.frame();
+  const kept = (await screenOfObject(app, b!.id))!.box;
+  expect(Math.abs((kept.minX + kept.maxX) / 2 - vp.width / 2)).toBeGreaterThan(150);
+  // By layer (a setting): the next layer up or down the stacking order, whatever its place on the canvas.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "layer" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await key(app, "Escape");
+  expect(await selection(app)).toEqual([]);
+  // Nothing selected: the first step lands on the top-most layer; then down the order and back up.
+  await key(app, "Control+ArrowUp");
+  await expect.poll(() => selection(app)).toEqual([c!.id]);
+  await key(app, "Control+ArrowDown");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  await key(app, "Control+ArrowDown");
+  await expect.poll(() => selection(app)).toEqual([a!.id]);
+  await key(app, "Control+ArrowDown");
+  await app.frame();
+  expect(await selection(app), "nothing below the bottom layer").toEqual([a!.id]);
+  await key(app, "Control+ArrowUp");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom, 'nearest anywhere' does not (ADR 0058)", async ({ app }) => {
+  const p = app.page;
+  // A big stroke B, then a tiny one A drawn 8 levels deeper right beside the middle of B; back to the first zoom.
+  await key(app, "p");
+  await app.drag({ x: 600, y: 440 }, { x: 680, y: 460 }, 4);
+  await p.evaluate(() => window.__canvastDebug.jump(8));
+  await app.drag({ x: 700, y: 440 }, { x: 760, y: 460 }, 4);
+  await p.evaluate(() => window.__canvastDebug.jump(-8));
+  await app.frame();
+  await key(app, "v");
+  const [b, a] = await objects(app);
+  const pick = async (): Promise<void> => {
+    // A quarter of the way along the stroke (its middle is where the tiny one sits).
+    const s = (await screenOfObject(app, b!.id))!.box;
+    await p.mouse.click(Math.round(s.minX + (s.maxX - s.minX) / 4), Math.round(s.minY + (s.maxY - s.minY) / 4));
+    expect(await selection(app)).toEqual([b!.id]);
+  };
+  await pick();
+  await key(app, "Control+ArrowRight");
+  await app.frame();
+  expect(await selection(app), "the tiny item is skipped").toEqual([b!.id]);
+  // The same step with the setting "anywhere" reaches it.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": "anywhere" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await key(app, "v");
+  await pick();
+  await key(app, "Control+ArrowRight");
+  await expect.poll(() => selection(app)).toEqual([a!.id]);
+  expect(app.consoleErrors).toEqual([]);
+});

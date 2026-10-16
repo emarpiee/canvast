@@ -1,3 +1,4 @@
+import type { NavDir } from "./item-navigation";
 import { canvasShortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
@@ -135,6 +136,10 @@ export interface ToolHooks {
   editText(target: TextObject | null, at: WorldPoint): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
+  /** Ctrl+arrow: step the selection to a neighbouring item (ADR 0058). */
+  navigate(dir: NavDir): void;
+  /** Alt: bring the selection into view. */
+  focusSelection(): void;
 }
 
 export function attachTools(
@@ -483,6 +488,7 @@ export function attachTools(
 
   // ---- pointer events ----------------------------------------------------
   const onPointerDown = (e: PointerEvent): void => {
+    altAlone = false;
     const s = local(e);
     if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 1) return;
     e.preventDefault();
@@ -725,11 +731,17 @@ export function attachTools(
   };
 
   // ---- keyboard ----------------------------------------------------------
+  /** Alt pressed and released on its own (no other key or pointer in between) brings the selection into view. */
+  let altAlone = false;
+  const ARROWS: Record<string, NavDir> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!canvasShortcutsActive(e)) return;
+    altAlone = e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
-    if (mod && key === "z") {
+    if (mod && !e.altKey && ARROWS[e.key]) {
+      hooks.navigate(ARROWS[e.key]!);
+    } else if (mod && key === "z") {
       if (g.kind !== "none") return;
       if (e.shiftKey) redo(doc, editor);
       else undo(doc, editor);
@@ -770,6 +782,14 @@ export function attachTools(
   };
 
   const onKeyUp = (e: KeyboardEvent): void => {
+    if (e.key === "Alt" && altAlone) {
+      altAlone = false;
+      if (canvasShortcutsActive(e)) {
+        e.preventDefault(); // not the browser's menu bar
+        hooks.focusSelection();
+      }
+      return;
+    }
     if (e.key === " ") {
       spaceDown = false;
       el.classList.remove("is-hand");
