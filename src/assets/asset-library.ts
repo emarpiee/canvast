@@ -233,7 +233,10 @@ export class AssetLibrary {
               size = { w: pr.w, h: pr.h };
             }
           }
-        } else img = await decode(file);
+        } else {
+          img = await decode(file);
+          if (!(img.width >= 1 && img.height >= 1)) throw new Error("no pixels"); // e.g. an SVG with no size: kept as a card
+        }
         if (type === "image/gif") {
           try {
             const g = new GifFrames(new Uint8Array(bytes));

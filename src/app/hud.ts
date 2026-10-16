@@ -73,6 +73,8 @@ export interface HudStatus {
   hasSelection(): boolean;
   /** Zen mode (ADR 0075): the floating bars and panels fade out until the pointer is over them. */
   toggleZen(): void;
+  /** Save a screenshot of the canvas to the library (ADR 0080). */
+  screenshot(): void;
   subscribeSelection(fn: () => void): void;
   /** Lines of internal state shown under the frame-rate readout (memory, queues, index). */
   diagnostics(): string[];
@@ -97,6 +99,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
+      <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save what the canvas shows to the library (Settings > Screenshot)">${ICONS.camera}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
@@ -139,6 +142,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "fit-all") status.fit("all");
     else if (action === "home") goHome(view);
     else if (action === "zen") status.toggleZen();
+    else if (action === "screenshot") status.screenshot();
     else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
     else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);
   });

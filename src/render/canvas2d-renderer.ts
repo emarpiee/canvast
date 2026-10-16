@@ -48,11 +48,15 @@ export function renderFrame(
   /** The world origin in the camera's coordinates (ADR 0014: the camera may be in another frame). */
   worldOrigin: WorldPoint = { x: D.ZERO, y: D.ZERO },
   pattern: Pattern = "scale",
+  /** False: no background colour (a transparent screenshot, ADR 0080). */
+  background = true,
 ): RenderStats {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = theme.background;
-  ctx.fillRect(0, 0, vp.width, vp.height);
+  if (background) {
+    ctx.fillStyle = theme.background;
+    ctx.fillRect(0, 0, vp.width, vp.height);
+  } else ctx.clearRect(0, 0, vp.width, vp.height);
 
   let gridLines = 0;
   if (pattern === "scale") {

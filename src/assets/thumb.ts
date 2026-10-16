@@ -51,7 +51,9 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
   } catch {
-    // A format the browser rejects: the file card (it is what the library and the canvas show for it too).
+    // A file shown as a card has its card as the thumbnail. A picture the browser cannot decode at a size (an SVG, say) has none: the library
+    // shows the original itself, as it always did.
+    if (!isCard(rec)) return null;
     try {
       const bmp = await card();
       const c = document.createElement("canvas");

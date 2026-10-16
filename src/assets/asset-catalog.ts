@@ -196,6 +196,24 @@ export class AssetCatalog {
     return req(tx.objectStore("thumbs").get(hash) as IDBRequest<ThumbRecord | undefined>);
   }
 
+  /**
+   * Thumbnails are derived data. Version 2 (ADR 0078): a picture the browser cannot decode at a size (an SVG, say) once got a file card as its
+   * thumbnail; those thumbnails are dropped once, so the library shows the picture itself again. Only types that always decode are kept.
+   */
+  async healThumbs(): Promise<void> {
+    const KEY = "thumbVersion";
+    const tx = this.db.transaction(["meta", "thumbs", "assetCatalog"], "readwrite");
+    const committed = done(tx);
+    const v = await req(tx.objectStore("meta").get(KEY) as IDBRequest<number | undefined>);
+    if ((v ?? 1) < 2) {
+      const ok = /^(image\/(png|jpeg|webp|gif|avif|bmp)|video\/|audio\/)/;
+      const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+      for (const e of entries) if (!ok.test(e.type)) tx.objectStore("thumbs").delete(e.hash);
+      tx.objectStore("meta").put(2, KEY);
+    }
+    await committed;
+  }
+
   /** Store a thumbnail. Derived data, so any tab may write it, and a failure only means it is made again next time. */
   async putThumb(rec: ThumbRecord): Promise<void> {
     const tx = this.db.transaction(["thumbs", "assetCatalog"], "readwrite");

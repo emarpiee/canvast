@@ -180,6 +180,7 @@ export class Session {
     }
     await this.lease.acquire();
     this.persistence.setWritable(!this.readOnly);
+    void this.catalog?.healThumbs().catch(() => undefined);
     this.editor.readOnly = this.readOnly;
     this.startup = await ensureWorkspace(this.repo);
     this.current = this.startup.current;

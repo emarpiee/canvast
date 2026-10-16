@@ -84,3 +84,42 @@ test("files with an unknown extension, none, or a picture the browser cannot rea
   await expect(p.getByTestId("asset-card")).toHaveCount(4);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("an SVG keeps its real preview (not a card), and the extension chip shows only while a library card is pointed at (ADR 0078)", async ({ app }) => {
+  const p = app.page;
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#c33"/></svg>');
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "logo.svg", mimeType: "image/svg+xml", buffer: svg });
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  const card = p.getByTestId("asset-card");
+  await expect(p.locator(".asset-thumb img")).toHaveJSProperty("complete", true);
+  // The picture is the SVG itself: red pixels, not the dark file card.
+  const px = await p.locator(".asset-thumb img").evaluate((img: HTMLImageElement) => {
+    const c = document.createElement("canvas");
+    c.width = 4;
+    c.height = 4;
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0, 4, 4);
+    return [...x.getImageData(2, 2, 1, 1).data];
+  });
+  expect(px[0]).toBeGreaterThan(150);
+  expect(px[1]).toBeLessThan(100);
+  // The chip: hidden until the card is pointed at (or picked).
+  const chip = card.locator(".ext-chip");
+  await p.mouse.move(5, 400);
+  await expect(chip).toHaveCSS("opacity", "0");
+  await card.hover();
+  await expect(chip).toHaveCSS("opacity", /0\.9/);
+  await card.click();
+  await expect(p.getByTestId("asset-file-info")).toHaveCount(0); // a real picture is not a card
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("opening the Assets view does not move the focus into the search box; only Ctrl+Shift+F does", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("assets-search")).not.toBeFocused();
+  await p.keyboard.press("Control+Shift+f");
+  await expect(p.getByTestId("assets-search")).toBeFocused();
+  expect(app.consoleErrors).toEqual([]);
+});

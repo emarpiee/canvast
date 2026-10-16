@@ -1844,7 +1844,9 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 /* The file extension chip (ADR 0078): on library cards of pictures, video and audio, and in the details of every asset. */
 .ext-chip { display: inline-flex; align-items: center; padding: 0 var(--sp-3); font: var(--weight-bold) var(--text-xs)/1.7 var(--font-ui); letter-spacing: 0.02em; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-xs); text-transform: uppercase; }
 .asset-thumb { position: relative; }
-.asset-thumb .ext-chip { position: absolute; left: var(--sp-3); bottom: var(--sp-3); opacity: 0.92; }
+.asset-thumb .ext-chip { position: absolute; right: var(--sp-3); top: var(--sp-3); opacity: 0; transition: opacity 120ms; pointer-events: none; }
+/* Like the checkbox and the details: shown while the card is pointed at, focused or picked. */
+.asset-card:hover .ext-chip, .asset-card:focus-visible .ext-chip, .asset-card[aria-pressed="true"] .ext-chip { opacity: 0.95; }
 .asset-facts .ext-chip { align-self: center; }
 .asset-file { padding: var(--sp-4); background: color-mix(in oklch, var(--hud-accent) 10%, transparent); border-radius: var(--r-md); }
 
@@ -1854,3 +1856,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .nav-ws .nav-ws-rename { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--sp-10); height: var(--sp-10); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
 .nav-ws .nav-ws-rename:hover { color: var(--hud-fg); background: var(--hud-hover); }
 .nav-ws .nav-ws-rename svg { width: var(--icon-md); height: var(--icon-md); }
+
+.set-text { min-width: 0; width: min(100%, 360px); height: var(--sp-12); padding: 0 var(--sp-5); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
+.set-text:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

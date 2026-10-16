@@ -1,4 +1,6 @@
 import { ViewState } from "./view-state";
+import { newObjectId } from "../doc/model";
+import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard } from "../assets/file-kind";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
@@ -264,14 +266,14 @@ async function start(): Promise<void> {
 
   let backdrop: ({ f: Frame } & ReturnType<typeof worldBackdrop>) | null = null;
   /** Render synchronously and return the timing breakdown. */
-  const renderNow = (): FrameBreakdown => {
+  const renderNow = (shot?: { pattern: boolean; overlays: boolean; transparent: boolean }): FrameBreakdown => {
     const t0 = performance.now();
     const cam = view.camera;
     const fc = view.frameCamera;
     const vp = view.viewport;
     // Axes and landmarks are world-frame content, re-expressed in the camera frame (once per frame change).
     if (backdrop?.f !== fc.f) backdrop = { f: fc.f, ...worldBackdrop(fc.f, LANDMARKS) };
-    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin, settings.get("ui.pattern"));
+    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin, shot && !shot.pattern ? "none" : settings.get("ui.pattern"), !shot?.transparent);
     density.draw(ctx, index.views(fc), index.dots(fc), vp, doc.revision);
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
@@ -329,7 +331,7 @@ async function start(): Promise<void> {
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
     const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
-    drawOverlays(ctx, selected, editor, fc, vp, theme);
+    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme);
     const t3 = performance.now();
     const b: FrameBreakdown = {
       totalMs: t3 - t0,
@@ -504,10 +506,111 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       });
     },
   });
+  // Screenshot (ADR 0080): what the canvas shows, without the selection outlines, saved to the library with the name, folder and tags of Settings > Screenshot.
+  const takeScreenshot = async (): Promise<void> => {
+    if (appView !== "canvas") return;
+    if (!session.catalog) {
+      editor.message = "Could not save a screenshot: the library is not available in this tab.";
+      editor.changed();
+      return;
+    }
+    const cfg = {
+      format: settings.get("shot.format"),
+      quality: settings.get("shot.quality"),
+      pattern: settings.get("shot.pattern"),
+      transparent: settings.get("shot.transparent"),
+      ui: settings.get("shot.interface"),
+      area: settings.get("shot.area"),
+      folder: settings.get("shot.folder").trim(),
+      name: settings.get("shot.name"),
+      style: settings.get("shot.nameStyle"),
+      copy: settings.get("shot.copy"),
+    };
+    try {
+      // A clean frame: the pattern as chosen, no selection outlines, and a background or not.
+      renderNow({ pattern: cfg.pattern, overlays: false, transparent: cfg.transparent });
+      let pic = document.createElement("canvas");
+      pic.width = canvas.width;
+      pic.height = canvas.height;
+      pic.getContext("2d")!.drawImage(canvas, 0, 0);
+      invalidate(); // the screen goes back to normal (selection outlines and all)
+      const vp = view.viewport;
+      const visible = visibleObjects(doc, index, null, view.frameCamera, vp);
+      const picked = editor.selection.size ? visible.filter((po) => editor.selection.has(po.obj.id)) : [];
+      const inShot = cfg.area === "selection" && picked.length ? picked : visible;
+      if (cfg.ui) {
+        try {
+          pic = await withInterface(pic, host, document.getElementById("nav")!, vp.width, vp.height);
+        } catch {
+          editor.message = "The interface could not be included in this browser; the screenshot has the canvas only.";
+          editor.changed();
+        }
+      }
+      if (cfg.area === "selection" && picked.length) {
+        const x0 = Math.max(0, Math.min(...picked.map((po) => po.box.minX)) - 12);
+        const y0 = Math.max(0, Math.min(...picked.map((po) => po.box.minY)) - 12);
+        const x1 = Math.min(vp.width, Math.max(...picked.map((po) => po.box.maxX)) + 12);
+        const y1 = Math.min(vp.height, Math.max(...picked.map((po) => po.box.maxY)) + 12);
+        if (x1 - x0 >= 2 && y1 - y0 >= 2) {
+          const crop = document.createElement("canvas");
+          crop.width = Math.round((x1 - x0) * dpr);
+          crop.height = Math.round((y1 - y0) * dpr);
+          crop.getContext("2d")!.drawImage(pic, Math.round(x0 * dpr), Math.round(y0 * dpr), crop.width, crop.height, 0, 0, crop.width, crop.height);
+          pic = crop;
+        }
+      }
+      if (cfg.format === "jpeg") {
+        // JPEG has no transparency: fill with white behind the picture.
+        const flat = document.createElement("canvas");
+        flat.width = pic.width;
+        flat.height = pic.height;
+        const fx = flat.getContext("2d")!;
+        fx.fillStyle = "#fff";
+        fx.fillRect(0, 0, flat.width, flat.height);
+        fx.drawImage(pic, 0, 0);
+        pic = flat;
+      }
+      const { blob, format } = await encodeShot(pic, cfg.format, cfg.quality);
+      const tree = session.tree;
+      const cur = session.current;
+      const boardRec = tree?.boards.find((b) => b.board.id === cur?.boardId);
+      const canvasRec = boardRec?.canvases.find((c) => c.id === cur?.canvasId);
+      const board = boardRec?.board.name ?? "board";
+      const canvasName = canvasRec?.name ?? "canvas";
+      const fileName = `${shotFileName(cfg.name, { workspace: tree?.workspace.displayName ?? "workspace", board, canvas: canvasName, at: new Date() }, cfg.style)}.${SHOT_FORMATS[format].ext}`;
+      const itemTags = [...new Set(inShot.flatMap((po) => po.obj.tags ?? []))];
+      const tags = shotTags({ screenshot: settings.get("shot.tagShot"), board: settings.get("shot.tagBoard"), canvas: settings.get("shot.tagCanvas"), items: settings.get("shot.tagItems") }, board, canvasName, itemTags);
+      const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: SHOT_FORMATS[format].mime }), false);
+      let where = "the library";
+      if (cfg.folder) {
+        const listing = await session.catalog.list();
+        const have = listing.folders.find((f) => f.parentId === null && f.name.toLowerCase() === cfg.folder.toLowerCase());
+        const id = have?.id ?? newObjectId();
+        if (!have) await session.organize((c) => c.createFolder(cfg.folder, null, id));
+        await session.organize((c) => c.updateMeta(record.hash, { addFolders: [id], ...(tags.length ? { addTags: tags } : {}) }));
+        where = `the “${have?.name ?? cfg.folder}” folder`;
+      } else if (tags.length) await session.organize((c) => c.updateMeta(record.hash, { addTags: tags }));
+      if (cfg.copy) {
+        try {
+          const png = format === "png" ? blob : await new Promise<Blob | null>((r) => pic.toBlob(r, "image/png"));
+          if (png) await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+        } catch {
+          // the clipboard refused (no permission): the screenshot is saved anyway
+        }
+      }
+      editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
+      editor.changed();
+    } catch (e) {
+      editor.message = `Could not save the screenshot: ${(e as Error).message}`;
+      editor.changed();
+    }
+  };
+
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     fit: (kind) => focusCycle.fit(kind),
     hasSelection: () => editor.selection.size > 0,
     toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
+    screenshot: () => void takeScreenshot(),
     subscribeSelection: (fn) => void editor.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,

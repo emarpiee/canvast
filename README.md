@@ -252,6 +252,7 @@ or network connection.
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
 | Import any file | the Import button, drag and drop or paste: pictures, video and audio show as themselves; any other file (3D model, document, ...) is kept as a card with its extension, and can be downloaded |
 | Show a picture in the library | select it, then the library button in the selection bar: the Assets view opens with its original picked |
+| Screenshot | the camera button in the bottom-right controls: saves the view to the library (Settings > Screenshot sets the format, name, folder, tags and what is included) |
 | Zen mode | the leaf button beside Home, or `Z` (rebind in Settings > Shortcuts): the floating bars and panels fade out and show again while the pointer is over them (ADR 0075) |
 | Settings | **Settings** view: tabs, scopes, reset, theme (system, light, dark), rebindable tool keys, `?` for the shortcut list, interface size, contrast and motion |
 | Developer tools | Settings > Develop (applies after a reload), or `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |

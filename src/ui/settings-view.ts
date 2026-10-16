@@ -12,7 +12,8 @@ type Control =
   | { kind: "toggle" }
   | { kind: "range"; min: number; max: number; step: number; unit?: string; /** A hue slider (rainbow track) with named presets, applied while dragging. */ hue?: ReadonlyArray<[name: string, degrees: number]>; /** Applied while dragging, not on release. */ live?: boolean }
   | { kind: "select"; options: ReadonlyArray<[value: string, label: string]> }
-  | { kind: "colour" };
+  | { kind: "colour" }
+  | { kind: "text"; max: number; placeholder?: string };
 
 interface Row {
   readonly key: SettingKey;
@@ -70,6 +71,26 @@ export const SETTINGS_TABS: readonly Tab[] = [
     ],
   },
   {
+    id: "screenshot",
+    label: "Screenshot",
+    rows: [
+      { key: "shot.format", label: "Picture format", help: "WebP is small and keeps transparency; PNG is lossless and bigger; JPEG is small but has no transparency. If the browser cannot write WebP, PNG is used.", control: { kind: "select", options: [["webp", "WebP"], ["png", "PNG"], ["jpeg", "JPEG"]] } },
+      { key: "shot.quality", label: "Quality", help: "For WebP and JPEG. Higher is sharper and bigger.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
+      { key: "shot.area", label: "Area", help: "The whole view, or only the box around the selected items (the whole view when nothing is selected).", control: { kind: "select", options: [["view", "The whole view"], ["selection", "The selection"]] } },
+      { key: "shot.pattern", label: "Include the canvas pattern", help: "The grid or dots behind the content.", control: { kind: "toggle" } },
+      { key: "shot.transparent", label: "Transparent background", help: "No background colour behind the content (WebP and PNG; JPEG is filled white). Turn the pattern off too for a clean cut-out.", control: { kind: "toggle" } },
+      { key: "shot.interface", label: "Include the interface", help: "The floating bars and panels over the canvas (the toolbar, panels, readout). Off by default: a clean picture of the canvas.", control: { kind: "toggle" } },
+      { key: "shot.copy", label: "Also copy it to the clipboard", help: "As a PNG, ready to paste into another app.", control: { kind: "toggle" } },
+      { key: "shot.folder", label: "Library folder", help: "Screenshots are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Screenshots" } },
+      { key: "shot.name", label: "File name", help: "Words in braces are replaced: {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm} {yyyy} {mm} {dd} {hh} {min} {ss}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}" } },
+      { key: "shot.nameStyle", label: "Name words", help: "How the board and canvas names are written in the file name.", control: { kind: "select", options: [["underscores", "lower_case_with_underscores"], ["keep", "As written"]] } },
+      { key: "shot.tagShot", label: "Tag: screenshot", help: "Put the tag “screenshot” on every screenshot, to find them all.", control: { kind: "toggle" } },
+      { key: "shot.tagBoard", label: "Tag: the board's name", control: { kind: "toggle" } },
+      { key: "shot.tagCanvas", label: "Tag: the canvas's name", control: { kind: "toggle" } },
+      { key: "shot.tagItems", label: "Tags of the items in it", help: "The in-canvas tags of the items in the screenshot (or in the selection).", control: { kind: "toggle" } },
+    ],
+  },
+  {
     id: "performance",
     label: "Performance",
     rows: [
@@ -113,6 +134,7 @@ function controlHtml(row: Row, id: string): string {
   const a = `aria-labelledby="${id}-l"${row.help ? ` aria-describedby="${id}-h"` : ""}`;
   if (c.kind === "toggle") return `<input type="checkbox" id="${id}" data-set="${row.key}" ${a}>`;
   if (c.kind === "colour") return `<input type="color" id="${id}" data-set="${row.key}" ${a}>`;
+  if (c.kind === "text") return `<input type="text" class="set-text" id="${id}" data-set="${row.key}" maxlength="${c.max}" placeholder="${esc(c.placeholder ?? "")}" autocomplete="off" spellcheck="false" ${a}>`;
   if (c.kind === "select") return `<select id="${id}" data-set="${row.key}" ${a}>${c.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
   const presets = c.hue ? `<span class="set-presets" role="group" aria-label="Theme colour presets">${c.hue.map(([n, d]) => `<button type="button" class="set-preset" data-preset="${row.key}" data-value="${d}" style="--p:${d}" aria-label="${esc(n)}" title="${esc(n)}"></button>`).join("")}</span>` : "";
   return `<input type="range" id="${id}" data-set="${row.key}" min="${c.min}" max="${c.max}" step="${c.step}" ${c.hue ? 'class="set-hue"' : ""} ${a}><output for="${id}"></output>${presets}`;

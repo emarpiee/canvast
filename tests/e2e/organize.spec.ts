@@ -428,7 +428,9 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   const b = (await btn.boundingBox())!;
   const m = (await menu.boundingBox())!;
   expect(Math.abs(m.y - (b.y + b.height))).toBeLessThan(12); // just under the button
-  expect(Math.abs(m.x + m.width - (b.x + b.width))).toBeLessThan(12); // right edges line up
+  // Right edges line up, or (near the window's left edge) the menu is kept inside the window and still sits under its button.
+  expect(b.x).toBeGreaterThanOrEqual(m.x - 1);
+  expect(b.x + b.width).toBeLessThanOrEqual(m.x + m.width + 1);
   await p.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   expect(app.consoleErrors).toEqual([]);

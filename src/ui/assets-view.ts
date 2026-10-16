@@ -2189,8 +2189,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       status.textContent = "";
       syncImmersive();
       void refresh();
-      if (viewer.hidden) search.focus();
-      else viewer.focus();
+      // The search box takes the focus only on Ctrl+Shift+F (focusSearch); opening the library leaves the focus where it is.
+      if (!viewer.hidden) viewer.focus();
     },
     async reveal(hashes) {
       if (!viewer.hidden) closeSlide();
