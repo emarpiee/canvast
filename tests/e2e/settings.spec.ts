@@ -282,3 +282,30 @@ test("Settings > Develop switches the developer tools on and off for every sessi
   await expect(p.getByTestId("debug-panel")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Zen mode fades the floating bars out, each shows while the pointer is over it, the Z key and the button toggle it, and it is remembered (ADR 0075)", async ({ app }) => {
+  const p = app.page;
+  const rail = p.locator("#toolbar > .rail");
+  const readout = p.locator(".hud-readout");
+  const zen = p.getByRole("button", { name: "Zen mode" });
+  await expect(rail).toHaveCSS("opacity", "1");
+  await zen.click();
+  await expect(zen).toHaveAttribute("aria-pressed", "true");
+  await p.mouse.move(600, 300); // away from every bar
+  await expect(rail).toHaveCSS("opacity", "0");
+  await expect(readout).toHaveCSS("opacity", "0");
+  await rail.hover();
+  await expect(rail).toHaveCSS("opacity", "1");
+  await p.mouse.move(600, 300);
+  await expect(rail).toHaveCSS("opacity", "0");
+  // Reload: still on. The Z key turns it off, on the canvas.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.mouse.move(600, 300);
+  await expect(rail).toHaveCSS("opacity", "0");
+  await p.locator("#canvas").focus();
+  await p.keyboard.press("z");
+  await expect(rail).toHaveCSS("opacity", "1");
+  await expect(p.getByRole("button", { name: "Zen mode" })).toHaveAttribute("aria-pressed", "false");
+  expect(app.consoleErrors).toEqual([]);
+});

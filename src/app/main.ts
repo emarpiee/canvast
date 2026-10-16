@@ -184,6 +184,13 @@ async function start(): Promise<void> {
     else document.documentElement.dataset["theme"] = t;
   };
   // Interface size, contrast and motion (Settings > Appearance): attributes and a variable on the root, read by the stylesheet.
+  // Zen mode (ui.zen): an attribute on the root, read by the stylesheet, and the pressed state of the button beside Home.
+  const applyZen = (): void => {
+    const on = settings.get("ui.zen");
+    if (on) document.documentElement.dataset["zen"] = "on";
+    else delete document.documentElement.dataset["zen"];
+    document.querySelector('[data-action="zen"]')?.setAttribute("aria-pressed", String(on));
+  };
   const applyAppearance = (): void => {
     const root = document.documentElement;
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
@@ -198,6 +205,7 @@ async function start(): Promise<void> {
     else root.dataset["motion"] = m;
   };
   applyAppearance();
+  applyZen();
   applyThemeAttribute();
   let theme = readTheme(document.documentElement);
   setThemeInk(theme.ink);
@@ -492,6 +500,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     fit: (kind) => focusCycle.fit(kind),
     hasSelection: () => editor.selection.size > 0,
+    toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
     subscribeSelection: (fn) => void editor.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
@@ -518,6 +527,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       editor.changed();
     },
   });
+  applyZen(); // the button beside Home exists now
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
   mountNavigator(document.getElementById("workspace")!, session);
 
@@ -595,6 +605,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
+  // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== settings.get("key.zen")) return;
+    if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault();
+    settings.set("ui.zen", !settings.get("ui.zen"));
+  });
   // Ctrl+F searches what you are looking at (the canvas, or the library in the Assets view); Ctrl+Shift+F goes to the library's search
   // from anywhere. The browser's own find is not used for these.
   window.addEventListener("keydown", (e) => {
@@ -634,6 +651,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "ui.contrast":
       case "ui.motion":
         applyAppearance();
+        return;
+      case "ui.zen":
+        applyZen();
         return;
       case "ui.pattern":
         invalidate();

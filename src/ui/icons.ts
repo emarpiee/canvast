@@ -29,6 +29,7 @@ import folderIcon from "lucide-static/icons/folder.svg";
 import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
 import folderXIcon from "lucide-static/icons/folder-x.svg";
 import sparklesIcon from "lucide-static/icons/sparkles.svg";
+import leafIcon from "lucide-static/icons/leaf.svg";
 import tagIcon from "lucide-static/icons/tag.svg";
 import minus from "lucide-static/icons/minus.svg";
 import infinity from "lucide-static/icons/infinity.svg";
@@ -147,6 +148,7 @@ export const ICONS = {
   folderPlus: clean(folderPlusIcon),
   folderX: clean(folderXIcon),
   sparkles: clean(sparklesIcon),
+  leaf: clean(leafIcon),
   tag: clean(tagIcon),
   minus: clean(minus),
   infinity: clean(infinity),

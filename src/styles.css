@@ -1800,3 +1800,15 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .layout-gaps { display: flex; gap: var(--sp-1); padding: var(--sp-1) var(--sp-4) var(--sp-3); }
 .toolbar .layout-menu .layout-gaps button, .tb-options-row .layout-menu .layout-gaps button, .layout-menu .layout-gaps button { display: inline-flex; justify-content: center; width: auto; flex: 1 1 auto; min-height: 30px; padding: 0 var(--sp-3); font-size: var(--text-sm); border-radius: var(--r-pill); }
 .layout-menu .layout-gaps button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+
+/* Zen mode (ADR 0075): the floating bars and panels fade out and show again while the pointer is over them or the focus is inside. */
+:root[data-zen="on"] #nav, :root[data-zen="on"] #toolbar > .rail, :root[data-zen="on"] #toolbar > .dock, :root[data-zen="on"] #toolbar > .toolbar,
+:root[data-zen="on"] .hud-readout, :root[data-zen="on"] .hud-controls, :root[data-zen="on"] #side-panels, :root[data-zen="on"] .ctx-bar { opacity: 0; transition: opacity 200ms ease; }
+:root[data-zen="on"] #nav:hover, :root[data-zen="on"] #nav:focus-within, :root[data-zen="on"] #toolbar > .rail:hover, :root[data-zen="on"] #toolbar > .rail:focus-within,
+:root[data-zen="on"] #toolbar > .dock:hover, :root[data-zen="on"] #toolbar > .dock:focus-within, :root[data-zen="on"] #toolbar > .toolbar:hover, :root[data-zen="on"] #toolbar > .toolbar:focus-within,
+:root[data-zen="on"] .hud-readout:hover, :root[data-zen="on"] .hud-readout:focus-within, :root[data-zen="on"] .hud-controls:hover, :root[data-zen="on"] .hud-controls:focus-within,
+:root[data-zen="on"] #side-panels:hover, :root[data-zen="on"] #side-panels:focus-within, :root[data-zen="on"] .ctx-bar:hover, :root[data-zen="on"] .ctx-bar:focus-within,
+/* A saving problem is never hidden. */
+:root[data-zen="on"] .hud-readout:has(.hud-save[data-state="error"], .hud-save[data-state="unavailable"], .hud-save[data-state="conflict"], .hud-save[data-state="readonly"]),
+/* The menu that opened from a bar keeps its bar shown. */
+:root[data-zen="on"] .ctx-bar:has([aria-expanded="true"]) { opacity: 1; }

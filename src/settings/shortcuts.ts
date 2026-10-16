@@ -53,6 +53,7 @@ export function navForKey(settings: SettingsStore, key: string): NavDir | undefi
 export const KEY_ROWS: ReadonlyArray<{ setting: SettingKey; name: string; group: string }> = [
   ...TOOL_ORDER.map((t) => ({ setting: TOOL_KEY_SETTING[t], name: TOOL_NAME[t], group: "Tools" })),
   ...NAV_ORDER.map((d) => ({ setting: NAV_KEY_SETTING[d], name: NAV_NAME[d], group: "Step to the next item" })),
+  { setting: "key.zen" as SettingKey, name: "Zen mode", group: "View" },
 ];
 
 /**
@@ -60,7 +61,7 @@ export const KEY_ROWS: ReadonlyArray<{ setting: SettingKey; name: string; group:
  * (ADR 0072), so the tool goes back to its own default letter and the two never share a key. Returns the tools that were reset.
  */
 export function releaseStepKeys(settings: SettingsStore): Tool[] {
-  const steps = new Set(NAV_ORDER.map((d) => settings.get(NAV_KEY_SETTING[d])));
+  const steps = new Set<unknown>([...NAV_ORDER.map((d) => settings.get(NAV_KEY_SETTING[d])), settings.get("key.zen")]);
   const freed: Tool[] = [];
   for (const t of TOOL_ORDER) {
     if (steps.has(settings.get(TOOL_KEY_SETTING[t]) as string)) {

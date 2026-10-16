@@ -71,6 +71,8 @@ export interface HudStatus {
   /** Bring the selection, or everything visible at this zoom, into view (the buttons beside zoom in and out). */
   fit(kind: "selection" | "all"): void;
   hasSelection(): boolean;
+  /** Zen mode (ADR 0075): the floating bars and panels fade out until the pointer is over them. */
+  toggleZen(): void;
   subscribeSelection(fn: () => void): void;
   /** Lines of internal state shown under the frame-rate readout (memory, queues, index). */
   diagnostics(): string[];
@@ -99,6 +101,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.maximize}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
+      <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>
   `;
@@ -133,6 +136,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "fit-selection") status.fit("selection");
     else if (action === "fit-all") status.fit("all");
     else if (action === "home") goHome(view);
+    else if (action === "zen") status.toggleZen();
     else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
     else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);
   });

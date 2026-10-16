@@ -249,6 +249,7 @@ or network connection.
 | Export / import | storage panel (click the save indicator): **Export workspace backup**, **Import archive…** · menu **Export** per board or canvas · drop a `.canvast` file on the page |
 | Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
+| Zen mode | the leaf button beside Home, or `Z` (rebind in Settings > Shortcuts): the floating bars and panels fade out and show again while the pointer is over them (ADR 0075) |
 | Settings | **Settings** view: tabs, scopes, reset, theme (system, light, dark), rebindable tool keys, `?` for the shortcut list, interface size, contrast and motion |
 | Developer tools | Settings > Develop (applies after a reload), or `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
 
