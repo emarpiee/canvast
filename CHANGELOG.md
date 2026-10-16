@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
+
+Built after v0.16.0 from owner feedback (ADRs 0052 to 0063). Tested spec by spec; the full suite has not been re-run since v0.16.0 ([record](docs/testing/ui-polish-0.17.md)).
 
 - **Fixed:** resize snapping with **Shift** (proportions kept) now snaps the edge the proportional size produces, not the pointer position; the pointer can be far past the line while the edge lands on it.
 - **Fixed:** resize snaps by the dragged **edge** (not the cursor), so grabbing a handle off-centre still lines the edge up exactly. The second **Alt** tap (and Fit everything) no longer zooms out to an empty canvas: it fits the selected items plus the legible items of the same depth that are near them, not every item that happens to be a legible size however far away.

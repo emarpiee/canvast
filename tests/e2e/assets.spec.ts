@@ -1564,6 +1564,8 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   await expect(grip).toBeVisible();
   const h0 = (await sheet.boundingBox())!.height;
   const g = (await grip.boundingBox())!;
+  const top0 = (await sheet.boundingBox())!.y;
+  expect(Math.abs(g.y + g.height / 2 - top0), "the grip sits on the sheet's top edge, whatever its content").toBeLessThan(10);
   await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
   await p.mouse.down();
   await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2 - 120, { steps: 6 });
@@ -1593,6 +1595,13 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   const ib = (await img.boundingBox())!;
   expect(Math.abs(ib.y - stage.y - (stage.y + stage.height - ib.y - ib.height)), "equal room above and below").toBeLessThan(2);
+  expect(Math.abs(ib.x - stage.x - (stage.x + stage.width - ib.x - ib.width)), "equal room left and right").toBeLessThan(2);
+  // The controls are two rows on a phone: previous, count, next; then zoom on the left and the buttons on the right, nothing wrapped.
+  const controls = (await viewer.locator(".viewer-bar").boundingBox())!;
+  expect(controls.height, "two tidy rows").toBeLessThan(120);
+  const prev = (await viewer.locator('[data-act="prev"]').boundingBox())!;
+  const closeB = (await viewer.locator('.viewer-tools [data-act="close"]').boundingBox())!;
+  expect(closeB.y).toBeGreaterThan(prev.y + prev.height - 2);
   const zoom = (await viewer.locator(".viewer-zoom").boundingBox())!;
   const bar = (await viewer.locator(".viewer-bar").boundingBox())!;
   expect(zoom.y).toBeGreaterThanOrEqual(bar.y - 1);

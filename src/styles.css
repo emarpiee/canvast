@@ -1535,3 +1535,17 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .assets-body.is-list .assets-list-head [data-col].is-drop { box-shadow: inset 2px 0 0 var(--hud-accent); }
 .assets-body.is-list .assets-scroll { overflow-x: auto; }
 .assets-body.is-list .assets-list-head, .assets-body.is-list .assets-grid { min-width: var(--list-min, 0); }
+
+/* ---- Viewer on a phone: the picture is centred (the inset is inside its box, not added to it), the bar is two tidy rows ---- */
+.viewer figure img, .viewer figure video { width: calc(100% - 32px); height: calc(100% - 32px); }
+@media (max-width: 640px) {
+  .viewer-bar { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .viewer-nav { display: flex; justify-content: space-between; align-items: center; }
+  .viewer-nav .vbtn { min-width: 44px; }
+  .viewer-pos { flex: 1; text-align: center; }
+  .viewer-tools { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 4px; }
+  .viewer-tools [data-act="play"] span, .viewer-tools [data-act="place"] span { display: none; }
+  .viewer-tools [data-act="details"] { display: none; }
+  .viewer-zoom { margin-right: auto; }
+  .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { bottom: calc(var(--sheet-now, 58vh) - 14px); }
+}

@@ -1518,6 +1518,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     grip.addEventListener("pointercancel", up);
   });
   grip.addEventListener("dblclick", () => setSheet(null, true));
+  // On a phone the sheet sits on the bottom edge and the grip on its top: keep the grip where the sheet really is, whatever its content.
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => body.style.setProperty("--sheet-now", `${inspector.offsetHeight}px`)).observe(inspector);
   grip.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
     setSheet(inspector.offsetHeight + (e.key === "ArrowUp" ? 48 : -48), true);
