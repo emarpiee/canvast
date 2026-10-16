@@ -354,7 +354,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const slideGif = viewer.querySelector<HTMLCanvasElement>(".viewer-gif")!;
   const avEng = avEngine(slideMedia);
   const gifEng = gifEngine(slideGif);
-  const controls = mountPlayerControls(stage, settings);
+  const controls = mountPlayerControls(stage, settings, {
+    extract: () => void extractFrame(),
+  });
   let eng: Engine | null = null;
   const unloadMedia = (): void => {
     eng?.pause();
@@ -362,9 +364,52 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     gifEng.unload();
     eng = null;
     controls.hide();
+    clearTimeout(peekTimer);
+    viewer.classList.remove("show-player");
     slideMedia.hidden = true;
     slideGif.hidden = true;
   };
+  /**
+   * Extract frame to the open canvas: the picture on screen now becomes a new PNG original in the library and is placed on the open
+   * canvas at once (the viewer stays as it is). The picture may not be presented yet (a seek just landed): a few tries.
+   */
+  const extractFrame = async (): Promise<void> => {
+    const engine = eng;
+    const at = slideHash;
+    if (!engine || !at || session.editor.blockEdit()) return;
+    let png: Blob | null = null;
+    for (let i = 0; i < 4 && !png; i++) {
+      png = await engine.frame().catch(() => null);
+      if (!png) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!png || eng !== engine) return;
+    const src = listing?.entries.find((x) => x.hash === at);
+    const stem = (src?.name ?? "frame").replace(/\.[^.]*$/, "") || "frame";
+    const label = engine.label().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    const { record } = await assets.importFileDetailed(new File([png], `${stem}-frame-${label}.png`, { type: "image/png" }), true);
+    const id = await session.placeAsset(record.hash);
+    const here = session.tree?.boards.flatMap((b) => b.canvases.map((c) => ({ b: b.board.name, c })))?.find((x) => x.c.id === session.current?.canvasId);
+    session.editor.message = id ? `Frame placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : "The frame was added to the library; it could not be placed.";
+    session.editor.changed();
+  };
+  // With the viewer's controls hidden the player is hidden too; a click inside the viewer brings back the player only (not the controls),
+  // and it goes again after a few quiet seconds.
+  let peekTimer = 0;
+  const peek = (): void => {
+    viewer.classList.add("show-player");
+    clearTimeout(peekTimer);
+    peekTimer = window.setTimeout(() => viewer.classList.remove("show-player"), 4000);
+  };
+  let downAt: { x: number; y: number } | null = null;
+  stage.addEventListener("pointerdown", (e) => void (downAt = { x: e.clientX, y: e.clientY }), true);
+  stage.addEventListener("click", (e) => {
+    const moved = downAt ? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) : 0;
+    if (moved > 5 || !eng || !viewer.classList.contains("no-bar")) return;
+    if ((e.target as HTMLElement).closest("button, .viewer-zoom, .media-bar, .viewer-edge")) return;
+    peek();
+  });
+  controls.el.addEventListener("pointerdown", () => viewer.classList.contains("show-player") && peek(), true);
+  controls.el.addEventListener("input", () => viewer.classList.contains("show-player") && peek());
   /** What a loaded file needs of the object the canvas player takes: where to start, and whether to loop. */
   const playOf = (repeat: boolean): ImageObject => ({ media: { t: 0, repeat } }) as unknown as ImageObject;
   const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;
@@ -464,7 +509,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const pointers = new Map<number, { x: number; y: number }>();
   let pinch = 0;
   stage.addEventListener("pointerdown", (e) => {
-    if ((e.target as HTMLElement).closest("button, .viewer-zoom, video") && !(e.target as HTMLElement).closest("video[controls]:not(:hover)")) return;
+    if ((e.target as HTMLElement).closest("button, .viewer-zoom, .media-bar")) return; // (the video itself pans and zooms like a picture: it has no controls of its own)
     if (!shownMedia()) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     stage.setPointerCapture(e.pointerId);

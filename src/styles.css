@@ -1556,3 +1556,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer-media-bar { position: absolute; left: 50%; bottom: 14px; top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); }
 .viewer-media-bar[hidden] { display: none; }
 .viewer-media-bar .media-gap { flex: 1; }
+
+/* With the controls hidden the player is hidden too; a click in the viewer shows the player alone for a few seconds */
+.viewer.no-bar .viewer-media-bar { display: none; }
+.viewer.no-bar.show-player .viewer-media-bar:not([hidden]) { display: flex; }
+.viewer-media-bar .media-bar-extract { margin-left: 4px; }

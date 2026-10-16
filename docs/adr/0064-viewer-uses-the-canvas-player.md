@@ -8,3 +8,5 @@ The viewer used the browser's own `<video controls>` for video and audio and a p
 - The slideshow plays a video or audio file to its end (the engine's `onEnded` steps on); a GIF loops until the slide timer moves on.
 - The bar sits over the bottom of the picture (two rows on a phone), stops its own pointer events so it never pans or clicks the picture, and its keys (the sliders) do not reach the viewer's shortcuts.
 - Zoom, pan and the Fit/100% toggle work on the GIF canvas like on the picture.
+
+**Amendment (owner feedback):** the viewer's bar has **Extract frame to the open canvas** (not for audio): the picture on screen now becomes a new PNG original in the library and is placed on the open canvas at once (notice: "Frame placed on Board › Canvas and added to the library"); the canvas player's own Extract frame (which places it beside the instance) is unchanged. A video, with no controls of its own any more, pans and zooms like a picture. With the viewer's controls hidden (F) the player is hidden too; a click inside the viewer (not an edge, a button or a drag) shows the player alone for four quiet seconds, not the controls.

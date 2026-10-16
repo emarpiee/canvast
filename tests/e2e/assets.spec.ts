@@ -1666,6 +1666,35 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   await expect(bar).toBeVisible();
   await expect(time).toHaveText(/^0:00 \/ 0:0[1-3]$/);
   await expect.poll(() => viewer.locator("video").evaluate((v: HTMLVideoElement) => v.videoWidth)).toBeGreaterThan(0);
+  // The video pans and zooms like a picture (it has no controls of its own): zoom in, then drag it.
+  await p.keyboard.press("+");
+  await p.keyboard.press("+");
+  const v0 = (await viewer.locator("video").boundingBox())!;
+  const st = (await viewer.locator(".viewer-stage").boundingBox())!;
+  await p.mouse.move(st.x + st.width / 2, st.y + st.height / 2 - 40);
+  await p.mouse.down();
+  await p.mouse.move(st.x + st.width / 2 - 70, st.y + st.height / 2 - 60, { steps: 5 });
+  await p.mouse.up();
+  const v1 = (await viewer.locator("video").boundingBox())!;
+  expect(Math.abs(v1.x - v0.x) + Math.abs(v1.y - v0.y), "the video was dragged").toBeGreaterThan(30);
+  await p.keyboard.press("0");
+  // Extract frame to the open canvas: a new picture on the canvas at once, and in the library.
+  const onCanvas = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o["kind"] === "image").length);
+  expect(await onCanvas()).toBe(0);
+  const extract = bar.getByRole("button", { name: /^Extract frame to the open canvas/ });
+  await extract.click();
+  await expect.poll(onCanvas).toBe(1);
+  await expect(p.getByTestId("toast")).toContainText("Frame placed on Board 1");
+  // With the controls hidden (F) the player hides too; a click inside the viewer brings back the player alone, and it goes again.
+  await p.keyboard.press("f");
+  await expect(bar).toBeHidden();
+  await expect(viewer.locator(".viewer-bar")).toBeHidden();
+  await p.mouse.click(st.x + st.width / 2, st.y + st.height / 2 - 40);
+  await expect(bar).toBeVisible();
+  await expect(viewer.locator(".viewer-bar"), "the controls stay hidden").toBeHidden();
+  await expect(bar).toBeHidden({ timeout: 8000 });
+  await p.keyboard.press("f");
+  await expect(bar).toBeVisible();
   // A GIF: frame by frame.
   await p.keyboard.press("Escape");
   await openOn("anim.gif");

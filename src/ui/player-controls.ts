@@ -18,7 +18,7 @@ export interface PlayerControls {
   refresh(): void;
 }
 
-export function mountPlayerControls(host: HTMLElement, settings: SettingsStore): PlayerControls {
+export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, hooks: { extract(): void }): PlayerControls {
   const bar = document.createElement("div");
   bar.className = "toolbar media-bar viewer-media-bar";
   bar.setAttribute("role", "toolbar");
@@ -27,7 +27,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore):
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
   bar.innerHTML = `<div class="media-row"><input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position"><output class="media-time">0:00 / 0:00</output></div>
-    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume"></div>`;
+    <div class="media-row">${btn("back", ICONS.rewind, "Step back")}${btn("play", ICONS.play, "Play")}${btn("fwd", ICONS.fastForward, "Step forward")}${btn("extract", ICONS.imagePlus, "Extract frame to the open canvas: places this frame as a picture there and keeps it in the library")}${btn("repeat", ICONS.repeat, "Repeat")}<span class="media-gap"></span>${btn("mute", ICONS.volume, "Mute")}<input type="range" class="media-volume" min="0" max="100" step="1" aria-label="Volume"></div>`;
   host.append(bar);
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");
@@ -36,6 +36,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore):
   const repeatBtn = $<HTMLButtonElement>('[data-cmd="repeat"]');
   const muteBtn = $<HTMLButtonElement>('[data-cmd="mute"]');
   const volume = $<HTMLInputElement>(".media-volume");
+  const extractBtn = $<HTMLButtonElement>('[data-cmd="extract"]');
   let eng: Engine | null = null;
   let kind: PlayerKind = "video";
   let loop = false;
@@ -52,6 +53,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore):
     playBtn.title = playing ? "Pause" : "Play";
     repeatBtn.setAttribute("aria-pressed", String(loop));
     muteBtn.hidden = volume.hidden = kind === "gif";
+    extractBtn.hidden = kind === "audio";
     const muted = video()?.muted ?? false;
     muteBtn.setAttribute("aria-pressed", String(muted));
     muteBtn.innerHTML = muted ? ICONS.volumeOff : ICONS.volume;
@@ -80,6 +82,8 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore):
       else eng.play();
     } else if (cmd === "back" || cmd === "fwd") {
       eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), loop);
+    } else if (cmd === "extract") {
+      hooks.extract();
     } else if (cmd === "repeat") {
       loop = !loop;
       eng.setLoop(loop);
