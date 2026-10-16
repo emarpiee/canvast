@@ -1,4 +1,5 @@
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
+import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
 import { esc } from "./format";
@@ -60,6 +61,16 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.gif", label: "GIF step", help: "Frames the step buttons move an animated GIF.", control: { kind: "range", min: 1, max: 100, step: 1, unit: "frames" } },
+      { key: "frame.format", label: "Extracted frame format", help: "The picture file made by Extract frame. PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
+      { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
+      { key: "frame.place", label: "Place extracted frames on the canvas", help: "When a frame is extracted in the Assets viewer: also put it on the open canvas. (From a player on the canvas it is always placed beside the video.)", control: { kind: "toggle" } },
+      { key: "frame.folder", label: "Extracted frames: library folder", help: "Frames are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Extracted frames" } },
+      { key: "frame.name", label: "Extracted frames: file name", help: "Words in braces are replaced: {name} the video's name, {position} where in it (0m03s, or frame12 for a GIF), {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{name}-{position}" } },
+      { key: "frame.nameStyle", label: "Extracted frames: name words", help: "How the video's name and the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
+      { key: "frame.tagFrame", label: "Extracted frames: tag “extracted-frame”", control: { kind: "toggle" } },
+      { key: "frame.tagSource", label: "Extracted frames: tag with the video's name", control: { kind: "toggle" } },
+      { key: "frame.tagInherit", label: "Extracted frames: the video's own tags", help: "Copy the library tags of the video (or GIF) onto each frame.", control: { kind: "toggle" } },
+      { key: "frame.tagsCustom", label: "Extracted frames: your own tags", help: "Tags you choose, put on every extracted frame. Separate them with commas.", control: { kind: "text", max: 200, placeholder: "reference, still" } },
     ],
   },
   {
@@ -83,11 +94,12 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "shot.copy", label: "Also copy it to the clipboard", help: "As a PNG, ready to paste into another app.", control: { kind: "toggle" } },
       { key: "shot.folder", label: "Library folder", help: "Screenshots are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Screenshots" } },
       { key: "shot.name", label: "File name", help: "Words in braces are replaced: {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm} {yyyy} {mm} {dd} {hh} {min} {ss}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}" } },
-      { key: "shot.nameStyle", label: "Name words", help: "How the board and canvas names are written in the file name.", control: { kind: "select", options: [["underscores", "lower_case_with_underscores"], ["keep", "As written"]] } },
+      { key: "shot.nameStyle", label: "Name words", help: "How the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
       { key: "shot.tagShot", label: "Tag: screenshot", help: "Put the tag “screenshot” on every screenshot, to find them all.", control: { kind: "toggle" } },
       { key: "shot.tagBoard", label: "Tag: the board's name", control: { kind: "toggle" } },
       { key: "shot.tagCanvas", label: "Tag: the canvas's name", control: { kind: "toggle" } },
       { key: "shot.tagItems", label: "Tags of the items in it", help: "The in-canvas tags of the items in the screenshot (or in the selection).", control: { kind: "toggle" } },
+      { key: "shot.tagsCustom", label: "Your own tags", help: "Tags you choose, put on every screenshot. Separate them with commas.", control: { kind: "text", max: 200, placeholder: "client, draft" } },
     ],
   },
   {

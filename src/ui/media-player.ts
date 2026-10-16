@@ -26,7 +26,7 @@ import { ICONS } from "./icons";
 export interface MediaPlayerActions {
   setMedia(id: string, patch: { t?: number; repeat?: boolean }, label: string): void;
   /** The picture shown now, as a PNG, to become a new image next to the instance. */
-  extract(id: string, png: Blob): void;
+  extract(id: string, png: Blob, label: string): void;
   /** Draw the instance again (its picture was replaced). */
   repaint(id: string): void;
 }
@@ -562,7 +562,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         for (let i = 0; i < 4; i++) {
           if (!players.get(id) || players.get(id)!.eng !== eng) return;
           const png = await eng.frame().catch(() => null);
-          if (png) return actions.extract(id, png);
+          if (png) return actions.extract(id, png, eng.label());
           await new Promise((r) => setTimeout(r, 250));
         }
       })();

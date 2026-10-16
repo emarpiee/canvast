@@ -652,7 +652,7 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   expectSlow((await objects(p))[1]!["media"]).toBeUndefined();
   // Layers name the files, not "Image WxH".
   await p.getByRole("button", { name: "Layers panel" }).click();
-  await expectSlow(p.getByTestId("layers-panel").locator(".layer-name")).toHaveText(["frame.png", "clip.webm"]);
+  await expectSlow(p.getByTestId("layers-panel").locator(".layer-name")).toHaveText([/^clip-\d+m\d{2}s\.png$/, "clip.webm"]);
   // The slide view plays the original video (it is not "missing or damaged").
   await toAssets(p);
   await card(p, String((await objects(p))[0]!["assetId"])).click();
@@ -1848,6 +1848,12 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   await extract.click();
   await expect.poll(onCanvas).toBe(1);
   await expect(p.getByTestId("toast")).toContainText("Frame placed on Board 1");
+  // The frame is filed as Settings > Media and playback says: its own name, the "Extracted frames" folder, the "extracted-frame" tag (ADR 0081).
+  const filed = await p.evaluate(async () => {
+    const l = await window.__canvastDebug.assetListing();
+    return l.entries.map((e) => ({ name: e.name, tags: [...(e.tags ?? [])], folder: l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? "" }));
+  });
+  expect(filed.find((e) => /^clip-\d+m\d{2}s\.png$/.test(e.name))).toMatchObject({ folder: "Extracted frames", tags: ["extracted-frame"] });
   // With the controls hidden (F) the player hides too; a click inside the viewer brings back the player alone, and it goes again.
   await p.keyboard.press("f");
   await expect(bar).toBeHidden();
@@ -1873,5 +1879,40 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   await expect(time).toHaveText("Frame 2 / 3");
   // A picture has no player bar.
   await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Extract frame follows Settings > Media and playback: name template and style, format, folder, tags (your own, the source's name), and not placing it (ADR 0081)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const gif = Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) }))));
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "My Anim.gif", mimeType: "image/gif", buffer: gif });
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.evaluate(() =>
+    localStorage.setItem(
+      "canvast.settings",
+      JSON.stringify({ "frame.format": "webp", "frame.name": "{name}_{position}", "frame.nameStyle": "kebab", "frame.folder": "Stills", "frame.tagFrame": false, "frame.tagSource": true, "frame.tagsCustom": "ref, client x", "frame.place": false }),
+    ),
+  );
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await p.getByTestId("asset-card").first().click();
+  await p.getByTestId("asset-preview").click();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: /^Extract frame to the open canvas/ }).click();
+  await expect(p.getByTestId("toast")).toContainText("added to the library");
+  await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length))).toBe(2);
+  const listing = await p.evaluate(async () => {
+    const l = await window.__canvastDebug.assetListing();
+    return l.entries.map((e) => ({ name: e.name, type: e.type, tags: [...(e.tags ?? [])], folder: l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? "" }));
+  });
+  const frame = listing.find((e) => e.name !== "My Anim.gif")!;
+  expect(frame.name).toMatch(/^my-anim_frame\d+\.webp$/);
+  expect(frame.type).toBe("image/webp");
+  expect(frame.folder).toBe("Stills");
+  expect(frame.tags.sort()).toEqual(["My Anim", "client x", "ref"].sort());
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0); // not placed
   expect(app.consoleErrors).toEqual([]);
 });

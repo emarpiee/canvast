@@ -15,14 +15,45 @@ export interface NameParts {
   board: string;
   canvas: string;
   at: Date;
+  /** Other name-like words: {name} the source file's name, {position} where in it (frames). */
+  extra?: Record<string, string>;
 }
 
 const p2 = (n: number): string => String(n).padStart(2, "0");
 
-/** One name part as a file name word: "lower_case_with_underscores" or as written; characters a file system refuses become "-". */
-export function nameWord(text: string, style: "underscores" | "keep"): string {
+/** How the words of a name are written in a file name. */
+export type NameStyle = "snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores";
+export const NAME_STYLES: ReadonlyArray<[NameStyle, string]> = [
+  ["snake", "snake_case (lower_case_with_underscores)"],
+  ["kebab", "kebab-case (lower-case-with-hyphens)"],
+  ["camel", "camelCase (firstWordLowerThenCapitals)"],
+  ["pascal", "PascalCase (EveryWordCapitalised)"],
+  ["keep", "As written"],
+];
+
+/** One name part as a file name word, in a naming style; characters a file system refuses become "-". */
+export function nameWord(text: string, style: NameStyle): string {
   const base = text.normalize("NFC").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-").trim();
-  const out = style === "underscores" ? base.toLowerCase().replace(/\s+/g, "_").replace(/_+/g, "_") : base;
+  const words = base.split(/[\s_]+|-+/).filter(Boolean);
+  const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  let out: string;
+  switch (style) {
+    case "snake":
+    case "underscores":
+      out = base.toLowerCase().replace(/[\s_]+/g, "_").replace(/_+/g, "_");
+      break;
+    case "kebab":
+      out = base.toLowerCase().replace(/[\s_]+/g, "-").replace(/-+/g, "-");
+      break;
+    case "camel":
+      out = words.map((w, i) => (i === 0 ? w.toLowerCase() : cap(w))).join("");
+      break;
+    case "pascal":
+      out = words.map(cap).join("");
+      break;
+    default:
+      out = base;
+  }
   return out.replace(/^[.\-_]+|[.\-_]+$/g, "") || "untitled";
 }
 
@@ -30,12 +61,13 @@ export function nameWord(text: string, style: "underscores" | "keep"): string {
  * The file name from a template. Tokens: {workspace} {board} {canvas} {ddmmyyyy} {yyyymmdd} {yyyy} {mm} {dd} {hhmmss} {hhmm} {hh} {min} {ss}.
  * An unknown word in braces is left as it is; an empty result falls back to "screenshot". The extension is added by the caller.
  */
-export function shotFileName(template: string, parts: NameParts, style: "underscores" | "keep"): string {
+export function shotFileName(template: string, parts: NameParts, style: NameStyle): string {
   const d = parts.at;
   const t: Record<string, string> = {
     workspace: nameWord(parts.workspace, style),
     board: nameWord(parts.board, style),
     canvas: nameWord(parts.canvas, style),
+    ...Object.fromEntries(Object.entries(parts.extra ?? {}).map(([k, v]) => [k, nameWord(v, style)])),
     yyyy: String(d.getFullYear()),
     mm: p2(d.getMonth() + 1),
     dd: p2(d.getDate()),
@@ -57,15 +89,21 @@ export interface TagChoices {
   board: boolean;
   canvas: boolean;
   items: boolean;
+  /** The person's own tags, separated by commas or lines. */
+  custom: string;
 }
 
-/** The tags to put on the screenshot: "screenshot", the board and canvas names, and the in-canvas tags of the items in it. */
+/** Tags typed by the person: separated by commas, semicolons or lines. */
+export const parseTags = (text: string): string[] => text.split(/[,;\n]+/).map((t) => t.trim()).filter(Boolean);
+
+/** The tags to put on the screenshot: "screenshot", the board and canvas names, the in-canvas tags of the items in it, and the person's own. */
 export function shotTags(choices: TagChoices, board: string, canvas: string, itemTags: readonly string[]): string[] {
   const out: string[] = [];
   if (choices.screenshot) out.push("screenshot");
   if (choices.board) out.push(board);
   if (choices.canvas) out.push(canvas);
   if (choices.items) out.push(...itemTags);
+  out.push(...parseTags(choices.custom));
   return out.map((t) => t.replace(/\s+/g, " ").trim().replace(/^#+/, "").slice(0, 64)).filter(Boolean);
 }
 

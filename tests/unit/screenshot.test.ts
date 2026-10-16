@@ -15,12 +15,23 @@ describe("screenshot names and tags (ADR 0080)", () => {
     expect(shotFileName("  ..  ", parts, "keep")).toBe("screenshot");
     expect(shotFileName("a:b*c?", parts, "keep")).toBe("a-b-c-");
   });
+  it("name styles: snake, kebab, camel, Pascal and as written", () => {
+    const w = "Cool board_name  here";
+    expect(nameWord(w, "snake")).toBe("cool_board_name_here");
+    expect(nameWord(w, "kebab")).toBe("cool-board-name-here");
+    expect(nameWord(w, "camel")).toBe("coolBoardNameHere");
+    expect(nameWord(w, "pascal")).toBe("CoolBoardNameHere");
+    expect(nameWord(w, "keep")).toBe("Cool board_name  here");
+    expect(nameWord("a-b c", "kebab")).toBe("a-b-c");
+    expect(shotFileName("{board}-{canvas}", { workspace: "W", board: "Cool Board", canvas: "Two Words", at }, "kebab")).toBe("cool-board-two-words");
+    expect(shotFileName("{name}-{position}", { workspace: "W", board: "B", canvas: "C", at, extra: { name: "My Clip", position: "0m03s" } }, "keep")).toBe("My Clip-0m03s");
+  });
   it("name words are safe on every file system", () => {
     expect(nameWord('  A  "Big"  Board?  ', "underscores")).toBe("a_-big-_board");
     expect(nameWord("", "keep")).toBe("untitled");
   });
   it("tags follow the choices and are clean", () => {
-    expect(shotTags({ screenshot: true, board: true, canvas: false, items: true }, "Cool Board", "C", ["#sky", "  hero "])).toEqual(["screenshot", "Cool Board", "sky", "hero"]);
-    expect(shotTags({ screenshot: false, board: false, canvas: false, items: false }, "B", "C", ["x"])).toEqual([]);
+    expect(shotTags({ screenshot: true, board: true, canvas: false, items: true, custom: "client x; draft" }, "Cool Board", "C", ["#sky", "  hero "])).toEqual(["screenshot", "Cool Board", "sky", "hero", "client x", "draft"]);
+    expect(shotTags({ screenshot: false, board: false, canvas: false, items: false, custom: "" }, "B", "C", ["x"])).toEqual([]);
   });
 });

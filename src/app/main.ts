@@ -1,4 +1,6 @@
 import { ViewState } from "./view-state";
+import { fileInLibrary } from "./library-filing";
+import { storeFrame } from "./frames";
 import { newObjectId } from "../doc/model";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard } from "../assets/file-kind";
@@ -441,7 +443,7 @@ async function start(): Promise<void> {
   side.id = "side-panels";
   host.appendChild(side);
   mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas));
-  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png) => void extractFrame(doc, editor, assets, id, png), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
+  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
@@ -579,17 +581,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const canvasName = canvasRec?.name ?? "canvas";
       const fileName = `${shotFileName(cfg.name, { workspace: tree?.workspace.displayName ?? "workspace", board, canvas: canvasName, at: new Date() }, cfg.style)}.${SHOT_FORMATS[format].ext}`;
       const itemTags = [...new Set(inShot.flatMap((po) => po.obj.tags ?? []))];
-      const tags = shotTags({ screenshot: settings.get("shot.tagShot"), board: settings.get("shot.tagBoard"), canvas: settings.get("shot.tagCanvas"), items: settings.get("shot.tagItems") }, board, canvasName, itemTags);
+      const tags = shotTags({ screenshot: settings.get("shot.tagShot"), board: settings.get("shot.tagBoard"), canvas: settings.get("shot.tagCanvas"), items: settings.get("shot.tagItems"), custom: settings.get("shot.tagsCustom") }, board, canvasName, itemTags);
       const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: SHOT_FORMATS[format].mime }), false);
-      let where = "the library";
-      if (cfg.folder) {
-        const listing = await session.catalog.list();
-        const have = listing.folders.find((f) => f.parentId === null && f.name.toLowerCase() === cfg.folder.toLowerCase());
-        const id = have?.id ?? newObjectId();
-        if (!have) await session.organize((c) => c.createFolder(cfg.folder, null, id));
-        await session.organize((c) => c.updateMeta(record.hash, { addFolders: [id], ...(tags.length ? { addTags: tags } : {}) }));
-        where = `the “${have?.name ?? cfg.folder}” folder`;
-      } else if (tags.length) await session.organize((c) => c.updateMeta(record.hash, { addTags: tags }));
+      const where = await fileInLibrary(session, record.hash, cfg.folder, tags);
       if (cfg.copy) {
         try {
           const png = format === "png" ? blob : await new Promise<Blob | null>((r) => pic.toBlob(r, "image/png"));

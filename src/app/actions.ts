@@ -572,11 +572,20 @@ export function placeImages(
  * Extract Frame (ADR 0043): the picture a video or GIF instance shows now becomes a new PNG original in the library
  * and a plain image placed just right of the instance, at its size. The source is never changed.
  */
-export async function extractFrame(doc: DocumentStore, editor: EditorState, assets: AssetLibrary, sourceId: string, png: Blob): Promise<void> {
+export async function extractFrame(
+  doc: DocumentStore,
+  editor: EditorState,
+  assets: AssetLibrary,
+  sourceId: string,
+  png: Blob,
+  label: string,
+  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string }) => Promise<AssetRecord>,
+): Promise<void> {
   if (editor.blockEdit()) return;
   const src = doc.get(sourceId);
   if (!src || src.kind !== "image" || !src.media) return;
-  const { record } = await assets.importFileDetailed(new File([png], "frame.png", { type: "image/png" }), true);
+  const sourceName = (await assets.record(src.assetId).catch(() => undefined))?.name ?? "";
+  const record = await store({ png, label, sourceName, sourceHash: src.assetId });
   const { media: _m, groups: _g, hidden: _h, locked: _l, rot, ...rest } = src;
   const frame: ImageObject = { ...rest, ...(rot ? { rot } : {}), id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
   const placed = translate(frame, D.shift(D.fromNumber(src.w * 1.05), src.unit), D.ZERO) as ImageObject;

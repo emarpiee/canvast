@@ -1,4 +1,5 @@
 import type { Session, AssetPlace } from "../app/session";
+import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, isCard } from "../assets/file-kind";
 import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "../assets/card";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
@@ -404,9 +405,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (!png || eng !== engine) return;
     const src = listing?.entries.find((x) => x.hash === at);
-    const stem = (src?.name ?? "frame").replace(/\.[^.]*$/, "") || "frame";
-    const label = engine.label().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").toLowerCase();
-    const { record } = await assets.importFileDetailed(new File([png], `${stem}-frame-${label}.png`, { type: "image/png" }), true);
+    // The name, format, folder and tags come from Settings > Media and playback (ADR 0081).
+    const record = await storeFrame(assets, session, settings, { png, label: engine.label(), sourceName: src?.name ?? "frame", sourceHash: at });
+    if (!settings.get("frame.place")) {
+      session.editor.message = `Frame “${record.name}” added to the library.`;
+      session.editor.changed();
+      return void (await refresh());
+    }
     const id = await session.placeAsset(record.hash);
     const here = session.tree?.boards.flatMap((b) => b.canvases.map((c) => ({ b: b.board.name, c })))?.find((x) => x.c.id === session.current?.canvasId);
     session.editor.message = id ? `Frame placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : "The frame was added to the library; it could not be placed.";

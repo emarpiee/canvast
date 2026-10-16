@@ -450,3 +450,23 @@ test("the workspace can be renamed from the menu's whole-workspace section, and 
   await expect(p.locator(".nav-ws h3")).toContainText("Studio 2026");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the board menu keeps long names and counts inside its edges (ADR 0079)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  for (let i = 0; i < 5; i++) await app.drag({ x: 500 + i * 60, y: 420 }, { x: 530 + i * 60, y: 450 }, 3);
+  await p.getByTestId("workspace-chevron").click();
+  await p.getByRole("button", { name: /^More actions for canvas/ }).click();
+  await p.getByRole("menuitem", { name: /^Rename canvas/ }).click();
+  await p.locator(".nav-rename").fill("this is an awesome canvas with a very long name indeed");
+  await p.keyboard.press("Enter");
+  await p.getByRole("button", { name: /^More actions for board/ }).click();
+  await p.getByRole("menuitem", { name: /^Rename board/ }).click();
+  await p.locator(".nav-rename").fill("a board with a long name too");
+  await p.keyboard.press("Enter");
+  await expect(p.locator(".nav-count")).toContainText("objects");
+  const menu = (await p.locator(".nav-menu").boundingBox())!;
+  const over = await p.locator(".nav-menu button, .nav-menu h3, .nav-menu section").evaluateAll((els, right) => els.filter((e) => e.getBoundingClientRect().right > (right as number) + 0.5).map((e) => e.className || e.tagName), menu.x + menu.width);
+  expect(over).toEqual([]);
+  expect(app.consoleErrors).toEqual([]);
+});

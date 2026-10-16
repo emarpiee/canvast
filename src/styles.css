@@ -1858,3 +1858,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 
 .set-text { min-width: 0; width: min(100%, 360px); height: var(--sp-12); padding: 0 var(--sp-5); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .set-text:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+
+/* The board menu never pushes past its own edge: a long canvas name (with "42 objects" beside it) is cut with an ellipsis, not clipped (ADR 0079). */
+.nav-menu > *, .nav-menu .nav-board, .nav-menu .nav-canvases, .nav-menu .nav-canvas-row, .nav-menu .nav-canvas, .nav-menu .nav-board-head { min-width: 0; }
+.nav-menu .nav-canvas .nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.nav-menu .nav-canvas .nav-count, .nav-menu .nav-canvas .nav-mark { flex: none; }
