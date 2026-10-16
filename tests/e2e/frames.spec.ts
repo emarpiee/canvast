@@ -1509,10 +1509,15 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
     await p.getByRole("button", { name: "Arrange and align" }).click();
     await p.getByRole("menuitem", { name }).click();
   };
-  // One stroke selected: nothing to align, and the message says so.
+  // The Arrange button is in the selection bar and only with two or more selected; two cannot be distributed, and the message says so.
   await p.mouse.click(450, 280);
-  await menuItem("Left");
-  await expect(p.getByTestId("toast")).toContainText("Select at least 2 items");
+  await expect(p.getByRole("button", { name: "Arrange and align" })).toBeHidden();
+  await p.keyboard.down("Shift");
+  await p.mouse.click(590, 420);
+  await p.keyboard.up("Shift");
+  await expect(p.getByRole("button", { name: "Arrange and align" })).toBeVisible();
+  await menuItem("Horizontally");
+  await expect(p.getByTestId("toast")).toContainText("Select at least 3 items");
   await p.keyboard.press("Control+a");
   const before = await boxes();
   await menuItem("Left");

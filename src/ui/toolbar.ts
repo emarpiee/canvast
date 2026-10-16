@@ -16,8 +16,6 @@ export interface ToolbarActions {
   copyMarkdown(): void;
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
-  /** Arrange the selection in a grid, or align or distribute it (docs/plans/arrange-commands.md). */
-  layoutSelection(cmd: LayoutCommand): void;
   clearFlag(flag: "hidden" | "locked"): void;
   /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
   setSelectedWidth(px: number): void;
@@ -39,7 +37,7 @@ const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string 
   { id: "marker", label: "Marker", title: "Marker: a wide, translucent line", icon: ICONS.highlighter },
 ];
 
-const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string }> }> = [
+export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string }> }> = [
   {
     head: "Arrange in a grid",
     items: [
@@ -118,14 +116,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
       <div class="tb-group tb-options" data-for="select">
-        <span class="layout-wrap">
-          <button type="button" data-action="layout-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Arrange and align" title="Arrange in a grid, align and distribute the selection">${ICONS.layoutGrid}</button>
-          <div class="layout-menu" role="menu" data-testid="layout-menu" hidden>
-            ${LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}`).join("")}
-          </div>
-        </span>
-      </div>
-      <div class="tb-group tb-options" data-for="select">
         <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
         <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
         <button type="button" class="snap" data-align-box aria-pressed="false" aria-label="Axis-aligned selection box" title="Selection box: by default it turns with the selected objects when they share a rotation. On: it stays aligned to the canvas axes.">${ICONS.boxSelect}</button>
@@ -151,24 +141,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
     input.value = "";
-  });
-
-  // The arrange menu closes on a click elsewhere or Esc.
-  const menu = root.querySelector<HTMLElement>(".layout-menu")!;
-  const menuButton = root.querySelector<HTMLElement>('[data-action="layout-menu"]')!;
-  const closeMenu = (): void => {
-    menu.hidden = true;
-    menuButton.setAttribute("aria-expanded", "false");
-  };
-  document.addEventListener("pointerdown", (e) => {
-    if (!menu.hidden && !(e.target as HTMLElement).closest(".layout-wrap")) closeMenu();
-  });
-  menu.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeMenu();
-      menuButton.focus();
-      e.stopPropagation();
-    }
   });
 
   // Continuous pen size: a new size is the new lock reference, like a preset.
@@ -200,14 +172,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (d["penKind"]) {
       editor.penKind = d["penKind"] as PenKind;
       editor.changed();
-    } else if (d["layout"]) {
-      const [kind, arg] = d["layout"].split(":") as [string, string];
-      menu.hidden = true;
-      menuButton.setAttribute("aria-expanded", "false");
-      actions.layoutSelection(kind === "grid" ? { grid: arg as SortKey } : kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" });
-    } else if (d["action"] === "layout-menu") {
-      menu.hidden = !menu.hidden;
-      menuButton.setAttribute("aria-expanded", String(!menu.hidden));
     } else if (d["tool"]) editor.setTool(d["tool"] as Tool);
     else if (d["color"]) {
       editor.penColor = d["color"];

@@ -4,6 +4,7 @@ import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
+import type { LayoutCommand } from "./actions";
 import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
@@ -421,23 +422,23 @@ async function start(): Promise<void> {
     assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
     reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
   });
+const runLayout = async (cmd: LayoutCommand): Promise<void> => {
+    // Sorting by name needs the file names of the selected images (the document only has their hashes).
+    const names = new Map<string, { name: string; date: number }>();
+    if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
+      for (const o of doc.ordered()) {
+        if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
+        const e = await session.catalog.entry(o.assetId).catch(() => undefined);
+        names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
+      }
+    }
+    layoutSelection(doc, editor, cmd, names);
+  };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     clearFlag: (flag) => clearFlag(doc, editor, flag),
-    layoutSelection: async (cmd) => {
-      // Sorting by name needs the file names of the selected images (the document only has their hashes).
-      const names = new Map<string, { name: string; date: number }>();
-      if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
-        for (const o of doc.ordered()) {
-          if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
-          const e = await session.catalog.entry(o.assetId).catch(() => undefined);
-          names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
-        }
-      }
-      layoutSelection(doc, editor, cmd, names);
-    },
     depth: () => depthOf(view.frameCamera),
     setSelectedWidth: (px) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.
@@ -495,6 +496,7 @@ async function start(): Promise<void> {
       group: () => groupSelection(doc, editor),
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),
+      layout: (cmd) => void runLayout(cmd),
       setFlag: (flag) => setFlag(doc, editor, flag),
       deleteSelection: () => deleteSelection(doc, editor),
     },

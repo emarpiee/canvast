@@ -1,6 +1,9 @@
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
+import type { LayoutCommand } from "../app/actions";
+import type { AlignKey, SortKey } from "../doc/arrange";
 import { ICONS } from "./icons";
+import { LAYOUT_MENU } from "./toolbar";
 
 /**
  * The selection action bar (ADR 0051): a small bar next to the selected objects with what is most often wanted next: duplicate,
@@ -14,6 +17,8 @@ export interface ContextActions {
   group(): void;
   ungroup(): void;
   arrange(to: "front" | "back"): void;
+  /** Arrange in a grid, align or distribute the selection. */
+  layout(cmd: LayoutCommand): void;
   setFlag(flag: "hidden" | "locked"): void;
   deleteSelection(): void;
 }
@@ -33,18 +38,69 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("duplicate", ICONS.copy, "Duplicate") +
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
+    btn("layout", ICONS.layoutGrid, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
     btn("lock", ICONS.lockKeyhole, "Lock selection") +
     btn("hide", ICONS.eyeOff, "Hide selection") +
     btn("delete", ICONS.trash, "Delete selection");
   host.appendChild(bar);
+  // The Arrange menu (grid, align, distribute) opens from the bar and floats beside it.
+  const menu = document.createElement("div");
+  menu.className = "layout-menu ctx-layout-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Arrange and align");
+  menu.dataset["testid"] = "layout-menu";
+  menu.hidden = true;
+  menu.innerHTML = LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}`).join("");
+  host.appendChild(menu);
+  const closeMenu = (): void => {
+    menu.hidden = true;
+    bar.querySelector('[data-ctx="layout"]')?.setAttribute("aria-expanded", "false");
+  };
+  const placeMenu = (): void => {
+    const r = bar.getBoundingClientRect();
+    const h = host.getBoundingClientRect();
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    let top = r.bottom - h.top + 6;
+    if (top + mh > h.height - MARGIN) top = Math.max(MARGIN, r.top - h.top - 6 - mh);
+    const left = Math.max(MARGIN, Math.min(r.left - h.left + r.width / 2 - mw / 2, h.width - mw - MARGIN));
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  };
+  menu.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-layout]");
+    if (!b) return;
+    const [kind, arg] = b.dataset["layout"]!.split(":") as [string, string];
+    closeMenu();
+    actions.layout(kind === "grid" ? { grid: arg as SortKey } : kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" });
+  });
+  menu.addEventListener("pointerdown", (e) => e.stopPropagation());
+  menu.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeMenu();
+      bar.querySelector<HTMLElement>('[data-ctx="layout"]')?.focus();
+      e.stopPropagation();
+    }
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!menu.hidden && !(e.target as HTMLElement).closest(".ctx-bar, .ctx-layout-menu")) closeMenu();
+  });
   const q = (act: string): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]`)!;
 
   bar.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ctx]");
     if (!b) return;
     switch (b.dataset["ctx"]) {
+      case "layout":
+        menu.hidden = !menu.hidden;
+        b.setAttribute("aria-expanded", String(!menu.hidden));
+        if (!menu.hidden) {
+          placeMenu();
+          menu.querySelector<HTMLElement>("button")?.focus();
+        }
+        break;
       case "duplicate": actions.duplicate(); break;
       case "group": actions.group(); break;
       case "ungroup": actions.ungroup(); break;
@@ -64,11 +120,14 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "lasso") && editor.preview.kind === "none" && !!box;
     if (!show || !box) {
       if (!bar.hidden) bar.hidden = true;
+      closeMenu();
       lastKey = "";
       return;
     }
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
+    q("layout").hidden = sel.length < 2;
+    if (sel.length < 2) closeMenu();
     q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
     bar.hidden = false;
     const xs = box.frame.corners.map((c) => c[0]);
@@ -87,6 +146,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       bar.style.left = `${Math.round(left)}px`;
       bar.style.top = `${Math.round(top)}px`;
       lastKey = key;
+      if (!menu.hidden) placeMenu();
     }
   };
   editor.subscribe(update);

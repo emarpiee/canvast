@@ -107,6 +107,8 @@ test("shortcuts: tool keys can be changed and are refused when taken; the list o
   await expect(waiting).toHaveCount(0);
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (K)");
+  // The tool tooltips belong to the tool buttons only; the canvas (which also carries the current tool) has none.
+  await expect(p.locator("#canvas")).not.toHaveAttribute("title", /.+/);
   await p.keyboard.press("v");
   expect(await tool()).toBe("select");
   await p.keyboard.press("p");

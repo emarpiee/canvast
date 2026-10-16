@@ -1395,3 +1395,7 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer-checker[hidden] { display: none; }
 .viewer-checker i { display: block; max-width: none; box-shadow: 0 0 0 1px var(--v-line); }
 .viewer.is-actual .viewer-checker { display: none; }
+
+/* The Arrange menu now opens from the selection action bar. */
+.ctx-layout-menu { position: absolute; z-index: 6; width: 270px; max-height: calc(100% - 16px); overflow: auto; }
+.ctx-layout-menu button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: var(--ctl); padding: 0 12px; text-align: left; font-size: 13px; white-space: nowrap; border-radius: var(--r-md); }
