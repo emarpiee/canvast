@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- The Arrange menu has Space between items (None, Tight, Normal, Wide, Wider) for grids; choosing one right after a grid lays it out again (ADR 0074).
+
 - A selection being moved, turned or stretched is drawn see-through (up to 200 objects; ADR 0073).
 
 - Stepping between items uses W A S D instead of Ctrl+Arrow; the four keys are rebindable in Settings > Shortcuts (ADR 0072).

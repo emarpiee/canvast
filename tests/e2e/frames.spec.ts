@@ -1572,6 +1572,24 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   expect(new Set(grid.map((b) => Math.round(b.minY))).size, "2 rows").toBe(2);
   await p.keyboard.press("Control+z");
   expect((await boxes()).map((b) => Math.round(b.minX))).toEqual(before.map((b) => Math.round(b.minX)));
+  // The space between the items of a grid is chosen in the same menu; choosing another one lays the grid just made out again (ADR 0074).
+  const extent = async (): Promise<number> => {
+    const bs = await boxes();
+    return Math.max(...bs.map((b) => b.maxX)) - Math.min(...bs.map((b) => b.minX));
+  };
+  const setGap = async (name: string): Promise<void> => {
+    await p.getByRole("button", { name: "Arrange and align" }).click();
+    await p.getByRole("menuitemradio", { name }).click();
+    await p.keyboard.press("Escape");
+  };
+  await menuItem("In stacking order");
+  const normal = await extent();
+  await setGap("Wider");
+  expect(await extent()).toBeGreaterThan(normal + 20);
+  await setGap("None");
+  expect(await extent()).toBeLessThan(normal - 5);
+  await p.getByRole("button", { name: "Arrange and align" }).click();
+  await expect(p.getByRole("menuitemradio", { name: "None" })).toHaveAttribute("aria-checked", "true");
   expect(app.consoleErrors).toEqual([]);
 });
 

@@ -83,18 +83,22 @@ export function gridCells(sizes: ReadonlyArray<{ w: number; h: number }>, gapFra
   };
 }
 
-const GAP = 0.08;
+/** The space between items in a grid, as a part of the largest item (Settings, or the Arrange menu). */
+export type GapKey = "none" | "tight" | "normal" | "wide" | "wider";
+export const GAP_FRACTION: Record<GapKey, number> = { none: 0, tight: 0.02, normal: 0.08, wide: 0.2, wider: 0.5 };
+export const GAP_LABEL: Record<GapKey, string> = { none: "None", tight: "Tight", normal: "Normal", wide: "Wide", wider: "Wider" };
+export const GAP_ORDER: readonly GapKey[] = ["none", "tight", "normal", "wide", "wider"];
 
 const moveUnit = (u: Unit, dx: D.Dyadic, dy: D.Dyadic): CanvasObject[] => (D.sign(dx) === 0 && D.sign(dy) === 0 ? [] : u.objects.map((o) => translate(o, dx, dy)));
 
 /** Lay the units out in a grid, in the order given, about the centre of the selection. Sizes are kept. */
-export function arrangeGrid(units: readonly Unit[], key: SortKey): CanvasObject[] {
+export function arrangeGrid(units: readonly Unit[], key: SortKey, gap: GapKey = "normal"): CanvasObject[] {
   if (units.length < 2) return [];
   const sorted = sortUnits(units, key);
   const boxes = sorted.map(boxOf);
   const e = scaleOf(boxes);
   const all = unionBounds(units.flatMap((u) => u.objects))!;
-  const g = gridCells(boxes.map((b) => ({ w: rel(D.sub(b.max.x, b.min.x), e), h: rel(D.sub(b.max.y, b.min.y), e) })), GAP);
+  const g = gridCells(boxes.map((b) => ({ w: rel(D.sub(b.max.x, b.min.x), e), h: rel(D.sub(b.max.y, b.min.y), e) })), GAP_FRACTION[gap]);
   const left = D.sub(centre(all.min.x, all.max.x), unrel(g.w / 2, e));
   const top = D.sub(centre(all.min.y, all.max.y), unrel(g.h / 2, e));
   return sorted.flatMap((u, i) => moveUnit(u, D.sub(D.add(left, unrel(g.cells[i]!.x, e)), boxes[i]!.min.x), D.sub(D.add(top, unrel(g.cells[i]!.y, e)), boxes[i]!.min.y)));

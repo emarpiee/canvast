@@ -1795,3 +1795,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .assets-search-pop .cs-modes { padding-top: var(--sp-4); border-bottom: 0; }
 .assets-search-pop .cs-recent { border-top: 1px solid var(--hud-border); border-bottom: 0; }
 .assets-search-pop kbd { font: inherit; font-size: var(--text-sm); opacity: 0.75; }
+
+/* Arrange menu: the space between items, a row of choices (ADR 0074). */
+.layout-gaps { display: flex; gap: var(--sp-1); padding: var(--sp-1) var(--sp-4) var(--sp-3); }
+.toolbar .layout-menu .layout-gaps button, .tb-options-row .layout-menu .layout-gaps button, .layout-menu .layout-gaps button { display: inline-flex; justify-content: center; width: auto; flex: 1 1 auto; min-height: 30px; padding: 0 var(--sp-3); font-size: var(--text-sm); border-radius: var(--r-pill); }
+.layout-menu .layout-gaps button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }

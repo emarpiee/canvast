@@ -3,6 +3,8 @@ import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
 import { ICONS } from "./icons";
+import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
+import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
 
 /**
@@ -26,6 +28,9 @@ export interface ContextActions {
   arrange(to: "front" | "back"): void;
   /** Arrange in a grid, align or distribute the selection. */
   layout(cmd: LayoutCommand): void;
+  /** The space between items in a grid (ADR 0074), and choosing another one (a grid just made is laid out again with it). */
+  gap(): GapKey;
+  setGap(gap: GapKey): void;
   setFlag(flag: "hidden" | "locked"): void;
   deleteSelection(): void;
 }
@@ -62,7 +67,12 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   menu.setAttribute("aria-label", "Arrange and align");
   menu.dataset["testid"] = "layout-menu";
   menu.hidden = true;
-  menu.innerHTML = LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}`).join("");
+  // After the grid choices: the space between the items of a grid, as a row of choices (one is chosen; the menu stays open).
+  const gapRow = `<div class="layout-head" id="layout-gap-head">Space between items</div><div class="layout-gaps" role="group" aria-labelledby="layout-gap-head">${GAP_ORDER.map((g) => `<button type="button" role="menuitemradio" aria-checked="false" data-gap="${g}">${GAP_LABEL[g]}</button>`).join("")}</div>`;
+  menu.innerHTML = LAYOUT_MENU.map((g, n) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}${n === 0 ? gapRow : ""}`).join("");
+  const showGap = (): void => {
+    for (const b of menu.querySelectorAll<HTMLElement>("[data-gap]")) b.setAttribute("aria-checked", String(b.dataset["gap"] === actions.gap()));
+  };
   host.appendChild(menu);
   const closeMenu = (): void => {
     menu.hidden = true;
@@ -80,6 +90,12 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     menu.style.top = `${Math.round(top)}px`;
   };
   menu.addEventListener("click", (e) => {
+    const gap = (e.target as HTMLElement).closest<HTMLElement>("[data-gap]");
+    if (gap) {
+      actions.setGap(gap.dataset["gap"] as GapKey);
+      showGap();
+      return;
+    }
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-layout]");
     if (!b) return;
     const [kind, arg] = b.dataset["layout"]!.split(":") as [string, string];
@@ -107,6 +123,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         menu.hidden = !menu.hidden;
         b.setAttribute("aria-expanded", String(!menu.hidden));
         if (!menu.hidden) {
+          showGap();
           placeMenu();
           menu.querySelector<HTMLElement>("button")?.focus();
         }

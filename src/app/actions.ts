@@ -8,7 +8,7 @@ import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
-import type { AlignKey, SortKey, Unit } from "../doc/arrange";
+import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
 import type { ClipboardPayload } from "../doc/clipboard";
 import { depthOf } from "../core/frames";
@@ -76,7 +76,7 @@ export function arrangeSelection(doc: DocumentStore, editor: EditorState, to: "f
   editor.changed();
 }
 
-export type LayoutCommand = { grid: SortKey } | { align: AlignKey } | { distribute: "x" | "y" };
+export type LayoutCommand = { grid: SortKey; gap?: GapKey } | { align: AlignKey } | { distribute: "x" | "y" };
 
 const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z to A", date: "by date added", size: "by size", type: "by type", stack: "in stacking order" };
 
@@ -116,7 +116,7 @@ export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: La
     editor.changed();
     return;
   }
-  const moved = "grid" in cmd ? arrangeGrid(units, cmd.grid) : "align" in cmd ? alignUnits(units, cmd.align) : distributeUnits(units, cmd.distribute);
+  const moved = "grid" in cmd ? arrangeGrid(units, cmd.grid, cmd.gap) : "align" in cmd ? alignUnits(units, cmd.align) : distributeUnits(units, cmd.distribute);
   if (!moved.length) return; // already in place
   const label = "grid" in cmd ? `Arrange ${units.length} items in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
   doc.commit(doc.transaction(label, moved));

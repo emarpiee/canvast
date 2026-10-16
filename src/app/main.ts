@@ -458,8 +458,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
       }
     }
-    layoutSelection(doc, editor, cmd, names);
+    // The grid is laid out with the chosen space between items; the last grid is kept so a new spacing can lay it out again.
+    const full: LayoutCommand = "grid" in cmd ? { grid: cmd.grid, gap: settings.get("arrange.gap") } : cmd;
+    if ("grid" in full) lastGrid = { cmd: full, ids: [...editor.selection].sort().join() };
+    layoutSelection(doc, editor, full, names);
   };
+  let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
@@ -535,6 +539,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),
       layout: (cmd) => void runLayout(cmd),
+      gap: () => settings.get("arrange.gap"),
+      setGap: (gap) => {
+        settings.set("arrange.gap", gap);
+        // Choosing another space right after arranging the same items lays them out again with it (one more undo step).
+        if (lastGrid && lastGrid.ids === [...editor.selection].sort().join()) void runLayout({ grid: lastGrid.cmd.grid });
+      },
       setFlag: (flag) => setFlag(doc, editor, flag),
       deleteSelection: () => deleteSelection(doc, editor),
     },
