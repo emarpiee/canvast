@@ -959,3 +959,20 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .hud-objects, .hud-fps:not(.hud-diag) { color: var(--hud-muted); }
 .hud-readout { min-width: 132px; }
 .hud-readout[data-mode="simple"] .hud-fps, .hud-readout[data-mode="more"] .hud-fps { font: inherit; }
+
+/* Compact density (Settings > Appearance > Density): the same layout on a smaller grid. Every floating element and the library bar
+   read these tokens, so one switch tightens them all and more of the canvas shows. */
+:root[data-density="compact"] { --ctl: 30px; --pad: 3px; --gap: 1px; --edge: 8px; --near: 6px; --r-lg: 10px; --r-md: 7px; --ctl-r: 7px; }
+:root[data-density="compact"] .rail button svg, :root[data-density="compact"] .dock button svg, :root[data-density="compact"] .toolbar button svg, :root[data-density="compact"] .ctx-bar button svg, :root[data-density="compact"] .hud-controls button svg { width: 16px; height: 16px; }
+:root[data-density="compact"] .view-switch button { padding: 0 9px; font-size: 12px; }
+:root[data-density="compact"] .nav-crumb { padding: 0 10px; font-size: 12px; }
+:root[data-density="compact"] .hud-readout { padding: 6px 10px; font-size: 11px; }
+:root[data-density="compact"] .hud-zoom { font-size: 13px; }
+:root[data-density="compact"] .layers-panel, :root[data-density="compact"] .bookmarks-panel { font-size: 11px; }
+:root[data-density="compact"] .layers-panel header, :root[data-density="compact"] .bookmarks-panel header { min-height: 32px; padding: 4px 6px 4px 10px; }
+:root[data-density="compact"] .notice { padding: 8px 6px 8px 10px; font-size: 13px; }
+:root[data-density="compact"] .assets-grid { gap: 6px; }
+:root[data-density="compact"] .asset-inspector { padding: 10px; flex-basis: 272px; }
+:root[data-density="compact"] .side-item { padding: 4px 8px; }
+:root[data-density="compact"] .set-row { padding: 6px 0; }
+:root[data-density="compact"] .film-item { width: 52px; height: 36px; }

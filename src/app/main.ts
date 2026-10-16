@@ -184,6 +184,8 @@ async function start(): Promise<void> {
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
     root.style.setProperty("--hue", String(settings.get("ui.hue")));
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
+    if (settings.get("ui.density") === "compact") root.dataset["density"] = "compact";
+    else delete root.dataset["density"];
     if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
     else delete root.dataset["contrast"];
     const m = settings.get("ui.motion");
@@ -560,6 +562,7 @@ async function start(): Promise<void> {
       case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
       case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
       case "ui.textScale":
+      case "ui.density":
       case "ui.contrast":
       case "ui.motion":
         applyAppearance();

@@ -121,6 +121,12 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await panel.getByLabel("Interface size", { exact: true }).selectOption("150");
   await panel.getByLabel("Contrast", { exact: true }).selectOption("high");
   await panel.getByLabel("Motion", { exact: true }).selectOption("reduce");
+  // Compact density tightens every floating element on one grid (the dock, the tabs and the rail share the control size).
+  const dockHeight = async () => (await p.locator("#toolbar > .dock").boundingBox())!.height;
+  const comfortable = await dockHeight();
+  await panel.getByLabel("Density", { exact: true }).selectOption("compact");
+  await expect(root).toHaveAttribute("data-density", "compact");
+  expect(await dockHeight(), "compact: a smaller dock").toBeLessThan(comfortable);
   await expect(root).toHaveAttribute("data-contrast", "high");
   await expect(root).toHaveAttribute("data-motion", "reduce");
   expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
@@ -129,12 +135,16 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(root).toHaveAttribute("data-contrast", "high");
+  await expect(root).toHaveAttribute("data-density", "compact"); // kept over the reload
   expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
-  expect(await clear(), "150%: the tools are clear of the view tabs").toBe(true);
+  expect(await clear(), "150% and compact: the tools are clear of the view tabs").toBe(true);
   // Back to the defaults leaves no attribute behind.
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
   for (const key of ["ui.textScale", "ui.contrast", "ui.motion"]) await panel.getByRole("button", { name: new RegExp(`Reset ${{ "ui.textScale": "Interface size", "ui.contrast": "Contrast", "ui.motion": "Motion" }[key]} `) }).click();
+  expect(await clear(), "compact and 100%: the tools are clear of the view tabs").toBe(true);
+  await panel.getByRole("button", { name: /Reset Density/ }).click();
+  await expect(root).not.toHaveAttribute("data-density", /.*/);
   await expect(root).not.toHaveAttribute("data-contrast", /.*/);
   await expect(root).not.toHaveAttribute("data-motion", /.*/);
   expect(app.consoleErrors).toEqual([]);
