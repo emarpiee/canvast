@@ -1614,3 +1614,17 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .layers-panel .layer-name { display: flex; min-width: 0; }
 .layers-panel .layer-name .n-start { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layers-panel .layer-name .n-end { flex: none; white-space: pre; }
+
+/* ---- Layers tree (ADR 0066): the guide lines sit under each parent's chevron, rows have no dead column, the eye and lock float ---- */
+.layers-panel .layer { padding-left: calc(4px + var(--depth, 0) * 18px); gap: 4px; position: relative; }
+.layers-panel .layer::before { left: 4px; width: calc(var(--depth, 0) * 18px);
+  background-image: repeating-linear-gradient(to right, transparent 0, transparent 8px, color-mix(in oklch, var(--hud-fg) 24%, transparent) 8px, color-mix(in oklch, var(--hud-fg) 24%, transparent) 9px, transparent 9px, transparent 18px); }
+.layers-panel .layer-twist { width: 18px; height: 24px; }
+.layers-panel .layer-name { flex: 1; min-width: 0; }
+.layer-actions { display: inline-flex; flex: none; }
+.layer .layer-btn[aria-pressed="false"] { opacity: 0.85; }
+@media (hover: hover) {
+  /* Pointed at or selected rows show them over the right end of the name; hidden or locked items always show theirs in the row. */
+  .layer:not(.is-hidden):not(.is-locked) .layer-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); opacity: 0; padding: 0 2px; background: color-mix(in oklch, var(--hud-bg) 90%, var(--hud-fg) 10%); border-radius: 999px; box-shadow: 0 0 0 1px var(--hud-border); }
+  .layer:not(.is-hidden):not(.is-locked):hover .layer-actions, .layer:not(.is-hidden):not(.is-locked):focus-within .layer-actions, .layer.is-selected:not(.is-hidden):not(.is-locked) .layer-actions { opacity: 1; }
+}
