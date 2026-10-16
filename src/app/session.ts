@@ -466,17 +466,22 @@ export class Session {
   }
 
   /** The in-canvas tags carried by instances of one library asset, anywhere in the workspace. */
-  async canvasTagsOfAsset(hash: string): Promise<string[]> {
+  async canvasTagsOfAsset(hash: string): Promise<Array<{ tag: string; canvases: string[] }>> {
     if (!this.repo) return [];
     await this.persistence.flush();
-    const rows = await new Promise<Array<{ data: { tags?: string[] } }>>((resolve, reject) => {
+    const rows = await new Promise<Array<{ canvasId: string; data: { tags?: string[] } }>>((resolve, reject) => {
       const r = this.repo!.db.transaction("objects", "readonly").objectStore("objects").index("assetId").getAll(hash);
-      r.onsuccess = () => resolve(r.result as Array<{ data: { tags?: string[] } }>);
+      r.onsuccess = () => resolve(r.result as Array<{ canvasId: string; data: { tags?: string[] } }>);
       r.onerror = () => reject(r.error);
     });
-    const seen = new Map<string, string>();
-    for (const row of rows) for (const t of row.data.tags ?? []) if (!seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
-    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+    // Each tag with the canvases it was put on this picture on (so the person can tell which canvas a tag comes from).
+    const seen = new Map<string, { tag: string; canvases: Set<string> }>();
+    for (const row of rows) for (const t of row.data.tags ?? []) {
+      const e = seen.get(t.toLowerCase()) ?? { tag: t, canvases: new Set<string>() };
+      e.canvases.add(row.canvasId);
+      seen.set(t.toLowerCase(), e);
+    }
+    return [...seen.values()].map((e) => ({ tag: e.tag, canvases: [...e.canvases] })).sort((a, b) => a.tag.localeCompare(b.tag));
   }
 
   /** Place a new instance of a library asset at the centre of the open canvas. */

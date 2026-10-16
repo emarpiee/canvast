@@ -400,8 +400,8 @@ html, body {
 .nav-crumb svg { flex: none; width: 16px; height: 16px; }
 .nav-crumb-text { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .nav-crumb-board, .nav-crumb-canvas { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-crumb-board { flex: 0 1 auto; max-width: 11em; }
-.nav-crumb-canvas { flex: 0 1 auto; max-width: 16em; }
+.nav-crumb-board { flex: 0 1 auto; max-width: 6em; }
+.nav-crumb-canvas { flex: 0 1 auto; max-width: 10em; }
 #workspace { flex: 0 1 auto; min-width: 0; }
 .nav-chev { flex: none; justify-content: center; width: 28px; padding: 0; color: var(--hud-muted); }
 .nav-chev svg { width: 16px; height: 16px; }
@@ -1863,3 +1863,16 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .nav-menu > *, .nav-menu .nav-board, .nav-menu .nav-canvases, .nav-menu .nav-canvas-row, .nav-menu .nav-canvas, .nav-menu .nav-board-head { min-width: 0; }
 .nav-menu .nav-canvas .nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .nav-menu .nav-canvas .nav-count, .nav-menu .nav-canvas .nav-mark { flex: none; }
+
+/* Suggestions under a search box (ADR 0083). */
+.search-suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--hud-border); }
+.search-suggest[hidden] { display: none; }
+.search-suggest .sg { display: inline-flex; align-items: center; gap: var(--sp-3); height: var(--sp-10); padding: 0 var(--sp-4); font: var(--font-control); color: inherit; background: var(--hud-hover); border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.search-suggest .sg:hover { background: color-mix(in oklch, var(--hud-accent) 22%, transparent); }
+.search-suggest .sg-operator { color: var(--hud-accent); font-weight: var(--weight-semibold); }
+.search-suggest .sg-n { color: var(--hud-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+
+/* In-canvas tags on a picture say which canvas they are on (ADR 0070). */
+.asset-ctags { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.asset-ctags li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); }
+.tag-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); font-size: var(--text-xs); }

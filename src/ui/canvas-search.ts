@@ -1,4 +1,6 @@
 import type { EditorState } from "../app/editor-state";
+import { mountSuggest } from "./search-suggest";
+import { extOf } from "../assets/file-kind";
 import { CANVAS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
@@ -55,6 +57,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
       <button type="button" role="tab" data-m="bookmark"><kbd>@</kbd>Bookmark</button>
     </div>
+    <div class="search-suggest" data-testid="search-suggest" hidden></div>
     <div class="cs-recent" data-testid="search-recent" hidden></div>
     <div class="cs-bar" hidden><label><input type="checkbox" class="cs-check" data-all> <span>Select all shown</span></label><span class="cs-count" aria-live="polite"></span></div>
     <ul id="cs-list" role="listbox" aria-label="Results" aria-multiselectable="true"></ul>
@@ -63,7 +66,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   const input = root.querySelector<HTMLInputElement>("input")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");
   const list = root.querySelector<HTMLElement>("ul")!;
-  const PLACEHOLDER: Record<Mode, string> = { all: "Name, tag, group or bookmark", name: "File, layer or text name", tag: "Tag of an item", bookmark: "Bookmark name" };
+  const PLACEHOLDER: Record<Mode, string> = { all: "Search", name: "Name", tag: "Tag", bookmark: "Bookmark" };
   const EMPTY: Record<Mode, string> = { all: "Type a name, tag, group or bookmark to search this canvas. / # @ narrow it to one.", name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
   let mode: Mode = "all";
   const setMode = (m: Mode): void => {
@@ -131,6 +134,23 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   };
   const noteOf = (o: CanvasObject): string => (o.kind === "image" ? "Picture" : o.kind === "text" ? "Text" : "Stroke") + (o.groups?.length ? " · in a group" : "");
 
+  mountSuggest(root.querySelector<HTMLElement>(".search-suggest")!, input, () => {
+    // What the canvas has: in-canvas tags and the tags of the pictures' originals, and the file types of the items' names.
+    const tagN = new Map<string, { label: string; n: number }>();
+    const typeN = new Map<string, number>();
+    for (const o of deps.doc.ordered()) {
+      const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
+      for (const x of new Set(t.map((y) => y.toLowerCase()))) {
+        const label = t.find((y) => y.toLowerCase() === x)!;
+        const c = tagN.get(x);
+        if (c) c.n++;
+        else tagN.set(x, { label, n: 1 });
+      }
+      const ext = extOf(labelOf(o, names).text).toLowerCase();
+      if (ext) typeN.set(ext, (typeN.get(ext) ?? 0) + 1);
+    }
+    return { tags: [...tagN.values()], types: [...typeN].map(([ext, n]) => ({ ext, n })) };
+  });
   const clearBtn = root.querySelector<HTMLButtonElement>(".cs-clear")!;
   const recentBox = root.querySelector<HTMLElement>(".cs-recent")!;
   const bar = root.querySelector<HTMLElement>(".cs-bar")!;

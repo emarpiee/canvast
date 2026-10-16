@@ -1448,6 +1448,8 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await box.fill("png -sky");
   await expect(results.getByRole("option")).toHaveCount(1);
   // A word that starts with a dot is a file type here too (ADR 0082).
+  await box.fill("sk");
+  await expect(p.getByTestId("canvas-search").getByTestId("search-suggest").getByRole("button", { name: /^#sky/ })).toBeVisible(); // suggestions (ADR 0083)
   await box.fill(".png");
   await expect(results.getByRole("option")).toHaveCount(2);
   await box.fill(".jpg");
@@ -1617,6 +1619,7 @@ test("in-canvas tags: tag items on the canvas, list them across the workspace, a
   // The properties list the canvas tags the asset does not have; choosing one adds it to the asset.
   const suggest = p.getByTestId("asset-canvas-tags");
   await expect(suggest.getByRole("button", { name: /Add the tag ABC/ })).toBeVisible();
+  await expect(suggest).toContainText("on Board 1 › Canvas 1"); // which canvas the tag is on
   await expect(suggest.getByRole("button", { name: /Add the tag shot-2/ })).toBeVisible();
   await suggest.getByRole("button", { name: /Add the tag ABC/ }).click();
   await expect(p.getByTestId("asset-tags")).toContainText("#ABC");

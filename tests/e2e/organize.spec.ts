@@ -101,6 +101,20 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await p.getByRole("button", { name: "How to combine search words" }).click();
   await p.getByRole("dialog", { name: "Combining search words" }).getByRole("button", { name: "red OR blue", exact: true }).click();
   await expect(p.getByTestId("assets-search")).toHaveValue("red OR blue");
+  // Suggestions follow the word being typed (ADR 0083): a dot word suggests file types, a plain word tags, a finished word the operators.
+  const sg = p.locator(".assets-search-pop").getByTestId("search-suggest");
+  await p.getByTestId("assets-search").focus();
+  await p.getByTestId("assets-search").fill(".p");
+  await expect(sg.getByRole("button", { name: /^\.png/ })).toBeVisible();
+  await sg.getByRole("button", { name: /^\.png/ }).click();
+  await expect(p.getByTestId("assets-search")).toHaveValue(".png ");
+  await expect(sg.getByRole("button", { name: /^OR/ })).toBeVisible(); // after a finished word: what can follow
+  await p.getByTestId("assets-search").fill("han");
+  await expect(sg.getByRole("button", { name: /^#hands/i })).toBeVisible();
+  await p.keyboard.press("Tab"); // Tab takes the first suggestion
+  await expect(p.getByTestId("assets-search")).toHaveValue("#Hands ");
+  await expect(cards(p)).toHaveCount(1);
+  await p.getByTestId("assets-search").fill("");
   // The same search as the canvas search (ADR 0071): ways, a first "/" for Name, a clear button and recent searches that found something.
   const box = p.getByTestId("assets-search");
   const pop = p.getByTestId("assets-search-pop");

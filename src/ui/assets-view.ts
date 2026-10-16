@@ -1,4 +1,5 @@
 import type { Session, AssetPlace } from "../app/session";
+import { mountSuggest } from "./search-suggest";
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
 import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "../assets/card";
@@ -85,7 +86,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
       <div class="assets-searchbox">
-              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
+              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type" aria-label="Search assets">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${searchHelpButton()}
         <div class="assets-search-pop" data-testid="assets-search-pop">
@@ -94,6 +95,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
             <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
           </div>
+          <div class="search-suggest" data-testid="search-suggest" hidden></div>
           <div class="cs-recent" data-testid="search-recent" hidden></div>
         </div>
       </div>
@@ -263,7 +265,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
   /** In-canvas tags across the workspace (ADR 0062), and those carried by instances of the open asset. */
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
-  let assetCanvasTags: string[] = [];
+  let assetCanvasTags: Array<{ tag: string; canvases: string[] }> = [];
   /** The row whose "more" menu is open in the sidebar. */
   let sideMenu: { kind: "folder" | "tag" | "ctag"; id: string } | null = null;
   /** On a narrow screen the sidebar is a strip that opens on demand. */
@@ -1133,7 +1135,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                           { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
                           { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
                         ]),
-                      }).replace("<button ", `<button title="On ${c.objects} item(s) across ${c.canvases.size} canvas(es); ${c.assets.size} from the library" `),
+                      }).replace("<button ", `<button title="On ${c.objects} item(s). Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `),
                 )
                 .join("") || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
@@ -1290,11 +1292,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </section>
       ${(() => {
         // Tags put on this picture's instances on canvases (in-canvas tags) that the asset itself does not have yet.
-        const extra = assetCanvasTags.filter((t) => !m.tags.some((x) => x.toLowerCase() === t.toLowerCase()));
+        const extra = assetCanvasTags.filter((t) => !m.tags.some((x) => x.toLowerCase() === t.tag.toLowerCase()));
         return extra.length
           ? `<section class="asset-sec"><h3>Tags used on canvases</h3>
-              <p class="asset-note">Added to this picture on a canvas, not in the library. Choose one to add it to the library tags.</p>
-              <div class="tag-chips" data-testid="asset-canvas-tags">${extra.map((t) => `<button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t)}" aria-label="Add the tag ${esc(t)} to this asset"${dis}>+ #${esc(t)}</button>`).join("")}</div>
+              <p class="asset-note">Added to this picture on a canvas, not in the library. Each says which canvas it is on; choose one to add it to the library tags.</p>
+              <ul class="asset-ctags" data-testid="asset-canvas-tags">${extra.map((t) => `<li><button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t.tag)}" aria-label="Add the tag ${esc(t.tag)} to this asset"${dis}>+ #${esc(t.tag)}</button><span class="tag-where" title="${esc(t.canvases.map(crumbOf).join("; "))}">on ${esc(t.canvases.slice(0, 2).map(crumbOf).join(", "))}${t.canvases.length > 2 ? ` and ${t.canvases.length - 2} more` : ""}</span></li>`).join("")}</ul>
             </section>`
           : "";
       })()}
@@ -2068,7 +2070,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const pop = root.querySelector<HTMLElement>(".assets-search-pop")!;
   const clearBtn = root.querySelector<HTMLButtonElement>(".assets-searchbox .cs-clear")!;
   const recentBox = pop.querySelector<HTMLElement>(".cs-recent")!;
-  const PLACE: Record<Way, string> = { all: "Search name, type or tag", name: "Search by name", tag: "Search by tag" };
+  const PLACE: Record<Way, string> = { all: "Search", name: "Name", tag: "Tag" };
   const setWay = (w: Way): void => {
     way = w;
     search.placeholder = PLACE[w];
@@ -2087,6 +2089,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     render();
   };
   setWay("all");
+  mountSuggest(pop.querySelector<HTMLElement>(".search-suggest")!, search, () => {
+    const tags = new Map<string, { label: string; n: number }>();
+    const types = new Map<string, number>();
+    for (const e of listing?.entries ?? []) {
+      for (const t of meta(e).tags) {
+        const c = tags.get(t.toLowerCase());
+        if (c) c.n++;
+        else tags.set(t.toLowerCase(), { label: t, n: 1 });
+      }
+      const k = chipOf(e.name, e.type).toLowerCase();
+      types.set(k, (types.get(k) ?? 0) + 1);
+    }
+    return { tags: [...tags.values()], types: [...types].map(([ext, n]) => ({ ext, n })) };
+  });
   search.addEventListener("input", () => {
     // A first "/" chooses Name and is not part of the search; a "#" stays (it is a search word).
     if (search.value[0] === "/") {
