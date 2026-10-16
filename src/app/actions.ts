@@ -481,6 +481,9 @@ export async function importImages(
   let done = 0;
   for (const file of list) {
     done++;
+    // Say so at once, for one file as for many: reading a big video takes a while.
+    editor.message = list.length > 1 ? `Importing ${done} of ${list.length}…` : `Importing ${file.name || "file"}…`;
+    editor.changed();
     try {
       const { record, duplicate } = await assets.importFileDetailed(file, list.length <= 3);
       if (duplicate) seen.push({ name: record.name || file.name, duplicate });
@@ -489,14 +492,11 @@ export async function importImages(
       editor.message = `Could not import ${file.name || "file"}: ${(e as Error).message}`;
       editor.changed();
     }
-    if (list.length > 3) {
-      editor.message = `Importing ${done} of ${list.length}…`;
-      editor.changed();
-    }
   }
   // One image goes in the middle as before; several go in a grid. Either way, one undo step.
   const placed = records.length === 1 ? [placeImage(records[0]!, doc, view, 0, "Import image")] : records.length ? placeImages(records, doc, view, `Import ${records.length} images`) : [];
   const notice = duplicateNotice(seen, list.length);
+  editor.progressDone.add("import");
   editor.message = notice ?? (list.length > 3 ? `Imported ${records.length} images.` : "");
   editor.changed();
   return placed;

@@ -40,6 +40,7 @@ import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
 import { mountContextBar } from "../ui/context-bar";
+import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
@@ -109,6 +110,7 @@ async function start(): Promise<void> {
   const index = new FrameIndex(() => doc.space);
   const indexSync = syncIndex(doc, index, {
     onProgress: (done, total) => {
+      if (done >= total) editor.progressDone.add("index");
       editor.message = done < total ? `Indexing ${total.toLocaleString()} objects… ${Math.round((100 * done) / total)}%` : "";
       editor.changed();
       invalidate();
@@ -136,6 +138,7 @@ async function start(): Promise<void> {
     }
   });
   const editor = new EditorState();
+  const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
   editor.penColor = settings.get("pen.color");
@@ -502,8 +505,9 @@ async function start(): Promise<void> {
     const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
     root.setProperty("--dock-w", `${Math.ceil(dock ? dock.width : 0)}px`);
     // Side panels start below the toolbar, however many rows it wraps to.
-    const bar = barBox.querySelector<HTMLElement>(".toolbar")?.getBoundingClientRect();
-    root.setProperty("--bar-bottom", `${Math.ceil(bar ? bar.bottom : 64)}px`);
+    const opts = barBox.querySelector<HTMLElement>(".toolbar");
+    const bottoms = [navBox.getBoundingClientRect().bottom, dock?.bottom ?? 0, opts && !opts.hidden ? opts.getBoundingClientRect().bottom : 0];
+    root.setProperty("--bar-bottom", `${Math.ceil(Math.max(...bottoms))}px`);
   };
   new ResizeObserver(measureNav).observe(navBox);
   new ResizeObserver(measureNav).observe(barBox);
@@ -532,7 +536,7 @@ async function start(): Promise<void> {
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
-  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"));
+  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices);
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
     const keys = toolKeys(settings);

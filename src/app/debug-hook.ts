@@ -131,6 +131,8 @@ export interface DebugHook {
   indexStats(): { objects: number; levels: number; levelsVisited: number; levelsSkippedSubPixel: number; cellsProbed: number; candidates: number; queryMs: number };
   /** Set an object's opacity through a normal transaction (no UI for this yet). */
   setOpacity(id: string, opacity: number): void;
+  /** Say something through the notice stack, as the app does with `editor.message`; `done` closes the progress notices of a channel. */
+  notify(text: string, done?: string): void;
   /** The visible top-level view. */
   appView(): AppView;
   setView(v: AppView): void;
@@ -443,6 +445,11 @@ export function installDebugHook(
       const o = doc.get(id);
       if (!o) throw new Error(`no object ${id}`);
       doc.commit(doc.transaction("Set opacity", [{ ...o, opacity }]));
+    },
+    notify: (text, done) => {
+      if (done) deps.editor.progressDone.add(done);
+      deps.editor.message = text;
+      deps.editor.changed();
     },
     appView: deps.appView,
     setView: deps.setView,

@@ -29,11 +29,11 @@ test("typing a zoom level jumps there exactly, anchored at the viewport centre",
 test("invalid text and oversized jumps are rejected without moving the camera", async ({ app }) => {
   const before = await app.camera();
   await typeZoom(app, "abc");
-  await expect(app.page.getByRole("status")).toContainText("not a zoom level");
+  await expect(app.page.getByTestId("toast")).toContainText("not a zoom level");
   await app.page.getByTestId("zoom-input").press("Escape");
   // One jump is capped at 2^50 levels (ADR 0014: zoom counts are doubles); depth itself is unbounded.
   await typeZoom(app, "2^1e16");
-  await expect(app.page.getByRole("status")).toContainText("limited to 2^50");
+  await expect(app.page.getByTestId("toast")).toContainText("limited to 2^50");
   await app.page.getByTestId("zoom-input").press("Escape");
   expect(await app.camera()).toEqual(before);
   // Escape restores the read-out and keeps the camera.

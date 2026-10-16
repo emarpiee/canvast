@@ -39,7 +39,7 @@ type UsageFilter = "all" | "used" | "unused";
 type SortKey = "newest" | "name" | "size" | "uses";
 
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
       <h1 class="assets-title">Assets <span class="assets-count" data-testid="assets-count"></span></h1>
@@ -672,11 +672,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void view.importFiles(files);
   });
 
-  // Messages from storage operations (delete, refusals, errors) are shown here while the view is open.
-  session.editor.subscribe(() => {
-    if (!visible || !session.editor.message) return;
-    status.textContent = session.editor.message;
-    session.editor.message = "";
+  // Notices are shown by the notice stack over every view; the view keeps the last one as text for screen readers and tests.
+  notices.subscribe((text) => {
+    if (visible) status.textContent = text;
   });
   session.subscribeAssets(() => void refresh());
   session.subscribe(() => void refresh()); // tree renamed, role changed
@@ -697,7 +695,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (session.editor.blockEdit()) return;
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
+      let done = 0;
       for (const f of files) {
+        done++;
+        session.editor.message = files.length > 1 ? `Importing ${done} of ${files.length}…` : `Importing ${f.name || "file"}…`;
+        session.editor.changed();
         try {
           const { record, duplicate } = await assets.importFileDetailed(f);
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
@@ -707,6 +709,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           session.editor.changed();
         }
       }
+      session.editor.progressDone.add("import");
+      session.editor.changed();
       if (n) {
         const notice = duplicateNotice(seen, n);
         session.editor.message = !notice ? `Imported ${n} file(s) into the library.` : seen.length === n ? notice : `${n - seen.length} new file(s) imported. ${notice}`;

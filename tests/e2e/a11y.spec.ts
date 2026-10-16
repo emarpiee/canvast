@@ -64,3 +64,34 @@ test("keyboard: the view tabs come first in tab order, every focus shows an outl
   await p.keyboard.press("Escape");
   expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("canvas");
 });
+
+test("notices: a message appears as a visible notice, progress updates in place and closes when the work is done, errors can be dismissed (ADR 0053)", async ({ app }) => {
+  const p = app.page;
+  const toast = p.getByTestId("toast");
+  await expect(toast).toBeHidden();
+  // Progress: one notice with a bar that moves; a new count replaces the old one.
+  await p.evaluate(() => window.__canvastDebug.notify("Importing 2 of 10…"));
+  await expect(toast.locator(".notice")).toHaveCount(1);
+  await expect(toast.locator(".notice-bar")).toBeVisible();
+  await p.evaluate(() => window.__canvastDebug.notify("Importing 7 of 10…"));
+  await expect(toast.locator(".notice")).toHaveCount(1);
+  await expect(toast).toContainText("7 of 10");
+  expect(await toast.locator(".notice-bar > span").evaluate((e) => e.style.width)).toBe("70%");
+  // The work ends with its result: the progress notice is replaced, not left behind.
+  await p.evaluate(() => window.__canvastDebug.notify("Imported 10 images.", "import"));
+  await expect(toast.locator(".notice")).toHaveCount(1);
+  await expect(toast.locator(".notice.is-success")).toContainText("Imported 10 images.");
+  await expect(toast.locator(".notice-bar")).toHaveCount(0);
+  // An error is a live alert that stays until it is dismissed.
+  await p.evaluate(() => window.__canvastDebug.notify("Could not import clip.mov: unsupported file."));
+  await expect(toast.getByRole("alert")).toContainText("Could not import clip.mov");
+  await toast.getByRole("alert").getByRole("button", { name: "Dismiss" }).click();
+  await expect(toast.getByRole("alert")).toHaveCount(0);
+  // It is above every view: still shown in Assets and Settings.
+  await p.getByTestId("view-assets").click();
+  await p.evaluate(() => window.__canvastDebug.notify("Copied 3 objects"));
+  await expect(toast).toBeVisible();
+  const box = (await toast.boundingBox())!;
+  expect(box.y + box.height, "inside the window, near the bottom").toBeGreaterThan(500);
+  expect(app.consoleErrors).toEqual([]);
+});

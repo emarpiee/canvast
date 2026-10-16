@@ -334,7 +334,7 @@ test("delete, undo delete, and invalid imports are reported without corrupting t
   await app.page
     .getByTestId("import-input")
     .setInputFiles({ name: "not-an-image.png", mimeType: "image/png", buffer: Buffer.from("definitely not a png") });
-  await expect(app.page.getByRole("status")).toContainText("could not be decoded");
+  await expect(app.page.getByTestId("toast")).toContainText("could not be decoded");
   expect(await objects(app)).toEqual([s]);
 });
 

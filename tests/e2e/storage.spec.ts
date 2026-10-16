@@ -190,7 +190,7 @@ test("v1 snapshot data is migrated, verified, and the legacy store is left untou
   expect((s.migration as { skipped: string[] }).skipped).toHaveLength(1);
   expect(await objectIds(page)).toEqual(["a".repeat(32), "b".repeat(32)]);
   expect(await page.evaluate(() => window.__canvastDebug.camera())).toEqual(camera);
-  await expect(page.getByRole("status")).toContainText("Upgraded your canvas");
+  await expect(page.getByTestId("toast")).toContainText("Upgraded your canvas");
 
   // The legacy record is byte-for-byte what was seeded.
   const after = await page.evaluate(
@@ -228,7 +228,7 @@ test("two tabs: the second is read-only, follows the writer, and can take over",
   // The read-only tab cannot edit.
   await draw(p2, [[300, 300], [400, 400]]);
   expect(await objectIds(p2)).toEqual([]);
-  await expect(p2.getByRole("status")).toContainText("Read-only");
+  await expect(p2.getByTestId("toast")).toContainText("Read-only");
 
   // The writer's edits reach the read-only tab.
   await draw(p1, [[500, 300], [600, 350]]);

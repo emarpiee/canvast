@@ -941,3 +941,54 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .set-control .set-hue + output { text-align: left; min-width: 48px; }
 /* Options in the bar are a little tighter than the buttons elsewhere, so a pen's options fit one row. */
 .tb-options-row button { min-width: 30px; height: 30px; padding: 0 5px; }
+
+/* ---- Floating elements: one spec (ADR 0053) -------------------------------------------------------------------------
+   Every floating element on the canvas has the same height (a 36 px control and 4 px of padding on each side, 44 px), the same
+   radius, border and shadow, sits 12 px from the window edge, and keeps 8 px from its neighbour. */
+:root { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; }
+.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.rail button, .dock button, .toolbar button, .view-switch button, .hud-controls button, .ctx-bar button, .tb-options-row button { min-width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r, 8px); }
+.rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
+.rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
+.view-switch button { padding: 0 12px; gap: 6px; }
+.view-switch button svg { width: 16px; height: 16px; }
+.nav-crumb { display: inline-flex; align-items: center; height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding: 0 14px; border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
+#nav { left: var(--edge); top: var(--edge); gap: var(--near); }
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); }
+#toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--near)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--edge) + var(--near)) / var(--ui-scale, 1)); }
+.toolbar { min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
+.tb-options-row { gap: var(--gap); align-items: center; }
+.tb-options-row > .tb-group + .tb-group, .dock .tb-group + .tb-group { padding-left: var(--near); margin-left: var(--gap); }
+.hud-readout { left: var(--edge); bottom: var(--edge); }
+.hud-controls { right: var(--edge); bottom: var(--edge); }
+#side-panels { top: calc(var(--bar-bottom, 56px) + var(--near)); right: var(--edge); gap: var(--near); }
+#side-panels > *, .layers-panel, .bookmarks-panel { border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.layers-panel header, .bookmarks-panel header { padding: 6px 8px 6px 12px; min-height: 40px; }
+
+/* ---- Notices (ui/notices.ts): where the app speaks, seen at a glance --------------------------------------------- */
+#notices { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: var(--near); align-items: center; width: min(520px, calc(100vw - 2 * var(--edge))); pointer-events: none; }
+#notices[hidden] { display: none; }
+.notice { --tone: var(--hud-accent); pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 8px 10px 12px; color: var(--hud-fg); background: var(--hud-bg); background-image: linear-gradient(in oklch, color-mix(in oklch, var(--tone) 14%, transparent), transparent 70%); border: 1px solid color-mix(in oklch, var(--tone) 45%, var(--hud-border)); border-left: 4px solid var(--tone); border-radius: var(--r-lg); box-shadow: var(--hud-lift), 0 12px 32px oklch(0 0 0 / 0.12); backdrop-filter: blur(10px); font: 500 14px/1.4 var(--font-ui); animation: notice-in 180ms ease-out; }
+.notice.is-success { --tone: oklch(0.62 0.15 150); }
+.notice.is-warning { --tone: oklch(0.72 0.15 80); }
+.notice.is-error { --tone: var(--hud-danger); }
+.notice-icon { flex: none; display: inline-flex; margin-top: 1px; color: var(--tone); }
+.notice-icon svg { width: 20px; height: 20px; }
+.notice-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.notice-text { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.notice-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.notice-close svg { width: 16px; height: 16px; }
+.notice-close:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.notice-close:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.notice-bar { display: block; height: 6px; border-radius: 3px; background: var(--hud-hover); overflow: hidden; }
+.notice-bar > span { display: block; height: 100%; background: var(--tone); border-radius: 3px; transition: width 160ms linear; }
+.notice-bar.is-unknown > span { width: 40% !important; animation: notice-slide 1.1s ease-in-out infinite; }
+.notice-spin { display: inline-flex; animation: notice-spin 0.9s linear infinite; }
+@keyframes notice-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes notice-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes notice-spin { to { transform: rotate(360deg); } }
+body[data-view="assets"] #notices { bottom: 92px; }
+@media (max-width: 640px) { #notices { bottom: 72px; } }
+.assets-status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -139,10 +139,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       </div>
     </div>
-    <div class="toast" role="status" aria-live="polite" data-testid="toast" hidden></div>
   `;
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
-  const toast = root.querySelector<HTMLElement>(".toast")!;
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
     input.value = "";
@@ -249,7 +247,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "copy-md") actions.copyMarkdown();
   });
 
-  let toastTimer: ReturnType<typeof setTimeout> | null = null;
   const update = (): void => {
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
       b.setAttribute("aria-checked", String(b.dataset["tool"] === editor.tool));
@@ -284,14 +281,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // The options bar shows what the current tool offers and is gone when there is nothing to show.
     for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool) || ![...g.children].some((c) => !(c as HTMLElement).hidden);
     root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
-    // In Assets view, that view shows (and consumes) messages instead.
-    if (editor.message && document.body.dataset["view"] !== "assets") {
-      toast.textContent = editor.message;
-      toast.hidden = false;
-      editor.message = "";
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => (toast.hidden = true), 5000);
-    }
   };
   editor.subscribe(update);
   doc.subscribe(update);

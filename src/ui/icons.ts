@@ -63,6 +63,11 @@ import waves from "lucide-static/icons/waves.svg";
 import scaling from "lucide-static/icons/scaling.svg";
 import pointerBan from "lucide-static/icons/mouse-pointer-ban.svg";
 import check from "lucide-static/icons/check.svg";
+import infoIcon from "lucide-static/icons/info.svg";
+import circleAlert from "lucide-static/icons/circle-alert.svg";
+import circleCheck from "lucide-static/icons/circle-check.svg";
+import loaderCircle from "lucide-static/icons/loader-circle.svg";
+import triangleAlert from "lucide-static/icons/triangle-alert.svg";
 
 function clean(svg: string): string {
   return svg
@@ -137,4 +142,9 @@ export const ICONS = {
   bringToFront: clean(bringToFront),
   sendToBack: clean(sendToBack),
   magnet: clean(magnet),
+  info: clean(infoIcon),
+  circleAlert: clean(circleAlert),
+  circleCheck: clean(circleCheck),
+  loader: clean(loaderCircle),
+  triangleAlert: clean(triangleAlert),
 } as const;

@@ -95,7 +95,10 @@ export class EditorState {
   /** Screen-space lasso polygon or marquee rectangle while dragging. */
   lasso: number[] | null = null;
   marquee: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  /** A short message for the user; the notice stack (ui/notices.ts) takes it and shows it. */
   message = "";
+  /** Work that has finished: the progress notices of these channels ("import", "index") are closed (ui/notices.ts). */
+  readonly progressDone = new Set<string>();
   /** Another tab holds the writer lease: navigation and selection only. */
   readOnly = false;
   private readonly listeners = new Set<() => void>();
