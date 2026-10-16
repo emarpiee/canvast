@@ -547,7 +547,7 @@ async function start(): Promise<void> {
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
     const keys = toolKeys(settings);
-    for (const t of TOOL_ORDER) document.querySelector<HTMLElement>(`[data-tool="${t}"]`)?.setAttribute("title", `${TOOL_NAME[t]} (${keys[t].toUpperCase()})`);
+    for (const t of TOOL_ORDER) document.querySelector<HTMLElement>(`button[data-tool="${t}"]`)?.setAttribute("title", `${TOOL_NAME[t]} (${keys[t].toUpperCase()})`);
   };
   updateToolTitles();
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, () => setView("canvas"));

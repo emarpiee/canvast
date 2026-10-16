@@ -9,6 +9,7 @@ import { ICONS } from "./icons";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
+import { hasAlpha } from "./alpha";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -95,7 +96,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
               <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
             </div>
-            <figure><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
+            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -324,6 +325,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const stage = viewer.querySelector<HTMLElement>(".viewer-stage")!;
   const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;
   const zoom = { s: 1, x: 0, y: 0 };
+  const checker = viewer.querySelector<HTMLElement>(".viewer-checker")!;
+  /** The open picture has see-through pixels. */
+  let slideAlpha = false;
+  slideImg.addEventListener("load", () => {
+    slideAlpha = hasAlpha(slideImg);
+    viewer.classList.toggle("has-alpha", slideAlpha);
+    paintZoom();
+  });
   const shownMedia = (): HTMLElement | null => (!slideMedia.hidden && slideMedia.videoWidth ? slideMedia : !slideImg.hidden ? slideImg : null);
   /** The picture's own size and how big "fit" draws it (CSS px). */
   const sizes = (): { nw: number; nh: number; fw: number } | null => {
@@ -341,6 +350,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const el = shownMedia();
     const z = sizes();
     for (const m of [slideImg, slideMedia]) m.style.transform = m === el && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
+    // A picture with see-through pixels sits on a chequered ground exactly the size of the picture, zoomed with it.
+    checker.hidden = !(el === slideImg && slideAlpha && z);
+    if (!checker.hidden && z) {
+      const tile = checker.firstElementChild as HTMLElement;
+      tile.style.width = `${z.fw}px`;
+      tile.style.height = `${(z.fw * z.nh) / z.nw}px`;
+      checker.style.transform = slideImg.style.transform;
+    }
     zoomPct.textContent = z ? (zoom.s === 1 ? "Fit" : `${Math.round(((zoom.s * z.fw) / z.nw) * 100)}%`) : "Fit";
     viewer.classList.toggle("is-zoomed", zoom.s !== 1);
   };
@@ -489,6 +506,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideMedia.hidden = true;
     slideMedia.removeAttribute("src");
     slideImg.hidden = false;
+    slideAlpha = false;
+    checker.hidden = true;
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
     if (token !== slideToken) return;
     const thumbnail = async (): Promise<void> => {
@@ -1345,6 +1364,27 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hash = selected;
     void session.organize((c) => put(c, hash, id));
   });
+
+  // A thumbnail with see-through pixels gets a chequered ground (cards, filmstrip and the details picture) so it reads as transparent.
+  const alphaOf = new Map<string, boolean>();
+  root.addEventListener(
+    "load",
+    (e) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || img === slideImg) return;
+      const host = img.closest<HTMLElement>(".asset-card, .film-item, .asset-preview");
+      if (!host) return;
+      const key = img.dataset["hash"] ?? img.src;
+      let a = alphaOf.get(key);
+      if (a === undefined) {
+        a = hasAlpha(img);
+        if (alphaOf.size > 4000) alphaOf.clear();
+        alphaOf.set(key, a);
+      }
+      host.classList.toggle("has-alpha", a);
+    },
+    true,
+  );
 
   // ---- "Place on…": an existing canvas, a new canvas in a board, or a new board
   const placeMenu = root.querySelector<HTMLElement>(".place-menu")!;

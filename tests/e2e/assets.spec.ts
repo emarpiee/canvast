@@ -1300,3 +1300,37 @@ test("Place on…: the open canvas, another existing canvas, a new canvas in a b
   await expect(p.getByTestId("place-menu")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the viewer follows the theme, and a picture with see-through pixels sits on a chequered ground that an opaque one does not get (ADR 0059)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const HALF = makePng(40, 30, (x) => (x < 20 ? [200, 30, 30, 0] : [30, 30, 200, 255]));
+  const halfHash = createHash("sha256").update(HALF).digest("hex");
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "half.png", mimeType: "image/png", buffer: HALF },
+    { name: "green.png", mimeType: "image/png", buffer: GREEN },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  // Cards: only the see-through one is chequered.
+  await expect(card(p, halfHash)).toHaveClass(/has-alpha/);
+  await expect(card(p, GREEN_HASH)).not.toHaveClass(/has-alpha/);
+  const viewer = p.getByTestId("slide-view");
+  const checker = viewer.locator(".viewer-checker");
+  await card(p, halfHash).dblclick();
+  await expect(viewer).toBeVisible();
+  await expect(checker).toBeVisible();
+  // The chequered ground is exactly the picture (40 x 30), not the whole stage.
+  const tile = (await checker.locator("i").boundingBox())!;
+  expect(Math.abs(tile.width / tile.height - 40 / 30)).toBeLessThan(0.02);
+  const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
+  expect(tile.width).toBeLessThan(stage.width);
+  await p.keyboard.press("ArrowRight");
+  await expect(checker).toBeHidden();
+  // The viewer's ground follows the theme: light in a light theme, dark in a dark one.
+  const lightness = () => viewer.evaluate((e) => Number(/oklch\(([\d.]+)/.exec(getComputedStyle(e).backgroundColor)?.[1] ?? "NaN"));
+  await p.emulateMedia({ colorScheme: "light" });
+  await expect.poll(lightness).toBeGreaterThan(0.8);
+  await p.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(lightness).toBeLessThan(0.3);
+  expect(app.consoleErrors).toEqual([]);
+});

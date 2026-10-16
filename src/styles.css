@@ -1338,3 +1338,60 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .tag-cloud .side-more { position: absolute; right: 2px; top: 50%; width: 20px; height: 20px; margin: 0; transform: translateY(-50%); background: var(--hud-bg); border-radius: 999px; }
 .tag-cloud .side-row:hover .side-n, .tag-cloud .side-row:focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
 @media (hover: none) { .tag-cloud .side-item { padding-right: 28px; } .tag-cloud .side-more { opacity: 1; } }
+
+/* ---- The viewer follows the theme (a light or dark ground, bars and overlays); see-through pictures sit on a chequered ground ---- */
+:root {
+  --v-stage: oklch(0.93 calc(0.01 * var(--vivid)) var(--hue));
+  --v-bar: oklch(0.98 calc(0.006 * var(--vivid)) var(--hue));
+  --v-fg: oklch(0.25 calc(0.012 * var(--vivid)) var(--hue));
+  --v-muted: oklch(0.45 calc(0.012 * var(--vivid)) var(--hue));
+  --v-line: oklch(0 0 0 / 0.12);
+  --v-hover: oklch(0 0 0 / 0.08);
+  --v-pill: oklch(1 0 0 / 0.86);
+  --check-a: oklch(0.99 0 0);
+  --check-b: oklch(0.86 0 0);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --v-stage: oklch(0.15 calc(0.012 * var(--vivid)) var(--hue));
+    --v-bar: oklch(0.21 calc(0.012 * var(--vivid)) var(--hue));
+    --v-fg: oklch(0.96 calc(0.006 * var(--vivid)) var(--hue));
+    --v-muted: oklch(0.8 calc(0.01 * var(--vivid)) var(--hue));
+    --v-line: oklch(1 0 0 / 0.1);
+    --v-hover: oklch(1 0 0 / 0.12);
+    --v-pill: oklch(0.1 0.01 var(--hue) / 0.62);
+    --check-a: oklch(0.42 0 0);
+    --check-b: oklch(0.3 0 0);
+  }
+}
+:root[data-theme="dark"] {
+  --v-stage: oklch(0.15 calc(0.012 * var(--vivid)) var(--hue));
+  --v-bar: oklch(0.21 calc(0.012 * var(--vivid)) var(--hue));
+  --v-fg: oklch(0.96 calc(0.006 * var(--vivid)) var(--hue));
+  --v-muted: oklch(0.8 calc(0.01 * var(--vivid)) var(--hue));
+  --v-line: oklch(1 0 0 / 0.1);
+  --v-hover: oklch(1 0 0 / 0.12);
+  --v-pill: oklch(0.1 0.01 var(--hue) / 0.62);
+  --check-a: oklch(0.42 0 0);
+  --check-b: oklch(0.3 0 0);
+}
+.viewer { background: var(--v-stage); color: var(--v-fg); }
+.viewer-bar { background: var(--v-bar); border-top-color: var(--v-line); }
+.viewer-pos, .viewer figcaption { color: var(--v-muted); }
+.viewer figcaption { background: var(--v-pill); }
+.vbtn:hover:not(:disabled) { background: var(--v-hover); }
+.viewer-interval { background: var(--v-hover); }
+.film-item { background: var(--v-hover); }
+.viewer-zoom, .viewer-handle .vbtn { background: var(--v-pill); border-color: var(--v-line); }
+.viewer-zoom button:hover { background: var(--v-hover); }
+.viewer-handle:not(:hover) .vbtn { color: var(--v-fg); }
+.is-checker, .assets-body:not(.is-list) .asset-card.has-alpha, .film-item.has-alpha, .asset-preview.has-alpha, .viewer-checker i {
+  background-color: var(--check-b);
+  background-image: conic-gradient(var(--check-a) 25%, transparent 0 50%, var(--check-a) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}
+.film-item.has-alpha, .assets-body:not(.is-list) .asset-card.has-alpha { background-size: 12px 12px; }
+.viewer-checker { position: absolute; inset: 16px 16px 52px; margin: auto; display: grid; place-items: center; pointer-events: none; will-change: transform; }
+.viewer-checker[hidden] { display: none; }
+.viewer-checker i { display: block; max-width: none; box-shadow: 0 0 0 1px var(--v-line); }
+.viewer.is-actual .viewer-checker { display: none; }
