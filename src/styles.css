@@ -1511,13 +1511,13 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .nav-crumb { flex: 1; text-align: left; }
   .nav-menu { width: min(340px, calc(100vw - 2 * var(--edge))); }
   /* Row 2: the dock, spread across the width. */
-  #toolbar > .dock { top: calc((var(--edge) + var(--row) + var(--near)) / var(--ui-scale, 1)); left: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
+  #toolbar > .dock { top: calc((var(--nav-bottom) + var(--near)) / var(--ui-scale, 1)); left: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
   /* Row 3: the options of the tool, full width. */
-  #toolbar { top: calc(var(--edge) + 2 * (var(--row) + var(--near))); left: var(--edge); right: var(--edge); justify-content: stretch; }
+  #toolbar { top: calc((var(--nav-bottom) + var(--near) + var(--dock-h) + var(--near)) / var(--ui-scale, 1)); left: var(--edge); right: var(--edge); justify-content: stretch; }
   #toolbar > .toolbar { width: 100%; max-width: none; }
   /* The tools sit below the rows, never under them; the panels go to their right. */
   #toolbar > .rail { top: max(calc(50vh / var(--ui-scale, 1)), calc((var(--bar-bottom, 140px) + 160px) / var(--ui-scale, 1))); }
-  #side-panels { left: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + var(--near) + 4px); right: var(--edge); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
+  #side-panels { top: calc(var(--bar-bottom, 140px) + var(--near)); left: calc(var(--rail-right, 52px) + var(--near)); right: var(--edge); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
   /* The readout and the view controls keep to the bottom edge, the readout narrower. */
   .hud-readout { max-width: calc(100vw - 8 * var(--ctl)); overflow: hidden; }
   .cs { top: calc(var(--bar-bottom, 56px) + 8px); }
@@ -2139,3 +2139,6 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .tag-cloud .side-row { min-width: 0; }
 .tag-cloud .side-item { max-width: 100%; }
 .side-sec-toggle h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* With the readout hidden the view controls sit the same distance from the edge as every other floating element. */
+.hud-bottom:has(> .hud-readout[hidden]) > .hud-controls { margin-bottom: var(--edge); }

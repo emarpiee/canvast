@@ -717,10 +717,29 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Side panels start below the toolbar, however many rows it wraps to.
     const opts = barBox.querySelector<HTMLElement>(".toolbar");
     const bottoms = [navBox.getBoundingClientRect().bottom, dock?.bottom ?? 0, opts && !opts.hidden ? opts.getBoundingClientRect().bottom : 0];
+    // On a phone the three bars stack in rows. Their places come from measured heights (never from a guessed row height), so the gap between
+    // the rows is the same everywhere: the rows are positioned by these (stylesheet: --nav-bottom, --dock-h), and the bottom of the last row follows.
+    const near = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--near")) || 6;
+    const navBottom = navBox.getBoundingClientRect().bottom;
+    const dockH = dock?.height ?? 0;
+    root.setProperty("--nav-bottom", `${Math.ceil(navBottom)}px`);
+    root.setProperty("--rail-right", `${Math.ceil(barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? 0)}px`);
+    root.setProperty("--dock-h", `${Math.ceil(dockH)}px`);
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      const optsH = opts && !opts.hidden ? opts.getBoundingClientRect().height : 0;
+      bottoms.push(navBottom + near + dockH + (optsH ? near + optsH : 0));
+      bottoms.splice(0, 3, bottoms[3]!); // the rows' own places are not final until the stylesheet has used the numbers above
+    }
     root.setProperty("--bar-bottom", `${Math.ceil(Math.max(...bottoms))}px`);
   };
   new ResizeObserver(measureNav).observe(navBox);
   new ResizeObserver(measureNav).observe(barBox);
+  const dockEl = barBox.querySelector<HTMLElement>(".dock");
+  if (dockEl) new ResizeObserver(measureNav).observe(dockEl);
+  const railEl = barBox.querySelector<HTMLElement>(".rail");
+  if (railEl) new ResizeObserver(measureNav).observe(railEl);
+  const optsEl = barBox.querySelector<HTMLElement>(".toolbar");
+  if (optsEl) new ResizeObserver(measureNav).observe(optsEl);
   window.addEventListener("resize", measureNav);
   measureNav();
 
@@ -773,6 +792,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     for (const t of TOOL_ORDER) document.querySelector<HTMLElement>(`button[data-tool="${t}"]`)?.setAttribute("title", `${TOOL_NAME[t]} (${keys[t].toUpperCase()})`);
   };
   updateToolTitles();
+  document.documentElement.dataset["version"] = __CANVAST_VERSION__; // before Settings is built: its Develop tab shows it
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, () => setView("canvas"));
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
   settings.subscribe((key) => {
@@ -903,7 +923,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready() },
     );
   }
-  document.documentElement.dataset["version"] = __CANVAST_VERSION__;
   resize();
   canvas.focus();
   editor.changed();

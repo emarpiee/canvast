@@ -18,6 +18,8 @@
 - A narrow library panel cuts nothing at its edge: long names and tags shorten with an ellipsis and keep their count, with the full name in the tooltip.
 - The Technical readout spreads its segments over the whole width in one row (they wrap on a narrow window).
 
+- Phones: the floating rows (tabs, dock, tool options, side panels) are placed from measured heights, so every gap between them is the same and the panels no longer touch the tool rail (ADR 0097).
+- Settings > Develop shows the version (it was blank: the version was set after Settings was built). `docs/reference/plan-gaps.md` is re-checked against the whole plan, item by item.
 - Layers (ADR 0096): the bars and panels floating on the edges are above everything on the canvas, selected, moving or placed (a GIF's picture no longer covers the status bar and the view controls); layer tokens `--z-item`, `--z-item-bar`, `--z-item-pop`, `--z-edge`. The selection bar finds a place clear of a player's bar, above or below it.
 
 - Tags follow Obsidian's rules: letters, numbers, _ - and / (nested), no spaces, not all digits; whatever is typed is formatted to fit (with a notice), `#project` finds `project/design` too, renaming a parent renames its children, and tags stored in an older form are formatted once at start-up (ADR 0084).
