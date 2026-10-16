@@ -963,24 +963,24 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 
 /* Compact density (Settings > Appearance > Density): the same layout on a smaller grid. Every floating element and the library bar
    read these tokens, so one switch tightens them all and more of the canvas shows. */
-:root[data-density="compact"] { --ctl: 30px; --pad: 3px; --gap: 1px; --edge: 8px; --near: 6px; --r-lg: 10px; --r-md: 7px; --ctl-r: 7px; }
-:root[data-density="compact"] .rail button svg, :root[data-density="compact"] .dock button svg, :root[data-density="compact"] .toolbar button svg, :root[data-density="compact"] .ctx-bar button svg, :root[data-density="compact"] .hud-controls button svg { width: 16px; height: 16px; }
-:root[data-density="compact"] .view-switch button { padding: 0 9px; font-size: 12px; }
-:root[data-density="compact"] .nav-crumb { padding: 0 10px; font-size: 12px; }
-:root[data-density="compact"] .hud-readout { padding: 6px 10px; font-size: 11px; }
-:root[data-density="compact"] .hud-zoom { font-size: 13px; }
-:root[data-density="compact"] .layers-panel, :root[data-density="compact"] .bookmarks-panel { font-size: 11px; }
-:root[data-density="compact"] .layers-panel header, :root[data-density="compact"] .bookmarks-panel header { min-height: 32px; padding: 4px 6px 4px 10px; }
-:root[data-density="compact"] .notice { padding: 8px 6px 8px 10px; font-size: 13px; }
-:root[data-density="compact"] .assets-grid { gap: 6px; }
-:root[data-density="compact"] .asset-inspector { padding: 10px; flex-basis: 272px; }
-:root[data-density="compact"] .side-item { padding: 4px 8px; }
-:root[data-density="compact"] .set-row { padding: 6px 0; }
-:root[data-density="compact"] .film-item { width: 52px; height: 36px; }
+:root:not([data-density="comfortable"]) { --ctl: 30px; --pad: 3px; --gap: 1px; --edge: 8px; --near: 6px; --r-lg: 10px; --r-md: 7px; --ctl-r: 7px; }
+:root:not([data-density="comfortable"]) .rail button svg, :root:not([data-density="comfortable"]) .dock button svg, :root:not([data-density="comfortable"]) .toolbar button svg, :root:not([data-density="comfortable"]) .ctx-bar button svg, :root:not([data-density="comfortable"]) .hud-controls button svg { width: 16px; height: 16px; }
+:root:not([data-density="comfortable"]) .view-switch button { padding: 0 9px; font-size: 12px; }
+:root:not([data-density="comfortable"]) .nav-crumb { padding: 0 10px; font-size: 12px; }
+:root:not([data-density="comfortable"]) .hud-readout { padding: 6px 10px; font-size: 11px; }
+:root:not([data-density="comfortable"]) .hud-zoom { font-size: 13px; }
+:root:not([data-density="comfortable"]) .layers-panel, :root:not([data-density="comfortable"]) .bookmarks-panel { font-size: 11px; }
+:root:not([data-density="comfortable"]) .layers-panel header, :root:not([data-density="comfortable"]) .bookmarks-panel header { min-height: 32px; padding: 4px 6px 4px 10px; }
+:root:not([data-density="comfortable"]) .notice { padding: 8px 6px 8px 10px; font-size: 13px; }
+:root:not([data-density="comfortable"]) .assets-grid { gap: 6px; }
+:root:not([data-density="comfortable"]) .asset-inspector { padding: 10px; flex-basis: 272px; }
+:root:not([data-density="comfortable"]) .side-item { padding: 4px 8px; }
+:root:not([data-density="comfortable"]) .set-row { padding: 6px 0; }
+:root:not([data-density="comfortable"]) .film-item { width: 52px; height: 36px; }
 
 /* Picking several: a checkbox on every card (it shows on hover, as soon as anything is picked, and always on a touch screen). */
 .asset-check { position: absolute; top: 8px; left: 8px; z-index: 2; width: 22px; height: 22px; margin: 0; cursor: pointer; opacity: 0; accent-color: var(--hud-accent); filter: drop-shadow(0 1px 3px oklch(0 0 0 / 0.5)); }
-.asset-cell:hover .asset-check, .asset-cell:focus-within .asset-check, .assets-grid.has-picks .asset-check, .asset-check:checked { opacity: 1; }
+.asset-cell:hover .asset-check, .assets-grid.has-picks .asset-check, .asset-check:checked { opacity: 1; }
 @media (hover: none) { .asset-check { opacity: 1; } }
 .asset-card[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--hud-accent); }
 .asset-card[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; background: color-mix(in oklch, var(--hud-accent) 14%, transparent); pointer-events: none; }
@@ -997,3 +997,153 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-interval option { color: var(--hud-fg); background: var(--hud-bg); }
 .vbtn[data-act="play"][aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); box-shadow: none; }
 .assets-grid { user-select: none; -webkit-user-select: none; }
+
+/* Comfortable density: the roomier grid (compact is the default). */
+:root[data-density="comfortable"] { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; --r-lg: 12px; --r-md: 8px; --ctl-r: 8px; }
+
+/* ---- Workspace menu: boards as sections, canvases as rows, actions as icons that show on hover ---------------------------------- */
+.nav-menu { width: 320px; padding: 6px; border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.nav-board { padding: 2px 0 6px; }
+.nav-board + .nav-board { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--hud-border); }
+.nav-board-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px 2px 8px; min-height: var(--ctl); }
+.nav-board-icon { display: inline-flex; color: var(--hud-muted); }
+.nav-board-icon svg { width: 16px; height: 16px; }
+.nav-board-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.nav-canvases { list-style: none; margin: 0; padding: 0 0 0 12px; display: grid; gap: 2px; }
+.nav-canvas-row { display: flex; align-items: center; gap: 2px; border-radius: var(--r-md); }
+.nav-canvas-row:hover { background: var(--hud-hover); }
+.nav-canvas { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 0 8px; min-height: var(--ctl); }
+.nav-canvas:hover { background: transparent; }
+.nav-canvas.is-active { background: transparent; color: var(--hud-accent); font-weight: 600; }
+.nav-mark { flex: none; width: 16px; display: inline-flex; }
+.nav-mark svg { width: 16px; height: 16px; }
+.nav-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-count { flex: none; padding: 0 7px; font-size: 11px; line-height: 18px; color: var(--hud-muted); background: var(--hud-hover); border-radius: 999px; }
+.nav-mini { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--ctl) - 6px); height: calc(var(--ctl) - 6px); padding: 0; opacity: 0; color: var(--hud-muted); }
+.nav-mini svg { width: 15px; height: 15px; }
+.nav-board-head:hover .nav-mini, .nav-board-head:focus-within .nav-mini, .nav-canvas-row:hover .nav-mini, .nav-canvas-row:focus-within .nav-mini { opacity: 1; }
+.nav-mini:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+.nav-mini:disabled { opacity: 0.25 !important; }
+@media (hover: none) { .nav-mini { opacity: 1; } }
+.nav-add { display: flex; align-items: center; width: calc(100% - 12px); min-height: var(--ctl); margin: 4px 0 0 12px; padding: 0 10px; color: var(--hud-muted); border: 1px dashed var(--hud-border); border-radius: var(--r-md); opacity: 1; }
+.nav-add:hover { color: var(--hud-fg); border-color: var(--hud-muted); background: var(--hud-hover); }
+.nav-add-board { width: 100%; margin: 6px 0 0; }
+
+/* ---- Assets view, second pass (ADR 0054) ------------------------------------------------------------------------------
+   The checkbox is a hover thing, or shows once anything is picked; focus left on a card by a click never keeps it on. */
+.asset-check { opacity: 0; }
+.asset-cell:hover .asset-check { opacity: 1; }
+.assets-grid.has-picks .asset-check, .asset-check:checked, .asset-cell:has(.asset-card:focus-visible) .asset-check { opacity: 1; }
+/* A touch screen, or any device that does not report a hover: the checkbox is always there. */
+@media (pointer: coarse), (hover: none), (hover: on-demand) { .asset-check { opacity: 1 !important; } }
+.asset-thumb img, .film-item img, .asset-preview img, .viewer img { -webkit-user-drag: none; user-select: none; }
+.assets-layout { display: inline-flex; gap: 2px; }
+.assets-layout .assets-btn { border-color: transparent; background: transparent; }
+.assets-layout .assets-btn[aria-pressed="true"] { background: var(--hud-hover); box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.asset-kind { display: none; }
+.assets-list-head { display: none; }
+
+/* List mode: a row per asset (picture, name, pixels, type and size, usage, tags), the same cards with a different layout. */
+.assets-body { --cols: 56px minmax(140px, 2fr) 110px 130px minmax(120px, 1.2fr) minmax(80px, 1fr); }
+.assets-body.is-list .assets-list-head { display: grid; grid-template-columns: var(--cols); gap: 12px; position: sticky; top: 0; z-index: 3; padding: 4px 8px 6px 40px; color: var(--hud-muted); font-size: 12px; font-weight: 600; background: var(--canvas-bg); border-bottom: 1px solid var(--hud-border); margin-bottom: 4px; }
+.assets-body.is-list .assets-grid { display: block; }
+.assets-body.is-list .assets-grid::after { display: none; }
+.assets-body.is-list .asset-cell { flex: none; min-width: 0; aspect-ratio: auto; height: 48px; margin-bottom: 2px; padding-left: 32px; }
+.assets-body.is-list .asset-card { position: static; display: grid; grid-template-columns: var(--cols); align-items: center; gap: 12px; padding: 4px 8px 4px 0; background: transparent; border-radius: var(--r-md); }
+.assets-body.is-list .asset-card:hover { background: var(--hud-hover); box-shadow: none; }
+.assets-body.is-list .asset-card[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent) 18%, transparent); box-shadow: none; }
+.assets-body.is-list .asset-card[aria-pressed="true"]::after { display: none; }
+.assets-body.is-list .asset-thumb { position: static; width: 56px; height: 40px; overflow: hidden; border-radius: var(--r-sm); background: var(--hud-hover); }
+.assets-body.is-list .asset-info { position: static; display: contents; opacity: 1; padding: 0; background: none; }
+.assets-body.is-list .asset-kind { display: block; }
+.assets-body.is-list .asset-name { color: inherit; }
+.assets-body.is-list .asset-meta, .assets-body.is-list .asset-kind, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+.assets-body.is-list .asset-check { top: 50%; left: 6px; transform: translateY(-50%); }
+#assets-view.is-list .assets-size { display: none; }
+
+/* The viewer takes the page: what does not apply to it leaves the library bar, and with the controls hidden so does the bar. */
+#assets-view.is-viewing .assets-size, #assets-view.is-viewing .assets-layout, #assets-view.is-viewing .assets-bar [data-action="import"], #assets-view.is-viewing .assets-bar [data-action="slideshow"], #assets-view.is-viewing .assets-bar [data-action="details"] { display: none; }
+#assets-view.is-viewing.no-controls .assets-bar { display: none; }
+.viewer-quick { display: none; }
+.assets-body.no-details .viewer-quick { display: contents; }
+.viewer img, .viewer video { cursor: zoom-in; }
+.viewer.is-actual img { cursor: zoom-out; }
+
+/* The Arrange menu: its items are plain rows, not toolbar buttons (the toolbar's fixed control height made a long label overlap the next one). */
+.layout-menu { min-width: max-content; width: max-content; max-width: min(320px, calc(100vw - 2 * var(--edge))); padding: 6px; border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.toolbar .layout-menu button, .tb-options-row .layout-menu button { display: flex; align-items: center; width: 100%; height: auto; min-height: var(--ctl); min-width: 0; padding: 0 12px; white-space: nowrap; border-radius: var(--r-md); }
+.layout-head { padding: 8px 12px 2px; }
+.layout-head:first-child { padding-top: 4px; }
+
+/* The Arrange menu, laid out: icon and label on the left of each row, sections divided by a rule. */
+.toolbar .layout-menu button, .tb-options-row .layout-menu button { justify-content: flex-start; gap: 10px; text-align: left; font-size: 13px; }
+.layout-menu button svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
+.layout-menu button:hover svg { color: var(--hud-fg); }
+.layout-head + button { margin-top: 2px; }
+.layout-menu button + .layout-head { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--hud-border); }
+.layout-menu { width: 270px; }
+
+/* The player: the scrubber takes the whole top row and the bar is wide enough to use it. */
+.media-bar { width: min(560px, calc(100% - 24px)); padding: 8px 12px; gap: 8px; }
+.media-bar .media-row:first-child { width: 100%; gap: 12px; }
+.media-bar .media-scrub { flex: 1 1 0; width: 0; min-width: 0; margin: 0; height: 24px; }
+.media-bar .media-time { flex: none; min-width: 84px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; opacity: 0.9; }
+
+/* The library bar on a smaller screen: one row, the least needed controls give way first. */
+.assets-bar { flex-wrap: nowrap; }
+.assets-search { flex: 1 1 140px; max-width: 360px; }
+.assets-bar > * { flex-shrink: 0; }
+.assets-bar .assets-search { flex-shrink: 1; min-width: 100px; }
+@media (max-width: 1500px) { .assets-count { display: none; } }
+@media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: 64px; } }
+@media (max-width: 1180px) { .assets-size { display: none; } }
+@media (max-width: 980px) { .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + 2px); } }
+
+/* In the viewer the library bar is not needed (it keeps its row so the viewer starts below the view tabs); with the controls hidden too, the picture gets the whole page. */
+#assets-view.is-viewing .assets-bar { visibility: hidden; }
+#assets-view.is-viewing.no-controls .assets-bar { display: none; visibility: visible; }
+
+/* Hidden controls: the way back fades out and returns when the pointer or the keyboard is near it; while a slideshow plays a pause button stays beside it. */
+.viewer-handle { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; gap: 6px; width: 240px; height: 72px; padding: 0 0 8px; background: none; border: 0; opacity: 0; transition: opacity 200ms; }
+.viewer-handle[hidden] { display: none; }
+.viewer-handle:hover, .viewer-handle:focus-within { opacity: 1; }
+.viewer-handle .vbtn { min-width: 40px; height: 32px; background: oklch(0.2 0.01 190 / 0.92); border: 1px solid oklch(1 0 0 / 0.14); border-radius: 999px; }
+.viewer-handle [data-act="play"] { display: none; }
+.viewer.is-showing .viewer-handle [data-act="play"] { display: inline-flex; }
+.viewer.is-showing .viewer-handle { opacity: 0.5; }
+.viewer.is-showing .viewer-handle:hover, .viewer.is-showing .viewer-handle:focus-within { opacity: 1; }
+@media (hover: none) { .viewer-handle { opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .viewer-handle { transition: none; } }
+
+/* ---- Workspace menu, third pass: plain words ---------------------------------------------------------------------------------
+   Each board and canvas has a "More" button that opens its actions as labelled rows (Rename, Export to a file, Delete). */
+.nav-menu { width: 340px; }
+.nav-board-head, .nav-canvas-row { position: relative; }
+.nav-count { padding: 0; font-size: 12px; line-height: 1.2; background: none; border-radius: 0; color: var(--hud-muted); white-space: nowrap; }
+.nav-more { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--ctl) - 4px); height: calc(var(--ctl) - 4px); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; opacity: 0.75; }
+.nav-more svg { width: 18px; height: 18px; }
+.nav-more:hover, .nav-more[aria-expanded="true"] { opacity: 1; color: var(--hud-fg); background: var(--hud-hover); }
+.nav-actions { position: absolute; right: 4px; top: calc(100% - 2px); z-index: 8; min-width: 190px; padding: 4px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(10px); }
+.nav-actions button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--ctl); padding: 0 12px; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.nav-actions button svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
+.nav-actions button:hover:not(:disabled) { background: var(--hud-hover); }
+.nav-actions button.is-danger { color: var(--hud-danger); }
+.nav-actions button.is-danger svg { color: inherit; }
+.nav-actions button:disabled { opacity: 0.4; cursor: default; }
+.nav-add { color: var(--hud-fg); }
+
+/* ---- The library list, aligned: the header sits over its columns ---------------------------------------------------------------- */
+.assets-body.is-list .assets-list-head { padding: 4px 8px 6px 32px; }
+.assets-body.is-list .asset-cell { height: 46px; padding-left: 32px; }
+.assets-body.is-list .asset-card { padding: 3px 8px 3px 0; }
+.assets-body.is-list .asset-thumb { width: 56px; height: 38px; }
+.assets-body.is-list .asset-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assets-body.is-list .asset-meta, .assets-body.is-list .asset-kind, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.assets-body.is-list .asset-check { width: 18px; height: 18px; left: 7px; opacity: 0; }
+.assets-body.is-list .asset-cell:hover .asset-check, .assets-body.is-list .asset-check:checked, .assets-body.is-list .assets-grid.has-picks .asset-check { opacity: 1; }
+@media (pointer: coarse), (hover: none), (hover: on-demand) { .assets-body.is-list .asset-check { opacity: 0.6 !important; } .assets-body.is-list .asset-check:checked { opacity: 1 !important; } }
+.assets-body.is-list .asset-cell:nth-child(even) .asset-card:not([aria-pressed="true"]) { background: color-mix(in oklch, var(--hud-hover) 45%, transparent); }
+/* The list of actions opens to the left of its More button, so the More buttons of the rows below stay reachable. */
+.nav-actions { top: 0; right: calc(var(--ctl) - 2px); }
+/* List rows read as text on the page, not as the white text of a picture overlay. */
+.assets-body.is-list .asset-info { color: var(--hud-fg); }

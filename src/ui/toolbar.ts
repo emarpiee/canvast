@@ -39,27 +39,34 @@ const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string 
   { id: "marker", label: "Marker", title: "Marker: a wide, translucent line", icon: ICONS.highlighter },
 ];
 
-const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string }> }> = [
+const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string }> }> = [
   {
     head: "Arrange in a grid",
     items: [
-      { id: "grid:name-asc", label: "By name, A to Z" },
-      { id: "grid:name-desc", label: "By name, Z to A" },
-      { id: "grid:date", label: "By date added, newest first" },
-      { id: "grid:size", label: "By size, largest first" },
-      { id: "grid:type", label: "By type" },
-      { id: "grid:stack", label: "In stacking order" },
+      { id: "grid:name-asc", label: "By name, A to Z", icon: ICONS.arrowDownAZ },
+      { id: "grid:name-desc", label: "By name, Z to A", icon: ICONS.arrowDownZA },
+      { id: "grid:date", label: "By date added, newest first", icon: ICONS.calendarDays },
+      { id: "grid:size", label: "By size, largest first", icon: ICONS.rulerIcon },
+      { id: "grid:type", label: "By type", icon: ICONS.fileType },
+      { id: "grid:stack", label: "In stacking order", icon: ICONS.layers2 },
     ],
   },
   {
     head: "Align",
-    items: ["left", "centre", "right", "top", "middle", "bottom"].map((a) => ({ id: `align:${a}`, label: a[0]!.toUpperCase() + a.slice(1) })),
+    items: [
+      { id: "align:left", label: "Left", icon: ICONS.alignHStart },
+      { id: "align:centre", label: "Centre", icon: ICONS.alignHCenter },
+      { id: "align:right", label: "Right", icon: ICONS.alignHEnd },
+      { id: "align:top", label: "Top", icon: ICONS.alignVStart },
+      { id: "align:middle", label: "Middle", icon: ICONS.alignVCenter },
+      { id: "align:bottom", label: "Bottom", icon: ICONS.alignVEnd },
+    ],
   },
   {
     head: "Distribute (3 or more)",
     items: [
-      { id: "distribute:x", label: "Horizontally" },
-      { id: "distribute:y", label: "Vertically" },
+      { id: "distribute:x", label: "Horizontally", icon: ICONS.distH },
+      { id: "distribute:y", label: "Vertically", icon: ICONS.distV },
     ],
   },
 ];
@@ -114,7 +121,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <span class="layout-wrap">
           <button type="button" data-action="layout-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Arrange and align" title="Arrange in a grid, align and distribute the selection">${ICONS.layoutGrid}</button>
           <div class="layout-menu" role="menu" data-testid="layout-menu" hidden>
-            ${LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.label}</button>`).join("")}`).join("")}
+            ${LAYOUT_MENU.map((g) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}`).join("")}
           </div>
         </span>
       </div>

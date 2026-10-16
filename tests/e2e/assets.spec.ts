@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, test } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
 import { makeFakeMp4 } from "./mp4";
@@ -52,6 +52,9 @@ async function importOnCanvas(p: Page, buffer = BLOCKS, name = "blocks.png"): Pr
 
 async function toAssets(p: Page): Promise<void> {
   await p.getByTestId("view-assets").click();
+  // The viewer stays open when the library is left (placing an asset, say); these specs start from the gallery.
+  const viewer = p.getByTestId("slide-view");
+  if (await viewer.isVisible()) await p.keyboard.press("Escape");
   await expect(p.getByTestId("assets-grid")).toBeVisible();
 }
 
@@ -66,13 +69,13 @@ async function openMenu(p: Page): Promise<void> {
 
 async function newCanvas(p: Page, expected: string): Promise<void> {
   await openMenu(p);
-  await p.getByRole("button", { name: "+ Canvas" }).last().click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).last().click();
   await expect(p.getByTestId("workspace-nav")).toHaveText(expected);
 }
 
 async function newBoard(p: Page, expected: string): Promise<void> {
   await openMenu(p);
-  await p.getByRole("button", { name: "+ Board" }).click();
+  await p.getByRole("button", { name: /^\+ New board/ }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText(expected);
 }
 
@@ -321,19 +324,20 @@ test("deleting canvases and boards removes their objects, keeps shared originals
 
   // Structural rules: Board 2's only canvas cannot be deleted on its own.
   await openMenu(p);
-  await expect(p.getByRole("button", { name: "Delete canvas Canvas 1" }).last()).toBeDisabled();
+  await openActions(p, "canvas", "Canvas 1");
+  await expect(p.getByRole("menuitem", { name: "Delete canvas Canvas 1" })).toBeDisabled();
 
   // Delete the open canvas Board 1 › Canvas 2: cancel first, then confirm.
   await openCanvas(p, /Canvas 2/, "Board 1 › Canvas 2");
   await openMenu(p);
-  await p.getByRole("button", { name: "Delete canvas Canvas 2" }).click();
+  await rowAction(p, "canvas", "Canvas 2", "Delete");
   await expect(p.getByTestId("confirm-dialog")).toContainText("It holds 2 object(s) on board “Board 1”.");
   await expect(p.getByTestId("confirm-dialog")).toContainText("Images placed on it stay in the Assets library.");
   await p.keyboard.press("Escape");
   await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
   expect((await sess(p)).tree![0]!.canvases.map((c) => c.name)).toEqual(["Canvas 1", "Canvas 2"]);
   await openMenu(p);
-  await p.getByRole("button", { name: "Delete canvas Canvas 2" }).click();
+  await rowAction(p, "canvas", "Canvas 2", "Delete");
   await p.getByTestId("confirm-ok").click();
   // The app moved to the neighbouring canvas before deleting.
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
@@ -344,15 +348,17 @@ test("deleting canvases and boards removes their objects, keeps shared originals
 
   // Delete Board 2 (not open).
   await openMenu(p);
-  await p.getByRole("button", { name: "Delete board Board 2" }).click();
+  await rowAction(p, "board", "Board 2", "Delete");
   await expect(p.getByTestId("confirm-dialog")).toContainText("Its 1 canvas(es) and 1 object(s) will be deleted.");
   await p.getByTestId("confirm-ok").click();
   await expect.poll(async () => (await sess(p)).tree!.map((b) => b.name)).toEqual(["Board 1"]);
   expect((await listing(p)).entries.map((e) => [e.instances, e.canvases])).toEqual([[1, 1]]);
   expect(await stored(p)).toEqual([HASH]);
   await openMenu(p);
-  await expect(p.getByRole("button", { name: "Delete board Board 1" })).toBeDisabled();
-  await expect(p.getByRole("button", { name: "Delete canvas Canvas 1" })).toBeDisabled();
+  await openActions(p, "board", "Board 1");
+  await expect(p.getByRole("menuitem", { name: "Delete board Board 1" })).toBeDisabled();
+  await openActions(p, "canvas", "Canvas 1");
+  await expect(p.getByRole("menuitem", { name: "Delete canvas Canvas 1" })).toBeDisabled();
 
   // After a reload the deletions hold, and nothing points at a deleted canvas.
   await p.reload();
@@ -375,7 +381,6 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: GREEN });
   await expect(card(p, GREEN_HASH)).toHaveCount(1);
   await card(p, HASH).click();
-  await p.getByTestId("asset-preview").click();
   const slide = p.getByTestId("slide-view");
   await expect(slide).toBeVisible();
   await expect.poll(() => slide.locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
@@ -403,7 +408,6 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await expect(card(p, HASH)).toContainText("Original missing");
   // Its slide view shows the thumbnail and says why.
   await card(p, HASH).click();
-  await p.getByTestId("asset-preview").click();
   await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The original is missing or damaged");
   await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await p.keyboard.press("Escape");
@@ -505,7 +509,7 @@ test("two tabs: a canvas deleted by the writer moves the reader off it; the read
 
   // The writer deletes Canvas 2 (it moves to Canvas 1 first); the reader follows.
   await openMenu(p1);
-  await p1.getByRole("button", { name: "Delete canvas Canvas 2" }).click();
+  await rowAction(p1, "canvas", "Canvas 2", "Delete");
   await p1.getByTestId("confirm-ok").click();
   await expect(p1.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
   await expect(p2.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
@@ -530,6 +534,10 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await p.mouse.click((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
   const bar = p.getByTestId("media-bar");
   await expectSlow(bar).toBeVisible();
+  // The scrubber has the room: it takes the bar's whole top row but for the time.
+  const barBox = (await bar.boundingBox())!;
+  const scrubBox = (await bar.locator(".media-scrub").boundingBox())!;
+  expect(scrubBox.width, "the player's scrubber is wide").toBeGreaterThan(barBox.width * 0.7);
   await expectSlow(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);
   const dur = await p.evaluate(() => document.querySelector<HTMLVideoElement>(".media-video")!.duration);
   expectSlow(dur).toBeGreaterThan(1);
@@ -648,7 +656,6 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   // The slide view plays the original video (it is not "missing or damaged").
   await toAssets(p);
   await card(p, String((await objects(p))[0]!["assetId"])).click();
-  await p.getByTestId("asset-preview").click();
   const slide = p.getByTestId("slide-view");
   await expectSlow(slide.locator("video")).toBeVisible();
   await expectSlow(slide.locator("figcaption")).not.toContainText("missing");
@@ -863,7 +870,7 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
   // The cards carry the picture only until hovered or selected; a double-click opens the viewer beside the details.
-  await p.getByTestId("asset-card").nth(0).dblclick();
+  await p.getByTestId("asset-card").nth(0).click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
@@ -886,7 +893,7 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await toAssets(p);
-  await p.getByTestId("asset-card").nth(0).dblclick();
+  await p.getByTestId("asset-card").nth(0).click();
   await expect(viewer).toBeVisible();
   await expect(p.getByTestId("asset-inspector")).toBeHidden();
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
@@ -906,19 +913,25 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   const cards = p.getByTestId("asset-card");
   await expect(cards).toHaveCount(5);
   const picked = () => p.locator('[data-testid="asset-card"][aria-pressed="true"]');
-  // A click picks one; Ctrl adds and removes; Shift takes the range from the last pick.
-  await cards.nth(0).click();
+  const viewer = p.getByTestId("slide-view");
+  // Ctrl adds and removes; Shift takes the range from the last pick. (A plain click opens the viewer.)
+  await cards.nth(0).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(1);
+  await expect(viewer).toBeHidden();
   await cards.nth(2).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(2);
   await cards.nth(0).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(1);
-  await cards.nth(1).click();
+  await cards.nth(1).click({ modifiers: ["Control"] });
   await cards.nth(4).click({ modifiers: ["Shift"] });
   await expect(picked()).toHaveCount(4);
-  // Checkboxes do the same without a keyboard: one tap adds, another removes.
+  // Once picking has started a plain click picks too; Esc clears the selection (the keyboard need not be in the library).
+  await cards.nth(0).click();
+  await expect(picked()).toHaveCount(5);
+  await expect(viewer).toBeHidden();
   await p.keyboard.press("Escape");
   await expect(picked()).toHaveCount(0);
+  // Checkboxes do the same without a keyboard: one tap adds, another removes.
   await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).check();
   await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).check();
   await expect(picked()).toHaveCount(2);
@@ -926,12 +939,16 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(details.locator("h2")).toHaveText("2 selected");
   await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).uncheck();
   await expect(details.locator("h2")).toContainText("ref-3.png");
+  // The checkbox of a picked card is always shown, whether or not the pointer is on it.
+  await p.mouse.move(5, 5);
+  await expect(p.getByRole("checkbox", { name: /^Select ref-3\.png/ })).toBeVisible();
+  expect(await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
   // Select all, then act on all of them: favourite, tag, folder, and delete the unused.
-  await p.locator(".assets-grid").focus();
+  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).focus();
   await p.keyboard.press("Control+a");
   await expect(details.locator("h2")).toHaveText("5 selected");
   await p.getByTestId("bulk-favorite").click();
-  await expect(p.locator(".asset-star")).toHaveCount(5);
+  await expect(p.getByTestId("assets-side").getByRole("button", { name: /^Favourites/ })).toContainText("5");
   await p.getByTestId("bulk-tag-input").fill("set");
   await p.keyboard.press("Enter");
   await expect(p.locator('[data-testid="asset-card-tags"]')).toHaveCount(5);
@@ -944,7 +961,7 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(cards).toHaveCount(5);
   // Delete: nothing is used, so all go; the summary says so.
   await p.getByTestId("assets-side").getByRole("button", { name: /^All assets/ }).click();
-  await p.locator(".assets-grid").focus();
+  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).focus();
   await p.keyboard.press("Control+a");
   await p.getByTestId("bulk-delete").click();
   await p.getByTestId("confirm-ok").click();
@@ -959,12 +976,12 @@ test("the viewer is still open when you come back from placing an asset (ADR 005
   await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "two.png", mimeType: "image/png", buffer: makePng(9, 6, () => [60, 200, 60, 255]) });
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
-  await p.getByTestId("asset-card").nth(0).dblclick();
+  await p.getByTestId("asset-card").nth(0).click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   await p.keyboard.press("ArrowRight");
   await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 2");
-  await viewer.getByRole("button", { name: "Place" }).click();
+  await p.getByTestId("asset-place").click();
   // On the canvas, the image is placed; back in Assets the viewer shows the same asset.
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(1);
   expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("canvas");
@@ -981,6 +998,11 @@ test("slideshow: plays through the library on a timer, wraps, stops on Space or 
     await p.getByTestId("assets-import-input").setInputFiles({ name: `s-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [60 * i, 120, 200, 255]) });
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  // The time per slide is a setting (Settings > Media and playback): 2 s, the shortest the test needs.
+  await p.getByTestId("view-settings").click();
+  await p.locator("#settings-view").getByRole("tab", { name: "Media and playback" }).click();
+  await p.locator("#settings-view").getByLabel("Slideshow", { exact: true }).fill("2");
+  await toAssets(p);
   // From the library bar: the viewer opens on the first asset and the show starts.
   const viewer = p.getByTestId("slide-view");
   await p.getByTestId("assets-slideshow").click();
@@ -990,7 +1012,6 @@ test("slideshow: plays through the library on a timer, wraps, stops on Space or 
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3");
   await expect(viewer.locator(".viewer-progress")).toBeVisible();
   // After the time it moves on by itself (2 s is the shortest), and keeps going round.
-  await viewer.getByLabel("Seconds per slide").selectOption("2");
   await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 3", { timeout: 6_000 });
   await expect(viewer.locator(".viewer-pos")).toHaveText("3 of 3", { timeout: 6_000 });
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3", { timeout: 6_000 });
@@ -1012,5 +1033,58 @@ test("slideshow: plays through the library on a timer, wraps, stops on Space or 
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 2");
   await expect(viewer.locator(".film-item")).toHaveCount(2);
   await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("sorting: each order can be reversed, and the choice and the button say which order it is (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  for (const [i, name] of ["b-ref", "a-ref", "c-ref"].entries()) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `${name}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [40 * i, 90, 200, 255]) });
+  }
+  const names = () => p.getByTestId("asset-card").evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") ?? "").split(",")[0]));
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  const sort = p.getByTestId("assets-sort");
+  const dir = p.getByTestId("assets-sort-dir");
+  await expect(sort.locator("option:checked")).toHaveText("Newest first");
+  await sort.selectOption("name");
+  await expect(sort.locator("option:checked")).toHaveText("Name A–Z");
+  expect(await names()).toEqual(["a-ref.png", "b-ref.png", "c-ref.png"]);
+  await dir.click();
+  await expect(sort.locator("option:checked")).toHaveText("Name Z–A");
+  await expect(dir).toHaveAttribute("title", /Sorted: Name Z–A\. Click for Name A–Z\./);
+  expect(await names()).toEqual(["c-ref.png", "b-ref.png", "a-ref.png"]);
+  // Another order starts from its usual direction, in words again.
+  await sort.selectOption("newest");
+  await expect(sort.locator("option:checked")).toHaveText("Newest first");
+  await dir.click();
+  await expect(sort.locator("option:checked")).toHaveText("Oldest first");
+  expect((await names())[0]).toBe("b-ref.png");
+  await sort.selectOption("size");
+  await dir.click();
+  await expect(sort.locator("option:checked")).toHaveText("Smallest first");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a drag that starts inside the app is never imported as a file; a file dropped from outside still is (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const b64 = makePng(8, 6, () => [200, 80, 40, 255]).toString("base64");
+  const drop = () =>
+    p.evaluate((data) => {
+      const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File([bytes], "dropped.png", { type: "image/png" }));
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }, b64);
+  // A picture dragged out of the library and let go in the window arrives as a file (its thumbnail): it must not become an asset.
+  await p.evaluate(() => window.dispatchEvent(new DragEvent("dragstart", { bubbles: true })));
+  await drop();
+  await p.waitForTimeout(600);
+  await expect(p.getByTestId("asset-card")).toHaveCount(0);
+  await p.evaluate(() => window.dispatchEvent(new DragEvent("dragend", { bubbles: true })));
+  // From outside (no dragstart in the page) the same drop imports.
+  await drop();
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });

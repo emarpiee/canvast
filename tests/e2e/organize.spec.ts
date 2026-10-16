@@ -31,7 +31,12 @@ async function libraryWithTwo(p: Page): Promise<void> {
 
 /** Select an asset and wait until the inspector shows it. */
 async function pick(p: Page, hash: string): Promise<void> {
+  // A click opens the viewer (with the details beside it); Esc closes it and the asset stays selected in the library.
   await card(p, hash).click();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   await expect(card(p, hash)).toHaveAttribute("aria-pressed", "true");
 }
 
@@ -110,7 +115,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
-  await card(p, HASH).click();
+  await pick(p, HASH);
   await expect(p.getByTestId("asset-tags")).toHaveText(/#Hands/);
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");

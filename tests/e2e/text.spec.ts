@@ -193,7 +193,7 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([stroke!.id]);
   // A second canvas: mention the first canvas's text from there.
   await nav.click();
-  await p.getByRole("button", { name: "+ Canvas" }).last().click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).last().click();
   await expect(nav).toHaveText("Board 1 › Canvas 2");
   await newText(p, 500, 300);
   await p.keyboard.type("see @");

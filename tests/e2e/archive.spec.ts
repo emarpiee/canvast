@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, test } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readZip, writeZip } from "../../src/storage/zip";
 
@@ -126,12 +126,12 @@ async function buildWorkspace(p: Page): Promise<void> {
   await expect(p.getByTestId("bookmarks-panel").locator("li.bookmark")).toHaveCount(1);
   await p.getByRole("button", { name: "Hide the Bookmarks panel" }).click();
   await openMenu(p);
-  await p.getByRole("button", { name: "+ Canvas" }).click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
   await importImage(p); // same original again
   await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "5p0", cy: "-3p0", zi: 5, zf: 0.5, pz: 5 }));
   await openMenu(p);
-  await p.getByRole("button", { name: "+ Board" }).click();
+  await p.getByRole("button", { name: /^\+ New board/ }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 2 › Canvas 1");
   await stroke(p, 500, 500);
   // An unused library asset.
@@ -215,13 +215,13 @@ test("canvas, board and asset exports contain only what their scope needs", asyn
 
   // Canvas scope (Board 1 › Canvas 2): one canvas, only the original it uses.
   await openMenu(p);
-  const canvasFile = await download(p, () => p.getByRole("button", { name: "Export canvas Canvas 2" }).click());
+  const canvasFile = await download(p, () => rowAction(p, "canvas", "Canvas 2", "Export"));
   expect(canvasFile.name).toMatch(/^Board-1-Canvas-2-.*\.canvast$/);
   let m = await manifestOf(canvasFile.bytes);
   expect([m["scope"], m.boards.length, m.boards[0]!.canvases.length, m.assets.map((a) => a.hash)]).toEqual(["canvas", 1, 1, [HASH]]);
   // Board scope (Board 2): its canvas, which uses no images, so no originals.
   await openMenu(p);
-  const boardFile = await download(p, () => p.getByRole("button", { name: "Export board Board 2" }).click());
+  const boardFile = await download(p, () => rowAction(p, "board", "Board 2", "Export"));
   m = await manifestOf(boardFile.bytes);
   expect([m["scope"], m.boards.map((b) => b.name), m.assets.length]).toEqual(["board", ["Board 2"], 0]);
   // Asset scope, from the Assets view inspector: the original and no canvases.

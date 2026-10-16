@@ -1341,6 +1341,57 @@ test("information readout: one button cycles Simple, More, Technical and Hidden,
   await expect(button()).toHaveAttribute("title", /Information shown: Hidden\. Click for Simple\./);
 });
 
+test("canvas pattern: one button cycles Grid, Dots, Multi-scale grid and None, and the choice is remembered (ADR 0056)", async ({ app }) => {
+  const p = app.page;
+  const button = () => p.getByRole("button", { name: /^Canvas pattern/ });
+  /** Marked pixels in a patch of empty canvas (nothing but the pattern is there): a measure of how much pattern is drawn. */
+  const marked = () =>
+    p.evaluate(() => {
+      // One read of the patch (a pixel at a time is far too slow in Firefox).
+      const c = document.getElementById("canvas") as HTMLCanvasElement;
+      const r = c.width / c.getBoundingClientRect().width;
+      const d = c.getContext("2d")!.getImageData(Math.round(90 * r), Math.round(70 * r), Math.round(390 * r), Math.round(180 * r)).data;
+      const bg = `${d[0]},${d[1]},${d[2]}`;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (`${d[i]},${d[i + 1]},${d[i + 2]}` !== bg) n++;
+      return Math.round(n / (r * r));
+    });
+  // The default is the regular grid; dots are fewer marks than lines; the multi-scale grid is what the app always had; None is blank.
+  await expect(button()).toHaveAttribute("data-pattern", "grid");
+  await app.frame();
+  const grid = await marked();
+  expect(grid, "a grid of lines is drawn").toBeGreaterThan(300);
+  await button().click();
+  await expect(button()).toHaveAttribute("data-pattern", "dots");
+  await app.frame();
+  const dots = await marked();
+  expect(dots, "dots are drawn").toBeGreaterThan(20);
+  expect(dots, "far fewer marks than lines").toBeLessThan(grid / 3);
+  await button().click();
+  await expect(button()).toHaveAttribute("data-pattern", "scale");
+  await app.frame();
+  expect(await marked(), "the multi-scale grid is drawn").toBeGreaterThan(300);
+  await button().click();
+  await expect(button()).toHaveAttribute("data-pattern", "none");
+  await app.frame();
+  expect(await marked(), "None leaves the canvas blank").toBe(0);
+  // Kept over a reload; the tooltip names this one and the next.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(button()).toHaveAttribute("data-pattern", "none");
+  await expect(button()).toHaveAttribute("title", /Canvas pattern: None\. Click for Grid\./);
+  // The grid keeps its squares a regular size as you zoom: its spacing is never more than twice another zoom's.
+  await button().click();
+  await app.frame();
+  const at = async (z: number) => {
+    await p.evaluate((zf) => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: Math.floor(zf), zf: zf - Math.floor(zf), pz: Math.floor(zf) }), z);
+    await app.frame();
+    return marked();
+  };
+  const counts = [await at(0), await at(0.5), await at(1), await at(1.5), await at(2.25)];
+  for (const c of counts) expect(c, "a grid at every zoom").toBeGreaterThan(300);
+});
+
 test("selection boxes follow the rotation, rotation works from outside a corner, and a marquee takes what it touches (ADR 0031)", async ({ app }) => {
   const p = app.page;
   const frame = () => p.evaluate(() => window.__canvastDebug.selectionFrame());

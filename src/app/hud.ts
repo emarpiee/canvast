@@ -44,6 +44,11 @@ function plainSave(state: string): string {
   }
 }
 
+export type CanvasPattern = "grid" | "dots" | "scale" | "none";
+const PATTERNS: readonly CanvasPattern[] = ["grid", "dots", "scale", "none"];
+const PATTERN_LABEL: Record<CanvasPattern, string> = { grid: "Grid", dots: "Dots", scale: "Multi-scale grid", none: "None" };
+const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots: ICONS.gripIcon, scale: ICONS.layoutGrid, none: ICONS.squareIcon };
+
 export interface HudStatus {
   /** Show a short message to the user. */
   notify(message: string): void;
@@ -51,6 +56,10 @@ export interface HudStatus {
   saveText(): string;
   saveState(): string;
   subscribe(fn: () => void): void;
+  /** The pattern behind the canvas (Settings > Appearance > Canvas pattern), and a way to change it. */
+  pattern(): CanvasPattern;
+  setPattern(pattern: CanvasPattern): void;
+  subscribePattern(fn: () => void): void;
   /** What the readout shows (Settings > Appearance > Information shown), and a way to change it. */
   infoMode(): InfoMode;
   setInfoMode(mode: InfoMode): void;
@@ -79,6 +88,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" class="hud-save" data-testid="save-status" aria-haspopup="dialog" aria-expanded="false" title="Storage status"></button>
     </div>
     <div class="hud-controls" role="toolbar" aria-label="Navigation">
+      <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
@@ -109,6 +119,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     if (action === "zoom-in") zoomByStep(view, 1);
     else if (action === "zoom-out") zoomByStep(view, -1);
     else if (action === "home") goHome(view);
+    else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
     else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);
   });
 
@@ -181,6 +192,18 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     update();
   };
   status.subscribeInfo(applyMode);
+  // The pattern button: its icon, name and the next one.
+  const patternButton = root.querySelector<HTMLElement>('[data-action="pattern"]')!;
+  const applyPattern = (): void => {
+    const p = status.pattern();
+    const next = PATTERNS[(PATTERNS.indexOf(p) + 1) % PATTERNS.length]!;
+    patternButton.innerHTML = PATTERN_ICON[p];
+    patternButton.dataset["pattern"] = p;
+    patternButton.setAttribute("aria-label", `Canvas pattern: ${PATTERN_LABEL[p]}`);
+    patternButton.title = `Canvas pattern: ${PATTERN_LABEL[p]}. Click for ${PATTERN_LABEL[next]}.`;
+  };
+  status.subscribePattern(applyPattern);
+  applyPattern();
 
   // Click the read-out to type an absolute zoom level (anchored at the centre).
   const closeInput = (): void => {

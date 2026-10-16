@@ -2,6 +2,7 @@ import type { Session } from "../app/session";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
 import { runExport } from "./archive-ui";
+import { ICONS } from "./icons";
 
 /**
  * Workspace › Board › Canvas navigator (top-left) and the read-only banner.
@@ -23,6 +24,8 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
   const menu = root.querySelector<HTMLElement>(".nav-menu")!;
   const banner = root.querySelector<HTMLElement>(".readonly-banner")!;
   let renaming: { kind: "board" | "canvas"; id: string } | null = null;
+  /** The board or canvas whose actions are open (the "More" button of its row). */
+  let actionsOf: { kind: "board" | "canvas"; id: string } | null = null;
 
   const renderMenu = (): void => {
     const tree = session.tree;
@@ -35,6 +38,21 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
       renaming && renaming.kind === kind && renaming.id === id
         ? `<input class="nav-rename" data-rename="${kind}" data-id="${id}" value="${esc(name)}" aria-label="New ${kind} name">`
         : extra;
+    /** The labelled actions of a board or canvas, opened by its More button: plain words, not icons to guess at. */
+    const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string): string => {
+      const open = actionsOf?.kind === kind && actionsOf.id === id;
+      return `<button type="button" class="nav-more" data-action="more" data-kind="${kind}" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}"
+          aria-label="More actions for ${kind} ${esc(name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>
+        ${
+          open
+            ? `<div class="nav-actions" role="menu" aria-label="Actions for ${kind} ${esc(name)}">
+                 <button type="button" role="menuitem" data-action="rename-${kind}" data-id="${id}" aria-label="Rename ${kind} ${esc(name)}">${ICONS.pencil}<span>Rename</span></button>
+                 <button type="button" role="menuitem" data-action="export-${kind}" data-id="${id}" aria-label="Export ${kind} ${esc(name)}">${ICONS.download}<span>Export to a file</span></button>
+                 <button type="button" role="menuitem" class="is-danger" data-action="delete-${kind}" data-id="${id}" aria-label="Delete ${kind} ${esc(name)}"${canDelete ? "" : ` disabled title="${why}"`}>${ICONS.trash2}<span>Delete</span></button>
+               </div>`
+            : ""
+        }`;
+    };
     menu.innerHTML =
       tree.boards
         .map(({ board, canvases }) => {
@@ -42,11 +60,8 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
             "board",
             board.id,
             board.name,
-            `<span class="nav-board-name">${esc(board.name)}</span>
-             <button type="button" class="nav-mini" data-action="rename-board" data-id="${board.id}" aria-label="Rename board ${esc(board.name)}" title="Rename board">Rename</button>
-             <button type="button" class="nav-mini" data-action="export-board" data-id="${board.id}" aria-label="Export board ${esc(board.name)}" title="Export board">Export</button>
-             <button type="button" class="nav-mini" data-action="delete-board" data-id="${board.id}" aria-label="Delete board ${esc(board.name)}"
-               ${tree.boards.length <= 1 ? 'disabled title="A workspace needs at least one board"' : 'title="Delete board"'}>Delete</button>`,
+            `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.layers}</span><span class="nav-board-name">${esc(board.name)}</span>
+             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board")}`,
           );
           const items = canvases
             .map((c) => {
@@ -55,21 +70,18 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
                 "canvas",
                 c.id,
                 c.name,
-                `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}">${esc(c.name)}<span class="nav-count">${c.objectCount}</span></button>
-                 <button type="button" class="nav-mini" data-action="rename-canvas" data-id="${c.id}" aria-label="Rename canvas ${esc(c.name)}" title="Rename canvas">Rename</button>
-                 <button type="button" class="nav-mini" data-action="export-canvas" data-id="${c.id}" aria-label="Export canvas ${esc(c.name)}" title="Export canvas">Export</button>
-                 <button type="button" class="nav-mini" data-action="delete-canvas" data-id="${c.id}" aria-label="Delete canvas ${esc(c.name)}"
-                   ${canvases.length <= 1 ? 'disabled title="A board needs at least one canvas; delete the board instead"' : 'title="Delete canvas"'}>Delete</button>`,
+                `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-mark">${active ? ICONS.check : ""}</span><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
+                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board needs at least one canvas; delete the board instead")}`,
               )}</li>`;
             })
             .join("");
           return `<section class="nav-board" aria-label="Board ${esc(board.name)}">
             <div class="nav-board-head">${head}</div>
             <ul class="nav-canvases">${items}</ul>
-            <button type="button" class="nav-add" data-action="new-canvas" data-id="${board.id}">+ Canvas</button>
+            <button type="button" class="nav-add" data-action="new-canvas" data-id="${board.id}">+ New canvas</button>
           </section>`;
         })
-        .join("") + `<button type="button" class="nav-add nav-add-board" data-action="new-board">+ Board</button>`;
+        .join("") + `<button type="button" class="nav-add nav-add-board" data-action="new-board">+ New board</button>`;
     const input = menu.querySelector<HTMLInputElement>(".nav-rename");
     if (input) {
       input.focus();
@@ -92,12 +104,21 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
     menu.hidden = !open;
     crumb.setAttribute("aria-expanded", String(open));
     if (open) renderMenu();
-    else renaming = null;
+    else {
+      renaming = null;
+      actionsOf = null;
+    }
   };
 
   crumb.addEventListener("click", () => setOpen(menu.hidden === true));
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !menu.hidden && !renaming) {
+    if (e.key === "Escape" && !menu.hidden && !renaming && actionsOf) {
+      const was = actionsOf;
+      actionsOf = null;
+      renderMenu();
+      menu.querySelector<HTMLElement>(`.nav-more[data-kind="${was.kind}"][data-id="${was.id}"]`)?.focus();
+      e.stopPropagation();
+    } else if (e.key === "Escape" && !menu.hidden && !renaming) {
       setOpen(false);
       crumb.focus();
       e.stopPropagation();
@@ -111,6 +132,14 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const id = b.dataset["id"] ?? "";
+    if (b.dataset["action"] === "more") {
+      const kind = b.dataset["kind"] as "board" | "canvas";
+      actionsOf = actionsOf?.kind === kind && actionsOf.id === id ? null : { kind, id };
+      renderMenu();
+      menu.querySelector<HTMLElement>(".nav-actions button:not(:disabled)")?.focus();
+      return;
+    }
+    actionsOf = null; // any other press closes an open list of actions
     switch (b.dataset["action"]) {
       case "open":
         void session.openCanvas(id).then(() => setOpen(false));

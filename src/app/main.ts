@@ -182,8 +182,8 @@ async function start(): Promise<void> {
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
     root.style.setProperty("--hue", String(settings.get("ui.hue")));
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
-    if (settings.get("ui.density") === "compact") root.dataset["density"] = "compact";
-    else delete root.dataset["density"];
+    if (settings.get("ui.density") === "comfortable") root.dataset["density"] = "comfortable";
+    else delete root.dataset["density"]; // compact is the default
     if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
     else delete root.dataset["contrast"];
     const m = settings.get("ui.motion");
@@ -251,7 +251,7 @@ async function start(): Promise<void> {
     const vp = view.viewport;
     // Axes and landmarks are world-frame content, re-expressed in the camera frame (once per frame change).
     if (backdrop?.f !== fc.f) backdrop = { f: fc.f, ...worldBackdrop(fc.f, LANDMARKS) };
-    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin);
+    renderFrame(ctx, cam, vp, dpr, theme, backdrop.landmarks, backdrop.origin, settings.get("ui.pattern"));
     density.draw(ctx, index.views(fc), index.dots(fc), vp, doc.revision);
     const t1 = performance.now();
     // Previews (move/resize in progress) change committed objects' appearance: draw directly.
@@ -455,6 +455,9 @@ async function start(): Promise<void> {
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),
+    pattern: () => settings.get("ui.pattern"),
+    setPattern: (p) => void settings.set("ui.pattern", p),
+    subscribePattern: (fn) => void settings.subscribe((key) => key === "ui.pattern" && fn()),
     infoMode: () => settings.get("ui.info"),
     setInfoMode: (m) => void settings.set("ui.info", m),
     subscribeInfo: (fn) => void settings.subscribe((key) => key === "ui.info" && fn()),
@@ -535,7 +538,7 @@ async function start(): Promise<void> {
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
-  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices);
+  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
     const keys = toolKeys(settings);
@@ -564,6 +567,9 @@ async function start(): Promise<void> {
       case "ui.contrast":
       case "ui.motion":
         applyAppearance();
+        return;
+      case "ui.pattern":
+        invalidate();
         return;
       case "ui.hue":
       case "ui.vivid":
@@ -615,8 +621,18 @@ async function start(): Promise<void> {
     if (appView === "assets") void assetsView.importFiles(files);
     else importFiles(files);
   };
+  // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
+  // the dragged thumbnail over as a new file and store it as an asset of its own.
+  let internalDrag = false;
+  window.addEventListener("dragstart", () => (internalDrag = true));
+  window.addEventListener("dragend", () => (internalDrag = false));
   window.addEventListener("drop", (e) => {
     const files = [...(e.dataTransfer?.files ?? [])];
+    if (internalDrag) {
+      if (files.length) e.preventDefault();
+      internalDrag = false;
+      return;
+    }
     if (!files.length) return;
     e.preventDefault();
     receive(files);

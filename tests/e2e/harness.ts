@@ -150,3 +150,16 @@ export async function showTechnicalReadout(page: Page): Promise<void> {
   const button = page.getByRole("button", { name: /^Information shown/ });
   for (let i = 0; i < 3 && (await button.getAttribute("data-mode")) !== "technical"; i++) await button.click();
 }
+
+/** Open the actions (the "More" button) of a board or canvas in the workspace menu, opening the menu first if it is closed. */
+export async function openActions(page: Page, kind: "board" | "canvas", name: string): Promise<void> {
+  if (await page.getByTestId("workspace-menu").isHidden()) await page.getByTestId("workspace-nav").click();
+  const more = page.getByRole("button", { name: `More actions for ${kind} ${name}` }).last(); // the newest board when names repeat, as the plain buttons were
+  if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
+}
+
+/** Rename, Export or Delete a board or canvas from its actions. */
+export async function rowAction(page: Page, kind: "board" | "canvas", name: string, action: "Rename" | "Export" | "Delete"): Promise<void> {
+  await openActions(page, kind, name);
+  await page.getByRole("menuitem", { name: `${action} ${kind} ${name}` }).click();
+}

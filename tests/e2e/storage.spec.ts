@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, test } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test } from "./harness";
 
 /**
  * Phase 1 storage foundation: Workspace → Boards → Canvas, per-object
@@ -80,7 +80,7 @@ test("boards and canvases: create, rename, switch; each canvas keeps its own obj
 
   // New canvas in Board 1.
   await openMenu(p);
-  await p.getByRole("button", { name: "+ Canvas" }).click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
   expect(await objectIds(p)).toEqual([]);
   await draw(p, [[600, 400], [700, 450]]);
@@ -106,11 +106,11 @@ test("boards and canvases: create, rename, switch; each canvas keeps its own obj
 
   // Rename the canvas, then add Board 2.
   await openMenu(p);
-  await p.getByRole("button", { name: "Rename canvas Canvas 2" }).click();
+  await rowAction(p, "canvas", "Canvas 2", "Rename");
   await p.getByLabel("New canvas name").fill("Sketches");
   await p.getByLabel("New canvas name").press("Enter");
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Sketches");
-  await p.getByRole("button", { name: "+ Board" }).click();
+  await p.getByRole("button", { name: /^\+ New board/ }).click();
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 2 › Canvas 1");
   await draw(p, [[500, 500], [520, 560]]);
   const board2Objects = await objectIds(p);

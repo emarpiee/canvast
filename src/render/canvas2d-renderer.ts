@@ -17,6 +17,12 @@ export interface Theme {
   landmarkLabel: string;
 }
 
+/**
+ * The pattern behind the content (Settings > Appearance > Canvas pattern): a regular grid of lines, a grid of dots, the multi-scale
+ * grid (nested tiers of powers of four, with the origin axes), or none. Landmarks (the orientation squares) are drawn in every one.
+ */
+export type Pattern = "grid" | "dots" | "scale" | "none";
+
 export interface RenderStats {
   gridLines: number;
   landmarksDrawn: number;
@@ -41,14 +47,21 @@ export function renderFrame(
   landmarks: readonly Landmark[],
   /** The world origin in the camera's coordinates (ADR 0014: the camera may be in another frame). */
   worldOrigin: WorldPoint = { x: D.ZERO, y: D.ZERO },
+  pattern: Pattern = "scale",
 ): RenderStats {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;
   ctx.fillStyle = theme.background;
   ctx.fillRect(0, 0, vp.width, vp.height);
 
-  const gridLines = drawGrid(ctx, cam, vp, theme);
-  drawAxes(ctx, cam, vp, theme, worldOrigin);
+  let gridLines = 0;
+  if (pattern === "scale") {
+    gridLines = drawGrid(ctx, cam, vp, theme);
+    drawAxes(ctx, cam, vp, theme, worldOrigin);
+  } else if (pattern !== "none") {
+    gridLines = drawRegularGrid(ctx, cam, vp, theme, pattern === "dots");
+    drawAxes(ctx, cam, vp, theme, worldOrigin);
+  }
   const landmarksDrawn = drawLandmarks(ctx, cam, vp, theme, landmarks);
   return { gridLines, landmarksDrawn };
 }
@@ -99,6 +112,52 @@ function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, them
   }
   ctx.globalAlpha = 1;
   return lines;
+}
+
+/** The regular grid keeps its squares between this many and twice this many CSS px as the zoom changes. */
+const REGULAR_MIN_PX = 32;
+
+/**
+ * One spacing at a time: a power of two chosen so squares stay between 32 and 64 px, with the next finer spacing fading in and the
+ * coarser one fading out across each doubling, so the grid never jumps. Lines (or dots at the crossings) are placed from the exact
+ * remainder of the camera centre, like every other mark, so they are right at any depth.
+ */
+function drawRegularGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme, dots: boolean): number {
+  const z = cam.zi + cam.zf;
+  const g = Math.ceil(Math.log2(REGULAR_MIN_PX) - z);
+  const s = 2 ** (g + z);
+  const base = dots ? 0.55 : 0.15;
+  const tiers = [
+    { g: g + 1, a: base * (1 - smoothstep(REGULAR_MIN_PX, 2 * REGULAR_MIN_PX, s)) },
+    { g, a: base },
+    { g: g - 1, a: base * smoothstep(REGULAR_MIN_PX / 2, REGULAR_MIN_PX, s / 2) },
+  ];
+  let marks = 0;
+  ctx.fillStyle = theme.grid;
+  for (const t of tiers) {
+    if (t.a <= 0.004) continue;
+    const spacing = 2 ** (t.g + z);
+    ctx.globalAlpha = t.a;
+    const xs: number[] = [];
+    for (let x = firstLineOffset(cam.center.x, t.g, vp.width / 2, cam); x <= vp.width; x += spacing) xs.push(x);
+    const ys: number[] = [];
+    for (let y = firstLineOffset(cam.center.y, t.g, vp.height / 2, cam); y <= vp.height; y += spacing) ys.push(y);
+    if (dots) {
+      ctx.beginPath();
+      for (const x of xs) for (const y of ys) {
+        ctx.moveTo(Math.round(x) + 1.3, Math.round(y));
+        ctx.arc(Math.round(x), Math.round(y), 1.3, 0, Math.PI * 2);
+        marks++;
+      }
+      ctx.fill();
+    } else {
+      for (const x of xs) ctx.fillRect(Math.round(x), 0, 1, vp.height);
+      for (const y of ys) ctx.fillRect(0, Math.round(y), vp.width, 1);
+      marks += xs.length + ys.length;
+    }
+  }
+  ctx.globalAlpha = 1;
+  return marks;
 }
 
 function drawAxes(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme, origin: WorldPoint): void {

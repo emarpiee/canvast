@@ -9,6 +9,7 @@ import { ICONS } from "./icons";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport } from "./archive-ui";
+import type { SettingsStore } from "../settings/settings";
 
 /**
  * Assets view: the full-window library of the workspace's shared originals
@@ -42,7 +43,7 @@ type SortKey = "newest" | "name" | "size" | "uses";
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
 const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select';
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
       <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
@@ -51,8 +52,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
       </select>
       <select data-testid="assets-sort" aria-label="Sort by">
-        <option value="newest">Newest first</option><option value="name">Name</option><option value="size">Largest first</option><option value="uses">Most used</option>
+        <option value="newest">Newest first</option><option value="name">Name A–Z</option><option value="size">Largest first</option><option value="uses">Most used</option>
       </select>
+      <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
+      <div class="assets-layout" role="group" aria-label="Layout">
+        <button type="button" class="assets-btn is-icon" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
+        <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.list}</button>
+      </div>
       <label class="assets-size" title="Thumbnail size">${ICONS.images}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.upload}<span>Import</span></button>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the assets you picked, as a slideshow">${ICONS.play}</button>
@@ -63,9 +69,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     <div class="assets-body">
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span><span>Name</span><span>Pixels</span><span>Type and size</span><span>Used</span><span>Tags</span></div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
-          <div class="viewer-stage"><span class="viewer-progress" hidden></span><figure><img alt=""><video controls hidden></video><figcaption></figcaption></figure></div>
+          <div class="viewer-stage"><span class="viewer-progress" hidden></span><figure><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -75,17 +81,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             <div class="viewer-film" role="listbox" aria-label="Library, in this order"></div>
             <div class="viewer-tools">
               <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.play}<span>Slideshow</span></button>
-              <select class="viewer-interval" aria-label="Seconds per slide" title="Seconds per slide"><option value="2">2 s</option><option value="3">3 s</option><option value="5" selected>5 s</option><option value="10">10 s</option><option value="20">20 s</option></select>
-              <button type="button" class="vbtn" data-act="fit" aria-pressed="false" title="Show at its own size (F)">100%</button>
               <button type="button" class="vbtn" data-act="fullscreen" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
-              <button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
-              <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button>
+              <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
+              <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
               <button type="button" class="vbtn" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
               <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (B)">${ICONS.chevronDown}</button>
               <button type="button" class="vbtn" data-act="close" aria-label="Close slide view" title="Back to the library (Esc)">${ICONS.x}</button>
             </div>
           </div>
-          <button type="button" class="viewer-handle" data-act="bar" aria-label="Show the controls" title="Show the controls (B)" hidden>${ICONS.chevronUp}</button>
+          <div class="viewer-handle" hidden>
+            <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
+            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (B)">${ICONS.chevronUp}</button>
+          </div>
         </div>
       </div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
@@ -100,6 +107,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
   const usageSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-usage"]')!;
   const sortSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-sort"]')!;
+  const sortDirBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-sort-dir"]')!;
+  /** Sort order reversed from its usual one (newest, A to Z, largest and most used first). */
+  let reversed = false;
+  const SORT_LABEL: Record<SortKey, [usual: string, reversed: string]> = {
+    newest: ["Newest first", "Oldest first"],
+    name: ["Name A–Z", "Name Z–A"],
+    size: ["Largest first", "Smallest first"],
+    uses: ["Most used", "Least used"],
+  };
+  /** The order named in words, on the choice and on the button, so the direction is never a guess. */
+  const showSort = (): void => {
+    for (const o of sortSel.options) o.textContent = SORT_LABEL[o.value as SortKey][reversed ? 1 : 0];
+    const now = SORT_LABEL[sortSel.value as SortKey][reversed ? 1 : 0];
+    const other = SORT_LABEL[sortSel.value as SortKey][reversed ? 0 : 1];
+    sortDirBtn.setAttribute("aria-pressed", String(reversed));
+    sortDirBtn.setAttribute("aria-label", `Sorted: ${now}. Reverse the order`);
+    sortDirBtn.title = `Sorted: ${now}. Click for ${other}.`;
+  };
+  showSort();
   const sizeInput = root.querySelector<HTMLInputElement>(".assets-size input")!;
   const fileInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-input"]')!;
   const importBtn = root.querySelector<HTMLButtonElement>('[data-action="import"]')!;
@@ -107,11 +133,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean } = { details: true, bar: true };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list" } = { details: true, bar: true, layout: "grid" };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
     if (typeof saved.bar === "boolean") ui.bar = saved.bar;
+    if (saved.layout === "grid" || saved.layout === "list") ui.layout = saved.layout;
   } catch {
     // unreadable: shown
   }
@@ -125,6 +152,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const applyUi = (): void => {
     body.classList.toggle("no-details", !ui.details);
     viewer.classList.toggle("no-bar", !ui.bar);
+    root.classList.toggle("no-controls", !ui.bar);
+    body.classList.toggle("is-list", ui.layout === "list");
+    root.classList.toggle("is-list", ui.layout === "list");
+    for (const b of root.querySelectorAll<HTMLElement>("[data-layout]")) b.setAttribute("aria-pressed", String(b.dataset["layout"] === ui.layout));
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
   };
@@ -136,6 +167,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let selected: string | null = null;
   const picked = new Set<string>();
   let anchor: string | null = null;
+  /** Picking several: once a checkbox, Ctrl or Shift started it, a plain click adds or removes; until then a click opens the viewer. */
+  let selecting = false;
   let places: AssetPlace[] = [];
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
@@ -223,7 +256,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     film.innerHTML = list
       .map(
         (e) =>
-          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}"><img alt="" data-hash="${e.hash}"></button>`,
+          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}"><img alt="" draggable="false" data-hash="${e.hash}"></button>`,
       )
       .join("");
     for (const img of film.querySelectorAll<HTMLImageElement>("img[data-hash]")) ioFilm.observe(img);
@@ -248,6 +281,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const opening = viewer.hidden;
     slideHash = hash;
     body.classList.add("is-viewing");
+    root.classList.add("is-viewing");
     viewer.hidden = false;
     viewer.focus();
     // The details beside the viewer describe the open asset (a picked set stays picked while a slideshow plays through it).
@@ -257,10 +291,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       picked.add(hash);
     } else picked.add(hash);
     anchor = hash;
-    places = await session.assetPlaces(hash);
-    if (token !== slideToken) return;
-    renderInspector();
+    const found = await session.assetPlaces(hash);
+    // The library and the details follow the selection even if the viewer has been closed or moved on while the places were read.
+    if (selected === hash) places = found;
     markPicked();
+    renderInspector();
+    if (token !== slideToken) return;
     const fav = viewer.querySelector<HTMLElement>('[data-act="favorite"]')!;
     fav.setAttribute("aria-pressed", String(meta(e).favorite));
     viewer.querySelector<HTMLButtonElement>('[data-act="place"]')!.disabled = !e.present || session.readOnly;
@@ -310,6 +346,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideHash = null;
     viewer.hidden = true;
     body.classList.remove("is-viewing");
+    root.classList.remove("is-viewing");
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
     slideMedia.pause();
@@ -325,7 +362,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!);
   };
   // ---- slideshow: moves to the next asset after the chosen time (a video or audio file plays to its end first) and wraps round
-  const intervalSel = viewer.querySelector<HTMLSelectElement>(".viewer-interval")!;
   const progress = viewer.querySelector<HTMLElement>(".viewer-progress")!;
   const playBtn = viewer.querySelector<HTMLElement>('[data-act="play"]')!;
   const clearShowTimer = (): void => {
@@ -338,7 +374,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     clearShowTimer();
     if (!showing || viewer.hidden) return;
     if (!slideMedia.hidden) return; // a video or audio file: `ended` steps
-    const ms = Number(intervalSel.value) * 1000;
+    const ms = settings.get("assets.slideSeconds") * 1000;
     progress.style.setProperty("--ms", `${ms}ms`);
     progress.hidden = false;
     progress.classList.remove("is-running");
@@ -348,6 +384,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const setShowing = (on: boolean): void => {
     showing = on;
+    viewer.classList.toggle("is-showing", on);
     playBtn.setAttribute("aria-pressed", String(on));
     playBtn.setAttribute("aria-label", on ? "Pause the slideshow" : "Start the slideshow");
     playBtn.title = on ? "Pause the slideshow (Space)" : "Start the slideshow (Space)";
@@ -361,7 +398,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   slideMedia.addEventListener("ended", () => {
     if (showing) stepSlide(1);
   });
-  intervalSel.addEventListener("change", () => armShow());
+  // The time per slide is a setting (Settings > Media and playback); a change applies to the slide on screen.
+  settings.subscribe((key) => {
+    if (key === "assets.slideSeconds") armShow();
+  });
   /** Open the viewer on one asset and start the slideshow; `only` limits it to a picked set. */
   const startShow = (hash: string, only?: Set<string>): void => {
     slideSet = only && only.size > 1 ? new Set(only) : null;
@@ -382,13 +422,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   viewer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
+    // A click on the picture shows it at its own size and back (a small one is scaled up to fit otherwise).
+    if (t === slideImg || t === slideMedia) return void viewer.classList.toggle("is-actual");
     const film1 = t.closest<HTMLElement>(".film-item");
     if (film1) return void showSlide(film1.dataset["hash"]!);
     const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
     if (act === "prev") stepSlide(-1);
     else if (act === "next") stepSlide(1);
     else if (act === "close") closeSlide();
-    else if (act === "fit") viewer.querySelector<HTMLElement>('[data-act="fit"]')!.setAttribute("aria-pressed", String(viewer.classList.toggle("is-actual")));
     else if (act === "play") setShowing(!showing);
     else if (act === "fullscreen") void (document.fullscreenElement ? document.exitFullscreen() : viewer.requestFullscreen()).catch(() => undefined);
     else if (act === "details") toggleDetails();
@@ -406,7 +447,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === " " && !(e.target as HTMLElement).closest("button, video")) setShowing(!showing);
     else if (e.key === "i" || e.key === "I") toggleDetails();
     else if (e.key === "b" || e.key === "B") toggleBar();
-    else if (e.key === "f" || e.key === "F") viewer.querySelector<HTMLElement>('[data-act="fit"]')!.click();
+    else if (e.key === "f" || e.key === "F") viewer.classList.toggle("is-actual");
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -471,64 +512,72 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       size: (a, b) => b.size - a.size,
       uses: (a, b) => b.instances - a.instances,
     };
-    return rows.sort((a, b) => cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
+    const flip = reversed ? -1 : 1;
+    return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
   };
 
   // ---- rendering
+  let lastGridHtml = "";
   const render = (): void => {
     if (!listing) return;
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
     count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} asset${listing.entries.length === 1 ? "" : "s"}`;
-    const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}"${picked.has(hash) ? " checked" : ""}>`;
+    const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
     const cards = rows.map((e) => {
       const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
       const ar = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));
       const name = e.name || "Untitled";
       return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
-          aria-pressed="${picked.has(e.hash)}" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb"><img alt="" class="${small.trim()}" data-hash="${e.hash}"></span>
+          aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
+        <span class="asset-thumb"><img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"></span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
+          <span class="asset-kind">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
-          ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : ""}
+          ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
         </span>
       </button>
       ${check(e.hash, name)}
-      ${meta(e).favorite ? `<span class="asset-star" aria-label="Favourite">${ICONS.star}</span>` : ""}
       </div>`;
     });
     const missing = usageAll
       ? listing.missing.map(
           (m) => `<div class="asset-cell" role="listitem" style="--ar:1.4">
-            <button type="button" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" aria-pressed="${picked.has(m.hash)}" aria-label="Missing original">
+            <button type="button" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" aria-pressed="false" aria-label="Missing original">
               <span class="asset-thumb"></span>
               <span class="asset-missing-label">Original missing</span>
               <span class="asset-info">
                 <span class="asset-name">Missing original</span>
                 <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
+                <span class="asset-kind"></span>
                 <span class="asset-uses" data-testid="asset-uses">${usesText(m.instances, m.canvases)}</span>
+                <span class="asset-tags"></span>
               </span>
             </button>
             ${check(m.hash, "missing original")}
           </div>`,
         )
       : [];
-    // The cards are drawn again on every change: keep the keyboard on the card (or checkbox) it was on.
-    const ae = document.activeElement as HTMLElement | null;
-    const focused = ae && grid.contains(ae) ? { hash: ae.dataset["hash"], box: ae.classList.contains("asset-check") } : null;
-    grid.innerHTML = cards.length + missing.length
+    const html = cards.length + missing.length
       ? cards.join("") + missing.join("")
       : listing.entries.length
         ? `<p class="assets-empty">No assets match.</p>`
         : `<p class="assets-empty">No assets yet. Import images here, or drop them on a canvas.</p>`;
     grid.style.setProperty("--thumb", `${sizeInput.value}px`);
-    grid.classList.toggle("has-picks", picked.size > 0);
-    if (focused?.hash) grid.querySelector<HTMLElement>(`${focused.box ? ".asset-check" : ".asset-card"}[data-hash="${focused.hash}"]`)?.focus({ preventScroll: true });
-    for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
+    // The cards are only drawn again when something about them changed: picking, opening and typing leave them (and the pictures) alone.
+    if (html !== lastGridHtml) {
+      const ae = document.activeElement as HTMLElement | null;
+      const focused = ae && grid.contains(ae) ? { hash: ae.dataset["hash"], box: ae.classList.contains("asset-check") } : null;
+      grid.innerHTML = html;
+      lastGridHtml = html;
+      if (focused?.hash) grid.querySelector<HTMLElement>(`${focused.box ? ".asset-check" : ".asset-card"}[data-hash="${focused.hash}"]`)?.focus({ preventScroll: true });
+      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
+    }
+    markPicked();
     renderSide();
     renderInspector();
     if (slideHash && !viewer.hidden) {
@@ -580,7 +629,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     side.innerHTML = `
       <ul class="side-list">
         ${item("all", "All assets", entries.length)}
-        ${item("favorites", "★ Favourites", entries.filter((e) => meta(e).favorite).length)}
+        ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length)}
         ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length)}
       </ul>
       <div class="side-head"><h2>Folders</h2>${ro ? "" : `<button type="button" class="side-mini" data-folder-action="new" data-id="" data-testid="folder-new" aria-label="New folder">+ Folder</button>`}</div>
@@ -700,7 +749,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
         <button type="button" class="assets-btn is-icon" data-action="close" aria-label="Close details" title="Close the details">${ICONS.x}</button>
       </div>
-      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)"><img alt="Preview of ${esc(e.name)}" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
+      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)"><img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
       ${
         e
           ? `<div class="asset-quick">
@@ -808,14 +857,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       selected = hash;
       anchor = hash;
     }
+    selecting = picked.size > 0 && (how !== "one" || selecting);
+    if (how === "one" && picked.size <= 1) selecting = false;
     places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
-    render();
+    markPicked();
+    renderInspector();
   };
   const selectAll = (): void => {
     for (const e of filtered()) picked.add(e.hash);
     selected = filtered()[filtered().length - 1]?.hash ?? selected;
+    selecting = true;
     places = [];
-    render();
+    markPicked();
+    renderInspector();
   };
 
   // ---- events
@@ -828,25 +882,51 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!card) return;
     const hash = card.dataset["hash"]!;
     if (e.shiftKey) void select(hash, e.ctrlKey || e.metaKey ? "add-range" : "range");
-    else if (e.ctrlKey || e.metaKey) void select(hash, "toggle");
-    else void select(hash); // Escape or the close button clears the selection
+    else if (e.ctrlKey || e.metaKey || selecting) void select(hash, "toggle");
+    else if (listing?.entries.some((x) => x.hash === hash)) {
+      // One click opens the viewer on it (with the filmstrip to move on).
+      slideSet = null;
+      void showSlide(hash);
+    } else void select(hash); // a missing original has no picture to show: its details open instead
+  });
+  // Arrow keys move through the cards (Shift extends the pick, Ctrl moves without picking); Home and End jump; Enter or Space opens.
+  grid.addEventListener("keydown", (e) => {
+    const t = e.target as HTMLElement;
+    const cur = t.closest<HTMLElement>(".asset-cell");
+    if (!cur || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+    const cells = [...grid.querySelectorAll<HTMLElement>(".asset-cell")];
+    const i = cells.indexOf(cur);
+    const list = ui.layout === "list";
+    let next: HTMLElement | undefined;
+    if (e.key === "Home") next = cells[0];
+    else if (e.key === "End") next = cells[cells.length - 1];
+    else if (e.key === "ArrowLeft" || (list && e.key === "ArrowUp")) next = cells[Math.max(0, i - 1)];
+    else if (e.key === "ArrowRight" || (list && e.key === "ArrowDown")) next = cells[Math.min(cells.length - 1, i + 1)];
+    else {
+      // Up and down in a justified gallery: the nearest card in the row above or below, by horizontal position.
+      const r = cur.getBoundingClientRect();
+      const cx = (r.left + r.right) / 2;
+      const down = e.key === "ArrowDown";
+      let best: { cell: HTMLElement; dy: number; dx: number } | null = null;
+      for (const c of cells) {
+        const b = c.getBoundingClientRect();
+        const dy = down ? b.top - r.bottom + 1 : r.top - b.bottom + 1;
+        if (dy < 0) continue;
+        const dx = Math.abs((b.left + b.right) / 2 - cx);
+        if (!best || dy < best.dy - 4 || (Math.abs(dy - best.dy) <= 4 && dx < best.dx)) best = { cell: c, dy, dx };
+      }
+      next = best?.cell;
+    }
+    e.preventDefault();
+    if (!next) return;
+    const card = next.querySelector<HTMLElement>(".asset-card")!;
+    card.focus();
+    card.scrollIntoView({ block: "nearest" });
+    const hash = card.dataset["hash"]!;
+    if (e.shiftKey) void select(hash, "range");
+    else if (!e.ctrlKey && !e.metaKey && !selecting) void select(hash);
   });
 
-  // Open in the viewer: a double-click, or Enter on the card that is already selected.
-  grid.addEventListener("dblclick", (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
-    if (!card || e.shiftKey || e.ctrlKey || e.metaKey || !listing?.entries.some((x) => x.hash === card.dataset["hash"])) return;
-    slideSet = null;
-    void select(card.dataset["hash"]!).then(() => showSlide(card.dataset["hash"]!));
-  });
-  grid.addEventListener("keydown", (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
-    if (e.key === "Enter" && card && card.getAttribute("aria-pressed") === "true" && picked.size === 1 && listing?.entries.some((x) => x.hash === card.dataset["hash"])) {
-      e.preventDefault();
-      slideSet = null;
-      void showSlide(card.dataset["hash"]!);
-    }
-  });
   inspector.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b || b.disabled || !selected) return;
@@ -1065,6 +1145,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
   root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails());
+  // Esc clears the selection wherever the keyboard is while the library is open (a click can leave focus on the page, not in the library).
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !visible || !viewer.hidden || !(selected || picked.size)) return;
+    if ((e.target as HTMLElement | null)?.closest?.("dialog, " + TYPING)) return;
+    if (document.querySelector("dialog[open]")) return;
+    void select(null);
+    selecting = false;
+  });
+  for (const b of root.querySelectorAll<HTMLElement>(".assets-layout [data-layout]")) {
+    b.addEventListener("click", () => {
+      ui.layout = b.dataset["layout"] === "list" ? "list" : "grid";
+      saveUi();
+      applyUi();
+    });
+  }
   // Slideshow from the library: the picked assets if several are picked, else everything shown, from the selected one (or the first).
   root.querySelector<HTMLElement>('.assets-bar [data-action="slideshow"]')!.addEventListener("click", () => {
     const list = filtered();
@@ -1072,6 +1167,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = picked.size > 1 ? list.filter((e) => picked.has(e.hash)) : list;
     const first = group.find((e) => e.hash === selected) ?? group[0]!;
     startShow(first.hash, picked.size > 1 ? new Set(group.map((e) => e.hash)) : undefined);
+  });
+  sortSel.addEventListener("change", () => {
+    reversed = false; // a new order starts from its usual direction
+    showSort();
+    render();
+  });
+  sortDirBtn.addEventListener("click", () => {
+    reversed = !reversed;
+    showSort();
+    render();
   });
   for (const el of [search, usageSel, sortSel]) {
     el.addEventListener("input", () => {

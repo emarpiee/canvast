@@ -48,6 +48,25 @@ import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
 import chevronUp from "lucide-static/icons/chevron-up.svg";
+import arrowDownAZ from "lucide-static/icons/arrow-down-a-z.svg";
+import arrowDownZA from "lucide-static/icons/arrow-down-z-a.svg";
+import calendarDays from "lucide-static/icons/calendar-days.svg";
+import rulerIcon from "lucide-static/icons/ruler.svg";
+import fileType from "lucide-static/icons/file-type.svg";
+import layers2 from "lucide-static/icons/layers-2.svg";
+import alignHStart from "lucide-static/icons/align-horizontal-justify-start.svg";
+import alignHCenter from "lucide-static/icons/align-horizontal-justify-center.svg";
+import alignHEnd from "lucide-static/icons/align-horizontal-justify-end.svg";
+import alignVStart from "lucide-static/icons/align-vertical-justify-start.svg";
+import alignVCenter from "lucide-static/icons/align-vertical-justify-center.svg";
+import alignVEnd from "lucide-static/icons/align-vertical-justify-end.svg";
+import distH from "lucide-static/icons/align-horizontal-distribute-center.svg";
+import distV from "lucide-static/icons/align-vertical-distribute-center.svg";
+import grid3x3 from "lucide-static/icons/grid-3x3.svg";
+import gripIcon from "lucide-static/icons/grip.svg";
+import squareIcon from "lucide-static/icons/square.svg";
+import arrowUpDown from "lucide-static/icons/arrow-up-down.svg";
+import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
 import maximize from "lucide-static/icons/maximize.svg";
 import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
@@ -152,6 +171,25 @@ export const ICONS = {
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
   maximize: clean(maximize),
+  ellipsis: clean(ellipsisIcon),
+  arrowUpDown: clean(arrowUpDown),
+  arrowDownAZ: clean(arrowDownAZ),
+  arrowDownZA: clean(arrowDownZA),
+  calendarDays: clean(calendarDays),
+  rulerIcon: clean(rulerIcon),
+  fileType: clean(fileType),
+  layers2: clean(layers2),
+  alignHStart: clean(alignHStart),
+  alignHCenter: clean(alignHCenter),
+  alignHEnd: clean(alignHEnd),
+  alignVStart: clean(alignVStart),
+  alignVCenter: clean(alignVCenter),
+  alignVEnd: clean(alignVEnd),
+  distH: clean(distH),
+  distV: clean(distV),
+  grid3x3: clean(grid3x3),
+  gripIcon: clean(gripIcon),
+  squareIcon: clean(squareIcon),
   star: clean(starIcon),
   trash2: clean(trash2),
   info: clean(infoIcon),
