@@ -12,17 +12,12 @@ export interface ToolbarActions {
   importFiles(files: File[]): void;
   undo(): void;
   redo(): void;
-  deleteSelection(): void;
   /** Copy the Markdown of the selected text objects. */
   copyMarkdown(): void;
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
-  groupSelection(): void;
-  ungroupSelection(): void;
-  arrangeSelection(to: "front" | "back"): void;
   /** Arrange the selection in a grid, or align or distribute it (docs/plans/arrange-commands.md). */
   layoutSelection(cmd: LayoutCommand): void;
-  setFlag(flag: "hidden" | "locked"): void;
   clearFlag(flag: "hidden" | "locked"): void;
   /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
   setSelectedWidth(px: number): void;
@@ -76,16 +71,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
       ).join("")}
     </div>
-    <div class="toolbar" role="toolbar" aria-label="Actions and options">
+    <div class="dock" role="toolbar" aria-label="History and panels">
+      <div class="tb-group">
+        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
+        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
+      </div>
       <div class="tb-group">
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
-        <button type="button" data-action="import" aria-label="Import image" title="Import image">${ICONS.imagePlus}</button>
-        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
-        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
-        <button type="button" data-action="delete" aria-label="Delete selection" title="Delete selection (Del)">${ICONS.trash}</button>
-        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
+        <button type="button" data-action="import" aria-label="Import image" title="Import image, video or audio">${ICONS.imagePlus}</button>
       </div>
+      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="import-input">
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
       <div class="tb-group tb-options" data-for="pen text">
         ${PEN_COLORS.map(
@@ -113,10 +111,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
       <div class="tb-group tb-options" data-for="select">
-        <button type="button" data-action="group" aria-label="Group" title="Group the selection (Ctrl+G)">${ICONS.group}</button>
-        <button type="button" data-action="ungroup" aria-label="Ungroup" title="Ungroup (Ctrl+Shift+G)">${ICONS.ungroup}</button>
-        <button type="button" data-action="front" aria-label="Bring to front" title="Bring to front (Ctrl+])">${ICONS.bringToFront}</button>
-        <button type="button" data-action="back" aria-label="Send to back" title="Send to back (Ctrl+[)">${ICONS.sendToBack}</button>
         <span class="layout-wrap">
           <button type="button" data-action="layout-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Arrange and align" title="Arrange in a grid, align and distribute the selection">${ICONS.layoutGrid}</button>
           <div class="layout-menu" role="menu" data-testid="layout-menu" hidden>
@@ -125,13 +119,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         </span>
       </div>
       <div class="tb-group tb-options" data-for="select">
-        <button type="button" data-action="hide" aria-label="Hide" title="Hide the selection (it is not drawn or picked until Show all)">${ICONS.eyeOff}</button>
         <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
-        <button type="button" data-action="lock" aria-label="Lock" title="Lock the selection (drawn, but it cannot be picked until Unlock all)">${ICONS.lockKeyhole}</button>
         <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
         <button type="button" class="snap" data-align-box aria-pressed="false" aria-label="Axis-aligned selection box" title="Selection box: by default it turns with the selected objects when they share a rotation. On: it stays aligned to the canvas axes.">${ICONS.boxSelect}</button>
         <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
+      </div>
+      <div class="tb-group tb-options" data-for="select text">
+        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.copy}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
@@ -143,7 +138,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
       </div>
-      <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="import-input">
     </div>
     <div class="toast" role="status" aria-live="polite" data-testid="toast" hidden></div>
   `;
@@ -250,14 +244,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["action"] === "import") input.click();
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
-    else if (d["action"] === "delete") actions.deleteSelection();
-    else if (d["action"] === "hide") actions.setFlag("hidden");
-    else if (d["action"] === "lock") actions.setFlag("locked");
     else if (d["action"] === "show-all") actions.clearFlag("hidden");
     else if (d["action"] === "unlock-all") actions.clearFlag("locked");
-    else if (d["action"] === "group") actions.groupSelection();
-    else if (d["action"] === "ungroup") actions.ungroupSelection();
-    else if (d["action"] === "front" || d["action"] === "back") actions.arrangeSelection(d["action"]);
     else if (d["action"] === "copy-md") actions.copyMarkdown();
   });
 
@@ -290,14 +278,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
-    for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool);
-    // The second row holds the options of the current tool; it is gone when the tool has none.
-    const row = root.querySelector<HTMLElement>(".tb-options-row")!;
-    row.hidden = ![...row.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
-    root.querySelector<HTMLButtonElement>('[data-action="delete"]')!.disabled = editor.selection.size === 0;
     root.querySelector<HTMLButtonElement>('[data-action="copy-md"]')!.hidden = ![...editor.selection].some((id) => doc.get(id)?.kind === "text");
+    // The options bar shows what the current tool offers and is gone when there is nothing to show.
+    for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool) || ![...g.children].some((c) => !(c as HTMLElement).hidden);
+    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
     // In Assets view, that view shows (and consumes) messages instead.
     if (editor.message && document.body.dataset["view"] !== "assets") {
       toast.textContent = editor.message;

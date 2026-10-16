@@ -1,31 +1,34 @@
 :root {
   color-scheme: light dark;
-  --canvas-bg: oklch(0.955 0.006 150);
-  --canvas-grid: oklch(0.55 0.015 170);
-  --canvas-axis: oklch(0.62 0.14 45);
-  --canvas-landmark: oklch(0.52 0.1 178);
-  --canvas-landmark-label: oklch(0.38 0.07 178);
-  --canvas-selection: oklch(0.52 0.1 178);
+  /* The two dials of the colour system (Settings > Appearance): the hue every tint is built on, and how much colour it carries.
+     Lightness is fixed in each token below, so turning either dial never changes contrast (ADR 0052). */
+  --hue: 178;
+  --vivid: 1;
+  --canvas-bg: oklch(0.955 calc(0.012 * var(--vivid)) var(--hue));
+  --canvas-grid: oklch(0.55 calc(0.02 * var(--vivid)) var(--hue));
+  --canvas-axis: oklch(0.62 calc(0.14 * var(--vivid)) calc(var(--hue) - 133));
+  --canvas-landmark: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
+  --canvas-landmark-label: oklch(0.38 calc(0.07 * var(--vivid)) var(--hue));
+  --canvas-selection: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
   --canvas-handle-fill: oklch(1 0 0);
-  --canvas-lasso: oklch(0.52 0.1 178);
-  --canvas-image-placeholder: oklch(0.89 0.008 150);
-  /* The default pen colour is document data (a stored hex): in the light theme it is drawn exactly as stored. */
+  --canvas-lasso: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
+  --canvas-image-placeholder: oklch(0.89 calc(0.012 * var(--vivid)) var(--hue));
   --canvas-ink: #1f2329;
   --canvas-danger: oklch(0.55 0.19 25);
   --canvas-danger-wash: oklch(0.55 0.19 25 / 0.18);
-  --canvas-guide: oklch(0.62 0.2 335);
-  --hud-bg: oklch(0.99 0.004 150 / 0.92);
-  --hud-fg: oklch(0.25 0.015 175);
-  --hud-muted: oklch(0.5 0.015 175);
-  --hud-border: oklch(0.25 0.015 175 / 0.14);
-  --hud-hover: oklch(0.5 0.02 175 / 0.14);
-  --hud-accent: oklch(0.52 0.1 178);
+  --canvas-guide: oklch(0.62 calc(0.2 * var(--vivid)) calc(var(--hue) + 157));
+  --hud-bg: oklch(0.99 calc(0.006 * var(--vivid)) var(--hue) / 0.92);
+  --hud-fg: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue));
+  --hud-muted: oklch(0.5 calc(0.02 * var(--vivid)) var(--hue));
+  --hud-border: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.14);
+  --hud-hover: oklch(0.5 calc(0.03 * var(--vivid)) var(--hue) / 0.14);
+  --hud-accent: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
   --hud-accent-fg: oklch(1 0 0);
   --hud-danger: oklch(0.47 0.15 20);
   --hud-danger-fg: oklch(1 0 0);
   --hud-star: oklch(0.72 0.15 85);
-  --hud-scrim: oklch(0.2 0.01 190 / 0.4);
-  --hud-lift: 0 1px 2px oklch(0.25 0.02 175 / 0.08), 0 8px 22px oklch(0.25 0.02 175 / 0.1);
+  --hud-scrim: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.4);
+  --hud-lift: 0 1px 2px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.08), 0 8px 22px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.1);
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --r-sm: 6px;
@@ -33,29 +36,29 @@
   --r-lg: 12px;
 }
 
-/* Every colour of the interface is oklch (ADR 0052): lightness is perceptual, so a step in L is the same step in both themes. */
+/* Every colour of the interface is oklch: lightness is perceptual, so a step in L is the same step in both themes. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --canvas-bg: oklch(0.2 0.008 200);
-    --canvas-grid: oklch(0.72 0.02 175);
-    --canvas-axis: oklch(0.72 0.12 50);
-    --canvas-landmark: oklch(0.78 0.075 175);
-    --canvas-landmark-label: oklch(0.92 0.04 175);
-    --canvas-selection: oklch(0.78 0.075 175);
-    --canvas-handle-fill: oklch(0.2 0.008 200);
-    --canvas-lasso: oklch(0.85 0.06 175);
-    --canvas-image-placeholder: oklch(0.3 0.01 190);
+    --canvas-bg: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+    --canvas-grid: oklch(0.72 calc(0.025 * var(--vivid)) var(--hue));
+    --canvas-axis: oklch(0.72 calc(0.12 * var(--vivid)) calc(var(--hue) - 125));
+    --canvas-landmark: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+    --canvas-landmark-label: oklch(0.92 calc(0.04 * var(--vivid)) var(--hue));
+    --canvas-selection: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+    --canvas-handle-fill: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+    --canvas-lasso: oklch(0.85 calc(0.06 * var(--vivid)) var(--hue));
+    --canvas-image-placeholder: oklch(0.3 calc(0.014 * var(--vivid)) var(--hue));
     --canvas-ink: oklch(0.93 0.008 160);
     --canvas-danger: oklch(0.7 0.17 25);
     --canvas-danger-wash: oklch(0.7 0.17 25 / 0.2);
-    --canvas-guide: oklch(0.75 0.17 335);
-    --hud-bg: oklch(0.25 0.01 190 / 0.92);
-    --hud-fg: oklch(0.93 0.01 175);
-    --hud-muted: oklch(0.72 0.012 175);
-    --hud-border: oklch(0.93 0.01 175 / 0.14);
-    --hud-hover: oklch(0.75 0.02 175 / 0.16);
-    --hud-accent: oklch(0.78 0.075 175);
-    --hud-accent-fg: oklch(0.25 0.04 180);
+    --canvas-guide: oklch(0.75 calc(0.17 * var(--vivid)) calc(var(--hue) + 160));
+    --hud-bg: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue) / 0.92);
+    --hud-fg: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue));
+    --hud-muted: oklch(0.72 calc(0.014 * var(--vivid)) var(--hue));
+    --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
+    --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
+    --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+    --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
     --hud-danger: oklch(0.7 0.14 20);
     --hud-danger-fg: oklch(0.2 0.02 20);
     --hud-star: oklch(0.8 0.14 85);
@@ -68,26 +71,26 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas-bg: oklch(0.2 0.008 200);
-  --canvas-grid: oklch(0.72 0.02 175);
-  --canvas-axis: oklch(0.72 0.12 50);
-  --canvas-landmark: oklch(0.78 0.075 175);
-  --canvas-landmark-label: oklch(0.92 0.04 175);
-  --canvas-selection: oklch(0.78 0.075 175);
-  --canvas-handle-fill: oklch(0.2 0.008 200);
-  --canvas-lasso: oklch(0.85 0.06 175);
-  --canvas-image-placeholder: oklch(0.3 0.01 190);
+  --canvas-bg: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+  --canvas-grid: oklch(0.72 calc(0.025 * var(--vivid)) var(--hue));
+  --canvas-axis: oklch(0.72 calc(0.12 * var(--vivid)) calc(var(--hue) - 125));
+  --canvas-landmark: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+  --canvas-landmark-label: oklch(0.92 calc(0.04 * var(--vivid)) var(--hue));
+  --canvas-selection: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+  --canvas-handle-fill: oklch(0.2 calc(0.012 * var(--vivid)) var(--hue));
+  --canvas-lasso: oklch(0.85 calc(0.06 * var(--vivid)) var(--hue));
+  --canvas-image-placeholder: oklch(0.3 calc(0.014 * var(--vivid)) var(--hue));
   --canvas-ink: oklch(0.93 0.008 160);
   --canvas-danger: oklch(0.7 0.17 25);
   --canvas-danger-wash: oklch(0.7 0.17 25 / 0.2);
-  --canvas-guide: oklch(0.75 0.17 335);
-  --hud-bg: oklch(0.25 0.01 190 / 0.92);
-  --hud-fg: oklch(0.93 0.01 175);
-  --hud-muted: oklch(0.72 0.012 175);
-  --hud-border: oklch(0.93 0.01 175 / 0.14);
-  --hud-hover: oklch(0.75 0.02 175 / 0.16);
-  --hud-accent: oklch(0.78 0.075 175);
-  --hud-accent-fg: oklch(0.25 0.04 180);
+  --canvas-guide: oklch(0.75 calc(0.17 * var(--vivid)) calc(var(--hue) + 160));
+  --hud-bg: oklch(0.25 calc(0.014 * var(--vivid)) var(--hue) / 0.92);
+  --hud-fg: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue));
+  --hud-muted: oklch(0.72 calc(0.014 * var(--vivid)) var(--hue));
+  --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
+  --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
+  --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
+  --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
   --hud-danger: oklch(0.7 0.14 20);
   --hud-danger-fg: oklch(0.2 0.02 20);
   --hud-star: oklch(0.8 0.14 85);
@@ -194,7 +197,7 @@ html, body {
 .hud-debug[hidden] { display: none; }
 
 /* The tools sit to the right of the view tabs and the workspace menu (--nav-w, measured in main.ts), centred in what is left. */
-#toolbar { position: absolute; top: 12px; left: calc((var(--nav-w, 0px) + 12px) / var(--ui-scale, 1)); right: calc(12px / var(--ui-scale, 1)); display: flex; justify-content: center; pointer-events: none; }
+#toolbar { position: absolute; top: 12px; left: calc((var(--nav-w, 0px) + 12px) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + 24px) / var(--ui-scale, 1)); display: flex; justify-content: center; pointer-events: none; }
 #toolbar > .toolbar { max-width: 100%; }
 
 .toolbar {
@@ -912,3 +915,29 @@ button.asset-preview { display: block; width: 100%; padding: 0; border: 0; backg
 .hud-save:hover { color: var(--hud-fg); }
 .hud-controls { padding: 4px; }
 input[type="range"], input[type="checkbox"], input[type="radio"], progress { accent-color: var(--hud-accent); }
+
+/* The hue slider: a rainbow at one lightness, so what it shows is what the dial does (the same L and C as the accent). */
+.set-hue { -webkit-appearance: none; appearance: none; height: 10px; border-radius: 999px; background: linear-gradient(in oklch longer hue to right, oklch(0.62 0.12 0), oklch(0.62 0.12 360)); }
+.set-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--hud-bg); border: 3px solid var(--hud-accent); cursor: pointer; }
+.set-hue::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--hud-bg); border: 3px solid var(--hud-accent); cursor: pointer; }
+.set-hue::-moz-range-track { background: transparent; }
+.set-presets { display: flex; gap: 6px; }
+.set-preset { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid var(--hud-border); background: oklch(0.62 0.12 var(--p)); cursor: pointer; }
+.set-preset:hover { border-color: var(--hud-fg); }
+.set-preset:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
+
+/* The dock: history, panels and import, at the top right. The options bar between it and the view tabs shows only what the tool offers. */
+#toolbar > .dock { position: fixed; top: calc(12px / var(--ui-scale, 1)); right: calc(12px / var(--ui-scale, 1)); z-index: 3; display: flex; gap: 6px; padding: 5px; pointer-events: auto; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.dock .tb-group + .tb-group { padding-left: 6px; border-left: 1px solid var(--hud-border); }
+.dock button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px; border: 0; border-radius: var(--r-md); background: transparent; color: inherit; cursor: pointer; }
+.dock button:hover:not(:disabled) { background: var(--hud-hover); }
+.dock button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.dock button:disabled { opacity: 0.35; cursor: default; }
+.dock button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.toolbar[hidden] { display: none; }
+.tb-options-row { padding-top: 0; border-top: 0; }
+.set-control { flex-wrap: wrap; }
+.set-control input.set-hue { flex: 1 1 100%; width: 100%; min-width: 0; margin: 4px 0; }
+.set-control .set-hue + output { text-align: left; min-width: 48px; }
+/* Options in the bar are a little tighter than the buttons elsewhere, so a pen's options fit one row. */
+.tb-options-row button { min-width: 30px; height: 30px; padding: 0 5px; }

@@ -949,7 +949,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   expect(drawn).not.toBe(none);
   await p.keyboard.press("v");
   await p.mouse.click(600, 300);
-  await p.getByRole("button", { name: "Hide", exact: true }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Hide selection" }).click();
   await app.frame();
   expect(await ink(), "not drawn").toBe(none);
   expect(await sel(), "not selected").toEqual([]);
@@ -958,9 +958,9 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.keyboard.press("Control+z");
   await app.frame();
   expect(await ink(), "undo brings it back").toBe(drawn);
-  await p.getByRole("button", { name: "Hide", exact: true }).click(); // nothing selected: no change
+  await expect(p.getByTestId("context-bar"), "nothing selected: no selection bar").toBeHidden();
   await p.mouse.click(600, 300);
-  await p.getByRole("button", { name: "Hide", exact: true }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Hide selection" }).click();
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -971,7 +971,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   expect(await ink()).toBe(drawn);
   // Locked: drawn, but a click, a box and select-all all miss it.
   await p.mouse.click(600, 300);
-  await p.getByRole("button", { name: "Lock", exact: true }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Lock selection" }).click();
   await p.mouse.click(600, 300);
   expect(await sel()).toEqual([]);
   await app.drag({ x: 350, y: 250 }, { x: 850, y: 350 }, 6);
@@ -997,7 +997,7 @@ test("object eraser: a fast swipe takes what the brush crosses once, whole group
   await p.keyboard.up("Shift");
   await p.keyboard.press("Control+g");
   await p.mouse.click(500, 450);
-  await p.getByRole("button", { name: "Lock", exact: true }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Lock selection" }).click();
   await p.keyboard.press("Escape");
   await p.keyboard.press("e");
   await expect(p.getByRole("radio", { name: /Object eraser/ })).toHaveAttribute("aria-checked", "true");
@@ -1112,7 +1112,7 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   // Group two layers and name the group.
   await rows.nth(0).click();
   await rows.nth(2).click({ modifiers: ["Shift"] });
-  await p.locator("#toolbar").getByRole("button", { name: "Group", exact: true }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Group", exact: true }).click();
   const group = panel.locator('li.layer[data-group="true"]');
   await group.locator(".layer-name").dblclick();
   await panel.locator("[data-rename]").fill("pair");

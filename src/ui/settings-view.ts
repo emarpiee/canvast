@@ -10,7 +10,7 @@ import { esc } from "./format";
  */
 type Control =
   | { kind: "toggle" }
-  | { kind: "range"; min: number; max: number; step: number; unit?: string }
+  | { kind: "range"; min: number; max: number; step: number; unit?: string; /** A hue slider (rainbow track) with named presets, applied while dragging. */ hue?: ReadonlyArray<[name: string, degrees: number]>; /** Applied while dragging, not on release. */ live?: boolean }
   | { kind: "select"; options: ReadonlyArray<[value: string, label: string]> }
   | { kind: "colour" };
 
@@ -71,6 +71,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Appearance",
     rows: [
       { key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } },
+      { key: "ui.hue", label: "Theme colour", help: "The hue of the accent and of every tint. Brightness and contrast do not change with it.", control: { kind: "range", min: 0, max: 360, step: 1, unit: "°", live: true, hue: [["Viridian", 178], ["Ultramarine", 265], ["Violet", 310], ["Madder", 15], ["Ochre", 80]] } },
+      { key: "ui.vivid", label: "Colourfulness", help: "From grey to vivid; brightness stays the same.", control: { kind: "range", min: 0, max: 150, step: 5, unit: "%", live: true } },
       { key: "ui.textScale", label: "Interface size", help: "Scales the toolbars, panels and views (not the canvas).", control: { kind: "select", options: [["90", "90%"], ["100", "100%"], ["115", "115%"], ["130", "130%"], ["150", "150%"]] } },
       { key: "ui.contrast", label: "Contrast", help: "High contrast: stronger text and borders in the interface.", control: { kind: "select", options: [["normal", "Normal"], ["high", "High"]] } },
       { key: "ui.motion", label: "Motion", help: "System follows your operating system's reduce-motion setting.", control: { kind: "select", options: [["system", "System"], ["reduce", "Reduce"], ["full", "Full"]] } },
@@ -91,7 +93,8 @@ function controlHtml(row: Row, id: string): string {
   if (c.kind === "toggle") return `<input type="checkbox" id="${id}" data-set="${row.key}" ${a}>`;
   if (c.kind === "colour") return `<input type="color" id="${id}" data-set="${row.key}" ${a}>`;
   if (c.kind === "select") return `<select id="${id}" data-set="${row.key}" ${a}>${c.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
-  return `<input type="range" id="${id}" data-set="${row.key}" min="${c.min}" max="${c.max}" step="${c.step}" ${a}><output for="${id}"></output>`;
+  const presets = c.hue ? `<span class="set-presets" role="group" aria-label="Theme colour presets">${c.hue.map(([n, d]) => `<button type="button" class="set-preset" data-preset="${row.key}" data-value="${d}" style="--p:${d}" aria-label="${esc(n)}" title="${esc(n)}"></button>`).join("")}</span>` : "";
+  return `<input type="range" id="${id}" data-set="${row.key}" min="${c.min}" max="${c.max}" step="${c.step}" ${c.hue ? 'class="set-hue"' : ""} ${a}><output for="${id}"></output>${presets}`;
 }
 
 /** Mount the view into `root`; returns what main needs to show and hide it. */
@@ -200,6 +203,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     if (row.control.kind === "range") {
       const out = t.parentElement?.querySelector("output");
       if (out) out.textContent = `${fmt(Number(t.value))} ${row.control.unit ?? ""}`.trim();
+      if (row.control.live) settings.set(key, Number(t.value) as never);
     }
   });
   root.addEventListener("change", (e) => {
@@ -215,6 +219,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     const t = e.target as HTMLElement;
     const tab = t.closest<HTMLElement>("[data-tab]");
     if (tab) return select(tab.dataset["tab"]!);
+    const preset = t.closest<HTMLElement>("[data-preset]");
+    if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
     const change = t.closest<HTMLElement>("[data-change-key]");
     if (change) {
       capturing = change.dataset["changeKey"] as (typeof TOOL_ORDER)[number];

@@ -53,9 +53,16 @@ declare const __CANVAST_DEBUG__: boolean;
 declare const __CANVAST_VERSION__: string;
 
 function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
-  const css = getComputedStyle(el);
-  const v = (name: string): string => css.getPropertyValue(name).trim();
-  return {
+  // A token may hold var() and calc() (the hue and colourfulness dials); a probe element resolves it to the plain colour the canvas can draw with.
+  const probe = document.createElement("span");
+  probe.style.display = "none";
+  el.appendChild(probe);
+  const v = (name: string): string => {
+    probe.style.color = "";
+    probe.style.color = `var(${name})`;
+    return getComputedStyle(probe).color;
+  };
+  const theme = {
     background: v("--canvas-bg"),
     grid: v("--canvas-grid"),
     axis: v("--canvas-axis"),
@@ -70,6 +77,8 @@ function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
     dangerWash: v("--canvas-danger-wash"),
     guide: v("--canvas-guide"),
   };
+  probe.remove();
+  return theme;
 }
 
 const SAVE_TEXT: Record<SaveState, string> = {
@@ -170,6 +179,8 @@ async function start(): Promise<void> {
   const applyAppearance = (): void => {
     const root = document.documentElement;
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
+    root.style.setProperty("--hue", String(settings.get("ui.hue")));
+    root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
     if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
     else delete root.dataset["contrast"];
     const m = settings.get("ui.motion");
@@ -406,12 +417,7 @@ async function start(): Promise<void> {
     importFiles,
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
-    deleteSelection: () => deleteSelection(doc, editor),
-    groupSelection: () => groupSelection(doc, editor),
-    setFlag: (flag) => setFlag(doc, editor, flag),
     clearFlag: (flag) => clearFlag(doc, editor, flag),
-    ungroupSelection: () => ungroupSelection(doc, editor),
-    arrangeSelection: (to) => arrangeSelection(doc, editor, to),
     layoutSelection: async (cmd) => {
       // Sorting by name needs the file names of the selected images (the document only has their hashes).
       const names = new Map<string, { name: string; date: number }>();
@@ -492,6 +498,9 @@ async function start(): Promise<void> {
   const measureNav = (): void => {
     const root = document.documentElement.style;
     root.setProperty("--nav-w", `${Math.ceil(navBox.getBoundingClientRect().right)}px`);
+    // The tool options sit between the view tabs and the dock (history, panels, import) at the top right.
+    const dock = barBox.querySelector<HTMLElement>(".dock")?.getBoundingClientRect();
+    root.setProperty("--dock-w", `${Math.ceil(dock ? dock.width : 0)}px`);
     // Side panels start below the toolbar, however many rows it wraps to.
     const bar = barBox.querySelector<HTMLElement>(".toolbar")?.getBoundingClientRect();
     root.setProperty("--bar-bottom", `${Math.ceil(bar ? bar.bottom : 64)}px`);
@@ -552,6 +561,15 @@ async function start(): Promise<void> {
       case "ui.contrast":
       case "ui.motion":
         applyAppearance();
+        return;
+      case "ui.hue":
+      case "ui.vivid":
+        // The canvas colours follow the dials too: read them again and redraw.
+        applyAppearance();
+        theme = readTheme(document.documentElement);
+        setThemeInk(theme.ink);
+        tiles.clear();
+        invalidate();
         return;
       case "ui.theme":
         applyThemeAttribute();

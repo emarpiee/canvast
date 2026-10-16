@@ -166,3 +166,53 @@ test("view tabs: arrow keys move between Canvas, Assets and Settings; Assets is 
   expect(await view(), "Settings is not reopened (the view before it is)").not.toBe("settings");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("theme colour: the hue and colourfulness dials recolour the interface but never change its contrast (ADR 0052)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.locator("#settings-view");
+  await p.getByTestId("view-settings").click();
+  await panel.getByRole("tab", { name: "Appearance" }).click();
+  /** Contrast of the selected view tab (its text on its fill) and the brightness of the canvas background, read from the real colours. */
+  const measure = () =>
+    p.evaluate(() => {
+      const rgb = (css: string): [number, number, number] => {
+        const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+        c.fillStyle = "#000";
+        c.fillStyle = css;
+        c.fillRect(0, 0, 1, 1);
+        const d = c.getImageData(0, 0, 1, 1).data;
+        return [d[0]!, d[1]!, d[2]!];
+      };
+      const lum = ([r, g, b]: [number, number, number]) => {
+        const f = (v: number) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const tab = getComputedStyle(document.querySelector('.view-switch [aria-selected="true"]')!);
+      const a = lum(rgb(tab.backgroundColor));
+      const b = lum(rgb(tab.color));
+      const bg = rgb(getComputedStyle(document.body).backgroundColor);
+      return { contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), bgLum: lum(bg), bg };
+    });
+  await panel.getByLabel("Colourfulness", { exact: true }).fill("150");
+  const seen: Array<{ hue: number; contrast: number; bgLum: number; bg: number[] }> = [];
+  for (const hue of [20, 90, 190, 265, 330]) {
+    await panel.getByLabel("Theme colour", { exact: true }).fill(String(hue));
+    expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe(String(hue));
+    seen.push({ hue, ...(await measure()) });
+  }
+  for (const m of seen) expect(m.contrast, `accent text contrast at hue ${m.hue}`).toBeGreaterThanOrEqual(4.5);
+  const lums = seen.map((m) => m.bgLum);
+  expect(Math.max(...lums) - Math.min(...lums), "the surface keeps its brightness whatever the hue").toBeLessThan(0.02);
+  expect(new Set(seen.map((m) => m.bg.join(","))).size, "but its colour does change").toBeGreaterThan(1);
+  // A preset sets the hue; kept after a reload; Reset puts the default back.
+  await panel.getByRole("button", { name: "Ultramarine" }).click();
+  await expect(panel.getByLabel("Theme colour", { exact: true })).toHaveValue("265");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe("265");
+  await p.getByTestId("view-settings").click();
+  await panel.getByRole("tab", { name: "Appearance" }).click();
+  await panel.getByRole("button", { name: /Reset Theme colour/ }).click();
+  expect(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--hue").trim())).toBe("178");
+  expect(app.consoleErrors).toEqual([]);
+});
