@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Notices redesigned to match the app's panels: a compact card, a small tinted icon badge, the same text size, a round close button (no more tinted gradient and thick side bar).
+
 - A dedicated Tags panel (dock button beside Layers): tags of the selection, suggestions, every tag on the canvas with counts, select by tag, rename and delete; the Layers panel no longer has tags (ADR 0076).
 
 - Zen mode: a leaf button beside Home (or Z) fades the floating bars and panels out; each shows while the pointer is over it (ADR 0075).
