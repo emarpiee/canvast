@@ -183,20 +183,24 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("view tabs: arrow keys move between Canvas, Assets and Settings; Assets is remembered over a reload, Settings is not (ADR 0048)", async ({ app }) => {
+test("view tabs: arrow keys move between Assets and Settings, the Canvas is the board pill; Assets is remembered over a reload, Settings is not (ADR 0048, 0079)", async ({ app }) => {
   const p = app.page;
   const view = () => p.evaluate(() => window.__canvastDebug.appView());
-  await p.getByTestId("view-canvas").focus();
-  await p.keyboard.press("ArrowRight");
+  await expect(p.getByTestId("view-canvas")).toHaveAttribute("aria-current", "page");
+  await p.getByTestId("view-assets").click();
   expect(await view()).toBe("assets");
-  await expect(p.getByTestId("view-assets")).toHaveAttribute("aria-selected", "true");
+  await expect(p.getByTestId("view-canvas")).not.toHaveAttribute("aria-current", "page");
+  await p.getByTestId("view-assets").focus(); // the opened view took the focus; the arrow keys work on the tab list
   await p.keyboard.press("ArrowRight");
   expect(await view()).toBe("settings");
   await expect(p.getByTestId("view-settings")).toHaveAttribute("aria-selected", "true");
   await p.keyboard.press("ArrowRight"); // wraps to the first tab
-  expect(await view()).toBe("canvas");
+  expect(await view()).toBe("assets");
   await p.keyboard.press("ArrowLeft"); // and back round
   expect(await view()).toBe("settings");
+  await p.getByTestId("view-canvas").click(); // the board pill is the way back to the canvas
+  expect(await view()).toBe("canvas");
+  await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Collaboration" }).click();
   await expect(p.locator("#set-panel-collaboration")).toContainText("Collaboration is off");
   await p.getByTestId("view-assets").click();

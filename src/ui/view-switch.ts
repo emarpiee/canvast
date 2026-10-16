@@ -3,13 +3,13 @@ import { ICONS } from "./icons";
 export type AppView = "canvas" | "assets" | "settings";
 
 /**
- * The top-level switch between Canvas view and Assets view: three buttons
- * that act as tabs. Left/Right arrows move between them, as in a tab list.
+ * The top-level switch to the Assets view and the Settings view: two buttons that act as tabs (Left and Right move between them, as in
+ * a tab list). The Canvas view is the navigator's pill, the first control, which names the open board and canvas (ADR 0079); here no tab
+ * is selected while the canvas is open.
  */
 export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void): (v: AppView) => void {
   root.innerHTML = `
     <div class="view-switch" role="tablist" aria-label="View">
-      <button type="button" role="tab" data-view="canvas" data-testid="view-canvas" title="Canvas view">${ICONS.infinity}<span>Canvas</span></button>
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Assets view">${ICONS.images}<span>Assets</span></button>
       <button type="button" role="tab" data-view="settings" data-testid="view-settings" title="Settings">${ICONS.settings}<span>Settings</span></button>
     </div>`;
@@ -18,7 +18,7 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
     for (const t of tabs) {
       const on = t.dataset["view"] === v;
       t.setAttribute("aria-selected", String(on));
-      t.tabIndex = on ? 0 : -1;
+      t.tabIndex = on || (v === "canvas" && t.dataset["view"] === "assets") ? 0 : -1;
     }
   };
   root.addEventListener("click", (e) => {

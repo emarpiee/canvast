@@ -4,17 +4,22 @@ import { esc } from "./format";
 import { placeMenu } from "./more-menu";
 import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-ui";
 import { ICONS } from "./icons";
+import type { AppView } from "./view-switch";
 
 /**
- * Workspace › Board › Canvas navigator (top-left) and the read-only banner.
- * The breadcrumb button opens a menu listing boards and their canvases with
- * create and rename actions. Everything is a button or input, so it is
- * keyboard-usable; Escape closes the menu.
+ * Board › Canvas navigator (top-left, the first control) and the read-only banner (ADR 0079).
+ * It is also the Canvas view's tab: one pill, "Board 1 › Canvas 1 ▾", so the word Canvas is not said twice. Pressing the name goes to
+ * the Canvas view (and, when already there, opens the menu); the chevron always opens the menu, which lists boards and their canvases
+ * with create, rename and export actions. Everything is a button or input, so it is keyboard-usable; Escape closes the menu.
+ * Returns a function that tells it which view is open.
  */
-export function mountNavigator(root: HTMLElement, session: Session): void {
+export function mountNavigator(root: HTMLElement, session: Session, openCanvasView: () => void): (v: AppView) => void {
   root.innerHTML = `
     <div class="nav">
-      <button type="button" class="nav-crumb" data-testid="workspace-nav" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="nav-pill" data-testid="workspace-nav" data-active="true">
+        <button type="button" class="nav-crumb" data-testid="view-canvas" aria-current="page" title="Canvas view">${ICONS.infinity}<span class="nav-crumb-text"></span></button>
+        <button type="button" class="nav-chev" data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" aria-label="Switch board or canvas" title="Switch board or canvas">${ICONS.chevronDown}</button>
+      </div>
       <div class="nav-menu" role="menu" data-testid="workspace-menu" hidden></div>
     </div>
     <div class="readonly-banner" role="alert" data-testid="readonly-banner" hidden>
@@ -22,6 +27,10 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
       <button type="button" data-action="take-over">Take over</button>
     </div>`;
   const crumb = root.querySelector<HTMLButtonElement>(".nav-crumb")!;
+  const crumbText = root.querySelector<HTMLElement>(".nav-crumb-text")!;
+  const chev = root.querySelector<HTMLButtonElement>(".nav-chev")!;
+  const pill = root.querySelector<HTMLElement>(".nav-pill")!;
+  let view: AppView = "canvas";
   const menu = root.querySelector<HTMLElement>(".nav-menu")!;
   const banner = root.querySelector<HTMLElement>(".readonly-banner")!;
   let renaming: { kind: "board" | "canvas"; id: string } | null = null;
@@ -108,15 +117,17 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
     const cur = session.current;
     const entry = tree?.boards.find((b) => b.board.id === cur?.boardId);
     const canvas = entry?.canvases.find((c) => c.id === cur?.canvasId);
-    crumb.textContent = entry && canvas ? `${entry.board.name} › ${canvas.name}` : "Canvas";
-    crumb.title = tree ? `${tree.workspace.displayName} › ${crumb.textContent}` : "";
+    // Each name is cut with an ellipsis to its own room (CSS), so a long name never pushes the tabs beside the pill; the full names are in the tooltip.
+    if (entry && canvas) crumbText.innerHTML = `<span class="nav-board">${esc(entry.board.name)}</span><span class="nav-sep"> › </span><span class="nav-canvas">${esc(canvas.name)}</span>`;
+    else crumbText.textContent = "Canvas";
+    crumb.title = tree && entry && canvas ? `${tree.workspace.displayName} › ${entry.board.name} › ${canvas.name}. Canvas view` : "Canvas view";
     banner.hidden = !session.readOnly;
     if (!menu.hidden) renderMenu();
   };
 
   const setOpen = (open: boolean): void => {
     menu.hidden = !open;
-    crumb.setAttribute("aria-expanded", String(open));
+    chev.setAttribute("aria-expanded", String(open));
     if (open) renderMenu();
     else {
       renaming = null;
@@ -124,7 +135,9 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
     }
   };
 
-  crumb.addEventListener("click", () => setOpen(menu.hidden === true));
+  // The name is the Canvas view's tab: from another view it goes there; on the canvas it opens the menu. The chevron always opens it.
+  crumb.addEventListener("click", () => (view === "canvas" ? setOpen(menu.hidden === true) : openCanvasView()));
+  chev.addEventListener("click", () => setOpen(menu.hidden === true));
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !menu.hidden && !renaming && actionsOf) {
       const was = actionsOf;
@@ -134,7 +147,7 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
       e.stopPropagation();
     } else if (e.key === "Escape" && !menu.hidden && !renaming) {
       setOpen(false);
-      crumb.focus();
+      chev.focus();
       e.stopPropagation();
     }
   });
@@ -264,4 +277,11 @@ export function mountNavigator(root: HTMLElement, session: Session): void {
 
   session.subscribe(render);
   render();
+  return (v) => {
+    view = v;
+    pill.dataset["active"] = String(v === "canvas");
+    if (v === "canvas") crumb.setAttribute("aria-current", "page");
+    else crumb.removeAttribute("aria-current");
+    if (v !== "canvas") setOpen(false);
+  };
 }

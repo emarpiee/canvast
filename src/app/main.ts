@@ -536,7 +536,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   applyZen(); // the button beside Home exists now
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
-  mountNavigator(document.getElementById("workspace")!, session);
+  const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
 
   const fileKinds = new Map<string, { card: boolean; open: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
@@ -628,6 +628,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     appView = v;
     document.body.dataset["view"] = v;
     markTab(v);
+    markNav(v);
     host.inert = v !== "canvas";
     if (was === "assets") assetsView.hide();
     if (was === "settings") settingsView.hide();
@@ -642,6 +643,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
+  markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
