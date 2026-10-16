@@ -12,6 +12,7 @@ Search joined words with an implicit AND only. Finding "red or blue but not cat"
 - An unreadable query (unclosed bracket, missing operand) is never an error: it falls back to every word joined by AND (`Parsed.fallback`).
 - In the canvas tag mode a term matches when any of the item's tags contains it, and NOT/XOR apply to the whole tag list.
 - Renaming a tag also rewrites `#tag` inside smart-folder searches that use brackets or operators.
+- Discoverability: a ? button beside both search boxes (`src/ui/search-help.ts`) opens a card listing every operator with an example; clicking an example fills the box and searches. Nobody has to read the docs.
 
 ## Consequences
 Old saved searches keep their meaning (plain words are still AND). A phrase in quotes now matches as one piece.

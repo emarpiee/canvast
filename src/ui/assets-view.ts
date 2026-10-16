@@ -1,4 +1,5 @@
 import type { Session, AssetPlace } from "../app/session";
+import { searchHelpButton, wireSearchHelp } from "./search-help";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -77,7 +78,8 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
-      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly. AND OR XOR NOT, - and ( ) combine words: red OR blue, cat -dog" aria-label="Search assets">
+      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
+      ${searchHelpButton()}
       <span class="assets-count" data-testid="assets-count"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
@@ -146,6 +148,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const status = root.querySelector<HTMLElement>(".assets-status")!;
   const count = root.querySelector<HTMLElement>(".assets-count")!;
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
+  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, search);
   const usageSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-usage"]')!;
   const sortSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-sort"]')!;
   const sortDirBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-sort-dir"]')!;

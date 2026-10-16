@@ -1394,6 +1394,14 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(2);
   await box.fill("/.png -green");
   await expect(results.getByRole("option")).toHaveCount(1);
+  // The syntax is explained next to the box: the ? button lists it, and an example fills the box and searches.
+  await p.getByRole("button", { name: "How to combine search words" }).click();
+  const help = p.getByRole("dialog", { name: "Combining search words" });
+  await expect(help).toContainText("XOR");
+  await help.getByRole("button", { name: "cat -dog" }).click();
+  await expect(help).toBeHidden();
+  await expect(box).toHaveValue("cat -dog");
+  await expect(results).toBeVisible(); // choosing an example does not close the search
   await box.fill("#sky XOR sky");
   await expect(results.getByRole("option")).toHaveCount(0);
   // "@": bookmarks. Save one, move away, and go back by name.

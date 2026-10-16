@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { searchHelpButton, wireSearchHelp } from "./search-help";
 import { evalQuery, parseQuery } from "../search/query";
 import type { BookmarkList } from "../app/bookmarks";
 import type { DocumentStore } from "../doc/document-store";
@@ -45,7 +46,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.setAttribute("aria-label", "Search the canvas");
   root.hidden = true;
   root.innerHTML = `
-    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"></div>
+    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false">${searchHelpButton()}</div>
     <div class="cs-modes" role="tablist" aria-label="Search by">
       <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
       <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
@@ -55,6 +56,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     <p class="cs-hint"><kbd>Enter</kbd> go to it · <kbd>Shift+Enter</kbd> select all · <kbd>Esc</kbd> close</p>`;
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
+  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");
   const list = root.querySelector<HTMLElement>("ul")!;
   const PLACEHOLDER: Record<Mode, string> = { name: "File, layer or text name", tag: "Tag of an item", bookmark: "Bookmark name" };
   const EMPTY: Record<Mode, string> = { name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
@@ -180,7 +182,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     if (li) go(results[Number(li.dataset["i"])]);
   });
   document.addEventListener("pointerdown", (e) => {
-    if (!root.hidden && !root.contains(e.target as Node)) close();
+    if (!root.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest(".search-help")) close();
   });
 
   return {

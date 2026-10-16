@@ -98,6 +98,9 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await searchFor("png -#ref", 1);
   await searchFor("NOT (hand OR colour)", 0);
   await searchFor("(hand", 1);
+  await p.getByRole("button", { name: "How to combine search words" }).click();
+  await p.getByRole("dialog", { name: "Combining search words" }).getByRole("button", { name: "red OR blue", exact: true }).click();
+  await expect(p.getByTestId("assets-search")).toHaveValue("red OR blue");
   await searchFor("", 2);
 
   // A smart folder saves a search (ADR 0035): it counts its matches, applies them when clicked, and can be renamed.

@@ -1748,3 +1748,15 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .layers-tags { padding-top: var(--sp-3); }
 .layers-blend, .layers-opacity { padding-top: var(--sp-3); padding-bottom: 0; }
 .layers-panel > .layers-opacity { padding-bottom: var(--sp-4); }
+
+/* The search help card (ADR 0069): a small button beside a search box and the operators it explains. */
+.search-help-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.search-help-btn:hover, .search-help-btn[aria-expanded="true"] { color: var(--hud-fg); background: var(--hud-hover); }
+.search-help-btn svg { width: var(--icon-md); height: var(--icon-md); }
+.search-help { position: fixed; z-index: 70; max-width: min(380px, calc(100vw - 16px)); padding: var(--sp-5); font: var(--font-control); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.search-help table { border-collapse: collapse; width: 100%; }
+.search-help th, .search-help td { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; text-align: left; font-weight: var(--weight-regular); vertical-align: middle; }
+.search-help th { white-space: nowrap; font-weight: var(--weight-semibold); }
+.search-help td:last-child { padding-right: 0; }
+.search-help td button { font: inherit; font-size: var(--text-xs); color: var(--hud-accent-fg); background: var(--hud-accent); border: 0; border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); cursor: pointer; white-space: nowrap; }
+.search-help p { margin: var(--sp-3) 0 0; color: var(--hud-muted); font-size: var(--text-xs); }
