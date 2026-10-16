@@ -8,7 +8,7 @@ import type { LayoutCommand } from "./actions";
 import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
-import { focusObjects, stepToNeighbour } from "../interaction/item-navigation";
+import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
@@ -401,6 +401,7 @@ async function start(): Promise<void> {
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   const bookmarkList = new BookmarkList(session, view, doc);
+  const focusCycle = createFocusCycle(doc, view, editor, () => true);
   const canvasSearch = mountCanvasSearch(host, {
     doc,
     editor,
@@ -413,7 +414,7 @@ async function start(): Promise<void> {
   });
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
-    focusSelection: () => focusObjects(doc, view, [...editor.selection], true),
+    focusSelection: () => focusCycle.tap(),
     openSearch: (prefix) => canvasSearch.open(prefix),
   });
   const side = document.createElement("div");
@@ -473,6 +474,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
   });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
+    fit: (kind) => focusCycle.fit(kind),
+    hasSelection: () => editor.selection.size > 0,
+    subscribeSelection: (fn) => void editor.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),

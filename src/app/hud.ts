@@ -68,6 +68,10 @@ export interface HudStatus {
   scene(): { objects: number; drawn: number; indexing: boolean };
   /** Adaptive quality level now (app/quality.ts). */
   quality(): number;
+  /** Bring the selection, or everything visible at this zoom, into view (the buttons beside zoom in and out). */
+  fit(kind: "selection" | "all"): void;
+  hasSelection(): boolean;
+  subscribeSelection(fn: () => void): void;
   /** Lines of internal state shown under the frame-rate readout (memory, queues, index). */
   diagnostics(): string[];
 }
@@ -92,6 +96,8 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
+      <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
+      <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.maximize}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>
@@ -114,10 +120,18 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   };
   status.subscribe(updateSave);
 
+  const fitSelectionButton = root.querySelector<HTMLButtonElement>('[data-action="fit-selection"]')!;
+  const syncFit = (): void => {
+    fitSelectionButton.disabled = !status.hasSelection();
+  };
+  status.subscribeSelection(syncFit);
+  syncFit();
   root.querySelector(".hud-controls")!.addEventListener("click", (e) => {
     const action = (e.target as HTMLElement).closest("button")?.dataset["action"];
     if (action === "zoom-in") zoomByStep(view, 1);
     else if (action === "zoom-out") zoomByStep(view, -1);
+    else if (action === "fit-selection") status.fit("selection");
+    else if (action === "fit-all") status.fit("all");
     else if (action === "home") goHome(view);
     else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
     else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);

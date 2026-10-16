@@ -1,7 +1,7 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { fitRect, lookAt, worldToScreen, zoomLevel } from "../core/camera";
-import { fromLocal, levelsBetween } from "../core/frames";
+import { fromLocal, levelsBetween, serializeFrameCamera } from "../core/frames";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
@@ -84,48 +84,122 @@ export function pickNeighbour(doc: DocumentStore, view: ViewState, editor: Edito
     const b = boxIn(view, u.members);
     if (b) boxes.set(u, b);
   }
-  /** Apparent size on screen in px (the larger side). */
-  const seenPx = (b: { min: WorldPoint; max: WorldPoint }): number => {
-    const a = worldToScreen(cam, vp, b.min);
-    const c = worldToScreen(cam, vp, b.max);
-    return Math.max(Math.abs(c.x - a.x), Math.abs(c.y - a.y));
-  };
-  const inView = (u: Unit): boolean => {
-    const b = boxes.get(u);
-    if (!b) return false;
-    const px = seenPx(b);
-    return px >= MIN_SEEN_PX && px <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height);
-  };
-
   const anchorBox = anchors.length ? boxIn(view, anchors.flatMap((a) => a.members)) : null;
-  // The point steps start from: the selection, or (nothing selected) the middle of the window.
-  const origin: WorldPoint = anchorBox ? centreOf(anchorBox) : cam.center;
-  const pool = units.filter((u) => !anchors.includes(u) && boxes.has(u) && (mode === "anywhere" || inView(u)));
+  const pool = units.filter((u) => !anchors.includes(u) && boxes.has(u));
   if (pool.length === 0) return null;
 
+  if (mode === "view") return pickInView(pool, boxes, anchorBox, anchors.length > 0, dir, view);
+
+  // "Nearest anywhere": by position alone, exact at any depth.
+  const origin: WorldPoint = anchorBox ? centreOf(anchorBox) : cam.center;
   const offs = pool.map((u) => {
     const c = centreOf(boxes.get(u)!);
     return { u, dx: D.sub(c.x, origin.x), dy: D.sub(c.y, origin.y) };
   });
+  const mag = (o: { dx: D.Dyadic; dy: D.Dyadic }): number => Math.max(D.log2Abs(o.dx), D.log2Abs(o.dy));
   if (!anchorBox) {
     // Nothing selected: the item nearest the middle of the window, whatever the direction.
-    const nearest = offs.reduce((best, o) => (Math.max(D.log2Abs(o.dx), D.log2Abs(o.dy)) < Math.max(D.log2Abs(best.dx), D.log2Abs(best.dy)) ? o : best));
-    return nearest.u.members.map((m) => m.id);
+    return offs.reduce((best, o) => (mag(o) < mag(best) ? o : best)).u.members.map((m) => m.id);
   }
   // Scale the offsets so the nearest is about 1; farther ones may overflow, which only ranks them last.
-  const mags = offs.map((o) => Math.max(D.log2Abs(o.dx), D.log2Abs(o.dy))).filter((m) => Number.isFinite(m));
+  const mags = offs.map(mag).filter((m) => Number.isFinite(m));
   const k = mags.length ? -Math.floor(Math.min(...mags)) : 0;
-  let best: { u: Unit; score: number; dist: number } | null = null;
+  let best: { u: Unit; score: number } | null = null;
   for (const o of offs) {
     const sx = D.toNumber(D.shift(o.dx, k));
     const sy = D.toNumber(D.shift(o.dy, k));
+    const horizontal = dir === "left" || dir === "right";
     const forward = dir === "left" ? -sx : dir === "right" ? sx : dir === "up" ? -sy : sy;
-    // Screen y grows downward; in world space the camera maps the same way, so "up" is negative.
+    const across = Math.abs(horizontal ? sy : sx);
+    // In the direction pressed: ahead, and not more than about 56 degrees off the line.
+    if (!(forward > 0) || across > forward * CONE) continue;
+    const score = forward + across * 2;
+    if (!best || score < best.score) best = { u: o.u, score };
+  }
+  return best ? best.u.members.map((m) => m.id) : null;
+}
+
+/** How far off the arrow's line a neighbour may lie: across <= ahead x CONE (about 56 degrees). */
+const CONE = 1.5;
+/** "Nearest in view" ignores items whose size on screen differs from the selected one's by more than this factor. */
+const SIZE_RATIO = 6;
+/** ...and by a gap wider than this many of the selected item's own sizes (so the rule means the same at every zoom). */
+const REACH = 3;
+
+/**
+ * "Nearest in view" (ADR 0058): measured on the screen, among what can be seen near the selected item. An item counts only when
+ *  1. it is neither too small to see (under 4 px) nor larger than 16 windows,
+ *  2. its size on screen is within a factor of 6 of the selected item's (a much larger or smaller item is another depth, not a neighbour),
+ *  3. the gap between it and the selected item is at most 3 sizes of the selected item (a far-off item is not a neighbour; measured in
+ *     the item's own size, so stepping works the same after the view has zoomed to the item),
+ * and it lies ahead in the direction pressed, within about 56 degrees of that line, or overlapping the selected item across it.
+ * Of those the nearest wins (distance ahead, and twice the sideways offset). Nothing qualifying: the selection stays.
+ * With nothing selected the first step picks the visible item nearest the middle of the window.
+ */
+function pickInView(
+  pool: readonly Unit[],
+  boxes: ReadonlyMap<Unit, { min: WorldPoint; max: WorldPoint }>,
+  anchorBox: { min: WorldPoint; max: WorldPoint } | null,
+  hasAnchor: boolean,
+  dir: NavDir,
+  view: ViewState,
+): ObjectId[] | null {
+  const vp = view.viewport;
+  const cam = view.camera;
+  interface Px {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    cx: number;
+    cy: number;
+    size: number;
+  }
+  const px = (b: { min: WorldPoint; max: WorldPoint }): Px => {
+    const a = worldToScreen(cam, vp, b.min);
+    const c = worldToScreen(cam, vp, b.max);
+    const minX = Math.min(a.x, c.x);
+    const maxX = Math.max(a.x, c.x);
+    const minY = Math.min(a.y, c.y);
+    const maxY = Math.max(a.y, c.y);
+    return { minX, minY, maxX, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, size: Math.max(maxX - minX, maxY - minY) };
+  };
+  const legible = (b: Px): boolean => b.size >= MIN_SEEN_PX && b.size <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height);
+  const inWindow = (b: Px): boolean => b.maxX > 0 && b.minX < vp.width && b.maxY > 0 && b.minY < vp.height;
+  const a = anchorBox ? px(anchorBox) : null;
+  const cands = pool.flatMap((u) => {
+    const b = px(boxes.get(u)!);
+    if (!legible(b)) return [];
+    if (a) {
+      if (b.size > a.size * SIZE_RATIO || b.size < a.size / SIZE_RATIO) return [];
+      const gap = Math.hypot(Math.max(0, a.minX - b.maxX, b.minX - a.maxX), Math.max(0, a.minY - b.maxY, b.minY - a.maxY));
+      if (gap > REACH * a.size) return [];
+    } else if (!inWindow(b)) return [];
+    return [{ u, b }];
+  });
+  if (!a || !hasAnchor) {
+    // Nothing selected: the nearest to the middle of the window.
+    const mx = vp.width / 2;
+    const my = vp.height / 2;
+    const first = cands.reduce<{ u: Unit; d: number } | null>((best, c) => {
+      const d = Math.hypot(c.b.cx - mx, c.b.cy - my);
+      return !best || d < best.d ? { u: c.u, d } : best;
+    }, null);
+    return first ? first.u.members.map((m) => m.id) : null;
+  }
+  const horizontal = dir === "left" || dir === "right";
+  let best: { u: Unit; score: number } | null = null;
+  for (const { u, b } of cands) {
+    const dx = b.cx - a.cx;
+    const dy = b.cy - a.cy;
+    const forward = dir === "left" ? -dx : dir === "right" ? dx : dir === "up" ? -dy : dy;
     if (!(forward > 0)) continue;
-    const lateral = dir === "left" || dir === "right" ? Math.abs(sy) : Math.abs(sx);
-    const score = forward + lateral * 1.5;
-    const dist = Math.hypot(sx, sy);
-    if (!best || score < best.score || (score === best.score && dist < best.dist)) best = { u: o.u, score, dist };
+    const across = Math.abs(horizontal ? dy : dx);
+    // Overlapping the selected item across the arrow's line counts as straight ahead.
+    const overlaps = horizontal ? b.minY < a.maxY && b.maxY > a.minY : b.minX < a.maxX && b.maxX > a.minX;
+    if (!overlaps && across > forward * CONE) continue;
+    const score = forward + across * 2;
+    if (!best || score < best.score) best = { u, score };
   }
   return best ? best.u.members.map((m) => m.id) : null;
 }
@@ -150,4 +224,62 @@ export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: Edi
   editor.select(ids);
   focusObjects(doc, view, ids, zoom);
   return true;
+}
+
+/**
+ * Fit the view to everything that can be seen at this zoom: the items that are not hidden and are neither too small to see nor far
+ * larger than the window (the same rule as the "nearest in view" way of stepping). Returns false when there is nothing to fit.
+ */
+export function fitAllVisible(doc: DocumentStore, view: ViewState): boolean {
+  const vp = view.viewport;
+  const near: CanvasObject[] = [];
+  for (const o of doc.ordered()) {
+    if (o.hidden) continue;
+    const b = boxIn(view, [o]);
+    if (!b) continue;
+    const a = worldToScreen(view.camera, vp, b.min);
+    const c = worldToScreen(view.camera, vp, b.max);
+    const px = Math.max(Math.abs(c.x - a.x), Math.abs(c.y - a.y));
+    if (px >= MIN_SEEN_PX && px <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height)) near.push(o);
+  }
+  const bounds = boxIn(view, near);
+  if (!bounds) return false;
+  view.setFrameCamera(fromLocal(view.frame, fitRect(bounds.min, bounds.max, vp, 0.9, zoomLevel(view.camera))));
+  return true;
+}
+
+/**
+ * Alt, pressed and released alone, cycles the view: the selection, then everything visible at this zoom, then the selection again.
+ * A press with nothing selected fits everything. The cycle only continues while the view is where it left it.
+ */
+export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: EditorState, zoomOnSelection: () => boolean): { tap(): void; fit(kind: "selection" | "all"): void } {
+  let last: { kind: "selection" | "all"; cam: string } | null = null;
+  const here = (): string => JSON.stringify(serializeFrameCamera(view.frameCamera));
+  const remember = (kind: "selection" | "all"): void => {
+    last = { kind, cam: here() };
+  };
+  const all = (): void => {
+    if (fitAllVisible(doc, view)) remember("all");
+    else {
+      editor.message = "Nothing to fit at this zoom.";
+      editor.changed();
+    }
+  };
+  const selection = (): void => {
+    if (!editor.selection.size) return all();
+    focusObjects(doc, view, [...editor.selection], zoomOnSelection());
+    remember("selection");
+  };
+  return {
+    tap() {
+      const same = last !== null && last.cam === here();
+      if (!editor.selection.size) return all();
+      if (same && last!.kind === "selection") return all();
+      return selection();
+    },
+    fit(kind) {
+      if (kind === "all") all();
+      else selection();
+    },
+  };
 }

@@ -75,6 +75,10 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await side(p, /#ref/).click();
   await expect(cards(p)).toHaveCount(1);
   await expect(card(p, HASH)).toBeVisible();
+  // Choosing the chosen tag again lets go of it.
+  await side(p, /#ref/).click();
+  await expect(cards(p)).toHaveCount(2);
+  await expect(side(p, /All assets/)).toHaveAttribute("aria-current", "true");
   await side(p, /All assets/).click();
   await expect(cards(p)).toHaveCount(2);
 

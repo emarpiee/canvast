@@ -1518,3 +1518,20 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .tb-options-row::-webkit-scrollbar { display: none; }
   .tb-options-row > .tb-group { flex: none; }
 }
+
+/* ---- List columns: more properties, header drag to reorder, no clipped overflow ---- */
+.assets-body.is-list .asset-type, .assets-body.is-list .assets-list-head [data-col="type"] { order: var(--o-type, 7); }
+.assets-body.is-list .asset-size, .assets-body.is-list .assets-list-head [data-col="size"] { order: var(--o-size, 8); }
+.assets-body.is-list .asset-folder, .assets-body.is-list .assets-list-head [data-col="folder"] { order: var(--o-folder, 9); }
+.assets-body.is-list .asset-fav, .assets-body.is-list .assets-list-head [data-col="favourite"] { order: var(--o-favourite, 10); }
+.asset-type, .asset-size, .asset-folder, .asset-fav { display: none; }
+.assets-body.is-list .asset-type, .assets-body.is-list .asset-size, .assets-body.is-list .asset-folder, .assets-body.is-list .asset-fav { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+.assets-body.hide-type.is-list .asset-type, .assets-body.hide-type .assets-list-head [data-col="type"],
+.assets-body.hide-size.is-list .asset-size, .assets-body.hide-size .assets-list-head [data-col="size"],
+.assets-body.hide-folder.is-list .asset-folder, .assets-body.hide-folder .assets-list-head [data-col="folder"],
+.assets-body.hide-favourite.is-list .asset-fav, .assets-body.hide-favourite .assets-list-head [data-col="favourite"] { display: none; }
+.assets-body.is-list .assets-list-head [data-col] { cursor: grab; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assets-body.is-list .assets-list-head [data-col].is-dragging { opacity: 0.4; }
+.assets-body.is-list .assets-list-head [data-col].is-drop { box-shadow: inset 2px 0 0 var(--hud-accent); }
+.assets-body.is-list .assets-scroll { overflow-x: auto; }
+.assets-body.is-list .assets-list-head, .assets-body.is-list .assets-grid { min-width: var(--list-min, 0); }

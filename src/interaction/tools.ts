@@ -98,6 +98,33 @@ const linesOf = (o: CanvasObject, f: Frame): ExactLines => {
   return exactLines(b.min, b.max);
 };
 
+type Edge = "n" | "e" | "s" | "w";
+interface ResizeHandle {
+  at: [number, number];
+  /** The opposite corner or side, which stays put. */
+  fixed: [number, number];
+  edge: Edge | null;
+}
+const mid = (a: readonly [number, number], b: readonly [number, number]): [number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+/** The resize handles of a selection box: its four corners, and (for an upright box that is long enough) the middle of each side. */
+function resizeHandles(frame: SelectionFrame): ResizeHandle[] {
+  const c = frame.corners;
+  const out: ResizeHandle[] = c.map((p, i) => ({ at: [p[0], p[1]] as [number, number], fixed: [c[(i + 2) % 4]![0], c[(i + 2) % 4]![1]] as [number, number], edge: null }));
+  if (frame.angle === 0) {
+    const w = Math.abs(c[1]![0] - c[0]![0]);
+    const h = Math.abs(c[3]![1] - c[0]![1]);
+    // A side handle needs room: on a thin box it would sit on top of the item itself (and its middle), so the corners alone are used.
+    const roomy = w >= 3 * HANDLE_SIZE_PX && h >= 3 * HANDLE_SIZE_PX;
+    if (roomy) {
+      out.push({ at: mid(c[0]!, c[1]!), fixed: mid(c[3]!, c[2]!), edge: "n" }, { at: mid(c[3]!, c[2]!), fixed: mid(c[0]!, c[1]!), edge: "s" });
+    }
+    if (roomy) {
+      out.push({ at: mid(c[1]!, c[2]!), fixed: mid(c[0]!, c[3]!), edge: "e" }, { at: mid(c[0]!, c[3]!), fixed: mid(c[1]!, c[2]!), edge: "w" });
+    }
+  }
+  return out;
+}
+
 type Gesture =
   | { kind: "none" }
   | { kind: "pan" }
@@ -116,7 +143,12 @@ type Gesture =
       frame: Frame;
       fixedWorld: WorldPoint;
       start: ScreenPoint;
-      uniform: boolean;
+      /** The box's middle (Alt resizes about it) and, for a side handle, which side. */
+      centre: ScreenPoint;
+      edge: Edge | null;
+      /** The selection may be stretched on one axis (only upright pictures); anything else keeps its proportions. */
+      free: boolean;
+      snap: SnapContext | null;
     }
   | {
       kind: "rotate";
@@ -333,27 +365,31 @@ export function attachTools(
         return;
       }
     }
-    if (sel) {
-      const corners = sel.frame.corners;
-      for (let i = 0; i < 4; i++) {
-        const [hx, hy] = corners[i]!;
-        if (Math.abs(s.x - hx) <= HANDLE_SIZE_PX && Math.abs(s.y - hy) <= HANDLE_SIZE_PX && !editor.blockEdit()) {
-          const [fx, fy] = corners[(i + 2) % 4]!;
-          const ids = [...editor.selection].filter((id) => doc.get(id));
-          // A turned image resizes uniformly: stretching its bounding box would shear it. So does anything in a turned box.
-          const onlyImage = ids.length === 1 && doc.get(ids[0]!)?.kind === "image" && !doc.get(ids[0]!)?.rot && sel.frame.angle === 0;
-          g = {
-            kind: "scale",
-            pointerId: e.pointerId,
-            ids,
-            fixed: { x: fx, y: fy },
-            frame: view.frame,
-            fixedWorld: world({ x: fx, y: fy }),
-            start: { x: hx, y: hy },
-            uniform: !(onlyImage && e.shiftKey),
-          };
-          return;
-        }
+    if (sel && !editor.blockEdit()) {
+      for (const h of resizeHandles(sel.frame)) {
+        // A side handle is only as big as its square: wider, it would take presses meant for the item under it.
+        const reach = h.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX;
+        if (Math.abs(s.x - h.at[0]) > reach || Math.abs(s.y - h.at[1]) > reach) continue;
+        const ids = [...editor.selection].filter((id) => doc.get(id));
+        // Free (one-axis, or both axes apart) only for upright pictures in an upright box: strokes and text keep their shape.
+        const free = sel.frame.angle === 0 && ids.length > 0 && ids.every((id) => {
+          const o = doc.get(id)!;
+          return o.kind === "image" && !o.rot;
+        });
+        g = {
+          kind: "scale",
+          pointerId: e.pointerId,
+          ids,
+          fixed: { x: h.fixed[0], y: h.fixed[1] },
+          frame: view.frame,
+          fixedWorld: world({ x: h.fixed[0], y: h.fixed[1] }),
+          start: { x: h.at[0], y: h.at[1] },
+          centre: { x: sel.frame.centre[0], y: sel.frame.centre[1] },
+          edge: h.edge,
+          free,
+          snap: editor.snap ? snapContext(ids, view.frame) : null,
+        };
+        return;
       }
     }
     const hits = pickAll(unlocked(vis), s.x, s.y);
@@ -367,11 +403,13 @@ export function attachTools(
     g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey };
   };
 
-  const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint): void => {
+  const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
     const draggable = t && (t.kind === "stroke" || editor.selection.has(t.id)) && !editor.readOnly;
     if (t && draggable) {
       if (!editor.selection.has(t.id)) pick([t.id], gp.additive);
+      // Alt held as the drag starts: the drag carries a copy (placed exactly on the original) and the original stays.
+      if (alt && !editor.blockEdit()) duplicateSelection(doc, editor, view, 0);
       const ids = [...editor.selection].filter((id) => doc.get(id));
       g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, snap: editor.snap ? snapContext(ids, view.frame) : null };
       updateMove(s);
@@ -443,17 +481,49 @@ export function attachTools(
     editor.changed();
   };
 
-  const scaleFactors = (gs: Extract<Gesture, { kind: "scale" }>, s: ScreenPoint): { kx: number; ky: number } => {
-    const sx = gs.start.x - gs.fixed.x;
-    const sy = gs.start.y - gs.fixed.y;
-    let kx = sx !== 0 ? (s.x - gs.fixed.x) / sx : 1;
-    let ky = sy !== 0 ? (s.y - gs.fixed.y) / sy : 1;
-    if (gs.uniform) {
-      // Project onto the diagonal so the corner tracks the pointer smoothly.
-      const k = (sx * (s.x - gs.fixed.x) + sy * (s.y - gs.fixed.y)) / (sx * sx + sy * sy || 1);
-      kx = ky = k;
+  /**
+   * The factors of a resize drag, Figma style: a corner or a side follows the pointer; Shift keeps the proportions; Alt resizes about the
+   * middle of the box; Ctrl (or Cmd) turns snapping off. The dragged edge snaps to the edges and middles of other objects.
+   * Anything but an upright picture keeps its proportions whatever is held (it cannot be stretched).
+   */
+  const scaleFactors = (gs: Extract<Gesture, { kind: "scale" }>, s: ScreenPoint, mods: { shift: boolean; alt: boolean; noSnap: boolean }): { kx: number; ky: number; fixed: ScreenPoint } => {
+    const fixed = mods.alt ? gs.centre : gs.fixed;
+    const sx = gs.start.x - fixed.x;
+    const sy = gs.start.y - fixed.y;
+    const proportional = mods.shift || !gs.free;
+    const moveX = gs.edge !== "n" && gs.edge !== "s";
+    const moveY = gs.edge !== "e" && gs.edge !== "w";
+    let px = s.x;
+    let py = s.y;
+    editor.guides = null;
+    let snapped: "x" | "y" | null = null;
+    const sn = gs.snap;
+    if (sn && !mods.noSnap) {
+      const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
+      const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
+      // Proportional: only the nearer line can hold, the other follows from the ratio.
+      if (proportional && hx && hy) (hx.dist <= hy.dist ? (px = sn.tx[hx.target]![hx.line]!, (snapped = "x")) : (py = sn.ty[hy.target]![hy.line]!, (snapped = "y")));
+      else {
+        if (hx) (px = sn.tx[hx.target]![hx.line]!, (snapped = "x"));
+        if (hy) (py = sn.ty[hy.target]![hy.line]!, (snapped = snapped === "x" && proportional ? "x" : "y"));
+      }
+      if (hx && (!proportional || snapped === "x")) editor.guides = { x: px };
+      if (hy && (!proportional || snapped === "y")) editor.guides = { ...editor.guides, y: py };
     }
-    return { kx: Math.max(MIN_SCALE, kx), ky: Math.max(MIN_SCALE, ky) };
+    let kx = sx !== 0 ? (px - fixed.x) / sx : 1;
+    let ky = sy !== 0 ? (py - fixed.y) / sy : 1;
+    if (proportional) {
+      let k: number;
+      if (gs.edge) k = gs.edge === "n" || gs.edge === "s" ? ky : kx;
+      else if (snapped === "x") k = kx;
+      else if (snapped === "y") k = ky;
+      else k = (sx * (px - fixed.x) + sy * (py - fixed.y)) / (sx * sx + sy * sy || 1); // along the diagonal, so the corner tracks the pointer
+      kx = ky = k;
+    } else {
+      if (!moveX) kx = 1;
+      if (!moveY) ky = 1;
+    }
+    return { kx: Math.max(MIN_SCALE, kx), ky: Math.max(MIN_SCALE, ky), fixed };
   };
 
   const commitPreview = (): void => {
@@ -568,11 +638,17 @@ export function attachTools(
       const p = local(e);
       el.classList.toggle("is-rotate", !!b && b.rotatable && inRotateZone(p, b.frame, b.handle));
       // A resize cursor over a corner handle, drawn along the diagonal the corner points along (turned boxes included).
-      const c = b && !el.classList.contains("is-rotate") ? b.frame.corners.find((q) => Math.abs(p.x - q[0]) <= HANDLE_SIZE_PX && Math.abs(p.y - q[1]) <= HANDLE_SIZE_PX) : undefined;
-      if (b && c) {
-        const deg = (Math.atan2(c[1] - b.frame.centre[1], c[0] - b.frame.centre[0]) * 180) / Math.PI;
-        const a = ((deg % 180) + 180) % 180;
-        el.dataset["hover"] = a < 22.5 || a >= 157.5 ? "ew" : a < 67.5 ? "nwse" : a < 112.5 ? "ns" : "nesw";
+      const hit = b && !el.classList.contains("is-rotate") ? resizeHandles(b.frame).find((q) => {
+        const reach = q.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX;
+        return Math.abs(p.x - q.at[0]) <= reach && Math.abs(p.y - q.at[1]) <= reach;
+      }) : undefined;
+      if (b && hit) {
+        if (hit.edge) el.dataset["hover"] = hit.edge === "n" || hit.edge === "s" ? "ns" : "ew";
+        else {
+          const deg = (Math.atan2(hit.at[1] - b.frame.centre[1], hit.at[0] - b.frame.centre[0]) * 180) / Math.PI;
+          const a = ((deg % 180) + 180) % 180;
+          el.dataset["hover"] = a < 22.5 || a >= 157.5 ? "ew" : a < 67.5 ? "nwse" : a < 112.5 ? "ns" : "nesw";
+        }
       } else delete el.dataset["hover"];
     }
     if (g.kind === "none" && effectiveTool() === "eraser") {
@@ -609,7 +685,7 @@ export function attachTools(
         editor.changed();
         break;
       case "press":
-        if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) pressBecomesDrag(g, s);
+        if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) pressBecomesDrag(g, s, e.altKey);
         break;
       case "move":
         updateMove(s);
@@ -630,8 +706,8 @@ export function attachTools(
         break;
       }
       case "scale": {
-        const { kx, ky } = scaleFactors(g, s);
-        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: g.fixedWorld, kx, ky, keepWidth: editor.lock !== null };
+        const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
+        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null };
         editor.changed();
         break;
       }
@@ -706,6 +782,7 @@ export function attachTools(
       }
       case "rotate":
       case "scale":
+        editor.guides = null;
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();
         break;

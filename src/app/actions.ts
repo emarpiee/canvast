@@ -211,7 +211,7 @@ export function pasteObjects(doc: DocumentStore, editor: EditorState, view: View
 }
 
 /** Copy and paste the selection in one step (Ctrl+D): the copy lands a little down and right of the original. */
-export function duplicateSelection(doc: DocumentStore, editor: EditorState, view: ViewState): void {
+export function duplicateSelection(doc: DocumentStore, editor: EditorState, view: ViewState, stepPx = PASTE_STEP_PX): void {
   if (editor.blockEdit()) return;
   const objs = selected(doc, editor).filter((o) => !o.locked);
   if (!objs.length) return;
@@ -221,7 +221,7 @@ export function duplicateSelection(doc: DocumentStore, editor: EditorState, view
   const cam = view.camera;
   const centre = payload.centre;
   const at = centre
-    ? { x: D.add(D.parse(centre[0]), D.shift(D.fromNumber(PASTE_STEP_PX / 2 ** cam.zf), -cam.zi)), y: D.add(D.parse(centre[1]), D.shift(D.fromNumber(PASTE_STEP_PX / 2 ** cam.zf), -cam.zi)) }
+    ? { x: D.add(D.parse(centre[0]), D.shift(D.fromNumber(stepPx / 2 ** cam.zf), -cam.zi)), y: D.add(D.parse(centre[1]), D.shift(D.fromNumber(stepPx / 2 ** cam.zf), -cam.zi)) }
     : screenToWorld(cam, view.viewport, { x: view.viewport.width / 2, y: view.viewport.height / 2 });
   try {
     const { objects } = instantiate(payload, doc.space, doc.topZ(), { frame: view.frame, at, depth: Number(depth.levels) + depth.frac });

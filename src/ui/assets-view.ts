@@ -42,16 +42,22 @@ export interface AssetsView {
 
 /** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
 const COLUMNS = [
-  { id: "name", label: "Name", width: "minmax(140px, 2fr)" },
-  { id: "pixels", label: "Pixels", width: "110px" },
-  { id: "kind", label: "Type and size", width: "130px" },
-  { id: "used", label: "Used", width: "minmax(120px, 1.2fr)" },
-  { id: "tags", label: "Tags", width: "minmax(80px, 1fr)" },
-  { id: "added", label: "Added", width: "130px" },
+  { id: "name", label: "Name", min: 140, grow: 2 },
+  { id: "pixels", label: "Pixels", min: 100, grow: 0 },
+  { id: "kind", label: "Type and size", min: 120, grow: 0 },
+  { id: "used", label: "Used", min: 120, grow: 1.2 },
+  { id: "tags", label: "Tags", min: 100, grow: 1 },
+  { id: "added", label: "Added", min: 110, grow: 0 },
+  { id: "type", label: "Type", min: 70, grow: 0 },
+  { id: "size", label: "Size", min: 80, grow: 0 },
+  { id: "folder", label: "Folder", min: 110, grow: 1 },
+  { id: "favourite", label: "Favourite", min: 80, grow: 0 },
 ] as const;
 type ColumnId = (typeof COLUMNS)[number]["id"];
 const DEFAULT_COLUMN_ORDER: readonly ColumnId[] = COLUMNS.map((c) => c.id);
-const DEFAULT_HIDDEN: readonly ColumnId[] = ["added"];
+const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "type", "size", "folder", "favourite"];
+/** A column's track in the list's grid: a fixed width, or a share of the room left over (never narrower than its minimum). */
+const trackOf = (c: (typeof COLUMNS)[number]): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
 
 /** The default preview of a file that is not media: a plain sheet with a folded corner. */
 const FILE_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150"><path d="M20 8h56l32 32v100a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8z" fill="#cfd8d6"/><path d="M76 8v24a8 8 0 0 0 8 8h24z" fill="#9fb0ad"/><rect x="28" y="70" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="88" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="106" width="40" height="6" rx="3" fill="#9fb0ad"/></svg>`;
@@ -91,7 +97,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     <div class="assets-body">
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" title="Drag to move this column">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
@@ -113,13 +119,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
               <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
               <button type="button" class="vbtn" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (B)">${ICONS.chevronDown}</button>
+              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronDown}</button>
               <button type="button" class="vbtn" data-act="close" aria-label="Close slide view" title="Back to the library (Esc)">${ICONS.x}</button>
             </div>
           </div>
           <div class="viewer-handle" hidden>
             <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
-            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (B)">${ICONS.chevronUp}</button>
+            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.chevronUp}</button>
           </div>
         </div>
       </div>
@@ -176,7 +182,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
-    if (Array.isArray(saved.hidden)) ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
+    if (Array.isArray(saved.hidden)) {
+      ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
+      // Columns added after these choices were saved start hidden.
+      const had = new Set(Array.isArray(saved.order) ? saved.order : DEFAULT_COLUMN_ORDER);
+      for (const c of DEFAULT_HIDDEN) if (!had.has(c) && !ui.hidden.includes(c)) ui.hidden.push(c);
+    }
   } catch {
     // unreadable: shown
   }
@@ -203,7 +214,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const shown = ui.order.filter((c) => !ui.hidden.includes(c));
     ui.order.forEach((c, i) => body.style.setProperty(`--o-${c}`, String(i + 1)));
     for (const c of DEFAULT_COLUMN_ORDER) body.classList.toggle(`hide-${c}`, ui.hidden.includes(c));
-    body.style.setProperty("--cols", ["56px", ...shown.map((c) => COLUMNS.find((x) => x.id === c)!.width)].join(" "));
+    body.style.setProperty("--cols", ["56px", ...shown.map((c) => trackOf(COLUMNS.find((x) => x.id === c)!))].join(" "));
+    // The list never squeezes a column below its minimum: when the window is narrower it scrolls sideways instead.
+    body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + COLUMNS.find((x) => x.id === c)!.min, 0) + 12 * shown.length + 48}px`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
     else body.style.removeProperty("--sheet-h");
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
@@ -679,11 +692,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === "ArrowRight") stepSlide(1);
     else if (e.key === " " && !(e.target as HTMLElement).closest("button, video")) setShowing(!showing);
     else if (e.key === "i" || e.key === "I") toggleDetails();
-    else if (e.key === "b" || e.key === "B") toggleBar();
+    else if (e.key === "f" || e.key === "F") toggleBar();
     else if (e.key === "+" || e.key === "=") zoomAt(zoom.s * 1.25, ...centre());
     else if (e.key === "-" || e.key === "_") zoomAt(zoom.s / 1.25, ...centre());
     else if (e.key === "0") resetZoom();
-    else if (e.key === "1" || e.key === "f" || e.key === "F") toggleActual();
+    else if (e.key === "1") toggleActual();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -777,6 +790,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
           <span class="asset-kind">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
+          <span class="asset-type">${esc(kindOf(e.type))}</span>
+          <span class="asset-size">${fmtBytes(e.size)}</span>
+          <span class="asset-folder">${esc(meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "")}</span>
+          <span class="asset-fav">${meta(e).favorite ? "★ Favourite" : ""}</span>
           <span class="asset-added">${new Date(e.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
@@ -1612,7 +1629,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.dataset["scope"]) {
-      scope = b.dataset["scope"];
+      // Choosing the one already chosen lets go of it (back to all assets); a smart folder takes its search with it.
+      const next = b.dataset["scope"];
+      if (next === scope && next !== "all") {
+        if (next.startsWith("smart:")) {
+          search.value = "";
+          usageSel.value = "all";
+        }
+        scope = "all";
+        sideMenu = null;
+        render();
+        return;
+      }
+      scope = next;
       if (narrow.matches) sideOpen = false; // a choice on a small screen folds the list away
       sideMenu = null;
       const sf = scope.startsWith("smart:") ? listing?.smart.find((x) => `smart:${x.id}` === scope) : undefined;
@@ -1759,6 +1788,44 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (moveBy(e)) e.preventDefault();
     }
   });
+  // ---- the list's columns: drag a header onto another to move it
+  const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;
+  let dragCol: ColumnId | null = null;
+  listHead.addEventListener("dragstart", (e) => {
+    const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
+    if (!h) return;
+    dragCol = h.dataset["col"] as ColumnId;
+    h.classList.add("is-dragging");
+    e.dataTransfer?.setData("text/plain", dragCol);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  listHead.addEventListener("dragover", (e) => {
+    const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
+    if (!dragCol || !h || h.dataset["col"] === dragCol) return;
+    e.preventDefault();
+    for (const x of listHead.querySelectorAll(".is-drop")) x.classList.remove("is-drop");
+    h.classList.add("is-drop");
+  });
+  listHead.addEventListener("dragend", () => {
+    dragCol = null;
+    for (const x of listHead.querySelectorAll(".is-drop, .is-dragging")) x.classList.remove("is-drop", "is-dragging");
+  });
+  listHead.addEventListener("drop", (e) => {
+    const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
+    const from = dragCol;
+    dragCol = null;
+    for (const x of listHead.querySelectorAll(".is-drop, .is-dragging")) x.classList.remove("is-drop", "is-dragging");
+    if (!h || !from || h.dataset["col"] === from) return;
+    e.preventDefault();
+    const to = h.dataset["col"] as ColumnId;
+    const order = ui.order.filter((c) => c !== from);
+    order.splice(order.indexOf(to) + (ui.order.indexOf(from) < ui.order.indexOf(to) ? 1 : 0), 0, from); // lands where the target was
+    ui.order = order;
+    saveUi();
+    applyUi();
+    if (!colPop.hidden) renderColumns();
+  });
+
   // ---- the list's columns: which are shown and in what order (remembered on this device)
   const colPop = root.querySelector<HTMLElement>(".assets-columns")!;
   const colBtn = root.querySelector<HTMLButtonElement>('[data-action="columns"]')!;

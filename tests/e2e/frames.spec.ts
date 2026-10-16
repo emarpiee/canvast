@@ -901,25 +901,25 @@ test("groups: picking one member picks the group, it moves as one, nests, enters
   await p.mouse.click(500, 250);
   expect((await sel()).sort(), "one member picks the group").toEqual([a, b].sort());
   const before = { a: (await boxOf(app, a))!, b: (await boxOf(app, b))!, c: (await boxOf(app, c))! };
-  await app.drag({ x: 500, y: 250 }, { x: 560, y: 250 }, 6);
+  await app.drag({ x: 450, y: 250 }, { x: 510, y: 250 }, 6); // on the stroke, clear of the box's side handles
   expect((await boxOf(app, b))!.minX - before.b.minX, "the whole group moved").toBeCloseTo(60, 4);
   expect((await boxOf(app, c))!, "the loose stroke did not").toEqual(before.c);
   // Nest: group the group with the loose stroke; entering goes one level at a time.
   await p.mouse.click(500, 450);
   await p.keyboard.down("Shift");
-  await p.mouse.click(560, 250);
+  await p.mouse.click(520, 250);
   await p.keyboard.up("Shift");
   await p.keyboard.press("Control+g");
   await p.keyboard.press("Escape");
   await p.mouse.click(500, 450);
   expect((await sel()).sort(), "the outer group").toEqual([a, b, c].sort());
-  await p.mouse.dblclick(560, 250);
+  await p.mouse.dblclick(520, 250);
   expect((await sel()).sort(), "entered: the inner group").toEqual([a, b].sort());
   await p.keyboard.press("Control+Shift+g"); // ungroup the inner level
-  await p.mouse.click(560, 250);
+  await p.mouse.click(520, 250);
   expect(await sel(), "a is loose inside the outer group now").toEqual([a]);
   await p.keyboard.press("Control+z"); // undo the ungroup: the inner group is back
-  await p.mouse.click(560, 250);
+  await p.mouse.click(520, 250);
   expect((await sel()).sort()).toEqual([a, b].sort());
   // Arrange: the picked group goes behind everything, in the same order among its members.
   const z0 = await zs();

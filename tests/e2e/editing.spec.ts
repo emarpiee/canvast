@@ -224,7 +224,10 @@ async function resizeFromBottomRight(app: App, id: string, dx: number, dy: numbe
   // the exact handle corner, so compute the expected factor the same way.
   const from: [number, number] = [Math.round(b.maxX), Math.round(b.maxY)];
   const to: [number, number] = [from[0] + dx, from[1] + dy];
+  // Ctrl: no snapping (this measures the plain scale; snapping has its own test).
+  await app.page.keyboard.down("Control");
   await drag(app, from, to);
+  await app.page.keyboard.up("Control");
   const after = (await screenOfObject(app, id))!;
   const sx = b.maxX - b.minX;
   const sy = b.maxY - b.minY;
@@ -310,11 +313,11 @@ test("U8: strokes in far-apart regions stay independent, addressable and persist
   expect(await objects(app)).toEqual(beforeReload);
   expect(await app.camera()).toEqual(farCam);
   expect((await screenOfObject(app, b.id))!.q).toEqual(bScreen.q);
-  await click(app, 600, 250);
+  await click(app, 580, 260); // on the stroke, clear of the box's side handles
   expect(await selection(app)).toEqual([b.id]);
-  const w0 = await app.worldAt(600, 250);
-  const w1 = await app.worldAt(650, 280);
-  await drag(app, [600, 250], [650, 280]);
+  const w0 = await app.worldAt(580, 260);
+  const w1 = await app.worldAt(630, 290);
+  await drag(app, [580, 260], [630, 290]);
   const all = await objects(app);
   expect(pick(byId(all, b.id))).toEqual(moved(b, worldDelta(w0, w1)));
   expect(byId(all, a.id)).toEqual(a);
@@ -457,9 +460,10 @@ test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom,
   const p = app.page;
   // A big stroke B, then a tiny one A drawn 8 levels deeper right beside the middle of B; back to the first zoom.
   await key(app, "p");
-  await app.drag({ x: 600, y: 440 }, { x: 680, y: 460 }, 4);
+  // On the window's middle line (y = 400), so the tiny one is straight to the right of the big one's middle.
+  await app.drag({ x: 600, y: 390 }, { x: 680, y: 410 }, 4);
   await p.evaluate(() => window.__canvastDebug.jump(8));
-  await app.drag({ x: 700, y: 440 }, { x: 760, y: 460 }, 4);
+  await app.drag({ x: 700, y: 390 }, { x: 760, y: 410 }, 4);
   await p.evaluate(() => window.__canvastDebug.jump(-8));
   await app.frame();
   await key(app, "v");
@@ -489,7 +493,7 @@ test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom,
 test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level' only moves the view (ADR 0058)", async ({ app }) => {
   const p = app.page;
   await key(app, "p");
-  for (const x of [300, 700]) await app.drag({ x, y: 450 }, { x: x + 60, y: 470 }, 4);
+  for (const x of [300, 440]) await app.drag({ x, y: 450 }, { x: x + 60, y: 470 }, 4);
   await key(app, "v");
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
   const [a, b] = await objects(app);
@@ -519,5 +523,180 @@ test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom le
   expect(after.zi + after.zf, "the zoom level is kept").toBeCloseTo(before.zi + before.zf, 3);
   const sb = (await screenOfObject(app, b!.id))!.box;
   expect(Math.abs((sb.minX + sb.maxX) / 2 - p.viewportSize()!.width / 2), "and the item is in the middle").toBeLessThan(60);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Ctrl+Arrow, nearest in view: an item far from the selected one (many of its sizes away) or of a very different size is not a neighbour; 'anywhere' still reaches it (ADR 0058)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "p");
+  // A small stroke; one far to the right (about 8 of its own sizes away); one close; one very large but near.
+  await app.drag({ x: 200, y: 400 }, { x: 260, y: 420 }, 4);
+  await app.drag({ x: 900, y: 400 }, { x: 960, y: 420 }, 4);
+  await key(app, "v");
+  const [a, far] = await objects(app);
+  const pick = async (id: string) => {
+    const s = (await screenOfObject(app, id))!.box;
+    await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+  };
+  await pick(a!.id);
+  await key(app, "Control+ArrowRight");
+  await app.frame();
+  expect(await selection(app), "too far to be a neighbour").toEqual([a!.id]);
+  expect(await p.evaluate(() => window.__canvastDebug.camera())).toBeTruthy();
+  expect(app.consoleErrors).toEqual([]);
+  void far;
+});
+
+test("resize, Figma style: corners and sides follow the pointer; Shift keeps the proportions, Alt resizes about the middle, Ctrl turns snapping off; edges snap to other items (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const img = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(5)); // the picture is about 8 px wide at first; make it big enough to work with
+  await app.frame();
+  await key(app, "v");
+  const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  const select = async (id: string) => {
+    const b = await boxOf(id);
+    await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+    expect(await selection(app)).toEqual([id]);
+  };
+  const drag = async (from: [number, number], to: [number, number], mods: string[] = []) => {
+    for (const m of mods) await p.keyboard.down(m);
+    await p.mouse.move(from[0], from[1]);
+    await p.mouse.down();
+    await p.mouse.move((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, { steps: 4 });
+    await p.mouse.move(to[0], to[1], { steps: 4 });
+    await p.mouse.up();
+    for (const m of mods.reverse()) await p.keyboard.up(m);
+    await app.frame();
+  };
+  await select(img.id);
+  const size = async () => {
+    const b = await boxOf(img.id);
+    return { w: b.maxX - b.minX, h: b.maxY - b.minY, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, b };
+  };
+  const s0 = await size();
+  let c = await frame();
+  // Free: the bottom-right corner follows the pointer in both axes, so the shape changes.
+  await drag(c[2] as [number, number], [c[2]![0] + 60, c[2]![1] + 20]);
+  const s1 = await size();
+  expect(s1.w - s0.w).toBeGreaterThan(50);
+  expect(s1.h - s0.h).toBeGreaterThan(15);
+  expect(s1.h - s0.h, "not proportional").toBeLessThan((s1.w - s0.w) * 0.6);
+  // Shift: proportions kept.
+  c = await frame();
+  await drag(c[2] as [number, number], [c[2]![0] + 80, c[2]![1] + 5], ["Shift"]);
+  const s2 = await size();
+  expect(Math.abs(s2.w / s2.h - s1.w / s1.h)).toBeLessThan(0.02);
+  expect(s2.w).toBeGreaterThan(s1.w + 40);
+  // Alt: about the middle, so the middle stays and the size changes on both sides.
+  c = await frame();
+  await drag(c[2] as [number, number], [c[2]![0] + 40, c[2]![1] + 30], ["Alt"]);
+  const s3 = await size();
+  expect(Math.abs(s3.cx - s2.cx)).toBeLessThan(1.5);
+  expect(Math.abs(s3.cy - s2.cy)).toBeLessThan(1.5);
+  expect(s3.w - s2.w, "grows on both sides").toBeGreaterThan(70);
+  // A side handle changes one axis only.
+  c = await frame();
+  const rightMid: [number, number] = [c[1]![0], (c[1]![1] + c[2]![1]) / 2];
+  await drag(rightMid, [rightMid[0] + 50, rightMid[1] + 40]);
+  const s4 = await size();
+  expect(s4.w - s3.w).toBeGreaterThan(40);
+  expect(Math.abs(s4.h - s3.h)).toBeLessThan(1.5);
+  // Snapping: the dragged edge lands exactly on another item's edge when it is within a few pixels; Ctrl turns that off.
+  const wall = await penStroke(app, [[s4.b.maxX + 140, s4.b.minY - 60], [s4.b.maxX + 140, s4.b.minY + 100]]);
+  await key(app, "v");
+  const wb = await boxOf(wall.id);
+  await select(img.id);
+  c = await frame();
+  const handle: [number, number] = [c[1]![0], (c[1]![1] + c[2]![1]) / 2];
+  await drag(handle, [wb.minX - 3, handle[1]]);
+  expect(Math.abs((await boxOf(img.id)).maxX - wb.minX), "snapped onto the wall's edge").toBeLessThan(0.6);
+  c = await frame();
+  const handle2: [number, number] = [c[1]![0], (c[1]![1] + c[2]![1]) / 2];
+  await drag(handle2, [wb.minX - 3 - 12, handle2[1]]);
+  await drag([(await frame())[1]![0], ((await frame())[1]![1] + (await frame())[2]![1]) / 2], [wb.minX - 3, handle2[1]], ["Control"]);
+  expect(Math.abs((await boxOf(img.id)).maxX - (wb.minX - 3)), "Ctrl: exactly where the pointer is").toBeLessThan(1.5);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Alt held as a drag starts carries a copy; the original stays; Alt tapped alone still focuses (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const s = await penStroke(app, [[400, 300], [520, 340]]);
+  await key(app, "v");
+  const box0 = (await screenOfObject(app, s.id))!.box;
+  await p.mouse.click(Math.round((box0.minX + box0.maxX) / 2), Math.round((box0.minY + box0.maxY) / 2));
+  expect(await selection(app)).toEqual([s.id]);
+  const cx = Math.round((box0.minX + box0.maxX) / 2);
+  const cy = Math.round((box0.minY + box0.maxY) / 2);
+  await p.keyboard.down("Alt");
+  await p.mouse.move(cx, cy);
+  await p.mouse.down();
+  await p.mouse.move(cx + 60, cy + 90, { steps: 6 });
+  await p.mouse.up();
+  await p.keyboard.up("Alt");
+  await app.frame();
+  const all = await objects(app);
+  expect(all).toHaveLength(2);
+  const orig = all.find((o) => o.id === s.id)!;
+  const copy = all.find((o) => o.id !== s.id)!;
+  expect(orig.ax, "the original did not move").toBe(s.ax);
+  expect(orig.ay).toBe(s.ay);
+  expect(await selection(app), "the copy is the selection").toEqual([copy.id]);
+  const cb = (await screenOfObject(app, copy.id))!.box;
+  expect(Math.abs(cb.minX - box0.minX - 60)).toBeLessThan(2);
+  expect(Math.abs(cb.minY - box0.minY - 90)).toBeLessThan(2);
+  // Alt after the drag, tapped alone, still brings the selection into view.
+  const zoom0 = await p.evaluate(() => window.__canvastDebug.camera());
+  await p.keyboard.down("Alt");
+  await p.keyboard.up("Alt");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.camera())).not.toEqual(zoom0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Alt tapped again fits everything visible; a third tap returns to the selection; the fit buttons do the same (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const a = await penStroke(app, [[300, 300], [380, 330]]);
+  const b = await penStroke(app, [[900, 500], [980, 530]]);
+  await key(app, "v");
+  const cam = async () => JSON.stringify(await p.evaluate(() => window.__canvastDebug.camera()));
+  const inside = async (id: string) => {
+    const s = await screenOfObject(app, id);
+    return !!s && s.box.minX >= 0 && s.box.minY >= 0 && s.box.maxX <= 1280 && s.box.maxY <= 800;
+  };
+  const alt = async () => {
+    await p.keyboard.down("Alt");
+    await p.keyboard.up("Alt");
+    await app.frame();
+  };
+  const fitSelection = p.getByRole("button", { name: "Fit the selection in view" });
+  const fitAll = p.getByRole("button", { name: "Fit everything in view" });
+  await expect(fitSelection, "nothing selected").toBeDisabled();
+  const s0 = await screenOfObject(app, a.id);
+  await p.mouse.click(Math.round((s0!.box.minX + s0!.box.maxX) / 2), Math.round((s0!.box.minY + s0!.box.maxY) / 2));
+  expect(await selection(app)).toEqual([a.id]);
+  await expect(fitSelection).toBeEnabled();
+  const start = await cam();
+  await alt(); // the selection fills the view
+  const onA = await cam();
+  expect(onA).not.toEqual(start);
+  expect(await inside(a.id)).toBe(true);
+  const ab = (await screenOfObject(app, a.id))!.box;
+  expect(ab.maxX - ab.minX, "zoomed in on it").toBeGreaterThan(500);
+  await alt(); // again: everything visible at this zoom fits
+  const onAll = await cam();
+  expect(onAll).not.toEqual(onA);
+  expect(await inside(a.id)).toBe(true);
+  expect(await inside(b.id)).toBe(true);
+  await alt(); // a third time: back to the selection
+  expect(await cam()).toEqual(onA);
+  // The buttons: fit everything, then the selection.
+  await fitAll.click();
+  await app.frame();
+  expect(await cam()).toEqual(onAll);
+  await fitSelection.click();
+  await app.frame();
+  expect(await cam()).toEqual(onA);
   expect(app.consoleErrors).toEqual([]);
 });

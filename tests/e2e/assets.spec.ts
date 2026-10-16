@@ -885,10 +885,10 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await viewer.locator(".film-item").nth(2).click();
   await expect(viewer.locator(".viewer-pos")).toHaveText("3 of 3");
   expect(await p.getByTestId("asset-inspector").locator("h2").textContent()).not.toBe(name);
-  // Hide the details (I) and the controls (B): the picture gets the room, a handle brings the controls back, and both choices are remembered.
+  // Hide the details (I) and the controls (F): the picture gets the room, a handle brings the controls back, and both choices are remembered.
   await p.keyboard.press("i");
   await expect(p.getByTestId("asset-inspector")).toBeHidden();
-  await p.keyboard.press("b");
+  await p.keyboard.press("f");
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
   await expect(viewer.getByRole("button", { name: "Show the controls" })).toBeVisible();
   await p.reload();
@@ -1105,7 +1105,7 @@ test("viewer with the controls hidden: the view tabs fade away and return near t
   const nav = p.locator("#nav");
   const opacity = () => nav.evaluate((e) => getComputedStyle(e).opacity);
   expect(await opacity(), "shown while the controls are").toBe("1");
-  await p.keyboard.press("b");
+  await p.keyboard.press("f");
   await expect.poll(opacity).toBe("0");
   await p.mouse.move(300, 24); // near the top edge: back
   await expect.poll(opacity).toBe("1");
@@ -1214,6 +1214,19 @@ test("list columns: each can be hidden or moved, the header follows, and the cho
   await expect(head("pixels")).toBeVisible();
   await expect(head("added")).toBeHidden();
   expect(await order("tags")).toBe("5");
+  // More properties can be shown: the folder, the size, the type, whether it is a favourite. (The panel stays open after Reset.)
+  await expect(p.getByTestId("columns-panel")).toBeVisible();
+  for (const name of ["Folder", "Size", "Favourite", "Type"]) await p.getByTestId("columns-panel").getByRole("checkbox", { name, exact: true }).check();
+  for (const col of ["folder", "size", "favourite", "type"]) await expect(head(col)).toBeVisible();
+  await p.keyboard.press("Escape");
+  // A header dragged onto another takes its place.
+  await head("used").dragTo(head("name"));
+  expect(await order("used")).toBe("1");
+  expect(await order("name")).toBe("2");
+  // The list never squeezes a column: it scrolls sideways instead of clipping (the header and the rows are as wide as the columns need).
+  await p.setViewportSize({ width: 700, height: 700 });
+  const wide = await p.locator(".assets-body.is-list .assets-list-head").evaluate((e) => e.scrollWidth <= e.clientWidth + 1 || e.parentElement!.scrollWidth > e.parentElement!.clientWidth);
+  expect(wide).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
 
