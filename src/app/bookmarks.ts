@@ -54,6 +54,12 @@ export class BookmarkList {
     await this.set(this.items.map((b) => (b.id === id ? { ...b, name: clean } : b)));
   }
 
+  /** Point a bookmark at the view as it is now, with a new picture (the old one stays when the browser cannot make one). */
+  async update(id: string, thumb?: string): Promise<void> {
+    const view = serializeFrameCamera(this.view.frameCamera);
+    await this.set(this.items.map((b) => (b.id === id ? { ...b, view, ...(thumb ? { thumb } : {}), at: Date.now() } : b)));
+  }
+
   async remove(id: string): Promise<void> {
     await this.set(this.items.filter((b) => b.id !== id));
   }

@@ -1561,3 +1561,21 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer.no-bar .viewer-media-bar { display: none; }
 .viewer.no-bar.show-player .viewer-media-bar:not([hidden]) { display: flex; }
 .viewer-media-bar .media-bar-extract { margin-left: 4px; }
+
+/* ---- Bookmarks panel (ADR 0065): cards with picture, name, date and Rename / Update / Delete; large and always shown on touch ---- */
+.bookmarks-panel ul { display: grid; gap: 6px; padding: 8px; }
+.bookmarks-panel .bookmark { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 4px; border: 1px solid var(--hud-border); border-radius: var(--r-md); background: color-mix(in oklch, var(--hud-fg) 4%, transparent); cursor: default; }
+.bookmarks-panel .bookmark:hover { background: var(--hud-hover); }
+.bookmarks-panel .bookmark-go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: var(--r-sm); }
+.bookmarks-panel .bookmark-go:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.bookmarks-panel .bookmark-thumb { width: 72px; height: 46px; border-radius: var(--r-sm); object-fit: cover; flex: none; background: var(--hud-border); }
+.bookmark-text { display: grid; gap: 2px; min-width: 0; }
+.bookmarks-panel .bookmark-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.bookmark-meta { font-size: 11px; color: var(--hud-muted); white-space: nowrap; }
+.bookmarks-panel .bookmark input { flex: 1; min-width: 0; font: inherit; font-weight: 600; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-accent); border-radius: var(--r-sm); padding: 2px 6px; }
+.bookmark-actions { display: inline-flex; flex: none; }
+.bookmark-actions .layer-btn { width: 32px; height: 32px; }
+.bookmark-actions .layer-btn svg { width: 16px; height: 16px; }
+.bookmarks-panel .layers-empty svg { width: 14px; height: 14px; vertical-align: -2px; }
+@media (hover: hover) { .bookmarks-panel .bookmark-actions { opacity: 0; } .bookmarks-panel .bookmark:hover .bookmark-actions, .bookmarks-panel .bookmark:focus-within .bookmark-actions { opacity: 1; } }
+@media (max-width: 640px) { .bookmarks-panel .bookmark-thumb { width: 60px; height: 40px; } .bookmark-actions .layer-btn { width: 36px; height: 36px; } .bookmarks-panel .bookmark-actions { opacity: 1; } }

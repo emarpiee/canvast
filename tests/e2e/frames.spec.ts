@@ -1165,6 +1165,30 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await p.keyboard.type("Far corner");
   await p.keyboard.press("Enter");
   await expect(rows.nth(1).locator(".bookmark-name")).toHaveText("Far corner");
+  // Rename with the button (no double-click needed), and the card shows when it was saved.
+  await rows.nth(0).getByRole("button", { name: "Rename Bookmark 1" }).click();
+  await p.keyboard.type("Home");
+  await p.keyboard.press("Enter");
+  await expect(rows.nth(0).locator(".bookmark-name")).toHaveText("Home");
+  await expect(rows.nth(0).locator(".bookmark-meta")).toContainText(/Today|,/);
+  // Update: the bookmark points at the view as it is now and its picture is made again.
+  await rows.nth(0).click(); // (go home first)
+  await app.frame();
+  const thumb0 = await rows.nth(0).locator("img.bookmark-thumb").getAttribute("src");
+  await p.keyboard.press("p");
+  await app.drag({ x: 300, y: 300 }, { x: 520, y: 360 }, 5);
+  await p.keyboard.press("h");
+  for (let i = 0; i < 2; i++) await p.keyboard.press("ArrowLeft");
+  await app.frame();
+  const moved = await app.camera();
+  expect(moved).not.toEqual({ cx: "0p0", cy: "0p0", zi: 0, zf: 0, pz: 0 });
+  await rows.nth(0).getByRole("button", { name: "Update Home to the current view" }).click();
+  await expect(rows.nth(0).locator("img.bookmark-thumb")).not.toHaveAttribute("src", thumb0!);
+  await p.keyboard.press("0");
+  await app.frame();
+  await rows.nth(0).locator(".bookmark-name").click();
+  await app.frame();
+  expect(await app.camera(), "it goes to the updated view").toEqual(moved);
   // Survives frame clean-up and a reload.
   await p.evaluate(() => window.__canvastDebug.collectFrames());
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
@@ -1178,7 +1202,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await app.frame();
   expect(await app.camera()).toEqual(deepCam);
   // Delete.
-  await p.getByTestId("bookmarks-panel").getByRole("button", { name: "Delete Bookmark 1" }).click();
+  await p.getByTestId("bookmarks-panel").getByRole("button", { name: "Delete Home" }).click();
   await expect(after).toHaveCount(1);
 });
 
@@ -1667,5 +1691,27 @@ test("medium screen (800 px wide): the tool options get their own row under the 
   expect(options.y, "the options are on the second row").toBeGreaterThanOrEqual(nav.y + nav.height - 1);
   expect(options.height, "one row, not a tall box").toBeLessThan(70);
   expect(options.x + options.width).toBeLessThanOrEqual(800);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("bookmarks on a phone (360 px): each card shows its Rename, Update and Delete at once, large enough to touch, inside the panel (ADR 0065)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 360, height: 700 });
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  const panel = p.getByTestId("bookmarks-panel");
+  const card = panel.locator("li.bookmark").first();
+  await expect(card).toBeVisible();
+  const pb = (await panel.boundingBox())!;
+  for (const name of [/^Rename/, /^Update/, /^Delete/]) {
+    const b = card.getByRole("button", { name });
+    await expect(b).toHaveCSS("opacity", "1");
+    const bb = (await b.boundingBox())!;
+    expect(bb.width).toBeGreaterThanOrEqual(34);
+    expect(bb.height).toBeGreaterThanOrEqual(34);
+    expect(bb.x + bb.width).toBeLessThanOrEqual(pb.x + pb.width + 1);
+  }
+  const name = (await card.locator(".bookmark-name").boundingBox())!;
+  expect(name.width, "the name keeps room").toBeGreaterThan(50);
   expect(app.consoleErrors).toEqual([]);
 });
