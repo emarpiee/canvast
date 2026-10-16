@@ -48,6 +48,7 @@ import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
 import chevronUp from "lucide-static/icons/chevron-up.svg";
+import maximize from "lucide-static/icons/maximize.svg";
 import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
 import trash2 from "lucide-static/icons/trash-2.svg";
@@ -150,6 +151,7 @@ export const ICONS = {
   chevronLeft: clean(chevronLeft),
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
+  maximize: clean(maximize),
   star: clean(starIcon),
   trash2: clean(trash2),
   info: clean(infoIcon),

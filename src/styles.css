@@ -841,7 +841,8 @@ body[data-view="assets"] #notices { bottom: 92px; }
 /* The library: a justified gallery, every picture at its own proportions, no frames or bands around them. */
 .assets-grid { --row-h: var(--thumb, 144px); display: flex; flex-wrap: wrap; gap: var(--near); align-content: flex-start; }
 .assets-grid::after { content: ""; flex-grow: 1000000; }
-.asset-card { position: relative; flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row-h)); min-width: 64px; aspect-ratio: var(--ar); padding: 0; overflow: hidden; color: inherit; text-align: left; background: var(--hud-hover); border: 0; border-radius: var(--r-md); cursor: pointer; }
+.asset-cell { position: relative; flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row-h)); min-width: 64px; aspect-ratio: var(--ar); }
+.asset-card { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; overflow: hidden; color: inherit; text-align: left; background: var(--hud-hover); border: 0; border-radius: var(--r-md); cursor: pointer; }
 .asset-thumb { position: absolute; inset: 0; display: block; }
 .asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .asset-thumb img.is-pixelated, .viewer img.is-pixelated { image-rendering: pixelated; }
@@ -852,9 +853,9 @@ body[data-view="assets"] #notices { bottom: 92px; }
 .asset-card:hover .asset-info, .asset-card:focus-visible .asset-info, .asset-card[aria-pressed="true"] .asset-info { opacity: 1; }
 .asset-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-meta, .asset-uses, .asset-tags { font-size: 12px; color: oklch(0.9 0.005 190); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.asset-star { position: absolute; top: 8px; left: 8px; display: inline-flex; color: var(--hud-star); filter: drop-shadow(0 1px 2px oklch(0 0 0 / 0.5)); }
+.asset-star { position: absolute; top: 8px; right: 8px; pointer-events: none; display: inline-flex; color: var(--hud-star); filter: drop-shadow(0 1px 2px oklch(0 0 0 / 0.5)); }
 .asset-star svg { width: 16px; height: 16px; fill: currentColor; }
-.asset-missing-label { position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--hud-danger-fg); background: var(--hud-danger); border-radius: 999px; }
+.asset-missing-label { position: absolute; left: 8px; bottom: 8px; z-index: 1; pointer-events: none; padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--hud-danger-fg); background: var(--hud-danger); border-radius: 999px; }
 .asset-card.is-missing { outline: 2px dashed var(--hud-danger); outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) { .asset-info { transition: none; } }
 
@@ -976,3 +977,23 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 :root[data-density="compact"] .side-item { padding: 4px 8px; }
 :root[data-density="compact"] .set-row { padding: 6px 0; }
 :root[data-density="compact"] .film-item { width: 52px; height: 36px; }
+
+/* Picking several: a checkbox on every card (it shows on hover, as soon as anything is picked, and always on a touch screen). */
+.asset-check { position: absolute; top: 8px; left: 8px; z-index: 2; width: 22px; height: 22px; margin: 0; cursor: pointer; opacity: 0; accent-color: var(--hud-accent); filter: drop-shadow(0 1px 3px oklch(0 0 0 / 0.5)); }
+.asset-cell:hover .asset-check, .asset-cell:focus-within .asset-check, .assets-grid.has-picks .asset-check, .asset-check:checked { opacity: 1; }
+@media (hover: none) { .asset-check { opacity: 1; } }
+.asset-card[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--hud-accent); }
+.asset-card[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; background: color-mix(in oklch, var(--hud-accent) 14%, transparent); pointer-events: none; }
+.asset-check:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
+
+/* The slideshow: a thin bar runs across the top of the picture for the time each slide stays. */
+.viewer-stage { position: relative; }
+.viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
+.viewer-progress[hidden] { display: none; }
+.viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
+@keyframes show-run { to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .viewer-progress.is-running { animation: none; transform: scaleX(1); opacity: 0.4; } }
+.viewer-interval { height: var(--ctl); padding: 0 6px; font: inherit; color: inherit; background: oklch(1 0 0 / 0.08); border: 0; border-radius: var(--r-md); }
+.viewer-interval option { color: var(--hud-fg); background: var(--hud-bg); }
+.vbtn[data-act="play"][aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); box-shadow: none; }
+.assets-grid { user-select: none; -webkit-user-select: none; }

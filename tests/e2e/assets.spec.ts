@@ -896,3 +896,121 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await expect(viewer).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk actions on the picked assets (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  for (let i = 0; i < 5; i++) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `ref-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [40 * i, 90, 200 - 30 * i, 255]) });
+  }
+  const cards = p.getByTestId("asset-card");
+  await expect(cards).toHaveCount(5);
+  const picked = () => p.locator('[data-testid="asset-card"][aria-pressed="true"]');
+  // A click picks one; Ctrl adds and removes; Shift takes the range from the last pick.
+  await cards.nth(0).click();
+  await expect(picked()).toHaveCount(1);
+  await cards.nth(2).click({ modifiers: ["Control"] });
+  await expect(picked()).toHaveCount(2);
+  await cards.nth(0).click({ modifiers: ["Control"] });
+  await expect(picked()).toHaveCount(1);
+  await cards.nth(1).click();
+  await cards.nth(4).click({ modifiers: ["Shift"] });
+  await expect(picked()).toHaveCount(4);
+  // Checkboxes do the same without a keyboard: one tap adds, another removes.
+  await p.keyboard.press("Escape");
+  await expect(picked()).toHaveCount(0);
+  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).check();
+  await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).check();
+  await expect(picked()).toHaveCount(2);
+  const details = p.getByTestId("asset-inspector");
+  await expect(details.locator("h2")).toHaveText("2 selected");
+  await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).uncheck();
+  await expect(details.locator("h2")).toContainText("ref-3.png");
+  // Select all, then act on all of them: favourite, tag, folder, and delete the unused.
+  await p.locator(".assets-grid").focus();
+  await p.keyboard.press("Control+a");
+  await expect(details.locator("h2")).toHaveText("5 selected");
+  await p.getByTestId("bulk-favorite").click();
+  await expect(p.locator(".asset-star")).toHaveCount(5);
+  await p.getByTestId("bulk-tag-input").fill("set");
+  await p.keyboard.press("Enter");
+  await expect(p.locator('[data-testid="asset-card-tags"]')).toHaveCount(5);
+  await p.getByTestId("assets-side").getByTestId("folder-new").click();
+  await p.getByTestId("folder-name-input").fill("Batch");
+  await p.keyboard.press("Enter");
+  await expect(p.getByTestId("bulk-folders").getByRole("checkbox")).toHaveCount(1);
+  await p.getByTestId("bulk-folders").getByRole("checkbox").check();
+  await p.getByTestId("assets-side").getByRole("button", { name: /^Batch/ }).click();
+  await expect(cards).toHaveCount(5);
+  // Delete: nothing is used, so all go; the summary says so.
+  await p.getByTestId("assets-side").getByRole("button", { name: /^All assets/ }).click();
+  await p.locator(".assets-grid").focus();
+  await p.keyboard.press("Control+a");
+  await p.getByTestId("bulk-delete").click();
+  await p.getByTestId("confirm-ok").click();
+  await expect(cards).toHaveCount(0);
+  await expect(p.getByTestId("toast")).toContainText("Deleted 5 assets from the library.");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the viewer is still open when you come back from placing an asset (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "two.png", mimeType: "image/png", buffer: makePng(9, 6, () => [60, 200, 60, 255]) });
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  await p.getByTestId("asset-card").nth(0).dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  await p.keyboard.press("ArrowRight");
+  await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 2");
+  await viewer.getByRole("button", { name: "Place" }).click();
+  // On the canvas, the image is placed; back in Assets the viewer shows the same asset.
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(1);
+  expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("canvas");
+  await p.getByTestId("view-assets").click();
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 2");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("slideshow: plays through the library on a timer, wraps, stops on Space or Esc, and plays only what was picked (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  for (let i = 0; i < 3; i++) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `s-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [60 * i, 120, 200, 255]) });
+  }
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  // From the library bar: the viewer opens on the first asset and the show starts.
+  const viewer = p.getByTestId("slide-view");
+  await p.getByTestId("assets-slideshow").click();
+  await expect(viewer).toBeVisible();
+  const play = viewer.getByRole("button", { name: /slideshow/i });
+  await expect(play).toHaveAttribute("aria-pressed", "true");
+  await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3");
+  await expect(viewer.locator(".viewer-progress")).toBeVisible();
+  // After the time it moves on by itself (2 s is the shortest), and keeps going round.
+  await viewer.getByLabel("Seconds per slide").selectOption("2");
+  await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 3", { timeout: 6_000 });
+  await expect(viewer.locator(".viewer-pos")).toHaveText("3 of 3", { timeout: 6_000 });
+  await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3", { timeout: 6_000 });
+  // Space pauses it: the position holds.
+  await viewer.focus();
+  await p.keyboard.press(" ");
+  await expect(viewer.getByRole("button", { name: "Start the slideshow" })).toHaveAttribute("aria-pressed", "false");
+  const at = await viewer.locator(".viewer-pos").textContent();
+  await p.waitForTimeout(2600);
+  await expect(viewer.locator(".viewer-pos")).toHaveText(at!);
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  // A selection of two plays only those two.
+  const checks = p.getByRole("checkbox", { name: /^Select / });
+  await checks.nth(0).check();
+  await checks.nth(2).check();
+  await p.getByTestId("bulk-slideshow").click();
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 2");
+  await expect(viewer.locator(".film-item")).toHaveCount(2);
+  await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});

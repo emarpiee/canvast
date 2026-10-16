@@ -7,7 +7,7 @@ import type { ObjectId } from "../doc/model";
 import { plainText } from "../text/markdown";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
-import { placeImage } from "./actions";
+import { placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { applyImport, archiveFileName, buildArchive, readArchive } from "../storage/archive";
 import { idbGet } from "../storage/idb";
@@ -407,6 +407,51 @@ export class Session {
       return null;
     }
     return placeImage(rec, this.doc, this.view, 0, "Place asset").id;
+  }
+
+  /** Place several library assets on the open canvas, in a grid, as one undo step. Returns how many were placed. */
+  async placeAssets(hashes: readonly string[]): Promise<number> {
+    if (this.editor.blockEdit() || !this.assets) return 0;
+    const recs = [];
+    for (const h of hashes) {
+      const rec = await this.assets.record(h);
+      if (rec) recs.push(rec);
+    }
+    if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the originals are missing and were not placed.`);
+    if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place asset");
+    else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} assets`);
+    return recs.length;
+  }
+
+  /**
+   * Delete several assets from the library. Those that instances use are kept; the rest are removed and their originals erased as
+   * soon as nothing can need them. One summary is shown. Returns how many were deleted.
+   */
+  async deleteAssets(hashes: readonly string[]): Promise<number> {
+    if (!this.guardWrite() || !this.catalog) return 0;
+    await this.persistence.flush();
+    const gone: string[] = [];
+    let inUse = 0;
+    for (const h of hashes) {
+      try {
+        await this.catalog.markDeleted(h);
+        gone.push(h);
+      } catch (e) {
+        if (e instanceof AssetInUseError) inUse++;
+        else {
+          this.tell(`Could not delete the asset: ${(e as Error).message}`);
+          break;
+        }
+      }
+    }
+    if (gone.length) {
+      this.gcPending = true;
+      await this.collectGarbage();
+      this.post({ kind: "assets" });
+      this.emitAssets();
+    }
+    this.tell(`Deleted ${gone.length} asset${gone.length === 1 ? "" : "s"} from the library.${inUse ? ` ${inUse} in use ${inUse === 1 ? "was" : "were"} kept.` : ""}`);
+    return gone.length;
   }
 
   /**
