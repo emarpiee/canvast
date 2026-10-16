@@ -39,7 +39,7 @@ export const SETTINGS = {
   "pen.stabilizer.strength": { scope: "device", default: 50, validate: range(0, 100), effect: "immediate" } as Def<number>,
   "pen.followZoom": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "ui.fps": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.bookmarksOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.layersOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
@@ -94,6 +94,11 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate(raw[key]);
       if (v !== undefined) this.values.set(key, v);
     }
+  }
+
+  /** Whether a value is stored (not the default): lets a build choose its own default. */
+  isSet(key: SettingKey): boolean {
+    return this.values.has(key);
   }
 
   get<K extends SettingKey>(key: K): SettingValue<K> {

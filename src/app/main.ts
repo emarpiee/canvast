@@ -141,6 +141,8 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
+  // A debug build (the tests, development) keeps the technical readout it has always had; everyone else starts with the simple one.
+  if (debug && !settings.isSet("ui.info")) settings.set("ui.info", "technical");
   editor.penColor = settings.get("pen.color");
   editor.penWidthPx = settings.get("pen.widthPx");
   editor.penKind = settings.get("pen.kind");
@@ -151,7 +153,6 @@ async function start(): Promise<void> {
   editor.snap = settings.get("snap.enabled");
   editor.alignBox = settings.get("select.alignBox");
   editor.layersOpen = settings.get("ui.layersOpen");
-  editor.showFps = settings.get("ui.fps");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
@@ -167,7 +168,6 @@ async function start(): Promise<void> {
     settings.set("snap.enabled", editor.snap);
     settings.set("select.alignBox", editor.alignBox);
     settings.set("ui.layersOpen", editor.layersOpen);
-    settings.set("ui.fps", editor.showFps);
     settings.set("ui.bookmarksOpen", editor.bookmarksOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
@@ -455,11 +455,10 @@ async function start(): Promise<void> {
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),
-    fpsOn: () => editor.showFps,
-    toggleFps: () => {
-      editor.showFps = !editor.showFps;
-      editor.changed();
-    },
+    infoMode: () => settings.get("ui.info"),
+    setInfoMode: (m) => void settings.set("ui.info", m),
+    subscribeInfo: (fn) => void settings.subscribe((key) => key === "ui.info" && fn()),
+    scene: () => ({ objects: doc.size, drawn: stats.last?.visibleCount ?? 0, indexing: indexSync.building() }),
     quality: () => quality.level,
     diagnostics: () => {
       const mem = assets.stats();
@@ -559,7 +558,6 @@ async function start(): Promise<void> {
       case "select.alignBox": editor.alignBox = settings.get(key); break;
       case "eraser.diameterPx": editor.eraserPx = settings.get(key); break;
       case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
-      case "ui.fps": editor.showFps = settings.get(key); break;
       case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
       case "ui.textScale":
       case "ui.contrast":

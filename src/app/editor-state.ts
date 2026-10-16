@@ -63,8 +63,6 @@ export class EditorState {
   lock: PenLock | null = null;
   /** The floating Layers panel is open (ui/layers-panel.ts). */
   layersOpen = false;
-  /** Show the frames-per-second readout (app/hud.ts). */
-  showFps = false;
   /** The floating Bookmarks panel is open (ui/bookmarks-panel.ts). */
   bookmarksOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */

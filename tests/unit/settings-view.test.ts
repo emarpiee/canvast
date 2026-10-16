@@ -37,3 +37,12 @@ describe("tool key settings (ADR 0049)", () => {
     expect([def.validate("K"), def.validate("5"), def.validate("kk"), def.validate("")]).toEqual([undefined, undefined, undefined, undefined]);
   });
 });
+
+describe("friendlyZoom (ADR 0055)", () => {
+  it("reads a zoom as a magnification, and very deep ones as a power of ten", async () => {
+    const { friendlyZoom } = await import("../../src/app/hud");
+    const f = (l: bigint, z: number) => friendlyZoom(l, z);
+    expect([f(0n, 0), f(0n, 1), f(3n, 0), f(0n, 0.41), f(-1n, 0), f(10n, 0), f(-3n, 0)]).toEqual(["1×", "2×", "8×", "1.33×", "0.5×", "1,024×", "0.13×"]);
+    expect([f(40n, 0), f(-40n, 0), f(3000n, 0)]).toEqual(["10^12×", "10^-12×", "10^903×"]);
+  });
+});

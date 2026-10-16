@@ -953,3 +953,9 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   .asset-inspector { flex: 0 0 auto; max-height: 44vh; }
   .viewer-film { display: none; }
 }
+
+/* The readout's views (app/hud.ts, ADR 0055): what a mode does not show is gone, whatever else sets display. */
+.hud-readout[hidden], .hud-readout [hidden] { display: none !important; }
+.hud-objects, .hud-fps:not(.hud-diag) { color: var(--hud-muted); }
+.hud-readout { min-width: 132px; }
+.hud-readout[data-mode="simple"] .hud-fps, .hud-readout[data-mode="more"] .hud-fps { font: inherit; }
