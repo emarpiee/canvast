@@ -1,4 +1,6 @@
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
+import { openColourPopover } from "./colour-popover";
+import { swatchBackground } from "../render/ink";
 import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
@@ -75,7 +77,9 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Drawing and selection",
     rows: [
       { key: "pen.kind", label: "Pen", help: "The pen new strokes are drawn with.", control: { kind: "select", options: [["fine", "Fine"], ["pencil", "Pencil"], ["ink", "Ink"], ["marker", "Marker"]] } },
-      { key: "pen.color", label: "Pen colour", control: { kind: "colour" } },
+      { key: "pen.color", label: "Pen colour", help: "Opens the colour picker. The colours you picked lately are in the toolbar.", control: { kind: "colour" } },
+      { key: "colour.model", label: "Colour picker model", help: "OKHSL and OKHSV keep every slider inside the colours a screen can show; OKHCL sets lightness and chroma as OKLab does. All three are even to the eye: the same step looks like the same change of colour.", control: { kind: "select", options: [["okhsv", "OKHSV (hue, saturation, value)"], ["okhsl", "OKHSL (hue, saturation, lightness)"], ["okhcl", "OKHCL (hue, chroma, lightness)"]] } },
+      { key: "colour.view", label: "Colour picker layout", control: { kind: "select", options: [["wheel", "Hue ring and box"], ["sliders", "Sliders"]] } },
       { key: "pen.widthPx", label: "Pen width", help: "On screen, in pixels, when you draw.", control: { kind: "range", min: 0.5, max: 128, step: 0.5, unit: "px" } },
       { key: "pen.followZoom", label: "Width follows zoom", help: "Keep the pen's width in the world when you zoom, instead of on the screen.", control: { kind: "toggle" } },
       { key: "pen.stabilizer.on", label: "Stabilizer", help: "Smooth the line while you draw.", control: { kind: "toggle" } },
@@ -184,7 +188,7 @@ function controlHtml(row: Row, id: string): string {
   // The control is named by the label alone; the help text describes it.
   const a = `aria-labelledby="${id}-l"${row.help ? ` aria-describedby="${id}-h"` : ""}`;
   if (c.kind === "toggle") return `<input type="checkbox" id="${id}" data-set="${row.key}" ${a}>`;
-  if (c.kind === "colour") return `<input type="color" id="${id}" data-set="${row.key}" ${a}>`;
+  if (c.kind === "colour") return `<button type="button" class="set-colour" id="${id}" data-set="${row.key}" data-colour="${row.key}" aria-haspopup="dialog" ${a}><span class="set-colour-dot"></span><span class="set-colour-hex"></span></button>`;
   if (c.kind === "text") return `<input type="text" class="set-text" id="${id}" data-set="${row.key}" maxlength="${c.max}" placeholder="${esc(c.placeholder ?? "")}" autocomplete="off" spellcheck="false" ${a}>`;
   if (c.kind === "select") return `<select id="${id}" data-set="${row.key}" ${a}>${c.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
   const presets = c.hue ? `<span class="set-presets" role="group" aria-label="Theme colour presets">${c.hue.map(([n, d]) => `<button type="button" class="set-preset" data-preset="${row.key}" data-value="${d}" style="--p:${d}" aria-label="${esc(n)}" title="${esc(n)}"></button>`).join("")}</span>` : "";
@@ -356,7 +360,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-set="${r.key}"]`);
       if (!el) continue;
       const v = settings.get(r.key) as SettingValue<typeof r.key>;
-      if (r.control.kind === "toggle") (el as HTMLInputElement).checked = v === true;
+      if (r.control.kind === "colour") {
+        (el.querySelector(".set-colour-dot") as HTMLElement).style.background = swatchBackground(String(v));
+        el.querySelector(".set-colour-hex")!.textContent = String(v).toUpperCase();
+      } else if (r.control.kind === "toggle") (el as HTMLInputElement).checked = v === true;
       else el.value = String(v);
       const out = el.parentElement?.querySelector("output");
       if (out && r.control.kind === "range") out.textContent = `${fmt(Number(v))} ${r.control.unit ?? ""}`.trim();
@@ -393,6 +400,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       // While searching every tab shows: the one chosen scrolls into view.
       if (panelsEl.classList.contains("is-searching")) panels.find((p) => p.dataset["panel"] === tab.dataset["tab"])?.scrollIntoView({ block: "start", behavior: "smooth" });
       return;
+    }
+    const swatch = t.closest<HTMLElement>("[data-colour]");
+    if (swatch) {
+      const key = swatch.dataset["colour"] as SettingKey;
+      const label = all.find((r) => r.key === key)?.label ?? "Colour";
+      return openColourPopover(swatch, { name: label, value: String(settings.get(key)), onInput: (hex) => void settings.set(key, hex as never) });
     }
     const preset = t.closest<HTMLElement>("[data-preset]");
     if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);

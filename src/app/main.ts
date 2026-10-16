@@ -39,6 +39,7 @@ import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
 import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
+import { initColourPopover } from "../ui/colour-popover";
 import { mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
@@ -151,6 +152,7 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
+  initColourPopover(settings);
   releaseStepKeys(settings); // a tool key set to W A S D before they became the step keys goes back to its own letter (ADR 0072)
   // Developer tools (the panel, the diagnostics, the test hook): on for a session with #debug at the end of the address (the tests use
   // this), or always once switched on in Settings > Develop (applies after a reload). There is no separate debug build.

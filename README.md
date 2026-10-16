@@ -215,6 +215,9 @@ or network connection.
 - **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Alt` brings the
   selection into view, bookmarks save places and zooms, the canvas search finds
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
+- **Colour picker:** one picker for every colour choice (the pen colour in the toolbar and in Settings): OKHSL, OKHSV or
+  OKHCL, as sliders or as a hue ring around a box, with hex, the colours picked lately and a palette (ADR 0098). It is a
+  standalone module in `src/colour-picker/` (`npm run build:picker` builds it alone).
 - **Media:** videos, audio and GIFs play on the canvas with a player; a frame
   can be extracted as a picture.
 - **Text:** `@` mentions an object by stable id, with backlinks across a
@@ -373,6 +376,7 @@ src/
   storage/                  IndexedDB schema, workspace repository, incremental persistence,
                             v1 migration, multi-tab writer lease, ZIP container, archive export/import
   doc/                      also groups, arrange, clipboard, media (video, audio, GIF)
+  colour-picker/            the colour picker, standalone: maths, component, styles, README (imports nothing from the app)
   search/query.ts           AND, OR, XOR, NOT query parser and evaluator (ADR 0069)
   settings/                 declared settings with scopes, rebindable shortcuts
   interaction/              also snapping, pens, item navigation (W A S D), shortcut scopes

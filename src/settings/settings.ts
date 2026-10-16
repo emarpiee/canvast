@@ -31,10 +31,17 @@ const letter = (v: unknown): string | undefined => (typeof v === "string" && /^[
 const text = (max: number) => (v: unknown): string | undefined => (typeof v === "string" && v.length <= max ? v : undefined);
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
 
+/** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
+const colourList = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 8 * 8 && (v === "" || v.split(",").every((c) => /^#[0-9a-f]{6}$/.test(c))) ? v : undefined);
+
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
+  // The colour picker (ADR 0098): which colour model and layout it opens in, and the colours picked lately.
+  "colour.model": { scope: "device", default: "okhsv", validate: oneOf("okhsl", "okhsv", "okhcl"), effect: "immediate" } as Def<"okhsl" | "okhsv" | "okhcl">,
+  "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "sliders"), effect: "immediate" } as Def<"wheel" | "sliders">,
+  "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
   "pen.kind": { scope: "device", default: "fine", validate: oneOf("fine", "pencil", "ink", "marker"), effect: "immediate" } as Def<"fine" | "pencil" | "ink" | "marker">,
   "pen.widthPx": { scope: "device", default: 3, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
   "pen.stabilizer.on": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,

@@ -14,9 +14,11 @@
     "check:offline": "node scripts/check-offline.mjs dist/canvast.html",
     "check:tokens": "node scripts/check-tokens.mjs",
     "check:names": "node scripts/check-names.mjs dist/canvast.html",
-    "test": "npm run typecheck && npm run test:unit && npm run test:e2e && npm run check:offline && npm run check:names && npm run check:tokens",
-    "test:full": "npm run typecheck && npm run test:unit && npm run test:e2e:full && npm run check:offline && npm run check:names && npm run check:tokens",
-    "bench": "npm run build && playwright test -c playwright.bench.config.ts"
+    "test": "npm run typecheck && npm run test:unit && npm run test:e2e && npm run check:offline && npm run check:names && npm run check:tokens && npm run check:picker",
+    "test:full": "npm run typecheck && npm run test:unit && npm run test:e2e:full && npm run check:offline && npm run check:names && npm run check:tokens && npm run check:picker",
+    "bench": "npm run build && playwright test -c playwright.bench.config.ts",
+    "check:picker": "node scripts/check-picker.mjs",
+    "build:picker": "node scripts/build-picker.mjs"
   },
   "devDependencies": {
     "@expo-google-fonts/inter": "0.4.2",

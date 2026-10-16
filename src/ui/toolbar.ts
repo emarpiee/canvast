@@ -1,5 +1,6 @@
 import type { EditorState, Tool } from "../app/editor-state";
-import { PEN_COLORS, PEN_WIDTHS } from "../app/editor-state";
+import { PEN_WIDTHS } from "../app/editor-state";
+import { openColourPopover, recentColours } from "./colour-popover";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -95,9 +96,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
       <div class="tb-group tb-options" data-for="pen text">
-        ${PEN_COLORS.map(
-          (c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c}" title="Pen and text colour"><span style="background:${swatchBackground(c)}"></span></button>`,
-        ).join("")}
+        <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
+        <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen and text colour: open the colour picker"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
@@ -180,6 +180,16 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["color"]) {
       editor.penColor = d["color"];
       editor.changed();
+    } else if (d["colourOpen"] !== undefined) {
+      openColourPopover(b, {
+        name: "Pen colour",
+        value: editor.penColor,
+        onInput: (hex) => {
+          editor.penColor = hex;
+          editor.changed();
+        },
+        onChange: () => editor.changed(), // the recent colours changed
+      });
     } else if (d["width"]) {
       editor.penWidthPx = Number(d["width"]);
       if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx }; // a new size is the new reference
@@ -231,7 +241,16 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       b.setAttribute("aria-checked", String(b.dataset["tool"] === editor.tool));
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
-    for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", b.dataset["color"] === editor.penColor);
+    const recent = recentColours();
+    const recents = root.querySelector<HTMLElement>("[data-recents]")!;
+    if (recents.dataset["list"] !== recent.join()) {
+      recents.dataset["list"] = recent.join();
+      recents.innerHTML = recent
+        .map((c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c.toUpperCase()}" title="${c.toUpperCase()}"><span style="background:${swatchBackground(c)}"></span></button>`)
+        .join("");
+    }
+    for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", (b.dataset["color"] ?? "").toLowerCase() === editor.penColor.toLowerCase());
+    root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = swatchBackground(editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;
     if (document.activeElement !== size) size.value = String(sliderFromPen(editor.penWidthPx));

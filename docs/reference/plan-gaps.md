@@ -168,6 +168,6 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | 2 | Vector objects: shapes, paths, node editing, SVG import as vectors and export | Large; the plan sets a professional vector editor bar. |
 | 3 | Attach and Detach, duplicate, move and reorder canvases and boards | Small, and the plan names each in a test scenario. |
 | 4 | Stroke eraser, audio range, text fonts, tilt | Each small to medium. |
-| 5 | Colour, size and orientation filters, duplicate review | Library depth (ratings and saved searches are dropped). |
+| 5 | Size and orientation filters, colour filter (the colour picker, ADR 0098, now exists to choose the colour), duplicate review | Library depth (ratings and saved searches are dropped). |
 | 6 | ZIP64, streaming export, incremental backup | Needed before very large libraries. |
 | 7 | Phase 8 and 9 checks, a Firefox pass and the full suite | Not run since v0.16.0 (the full suite) and not yet for the latest UI work (Firefox). |

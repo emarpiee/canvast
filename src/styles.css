@@ -34,6 +34,7 @@
   --z-item-bar: 6;
   --z-item-pop: 7;
   --z-edge: 10;
+  --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
   --anim-speed: 1;
   --anim-move: 1;
@@ -323,6 +324,9 @@ html, body {
 .toolbar button:disabled { opacity: 0.35; cursor: default; }
 .toolbar button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .toolbar .swatch span { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--hud-border); }
+.toolbar .tb-recents { display: contents; }
+/* The current colour: a ring around the dot says it opens the picker. */
+.toolbar .swatch-current span { width: var(--icon-md); height: var(--icon-md); box-shadow: 0 0 0 2px var(--hud-bg), 0 0 0 3px var(--hud-fg); }
 .toolbar .size { width: 84px; accent-color: var(--hud-accent); }
 .toolbar .size-out { font: var(--weight-medium) var(--text-xs) var(--font-ui); min-width: 38px; opacity: 0.8; }
 .toolbar .swatch.is-on, .toolbar .width.is-on, .toolbar .pen-kind[aria-checked="true"], .toolbar .lock[aria-pressed="true"], .toolbar .stab[aria-pressed="true"], .toolbar .follow[aria-pressed="true"], .toolbar .ignore-fill[aria-pressed="true"], .toolbar .snap[aria-pressed="true"], .toolbar .layers-toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
@@ -2142,3 +2146,20 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 
 /* With the readout hidden the view controls sit the same distance from the edge as every other floating element. */
 .hud-bottom:has(> .hud-readout[hidden]) > .hud-controls { margin-bottom: var(--edge); }
+
+/* The colour picker (ADR 0098): the standalone module in src/colour-picker takes its look from --cp-* properties; here they are the app's tokens. */
+.cp {
+  --cp-bg: var(--hud-bg); --cp-fg: var(--hud-fg); --cp-muted: var(--hud-muted); --cp-border: var(--hud-border); --cp-field: var(--hud-hover); --cp-hover: var(--hud-hover);
+  --cp-accent: var(--hud-accent); --cp-accent-fg: var(--hud-accent-fg); --cp-focus: var(--hud-accent);
+  --cp-text: var(--text-md); --cp-text-sm: var(--text-xs); --cp-font: var(--font-ui); --cp-mono: var(--font-mono);
+  --cp-radius: var(--r-md); --cp-radius-sm: var(--r-sm); --cp-gap: var(--sp-5); --cp-gap-sm: var(--sp-3);
+  --cp-thumb: var(--sp-8); --cp-bar: var(--sp-6); --cp-swatch: var(--sp-9);
+}
+.colour-pop { position: fixed; z-index: var(--z-pop); max-width: calc(100vw - var(--sp-8)); max-height: calc(100dvh - var(--sp-8)); overflow: auto; padding: var(--sp-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.colour-pop, .pop-menu { animation: pop-in var(--dur-base) var(--ease-out) both; }
+/* Settings: the colour row is a button showing the colour and its hex; it opens the picker. */
+.set-colour { display: inline-flex; align-items: center; gap: var(--sp-4); height: var(--ctl); padding: 0 var(--sp-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
+.set-colour:hover { background: var(--hud-hover); }
+.set-colour:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.set-colour-dot { width: var(--icon-md); height: var(--icon-md); border-radius: 50%; border: 1px solid var(--hud-border); }
+.set-colour-hex { font-family: var(--font-mono); font-size: var(--text-sm); }
