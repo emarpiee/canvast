@@ -485,7 +485,7 @@ export function attachTools(
   };
 
   /**
-   * The factors of a resize drag, Figma style: a corner or a side follows the pointer; Shift keeps the proportions; Alt resizes about the
+   * The factors of a resize drag, side-handle: a corner or a side follows the pointer; Shift keeps the proportions; Alt resizes about the
    * middle of the box; Ctrl (or Cmd) turns snapping off. The dragged edge snaps to the edges and middles of other objects.
    * Anything but an upright picture keeps its proportions whatever is held (it cannot be stretched).
    */

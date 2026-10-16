@@ -550,7 +550,7 @@ test("Ctrl+Arrow, nearest in view: an item far from the selected one (many of it
   void far;
 });
 
-test("resize, Figma style: corners and sides follow the pointer; Shift keeps the proportions, Alt resizes about the middle, Ctrl turns snapping off; edges snap to other items (ADR 0063)", async ({ app }) => {
+test("resize with side handles: corners and sides follow the pointer; Shift keeps the proportions, Alt resizes about the middle, Ctrl turns snapping off; edges snap to other items (ADR 0063)", async ({ app }) => {
   const p = app.page;
   const img = await importImage(app);
   await p.evaluate(() => window.__canvastDebug.jump(5)); // the picture is about 8 px wide at first; make it big enough to work with

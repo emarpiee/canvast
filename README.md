@@ -23,7 +23,7 @@ or network connection.
 > player's controls, multi-select, one folder per asset, renamable tags, a
 > plain ZIP by kind or folder, whole-workspace export and import); in-canvas
 > tags; search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`) and
-> boolean search (ADR 0069); stepping with `Ctrl+Arrow` and `Alt`; Figma-style
+> boolean search (ADR 0069); stepping with `Ctrl+Arrow` and `Alt`; Side-handle
 > resize; `Alt`+drag to copy; a Layers panel with sort, guides, Ctrl/Shift
 > selection and Rename, Hide and Lock for the selection; a shared ⋯ More menu;
 > design tokens for every colour, size, space and radius (ADR 0068); one HTML

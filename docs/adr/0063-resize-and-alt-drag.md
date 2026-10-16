@@ -1,4 +1,4 @@
-# ADR 0063: Figma-style resize, Alt-drag copies, Alt cycles the view, fit buttons
+# ADR 0063: Side-handle resize, Alt-drag copies, Alt cycles the view, fit buttons
 
 Status: accepted (owner request, 2026-10-16)
 
