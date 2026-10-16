@@ -8,7 +8,7 @@ import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
-import { runExport } from "./archive-ui";
+import { runExport, runExportFiles } from "./archive-ui";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -213,7 +213,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = "all";
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
 
   // ---- thumbnails: generated lazily from the stored original, kept in memory only
@@ -845,7 +845,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </ul>
       <div class="side-head"><h2>Tags</h2></div>
       <ul class="side-list" data-testid="tag-list">
-        ${[...tagCounts].sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([k, c]) => item(`tag:${k}`, `#${esc(c.label)}`, c.n)).join("") || `<li class="side-empty">No tags yet.</li>`}
+        ${[...tagCounts].sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([k, c]) =>
+            naming?.kind === "rename-tag" && naming.key === k
+              ? nameInput(c.label, `New name for tag ${c.label}`)
+              : item(
+                  `tag:${k}`,
+                  `#${esc(c.label)}`,
+                  c.n,
+                  0,
+                  ro ? "" : `<button type="button" class="side-mini" data-tag-action="rename" data-key="${esc(k)}" aria-label="Rename tag ${esc(c.label)}">Rename</button>
+                   <button type="button" class="side-mini" data-tag-action="delete" data-key="${esc(k)}" aria-label="Delete tag ${esc(c.label)}">Delete</button>`,
+                ),
+          )
+          .join("") || `<li class="side-empty">No tags yet.</li>`}
       </ul>`;
     const input = side.querySelector<HTMLInputElement>(".side-name");
     if (input) {
@@ -882,25 +894,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="tag-chips"><input class="tag-input bulk-tag-input" data-testid="bulk-tag-input" placeholder="Add a tag" aria-label="Add a tag to all selected" title="Type a tag and press Enter" maxlength="64"${dis}></div>
       </section>
       <section class="asset-sec">
-        <h3>Folders</h3>
+        <h3>Move all to a folder</h3>
         ${
           sorted.length
-            ? `<ul class="asset-folders" data-testid="bulk-folders">${sorted
-                .map((f: AssetFolder) => {
-                  const inCount = ents.filter((e) => meta(e).folderIds.includes(f.id)).length;
-                  return `<li><label><input type="checkbox" data-bulk-folder="${f.id}" data-some="${inCount > 0 && inCount < ents.length}"${inCount === ents.length && inCount > 0 ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`;
-                })
-                .join("")}</ul>`
+            ? `<ul class="asset-folders" data-testid="bulk-folders">${[`<li><label><input type="radio" name="bulk-folder" data-bulk-folder=""${ents.every((e) => meta(e).folderIds.length === 0) ? " checked" : ""}${dis}>No folder</label></li>`, ...sorted.map((f: AssetFolder) => `<li><label><input type="radio" name="bulk-folder" data-bulk-folder="${f.id}"${ents.every((e) => meta(e).folderIds[0] === f.id) ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`)].join("")}</ul>`
             : `<p class="asset-note">No folders yet. Make one with “+ Folder” in the sidebar.</p>`
         }
       </section>
       <div class="asset-actions">
         <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.play}<span>Slideshow of these</span></button>
+        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.download}<span>Export ${placeable} files as ZIP</span></button>
         <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.upload}<span>Export ${placeable} as archive</span></button>
         <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
         ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first.</p>` : ""}
       </div>`;
-    for (const b of inspector.querySelectorAll<HTMLInputElement>("[data-bulk-folder]")) b.indeterminate = b.dataset["some"] === "true";
   };
 
   const renderInspector = (): void => {
@@ -989,15 +996,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
       </section>
       <section class="asset-sec">
-        <h3>Folders</h3>
+        <h3>Folder</h3>
         ${
           sorted.length
-            ? `<ul class="asset-folders" data-testid="asset-folders">${sorted
-                .map(
-                  (f: AssetFolder) =>
-                    `<li><label><input type="checkbox" data-folder="${f.id}"${m.folderIds.includes(f.id) ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`,
-                )
-                .join("")}</ul>`
+            ? `<ul class="asset-folders" data-testid="asset-folders">${[`<li><label><input type="radio" name="asset-folder" data-folder=""${m.folderIds.length === 0 ? " checked" : ""}${dis}>No folder</label></li>`, ...sorted.map((f: AssetFolder) => `<li><label><input type="radio" name="asset-folder" data-folder="${f.id}"${m.folderIds[0] === f.id ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`)].join("")}</ul>`
             : `<p class="asset-note">No folders yet. Make one with “+ Folder” in the sidebar.</p>`
         }
       </section>`;
@@ -1019,6 +1021,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /** Pick: one (a plain click), add or remove one (Ctrl, Cmd or the checkbox), or a range from the last pick (Shift). */
   const select = async (hash: string | null, how: "one" | "toggle" | "range" | "add-range" = "one"): Promise<void> => {
+    // Picking anything always shows its properties, whatever the panel button was last set to (the button is for looking at nothing).
+    if (hash !== null && !ui.details && viewer.hidden) {
+      ui.details = true;
+      autoShown = true;
+      saveUi();
+      applyUi();
+    }
     if (hash === null) {
       picked.clear();
       selected = null;
@@ -1073,12 +1082,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.ctrlKey || e.metaKey || selecting) void select(hash, "toggle");
     else {
       // A click picks it and shows its details; the viewer opens from a double-click or from the picture in the details.
-      if (!ui.details) {
-        ui.details = true;
-        autoShown = true;
-        saveUi();
-        applyUi();
-      } else if (e.detail <= 1) autoShown = false;
+      if (ui.details && e.detail <= 1) autoShown = false;
       void select(hash);
     }
   });
@@ -1165,6 +1169,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         });
         break;
       }
+      case "export-files-all":
+        void runExportFiles(session, { kind: "assets", hashes: group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)) });
+        break;
       case "export-all":
         void runExport(session, { kind: "assets", hashes: group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)) });
         break;
@@ -1252,23 +1259,42 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
     const bulk = box.dataset["bulkFolder"];
-    if (bulk) {
+    const put = (c: { updateMeta: (h: string, ch: { addFolders?: string[]; clearFolder?: boolean }) => Promise<unknown> }, h: string, id: string): Promise<unknown> =>
+      c.updateMeta(h, id ? { addFolders: [id] } : { clearFolder: true });
+    if (bulk !== undefined) {
       const group = [...picked];
       void session.organize(async (c) => {
-        for (const h of group) await c.updateMeta(h, box.checked ? { addFolders: [bulk] } : { removeFolders: [bulk] });
+        for (const h of group) await put(c, h, bulk);
       });
       return;
     }
     const id = box.dataset["folder"];
-    if (!id || !selected) return;
+    if (id === undefined || !selected) return;
     const hash = selected;
-    void session.organize((c) => c.updateMeta(hash, box.checked ? { addFolders: [id] } : { removeFolders: [id] }));
+    void session.organize((c) => put(c, hash, id));
   });
 
   // ---- sidebar: scope, folders
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.dataset["tagAction"]) {
+      const key = b.dataset["key"]!;
+      const label = [...side.querySelectorAll<HTMLElement>(`[data-scope="tag:${CSS.escape(key)}"] .side-label`)][0]?.textContent?.replace(/^#/, "") ?? key;
+      if (b.dataset["tagAction"] === "rename") {
+        naming = { kind: "rename-tag", key, label };
+        renderSide();
+      } else {
+        void confirmDialog({
+          title: `Delete the tag “${label}”?`,
+          lines: ["It is taken off every asset that has it. The assets stay in the library."],
+          confirmLabel: "Delete tag",
+        }).then(async (ok) => {
+          if (ok && (await session.organize((c) => c.deleteTag(label))) && scope === `tag:${key}`) scope = "all";
+        });
+      }
+      return;
+    }
     if (b.dataset["scope"]) {
       scope = b.dataset["scope"];
       const sf = scope.startsWith("smart:") ? listing?.smart.find((x) => `smart:${x.id}` === scope) : undefined;
@@ -1330,7 +1356,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const n = naming;
       const name = input.value;
       naming = null;
-      if (n.kind === "new-smart") {
+      if (n.kind === "rename-tag") {
+        const was = n.label;
+        void session.organize((c) => c.renameTag(was, name)).then((ok) => {
+          if (ok && scope === `tag:${n.key}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
+          renderSide();
+        });
+      } else if (n.kind === "new-smart") {
         const id = newObjectId();
         const q = search.value;
         const u = usageSel.value as UsageFilter;

@@ -957,8 +957,9 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await p.getByTestId("assets-side").getByTestId("folder-new").click();
   await p.getByTestId("folder-name-input").fill("Batch");
   await p.keyboard.press("Enter");
-  await expect(p.getByTestId("bulk-folders").getByRole("checkbox")).toHaveCount(1);
-  await p.getByTestId("bulk-folders").getByRole("checkbox").check();
+  // "Move all": the choices are No folder and Batch; one folder for each asset.
+  await expect(p.getByTestId("bulk-folders").getByRole("radio")).toHaveCount(2);
+  await p.getByTestId("bulk-folders").getByRole("radio", { name: "Batch" }).check();
   await p.getByTestId("assets-side").getByRole("button", { name: /^Batch/ }).click();
   await expect(cards).toHaveCount(5);
   // Delete: nothing is used, so all go; the summary says so.

@@ -35,7 +35,7 @@ export interface CatalogEntry {
   /** Organization (ADR 0011). Absent on entries written before v0.6.0: read through `meta()`. */
   tags?: string[];
   favorite?: boolean;
-  /** Folders the asset is filed in (any number; filing never copies the original). */
+  /** The folder the asset is filed in: at most one (older libraries may hold several; the first counts). Filing never copies the original. */
   folderIds?: string[];
 }
 
@@ -48,7 +48,7 @@ export interface AssetFolder {
 
 /** Organization fields of an entry, with defaults for entries that predate them. */
 export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; folderIds: string[] } {
-  return { tags: e.tags ?? [], favorite: e.favorite ?? false, folderIds: e.folderIds ?? [] };
+  return { tags: e.tags ?? [], favorite: e.favorite ?? false, folderIds: (e.folderIds ?? []).slice(0, 1) };
 }
 
 export class CatalogInputError extends Error {}
@@ -240,7 +240,7 @@ export class AssetCatalog {
    */
   async updateMeta(
     hash: string,
-    change: { favorite?: boolean; addTags?: readonly string[]; removeTags?: readonly string[]; addFolders?: readonly string[]; removeFolders?: readonly string[] },
+    change: { favorite?: boolean; addTags?: readonly string[]; removeTags?: readonly string[]; addFolders?: readonly string[]; removeFolders?: readonly string[]; clearFolder?: boolean },
   ): Promise<CatalogEntry> {
     return this.write(["assetCatalog", "meta"], async (tx) => {
       const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
@@ -252,14 +252,57 @@ export class AssetCatalog {
         const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
         next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
       }
-      if (change.addFolders || change.removeFolders) {
+      if (change.addFolders || change.removeFolders || change.clearFolder) {
         const known = new Set((await this.readFolders(tx)).map((f) => f.id));
         if ((change.addFolders ?? []).some((id) => !known.has(id))) throw new CatalogInputError("that folder no longer exists");
         const drop = new Set(change.removeFolders ?? []);
-        next.folderIds = [...new Set([...m.folderIds.filter((id) => !drop.has(id)), ...(change.addFolders ?? [])])];
+        // One folder per asset: adding replaces the folder; removing clears it.
+        const added = change.addFolders ?? [];
+        next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
       }
       tx.objectStore("assetCatalog").put(next);
       return next;
+    });
+  }
+
+  /**
+   * Rename a tag on every asset that has it (case-insensitive); renaming onto an existing tag merges the two. Saved searches that
+   * name the tag follow. Returns how many assets changed.
+   */
+  async renameTag(from: string, to: string): Promise<number> {
+    const [target] = normalizeTags([to]);
+    if (!target) throw new CatalogInputError("a tag needs a name");
+    const key = from.toLowerCase();
+    return this.write(["assetCatalog", "meta"], async (tx) => {
+      const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+      let n = 0;
+      for (const e of all) {
+        if (e.state !== "active" || !(e.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
+        tx.objectStore("assetCatalog").put({ ...e, tags: normalizeTags((e.tags ?? []).map((t) => (t.toLowerCase() === key ? target : t))) });
+        n++;
+      }
+      const smart = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
+      const word = new RegExp(`(^|\\s)#${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`, "gi");
+      if (smart.some((x) => word.test(x.search))) {
+        word.lastIndex = 0;
+        tx.objectStore("meta").put(smart.map((x) => ({ ...x, search: x.search.replace(word, `$1#${target}`) })), SMART_KEY);
+      }
+      return n;
+    });
+  }
+
+  /** Remove a tag from every asset that has it. The assets stay. Returns how many assets changed. */
+  async deleteTag(tag: string): Promise<number> {
+    const key = tag.toLowerCase();
+    return this.write(["assetCatalog"], async (tx) => {
+      const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+      let n = 0;
+      for (const e of all) {
+        if (e.state !== "active" || !(e.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
+        tx.objectStore("assetCatalog").put({ ...e, tags: (e.tags ?? []).filter((t) => t.toLowerCase() !== key) });
+        n++;
+      }
+      return n;
     });
   }
 

@@ -120,17 +120,22 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("folders nest, an asset can be in several, and deleting a folder never deletes assets", async ({ app }) => {
+test("folders nest, an asset is in one folder at a time, and deleting a folder never deletes assets", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);
   await newFolder(p, "Refs");
   await newFolder(p, "Hands", "Refs");
-  // File blocks in Hands and in Refs (two folders, one original); green in Refs only.
+  // One folder each: blocks go to Hands, green to Refs. Choosing another folder moves the asset, it does not add one.
   await pick(p, HASH);
   await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
-  await p.getByTestId("asset-folders").getByRole("checkbox", { name: "Refs", exact: true }).check();
+  await expect(p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true })).not.toBeChecked();
   await pick(p, GREEN_HASH);
-  await p.getByTestId("asset-folders").getByRole("checkbox", { name: "Refs", exact: true }).check();
+  await p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true }).check();
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
+  await p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true }).check();
+  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).not.toBeChecked();
+  await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
 
   await side(p, /^Refs/).click();
   await expect(cards(p)).toHaveCount(2); // a folder shows its subfolders too
@@ -221,4 +226,105 @@ test("a read-only tab sees the writer's changes and cannot edit organization", a
   await addTags(p1, HASH, "shared");
   await expect(p2.getByTestId("tag-list")).toContainText("#shared");
   await p2.close();
+});
+
+test("tags can be renamed and deleted for the whole library; saved searches follow a rename (ADR 0057)", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await addTags(p, HASH, "hands, ref");
+  await addTags(p, GREEN_HASH, "ref, colour");
+  const tagRow = (name: string) => p.getByTestId("tag-list").getByRole("button", { name: new RegExp(`^#${name}\\b`) });
+  await expect(tagRow("ref")).toContainText("2");
+  // A smart folder that searches the tag.
+  await p.getByTestId("assets-search").fill("#ref");
+  await p.getByTestId("smart-new").click();
+  await p.getByTestId("folder-name-input").fill("Refs");
+  await p.keyboard.press("Enter");
+  // Rename: every asset that had it has the new name; renaming onto an existing tag merges.
+  await p.getByRole("button", { name: "Rename tag ref" }).click();
+  await p.getByTestId("folder-name-input").fill("reference");
+  await p.keyboard.press("Enter");
+  await expect(tagRow("reference")).toContainText("2");
+  await expect(tagRow("ref")).toHaveCount(0);
+  await p.getByTestId("assets-search").fill("");
+  await p.locator('[data-testid="smart-list"] .side-item').click();
+  await expect(p.getByTestId("assets-search")).toHaveValue("#reference");
+  await expect(cards(p)).toHaveCount(2);
+  await p.getByRole("button", { name: "Rename tag colour" }).click();
+  await p.getByTestId("folder-name-input").fill("hands");
+  await p.keyboard.press("Enter");
+  await expect(tagRow("hands")).toContainText("2");
+  await expect(tagRow("colour")).toHaveCount(0);
+  // Delete: taken off every asset, the assets stay.
+  await p.getByRole("button", { name: "Delete tag hands" }).click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("assets stay");
+  await p.getByTestId("confirm-ok").click();
+  await expect(tagRow("hands")).toHaveCount(0);
+  await p.getByRole("button", { name: /^All assets/ }).click();
+  await expect(cards(p)).toHaveCount(2);
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-tags")).toHaveText(/#reference/);
+  await expect(p.getByTestId("asset-tags")).not.toHaveText(/hands/);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("picking an item always shows its properties, even after the panel button hid them", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
+  await p.locator('.assets-bar [data-action="details"]').click();
+  await expect(p.getByTestId("asset-inspector")).toBeHidden();
+  await pick(p, GREEN_HASH); // a click
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
+  await p.locator('.assets-bar [data-action="details"]').click();
+  await expect(p.getByTestId("asset-inspector")).toBeHidden();
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("ArrowRight"); // a key
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
+});
+
+test("the workspace menu exports the whole workspace as a backup or as plain files (by kind or by folder) and imports a file (ADR 0057)", async ({ app, browser }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await newFolder(p, "Refs");
+  await pick(p, HASH);
+  await p.getByTestId("asset-folders").getByLabel("Refs").check();
+  await p.getByTestId("view-canvas").click();
+  const crumb = p.locator(".nav-crumb");
+  const zipPaths = async (choice: RegExp): Promise<string[]> => {
+    await crumb.click();
+    const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {
+      await p.getByTestId("nav-export-files").click();
+      await p.getByRole("radio", { name: choice }).check();
+      await p.getByTestId("choose-ok").click();
+    })()]);
+    expect(dl.suggestedFilename()).toMatch(/-files-\d{4}-\d{2}-\d{2}\.zip$/);
+    const entries = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
+    return [...entries.keys()].sort();
+  };
+  // By kind: every file under its own name in a folder for its kind.
+  expect(await zipPaths(/By kind/)).toEqual(["Images/blocks.png", "Images/green.png"]);
+  // By my folders: the filed one goes to its folder, the other to the folder of its kind.
+  expect(await zipPaths(/By my folders/)).toEqual(["Images/green.png", "Refs/blocks.png"]);
+  // A backup of the whole workspace, imported into a fresh profile from the same menu.
+  await crumb.click();
+  const [bk] = await Promise.all([p.waitForEvent("download"), p.getByTestId("nav-export-workspace").click()]);
+  expect(bk.suggestedFilename()).toMatch(/\.canvast$/);
+  const bytes = await readFile((await bk.path())!);
+  const context = await browser.newContext();
+  const q = await context.newPage();
+  await q.setViewportSize({ width: 1280, height: 800 });
+  await q.goto(APP_URL);
+  await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await q.locator(".nav-crumb").click();
+  await q.getByTestId("nav-import-input").setInputFiles({ name: bk.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
+  await q.getByTestId("confirm-ok").click();
+  await expect(q.getByTestId("toast")).toContainText("Imported");
+  await q.getByTestId("view-assets").click();
+  await expect(cards(q)).toHaveCount(2);
+  await expect(q.getByTestId("folder-tree").getByRole("button", { name: /^Refs/ })).toHaveCount(1);
+  await context.close();
+  expect(app.consoleErrors).toEqual([]);
 });

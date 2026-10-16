@@ -1215,3 +1215,16 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer.is-zoomed figure img { cursor: grab; }
 .viewer-stage { touch-action: none; overflow: hidden; }
 .viewer.is-actual .viewer-stage { overflow: hidden; }
+
+/* Whole-workspace actions at the foot of the workspace menu, and the export choice dialog */
+.nav-ws { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hud-border); display: grid; gap: 2px; }
+.nav-ws h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--hud-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-ws button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 0 8px; text-align: left; background: transparent; border: 0; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
+.nav-ws button:hover:not(:disabled) { background: var(--hud-hover); }
+.nav-ws button:disabled { opacity: 0.45; cursor: default; }
+.nav-ws svg { width: 16px; height: 16px; flex: none; }
+.choose-list { display: grid; gap: 8px; margin: 12px 0; }
+.choose-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--hud-border); border-radius: 10px; cursor: pointer; }
+.choose-item:has(input:checked) { border-color: var(--hud-accent); background: color-mix(in oklch, var(--hud-accent) 10%, transparent); }
+.choose-item span { display: grid; gap: 2px; }
+.choose-item small { color: var(--hud-muted); }

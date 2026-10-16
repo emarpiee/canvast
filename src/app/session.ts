@@ -10,6 +10,8 @@ import { unionBounds } from "../doc/edit-ops";
 import { placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { applyImport, archiveFileName, buildArchive, readArchive } from "../storage/archive";
+import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
+import { buildFilesZip } from "../storage/files-zip";
 import { idbGet } from "../storage/idb";
 import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
@@ -529,6 +531,21 @@ export class Session {
    * Build a verified archive. Saves are flushed first, so it includes every
    * edit made so far. Read-only tabs may export (it only reads).
    */
+  /** The original files of a scope as a plain ZIP (see `files-zip.ts`), named and grouped as asked. */
+  async exportFiles(scope: ExportScope, layout: FilesLayout): Promise<FilesZipResult & { fileName: string }> {
+    if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
+    await this.persistence.flush();
+    const r = await buildFilesZip(this.repo.db, this.current.workspaceId, scope, layout);
+    const tree = this.tree;
+    const label =
+      scope.kind === "workspace" ? (tree?.workspace.displayName ?? "workspace")
+      : scope.kind === "board" ? (tree?.boards.find((b) => b.board.id === scope.boardId)?.board.name ?? "board")
+      : scope.kind === "canvas" ? (tree?.boards.flatMap((b) => b.canvases).find((c) => c.id === scope.canvasId)?.name ?? "canvas")
+      : "assets";
+    const fileName = archiveFileName(`${label}-files`, new Date()).replace(/\.canvast$/, ".zip");
+    return { ...r, fileName };
+  }
+
   async exportArchive(scope: ExportScope): Promise<ExportResult & { fileName: string }> {
     if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
     await this.persistence.flush();

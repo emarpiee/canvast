@@ -1,7 +1,7 @@
 import type { Session } from "../app/session";
 import type { ExportScope } from "../storage/archive";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
-import { confirmDialog } from "./confirm";
+import { chooseDialog, confirmDialog } from "./confirm";
 import { fmtBytes } from "./format";
 
 /** Export, download and import of `.canvast` archives (ADR 0008). Results are reported through the editor message. */
@@ -42,6 +42,29 @@ export async function runExport(session: Session, scope: ExportScope): Promise<v
       `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${r.canvases} canvas(es), ${r.objects} object(s), ${r.manifest.assets.length} original(s); checked before saving).` +
         (missing ? ` ${missing} original(s) were already missing and are not included.` : ""),
     );
+  } catch (e) {
+    tell(session, `Export failed: ${(e as Error).message}`);
+  }
+}
+
+/** Export the original files of a scope as a plain ZIP, after asking how to group them. */
+export async function runExportFiles(session: Session, scope: ExportScope): Promise<void> {
+  const layout = await chooseDialog({
+    title: "Export the files as a ZIP",
+    lines: ["Every file keeps its original name. Choose how they are grouped inside the ZIP."],
+    choices: [
+      { value: "type", label: "By kind", help: "Folders Images, Videos, Audio, PDFs, Text and Other." },
+      { value: "folder", label: "By my folders", help: "The folders you made in the Assets view; files with no folder go in the folder of their kind." },
+    ],
+    confirmLabel: "Export ZIP",
+  });
+  if (layout !== "type" && layout !== "folder") return;
+  tell(session, "Preparing the ZIP…");
+  try {
+    const r = await session.exportFiles(scope, layout);
+    if (r.files === 0) return tell(session, "There are no files to export here.");
+    download(r.blob, r.fileName);
+    tell(session, `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${r.files} file(s)).` + (r.missing ? ` ${r.missing} original(s) were missing and are not included.` : ""));
   } catch (e) {
     tell(session, `Export failed: ${(e as Error).message}`);
   }

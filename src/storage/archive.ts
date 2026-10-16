@@ -469,9 +469,9 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
         // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path.
         folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
         const m = meta(entry);
-        const ids = new Set(m.folderIds);
-        for (const path of org.folders) ids.add(resolveFolder(folders, path));
-        entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, folderIds: [...ids] };
+        // One folder per asset: an asset already filed keeps its folder; otherwise the archive's (first) folder is used.
+        const ids = m.folderIds.length || !org.folders.length ? m.folderIds : [resolveFolder(folders, org.folders[0]!)];
+        entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, folderIds: ids };
       }
       if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }
