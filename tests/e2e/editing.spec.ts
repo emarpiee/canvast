@@ -231,7 +231,10 @@ async function resizeFromBottomRight(app: App, id: string, dx: number, dy: numbe
   const after = (await screenOfObject(app, id))!;
   const sx = b.maxX - b.minX;
   const sy = b.maxY - b.minY;
-  const k = (sx * (to[0] - b.minX) + sy * (to[1] - b.minY)) / (sx * sx + sy * sy);
+  // The corner follows the pointer less the (sub-pixel) offset it was grabbed at.
+  const tx = to[0] - (from[0] - b.maxX);
+  const ty = to[1] - (from[1] - b.maxY);
+  const k = (sx * (tx - b.minX) + sy * (ty - b.minY)) / (sx * sx + sy * sy);
   const a = after.box;
   const cornerErr = distance({ x: a.minX, y: a.minY }, { x: b.minX, y: b.minY });
   const sizeErr = Math.max(Math.abs(a.maxX - a.minX - sx * k), Math.abs(a.maxY - a.minY - sy * k));
