@@ -37,7 +37,7 @@ const MAX_OVERLAY_PX = 16000;
 export const MAX_PLAYING = 4;
 
 /** What differs between the kinds: the element laid over the picture and how time or frames move. Positions are saved units (seconds, or a GIF frame index). */
-interface Engine {
+export interface Engine {
   readonly el: HTMLElement;
   /** Whether the overlay is drawn over the picture (audio has none). */
   visual: boolean;
@@ -66,7 +66,7 @@ interface Engine {
   onEnded: () => void;
 }
 
-function avEngine(v: HTMLVideoElement): Engine {
+export function avEngine(v: HTMLVideoElement): Engine {
   let url = "";
   let file: Blob | null = null;
   let duration = 0;
@@ -176,7 +176,7 @@ function avEngine(v: HTMLVideoElement): Engine {
 }
 
 /** A GIF plays frame by frame from the decoder (assets/gif.ts), each held for its own delay. */
-function gifEngine(c: HTMLCanvasElement): Engine {
+export function gifEngine(c: HTMLCanvasElement): Engine {
   const ctx = c.getContext("2d")!;
   let g: GifFrames | null = null;
   let idx = 0;

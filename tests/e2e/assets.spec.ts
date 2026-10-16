@@ -1626,3 +1626,53 @@ test("Ctrl+F searches the canvas (or the library in the Assets view); Ctrl+Shift
   await expect(p.getByTestId("assets-search")).toBeFocused();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the viewer plays audio, video and GIF with the on-canvas player's controls (ADR 0064)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const gif = Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) }))));
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(3) },
+    { name: "clip.webm", mimeType: "video/webm", buffer: await makeWebm(p, 2) },
+    { name: "anim.gif", mimeType: "image/gif", buffer: gif },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  const viewer = p.getByTestId("slide-view");
+  const bar = p.getByTestId("viewer-media-bar");
+  const time = bar.locator(".media-time");
+  const play = bar.getByRole("button", { name: /^(Play|Pause)$/ });
+  // Audio.
+  await p.locator('[data-testid="asset-card"][aria-label^="tone.wav"]').dblclick();
+  await expect(viewer).toBeVisible();
+  await expect(bar).toBeVisible();
+  await expect(time).toHaveText(/^0:00 \/ 0:0[23]$/); // the length is read by the browser (2.99 s shows as 0:02 in some)
+  await expect(viewer.locator("video")).not.toHaveAttribute("controls", /.*/); // the browser's own bar is not used
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect(time).toHaveText(/^0:01 \/ 0:0[23]$/); // the audio step setting (1 s)
+  await play.click();
+  await expect(bar.getByRole("button", { name: "Pause" })).toBeVisible();
+  await bar.getByRole("button", { name: "Pause" }).click();
+  await expect(bar.getByRole("button", { name: "Play" })).toBeVisible();
+  // A video file: the picture is shown and the same bar steps it (3 s default, clipped to its length).
+  await p.keyboard.press("Escape");
+  await p.locator('[data-testid="asset-card"][aria-label^="clip.webm"]').dblclick();
+  await expect(bar).toBeVisible();
+  await expect(time).toHaveText(/^0:00 \/ 0:0[1-3]$/);
+  await expect.poll(() => viewer.locator("video").evaluate((v: HTMLVideoElement) => v.videoWidth)).toBeGreaterThan(0);
+  // A GIF: frame by frame.
+  await p.keyboard.press("Escape");
+  await p.locator('[data-testid="asset-card"][aria-label^="anim.gif"]').dblclick();
+  await expect(bar).toBeVisible();
+  await expect(viewer.locator("canvas.viewer-gif")).toBeVisible();
+  await bar.getByRole("button", { name: "Pause" }).click(); // it loops on its own
+  await bar.locator(".media-scrub").evaluate((e: HTMLInputElement) => {
+    e.value = "0";
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(time).toHaveText("Frame 1 / 3");
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await expect(time).toHaveText("Frame 2 / 3");
+  // A picture has no player bar.
+  await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});

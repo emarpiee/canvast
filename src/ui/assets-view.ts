@@ -10,6 +10,10 @@ import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
 import { hasAlpha } from "./alpha";
+import type { Engine } from "./media-player";
+import { avEngine, gifEngine } from "./media-player";
+import { mountPlayerControls } from "./player-controls";
+import type { ImageObject } from "../doc/model";
 import { chooseDialog } from "./confirm";
 import type { SettingsStore } from "../settings/settings";
 
@@ -100,7 +104,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" title="Drag to move this column">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
-            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
+            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -346,6 +350,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   // ---- zoom: the wheel (or a pinch) zooms at the pointer, a drag pans, a double-click toggles Fit and 100%, + - 0 1 work from the keyboard
   const stage = viewer.querySelector<HTMLElement>(".viewer-stage")!;
+  // Video, audio and GIF play with the same engines and control bar as the on-canvas player (ADR 0064).
+  const slideGif = viewer.querySelector<HTMLCanvasElement>(".viewer-gif")!;
+  const avEng = avEngine(slideMedia);
+  const gifEng = gifEngine(slideGif);
+  const controls = mountPlayerControls(stage, settings);
+  let eng: Engine | null = null;
+  const unloadMedia = (): void => {
+    eng?.pause();
+    avEng.unload();
+    gifEng.unload();
+    eng = null;
+    controls.hide();
+    slideMedia.hidden = true;
+    slideGif.hidden = true;
+  };
+  /** What a loaded file needs of the object the canvas player takes: where to start, and whether to loop. */
+  const playOf = (repeat: boolean): ImageObject => ({ media: { t: 0, repeat } }) as unknown as ImageObject;
   const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;
   const zoom = { s: 1, x: 0, y: 0 };
   const checker = viewer.querySelector<HTMLElement>(".viewer-checker")!;
@@ -356,13 +377,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     viewer.classList.toggle("has-alpha", slideAlpha);
     paintZoom();
   });
-  const shownMedia = (): HTMLElement | null => (!slideMedia.hidden && slideMedia.videoWidth ? slideMedia : !slideImg.hidden ? slideImg : null);
+  const shownMedia = (): HTMLElement | null => (!slideGif.hidden && slideGif.width ? slideGif : !slideMedia.hidden && slideMedia.videoWidth ? slideMedia : !slideImg.hidden ? slideImg : null);
   /** The picture's own size and how big "fit" draws it (CSS px). */
   const sizes = (): { nw: number; nh: number; fw: number } | null => {
     const el = shownMedia();
     if (!el) return null;
-    const nw = el instanceof HTMLVideoElement ? el.videoWidth : (el as HTMLImageElement).naturalWidth;
-    const nh = el instanceof HTMLVideoElement ? el.videoHeight : (el as HTMLImageElement).naturalHeight;
+    const nw = el instanceof HTMLVideoElement ? el.videoWidth : el instanceof HTMLCanvasElement ? el.width : (el as HTMLImageElement).naturalWidth;
+    const nh = el instanceof HTMLVideoElement ? el.videoHeight : el instanceof HTMLCanvasElement ? el.height : (el as HTMLImageElement).naturalHeight;
     if (!nw || !nh) return null;
     const box = el.getBoundingClientRect();
     const boxW = el.offsetWidth || box.width / zoom.s;
@@ -372,7 +393,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const paintZoom = (): void => {
     const el = shownMedia();
     const z = sizes();
-    for (const m of [slideImg, slideMedia]) m.style.transform = m === el && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
+    for (const m of [slideImg, slideMedia, slideGif]) m.style.transform = m === el && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
     // A picture with see-through pixels sits on a chequered ground exactly the size of the picture, zoomed with it.
     checker.hidden = !(el === slideImg && slideAlpha && z);
     if (!checker.hidden && z) {
@@ -526,9 +547,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.style.maxWidth = `${e.pixelW * 3}px`;
     slideImg.style.maxHeight = `${e.pixelH * 3}px`;
     freeSlideUrl();
-    slideMedia.pause();
-    slideMedia.hidden = true;
-    slideMedia.removeAttribute("src");
+    unloadMedia();
     slideImg.hidden = false;
     slideAlpha = false;
     checker.hidden = true;
@@ -552,18 +571,52 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     slideUrl = URL.createObjectURL(rec.blob);
     if (/^(video|audio)\//.test(rec.type)) {
-      // A video or audio original plays here, with the browser's own controls (an audio file shows the picture of its waveform above them).
-      slideImg.hidden = rec.type.startsWith("video/");
+      // A video or audio original plays here, with the same player as on the canvas (an audio file shows the picture of its waveform above it).
+      const isVideo = rec.type.startsWith("video/");
+      slideImg.hidden = isVideo;
       if (!slideImg.hidden) slideImg.src = await thumbFor(hash).catch(() => "");
+      avEng.visual = isVideo;
+      avEng.onEnded = () => {
+        controls.refresh();
+        if (showing) stepSlide(1);
+      };
       slideMedia.hidden = false;
-      slideMedia.onerror = () => {
-        slideMedia.hidden = true;
+      try {
+        await avEng.load(playOf(false), rec.blob, rec.duration ?? 0);
+      } catch {
+        if (token !== slideToken) return;
+        unloadMedia();
         slideImg.hidden = false;
         void thumbnail();
-      };
-      slideMedia.src = slideUrl;
+        return;
+      }
+      if (token !== slideToken) return;
+      eng = avEng;
+      controls.show(avEng, isVideo ? "video" : "audio", false);
       // In a slideshow a video or audio file plays and the show moves on when it ends.
-      if (showing) void slideMedia.play().catch(() => undefined);
+      if (showing) avEng.play();
+      armShow();
+      return;
+    }
+    if (rec.type === "image/gif" && (rec.frames ?? 0) > 1) {
+      // An animated GIF plays frame by frame, with the same controls (it loops until the slideshow moves on).
+      slideImg.hidden = true;
+      slideGif.hidden = false;
+      try {
+        await gifEng.load(playOf(true), rec.blob, 0);
+      } catch {
+        if (token !== slideToken) return;
+        unloadMedia();
+        slideImg.hidden = false;
+        slideImg.src = slideUrl;
+        armShow();
+        return;
+      }
+      if (token !== slideToken) return;
+      eng = gifEng;
+      controls.show(gifEng, "gif", true);
+      gifEng.play();
+      paintZoom();
       armShow();
       return;
     }
@@ -583,8 +636,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     syncImmersive();
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
-    slideMedia.pause();
-    slideMedia.removeAttribute("src");
+    unloadMedia();
     freeSlideUrl();
     film.innerHTML = "";
     // Back in the library the card of the asset that was open is in view.
@@ -634,14 +686,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     playBtn.title = on ? "Pause the slideshow (Space)" : "Start the slideshow (Space)";
     playBtn.innerHTML = `${on ? ICONS.pause : ICONS.play}<span>${on ? "Pause" : "Slideshow"}</span>`;
     if (on) {
-      if (!slideMedia.hidden) void slideMedia.play().catch(() => undefined);
+      if (eng === avEng) avEng.play();
       armShow();
     } else clearShowTimer();
   };
   const stopShow = (): void => setShowing(false);
-  slideMedia.addEventListener("ended", () => {
-    if (showing) stepSlide(1);
-  });
   // The time per slide is a setting (Settings > Media and playback); a change applies to the slide on screen.
   settings.subscribe((key) => {
     if (key === "assets.edgeWidth") applyEdge();
@@ -1958,7 +2007,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     hide() {
       visible = false;
       // The viewer stays as it is for when the library is opened again (after placing an asset, say); only sound and the show stop.
-      slideMedia.pause();
+      eng?.pause();
       stopShow();
       root.hidden = true;
       syncImmersive();

@@ -1549,3 +1549,10 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   .viewer-zoom { margin-right: auto; }
   .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { bottom: calc(var(--sheet-now, 58vh) - 14px); }
 }
+
+/* ---- Viewer: the on-canvas player's controls over the picture (ADR 0064); the GIF canvas is placed like the picture ---- */
+.viewer figure canvas.viewer-gif { position: absolute; inset: 16px; margin: auto; width: calc(100% - 32px); height: calc(100% - 32px); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
+.viewer figure canvas.viewer-gif[hidden] { display: none; }
+.viewer-media-bar { position: absolute; left: 50%; bottom: 14px; top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); }
+.viewer-media-bar[hidden] { display: none; }
+.viewer-media-bar .media-gap { flex: 1; }
