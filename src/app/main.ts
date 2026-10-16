@@ -212,6 +212,9 @@ async function start(): Promise<void> {
     const m = settings.get("ui.motion");
     if (m === "system") delete root.dataset["motion"];
     else root.dataset["motion"] = m;
+    // How long animations take: the speed choice, and shorter again for "subtle".
+    const speed = { slow: 1.6, normal: 1, fast: 0.6 }[settings.get("ui.animSpeed")];
+    root.style.setProperty("--anim-speed", String(m === "subtle" ? speed * 0.6 : speed));
   };
   applyAppearance();
   applyZen();
@@ -791,6 +794,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "ui.density":
       case "ui.contrast":
       case "ui.motion":
+      case "ui.animSpeed":
         applyAppearance();
         return;
       case "ui.zen":

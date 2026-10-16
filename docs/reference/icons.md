@@ -62,7 +62,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `layout-list` | List |
 | `leaf` | Zen mode |
 | `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
-| `library` | Show in the library (selection bar) |
+| `library` | View in the library (selection bar) |
 | `lock` | Lock thickness |
 | `lock-keyhole` | Lock the selection: it is drawn, but cannot be pic; Lock selection |
 | `lock-keyhole-open` | Unlock all |

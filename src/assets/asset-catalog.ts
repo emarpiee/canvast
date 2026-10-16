@@ -208,7 +208,6 @@ export class AssetCatalog {
         const e = await req(tx.objectStore("assetCatalog").get(c.hash) as IDBRequest<CatalogEntry | undefined>);
         if (!e || e.state !== "active" || e.name === name) continue;
         tx.objectStore("assetCatalog").put({ ...e, name });
-        if (isCard(e)) tx.objectStore("thumbs").delete(c.hash);
         n++;
       }
       return n;

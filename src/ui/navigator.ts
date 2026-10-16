@@ -123,7 +123,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     const entry = tree?.boards.find((b) => b.board.id === cur?.boardId);
     const canvas = entry?.canvases.find((c) => c.id === cur?.canvasId);
     // Each name is cut with an ellipsis to its own room (CSS), so a long name never pushes the tabs beside the pill; the full names are in the tooltip.
-    if (entry && canvas) crumbText.innerHTML = `<span class="nav-crumb-board">${esc(entry.board.name)}</span> › <span class="nav-crumb-canvas">${esc(canvas.name)}</span>`;
+    if (entry && canvas) crumbText.innerHTML = `<span class="nav-crumb-board">${esc(entry.board.name)}</span><span class="nav-crumb-sep"> › </span><span class="nav-crumb-canvas">${esc(canvas.name)}</span>`;
     else crumbText.textContent = "Canvas";
     crumb.title = tree && entry && canvas ? `${tree.workspace.displayName} › ${entry.board.name} › ${canvas.name}. Canvas view` : "Canvas view";
     banner.hidden = !session.readOnly;

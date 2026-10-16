@@ -1195,10 +1195,8 @@ test("list columns: each can be hidden or moved, the header follows, and the cho
   await expect(p.locator(".asset-cell").first().locator(".asset-added")).toBeVisible();
   // Move Tags to just after Name: its place in the order is second.
   const order = (col: string) => p.locator(".assets-body").evaluate((e, c) => getComputedStyle(e).getPropertyValue(`--o-${c}`).trim(), col);
-  expect(await order("tags")).toBe("5");
-  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
-  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
-  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
+  expect(await order("tags")).toBe("6");
+  for (let i = 0; i < 4; i++) await panel.getByRole("button", { name: "Move Tags earlier" }).click();
   expect(await order("tags")).toBe("2");
   expect(await order("pixels")).toBe("3");
   await p.keyboard.press("Escape");
@@ -1213,16 +1211,29 @@ test("list columns: each can be hidden or moved, the header follows, and the cho
   await p.getByTestId("columns-panel").getByRole("button", { name: "Reset the columns" }).click();
   await expect(head("pixels")).toBeVisible();
   await expect(head("added")).toBeHidden();
-  expect(await order("tags")).toBe("5");
-  // More properties can be shown: the folder, the size, the type, whether it is a favourite. (The panel stays open after Reset.)
-  await expect(p.getByTestId("columns-panel")).toBeVisible();
-  for (const name of ["Folder", "Size", "Favourite", "Type"]) await p.getByTestId("columns-panel").getByRole("checkbox", { name, exact: true }).check();
-  for (const col of ["folder", "size", "favourite", "type"]) await expect(head(col)).toBeVisible();
+  expect(await order("tags")).toBe("6");
+  await expect(head("type")).toBeVisible(); // Type and Size are a column each
+  await expect(head("size")).toBeVisible();
   await p.keyboard.press("Escape");
   // A header dragged onto another takes its place.
   await head("used").dragTo(head("name"));
   expect(await order("used")).toBe("1");
   expect(await order("name")).toBe("2");
+  // More properties can be shown: the folder, whether it is a favourite, the width.
+  await p.getByTestId("assets-columns").click();
+  await expect(p.getByTestId("columns-panel")).toBeVisible();
+  for (const name of ["Folder", "Favourite", "Width", "Canvases"]) await p.getByTestId("columns-panel").getByRole("checkbox", { name, exact: true }).check();
+  for (const col of ["folder", "favourite", "width", "canvases"]) await expect(head(col)).toBeVisible();
+  // A header sorts like a table's: a click sorts by it, another reverses it, and the sort choice follows.
+  await head("name").click();
+  await expect(head("name")).toHaveAttribute("aria-sort", "ascending");
+  await expect(p.getByTestId("assets-sort").locator("option:checked")).toHaveText("Name A–Z");
+  await head("name").click();
+  await expect(head("name")).toHaveAttribute("aria-sort", "descending");
+  await head("width").click();
+  await expect(head("width")).toHaveAttribute("aria-sort", "descending");
+  await expect(head("name")).toHaveAttribute("aria-sort", "none");
+  await p.keyboard.press("Escape");
   // The list never squeezes a column: it scrolls sideways instead of clipping (the header and the rows are as wide as the columns need).
   await p.setViewportSize({ width: 700, height: 700 });
   const wide = await p.locator(".assets-body.is-list .assets-list-head").evaluate((e) => e.scrollWidth <= e.clientWidth + 1 || e.parentElement!.scrollWidth > e.parentElement!.clientWidth);
@@ -1495,19 +1506,19 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Show in the library: the selection bar takes the selected pictures' originals to the Assets view, picked, with any search cleared (ADR 0077)", async ({ app }) => {
+test("View in the library: the selection bar takes the selected pictures' originals to the Assets view, picked, with their names as the search so the rest is filtered out (ADR 0077)", async ({ app }) => {
   const p = app.page;
   await importOnCanvas(p);
   await importOnCanvas(p, GREEN, "green.png");
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");
-  const show = p.getByRole("button", { name: "Show in the library" });
+  const show = p.getByRole("button", { name: "View in the library" });
   await expect(show).toBeVisible();
   // With nothing selected the bar, and so the button, is gone.
   await p.keyboard.press("Escape");
   await expect(show).toBeHidden();
   await p.keyboard.press("Control+a");
-  // Something is searched in the library first; the reveal clears it so the originals are in the list.
+  // Something is searched in the library first; the reveal replaces it with the names, so the originals are the list.
   await toAssets(p);
   await p.getByTestId("assets-search").fill("zzz-nothing");
   await expect(p.getByTestId("asset-card")).toHaveCount(0);
@@ -1515,7 +1526,7 @@ test("Show in the library: the selection bar takes the selected pictures' origin
   await p.keyboard.press("Control+a");
   await show.click();
   expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("assets");
-  await expect(p.getByTestId("assets-search")).toHaveValue("");
+  await expect(p.getByTestId("assets-search")).toHaveValue(/^"[^"]+" OR "[^"]+"$/);
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
   await expect(p.getByTestId("asset-card").first()).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("asset-card").nth(1)).toHaveAttribute("aria-pressed", "true");
@@ -1995,5 +2006,86 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   expect(frame.folder).toBe("Stills");
   expect(frame.tags.sort()).toEqual(["My-Anim", "client-x", "ref"].sort());
   expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0); // not placed
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("wide screen: the library and details panels are resized by their edges (drag, arrow keys, double-click resets) and the widths are remembered (ADR 0095)", async ({ app }) => {
+  const p = app.page;
+  await libraryOf(p, 1);
+  await p.locator('[data-testid="asset-card"]').first().click();
+  const side = p.getByTestId("assets-side");
+  const insp = p.getByTestId("asset-inspector");
+  const w = async (l: typeof side) => Math.round((await l.boundingBox())!.width);
+  const side0 = await w(side);
+  const insp0 = await w(insp);
+  const sg = (await p.getByTestId("side-grip").boundingBox())!;
+  await p.mouse.move(sg.x, sg.y + 200);
+  await p.mouse.down();
+  await p.mouse.move(sg.x + 60, sg.y + 200, { steps: 4 });
+  await p.mouse.up();
+  expect(await w(side)).toBe(side0 + 60);
+  const ig = (await p.getByTestId("insp-grip").boundingBox())!;
+  await p.mouse.move(ig.x, ig.y + 200);
+  await p.mouse.down();
+  await p.mouse.move(ig.x - 50, ig.y + 200, { steps: 4 });
+  await p.mouse.up();
+  expect(await w(insp)).toBe(insp0 + 50);
+  await p.getByTestId("insp-grip").focus();
+  await p.keyboard.press("ArrowLeft"); // the edge moves left: wider
+  expect(await w(insp)).toBe(insp0 + 66);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"]').first().click();
+  expect(await w(side), "kept over a reload").toBe(side0 + 60);
+  const sg2 = (await p.getByTestId("side-grip").boundingBox())!; // the grip has no width of its own: its hit area is a pseudo-element
+  await p.mouse.dblclick(sg2.x, sg2.y + 200);
+  expect(await w(side)).toBe(side0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a picture with a player: the selection bar and the player bar never sit on each other, and the player's picture is under the floating bars on the edges (ADR 0096)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "tiny.gif", mimeType: "image/gif", buffer: Buffer.from(encodeGif(8, 8, [[255, 0, 0], [0, 0, 255]], [0, 1].map((c) => ({ w: 8, h: 8, pixels: Array(64).fill(c) })))) });
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).length).toBe(1);
+  const id = ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<Record<string, unknown>>)[0]!["id"] as string;
+  await p.locator("#canvas").focus();
+  await p.keyboard.press("Control+a");
+  const media = p.getByTestId("media-bar");
+  const ctx = p.locator(".ctx-bar");
+  const apart = async (label: string): Promise<void> => {
+    await expect(media).toBeVisible();
+    await expect(ctx).toBeVisible();
+    await p.waitForTimeout(150); // the selection bar looks once more after the player's bar has placed itself
+    const [m, c] = [(await media.boundingBox())!, (await ctx.boundingBox())!];
+    const clear = c.y >= m.y + m.height - 1 || c.y + c.height <= m.y + 1 || c.x >= m.x + m.width - 1 || c.x + c.width <= m.x + 1;
+    expect(clear, `${label}: the selection bar (${JSON.stringify(c)}) is clear of the player (${JSON.stringify(m)})`).toBe(true);
+  };
+  await apart("in the middle");
+  // Pan until the picture is at the bottom edge: the player's bar goes above it, and the selection bar must not land on that.
+  const vh = p.viewportSize()!.height;
+  for (let i = 0; i < 60; i++) {
+    const box = (await p.evaluate((o) => window.__canvastDebug.objectScreen(o), id))!.box;
+    if (box.maxY > vh - 30) break;
+    await p.keyboard.press("ArrowUp");
+  }
+  await apart("at the bottom edge");
+  // The floating bars on the edges are above everything on the canvas: the status bar and the view controls win over the picture.
+  const above = await p.evaluate(() => {
+    const pic = document.querySelector(".media-video") as HTMLElement | null;
+    const hud = [document.querySelector(".hud-readout"), document.querySelector(".hud-controls")].filter(Boolean) as HTMLElement[];
+    const z = (e: Element): number => {
+      let n: Element | null = e;
+      const chain: number[] = [];
+      while (n) {
+        const v = getComputedStyle(n).zIndex;
+        if (v !== "auto") chain.push(Number(v));
+        n = n.parentElement;
+      }
+      return chain[chain.length - 1] ?? 0; // the layer of the outermost stacking element
+    };
+    return { pic: pic ? z(pic) : -1, hud: hud.map(z) };
+  });
+  expect(above.hud.every((h) => h > above.pic)).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });

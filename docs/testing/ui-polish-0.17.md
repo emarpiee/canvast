@@ -10,6 +10,9 @@ Run per slice on Chromium (and the new tests on Firefox), as the cadence rule sa
 | Canvas: Side-handle resize (sides, Shift, Alt, Ctrl, edge snapping incl. proportional), Alt-drag copy, reset rotation and proportions | `editing.spec.ts`, `frames.spec.ts` | pass |
 | Layers panel: sort, guides, expand all, tags row; phone and medium layouts | `text.spec.ts`, `frames.spec.ts` | pass |
 | Settings: Navigation tab, shortcuts list, viewer edges | `settings.spec.ts` | pass |
-| Unit | `npm run test:unit` | 180+ pass (includes `files-zip`) |
+| Second round (ADRs 0088 to 0096): sidebar and settings layout, file tiles, status bar, list columns and header sorting, animation setting, settings search and groups, resizable panels, View in the library, selection bar and player bar apart, edge components above the canvas | `assets.spec.ts`, `files.spec.ts`, `organize.spec.ts`, `settings.spec.ts`, `a11y.spec.ts`, `frames.spec.ts` (readout, Zen) | pass in Chromium; Firefox not run |
+| Unit | `npm run test:unit` | 202 pass (includes `files-zip`) |
 
 Known flaky under load (passes alone, 6 of 6): the Ctrl+F / Ctrl+Shift+F focus test and the canvas-search test once each in a long run.
+
+Seen once during the second round, then passing alone and in a rerun: the workspace menu edge test (it measured the menu while it was animating, now fixed by animating only opacity and position) and the "panels stack" test in `frames.spec.ts` under load.

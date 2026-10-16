@@ -5,6 +5,20 @@
 - Rename assets (the details panel, the bulk bar, F2), one or many, with a file-manager-style dialog: enumerate, replace text, add text, change the extension, and a preview of every name in full. The rules and the dialog are a reusable module (ADR 0085).
 - Counts in the interface read right for one and for many ("1 original is still missing"), and the wording is general ("Select the items with this tag") (ADR 0086).
 - The asset details panel is redesigned: a summary, cards, full-width actions, technical details last (ADR 0087).
+- The library sidebar is redesigned to match the details panel: a framed panel, the fixed views as a group, each section a card, one row height, quiet counts (ADR 0088).
+- Files with no preview show a fixed grey tile (file icon, extension, one general message) instead of a generated thumbnail; renaming no longer remakes anything (ADR 0089).
+- The information readout is one inline status bar along the very bottom of the window, full width, most important first, with the view controls floating just above it at the right (ADR 0090).
+- The library list: Type and Size are a column each; Width, Height and Canvases can be added; every header sorts, and a second click reverses it (ADR 0091).
+- Settings match the library and the details: framed tabs and panel, the shared button and field look, and the same columns on every tab, Shortcuts included (ADR 0092).
+- Animation: duration and curve tokens, menus/panels/dialogs/views ease in, buttons change colour smoothly, and Settings > Performance has Animation (System, Full, Subtle, None) and Animation speed (ADR 0093). The old Motion row moved there.
+- Settings: the tabs are in groups (Working, Media, Interface, App) and a search finds any setting across all of them, with a count on each tab (ADR 0094). "Running smoothly" is no longer shown in the readout; only "A little slow" or "Slow" appear.
+- The library and details panels resize by their edges on a wide screen (ADR 0095); the library bar keeps every control on a narrow window (the size slider included) by wrapping; the board pill shows the canvas name only.
+
+- **View in the library** (was "Show"): the selection bar puts the names of the selected originals in the library search, so everything else is filtered out and these are listed, still picked (ADR 0077).
+- A narrow library panel cuts nothing at its edge: long names and tags shorten with an ellipsis and keep their count, with the full name in the tooltip.
+- The Technical readout spreads its segments over the whole width in one row (they wrap on a narrow window).
+
+- Layers (ADR 0096): the bars and panels floating on the edges are above everything on the canvas, selected, moving or placed (a GIF's picture no longer covers the status bar and the view controls); layer tokens `--z-item`, `--z-item-bar`, `--z-item-pop`, `--z-edge`. The selection bar finds a place clear of a player's bar, above or below it.
 
 - Tags follow Obsidian's rules: letters, numbers, _ - and / (nested), no spaces, not all digits; whatever is typed is formatted to fit (with a notice), `#project` finds `project/design` too, renaming a parent renames its children, and tags stored in an older form are formatted once at start-up (ADR 0084).
 - File types: the count no longer disappears while a chip is pointed at.

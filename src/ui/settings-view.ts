@@ -3,6 +3,7 @@ import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
 import { esc } from "./format";
+import { ICONS } from "./icons";
 
 /**
  * The Settings view (ADR 0048, engineering plan §14.40): a tabbed page, one of the three top-level views. Every row is one declared
@@ -28,6 +29,43 @@ interface Tab {
   readonly label: string;
   readonly rows?: readonly Row[];
 }
+
+/** Where a card of rows begins: a row named here starts a new card, titled so, and the rows after it stay in that card. A tab with none is one card. */
+const CARD_STARTS: Partial<Record<SettingKey, string>> = {
+  "pen.kind": "Drawing",
+  "lasso.filter": "Selecting and arranging",
+  "eraser.diameterPx": "Eraser",
+  "assets.edgeWidth": "The asset viewer",
+  "media.volume": "Players",
+  "frame.format": "Extracted frames",
+  "shot.format": "The picture",
+  "shot.folder": "Where it goes and its name",
+  "shot.tagShot": "Tags",
+  "ui.theme": "Colour",
+  "ui.info": "Canvas and readout",
+  "ui.density": "Size and comfort",
+  "ui.zen": "Focus",
+  "quality.auto": "Drawing quality",
+  "ui.motion": "Animation",
+};
+/** Rows into cards (a title on a card only when the tab has more than one). */
+function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
+  const cards: Array<{ title: string; rows: Row[] }> = [];
+  for (const r of rows) {
+    const start = CARD_STARTS[r.key];
+    if (start !== undefined || cards.length === 0) cards.push({ title: start ?? "", rows: [] });
+    cards[cards.length - 1]!.rows.push(r);
+  }
+  return cards.length > 1 ? cards : cards.map((c) => ({ ...c, title: "" }));
+}
+
+/** The tabs in the sidebar, in groups. */
+const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
+  ["Working", ["drawing", "navigation", "shortcuts"]],
+  ["Media", ["media", "screenshot"]],
+  ["Interface", ["appearance", "performance"]],
+  ["App", ["storage", "privacy", "collaboration", "develop"]],
+];
 
 const SCOPE_LABEL = { device: "This device", workspace: "This workspace", board: "This board" } as const;
 
@@ -107,6 +145,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Performance",
     rows: [
       { key: "quality.auto", label: "Adaptive quality", help: "Lower the canvas resolution when frames are slow.", control: { kind: "toggle" } },
+      { key: "ui.motion", label: "Animation", help: "How the interface moves: panels and menus fade and rise in, the floating bars fade in Zen mode, buttons change colour smoothly. System follows your operating system's reduce-motion setting (the choice that most often makes everything instant). Subtle fades only, and shorter. None changes everything at once.", control: { kind: "select", options: [["system", "System"], ["full", "Full"], ["subtle", "Subtle"], ["reduce", "None"]] } },
+      { key: "ui.animSpeed", label: "Animation speed", help: "How long each animation takes. It has no effect when Animation is None.", control: { kind: "select", options: [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]] } },
     ],
   },
   {
@@ -122,7 +162,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "ui.textScale", label: "Interface size", help: "Scales the toolbars, panels and views (not the canvas).", control: { kind: "select", options: [["90", "90%"], ["100", "100%"], ["115", "115%"], ["130", "130%"], ["150", "150%"]] } },
       { key: "ui.contrast", label: "Contrast", help: "High contrast: stronger text and borders in the interface.", control: { kind: "select", options: [["normal", "Normal"], ["high", "High"]] } },
       { key: "ui.zen", label: "Zen mode", help: "Fade the floating bars and panels out; each shows again while the pointer is over it. Also the leaf button beside Home, or the Zen key (Settings > Shortcuts).", control: { kind: "toggle" } },
-      { key: "ui.motion", label: "Motion", help: "System follows your operating system's reduce-motion setting.", control: { kind: "select", options: [["system", "System"], ["reduce", "Reduce"], ["full", "Full"]] } },
     ],
   },
   { id: "shortcuts", label: "Shortcuts" },
@@ -154,39 +193,49 @@ function controlHtml(row: Row, id: string): string {
 
 /** Mount the view into `root`; returns what main needs to show and hide it. */
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void): { show(tab?: string): void; hide(): void } {
-  const tabsHtml = SETTINGS_TABS.map((t) => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}</button>`).join("");
+  const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}<span class="set-hits" aria-hidden="true"></span></button>`;
+  const tabsHtml = TAB_GROUPS.map(
+    ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.map((id) => tabButton(SETTINGS_TABS.find((t) => t.id === id)!)).join("")}`,
+  ).join("");
   const panelsHtml = SETTINGS_TABS.map((t) => {
-    const body = t.rows
-      ? t.rows
-          .map((r) => {
-            const id = `set-${r.key.replace(/\./g, "-")}`;
-            const scope = SCOPE_LABEL[SETTINGS[r.key].scope];
-            return `<div class="set-row" data-row="${r.key}"><label for="${id}"><span class="set-label" id="${id}-l">${esc(r.label)}</span>${r.help ? `<span class="set-help" id="${id}-h">${esc(r.help)}</span>` : ""}</label>
+    const rowHtml = (r: Row): string => {
+      const id = `set-${r.key.replace(/\./g, "-")}`;
+      const scope = SCOPE_LABEL[SETTINGS[r.key].scope];
+      return `<div class="set-row" data-row="${r.key}"><label for="${id}"><span class="set-label" id="${id}-l">${esc(r.label)}</span>${r.help ? `<span class="set-help" id="${id}-h">${esc(r.help)}</span>` : ""}</label>
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default">Reset</button></div>`;
-          })
+    };
+    const body = t.rows
+      ? cardsOf(t.rows)
+          .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
           .join("") +
         (t.id === "develop"
-          ? `<div class="set-info" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
+          ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
       : t.id === "shortcuts"
         ? `<div class="set-info set-keys"><p>Tool keys and the keys that step to the next item are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
-           <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3>Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl>`).join("")}</div>`
+           <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
       : t.id === "storage"
-        ? `<div class="set-info" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
+        ? `<div class="set-info set-card" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
            <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Use an export from the workspace menu to keep a copy.</p></div>`
         : t.id === "collaboration"
-          ? `<div class="set-info"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
+          ? `<div class="set-info set-card"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
            <p>When it is added it will be opt-in for each workspace, with named roles, and everything will keep working offline. Until then, share work with an export from the workspace menu.</p></div>`
-        : `<div class="set-info"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
+        : `<div class="set-info set-card"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
            <p>Nothing you draw, import or write leaves this browser unless you export it yourself.</p></div>`;
     return `<section role="tabpanel" id="set-panel-${t.id}" aria-labelledby="set-tab-${t.id}" data-panel="${t.id}" hidden><h2>${esc(t.label)}</h2>${body}</section>`;
   }).join("");
-  root.innerHTML = `<div class="set-head"><h1 class="set-title">Settings</h1><button type="button" class="set-done" data-done>Back to canvas</button></div>
-    <div class="set-body"><div class="set-tabs" role="tablist" aria-label="Settings" aria-orientation="vertical">${tabsHtml}</div><div class="set-panels">${panelsHtml}</div></div>`;
+  root.innerHTML = `<div class="set-head"><h1 class="set-title">Settings</h1>
+    <div class="set-searchbox">${ICONS.search}<input type="search" class="set-search" data-testid="settings-search" placeholder="Search settings" aria-label="Search settings" title="Search settings (press / to start)" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" data-search-clear aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button></div>
+    <button type="button" class="set-done" data-done>Back to canvas</button></div>
+    <div class="set-body"><div class="set-tabs" role="tablist" aria-label="Settings" aria-orientation="vertical">${tabsHtml}</div><div class="set-panels">${panelsHtml}<p class="set-none" data-testid="settings-none" role="status" hidden></p></div></div>`;
 
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  const searchEl = root.querySelector<HTMLInputElement>(".set-search")!;
+  const clearEl = root.querySelector<HTMLButtonElement>("[data-search-clear]")!;
+  const panelsEl = root.querySelector<HTMLElement>(".set-panels")!;
+  const noneEl = root.querySelector<HTMLElement>(".set-none")!;
   const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
   let current = "drawing";
   const select = (id: string, focus = false): void => {
@@ -201,6 +250,63 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     cancelCapture();
     if (id === "storage") void storage();
   };
+
+  /**
+   * Search: every word must be somewhere in a row (its name, its help, the key, the card and tab it is on). While a search is on, all the
+   * tabs show together with only what matches, and each tab in the list says how many matches it has. An empty search puts it all back.
+   */
+  const search = (): void => {
+    const words = searchEl.value.toLowerCase().split(/\s+/).filter(Boolean);
+    clearEl.hidden = words.length === 0;
+    panelsEl.classList.toggle("is-searching", words.length > 0);
+    root.querySelector(".set-body")!.classList.toggle("is-searching", words.length > 0);
+    let total = 0;
+    for (const sec of panels) {
+      const tabLabel = SETTINGS_TABS.find((t) => t.id === sec.dataset["panel"])!.label.toLowerCase();
+      let hits = 0;
+      for (const card of sec.querySelectorAll<HTMLElement>(".set-card")) {
+        const title = card.querySelector(":scope > h3, :scope > h4")?.textContent?.toLowerCase() ?? "";
+        const rows = [...card.querySelectorAll<HTMLElement>(".set-row")];
+        const items = rows.length ? rows : [card];
+        let cardHits = 0;
+        for (const el of items) {
+          const hit = words.every((w) => `${el.textContent} ${title} ${tabLabel}`.toLowerCase().includes(w));
+          el.classList.toggle("set-miss", words.length > 0 && !hit);
+          if (hit) cardHits++;
+        }
+        card.classList.toggle("set-miss", words.length > 0 && cardHits === 0);
+        hits += words.length > 0 ? cardHits : 0;
+      }
+      for (const h of sec.querySelectorAll<HTMLElement>("h3.set-sub, .set-note")) h.classList.toggle("set-miss", words.length > 0);
+      sec.classList.toggle("set-miss", words.length > 0 && hits === 0);
+      const badge = root.querySelector<HTMLElement>(`[data-tab="${sec.dataset["panel"]}"] .set-hits`)!;
+      badge.textContent = words.length > 0 && hits > 0 ? String(hits) : "";
+      total += hits;
+    }
+    noneEl.hidden = words.length === 0 || total > 0;
+    noneEl.textContent = `Nothing in Settings matches "${searchEl.value.trim()}".`;
+  };
+  searchEl.addEventListener("input", search);
+  clearEl.addEventListener("click", () => {
+    searchEl.value = "";
+    search();
+    searchEl.focus();
+  });
+  searchEl.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && searchEl.value) {
+      e.stopPropagation(); // the first Escape clears the search; the next closes Settings
+      searchEl.value = "";
+      search();
+    }
+  });
+  // "/" starts a search from anywhere in Settings that is not a field.
+  root.addEventListener("keydown", (e) => {
+    const t = e.target as HTMLElement;
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !t.closest("input, select, textarea")) {
+      e.preventDefault();
+      searchEl.focus();
+    }
+  });
 
   const storage = async (): Promise<void> => {
     const set = (sel: string, text: string): void => {
@@ -230,12 +336,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     host.innerHTML = KEY_ROWS.map((r) => {
       const def = SETTINGS[r.setting].default as string;
       const cur = settings.get(r.setting) as string;
-      const head = r.group !== group ? `<h4>${esc(r.group)}</h4>` : "";
+      const head = r.group !== group ? `${group ? "</div>" : ""}<div class="set-card"><h3>${esc(r.group)}</h3>` : "";
       group = r.group;
       return `${head}<div class="set-row set-keyrow"><span class="set-label">${esc(r.name)}</span>
         <div class="set-control"><kbd class="set-key">${capturing === r.setting ? "press a letter…" : esc(cur.toUpperCase())}</kbd><button type="button" class="set-reset" data-change-key="${r.setting}" aria-label="Change the key for ${esc(r.name)}">Change</button></div>
         <span class="set-scope">This device</span><button type="button" class="set-reset" data-reset="${r.setting}" aria-label="Reset the key for ${esc(r.name)} to its default"${cur === def ? " disabled" : ""}>Reset</button></div>`;
-    }).join("");
+    }).join("") + (KEY_ROWS.length ? "</div>" : "");
   };
   const keyNote = (text: string): void => {
     const n = root.querySelector<HTMLElement>("[data-key-note]");
@@ -245,6 +351,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   const refresh = (): void => {
     renderKeys();
+    search();
     for (const r of all) {
       const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-set="${r.key}"]`);
       if (!el) continue;
@@ -281,7 +388,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
   root.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const tab = t.closest<HTMLElement>("[data-tab]");
-    if (tab) return select(tab.dataset["tab"]!);
+    if (tab) {
+      select(tab.dataset["tab"]!);
+      // While searching every tab shows: the one chosen scrolls into view.
+      if (panelsEl.classList.contains("is-searching")) panels.find((p) => p.dataset["panel"] === tab.dataset["tab"])?.scrollIntoView({ block: "start", behavior: "smooth" });
+      return;
+    }
     const preset = t.closest<HTMLElement>("[data-preset]");
     if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
     const change = t.closest<HTMLElement>("[data-change-key]");

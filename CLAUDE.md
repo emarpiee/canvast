@@ -30,6 +30,8 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
 
+- **Layers.** Floating elements use the `--z-*` tokens in `:root` (ADR 0096), never a number: `--z-item` and `--z-item-bar`/`--z-item-pop` for what belongs to a canvas item (a player's picture and bar, the selection bar), `--z-edge` for the bars and panels on the edges, which are always above anything on the canvas.
+
 - **Icons (`src/ui/icons.ts`, registry in `docs/reference/icons.md`).** Every icon button must use an icon no other *different* function uses, and the icon must make sense for what the button does (not a stand-in picked because it was free). Buttons with the same function (all "close", all "delete", all "More") share one icon. Before adding an icon button, check the registry and `src/ui/icons.ts` for the icon you want, and add a row when you add one. Don't reuse an icon from another function even if it is close (a pencil is the Pen tool, so Rename uses a text cursor).
 
 ## Architecture (big picture)

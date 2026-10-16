@@ -58,7 +58,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
     btn("tag", ICONS.tag, "Tag the selection") +
-    btn("library", ICONS.library, "Show in the library") +
+    btn("library", ICONS.library, "View in the library") +
     btn("download", ICONS.download, "Download the original file") +
     btn("open", ICONS.externalLink, "Open in a new tab") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
@@ -158,6 +158,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   bar.addEventListener("pointerdown", (e) => e.stopPropagation());
 
   let lastKey = "";
+  let settling = false;
   const update = (): void => {
     const box = editor.selectionBoxOnScreen;
     const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "lasso") && editor.preview.kind === "none" && !!box;
@@ -187,10 +188,27 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const vw = host.clientWidth;
     const vh = host.clientHeight;
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-    let top = Math.max(...ys) + GAP;
-    if (top + h > vh - MARGIN) top = Math.min(...ys) - GAP - h - 24; // no room below: above the rotate handle
+    // The bar goes below the selection when there is room, else above its turn handle. A picture with a player (video, audio, GIF) has the
+    // player's bar on one side of it (below, or above when the view's edge leaves no room below): this bar then takes the first place that
+    // is inside the view and clear of the player's bar: below the selection, above it, below the player, above the player.
+    const hostBox = host.getBoundingClientRect();
+    const playerEl = sel.length === 1 && "media" in sel[0]! && sel[0].media ? host.querySelector<HTMLElement>(".media-bar:not([hidden])") : null;
+    const pr = playerEl && playerEl.style.display !== "none" ? playerEl.getBoundingClientRect() : null;
+    const player = pr ? { top: pr.top - hostBox.top, bottom: pr.bottom - hostBox.top } : null;
+    const clear = (t: number): boolean => !player || t + h + 2 <= player.top || t >= player.bottom + 2;
+    const fits = (t: number): boolean => t >= MARGIN && t + h <= vh - MARGIN && clear(t);
+    const candidates = [Math.max(...ys) + GAP, Math.min(...ys) - GAP - h - 24, ...(player ? [player.bottom + GAP, player.top - GAP - h] : [])];
+    let top = candidates.find(fits) ?? candidates[0]!;
     top = Math.max(MARGIN, Math.min(top, vh - h - MARGIN));
     const left = Math.max(MARGIN, Math.min(cx - w / 2, vw - w - MARGIN));
+    // The player's bar places itself in its own update; look again once it has, so the two agree.
+    if (playerEl && !settling) {
+      settling = true;
+      requestAnimationFrame(() => {
+        update(); // (settling is still on: this look does not ask for another)
+        settling = false;
+      });
+    }
     const key = `${Math.round(left)},${Math.round(top)}`;
     if (key !== lastKey) {
       bar.style.left = `${Math.round(left)}px`;

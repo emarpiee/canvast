@@ -206,10 +206,9 @@ export class AssetLibrary {
     // Anything the browser cannot show (a 3D model, a document, a picture or sound of a format it cannot read) is kept as it is
     // and shown as a card with its extension, name and kind (ADR 0078).
     let carded = false;
-    const asCard = async (note?: string): Promise<void> => {
+    const asCard = async (): Promise<void> => {
       carded = true;
-      const d = describeFile(file.name ?? "", type);
-      img = await makeFileCard(file.name ?? "", d.chip, d.category, file.size, 1, note);
+      img = await makeFileCard(describeFile(file.name ?? "", type).chip);
       size = { w: FILE_CARD_W, h: FILE_CARD_H };
       duration = undefined;
     };
@@ -229,7 +228,7 @@ export class AssetLibrary {
               img = e.result.bitmap; // nothing better to show than the flat picture
               duration = e.result.duration;
             } else {
-              img = await makeCard(pr.w, pr.h, file.name ?? "", pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
+              img = await makeCard(pr.w, pr.h, pr.codec);
               duration = pr.duration;
               size = { w: pr.w, h: pr.h };
             }
@@ -250,7 +249,7 @@ export class AssetLibrary {
           }
         }
       } catch {
-        await asCard(`This browser cannot read it as ${type.startsWith("video/") ? "a video" : type.startsWith("audio/") ? "audio" : "a picture"}`);
+        await asCard();
       }
     }
     const record: AssetRecord = {
@@ -410,10 +409,7 @@ export class AssetLibrary {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
-      const card = (): Promise<ImageBitmap> => {
-        const d = describeFile(rec.name, rec.type);
-        return makeFileCard(rec.name, d.chip, d.category, rec.size, 1, isMediaType(rec.type) ? "This browser cannot read it" : undefined);
-      };
+      const card = (): Promise<ImageBitmap> => makeFileCard(describeFile(rec.name, rec.type).chip);
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
@@ -423,7 +419,7 @@ export class AssetLibrary {
           if (!pr) {
             if (!(e instanceof BlankPictureError)) img = await card();
             else img = e.result.bitmap;
-          } else img = await makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : "");
+          } else img = await makeCard(pr.w, pr.h, pr.codec);
         }
       }
       if (this.decoded.has(key)) {

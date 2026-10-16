@@ -86,14 +86,15 @@ export interface HudStatus {
  */
 export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, debug: boolean, status: HudStatus): () => void {
   root.innerHTML = `
+    <div class="hud-bottom">
     <div class="hud-readout" aria-live="off">
       <button type="button" class="hud-zoom" data-testid="zoom-readout" title="Click to type a zoom level (e.g. 3000, 2^-500, 10^900)"></button>
       <input class="hud-zoom-input" data-testid="zoom-input" aria-label="Zoom level (log2), e.g. 3000, 2^-500 or 10^900" hidden spellcheck="false" autocomplete="off">
+      <button type="button" class="hud-save" data-testid="save-status" aria-haspopup="dialog" aria-expanded="false" title="Storage status"></button>
       <span class="hud-pos" data-testid="position-readout"></span>
       <span class="hud-objects" data-testid="objects-readout" hidden></span>
       <span class="hud-fps" data-testid="fps-readout" aria-live="off" hidden></span>
-      <pre class="hud-fps hud-diag" data-testid="diagnostics" aria-live="off" hidden></pre>
-      <button type="button" class="hud-save" data-testid="save-status" aria-haspopup="dialog" aria-expanded="false" title="Storage status"></button>
+      <div class="hud-fps hud-diag" data-testid="diagnostics" aria-live="off" hidden></div>
     </div>
     <div class="hud-controls" role="toolbar" aria-label="Navigation">
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
@@ -107,6 +108,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.frame}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
+    </div>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>
   `;
@@ -164,11 +166,11 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     if (!r) return "… FPS";
     return `${Math.round(r.fps)} FPS · ${r.avgMs.toFixed(1)} ms · worst ${r.worstMs.toFixed(0)} ms · draw ${stats.recent(50).toFixed(1)} ms${q ? ` · quality ${q}` : ""}`;
   };
-  /** How the canvas is running, in a word: from the same frame meter. */
+  /** How the canvas is running, said only when it is not fine (nothing is said while it runs smoothly): from the same frame meter. */
   const speedText = (): string => {
     const r = meter.read();
     if (!r) return "";
-    return r.fps >= 50 ? "Running smoothly" : r.fps >= 30 ? "A little slow" : "Slow";
+    return r.fps >= 50 ? "" : r.fps >= 30 ? "A little slow" : "Slow";
   };
   const sceneText = (): string => {
     const sc = status.scene();
@@ -183,7 +185,8 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       const mode = status.infoMode();
       if (mode === "technical") {
         fpsEl.textContent = fpsText();
-        diagEl.textContent = diagText();
+        // One segment a line, side by side in the bar; the line breaks stay between them for anything that reads the text.
+        diagEl.innerHTML = diagText().split("\n").map((l) => `<span>${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("\n");
       } else {
         fpsEl.textContent = speedText();
         objEl.textContent = sceneText();

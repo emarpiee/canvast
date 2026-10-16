@@ -17,8 +17,8 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   expect(await tool()).toBe(before);
   await expect(panel.getByRole("tab", { name: "Drawing and selection" })).toHaveAttribute("aria-selected", "true");
   await p.keyboard.press("ArrowDown");
-  await expect(panel.getByRole("tab", { name: "Media and playback" })).toHaveAttribute("aria-selected", "true");
-  await expect(panel.locator("#set-panel-media")).toBeVisible();
+  await expect(panel.getByRole("tab", { name: "Navigation" })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.locator("#set-panel-navigation")).toBeVisible();
   await expect(panel.locator("#set-panel-drawing")).toBeHidden();
   // A row writes the shared store and the tool: the marker is one translucent stroke.
   await panel.getByRole("tab", { name: "Drawing and selection" }).click();
@@ -152,7 +152,9 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await panel.getByRole("tab", { name: "Appearance" }).click();
   await panel.getByLabel("Interface size", { exact: true }).selectOption("150");
   await panel.getByLabel("Contrast", { exact: true }).selectOption("high");
-  await panel.getByLabel("Motion", { exact: true }).selectOption("reduce");
+  await panel.getByRole("tab", { name: "Performance" }).click();
+  await panel.getByLabel("Animation", { exact: true }).selectOption("reduce");
+  await panel.getByRole("tab", { name: "Appearance" }).click();
   // Compact is the default; comfortable loosens every floating element on one grid (the dock, the tabs and the rail share the control size).
   const dockHeight = async () => (await p.locator("#toolbar > .dock").boundingBox())!.height;
   const compact = await dockHeight();
@@ -174,7 +176,18 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   // Back to the defaults leaves no attribute behind.
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  for (const key of ["ui.textScale", "ui.contrast", "ui.motion"]) await panel.getByRole("button", { name: new RegExp(`Reset ${{ "ui.textScale": "Interface size", "ui.contrast": "Contrast", "ui.motion": "Motion" }[key]} `) }).click();
+  for (const key of ["ui.textScale", "ui.contrast"]) await panel.getByRole("button", { name: new RegExp(`Reset ${{ "ui.textScale": "Interface size", "ui.contrast": "Contrast" }[key]} `) }).click();
+  await panel.getByRole("tab", { name: "Performance" }).click();
+  await panel.getByRole("button", { name: /Reset Animation /i }).first().click();
+  await expect(root).not.toHaveAttribute("data-motion", /.*/);
+  // Subtle and the speed set the durations: the tokens, not each rule.
+  await panel.getByLabel("Animation", { exact: true }).selectOption("subtle");
+  await panel.getByLabel("Animation speed", { exact: true }).selectOption("slow");
+  await expect(root).toHaveAttribute("data-motion", "subtle");
+  expect(await root.evaluate((e) => e.style.getPropertyValue("--anim-speed"))).toBe("0.96");
+  await panel.getByRole("button", { name: /Reset Animation /i }).first().click();
+  await panel.getByRole("button", { name: /Reset Animation speed/ }).click();
+  await panel.getByRole("tab", { name: "Appearance" }).click();
   expect(await clear(), "comfortable and 100%: the tools are clear of the view tabs").toBe(true);
   await panel.getByRole("button", { name: /Reset Density/ }).click();
   await expect(root).not.toHaveAttribute("data-density", /.*/);
@@ -311,5 +324,25 @@ test("Zen mode fades the floating bars out, each shows while the pointer is over
   await p.keyboard.press("z");
   await expect(rail).toHaveCSS("opacity", "1");
   await expect(p.getByRole("button", { name: "Zen mode" })).toHaveAttribute("aria-pressed", "false");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("settings search: every word must match, all tabs show with only their matches and a count each, Escape clears, and a miss says so (ADR 0094)", async ({ app }) => {
+  const p = app.page;
+  const panel = p.locator("#settings-view");
+  await p.getByTestId("view-settings").click();
+  const search = p.getByTestId("settings-search");
+  await search.fill("tag screenshot");
+  await expect(panel.getByRole("tab", { name: /Screenshot/ }).locator(".set-hits")).toHaveText(/^[1-9]/);
+  await expect(panel.getByRole("tab", { name: /Appearance/ }).locator(".set-hits")).toBeHidden();
+  await expect(panel.locator('[data-row="shot.tagShot"]')).toBeVisible();
+  await expect(panel.locator('[data-row="shot.format"]')).toBeHidden();
+  await expect(panel.locator('[data-row="pen.kind"]')).toBeHidden();
+  await search.fill("zzzz");
+  await expect(p.getByTestId("settings-none")).toBeVisible();
+  await search.press("Escape");
+  await expect(search).toHaveValue("");
+  await expect(panel).toBeVisible(); // the first Escape only clears the search
+  await expect(panel.locator('[data-row="pen.kind"]')).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });

@@ -5,7 +5,7 @@ import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
-import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "../assets/card";
+import { FILE_CARD_NOTE } from "../assets/card";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
@@ -59,27 +59,50 @@ export interface AssetsView {
 }
 
 /** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
+/** How wide the library panel (left) and the details panel (right) can be made on a wide screen, in pixels. */
+/** The most names "View in the library" puts in the search; a longer selection is picked in the whole list instead. */
+const REVEAL_NAMES_MAX = 20;
+const SIDE_W = { min: 180, max: 420, def: 232 };
+const INSP_W = { min: 260, max: 560, def: 308 };
+
 const COLUMNS = [
   { id: "name", label: "Name", min: 140, grow: 2 },
   { id: "pixels", label: "Pixels", min: 100, grow: 0 },
-  { id: "kind", label: "Type and size", min: 120, grow: 0 },
+  { id: "type", label: "Type", min: 70, grow: 0 },
+  { id: "size", label: "Size", min: 80, grow: 0 },
   { id: "used", label: "Used", min: 120, grow: 1.2 },
   { id: "tags", label: "Tags", min: 100, grow: 1 },
   { id: "added", label: "Added", min: 110, grow: 0 },
-  { id: "type", label: "Type", min: 70, grow: 0 },
-  { id: "size", label: "Size", min: 80, grow: 0 },
   { id: "folder", label: "Folder", min: 110, grow: 1 },
   { id: "favourite", label: "Favourite", min: 80, grow: 0 },
+  { id: "width", label: "Width", min: 76, grow: 0 },
+  { id: "height", label: "Height", min: 76, grow: 0 },
+  { id: "canvases", label: "Canvases", min: 90, grow: 0 },
 ] as const;
 type ColumnId = (typeof COLUMNS)[number]["id"];
 const DEFAULT_COLUMN_ORDER: readonly ColumnId[] = COLUMNS.map((c) => c.id);
-const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "type", "size", "folder", "favourite"];
+const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "folder", "favourite", "width", "height", "canvases"];
 /** A column's track in the list's grid: a fixed width, or a share of the room left over (never narrower than its minimum). */
 const trackOf = (c: (typeof COLUMNS)[number]): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
 
 
 type UsageFilter = "all" | "used" | "unused";
-type SortKey = "newest" | "name" | "size" | "uses";
+type SortKey = "newest" | "name" | "size" | "uses" | "pixels" | "type" | "tags" | "folder" | "favourite" | "width" | "height" | "canvases";
+/** The order a column header sorts by (a click), and whether that order is high to low or A to Z, newest first and so on when not reversed. */
+const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
+  name: { key: "name", desc: false },
+  pixels: { key: "pixels", desc: true },
+  type: { key: "type", desc: false },
+  size: { key: "size", desc: true },
+  used: { key: "uses", desc: true },
+  tags: { key: "tags", desc: false },
+  added: { key: "newest", desc: true },
+  folder: { key: "folder", desc: false },
+  favourite: { key: "favourite", desc: true },
+  width: { key: "width", desc: true },
+  height: { key: "height", desc: true },
+  canvases: { key: "canvases", desc: true },
+};
 
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
@@ -108,6 +131,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </select>
       <select data-testid="assets-sort" aria-label="Sort by">
         <option value="newest">Newest first</option><option value="name">Name A–Z</option><option value="size">Largest first</option><option value="uses">Most used</option>
+        <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
       <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
@@ -125,8 +149,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
+      <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" title="Drag to move this column">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
@@ -158,6 +183,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </div>
         </div>
       </div>
+      <div class="col-grip" data-grip="insp" data-testid="insp-grip" role="separator" aria-orientation="vertical" aria-label="Resize the details panel" title="Drag to resize the details panel (double-click to reset)" tabindex="0"></div>
       <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
     </div>
@@ -181,6 +207,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     name: ["Name A–Z", "Name Z–A"],
     size: ["Largest first", "Smallest first"],
     uses: ["Most used", "Least used"],
+    pixels: ["Most pixels", "Fewest pixels"],
+    type: ["Type A–Z", "Type Z–A"],
+    tags: ["Tags A–Z", "Tags Z–A"],
+    folder: ["Folder A–Z", "Folder Z–A"],
+    favourite: ["Favourites first", "Favourites last"],
+    width: ["Widest first", "Narrowest first"],
+    height: ["Tallest first", "Shortest first"],
+    canvases: ["On most canvases", "On fewest canvases"],
   };
   /** The order named in words, on the choice and on the button, so the direction is never a guess. */
   const showSort = (): void => {
@@ -190,6 +224,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     sortDirBtn.setAttribute("aria-pressed", String(reversed));
     sortDirBtn.setAttribute("aria-label", `Sorted: ${now}. Reverse the order`);
     sortDirBtn.title = `Sorted: ${now}. Click for ${other}.`;
+    // The list's headers show the sorted column and its direction, like a table's.
+    for (const h of root.querySelectorAll<HTMLElement>(".assets-list-head [data-col]")) {
+      const o = SORT_OF[h.dataset["col"] as ColumnId];
+      const on = o.key === sortSel.value;
+      const down = o.desc !== reversed;
+      h.setAttribute("aria-sort", on ? (down ? "descending" : "ascending") : "none");
+      h.classList.toggle("is-sorted", on);
+      h.querySelector<HTMLElement>(".col-sort")!.textContent = on ? (down ? "↓" : "↑") : "";
+    }
   };
   showSort();
   const sizeInput = root.querySelector<HTMLInputElement>(".assets-size input")!;
@@ -199,17 +242,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; sheetH: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], sheetH: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
     if (typeof saved.bar === "boolean") ui.bar = saved.bar;
     if (saved.layout === "grid" || saved.layout === "list") ui.layout = saved.layout;
+    // The combined "Type and size" column became two (Type, Size): where it was, they are, shown if it was shown.
+    const hadKind = Array.isArray(saved.order) && (saved.order as string[]).includes("kind");
+    if (hadKind) {
+      (saved as { order: string[] }).order = (saved.order as string[]).flatMap((c) => (c === "kind" ? ["type", "size"] : [c]));
+      if (Array.isArray(saved.hidden)) {
+        const kindHidden = (saved.hidden as string[]).includes("kind");
+        (saved as { hidden: string[] }).hidden = (saved.hidden as string[]).filter((c) => c !== "kind" && c !== "type" && c !== "size").concat(kindHidden ? ["type", "size"] : []);
+      }
+    }
     const known = new Set<string>(DEFAULT_COLUMN_ORDER);
     if (Array.isArray(saved.order)) {
       const order = saved.order.filter((c, i, a) => known.has(c) && a.indexOf(c) === i);
       ui.order = [...order, ...DEFAULT_COLUMN_ORDER.filter((c) => !order.includes(c))];
     }
+    if (typeof saved.sideW === "number" && saved.sideW >= SIDE_W.min && saved.sideW <= SIDE_W.max) ui.sideW = saved.sideW;
+    if (typeof saved.inspW === "number" && saved.inspW >= INSP_W.min && saved.inspW <= INSP_W.max) ui.inspW = saved.inspW;
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.hidden)) {
@@ -249,6 +303,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + COLUMNS.find((x) => x.id === c)!.min, 0) + 12 * shown.length + 48}px`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
     else body.style.removeProperty("--sheet-h");
+    for (const [cls, prop, w] of [["has-side-w", "--side-w", ui.sideW], ["has-insp-w", "--insp-w", ui.inspW]] as const) {
+      body.classList.toggle(cls, w !== null);
+      if (w !== null) body.style.setProperty(prop, `${w}px`);
+      else body.style.removeProperty(prop);
+    }
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
   };
@@ -276,6 +335,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
+  /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
+  const fileTile = (e: { name: string; type: string }, note = true): string =>
+    `<span class="file-tile" aria-hidden="true">${ICONS.fileIcon}<span class="file-tile-ext">${esc(chipOf(e.name, e.type))}</span>${note ? `<span class="file-tile-note">${FILE_CARD_NOTE}</span>` : ""}</span>`;
 
   // ---- thumbnails: generated lazily from the stored original, kept in memory only
   const thumbFor = (hash: string): Promise<string> => {
@@ -327,6 +389,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const slideImg = viewer.querySelector<HTMLImageElement>("img")!;
   const slideMedia = viewer.querySelector<HTMLVideoElement>("video")!;
   const slideCaption = viewer.querySelector<HTMLElement>("figcaption")!;
+  const slideTile = document.createElement("div");
+  slideTile.className = "viewer-tile";
+  slideTile.hidden = true;
+  slideImg.after(slideTile);
   const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;
   let slideHash: string | null = null;
   /** The assets the viewer steps through: the whole library list, or only what was picked when the slideshow started from a selection. */
@@ -356,7 +422,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     film.innerHTML = list
       .map(
         (e) =>
-          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}"><img alt="" draggable="false" data-hash="${e.hash}"></button>`,
+          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`,
       )
       .join("");
     for (const img of film.querySelectorAll<HTMLImageElement>("img[data-hash]")) ioFilm.observe(img);
@@ -624,6 +690,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     freeSlideUrl();
     unloadMedia();
     slideImg.hidden = false;
+    slideTile.hidden = true;
     slideAlpha = false;
     checker.hidden = true;
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
@@ -637,18 +704,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (isCard(rec)) {
       // Not something the browser can show: its card, large, and what it is (ADR 0078).
       const d = describeFile(rec.name, rec.type);
-      const bmp = await makeFileCard(rec.name, d.chip, d.category, rec.size, 2);
-      const c = document.createElement("canvas");
-      c.width = bmp.width;
-      c.height = bmp.height;
-      c.getContext("2d")!.drawImage(bmp, 0, 0);
-      bmp.close();
-      const png = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
-      if (token !== slideToken) return;
-      slideUrl = png ? URL.createObjectURL(png) : null;
-      slideImg.className = "is-file";
-      slideImg.removeAttribute("style");
-      slideImg.src = slideUrl ?? "";
+      slideImg.hidden = true;
+      slideTile.innerHTML = fileTile(rec);
+      slideTile.hidden = false;
       slideCaption.textContent = `${label}. No preview for this kind of file: ${d.todo}`;
       slideCaption.classList.add("is-note");
       armShow();
@@ -903,11 +961,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
     const key = sortSel.value as SortKey;
+    const folderOf = (e: (typeof rows)[number]): string => (meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "");
     const cmp: Record<SortKey, (a: (typeof rows)[number], b: (typeof rows)[number]) => number> = {
       newest: (a, b) => b.importedAt - a.importedAt,
       name: (a, b) => a.name.localeCompare(b.name),
       size: (a, b) => b.size - a.size,
       uses: (a, b) => b.instances - a.instances,
+      pixels: (a, b) => b.pixelW * b.pixelH - a.pixelW * a.pixelH,
+      type: (a, b) => chipOf(a.name, a.type).localeCompare(chipOf(b.name, b.type)),
+      tags: (a, b) => meta(a).tags.join(" ").localeCompare(meta(b).tags.join(" ")) || a.name.localeCompare(b.name),
+      folder: (a, b) => folderOf(a).localeCompare(folderOf(b)) || a.name.localeCompare(b.name),
+      favourite: (a, b) => Number(meta(b).favorite) - Number(meta(a).favorite),
+      width: (a, b) => b.pixelW - a.pixelW,
+      height: (a, b) => b.pixelH - a.pixelH,
+      canvases: (a, b) => b.canvases - a.canvases,
     };
     const flip = reversed ? -1 : 1;
     return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
@@ -929,16 +996,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb"><img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}">${!isCard(e) ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>` : ""}</span>
+        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
-          <span class="asset-kind">${esc(chipOf(e.name, e.type))}, ${fmtBytes(e.size)}</span>
           <span class="asset-type">${esc(chipOf(e.name, e.type))}</span>
           <span class="asset-size">${fmtBytes(e.size)}</span>
           <span class="asset-folder">${esc(meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "")}</span>
           <span class="asset-fav">${meta(e).favorite ? "★ Favourite" : ""}</span>
+          <span class="asset-width">${e.pixelW} px</span>
+          <span class="asset-height">${e.pixelH} px</span>
+          <span class="asset-canvases">${e.canvases}</span>
           <span class="asset-added">${new Date(e.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
@@ -956,7 +1025,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <span class="asset-info">
                 <span class="asset-name">Missing original</span>
                 <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
-                <span class="asset-kind"></span>
                 <span class="asset-added"></span>
                 <span class="asset-uses" data-testid="asset-uses">${usesText(m.instances, m.canvases)}</span>
                 <span class="asset-tags"></span>
@@ -1022,7 +1090,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }`;
     };
     const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key}">
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key}" title="${label.replace(/<[^>]*>/g, "")}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -1240,7 +1308,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
         <button type="button" class="assets-btn is-icon" data-action="close" aria-label="Close details" title="Close the details">${ICONS.x}</button>
       </div>
-      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)"><img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
+      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
       ${
         e
           ? `<div class="asset-quick">
@@ -1699,6 +1767,48 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.stopPropagation();
   });
 
+  // ---- the library and details panels' widths on a wide screen: drag the edge (or use the arrow keys); double-click goes back to the default
+  for (const g of root.querySelectorAll<HTMLElement>(".col-grip")) {
+    const isSide = g.dataset["grip"] === "side";
+    const range = isSide ? SIDE_W : INSP_W;
+    const panel = isSide ? side : inspector;
+    const set = (w: number | null, save: boolean): void => {
+      const v = w === null ? null : Math.max(range.min, Math.min(range.max, Math.round(w)));
+      if (isSide) ui.sideW = v;
+      else ui.inspW = v;
+      applyUi();
+      g.setAttribute("aria-valuenow", String(v ?? panel.offsetWidth));
+      if (save) saveUi();
+    };
+    g.setAttribute("aria-valuemin", String(range.min));
+    g.setAttribute("aria-valuemax", String(range.max));
+    g.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = panel.offsetWidth;
+      g.setPointerCapture(e.pointerId);
+      g.classList.add("is-dragging");
+      const move = (ev: PointerEvent): void => set(startW + (isSide ? ev.clientX - startX : startX - ev.clientX), false);
+      const up = (): void => {
+        g.classList.remove("is-dragging");
+        g.removeEventListener("pointermove", move);
+        g.removeEventListener("pointerup", up);
+        g.removeEventListener("pointercancel", up);
+        saveUi();
+      };
+      g.addEventListener("pointermove", move);
+      g.addEventListener("pointerup", up);
+      g.addEventListener("pointercancel", up);
+    });
+    g.addEventListener("dblclick", () => set(null, true));
+    g.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      set(panel.offsetWidth + (e.key === "ArrowRight" ? 1 : -1) * (isSide ? 1 : -1) * 16, true);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+
   // ---- "Place on…": an existing canvas, a new canvas in a board, or a new board
   const placeMenu = root.querySelector<HTMLElement>(".place-menu")!;
   let placing: string[] = [];
@@ -1978,6 +2088,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- the list's columns: drag a header onto another to move it
   const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;
   let dragCol: ColumnId | null = null;
+  // A click on a header sorts by it; another click reverses it, as in a table.
+  listHead.addEventListener("click", (e) => {
+    const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
+    if (!h) return;
+    const key = SORT_OF[h.dataset["col"] as ColumnId].key;
+    if (sortSel.value === key) reversed = !reversed;
+    else {
+      sortSel.value = key;
+      reversed = false;
+    }
+    showSort();
+    render();
+  });
   listHead.addEventListener("dragstart", (e) => {
     const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
     if (!h) return;
@@ -2230,6 +2353,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       selected = have[have.length - 1] ?? null;
       anchor = selected;
       places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
+      // The names go into the search (by name), so the rest of the library is filtered out and these are what is listed; with a very long
+      // selection the search would be unreadable, so then the whole library stays listed with these picked.
+      const names = [...new Set((listing?.entries ?? []).filter((e) => picked.has(e.hash)).map((e) => e.name.replace(/"/g, "").trim()).filter(Boolean))];
+      if (names.length > 0 && names.length <= REVEAL_NAMES_MAX) {
+        search.value = names.map((n) => `"${n}"`).join(" OR ");
+        setWay("name");
+        paintSearchUi();
+      }
       render();
       markPicked();
       renderInspector();

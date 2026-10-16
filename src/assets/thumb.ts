@@ -2,8 +2,8 @@ import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
-import { makeCard, makeFileCard } from "./card";
-import { describeFile, isCard, isMediaType } from "./file-kind";
+import { makeCard } from "./card";
+import { isCard } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -16,15 +16,11 @@ const THUMB_QUALITY = 0.6;
  * where the browser cannot encode WebP.
  */
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
-  const card = async (): Promise<ImageBitmap> => {
-    const d = describeFile(rec.name, rec.type);
-    return makeFileCard(rec.name, d.chip, d.category, rec.size, 1, isMediaType(rec.type) ? "This browser cannot read it" : undefined);
-  };
+  // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
+  if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
-    const bmp = isCard(rec)
-      ? await card()
-      : rec.type.startsWith("video/")
+    const bmp = rec.type.startsWith("video/")
       ? await decodeVideo(rec.blob).then(
           (v) => v.bitmap,
           async (e) => {
@@ -33,7 +29,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
               if (e instanceof BlankPictureError) return e.result.bitmap;
               throw e;
             }
-            return makeCard(pr.w, pr.h, rec.name, pr.codec, e instanceof BlankPictureError ? e.why : e instanceof Error ? e.message : ""); // a video this browser cannot decode: its card
+            return makeCard(pr.w, pr.h, pr.codec); // a video this browser cannot decode: its card
           },
         )
       : rec.type.startsWith("audio/")
@@ -51,20 +47,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
   } catch {
-    // A file shown as a card has its card as the thumbnail. A picture the browser cannot decode at a size (an SVG, say) has none: the library
-    // shows the original itself, as it always did.
-    if (!isCard(rec)) return null;
-    try {
-      const bmp = await card();
-      const c = document.createElement("canvas");
-      c.width = bmp.width;
-      c.height = bmp.height;
-      c.getContext("2d")!.drawImage(bmp, 0, 0);
-      bmp.close();
-      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
-      return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
-    } catch {
-      return null;
-    }
+    // A picture the browser cannot decode at a size (an SVG, say) has no thumbnail: the library shows the original itself, as it always did.
+    return null;
   }
 }

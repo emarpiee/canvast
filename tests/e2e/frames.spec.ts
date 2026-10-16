@@ -1360,7 +1360,7 @@ test("information readout: one button cycles Simple, More, Technical and Hidden,
   await expect(button()).toHaveAttribute("data-mode", "more");
   await expect(p.getByTestId("position-readout")).toContainText("Position 0, 0");
   await expect(p.getByTestId("objects-readout")).toHaveText("Nothing on the canvas yet");
-  await expect(fps).toHaveText(/^(Running smoothly|A little slow|Slow)$/, { timeout: 10_000 });
+  await expect(fps).toHaveText(/^(A little slow|Slow)?$/, { timeout: 10_000 }); // nothing is said while it runs smoothly
   // Technical: the numbers.
   await button().click();
   await expect(button()).toHaveAttribute("data-mode", "technical");

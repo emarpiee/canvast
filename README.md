@@ -27,7 +27,7 @@ or network connection.
 > resize; `Alt`+drag to copy; a Layers panel with sort, guides, Ctrl/Shift
 > selection and Rename, Hide and Lock for the selection; a shared ⋯ More menu;
 > design tokens for every colour, size, space and radius (ADR 0068); one HTML
-> file with Settings > Develop; layouts for medium and phone screens. Earlier
+> file with Settings > Develop; layouts for medium and phone screens; resizable library and details panels; list columns per property with sortable headers; a full-width status bar; Settings in groups with a search and an Animation setting. Earlier
 > versions are in the [changelog](CHANGELOG.md) and the milestone log below.
 
 ## What works today
