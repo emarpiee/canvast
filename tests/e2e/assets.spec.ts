@@ -140,7 +140,7 @@ test("one original is shared by instances on several boards and canvases; usage 
   await expect(rows).toHaveText([/Board 1 › Canvas 1\s*2/, /Board 1 › Canvas 2\s*1/, /Board 2 › Canvas 1\s*1/]);
   // In use: deleting from the library is refused, with the reason.
   await expect(p.getByTestId("asset-delete")).toBeDisabled();
-  await expect(p.getByTestId("asset-delete-note")).toContainText("4 instance(s)");
+  await expect(p.getByTestId("asset-delete-note")).toContainText("4 instances");
 
   // Deleting an instance never deletes the shared original.
   await toCanvas(p);
@@ -331,7 +331,7 @@ test("deleting canvases and boards removes their objects, keeps shared originals
   await openCanvas(p, /Canvas 2/, "Board 1 › Canvas 2");
   await openMenu(p);
   await rowAction(p, "canvas", "Canvas 2", "Delete");
-  await expect(p.getByTestId("confirm-dialog")).toContainText("It holds 2 object(s) on board “Board 1”.");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("It holds 2 objects on board “Board 1”.");
   await expect(p.getByTestId("confirm-dialog")).toContainText("Images placed on it stay in the Assets library.");
   await p.keyboard.press("Escape");
   await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
@@ -349,7 +349,7 @@ test("deleting canvases and boards removes their objects, keeps shared originals
   // Delete Board 2 (not open).
   await openMenu(p);
   await rowAction(p, "board", "Board 2", "Delete");
-  await expect(p.getByTestId("confirm-dialog")).toContainText("Its 1 canvas(es) and 1 object(s) will be deleted.");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Its 1 canvas and 1 object will be deleted.");
   await p.getByTestId("confirm-ok").click();
   await expect.poll(async () => (await sess(p)).tree!.map((b) => b.name)).toEqual(["Board 1"]);
   expect((await listing(p)).entries.map((e) => [e.instances, e.canvases])).toEqual([[1, 1]]);

@@ -1,4 +1,5 @@
 import type { RasterSource } from "../render/draw-objects";
+import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
 import { done, idbGet, req } from "../storage/idb";
 import type { CatalogEntry } from "./asset-catalog";
@@ -52,7 +53,7 @@ export function duplicateNotice(names: ReadonlyArray<{ name: string; duplicate: 
     const label = n.name ? `“${n.name}”` : "This image";
     return n.duplicate === "restored" ? `${label} was in the deleted list and is back in your library.` : `${label} is already in your library: no second copy is stored.`;
   }
-  return `${names.length} of ${total} files were already in your library: no second copies are stored${restored ? ` (${restored} restored from the deleted list)` : ""}.`;
+  return `${names.length} of ${plural(total, "file")} were already in your library: no second copies are stored${restored ? ` (${restored} restored from the deleted list)` : ""}.`;
 }
 
 interface Decoded extends RasterSource {
@@ -360,8 +361,18 @@ export class AssetLibrary {
   }
 
   async record(hash: string): Promise<AssetRecord | undefined> {
-    if (this.db) return idbGet<AssetRecord>(this.db, "assets", hash);
-    return this.memoryOnly.get(hash);
+    if (!this.db) return this.memoryOnly.get(hash);
+    const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+    if (!rec) return rec;
+    // The name is the catalog entry's: renaming an asset (ADR 0085) changes that entry and never rewrites the stored bytes.
+    const entry = await idbGet<CatalogEntry>(this.db, "assetCatalog", hash).catch(() => undefined);
+    return entry && entry.name !== rec.name ? { ...rec, name: entry.name } : rec;
+  }
+
+  /** Names changed (ADR 0085): the cards drawn from them are made again, here and on the canvas. */
+  renamed(hashes: readonly string[]): void {
+    for (const h of hashes) this.forget(h);
+    this.onReady();
   }
 
   /**

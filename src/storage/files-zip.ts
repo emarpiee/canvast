@@ -93,6 +93,7 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
     }
     rows.push({ hash, rec, entry: await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>) });
   }
+  for (const r of rows) if (r.entry && r.entry.name !== r.rec.name) r.rec = { ...r.rec, name: r.entry.name }; // the catalog holds the current name
   rows.sort((a, b) => a.rec.name.localeCompare(b.rec.name) || a.hash.localeCompare(b.hash));
   for (const { hash, rec, entry } of rows) {
     const kind = kindFolder(rec.type, rec.name);

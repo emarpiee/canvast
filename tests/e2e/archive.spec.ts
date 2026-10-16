@@ -176,8 +176,8 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   const other = await freshProfile(browser);
   const q = other.page;
   const text = await importArchive(q, file.name, file.bytes);
-  expect(text).toContain("Contains 3 canvas(es), 5 object(s) and 2 original(s).");
-  expect(text).toContain("2 new board(s)");
+  expect(text).toContain("Contains 3 canvases, 5 objects and 2 originals.");
+  expect(text).toContain("2 new boards");
   await expect(q.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
   const tree = (await sess(q)).tree!;
   expect(tree.map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])])).toEqual([
@@ -307,8 +307,8 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   })();
   const text = await importArchive(p, "tampered.canvast", fresh);
   expect(text).toContain("does not match its content hash (damaged) and was skipped.");
-  expect(text).toContain("1 image(s) refer to originals that are not in the archive");
-  await expect(p.getByTestId("toast")).toContainText("1 original(s) are still missing.");
+  expect(text).toContain("1 image refers to originals that are not in the archive");
+  await expect(p.getByTestId("toast")).toContainText("1 original is still missing.");
   expect(await stored(p)).toEqual([]);
   expect((await sess(p)).tree!.length).toBe(2);
 

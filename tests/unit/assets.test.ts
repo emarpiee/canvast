@@ -116,8 +116,8 @@ describe("garbage-collection roots", () => {
 
 describe("library organization (ADR 0011)", () => {
   it("normalizes tags: trims, drops # and empties, dedupes case-insensitively keeping the first spelling", () => {
-    expect(normalizeTags(["  Hands ", "#ref", "hands", "", "a  b", "REF"])).toEqual(["Hands", "ref", "a b"]);
-    expect(() => normalizeTags(["x".repeat(65)])).toThrow(/at most 64/);
+    expect(normalizeTags(["  Hands ", "#ref", "hands", "", "a  b", "REF"])).toEqual(["Hands", "ref", "a-b"]); // spaces become hyphens (ADR 0084)
+    expect(normalizeTags(["x".repeat(65)])[0]!.length).toBe(64); // too long: cut to 64
     expect(() => normalizeTags(Array.from({ length: 101 }, (_, i) => `t${i}`))).toThrow(/at most 100/);
   });
 

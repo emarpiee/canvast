@@ -1,4 +1,5 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
+import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
@@ -222,7 +223,7 @@ export class Session {
     if (!placed) this.view.setWorldCamera(HOME);
     this.persistence.attach(canvasId, loaded.canvas.revision, loaded.space, loaded.bookmarks);
     if (loaded.skipped.length) {
-      this.editor.message = `Skipped ${loaded.skipped.length} damaged item(s) on "${loaded.canvas.name}".`;
+      this.editor.message = `Skipped ${plural(loaded.skipped.length, "damaged item")} on "${loaded.canvas.name}".`;
       console.warn("canvast: skipped while loading", loaded.skipped);
       this.editor.changed();
     }
@@ -730,6 +731,22 @@ export class Session {
     await this.refreshTree();
     this.post({ kind: "tree" });
     await this.openCanvas(canvas.id);
+  }
+
+  /** Called after assets are renamed, so the canvas draws its cards again (set by the app). */
+  onAssetsRenamed: (() => void) | null = null;
+
+  /** Rename assets in the library (ADR 0085). Returns how many changed (0 when refused). */
+  async renameAssets(changes: ReadonlyArray<{ hash: string; name: string }>): Promise<number> {
+    let n = 0;
+    const ok = await this.organize(async (c) => {
+      n = await c.renameAssets(changes);
+    });
+    if (ok && n) {
+      this.assets?.renamed(changes.map((c) => c.hash));
+      this.onAssetsRenamed?.();
+    }
+    return ok ? n : 0;
   }
 
   async renameWorkspace(name: string): Promise<void> {

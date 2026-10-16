@@ -1,4 +1,7 @@
 import type { ObjectId } from "../doc/model";
+import { plural } from "../doc/plural";
+import { cleanFileName } from "../doc/rename-rules";
+import { isCard } from "./file-kind";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import { done, req } from "../storage/idb";
 import type { AssetRecord } from "./asset-library";
@@ -130,7 +133,7 @@ export class AssetInUseError extends Error {
     readonly hash: string,
     readonly instances: number,
   ) {
-    super(`the asset is still used by ${instances} instance(s); remove them first`);
+    super(`the asset is still used by ${plural(instances, "instance")}; remove ${instances === 1 ? "it" : "them"} first`);
   }
 }
 
@@ -190,6 +193,26 @@ export class AssetCatalog {
       tx.objectStore("meta").put(2, KEY);
     }
     await committed;
+  }
+
+  /**
+   * Rename assets (ADR 0085): the catalog entry's name changes; the stored original is untouched. A file shown as a card has its name and
+   * extension in its picture, so its thumbnail is dropped and made again. Returns how many names changed.
+   */
+  async renameAssets(changes: ReadonlyArray<{ hash: string; name: string }>): Promise<number> {
+    return this.write(["assetCatalog", "thumbs"], async (tx) => {
+      let n = 0;
+      for (const c of changes) {
+        const name = cleanFileName(c.name);
+        if (!name) throw new CatalogInputError("a name cannot be empty");
+        const e = await req(tx.objectStore("assetCatalog").get(c.hash) as IDBRequest<CatalogEntry | undefined>);
+        if (!e || e.state !== "active" || e.name === name) continue;
+        tx.objectStore("assetCatalog").put({ ...e, name });
+        if (isCard(e)) tx.objectStore("thumbs").delete(c.hash);
+        n++;
+      }
+      return n;
+    });
   }
 
   /** Tags stored in an older form (spaces, punctuation) are formatted once the way Obsidian writes them (ADR 0084). */

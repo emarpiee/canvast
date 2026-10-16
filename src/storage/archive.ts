@@ -1,4 +1,5 @@
 import type { SerializedCamera } from "../core/camera";
+import { plural, were } from "../doc/plural";
 import { deserializeCamera } from "../core/camera";
 import type { FrameRecord, StoredFrameView } from "../core/frames";
 import { FrameSpace, deserializeFrameCamera } from "../core/frames";
@@ -166,7 +167,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const allFolders = folders;
     assets.push({
       hash,
-      name: r.name,
+      name: entry?.name ?? r.name,
       type: r.type,
       size: r.blob.size,
       pixelW: r.pixelW,
@@ -325,7 +326,7 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
           bad++;
         }
       }
-      if (bad) problems.push(`${bad} damaged object(s) on “${name}” were skipped.`);
+      if (bad) problems.push(`${plural(bad, "damaged object")} on “${name}” ${were(bad)} skipped.`);
       let view: StoredView | null = null;
       let viewFrame = space.world;
       if (data["view"] != null) {

@@ -138,7 +138,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       openMoreMenu(
         more,
         [
-          { label: "Select these items", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
+          { label: "Select the items with this tag", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
           { label: "Rename on every canvas", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => { renaming = { key, value: tag }; refocus = "data-tag-rename"; render(); } },
           { label: "Delete from every canvas", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
         ],

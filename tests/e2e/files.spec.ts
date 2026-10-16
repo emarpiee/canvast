@@ -123,3 +123,74 @@ test("opening the Assets view does not move the focus into the search box; only 
   await expect(p.getByTestId("assets-search")).toBeFocused();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("rename assets: one (a new name, even a new extension) and many (enumerate, replace text, add text, change the extension), with a preview (ADR 0085)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "robot.glb", mimeType: "model/gltf-binary", buffer: Buffer.from("glTF-bytes-1") },
+    { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("some notes") },
+    { name: "scene.xyz", mimeType: "", buffer: Buffer.from("scene-bytes") },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  const names = async (): Promise<string[]> => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.name))).sort();
+  const dialog = p.getByTestId("rename-dialog");
+  // One: the name to edit, extension included; the file type, chip and download name follow.
+  await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click();
+  await p.getByTestId("asset-rename").click();
+  await expect(dialog).toBeVisible();
+  await p.getByLabel("New name", { exact: true }).fill("droid.obj");
+  await p.getByTestId("rename-ok").click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(names).toEqual(["droid.obj", "notes.txt", "scene.xyz"]);
+  await expect(p.locator(".asset-facts .ext-chip")).toHaveText("OBJ");
+  await expect(p.getByTestId("type-list").getByRole("button", { name: /^\.OBJ/ })).toContainText("1");
+  await expect(p.getByTestId("type-list").getByRole("button", { name: /^\.GLB/ })).toHaveCount(0);
+  const dl = p.waitForEvent("download");
+  await p.getByTestId("asset-download").click();
+  expect((await dl).suggestedFilename()).toBe("droid.obj");
+  // Many: Ctrl+A picks all three; Enumerate is the first way, with a preview before anything changes.
+  await p.locator("#assets-view").press("Control+a");
+  await p.getByTestId("bulk-rename").click();
+  await expect(dialog).toContainText("Rename 3 assets");
+  await p.getByLabel("Name pattern").fill("Item ##");
+  await p.getByLabel("First number").fill("5");
+  const preview = p.getByTestId("rename-preview");
+  await expect(preview.locator("li")).toHaveCount(3); // every name is listed, whole
+  await expect(preview).toContainText("Item 05");
+  await expect(p.locator(".rn-h")).toContainText("all 3 change");
+  await p.getByTestId("rename-ok").click();
+  await expect.poll(async () => (await names()).every((n) => n.startsWith("Item 0"))).toBe(true);
+  const after = await names();
+  expect(after.map((n) => n.replace(/\.[a-z]+$/, "")).sort()).toEqual(["Item 05", "Item 06", "Item 07"]);
+  expect(after.map((n) => n.replace(/^[^.]*\./, "")).sort()).toEqual(["obj", "txt", "xyz"]); // extensions kept
+  // Replace text, Add text and Change the extension, through the same dialog (F2).
+  await p.keyboard.press("F2");
+  await dialog.getByLabel("How to rename:").selectOption("replace");
+  await p.getByLabel("Text to find").fill("Item");
+  await p.getByLabel("Replace with").fill("Shot");
+  await p.getByTestId("rename-ok").click();
+  await expect.poll(async () => (await names()).every((n) => n.startsWith("Shot 0"))).toBe(true);
+  await p.keyboard.press("F2");
+  await dialog.getByLabel("How to rename:").selectOption("add");
+  await p.getByLabel("Text to add").fill("old-");
+  await dialog.getByLabel("Before the name").check();
+  await p.getByTestId("rename-ok").click();
+  await expect.poll(async () => (await names()).every((n) => n.startsWith("old-Shot 0"))).toBe(true);
+  await p.keyboard.press("F2");
+  await dialog.getByLabel("How to rename:").selectOption("extension");
+  await p.getByLabel("New extension").fill("dat");
+  await expect(p.getByTestId("rename-preview")).toContainText(".dat");
+  await p.getByTestId("rename-ok").click();
+  await expect.poll(async () => (await names()).every((n) => n.endsWith(".dat"))).toBe(true);
+  // Cancel changes nothing; an unreadable pattern says so and cannot be applied.
+  await p.keyboard.press("F2");
+  await dialog.getByLabel("How to rename:").selectOption("replace");
+  await p.getByLabel("Regular expression").check();
+  await p.getByLabel("Text to find").fill("(");
+  await expect(p.getByTestId("rename-error")).toContainText("regular expression");
+  await expect(p.getByTestId("rename-ok")).toBeDisabled();
+  await p.getByTestId("rename-cancel").click();
+  expect((await names()).every((n) => n.endsWith(".dat"))).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -2,6 +2,10 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- Rename assets (the details panel, the bulk bar, F2), one or many, with a file-manager-style dialog: enumerate, replace text, add text, change the extension, and a preview of every name in full. The rules and the dialog are a reusable module (ADR 0085).
+- Counts in the interface read right for one and for many ("1 original is still missing"), and the wording is general ("Select the items with this tag") (ADR 0086).
+- The asset details panel is redesigned: a summary, cards, full-width actions, technical details last (ADR 0087).
+
 - Tags follow Obsidian's rules: letters, numbers, _ - and / (nested), no spaces, not all digits; whatever is typed is formatted to fit (with a notice), `#project` finds `project/design` too, renaming a parent renames its children, and tags stored in an older form are formatted once at start-up (ADR 0084).
 - File types: the count no longer disappears while a chip is pointed at.
 

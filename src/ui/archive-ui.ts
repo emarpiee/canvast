@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
 import { chooseDialog, confirmDialog } from "./confirm";
@@ -39,8 +40,8 @@ export async function runExport(session: Session, scope: ExportScope): Promise<v
     const missing = r.manifest.missingAssets.length;
     tell(
       session,
-      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${r.canvases} canvas(es), ${r.objects} object(s), ${r.manifest.assets.length} original(s); checked before saving).` +
-        (missing ? ` ${missing} original(s) were already missing and are not included.` : ""),
+      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "original")}; checked before saving).` +
+        (missing ? ` ${plural(missing, "original")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
     );
   } catch (e) {
     tell(session, `Export failed: ${(e as Error).message}`);
@@ -64,7 +65,7 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
     const r = await session.exportFiles(scope, layout);
     if (r.files === 0) return tell(session, "There are no files to export here.");
     download(r.blob, r.fileName);
-    tell(session, `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${r.files} file(s)).` + (r.missing ? ` ${r.missing} original(s) were missing and are not included.` : ""));
+    tell(session, `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "original")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
   } catch (e) {
     tell(session, `Export failed: ${(e as Error).message}`);
   }
@@ -84,13 +85,13 @@ export async function runImport(session: Session, file: File): Promise<void> {
   const where =
     plan.scope === "canvas" ? "It will be added as a new canvas on the open board."
     : plan.scope === "assets" ? "The originals will be added to the Assets library."
-    : `It will be added as ${plan.boards.length} new board(s); nothing existing is replaced.`;
+    : `It will be added as ${plural(plan.boards.length, "new board")}; nothing existing is replaced.`;
   const lines = [
     `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”.`,
-    `Contains ${canvases} canvas(es), ${plan.objects} object(s) and ${plan.assets.length} original(s). All checksums and content hashes were verified.`,
+    `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
   ];
-  if (plan.unresolved.length) lines.push(`${plan.unresolved.length} image(s) refer to originals that are not in the archive; they show as missing unless already in your library.`);
+  if (plan.unresolved.length) lines.push(`${plural(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`);
   if (plan.problems.length) {
     lines.push(`Problems (${plan.problems.length}):`, ...plan.problems.slice(0, 5));
     if (plan.problems.length > 5) lines.push(`…and ${plan.problems.length - 5} more.`);
@@ -102,8 +103,8 @@ export async function runImport(session: Session, file: File): Promise<void> {
     if (!r) return;
     tell(
       session,
-      `Imported ${r.canvases} canvas(es) and ${r.objects} object(s); ${r.assetsAdded} new original(s) stored.` +
-        (r.stillMissing ? ` ${r.stillMissing} original(s) are still missing.` : ""),
+      `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
+        (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
     );
   } catch (e) {
     tell(session, `Import failed; nothing was changed: ${(e as Error).message}`);

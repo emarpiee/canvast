@@ -380,6 +380,10 @@ async function start(): Promise<void> {
     editor.message = `Storage unavailable (${storageError}); work will not be saved.`;
   }
   const persistence = session.persistence;
+  session.onAssetsRenamed = () => {
+    tiles.clear(); // cards drawn with the old name
+    invalidate();
+  };
 
   const resize = (): void => {
     const r = host.getBoundingClientRect();

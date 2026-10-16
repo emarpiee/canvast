@@ -1,4 +1,6 @@
 import type { Session, AssetPlace } from "../app/session";
+import { plural } from "../doc/plural";
+import { openBatchRename } from "./batch-rename";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { storeFrame } from "../app/frames";
@@ -1136,7 +1138,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                           { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
                           { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
                         ]),
-                      }).replace("<button ", `<button title="On ${c.objects} item(s). Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `),
+                      }).replace("<button ", `<button title="On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `),
                 )
                 .join("") || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
@@ -1195,8 +1197,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
       </section>
       <div class="asset-actions">
+        <button type="button" class="assets-btn" data-action="rename-all" data-testid="bulk-rename" title="Rename them together: enumerate, replace text, add text, change the extension (F2)"${dis}>${ICONS.textCursorInput}<span>Rename ${n}…</span></button>
         <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
-        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${placeable} files as ZIP</span></button>
+        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${plural(placeable, "file")} as ZIP</span></button>
         <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
         <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
         ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first.</p>` : ""}
@@ -1227,7 +1230,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       .map(
         (p) => `<li><span class="asset-place-name">${esc(p.boardName)} › ${esc(p.canvasName)} <span class="asset-place-n">${p.ids.length}</span></span>
           <button type="button" class="assets-btn" data-action="show" data-canvas="${p.canvasId}" data-testid="asset-show"
-            aria-label="Show ${p.ids.length} instance(s) on ${esc(p.boardName)} › ${esc(p.canvasName)}">${ICONS.locate}<span>Show</span></button></li>`,
+            aria-label="Show ${plural(p.ids.length, "instance")} on ${esc(p.boardName)} › ${esc(p.canvasName)}">${ICONS.locate}<span>Show</span></button></li>`,
       )
       .join("");
     const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
@@ -1255,19 +1258,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
       ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
+      <div class="asset-actions">
+        ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename…</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download original</span></button>` : ""}
+        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in a new tab</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
+        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
+               ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove ${instances === 1 ? "its" : "its"} ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first.</p>` : ""}` : ""}
+      </div>
       <details class="asset-more"><summary>Technical details</summary>
         <dl>
           ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd><dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
           <dt>Content hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 16)}…</dd>
         </dl>
-      </details>
-      <div class="asset-actions">
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download original</span></button>` : ""}
-        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in a new tab</span></button>` : ""}
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
-        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
-               ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove its ${instances} instance(s) from their canvases first.</p>` : ""}` : ""}
-      </div>`;
+      </details>`;
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
@@ -1552,6 +1556,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "download":
         void downloadOriginal(assets, hash);
         break;
+      case "rename":
+        void renameAssetsDialog([hash]);
+        break;
+      case "rename-all":
+        void renameAssetsDialog(filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash));
+        break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
         break;
@@ -1709,7 +1719,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
             <h3>${ICONS.squareStack}<span>${esc(board.name)}</span></h3>
             ${canvases
-              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "active" : c.objectCount ? `${c.objectCount} objects` : "empty"}</small></button>`)
+              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "active" : c.objectCount ? plural(c.objectCount, "object") : "empty"}</small></button>`)
               .join("")}
             <button type="button" role="menuitem" class="pm-new" data-pm="new-canvas" data-id="${board.id}">${ICONS.plus}<span>New canvas in ${esc(board.name)}</span></button>
           </section>`,
@@ -1802,7 +1812,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const c = canvasTags.get(key);
         void confirmDialog({
           title: `Delete the canvas tag “${label}”?`,
-          lines: [`It is taken off ${c?.objects ?? 0} item(s) on ${c?.canvases.size ?? 0} canvas(es). The items stay. On the open canvas Undo brings it back; on the others it cannot be undone.`],
+          lines: [`It is taken off ${plural(c?.objects ?? 0, "item")} on ${plural(c?.canvases.size ?? 0, "canvas", "canvases")}. The items stay. On the open canvas Undo brings it back; on the others it cannot be undone.`],
           confirmLabel: "Delete tag",
         }).then(async (ok) => {
           if (ok) await session.changeCanvasTag(label, null);
@@ -1894,6 +1904,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
 
+  /** Rename one or many assets with the shared rename dialog (ADR 0085); names keep the order given. */
+  const renameAssetsDialog = async (hashes: readonly string[]): Promise<void> => {
+    if (session.readOnly) return;
+    const items = hashes.flatMap((h) => {
+      const en = listing?.entries.find((x) => x.hash === h);
+      return en ? [{ id: h, name: en.name }] : [];
+    });
+    if (!items.length) return;
+    const result = await openBatchRename(items, { noun: items.length === 1 ? "asset" : "assets" });
+    if (!result) return;
+    const n = await session.renameAssets(result.map((r) => ({ hash: r.id, name: r.name })));
+    if (n) {
+      session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} assets.`;
+      session.editor.changed();
+    }
+    await refresh();
+    // Keep the keyboard where it was: on the first renamed card (F2 works again).
+    grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(items[0]!.id)}"]`)?.focus({ preventScroll: true });
+  };
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && sideMenu) {
       const was = sideMenu;
@@ -1904,6 +1933,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else if (e.key === "Escape" && (selected || picked.size)) {
       void select(null);
       e.stopPropagation();
+    } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {
+      void renameAssetsDialog(picked.size ? filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash) : [selected!]);
+      e.preventDefault();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {
       toggleDetails();
       e.preventDefault();
@@ -2239,7 +2271,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
       if (n) {
         const notice = duplicateNotice(seen, n);
-        session.editor.message = !notice ? `Imported ${n} file(s) into the library.` : seen.length === n ? notice : `${n - seen.length} new file(s) imported. ${notice}`;
+        session.editor.message = !notice ? `Imported ${plural(n, "file")} into the library.` : seen.length === n ? notice : `${plural(n - seen.length, "new file")} imported. ${notice}`;
         session.editor.changed();
       }
       await refresh();

@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { plural } from "../doc/plural";
 import { esc, fmtBytes } from "./format";
 import { ARCHIVE_ACCEPT, runExport, runImport } from "./archive-ui";
 
@@ -41,7 +42,7 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
     }
     const backup = await session.lastBackup();
     const backupText = backup
-      ? `${new Date(backup.at).toLocaleString()} — ${esc(backup.fileName)}, ${fmtBytes(backup.bytes)} (${backup.canvases} canvas(es), ${backup.objects} object(s), ${backup.assets} original(s)); checked before saving. The browser does not report whether the download finished, so keep the file somewhere safe.`
+      ? `${new Date(backup.at).toLocaleString()} — ${esc(backup.fileName)}, ${fmtBytes(backup.bytes)} (${plural(backup.canvases, "canvas", "canvases")}, ${plural(backup.objects, "object")}, ${plural(backup.assets, "original")}); checked before saving. The browser does not report whether the download finished, so keep the file somewhere safe.`
       : "none. Browser storage is not a backup: export one and keep the file safe.";
     const mig = session.startup?.kind === "migrated" ? session.startup.migration : null;
     panel.innerHTML = `
@@ -53,7 +54,7 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         <dt>Space</dt><dd>${quota}</dd>
         <dt>Persistence</dt><dd>${persisted}${typeof sm?.persist === "function" ? ` <button type="button" data-action="persist">Request persistent storage</button>` : ""}</dd>
         <dt>Last full backup</dt><dd data-testid="storage-backup">${backupText}</dd>
-        ${mig ? `<dt>Upgrade</dt><dd>Migrated ${mig.copied} of ${mig.sourceObjects} objects from the previous format${mig.verified ? " (verified)" : ` — verification failed: ${esc(mig.verifyError ?? "unknown")}`}. The old data was kept unchanged.</dd>` : ""}
+        ${mig ? `<dt>Upgrade</dt><dd>Migrated ${mig.copied} of ${plural(mig.sourceObjects, "object")} from the previous format${mig.verified ? " (verified)" : ` — verification failed: ${esc(mig.verifyError ?? "unknown")}`}. The old data was kept unchanged.</dd>` : ""}
       </dl>
       <div class="storage-actions">
         <button type="button" data-action="export" data-testid="export-workspace">Export workspace backup</button>

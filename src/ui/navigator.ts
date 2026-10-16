@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { plural } from "../doc/plural";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
 import { placeMenu } from "./more-menu";
@@ -81,7 +82,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
                 "canvas",
                 c.id,
                 c.name,
-                `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-mark">${active ? ICONS.check : ""}</span><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
+                `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
                  ${actions("canvas", c.id, c.name, canvases.length > 1, "A board needs at least one canvas; delete the board instead")}`,
               )}</li>`;
             })
@@ -246,7 +247,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     setOpen(false);
     const ok = await confirmDialog({
       title: `Delete canvas “${c.name}”?`,
-      lines: [`It holds ${c.objectCount} object(s) on board “${entry.board.name}”.`, KEPT],
+      lines: [`It holds ${plural(c.objectCount, "object")} on board “${entry.board.name}”.`, KEPT],
       confirmLabel: "Delete canvas",
     });
     if (ok) await session.deleteCanvas(id);
@@ -259,7 +260,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     const objects = entry.canvases.reduce((n, c) => n + c.objectCount, 0);
     const ok = await confirmDialog({
       title: `Delete board “${entry.board.name}”?`,
-      lines: [`Its ${entry.canvases.length} canvas(es) and ${objects} object(s) will be deleted.`, KEPT],
+      lines: [`Its ${plural(entry.canvases.length, "canvas", "canvases")} and ${plural(objects, "object")} will be deleted.`, KEPT],
       confirmLabel: "Delete board",
     });
     if (ok) await session.deleteBoard(id);
