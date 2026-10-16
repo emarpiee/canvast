@@ -585,7 +585,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (e.shiftKey || appView === "assets") {
       setView("assets");
       assetsView.focusSearch();
-    } else canvasSearch.open("/");
+    } else canvasSearch.open("");
   });
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {

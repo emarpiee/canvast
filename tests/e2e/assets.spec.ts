@@ -1422,6 +1422,17 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(at);
   // The dock button opens it too, and the box never lets its keys reach the canvas (a "p" does not pick the pen).
   await p.getByRole("button", { name: "Search the canvas" }).click();
+  // It starts on All: names, tags, groups and bookmarks together, and the words combine across them (ADR 0069).
+  await expect(results.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+  await box.fill("sky");
+  await expect(results.getByRole("option")).toHaveCount(1); // the tag
+  await box.fill("blocks OR green");
+  await expect(results.getByRole("option")).toHaveCount(2);
+  await box.fill("png -sky");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await box.fill("bookmark");
+  await expect(results.getByRole("option", { name: /Bookmark 1/ })).toBeVisible();
+  await box.fill("");
   await p.keyboard.press("p");
   expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");
   await p.keyboard.press("Escape");

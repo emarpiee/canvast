@@ -36,7 +36,7 @@ interface Result {
 }
 
 const MAX_RESULTS = 50;
-type Mode = "name" | "tag" | "bookmark";
+type Mode = "all" | "name" | "tag" | "bookmark";
 
 export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(prefix?: string): void; close(): void; isOpen(): boolean } {
   const root = document.createElement("div");
@@ -48,6 +48,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.innerHTML = `
     <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false">${searchHelpButton()}</div>
     <div class="cs-modes" role="tablist" aria-label="Search by">
+      <button type="button" role="tab" data-m="all">All</button>
       <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
       <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
       <button type="button" role="tab" data-m="bookmark"><kbd>@</kbd>Bookmark</button>
@@ -58,9 +59,9 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   const input = root.querySelector<HTMLInputElement>("input")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");
   const list = root.querySelector<HTMLElement>("ul")!;
-  const PLACEHOLDER: Record<Mode, string> = { name: "File, layer or text name", tag: "Tag of an item", bookmark: "Bookmark name" };
-  const EMPTY: Record<Mode, string> = { name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
-  let mode: Mode = "name";
+  const PLACEHOLDER: Record<Mode, string> = { all: "Name, tag, group or bookmark", name: "File, layer or text name", tag: "Tag of an item", bookmark: "Bookmark name" };
+  const EMPTY: Record<Mode, string> = { all: "Type a name, tag, group or bookmark to search this canvas. / # @ narrow it to one.", name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
+  let mode: Mode = "all";
   const setMode = (m: Mode): void => {
     mode = m;
     input.placeholder = PLACEHOLDER[m];
@@ -85,7 +86,16 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       const objs = [...deps.doc.ordered()].filter((o) => !o.hidden).sort((a, b) => b.z - a.z);
       for (const o of objs) {
         const lab = labelOf(o, names);
-        if (mode === "tag") {
+        if (mode === "all") {
+          // Every kind at once: a word matches the name, a group's name, the kind, or any tag; `#word` matches tags only.
+          const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
+          const own = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
+          const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
+          const hay = `${lab.text} ${groupName} ${noteOf(o)}`.toLowerCase();
+          const tagHit = (w: string): boolean => own.some((x) => x.toLowerCase().includes(w));
+          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? tagHit(term.text.slice(1)) : hay.includes(term.text) || tagHit(term.text)))) continue;
+          out.push({ key: o.id, icon: lab.icon, label: lab.text, note: own.length ? own.map((x) => `#${x}`).join(" ") : noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
+        } else if (mode === "tag") {
           // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
           const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
           const all = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
@@ -103,6 +113,13 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       }
     }
     results = out.slice(0, MAX_RESULTS);
+    if (mode === "all" && q) {
+      // Bookmarks whose name matches follow the items (a `#tag` word is about tags, so it never matches a bookmark).
+      for (const b of deps.bookmarks.items) {
+        const bn = b.name.toLowerCase();
+        if (evalQuery(q, (t) => !t.text.startsWith("#") && bn.includes(t.text))) results.push({ key: `b:${b.id}`, icon: ICONS.bookmark, label: b.name, note: "Bookmark", bookmark: b.id });
+      }
+    }
     active = Math.min(active, Math.max(0, results.length - 1));
     paint();
   };
@@ -170,8 +187,8 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     } else if (e.key === "Enter") {
       go(results[active], e.shiftKey);
       e.preventDefault();
-    } else if (e.key === "Backspace" && !input.value && mode !== "name") {
-      setMode("name"); // nothing left to delete: back to the plain name search
+    } else if (e.key === "Backspace" && !input.value && mode !== "all") {
+      setMode("all"); // nothing left to delete: back to searching everything
       compute();
       e.preventDefault();
     }
@@ -186,9 +203,9 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   });
 
   return {
-    open(prefix = "/") {
+    open(prefix = "") {
       root.hidden = false;
-      setMode(prefix === "#" ? "tag" : prefix === "@" ? "bookmark" : "name");
+      setMode(prefix === "#" ? "tag" : prefix === "@" ? "bookmark" : prefix === "/" ? "name" : "all");
       input.value = "";
       active = 0;
       const my = ++token;

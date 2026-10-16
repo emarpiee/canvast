@@ -214,7 +214,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.lassoFilter = d["filter"] as "strokes" | "all";
       editor.changed();
     } else if (d["action"] === "import") input.click();
-    else if (d["action"] === "search") actions.openSearch("/");
+    else if (d["action"] === "search") actions.openSearch("");
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
     else if (d["action"] === "show-all") actions.clearFlag("hidden");
