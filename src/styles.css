@@ -1847,3 +1847,10 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .asset-thumb .ext-chip { position: absolute; left: var(--sp-3); bottom: var(--sp-3); opacity: 0.92; }
 .asset-facts .ext-chip { align-self: center; }
 .asset-file { padding: var(--sp-4); background: color-mix(in oklch, var(--hud-accent) 10%, transparent); border-radius: var(--r-md); }
+
+/* Rename the workspace, in the menu's whole-workspace section (ADR 0079). */
+.nav-ws h3 { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.nav-ws-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-ws .nav-ws-rename { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--sp-10); height: var(--sp-10); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
+.nav-ws .nav-ws-rename:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.nav-ws .nav-ws-rename svg { width: var(--icon-md); height: var(--icon-md); }

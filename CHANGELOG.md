@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- The workspace can be renamed: the pencil beside "Whole workspace" in the board menu.
+
 - The top bar starts with the board pill (∞ Board › Canvas ▾), which is also the Canvas view's tab, then Assets and Settings; long names are cut with an ellipsis (ADR 0079).
 
 - Any file can be imported (ADR 0078): what the browser cannot show (a 3D model, a document, an unreadable picture) is kept as a card with its extension chip, name and kind, placed on the canvas like a picture, with Download original and (PDF, text) Open in a new tab in the library and the selection bar.

@@ -723,6 +723,14 @@ export class Session {
     await this.openCanvas(canvas.id);
   }
 
+  async renameWorkspace(name: string): Promise<void> {
+    const id = this.tree?.workspace.id;
+    if (!this.guardWrite() || !id || !name.trim()) return;
+    await this.repo!.renameWorkspace(id, name.trim().slice(0, 120));
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+  }
+
   async renameBoard(id: string, name: string): Promise<void> {
     if (!this.guardWrite() || !name.trim()) return;
     await this.repo!.renameBoard(id, name.trim());

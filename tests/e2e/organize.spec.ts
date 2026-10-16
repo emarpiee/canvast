@@ -433,3 +433,18 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   await expect(menu).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the workspace can be renamed from the menu's whole-workspace section, and the name is kept (ADR 0079)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("workspace-chevron").click();
+  await expect(p.locator(".nav-ws h3")).toContainText("My workspace");
+  await p.getByRole("button", { name: /^Rename the workspace/ }).click();
+  await p.getByLabel("New workspace name").fill("Studio 2026");
+  await p.keyboard.press("Enter");
+  await expect(p.locator(".nav-ws h3")).toContainText("Studio 2026");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("workspace-chevron").click();
+  await expect(p.locator(".nav-ws h3")).toContainText("Studio 2026");
+  expect(app.consoleErrors).toEqual([]);
+});

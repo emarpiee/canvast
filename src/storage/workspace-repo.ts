@@ -186,6 +186,14 @@ export class WorkspaceRepo {
     return canvas;
   }
 
+  async renameWorkspace(id: string, name: string): Promise<void> {
+    const tx = this.db.transaction("workspaces", "readwrite");
+    const w = await req(tx.objectStore("workspaces").get(id) as IDBRequest<WorkspaceRecord | undefined>);
+    if (!w) throw new Error(`workspace ${id} not found`);
+    tx.objectStore("workspaces").put({ ...w, displayName: name });
+    await done(tx);
+  }
+
   async renameBoard(id: string, name: string): Promise<void> {
     const tx = this.db.transaction("boards", "readwrite");
     const b = await req(tx.objectStore("boards").get(id) as IDBRequest<BoardRecord | undefined>);

@@ -33,7 +33,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   let view: AppView = "canvas";
   const menu = root.querySelector<HTMLElement>(".nav-menu")!;
   const banner = root.querySelector<HTMLElement>(".readonly-banner")!;
-  let renaming: { kind: "board" | "canvas"; id: string } | null = null;
+  let renaming: { kind: "board" | "canvas" | "workspace"; id: string } | null = null;
   /** The board or canvas whose actions are open (the "More" button of its row). */
   let actionsOf: { kind: "board" | "canvas"; id: string } | null = null;
 
@@ -95,7 +95,11 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         .join("") +
       `<button type="button" class="nav-add nav-add-board" data-action="new-board">+ New board</button>
        <section class="nav-ws" aria-label="The whole workspace">
-         <h3>Whole workspace “${esc(tree.workspace.displayName)}”</h3>
+         ${
+           renaming?.kind === "workspace"
+             ? `<input class="nav-rename" data-rename="workspace" data-id="${tree.workspace.id}" value="${esc(tree.workspace.displayName)}" aria-label="New workspace name" maxlength="120">`
+             : `<h3><span class="nav-ws-name">Whole workspace “${esc(tree.workspace.displayName)}”</span>${session.readOnly ? "" : `<button type="button" class="nav-ws-rename" data-action="rename-workspace" data-id="${tree.workspace.id}" aria-label="Rename the workspace ${esc(tree.workspace.displayName)}" title="Rename the workspace">${ICONS.textCursorInput}</button>`}</h3>`
+         }
          <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.hardDriveDownload}<span>Export a backup (.canvast)</span></button>
          <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
          <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.fileInput}<span>Import a file…</span></button>
@@ -190,6 +194,10 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         renaming = { kind: "board", id };
         renderMenu();
         break;
+      case "rename-workspace":
+        renaming = { kind: "workspace", id };
+        renderMenu();
+        break;
       case "rename-canvas":
         renaming = { kind: "canvas", id };
         renderMenu();
@@ -264,6 +272,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       const { rename, id } = input.dataset;
       renaming = null;
       if (rename === "board") void session.renameBoard(id!, input.value);
+      else if (rename === "workspace") void session.renameWorkspace(input.value);
       else void session.renameCanvas(id!, input.value);
       e.preventDefault();
     } else if (e.key === "Escape") {
