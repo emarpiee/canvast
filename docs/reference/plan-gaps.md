@@ -34,7 +34,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Partial | Reduced copies and tiles exist; no mipmap pyramid; EXIF and colour profiles are not read (the browser decides). |
 | SVG import | Partial | An SVG is kept as a picture (the browser draws it). It is not turned into editable vector objects. |
 | SVG export | **Gap** | Not present. |
-| Vector shapes, custom paths, Bézier points and handles, fills, strokes, gradients, Booleans, clipping, node editing | **Gap (large)** | The only vector object is the freehand stroke. There are no shapes or paths, no node editing and no Boolean operations. The plan holds this to a Figma-like standard (14.9). |
+| Vector shapes, custom paths, Bézier points and handles, fills, strokes, gradients, Booleans, clipping, node editing | **Gap (large)** | The only vector object is the freehand stroke. There are no shapes or paths, no node editing and no Boolean operations. The plan holds this to a professional vector editor standard (14.9). |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | **Gap** | Pressure is read; tilt is not. |
 | Object eraser (swept, one undoable step, never deletes the original) | Done | ADR 0022. Whole-group option. |
@@ -165,7 +165,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Order | Gap | Why |
 | --- | --- | --- |
 | 1 | Non-destructive editing: crop, then the adjustment stack and Copy and Paste Adjustments (masks are dropped) | The largest plan item with nothing built; it blocks U12, Copy Rendered Media and video and GIF adjustments. |
-| 2 | Vector objects: shapes, paths, node editing, SVG import as vectors and export | Large; the plan sets a Figma-like bar. |
+| 2 | Vector objects: shapes, paths, node editing, SVG import as vectors and export | Large; the plan sets a professional vector editor bar. |
 | 3 | Attach and Detach, duplicate, move and reorder canvases and boards | Small, and the plan names each in a test scenario. |
 | 4 | Stroke eraser, audio range, text fonts, tilt | Each small to medium. |
 | 5 | Colour, size and orientation filters, duplicate review | Library depth (ratings and saved searches are dropped). |
