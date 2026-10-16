@@ -6,26 +6,29 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: Phase 1, slice 7 — smooth zooming over dense scenes.** On top of
-> endless navigation (0A), editing at any depth (0B) and rendering that
-> scales with what is on screen (0C), your work is organized as
-> Workspace → Boards → Canvases with safe, incremental saving (1a), a shared
-> Assets library (1b), export/import of `.canvast` archives (1c), and a raster
-> tile cache that keeps panning and drawing over dense scenes at 60 fps (1d),
-> a density preview that keeps far-away and tiny content visible (1e), and
-> tags, favourites and folders in the Assets library (1f), and a zoom preview
-> that keeps zooming over dense scenes at about 60 fps (1g). Text, video,
-> groups and settings are **not implemented
-> yet**; see [Roadmap and status](docs/status.md). This README describes only
-> what exists.
+> **Status: v0.17.0, UI polish after Phase 7 (professional UX).** Done:
+> endless navigation and editing at any depth, a Workspace → Boards →
+> Canvases model with safe incremental saving, a shared Assets library with
+> tags, folders and smart folders, `.canvast` archives and plain ZIP export,
+> text, groups, hide and lock, snapping, rotation, four pens, videos, audio
+> and GIFs with an on-canvas player, a Settings view, accessibility options and
+> search with AND, OR, XOR and NOT. **Not done:** non-destructive editing
+> (crop, adjustments), ratings, similar-image review, Phase 8 (scale and
+> compatibility), Phase 9 (standalone release) and collaboration. See
+> [Roadmap and status](docs/status.md) and
+> [gaps against the plan](docs/reference/plan-gaps.md). This README describes
+> only what exists.
 >
-> **v0.17.0:** the Assets view redesigned (gallery, viewer with zoom and invisible edge clicks, multi-select, one folder per asset, tags you can rename and delete, a plain ZIP of the original files by kind or by folder, whole-workspace export and import from the workspace menu), in-canvas tags, search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`), stepping between items with `Ctrl+Arrow` and `Alt` to bring the selection into view, Figma-style resize with side handles, Shift, Alt, Ctrl and snapping, `Alt`+drag to copy, Reset rotation and proportions, a Layers panel with sort and guides, Place on another or a new canvas, a theme-adaptive viewer with chequered ground for transparent pictures, and layouts for medium and phone screens (ADRs 0052 to 0063). **v0.16.0:** Phase 7, professional UX: a Settings view with tabs, scopes, reset and a light, dark or system theme (ADR 0048), rebindable tool keys and a shortcut list (ADR 0049), an accessibility audit with interface size, contrast and motion options (ADR 0050), and a selection action bar (ADR 0051). **Phase 6:** videos, audio and GIFs with an on-canvas player; blend modes, layer and group names and relinking of missing mentions (ADR 0047). **v0.14.0:** Phase 5, creative editing: four pens (fine, pencil, ink, marker), copy, cut, paste and duplicate, arrange, align and distribute, an opacity slider in the Layers panel, and `@` mentions in text with backlinks across a board's canvases (ADRs 0036–0040). **v0.13.0:** Assets keep a small thumbnail (made at import) and open in a full-window slide view, a lost original keeps its picture, saved searches (smart folders) in the Assets sidebar, and dense scenes zoom without a hitch at the preview bound (Phase 4). **v0.12.0:** a frame rate counter with diagnostics, adaptive quality, a decoded-image budget, big documents that open without freezing, and a grid for batch imports (Phase 3). **v0.11.0:** strokes, images and text can be rotated with a handle above the selection (ADR 0018), a moving selection snaps to other objects with guide lines (ADR 0019), objects can be grouped, nested and re-stacked (ADR 0020), hidden or locked (ADR 0021), removed with the object eraser (ADR 0022), the canvas redraws itself if the browser resets the drawing surface (ADR 0023), a floating Layers panel lists, selects, hides, locks and reorders objects (ADR 0024), and a Bookmarks panel saves places and zooms to come back to (ADR 0025).
->
-> **v0.10.0:** pen and select options and the last view now persist across reloads (device settings, ADR 0017).
->
-> **v0.9.0 — nested frames:** the canvas costs the same at any depth (2^10 to
-> 2^10^12 and beyond), with pen options (size slider, thickness lock,
-> stabilizer). See the [changelog](CHANGELOG.md) and ADR 0014–0016.
+> **v0.17.0 in short:** a redesigned Assets view (gallery, viewer with the canvas
+> player's controls, multi-select, one folder per asset, renamable tags, a
+> plain ZIP by kind or folder, whole-workspace export and import); in-canvas
+> tags; search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`) and
+> boolean search (ADR 0069); stepping with `Ctrl+Arrow` and `Alt`; Figma-style
+> resize; `Alt`+drag to copy; a Layers panel with sort, guides, Ctrl/Shift
+> selection and Rename, Hide and Lock for the selection; a shared ⋯ More menu;
+> design tokens for every colour, size, space and radius (ADR 0068); one HTML
+> file with Settings > Develop; layouts for medium and phone screens. Earlier
+> versions are in the [changelog](CHANGELOG.md) and the milestone log below.
 
 ## What works today
 
@@ -60,8 +63,9 @@ or network connection.
   - click to select (shift adds, alt+click cycles through overlapping
     objects);
   - drag strokes to move them;
-  - drag the corner handles to resize (uniform; shift gives free aspect
-    ratio for a single image);
+  - drag a corner or side handle to resize (a picture resizes freely and
+    `Shift` keeps its proportions; `Alt` resizes about the middle; edges snap
+    to other items unless `Ctrl` is held);
   - drag on empty space for a box selection.
   Images must be clicked first before a drag moves them, so a huge image
   filling the screen is never grabbed by accident.
@@ -92,9 +96,10 @@ or network connection.
   - 1M objects: 7.7–9.6 ms, down from 5.8–6.4 s before the index.
 - **Content far below a pixel is skipped** (level of detail).
 - **Identical opaque strokes are drawn in one call.**
-- **Known limit:** scenes with thousands of strokes visible at once are
-  limited by Canvas 2D rasterization (about 59 ms p50 at 3K–7.7K visible
-  strokes). The planned fix is a raster tile cache (ADR 0005).
+- **Known limit (before Phase 1, slices 4 and 7):** scenes with thousands of
+  strokes visible at once were limited by Canvas 2D rasterization (about 59 ms
+  p50 at 3K–7.7K visible strokes). The raster tile cache and the zoom preview
+  fixed this (ADRs 0009 and 0012; see Known limitations).
 
 ### Workspace and storage (Phase 1)
 
@@ -197,6 +202,26 @@ or network connection.
 - Text resizes as a whole with the corner handles; the pen colours apply to
   new text.
 
+### Working on the canvas (Phases 2 to 7)
+
+- **Layers and groups:** objects can be grouped and nested, hidden, locked,
+  renamed, re-stacked, given an opacity and a blend mode, and rotated. The
+  Layers panel lists them with sort, filter, guide lines for groups and
+  `Ctrl`/`Shift` multi-selection; Rename, Hide and Lock act on the selection.
+- **Snapping, arranging and clipboard:** a moving selection snaps to other
+  objects with guide lines; align, distribute, copy, cut, paste and
+  duplicate; `Alt`+drag copies.
+- **Navigation aids:** `Ctrl+Arrow` steps to the next item, `Alt` brings the
+  selection into view, bookmarks save places and zooms, the canvas search finds
+  items by name, tag or bookmark, with AND, OR, XOR and NOT.
+- **Media:** videos, audio and GIFs play on the canvas with a player; a frame
+  can be extracted as a picture.
+- **Text:** `@` mentions an object by stable id, with backlinks across a
+  board's canvases.
+- **Settings and accessibility:** a Settings view (device and canvas scopes,
+  reset, theme), rebindable tool keys, interface size, contrast and motion
+  options, and layouts for medium and phone screens.
+
 ### Controls
 
 | Action | Input |
@@ -214,13 +239,18 @@ or network connection.
 | Step to the next item | `Ctrl+Arrow` (Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
 | Bring the selection into view | `Alt` pressed and released alone; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
 | Search the canvas | `/` name, `#` tag (in-canvas tags and library tags), `@` bookmark · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
+| Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library, smart folders and canvas search; ADR 0069) |
+| Select several layers | `Ctrl`+click toggles · `Shift`+click selects a range · `Ctrl+Shift`+click adds a range |
+| Viewer (Assets) | `F` shows or hides the controls · arrows or edge clicks move between pictures · wheel zooms · drag pans |
+| Row actions | the ⋯ button on a bookmark, folder, tag or navigator row opens a menu (Up/Down/Home/End, `Esc` closes) |
 | Resize | drag a corner or side handle; `Shift` keeps proportions, `Alt` about the middle, `Ctrl` no snapping (the edge snaps to other items) |
 | Copy by dragging | hold `Alt` as the drag starts |
 | Import images | toolbar image button · drag files onto the page · paste (in Assets view these add to the library only) |
 | Export / import | storage panel (click the save indicator): **Export workspace backup**, **Import archive…** · menu **Export** per board or canvas · drop a `.canvast` file on the page |
 | Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
-| Debug + dev panel | open the file with `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
+| Settings | **Settings** view: tabs, scopes, reset, theme (system, light, dark), rebindable tool keys, `?` for the shortcut list, interface size, contrast and motion |
+| Developer tools | Settings > Develop (applies after a reload), or `#debug` at the end of the URL: camera internals, frame times, ±10/100/1000-level jump buttons, and auto-zoom in/out at 1–1000 levels/s (any click, key or wheel stops it) |
 
 ## Terminology
 
@@ -228,7 +258,7 @@ or network connection.
 authoritative positions of things on the canvas. The **camera** is the current
 view: its centre in world coordinates plus a zoom level. A **zoom level** of
 `z` means 2^z CSS pixels per world unit. An **object** is something placed on
-the canvas: a stroke, an image instance or a text. An **asset** is an imported source
+the canvas: a stroke, an image instance (picture, video, audio or GIF) or a text. An **asset** is an imported source
 file. Each asset is stored once, and placed images are **instances** that
 refer to it. A **workspace** holds **boards**; each board holds one or more
 **canvases**. **Canvas view** shows one canvas; **Assets view** shows the
@@ -266,7 +296,7 @@ connection.
 
 | Command | Time | When |
 | --- | --- | --- |
-| `npm test` | ~16 min | After every ordinary change (quick E2E suite: short stress loops) |
+| `npm test` | ~16 min (unit, quick E2E, offline, names and token checks) | After every ordinary change (quick E2E suite: short stress loops). During a slice, run only the affected specs |
 | `npm run test:full` | ~50 min | Only when a whole phase is complete (full stress loops); log the result |
 | `npm run test:unit` | ~15 s | While developing |
 | `npm run bench` (scale + tile-cache benchmarks, 3 browser setups) | ~15–25 min | After rendering or performance changes (scale benchmarks, not a gate) |
@@ -275,7 +305,7 @@ Both E2E lengths run the same tests; only the stress-loop counts differ.
 Never rebuild `dist/` while a suite is running.
 
 Individual commands: `npm run typecheck`, `npm run test:e2e` (quick),
-`npm run test:e2e:full`, `npm run check:offline`, `npm run check:names`.
+`npm run test:e2e:full`, `npm run check:offline`, `npm run check:names`, `npm run check:tokens` (no new colour, size, space or radius literals in the CSS; ADR 0068).
 
 The E2E suite runs every test in three Chromium configurations: the default,
 GPU disabled (`--disable-gpu --disable-accelerated-2d-canvas`), and
@@ -285,26 +315,12 @@ devicePixelRatio 2 with touch. Measurements are written to `metrics/*.json`
 image fixtures are generated in code (`tests/e2e/png.ts`); no binary
 fixtures are committed.
 
-Results with environment and caveats:
-
-- [Phase 0A navigation](docs/testing/phase-0a.md)
-- [Phase 0B editing](docs/testing/phase-0b.md)
-- [Phase 0C scale benchmarks](docs/testing/phase-0c.md)
-- [Phase 1 slice 1 storage](docs/testing/phase-1a.md)
-
-Latest results (Phase 1 slice 1): 58/58 unit tests; full E2E suite 88
-passed, 2 skipped by design, 0 failed across 3 projects
-([docs/testing/phase-1a.md](docs/testing/phase-1a.md)).
-
-Phase 0C: 67 passed, 2 skipped, 0 failed; scale benchmarks in
-[docs/testing/phase-0c.md](docs/testing/phase-0c.md).
-
-Phase 0B results:
-- 52/52 unit tests.
-- Final full E2E run: 61 passed and 2 skipped (by design). The 6 failures
-  were test-harness defects; after fixing them, every failed or related test
-  passed in all 3 projects (21/21).
-- Details: [docs/testing/phase-0b.md](docs/testing/phase-0b.md).
+Results with environment and caveats are in [docs/testing/](docs/testing/)
+(one log per phase, plus [ui-polish-0.17.md](docs/testing/ui-polish-0.17.md)).
+Latest: 186 unit tests pass. The full E2E suite has not been re-run since
+v0.16.0; slices since then ran only the specs they touch, in Chromium and
+Firefox. [docs/status.md](docs/status.md) lists, for each milestone, what was
+tested and what is unverified.
 
 ## Browser support and requirements
 
@@ -351,8 +367,13 @@ src/
                             usage lookups and mark-and-sweep garbage collection
   storage/                  IndexedDB schema, workspace repository, incremental persistence,
                             v1 migration, multi-tab writer lease, ZIP container, archive export/import
-  ui/                       toolbar, text editor overlay, view switch, workspace navigator, Assets view, confirmation
-                            dialog, storage panel, dev panel, Lucide icons
+  doc/                      also groups, arrange, clipboard, media (video, audio, GIF)
+  search/query.ts           AND, OR, XOR, NOT query parser and evaluator (ADR 0069)
+  settings/                 declared settings with scopes, rebindable shortcuts
+  interaction/              also snapping, pens, item navigation (Ctrl+Arrow), shortcut scopes
+  ui/                       toolbar, text editor overlay, view switch, workspace navigator, Assets view (gallery,
+                            viewer), Layers and Bookmarks panels, canvas search, Settings view, shared ⋯ More
+                            menu, media player, confirmation dialog, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
 scripts/                    single-file build, offline check, naming check
 tests/unit/, tests/e2e/     Vitest and Playwright suites
@@ -396,16 +417,21 @@ docs/status.md              roadmap and current status (single source of truth)
   bounds, refinement, measurements.
 - [ADR 0013](docs/adr/0013-text-objects.md): text objects — Markdown model,
   bundled font, layout, exact outlines at any depth, editing.
+- ADRs 0014 to 0069 in [docs/adr/](docs/adr/) cover nested frames, rotation,
+  snapping, groups, layers, bookmarks, video and audio, the Settings view,
+  accessibility, navigation, resize, the viewer, boolean search (0069) and
+  design tokens (0068).
 
 ## Storage, backups, import/export
 
-- **Where data lives:** IndexedDB database `canvast`, schema version 3
+- **Where data lives:** IndexedDB database `canvast`, schema version 8
   (details in [ADR 0006](docs/adr/0006-workspace-storage.md) and
   [ADR 0007](docs/adr/0007-asset-catalog-and-gc.md)). It has these stores:
   - `workspaces`, `boards`, `canvases`;
   - `objects`, with one record per object, indexed by the asset an image
     uses;
   - `canvasViews`, the per-canvas camera;
+  - `frames`, `bookmarks` and `thumbs` (nested frames, saved places, small asset thumbnails);
   - `assets`, the original image bytes, keyed by SHA-256 and stored once;
   - `assetCatalog`, the library entries (metadata only);
   - `meta`;
@@ -475,16 +501,17 @@ docs/status.md              roadmap and current status (single source of truth)
     show as neutral grey.
   - Marks cannot be selected; zoom in to edit.
 - **Not implemented:**
-  - groups, attach/detach, locking, rotation, and a Layers panel;
+  - non-destructive editing of pictures: crop, masks, adjustments and filters
+    (only opacity and blend modes exist);
   - picking that respects image transparency (images are picked by their
     bounds);
-  - video, GIF, audio and PDF;
-  - in text: other fonts and weights, alignment, links, code, mentions and
-    backlinks, right-to-left and complex scripts (Arabic, Indic), and
-    changing the wrap width on its own;
-  - adjustments and settings;
-  - smart folders, ratings, batch editing of several assets and
-    similar-image review; dragging an asset onto the canvas (use Place);
+  - PDF;
+  - in text: other fonts and weights, alignment, links, code, right-to-left
+    and complex scripts (Arabic, Indic), and changing the wrap width on its
+    own;
+  - ratings, filters by colour or size, duplicate review and similar-image
+    search in the library; dragging an asset onto the canvas (use Place);
+  - renaming or deleting an in-canvas tag across canvases;
   - collaboration.
 - **Text and system fonts.** Characters the bundled font lacks use the
   system font: their width comes from the browser, so such text can wrap
@@ -506,7 +533,7 @@ docs/status.md              roadmap and current status (single source of truth)
 - The app makes no network requests and has no runtime dependencies. The
   bundled font is handed to the browser from memory, so no font source is
   allowed either.
-- Imports are limited to `image/*` files of at most 256 MiB. Each file is
+- Imports are limited to `image/*`, `video/*` and `audio/*` files of at most 256 MiB. Each file is
   decoded before it is stored, and files that fail to decode are rejected
   with a message.
 - Every object is validated before it enters the document or is loaded:
@@ -552,3 +579,4 @@ reproduces on any checkout.
 | Phase 2 (7 slices) — rotation (strokes, images, text), snapping, groups, hide and lock, object eraser, recovery | 140/140 unit (6 new); full suite on 4 projects 340 passed / 6 skipped / 2 failed (one test that measured the wrong thing; fixed and re-run alone 64/64), 34 min 50 s; snapping E2E in Chromium and Firefox with frames, text and editing 62 passed (2.3 min; the editing U1 test now turns snapping off); rotation E2E (strokes; image and text) in 4 projects; frames, text, editing, deep-zoom-rendering, tiles and density specs in Chromium and Firefox 96 passed (6.7 min); full suite not re-run since v0.9.0 |
 | Phase 3 slices 1-6 — decoded-image budget, adaptive quality, cooperative index build, duplicate notice, import grid, reduced copies, decode queue, FPS counter | 147/147 unit; E2E for each; assets, editing, frames, deep-zoom-rendering, archive and organize in Chromium and Firefox 122 passed (8.9 min) |
 | Selection fixes (owner feedback) — oriented boxes, rotate from a corner, select by touch, shortcuts after a slider | 147/147 unit; E2E for each; frames, editing and text in Chromium and Firefox 90 passed (3.5 min) |
+| v0.10.0 to v0.17.0 — Phases 4 to 7 and UI polish (device settings, layers, bookmarks, video and audio, Settings, accessibility, navigation, resize, viewer, boolean search, design tokens) | 186/186 unit; each slice ran its own specs in Chromium and Firefox; full suite not re-run since v0.16.0; see [docs/status.md](docs/status.md) and [docs/testing/ui-polish-0.17.md](docs/testing/ui-polish-0.17.md) | see `git log` |
