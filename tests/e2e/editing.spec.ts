@@ -700,3 +700,62 @@ test("Alt tapped again fits everything visible; a third tap returns to the selec
   expect(await cam()).toEqual(onA);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Reset rotation and Reset proportions in the selection bar put a turned or stretched picture back, about its middle, as one undo step each (ADR 0063)", async ({ app }) => {
+  const p = app.page;
+  const img = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(5));
+  await app.frame();
+  await key(app, "v");
+  const box = async () => (await screenOfObject(app, img.id))!.box;
+  const b0 = await box();
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
+  const unrotate = p.getByRole("button", { name: "Reset rotation" });
+  const unstretch = p.getByRole("button", { name: /Reset proportions/ });
+  await expect(unrotate).toBeHidden();
+  await expect(unstretch).toBeHidden();
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  // Stretch with the right side handle.
+  let c = await frame();
+  const mid: [number, number] = [c[1]![0], (c[1]![1] + c[2]![1]) / 2];
+  await p.mouse.move(mid[0], mid[1]);
+  await p.mouse.down();
+  await p.mouse.move(mid[0] + 40, mid[1], { steps: 3 });
+  await p.mouse.move(mid[0] + 120, mid[1], { steps: 4 });
+  await p.mouse.up();
+  await app.frame();
+  const b1 = await box();
+  expect((b1.maxX - b1.minX) / (b1.maxY - b1.minY)).toBeGreaterThan(((b0.maxX - b0.minX) / (b0.maxY - b0.minY)) * 1.3);
+  await expect(unstretch).toBeVisible();
+  await unstretch.click();
+  await app.frame();
+  const b2 = await box();
+  expect(Math.abs((b2.maxX - b2.minX) / (b2.maxY - b2.minY) - (b0.maxX - b0.minX) / (b0.maxY - b0.minY)), "its own shape again").toBeLessThan(0.02);
+  expect(Math.abs((b2.minX + b2.maxX) / 2 - (b1.minX + b1.maxX) / 2), "same middle").toBeLessThan(1);
+  expect(Math.abs((b2.minY + b2.maxY) / 2 - (b1.minY + b1.maxY) / 2), "same middle").toBeLessThan(1);
+  await expect(unstretch).toBeHidden();
+  await key(app, "Control+z");
+  await app.frame();
+  const b3 = await box();
+  expect(Math.abs(b3.maxX - b1.maxX)).toBeLessThan(1); // one undo step puts the stretch back
+  await key(app, "Control+z");
+  // Turn it: drag just outside a corner.
+  c = await frame();
+  const corner = c[2] as [number, number];
+  await p.mouse.move(corner[0] + 16, corner[1] + 16);
+  await p.mouse.down();
+  await p.mouse.move(corner[0] + 60, corner[1] - 10, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  const turned = ((await objects(app)).find((o) => o.id === img.id) as Obj & { rot?: number }).rot;
+  expect(turned, "turned").toBeGreaterThan(0);
+  await expect(unrotate).toBeVisible();
+  const mid1 = await box();
+  await unrotate.click();
+  await app.frame();
+  expect(((await objects(app)).find((o) => o.id === img.id) as Obj & { rot?: number }).rot, "no turn left").toBeUndefined();
+  const after = await box();
+  expect(Math.abs((after.minX + after.maxX) / 2 - (mid1.minX + mid1.maxX) / 2), "turned about its middle").toBeLessThan(1);
+  await expect(unrotate).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});

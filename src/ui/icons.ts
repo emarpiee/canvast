@@ -18,6 +18,8 @@ import redo from "lucide-static/icons/redo-2.svg";
 import trash from "lucide-static/icons/trash-2.svg";
 import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
+import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
+import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
 import searchIcon from "lucide-static/icons/search.svg";
 import chevronsDownUp from "lucide-static/icons/chevrons-down-up.svg";
@@ -133,6 +135,8 @@ export const ICONS = {
   trash: clean(trash),
   house: clean(house),
   plus: clean(plus),
+  rotateCcw: clean(rotateCcw),
+  ratio: clean(ratioIcon),
   focus: clean(focusIcon),
   search: clean(searchIcon),
   chevronsDownUp: clean(chevronsDownUp),

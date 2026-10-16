@@ -14,6 +14,11 @@ import { LAYOUT_MENU } from "./toolbar";
  */
 export interface ContextActions {
   duplicate(): void;
+  /** Take the turn off the selection; give stretched pictures their own proportions back. */
+  resetRotation(): void;
+  resetProportions(): void;
+  /** What the selection can be reset from. */
+  resettable(): { turned: boolean; stretched: boolean };
   /** Open the Layers panel on the tag box for the selection. */
   tag(): void;
   group(): void;
@@ -41,6 +46,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
     btn("tag", ICONS.tag, "Tag the selection") +
+    btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
+    btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
     btn("layout", ICONS.layoutGrid, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
@@ -105,6 +112,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         }
         break;
       case "tag": actions.tag(); break;
+      case "unrotate": actions.resetRotation(); break;
+      case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
       case "group": actions.group(); break;
       case "ungroup": actions.ungroup(); break;
@@ -131,6 +140,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
     q("layout").hidden = sel.length < 2;
+    const reset = actions.resettable();
+    q("unrotate").hidden = !reset.turned;
+    q("unstretch").hidden = !reset.stretched;
     if (sel.length < 2) closeMenu();
     q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
     bar.hidden = false;

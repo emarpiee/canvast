@@ -4,8 +4,9 @@ import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, MediaState } from "../doc/model";
+import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
-import { normalizeUnit, placeAbove, restack, translate } from "../doc/edit-ops";
+import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
@@ -387,6 +388,46 @@ export function tagObjects(doc: DocumentStore, editor: EditorState, ids: readonl
   doc.commit(doc.transaction(add.length ? "Add tags" : "Remove tag", changed));
   editor.changed();
   return changed.length;
+}
+
+/**
+ * Take the turn off the selected items (each about its own middle, so none moves) and, separately, give stretched pictures their
+ * own proportions back (the same width and middle, the height of the original). One undo step each. Return how many changed.
+ */
+export function resetRotation(doc: DocumentStore, editor: EditorState): number {
+  if (editor.blockEdit()) return 0;
+  const turned = selected(doc, editor).filter((o) => !o.locked && o.rot);
+  if (!turned.length) return 0;
+  const next = turned.map((o) => {
+    const pv = pivotOf(o);
+    return rotateAbout(o, localToWorld(o, pv.x, pv.y), -(o.rot ?? 0));
+  });
+  doc.commit(doc.transaction(next.length === 1 ? "Reset rotation" : `Reset rotation of ${next.length} items`, next));
+  editor.changed();
+  return next.length;
+}
+
+const distorted = (o: CanvasObject): o is ImageObject => o.kind === "image" && !o.rot && !o.locked && Math.abs(o.w / o.h / (o.pixelW / o.pixelH) - 1) > 0.002;
+
+export function resetProportions(doc: DocumentStore, editor: EditorState): number {
+  if (editor.blockEdit()) return 0;
+  const stretched = selected(doc, editor).filter(distorted);
+  if (!stretched.length) return 0;
+  const next = stretched.map((o): CanvasObject => {
+    const h = (o.w * o.pixelH) / o.pixelW;
+    // The middle stays where it is: the top moves by half of what the height changes by.
+    const anchor = { x: o.anchor.x, y: D.add(o.anchor.y, D.shift(D.fromNumber((o.h - h) / 2), o.unit)) };
+    return normalizeUnit({ ...o, h, anchor });
+  });
+  doc.commit(doc.transaction(next.length === 1 ? "Reset proportions" : `Reset proportions of ${next.length} pictures`, next));
+  editor.changed();
+  return next.length;
+}
+
+/** Whether any selected item is turned, or any selected picture stretched (the selection bar shows the reset buttons then). */
+export function resettable(doc: DocumentStore, editor: EditorState): { turned: boolean; stretched: boolean } {
+  const sel = selected(doc, editor);
+  return { turned: sel.some((o) => !o.locked && !!o.rot), stretched: sel.some(distorted) };
 }
 
 /** Show every hidden object, or unlock every locked one. */

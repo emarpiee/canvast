@@ -9,3 +9,5 @@ Status: accepted (owner request, 2026-10-16)
 - **Alt tapped alone:** brings the selection into view; tapped again while the view is where it was left, it fits everything visible at this zoom (items from 4 px up to 16 windows, the same rule as stepping), and a third tap goes back to the selection. With nothing selected it fits everything.
 - **Fit buttons** beside zoom out and in (bottom right): *Fit the selection in view* (disabled with nothing selected) and *Fit everything in view*, for screens with no Alt key.
 - **Not done:** free stretching of strokes and text; resize handles for turned boxes' sides.
+
+**Resetting:** *Reset rotation* removes the turn of the selected items about each one's own middle (exact: turning by the opposite angle); *Reset proportions* gives an upright stretched picture its pixel aspect ratio back, keeping its width and its middle. Both are buttons in the selection bar, shown only when something selected can be reset, and one undo step each. Strokes and text are never stretched, so they have nothing to reset but their turn.
