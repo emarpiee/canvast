@@ -144,3 +144,9 @@ export function recordMetric(info: TestInfo, name: string, value: Record<string,
   writeFileSync(file, JSON.stringify({ project: info.project.name, test: info.title, ...value }, null, 2));
   info.annotations.push({ type: "metric", description: `${name}: ${JSON.stringify(value)}` });
 }
+
+/** The readout starts in its Simple view; a few specs read the technical numbers (the third view of the information button). */
+export async function showTechnicalReadout(page: Page): Promise<void> {
+  const button = page.getByRole("button", { name: /^Information shown/ });
+  for (let i = 0; i < 3 && (await button.getAttribute("data-mode")) !== "technical"; i++) await button.click();
+}

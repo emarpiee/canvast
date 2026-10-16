@@ -141,8 +141,6 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
-  // A debug build (the tests, development) keeps the technical readout it has always had; everyone else starts with the simple one.
-  if (debug && !settings.isSet("ui.info")) settings.set("ui.info", "technical");
   editor.penColor = settings.get("pen.color");
   editor.penWidthPx = settings.get("pen.widthPx");
   editor.penKind = settings.get("pen.kind");

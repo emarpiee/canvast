@@ -1306,20 +1306,7 @@ test("information readout: one button cycles Simple, More, Technical and Hidden,
   const button = () => p.getByRole("button", { name: /^Information shown/ });
   const zoom = p.getByTestId("zoom-readout");
   const fps = p.getByTestId("fps-readout");
-  // A debug build starts on the technical view: the numbers, as before.
-  await expect(button()).toHaveAttribute("data-mode", "technical");
-  await expect(zoom).toContainText("zoom 2^0.00");
-  await expect(fps).toHaveText(/^\d+ FPS · [\d.]+ ms · worst \d+ ms · draw [\d.]+ ms/, { timeout: 10_000 });
-  await expect.poll(async () => Number(((await fps.textContent()) ?? "").match(/^(\d+) FPS/)?.[1] ?? 0), { message: "a responsive page runs near the display rate", timeout: 10_000 }).toBeGreaterThan(20);
-  await expect(p.getByTestId("diagnostics")).toHaveText(/p50 [\d.]+ · p95 [\d.]+ · p99 [\d.]+ ms\nobjects 0 · drawn \d+\ndecoded 0 images · 0 \/ \d+ MiB · decoding 0 · waiting 0/);
-  await expect(p.getByTestId("save-status")).toContainText(/Saved \(verified\)|Saved/);
-  // Hidden: nothing of the readout is left.
-  await button().click();
-  await expect(button()).toHaveAttribute("data-mode", "hidden");
-  await expect(zoom).toBeHidden();
-  await expect(fps).toBeHidden();
-  // Simple: the zoom as a magnification and whether it is saved, in plain words, and nothing else.
-  await button().click();
+  // The default: the zoom as a magnification and whether the work is saved, in plain words, and nothing else.
   await expect(button()).toHaveAttribute("data-mode", "simple");
   await expect(zoom).toHaveText("Zoom 1×");
   await expect(p.getByTestId("position-readout")).toBeHidden();
@@ -1334,11 +1321,24 @@ test("information readout: one button cycles Simple, More, Technical and Hidden,
   await expect(p.getByTestId("position-readout")).toContainText("Position 0, 0");
   await expect(p.getByTestId("objects-readout")).toHaveText("Nothing on the canvas yet");
   await expect(fps).toHaveText(/^(Running smoothly|A little slow|Slow)$/, { timeout: 10_000 });
+  // Technical: the numbers.
+  await button().click();
+  await expect(button()).toHaveAttribute("data-mode", "technical");
+  await expect(zoom).toContainText("zoom 2^3.00");
+  await expect(fps).toHaveText(/^\d+ FPS · [\d.]+ ms · worst \d+ ms · draw [\d.]+ ms/, { timeout: 10_000 });
+  await expect.poll(async () => Number(((await fps.textContent()) ?? "").match(/^(\d+) FPS/)?.[1] ?? 0), { message: "a responsive page runs near the display rate", timeout: 10_000 }).toBeGreaterThan(20);
+  await expect(p.getByTestId("diagnostics")).toHaveText(/p50 [\d.]+ · p95 [\d.]+ · p99 [\d.]+ ms\nobjects 0 · drawn \d+\ndecoded 0 images · 0 \/ \d+ MiB · decoding 0 · waiting 0/);
+  await expect(p.getByTestId("save-status")).toContainText("Saved");
+  // Hidden: nothing of the readout is left.
+  await button().click();
+  await expect(button()).toHaveAttribute("data-mode", "hidden");
+  await expect(zoom).toBeHidden();
+  await expect(fps).toBeHidden();
   // The choice is kept over a reload, and the tooltip names this view and the next.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  await expect(button()).toHaveAttribute("data-mode", "more");
-  await expect(button()).toHaveAttribute("title", /Information shown: More\. Click for Technical\./);
+  await expect(button()).toHaveAttribute("data-mode", "hidden");
+  await expect(button()).toHaveAttribute("title", /Information shown: Hidden\. Click for Simple\./);
 });
 
 test("selection boxes follow the rotation, rotation works from outside a corner, and a marquee takes what it touches (ADR 0031)", async ({ app }) => {

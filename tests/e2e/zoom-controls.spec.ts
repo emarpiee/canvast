@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { expect, showTechnicalReadout, test } from "./harness";
 import type { App } from "./harness";
 
 /** Typed zoom levels (all builds) and the #debug developer navigation panel. */
@@ -23,6 +23,7 @@ test("typing a zoom level jumps there exactly, anchored at the viewport centre",
     expect(await app.worldAt(640, 400)).toEqual(centre); // the centre's world point is unchanged
     await expect(app.page.getByTestId("zoom-input")).toBeHidden();
   }
+  await showTechnicalReadout(app.page);
   await expect(app.page.getByTestId("zoom-readout")).toContainText("2^12.50");
 });
 

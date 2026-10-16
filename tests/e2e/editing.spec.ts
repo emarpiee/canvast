@@ -114,11 +114,11 @@ test("U1/U2/U4/U5: draw over deep-zoomed media, move only the media, lasso strok
   await key(app, "v");
   // This test checks the exact pointer delta, so snapping to the stroke nearby is off (it has its own test).
   await app.page.getByRole("button", { name: "Snap to other objects" }).click();
-  await click(app, 300, 650);
+  await click(app, 300, 560);
   expect(await selection(app)).toEqual([img0.id]);
-  const w0 = await app.worldAt(300, 650);
+  const w0 = await app.worldAt(300, 560);
   const w1 = await app.worldAt(500, 550);
-  await drag(app, [300, 650], [500, 550]);
+  await drag(app, [300, 560], [500, 550]);
   const afterMove = await objects(app);
   const img1 = byId(afterMove, img0.id);
   expect(pick(img1)).toEqual(moved(img0, worldDelta(w0, w1))); // exact world delta

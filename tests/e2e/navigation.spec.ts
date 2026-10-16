@@ -1,4 +1,4 @@
-import { FULL, LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, reps, test } from "./harness";
+import { FULL, LIMITS, assertFiniteCamera, distance, expect, percentile, recordMetric, reps, showTechnicalReadout, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -24,6 +24,7 @@ async function expectInked(app: App, label: string): Promise<number> {
 
 test("loads offline from file:// with no network requests or errors", async ({ app }) => {
   await expect(app.page).toHaveTitle("canvast");
+  await showTechnicalReadout(app.page);
   await expect(app.page.getByTestId("zoom-readout")).toContainText("zoom 2^0.00");
   await expectInked(app, "home");
   const lm = await app.landmark(LANDMARK);
@@ -235,6 +236,7 @@ test("renders and stays interactive at extreme depths and distances", async ({ a
   const nearOne = await app.landmark("near-one-2^-300");
   // 2^-300 world units to the right of 1.0 at 2^305 px/unit = 32 px.
   expect(distance(nearOne, { x: 672, y: 400 })).toBeLessThan(1e-9);
+  await showTechnicalReadout(app.page);
   await expect(app.page.getByTestId("zoom-readout")).toContainText("2^305.00");
   expect(app.consoleErrors).toEqual([]);
 });
