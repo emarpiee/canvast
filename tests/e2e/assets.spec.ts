@@ -1294,7 +1294,7 @@ test("Place on…: the open canvas, another existing canvas, a new canvas in a b
   await toAssets(p);
   await card(p, GREEN_HASH).click();
   await p.getByTestId("asset-place-menu").click();
-  await expect(p.getByRole("menuitem", { name: /Canvas 2.*open now/ })).toBeVisible();
+  await expect(p.getByRole("menuitem", { name: /Canvas 2.*active/ })).toBeVisible();
   await p.getByRole("menuitem", { name: /^Canvas 1/ }).click();
   await expect(crumb).toHaveText("Board 1 › Canvas 1");
   await expect.poll(count).toBe(1);

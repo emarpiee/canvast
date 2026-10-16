@@ -1709,7 +1709,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
             <h3>${ICONS.squareStack}<span>${esc(board.name)}</span></h3>
             ${canvases
-              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "open now" : c.objectCount ? `${c.objectCount} objects` : "empty"}</small></button>`)
+              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "active" : c.objectCount ? `${c.objectCount} objects` : "empty"}</small></button>`)
               .join("")}
             <button type="button" role="menuitem" class="pm-new" data-pm="new-canvas" data-id="${board.id}">${ICONS.plus}<span>New canvas in ${esc(board.name)}</span></button>
           </section>`,
