@@ -46,6 +46,11 @@ import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
+import chevronLeft from "lucide-static/icons/chevron-left.svg";
+import chevronUp from "lucide-static/icons/chevron-up.svg";
+import panelRight from "lucide-static/icons/panel-right.svg";
+import starIcon from "lucide-static/icons/star.svg";
+import trash2 from "lucide-static/icons/trash-2.svg";
 import eraser from "lucide-static/icons/eraser.svg";
 import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
@@ -142,6 +147,11 @@ export const ICONS = {
   bringToFront: clean(bringToFront),
   sendToBack: clean(sendToBack),
   magnet: clean(magnet),
+  chevronLeft: clean(chevronLeft),
+  chevronUp: clean(chevronUp),
+  panelRight: clean(panelRight),
+  star: clean(starIcon),
+  trash2: clean(trash2),
   info: clean(infoIcon),
   circleAlert: clean(circleAlert),
   circleCheck: clean(circleCheck),

@@ -378,7 +378,7 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await p.getByTestId("asset-preview").click();
   const slide = p.getByTestId("slide-view");
   await expect(slide).toBeVisible();
-  await expect.poll(() => slide.locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await expect.poll(() => slide.locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   const first = await slide.locator("figcaption").textContent();
   expect(first).not.toContain("missing");
   await p.keyboard.press("ArrowRight");
@@ -405,7 +405,7 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await card(p, HASH).click();
   await p.getByTestId("asset-preview").click();
   await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The original is missing or damaged");
-  await expect.poll(() => p.getByTestId("slide-view").locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await p.keyboard.press("Escape");
   await card(p, HASH).click();
   await expect(p.getByTestId("asset-inspector")).toContainText("The original file is missing from storage.");
@@ -852,5 +852,47 @@ test("a video this browser cannot decode is still imported as a card of its own 
   expect((await download).suggestedFilename()).toBe("hevc.mp4");
   // A selected, unplayable instance has no black layer over its card.
   await expect(p.locator("video.media-video")).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("viewer: opens from a card, steps through the library with a filmstrip, and the details and the controls can be hidden and stay hidden (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  for (const [i, c] of ([[200, 40, 40], [40, 200, 40], [40, 40, 200]] as const).entries()) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `ref-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [c[0], c[1], c[2], 255]) });
+  }
+  await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  // The cards carry the picture only until hovered or selected; a double-click opens the viewer beside the details.
+  await p.getByTestId("asset-card").nth(0).dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
+  await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3");
+  await expect(viewer.locator(".film-item")).toHaveCount(3);
+  await p.keyboard.press("ArrowRight");
+  await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 3");
+  await expect(viewer.locator(".film-item.is-current")).toHaveCount(1);
+  // The details follow the open asset; a filmstrip item opens its asset.
+  const name = await p.getByTestId("asset-inspector").locator("h2").textContent();
+  await viewer.locator(".film-item").nth(2).click();
+  await expect(viewer.locator(".viewer-pos")).toHaveText("3 of 3");
+  expect(await p.getByTestId("asset-inspector").locator("h2").textContent()).not.toBe(name);
+  // Hide the details (I) and the controls (B): the picture gets the room, a handle brings the controls back, and both choices are remembered.
+  await p.keyboard.press("i");
+  await expect(p.getByTestId("asset-inspector")).toBeHidden();
+  await p.keyboard.press("b");
+  await expect(viewer.locator(".viewer-bar")).toBeHidden();
+  await expect(viewer.getByRole("button", { name: "Show the controls" })).toBeVisible();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await p.getByTestId("asset-card").nth(0).dblclick();
+  await expect(viewer).toBeVisible();
+  await expect(p.getByTestId("asset-inspector")).toBeHidden();
+  await expect(viewer.locator(".viewer-bar")).toBeHidden();
+  await viewer.getByRole("button", { name: "Show the controls" }).click();
+  await expect(viewer.locator(".viewer-bar")).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

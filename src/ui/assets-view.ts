@@ -42,24 +42,50 @@ type SortKey = "newest" | "name" | "size" | "uses";
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
-      <h1 class="assets-title">Assets <span class="assets-count" data-testid="assets-count"></span></h1>
-      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag (#tag for exact)" aria-label="Search assets">
+      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
+      <span class="assets-count" data-testid="assets-count"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
       </select>
       <select data-testid="assets-sort" aria-label="Sort by">
         <option value="newest">Newest first</option><option value="name">Name</option><option value="size">Largest first</option><option value="uses">Most used</option>
       </select>
-      <label class="assets-size">Size <input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
+      <label class="assets-size" title="Thumbnail size">${ICONS.images}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.upload}<span>Import</span></button>
+      <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="assets-import-input">
     </div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
-      <div class="assets-scroll"><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+      <div class="assets-main">
+        <div class="assets-scroll"><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
+          <div class="viewer-stage"><figure><img alt=""><video controls hidden></video><figcaption></figcaption></figure></div>
+          <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
+            <div class="viewer-nav">
+              <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
+              <button type="button" class="vbtn" data-act="next" aria-label="Next" title="Next (Right arrow)">${ICONS.chevronRight}</button>
+              <span class="viewer-pos"></span>
+            </div>
+            <div class="viewer-film" role="listbox" aria-label="Library, in this order"></div>
+            <div class="viewer-tools">
+              <button type="button" class="vbtn" data-act="fit" aria-pressed="false" title="Show at its own size (F)">100%</button>
+              <button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
+              <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button>
+              <button type="button" class="vbtn" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
+              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (B)">${ICONS.chevronDown}</button>
+              <button type="button" class="vbtn" data-act="close" aria-label="Close slide view" title="Back to the library (Esc)">${ICONS.x}</button>
+            </div>
+          </div>
+          <button type="button" class="viewer-handle" data-act="bar" aria-label="Show the controls" title="Show the controls (B)" hidden>${ICONS.chevronUp}</button>
+        </div>
+      </div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
     </div>`;
+  const body = root.querySelector<HTMLElement>(".assets-body")!;
+  const viewer = root.querySelector<HTMLElement>(".viewer")!;
+  const film = root.querySelector<HTMLElement>(".viewer-film")!;
   const grid = root.querySelector<HTMLElement>(".assets-grid")!;
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
   const status = root.querySelector<HTMLElement>(".assets-status")!;
@@ -71,6 +97,31 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const fileInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-input"]')!;
   const importBtn = root.querySelector<HTMLButtonElement>('[data-action="import"]')!;
   const side = root.querySelector<HTMLElement>(".assets-side")!;
+
+  // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
+  const UI_KEY = "canvast.assets.ui";
+  const ui: { details: boolean; bar: boolean } = { details: true, bar: true };
+  try {
+    const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
+    if (typeof saved.details === "boolean") ui.details = saved.details;
+    if (typeof saved.bar === "boolean") ui.bar = saved.bar;
+  } catch {
+    // unreadable: shown
+  }
+  const saveUi = (): void => {
+    try {
+      localStorage.setItem(UI_KEY, JSON.stringify(ui));
+    } catch {
+      // blocked: kept for this session
+    }
+  };
+  const applyUi = (): void => {
+    body.classList.toggle("no-details", !ui.details);
+    viewer.classList.toggle("no-bar", !ui.bar);
+    viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
+    for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
+  };
+  applyUi();
 
   let visible = false;
   let listing: CatalogListing | null = null;
@@ -129,23 +180,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   };
 
-  // ---- slide view: the original, full window; a lost one shows its thumbnail and says so
-  const slide = document.createElement("div");
-  slide.className = "slide-view";
-  slide.hidden = true;
-  slide.tabIndex = -1;
-  slide.setAttribute("role", "dialog");
-  slide.setAttribute("aria-modal", "true");
-  slide.setAttribute("aria-label", "Slide view");
-  slide.dataset["testid"] = "slide-view";
-  slide.innerHTML = `<button type="button" class="slide-nav" data-act="prev" aria-label="Previous">‹</button>
-    <figure><img alt=""><video controls hidden></video><figcaption></figcaption></figure>
-    <button type="button" class="slide-nav" data-act="next" aria-label="Next">›</button>
-    <button type="button" class="slide-close" data-act="close" aria-label="Close slide view">×</button>`;
-  root.append(slide);
-  const slideImg = slide.querySelector<HTMLImageElement>("img")!;
-  const slideMedia = slide.querySelector<HTMLVideoElement>("video")!;
-  const slideCaption = slide.querySelector<HTMLElement>("figcaption")!;
+  // ---- viewer: the original in the library's own window, with the details beside it and the controls below (both can be hidden)
+  const slideImg = viewer.querySelector<HTMLImageElement>("img")!;
+  const slideMedia = viewer.querySelector<HTMLVideoElement>("video")!;
+  const slideCaption = viewer.querySelector<HTMLElement>("figcaption")!;
+  const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;
   let slideHash: string | null = null;
   let slideToken = 0;
   let slideUrl: string | null = null;
@@ -153,13 +192,60 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (slideUrl) URL.revokeObjectURL(slideUrl);
     slideUrl = null;
   };
+  const ioFilm = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        ioFilm.unobserve(e.target);
+        loadThumb(e.target as HTMLImageElement);
+      }
+    },
+    { root: film, rootMargin: "0px 400px" },
+  );
+  /** The filmstrip: every asset of the current list, in order, the open one marked. */
+  const renderFilm = (): void => {
+    const list = filtered();
+    film.innerHTML = list
+      .map(
+        (e) =>
+          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}"><img alt="" data-hash="${e.hash}"></button>`,
+      )
+      .join("");
+    for (const img of film.querySelectorAll<HTMLImageElement>("img[data-hash]")) ioFilm.observe(img);
+    const i = list.findIndex((e) => e.hash === slideHash);
+    pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
+  };
+  const markFilm = (): void => {
+    for (const b of film.querySelectorAll<HTMLElement>(".film-item")) {
+      const on = b.dataset["hash"] === slideHash;
+      b.classList.toggle("is-current", on);
+      b.setAttribute("aria-selected", String(on));
+      if (on) b.scrollIntoView({ block: "nearest", inline: "center" });
+    }
+    const list = filtered();
+    const i = list.findIndex((e) => e.hash === slideHash);
+    pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
+  };
   const showSlide = async (hash: string): Promise<void> => {
     const e = listing?.entries.find((x) => x.hash === hash);
     if (!e) return;
     const token = ++slideToken;
+    const opening = viewer.hidden;
     slideHash = hash;
-    slide.hidden = false;
-    slide.focus();
+    body.classList.add("is-viewing");
+    viewer.hidden = false;
+    viewer.focus();
+    // The details beside the viewer describe the open asset.
+    selected = hash;
+    places = await session.assetPlaces(hash);
+    if (token !== slideToken) return;
+    renderInspector();
+    for (const c of grid.querySelectorAll<HTMLElement>(".asset-card")) c.setAttribute("aria-pressed", String(c.dataset["hash"] === hash));
+    const fav = viewer.querySelector<HTMLElement>('[data-act="favorite"]')!;
+    fav.setAttribute("aria-pressed", String(meta(e).favorite));
+    viewer.querySelector<HTMLButtonElement>('[data-act="place"]')!.disabled = !e.present || session.readOnly;
+    if (opening) renderFilm();
+    else markFilm();
     const label = `${e.name || "Untitled"}, ${e.pixelW} × ${e.pixelH} px, ${fmtBytes(e.size)}`;
     slideCaption.textContent = label;
     slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
@@ -193,31 +279,60 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.src = slideUrl;
   };
   const closeSlide = (): void => {
+    const was = slideHash;
     slideToken++;
     slideHash = null;
-    slide.hidden = true;
+    viewer.hidden = true;
+    body.classList.remove("is-viewing");
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
     slideMedia.pause();
     slideMedia.removeAttribute("src");
     freeSlideUrl();
+    film.innerHTML = "";
+    // Back in the library the card of the asset that was open is in view.
+    if (was) grid.querySelector<HTMLElement>(`.asset-card[data-hash="${was}"]`)?.scrollIntoView({ block: "nearest" });
   };
   const stepSlide = (d: number): void => {
     const list = filtered().map((x) => x.hash);
     const i = list.indexOf(slideHash ?? "");
     if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!);
   };
-  slide.addEventListener("click", (e) => {
+  const toggleDetails = (): void => {
+    ui.details = !ui.details;
+    saveUi();
+    applyUi();
+    if (!viewer.hidden) viewer.focus();
+  };
+  const toggleBar = (): void => {
+    ui.bar = !ui.bar;
+    saveUi();
+    applyUi();
+    // The button that was pressed may have just been hidden: keep the keyboard in the viewer.
+    if (!viewer.hidden) viewer.focus();
+  };
+  viewer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
+    const film1 = t.closest<HTMLElement>(".film-item");
+    if (film1) return void showSlide(film1.dataset["hash"]!);
     const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
     if (act === "prev") stepSlide(-1);
     else if (act === "next") stepSlide(1);
-    else if (act === "close" || t === slide) closeSlide();
+    else if (act === "close") closeSlide();
+    else if (act === "fit") viewer.querySelector<HTMLElement>('[data-act="fit"]')!.setAttribute("aria-pressed", String(viewer.classList.toggle("is-actual")));
+    else if (act === "details") toggleDetails();
+    else if (act === "bar") toggleBar();
+    else if (act === "favorite" || act === "place") inspector.querySelector<HTMLButtonElement>(`[data-action="${act}"]`)?.click();
   });
-  slide.addEventListener("keydown", (e) => {
+  viewer.addEventListener("keydown", (e) => {
+    const typing = (e.target as HTMLElement).closest("input, textarea, select");
     if (e.key === "Escape") closeSlide();
+    else if (typing) return;
     else if (e.key === "ArrowLeft") stepSlide(-1);
     else if (e.key === "ArrowRight") stepSlide(1);
+    else if (e.key === "i" || e.key === "I") toggleDetails();
+    else if (e.key === "b" || e.key === "B") toggleBar();
+    else if (e.key === "f" || e.key === "F") viewer.querySelector<HTMLElement>('[data-act="fit"]')!.click();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -288,25 +403,34 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!listing) return;
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
-    count.textContent = `${listing.entries.length}`;
+    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} asset${listing.entries.length === 1 ? "" : "s"}`;
     const cards = rows.map((e) => {
       const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
-      return `<button type="button" role="listitem" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
-          aria-pressed="${selected === e.hash}" title="${esc(e.name || "Untitled")}">
-        <span class="asset-thumb"><img alt="" class="${small.trim()}" data-hash="${e.hash}">${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}</span>
-        <span class="asset-name">${meta(e).favorite ? `<span class="asset-star" aria-label="Favourite">★</span> ` : ""}${esc(e.name || "Untitled")}</span>
-        ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : ""}
-        <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span><span class="asset-meta">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
-        <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
+      const ar = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));
+      const name = e.name || "Untitled";
+      return `<button type="button" role="listitem" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" style="--ar:${ar.toFixed(3)}"
+          aria-pressed="${selected === e.hash}" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
+        <span class="asset-thumb"><img alt="" class="${small.trim()}" data-hash="${e.hash}"></span>
+        ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
+        ${meta(e).favorite ? `<span class="asset-star" aria-label="Favourite">${ICONS.star}</span>` : ""}
+        <span class="asset-info">
+          <span class="asset-name">${esc(name)}</span>
+          <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
+          <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
+          ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : ""}
+        </span>
       </button>`;
     });
     const missing = usageAll
       ? listing.missing.map(
-          (m) => `<button type="button" role="listitem" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" aria-pressed="${selected === m.hash}">
-            <span class="asset-thumb"><span class="asset-missing-label">Original missing</span></span>
-            <span class="asset-name">Missing original</span>
-            <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
-            <span class="asset-uses" data-testid="asset-uses">${usesText(m.instances, m.canvases)}</span>
+          (m) => `<button type="button" role="listitem" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" style="--ar:1.4" aria-pressed="${selected === m.hash}" aria-label="Missing original">
+            <span class="asset-thumb"></span>
+            <span class="asset-missing-label">Original missing</span>
+            <span class="asset-info">
+              <span class="asset-name">Missing original</span>
+              <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
+              <span class="asset-uses" data-testid="asset-uses">${usesText(m.instances, m.canvases)}</span>
+            </span>
           </button>`,
         )
       : [];
@@ -319,6 +443,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
     renderSide();
     renderInspector();
+    if (slideHash && !viewer.hidden) {
+      if (listing.entries.some((x) => x.hash === slideHash)) renderFilm();
+      else closeSlide(); // the open asset was deleted
+    }
     importBtn.disabled = session.readOnly;
   };
 
@@ -418,32 +546,44 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const where = session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas";
     const placeRows = places
       .map(
-        (p) => `<li><span>${esc(p.boardName)} › ${esc(p.canvasName)} <span class="asset-place-n">${p.ids.length}</span></span>
+        (p) => `<li><span class="asset-place-name">${esc(p.boardName)} › ${esc(p.canvasName)} <span class="asset-place-n">${p.ids.length}</span></span>
           <button type="button" class="assets-btn" data-action="show" data-canvas="${p.canvasId}" data-testid="asset-show"
             aria-label="Show ${p.ids.length} instance(s) on ${esc(p.boardName)} › ${esc(p.canvasName)}">${ICONS.locate}<span>Show</span></button></li>`,
       )
       .join("");
     const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
+    const fav = e ? meta(e).favorite : false;
     inspector.innerHTML = `
       <div class="asset-insp-head">
-        <h2>${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
-        <button type="button" class="assets-icon" data-action="close" aria-label="Close details">${ICONS.x}</button>
+        <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
+        <button type="button" class="assets-btn is-icon" data-action="close" aria-label="Close details" title="Close the details">${ICONS.x}</button>
       </div>
-      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open slide view"><img alt="Preview of ${esc(e.name)}" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
-      <dl>
-        ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Pixels</dt><dd>${e.pixelW} × ${e.pixelH}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd>
-               <dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
-        <dt>Content hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 16)}…</dd>
-        <dt>Used</dt><dd data-testid="asset-usage">${usesText(instances, e?.canvases ?? m!.canvases)}</dd>
-      </dl>
+      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)"><img alt="Preview of ${esc(e.name)}" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}"></button>` : ""}
+      ${
+        e
+          ? `<div class="asset-quick">
+               <button type="button" class="assets-btn is-icon" data-action="favorite" data-testid="asset-favorite" aria-pressed="${fav}" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" title="${fav ? "Remove from favourites" : "Add to favourites"}"${session.readOnly ? " disabled" : ""}>${ICONS.star}</button>
+               ${e.present ? `<button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro} title="Place on ${esc(where)}">${ICONS.mapPin}<span>Place on canvas</span></button>` : ""}
+             </div>`
+          : ""
+      }
+      <div class="asset-facts">
+        ${e ? `<span>${e.pixelW} × ${e.pixelH} px</span><span>${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>` : ""}
+        <span data-testid="asset-usage">${usesText(instances, e?.canvases ?? m!.canvases)}</span>
+      </div>
       ${e && !e.present ? `<p class="asset-warn">The original file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
-      ${places.length ? `<h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul>` : ""}
+      ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
+      <details class="asset-more"><summary>Technical details</summary>
+        <dl>
+          ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd><dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
+          <dt>Content hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 16)}…</dd>
+        </dl>
+      </details>
       <div class="asset-actions">
-        ${e?.present ? `<button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro}>${ICONS.mapPin}<span>Place on ${esc(where)}</span></button>` : ""}
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">Export as archive</button>` : ""}
-        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>Delete from library</button>
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.upload}<span>Export as archive</span></button>` : ""}
+        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove its ${instances} instance(s) from their canvases first.</p>` : ""}` : ""}
       </div>`;
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
@@ -451,22 +591,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
     if (tagInput && draft) tagInput.value = draft;
     if (tagInput && hadFocus) tagInput.focus();
+    // The viewer's favourite button follows the stored state.
+    if (e && slideHash === e.hash) viewer.querySelector<HTMLElement>('[data-act="favorite"]')!.setAttribute("aria-pressed", String(fav));
   };
 
-  /** Favourite, tags and folders of an entry (inspector). */
+  /** Tags and folders of an entry (inspector). */
   const organizeHtml = (e: CatalogListing["entries"][number]): string => {
     const m = meta(e);
     const dis = session.readOnly ? " disabled" : "";
     const folders = listing!.folders;
     const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
     return `
-      <div class="asset-organize">
-        <button type="button" class="assets-btn" data-action="favorite" data-testid="asset-favorite" aria-pressed="${m.favorite}"${dis}>${m.favorite ? "★ Favourite" : "☆ Add to favourites"}</button>
+      <section class="asset-sec">
         <h3>Tags</h3>
         <div class="tag-chips" data-testid="asset-tags">
           ${m.tags.map((t) => `<span class="tag-chip">#${esc(t)}<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}"${dis}>×</button></span>`).join("")}
-          <input class="tag-input" data-testid="asset-tag-input" placeholder="Add tag, press Enter" aria-label="Add a tag" maxlength="64"${dis}>
+          <input class="tag-input" data-testid="asset-tag-input" placeholder="Add a tag" aria-label="Add a tag" title="Type a tag and press Enter" maxlength="64"${dis}>
         </div>
+      </section>
+      <section class="asset-sec">
         <h3>Folders</h3>
         ${
           sorted.length
@@ -476,9 +619,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                     `<li><label><input type="checkbox" data-folder="${f.id}"${m.folderIds.includes(f.id) ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`,
                 )
                 .join("")}</ul>`
-            : `<p class="asset-note">No folders yet. Create one with “+ Folder” in the sidebar.</p>`
+            : `<p class="asset-note">No folders yet. Make one with “+ Folder” in the sidebar.</p>`
         }
-      </div>`;
+      </section>`;
   };
 
   const crumbOf = (canvasId: string): string => {
@@ -500,13 +643,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
     if (card) void select(card.dataset["hash"]!); // Escape or the close button clears the selection
   });
+  // Open in the viewer: a double-click, or Enter on the card that is already selected.
+  grid.addEventListener("dblclick", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (card && listing?.entries.some((x) => x.hash === card.dataset["hash"])) void showSlide(card.dataset["hash"]!);
+  });
+  grid.addEventListener("keydown", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (e.key === "Enter" && card && card.getAttribute("aria-pressed") === "true" && listing?.entries.some((x) => x.hash === card.dataset["hash"])) {
+      e.preventDefault();
+      void showSlide(card.dataset["hash"]!);
+    }
+  });
   inspector.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b || b.disabled || !selected) return;
     const hash = selected;
     switch (b.dataset["action"]) {
       case "close":
-        void select(null);
+        if (!viewer.hidden) toggleDetails();
+        else void select(null);
         break;
       case "slide":
         void showSlide(hash);
@@ -656,8 +812,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (e.key === "Escape" && selected) {
       void select(null);
       e.stopPropagation();
+    } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest("input, textarea, select") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      toggleDetails();
+      e.preventDefault();
     }
   });
+  root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails());
   for (const el of [search, usageSel, sortSel]) {
     el.addEventListener("input", () => {
       if (el !== sortSel && scope.startsWith("smart:")) scope = "all"; // the query is no longer the saved one
@@ -689,6 +849,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
     hide() {
       visible = false;
+      if (!viewer.hidden) closeSlide();
       root.hidden = true;
     },
     async importFiles(files) {
