@@ -83,6 +83,8 @@ export function mountTextEditor(
   editor: EditorState,
   /** Texts and images on the board's other canvases matching a query (the picker's second list). */
   elsewhere: (query: string) => Promise<Array<{ id: string; label: string; canvasName: string }>> = () => Promise.resolve([]),
+  /** The file name of an original (an image is listed by it, not by its pixel size). */
+  assetName: (hash: string) => Promise<string> = () => Promise.resolve(""),
 ): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
@@ -163,9 +165,20 @@ export function mountTextEditor(
     pickAt = null;
     if (refocus) box.focus({ preventScroll: true });
   };
+  const fileNames = new Map<string, string>();
+  const askedNames = new Set<string>();
   const fillPicker = (): void => {
     const q = pickInput.value.trim().toLowerCase();
-    choices = [...doc.ordered()].reverse().filter((o) => o.id !== target?.id).map((o) => ({ id: o.id, label: labelOf(o).text })).filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
+    for (const o of doc.ordered()) {
+      if (o.kind !== "image" || askedNames.has(o.assetId)) continue;
+      askedNames.add(o.assetId);
+      void assetName(o.assetId).then((n) => {
+        if (!n) return;
+        fileNames.set(o.assetId, n);
+        if (!picker.hidden) fillPicker();
+      });
+    }
+    choices = [...doc.ordered()].reverse().filter((o) => o.id !== target?.id).map((o) => ({ id: o.id, label: labelOf(o, fileNames).text })).filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
     const ask = ++asked;
     void elsewhere(q).then((more) => {
       if (ask !== asked || picker.hidden) return; // a newer query, or closed

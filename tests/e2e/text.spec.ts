@@ -212,6 +212,14 @@ test("backlinks: mentions are listed both ways, across the board's canvases, and
   await nav.click();
   await p.getByRole("menuitemradio", { name: /Canvas 1/ }).click();
   await expect(nav).toHaveText("Board 1 › Canvas 1");
+  // On this canvas too an image is listed by its file name, not "Image 1920×1080".
+  await newText(p, 700, 500);
+  await p.keyboard.type("@");
+  await p.getByRole("textbox", { name: "Mention an item" }).fill("sky-ref");
+  await expect(p.getByRole("option", { name: /^sky-ref\.png$/ })).toBeVisible();
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Escape");
+  await finish(p);
   await row(t1!.id).click();
   const back = panel.locator(".layers-links").getByRole("button", { name: /see/ });
   await expect(back).toHaveCount(1);

@@ -396,7 +396,7 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6));
+  const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k) });
   const side = document.createElement("div");
   side.id = "side-panels";
