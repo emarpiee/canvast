@@ -1165,6 +1165,12 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await p.keyboard.type("Far corner");
   await p.keyboard.press("Enter");
   await expect(rows.nth(1).locator(".bookmark-name")).toHaveText("Far corner");
+  // Nothing is cut off at the panel's edge: all three buttons lie inside it.
+  const pbox = (await panel.boundingBox())!;
+  for (const name of [/^Rename/, /^Update/, /^Delete/]) {
+    const bb = (await rows.nth(0).getByRole("button", { name }).boundingBox())!;
+    expect(bb.x + bb.width, `${name} inside the panel`).toBeLessThanOrEqual(pbox.x + pbox.width - 4);
+  }
   // Rename with the button (no double-click needed), and the card shows when it was saved.
   await rows.nth(0).getByRole("button", { name: "Rename Bookmark 1" }).click();
   await p.keyboard.type("Home");
