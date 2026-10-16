@@ -108,6 +108,8 @@ export interface SmartFolder {
   name: string;
   search: string;
   usage: "all" | "used" | "unused";
+  /** The way of the search (ADR 0071); absent = all (name, type, hash and tags). */
+  way?: "name" | "tag";
 }
 const MAX_SEARCH = 200;
 
@@ -306,12 +308,12 @@ export class AssetCatalog {
     });
   }
 
-  async saveSmart(id: string, name: string, search: string, usage: SmartFolder["usage"]): Promise<void> {
+  async saveSmart(id: string, name: string, search: string, usage: SmartFolder["usage"], way?: SmartFolder["way"]): Promise<void> {
     await this.write(["meta"], async (tx) => {
       const all = (await req(tx.objectStore("meta").get(SMART_KEY) as IDBRequest<SmartFolder[] | undefined>)) ?? [];
       if (search.length > MAX_SEARCH) throw new CatalogInputError(`a saved search can be at most ${MAX_SEARCH} characters`);
       if (!search.trim() && usage === "all") throw new CatalogInputError("a saved search needs a search or a usage filter");
-      tx.objectStore("meta").put([...all, { id, name: folderName(name), search: search.trim(), usage }], SMART_KEY);
+      tx.objectStore("meta").put([...all, { id, name: folderName(name), search: search.trim(), usage, ...(way ? { way } : {}) }], SMART_KEY);
     });
   }
   async renameSmart(id: string, name: string): Promise<void> {

@@ -101,6 +101,37 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await p.getByRole("button", { name: "How to combine search words" }).click();
   await p.getByRole("dialog", { name: "Combining search words" }).getByRole("button", { name: "red OR blue", exact: true }).click();
   await expect(p.getByTestId("assets-search")).toHaveValue("red OR blue");
+  // The same search as the canvas search (ADR 0071): ways, a first "/" for Name, a clear button and recent searches that found something.
+  const box = p.getByTestId("assets-search");
+  const pop = p.getByTestId("assets-search-pop");
+  await box.focus();
+  await pop.getByRole("tab", { name: /Tag/ }).click();
+  await searchFor("png", 0); // tags only
+  await searchFor("hand", 1);
+  await pop.getByRole("tab", { name: /Name/ }).click();
+  await searchFor("hand", 0); // names only
+  await searchFor("blocks", 1);
+  await pop.getByRole("tab", { name: "All" }).click();
+  await box.fill("/green"); // a first "/" chooses Name and is not part of the search
+  await expect(box).toHaveValue("green");
+  await expect(pop.getByRole("tab", { name: /Name/ })).toHaveAttribute("aria-selected", "true");
+  await expect(cards(p)).toHaveCount(1);
+  await box.press("Enter"); // used and it found something: remembered
+  await p.getByRole("button", { name: "Clear the search" }).click();
+  await expect(box).toHaveValue("");
+  await expect(cards(p)).toHaveCount(2);
+  const recent = pop.getByTestId("search-recent");
+  await expect(recent).toContainText("/ green");
+  await recent.getByRole("button", { name: "/ green", exact: true }).click();
+  await expect(box).toHaveValue("green");
+  await expect(cards(p)).toHaveCount(1);
+  await box.fill("zzz-nothing");
+  await box.press("Enter"); // found nothing: not remembered
+  await box.fill("");
+  await expect(recent).not.toContainText("zzz-nothing");
+  await recent.getByRole("button", { name: "Clear recent" }).click();
+  await expect(recent).toBeHidden();
+  await pop.getByRole("tab", { name: "All" }).click();
   await searchFor("", 2);
 
   // A smart folder saves a search (ADR 0035): it counts its matches, applies them when clicked, and can be renamed.
@@ -384,5 +415,21 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await side(p, /^Unfiled/).click();
   await expect(p.locator(".side-body")).toBeHidden();
   await expect(strip).toContainText("Library: Unfiled");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the workspace menu's ⋯ menu opens right beside its button, even though the menu is a blurred panel (ADR 0068)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("workspace-nav").click();
+  const btn = p.getByRole("button", { name: /^More actions for canvas / }).first();
+  await btn.click();
+  const menu = p.getByRole("menu", { name: /^Actions for canvas / });
+  await expect(menu).toBeVisible();
+  const b = (await btn.boundingBox())!;
+  const m = (await menu.boundingBox())!;
+  expect(Math.abs(m.y - (b.y + b.height))).toBeLessThan(12); // just under the button
+  expect(Math.abs(m.x + m.width - (b.x + b.width))).toBeLessThan(12); // right edges line up
+  await p.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });

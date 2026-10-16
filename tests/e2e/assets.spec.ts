@@ -1454,7 +1454,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(box).toBeVisible();
   // Searches that found something and were used are remembered, and can be reused, removed or cleared.
   await box.fill("");
-  const recent = p.getByTestId("search-recent");
+  const recent = results.getByTestId("search-recent");
   await expect(recent).toContainText(".png");
   await recent.getByRole("button", { name: ".png", exact: true }).click();
   await expect(box).toHaveValue(".png");

@@ -2,6 +2,9 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- The library search matches the canvas search: help, clear button, All/Name/Tag ways, recent searches; smart folders save the way (ADR 0071).
+- Fix: the workspace menu's ⋯ menu opened far from its button (a blurred panel changed where fixed positions start).
+
 - The canvas search stays open until Escape or a press outside, keeps its text and way until you clear it, has checkboxes (the checked results are the selection) and remembers recent searches that found something, with remove and clear (ADR 0071).
 
 - In-canvas tags can be renamed or deleted on every canvas, from a Layers tag chip or the Assets sidebar's Canvas tags (ADR 0070).

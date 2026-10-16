@@ -154,6 +154,8 @@ export async function showTechnicalReadout(page: Page): Promise<void> {
 /** Open the actions (the "More" button) of a board or canvas in the workspace menu, opening the menu first if it is closed. */
 export async function openActions(page: Page, kind: "board" | "canvas", name: string): Promise<void> {
   if (await page.getByTestId("workspace-menu").isHidden()) await page.getByTestId("workspace-nav").click();
+  const open = page.getByRole("menu", { name: /^Actions for / });
+  if (await open.isVisible()) await page.keyboard.press("Escape"); // a row's menu sits over the next row's button: close it first, as a person would
   const more = page.getByRole("button", { name: `More actions for ${kind} ${name}` }).last(); // the newest board when names repeat, as the plain buttons were
   if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
 }

@@ -1,5 +1,7 @@
 import type { Session, AssetPlace } from "../app/session";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
+import { ASSETS_RECENT, rememberSearch } from "../search/history";
+import { paintRecent, wireRecent } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -78,8 +80,19 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
-      <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
-      ${searchHelpButton()}
+      <div class="assets-searchbox">
+              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search name, type or tag" title="Search by name, type or tag; #tag matches a tag exactly" aria-label="Search assets">
+        <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
+        ${searchHelpButton()}
+        <div class="assets-search-pop" data-testid="assets-search-pop">
+          <div class="cs-modes" role="tablist" aria-label="Search by">
+            <button type="button" role="tab" data-m="all">All</button>
+            <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
+            <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
+          </div>
+          <div class="cs-recent" data-testid="search-recent" hidden></div>
+        </div>
+      </div>
       <span class="assets-count" data-testid="assets-count"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
@@ -829,15 +842,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const usesText = (instances: number, canvases: number): string =>
     instances === 0 ? "Unused" : `Used ${instances} time${instances === 1 ? "" : "s"} on ${canvases} canvas${canvases === 1 ? "" : "es"}`;
 
+  type Way = "all" | "name" | "tag";
+  let way: Way = "all";
   const searchWords = (q: string): Query | null => parseQuery(q).query;
-  /** The search (name, type, hash start, tags; `#tag` is exact; AND, OR, XOR, NOT as in ADR 0069) and the usage filter: what a smart folder saves. */
-  const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter): boolean => {
+  /**
+   * The search (ADR 0069, 0071): a word matches the name, type, start of the hash or a tag (All), only the name (Name) or only the tags (Tag);
+   * `#tag` is an exact tag in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter: what a smart folder saves.
+   */
+  const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter, how: Way = way): boolean => {
     const tags = meta(e).tags.map((t) => t.toLowerCase());
-    const words_ok = evalQuery(query, ({ text: w }) =>
-      w.startsWith("#")
-        ? tags.includes(w.slice(1))
-        : e.name.toLowerCase().includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || tags.some((t) => t.includes(w)),
-    );
+    const name = e.name.toLowerCase();
+    const words_ok = evalQuery(query, ({ text: w }) => {
+      if (w.startsWith("#")) return tags.includes(w.slice(1));
+      const inTags = tags.some((t) => t.includes(w));
+      if (how === "tag") return inTags;
+      if (how === "name") return name.includes(w);
+      return name.includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || inTags;
+    });
     return words_ok && (usage === "all" || (usage === "used" ? e.instances > 0 : e.instances === 0));
   };
   const filtered = (): CatalogListing["entries"] => {
@@ -870,6 +891,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- rendering
   let lastGridHtml = "";
   const render = (): void => {
+    root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value; // set by a smart folder too
     if (!listing) return;
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
@@ -1043,7 +1065,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               .map((sf) =>
                 naming?.kind === "rename-smart" && naming.id === sf.id
                   ? nameInput(sf.name, `New name for smart folder ${sf.name}`)
-                  : item(`smart:${sf.id}`, esc(sf.name), entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage)).length, {
+                  : item(`smart:${sf.id}`, esc(sf.name), entries.filter((e) => matchesQuery(e, searchWords(sf.search), sf.usage, sf.way ?? "all")).length, {
                       icon: ICONS.sparkles,
                       extra: more("smart", sf.id, sf.name, [
                         { attr: 'data-smart-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename smart folder ${sf.name}` },
@@ -1772,6 +1794,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       sideMenu = null;
       const sf = scope.startsWith("smart:") ? listing?.smart.find((x) => `smart:${x.id}` === scope) : undefined;
       if (sf) {
+        setWay(sf.way ?? "all");
         search.value = sf.search;
         usageSel.value = sf.usage;
       }
@@ -1857,7 +1880,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const id = newObjectId();
         const q = search.value;
         const u = usageSel.value as UsageFilter;
-        void session.organize((c) => c.saveSmart(id, name, q, u)).then((ok) => {
+        const w = way === "all" ? undefined : way;
+        void session.organize((c) => c.saveSmart(id, name, q, u, w)).then((ok) => {
           if (ok) scope = `smart:${id}`;
           else renderSide();
         });
@@ -2049,6 +2073,73 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     showSort();
     render();
   });
+  // The search box, the same as the canvas search (ADR 0071): ways (All, Name, Tag), a clear button, recent searches that found something.
+  const pop = root.querySelector<HTMLElement>(".assets-search-pop")!;
+  const clearBtn = root.querySelector<HTMLButtonElement>(".assets-searchbox .cs-clear")!;
+  const recentBox = pop.querySelector<HTMLElement>(".cs-recent")!;
+  const PLACE: Record<Way, string> = { all: "Search name, type or tag", name: "Search by name", tag: "Search by tag" };
+  const setWay = (w: Way): void => {
+    way = w;
+    search.placeholder = PLACE[w];
+    for (const t of pop.querySelectorAll<HTMLElement>("[data-m]")) t.setAttribute("aria-selected", String(t.dataset["m"] === w));
+  };
+  const paintSearchUi = (): void => {
+    clearBtn.hidden = !search.value;
+    paintRecent(recentBox, ASSETS_RECENT, !search.value.trim());
+  };
+  /** A search that found something and was used (Enter, or a card chosen) goes to the recent list. */
+  const rememberNow = (): void => {
+    if (search.value.trim() && filtered().length) rememberSearch(ASSETS_RECENT, search.value, way);
+  };
+  const searchChanged = (): void => {
+    if (scope.startsWith("smart:")) scope = "all"; // the query is no longer the saved one
+    paintSearchUi();
+    render();
+  };
+  setWay("all");
+  search.addEventListener("input", () => {
+    // A first "/" chooses Name and is not part of the search; a "#" stays (it is a search word).
+    if (search.value[0] === "/") {
+      setWay("name");
+      search.value = search.value.slice(1);
+    }
+    paintSearchUi();
+  });
+  search.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") rememberNow();
+    else if (e.key === "Backspace" && !search.value && way !== "all") {
+      setWay("all"); // nothing left to delete: back to searching everything
+      searchChanged();
+    }
+  });
+  pop.querySelector(".cs-modes")!.addEventListener("click", (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
+    if (!t) return;
+    setWay(t.dataset["m"] as Way);
+    searchChanged();
+    search.focus();
+  });
+  clearBtn.addEventListener("click", () => {
+    search.value = "";
+    searchChanged();
+    search.focus();
+  });
+  search.addEventListener("focus", paintSearchUi);
+  wireRecent(
+    recentBox,
+    ASSETS_RECENT,
+    (r) => {
+      setWay(r.m === "name" || r.m === "tag" ? r.m : "all");
+      search.value = r.q;
+      searchChanged();
+      search.focus();
+    },
+    () => {
+      paintSearchUi();
+      search.focus();
+    },
+  );
+  grid.addEventListener("click", rememberNow);
   for (const el of [search, usageSel, sortSel]) {
     el.addEventListener("input", () => {
       if (el !== sortSel && scope.startsWith("smart:")) scope = "all"; // the query is no longer the saved one

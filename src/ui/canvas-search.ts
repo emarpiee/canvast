@@ -1,4 +1,6 @@
 import type { EditorState } from "../app/editor-state";
+import { CANVAS_RECENT, rememberSearch } from "../search/history";
+import { paintRecent, wireRecent } from "./search-recent";
 import { searchHelpButton, wireSearchHelp } from "./search-help";
 import { evalQuery, parseQuery } from "../search/query";
 import type { BookmarkList } from "../app/bookmarks";
@@ -95,14 +97,16 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
           const hay = `${lab.text} ${groupName} ${noteOf(o)}`.toLowerCase();
           const tagHit = (w: string): boolean => own.some((x) => x.toLowerCase().includes(w));
-          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? tagHit(term.text.slice(1)) : hay.includes(term.text) || tagHit(term.text)))) continue;
+          const exact = (w: string): boolean => own.some((x) => x.toLowerCase() === w);
+          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? exact(term.text.slice(1)) : hay.includes(term.text) || tagHit(term.text)))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: own.length ? own.map((x) => `#${x}`).join(" ") : noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else if (mode === "tag") {
           // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
           const t = [...(o.tags ?? []), ...(o.kind === "image" ? (tags.get(o.assetId) ?? []) : [])];
           const all = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
           // A term matches when some tag contains it; NOT and XOR then apply to the item's whole tag list.
-          if (!all.length || !evalQuery(q, (term) => all.some((x) => x.toLowerCase().includes(term.text.replace(/^#/, ""))))) continue;
+          // A `#word` is an exact tag; a plain word is part of a tag (the same as in the library).
+          if (!all.length || !evalQuery(q, (term) => all.some((x) => (term.text.startsWith("#") ? x.toLowerCase() === term.text.slice(1) : x.toLowerCase().includes(term.text))))) continue;
           const hit = all;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: hit.map((x) => `#${x}`).join(" "), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else {
@@ -133,50 +137,18 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   const allBox = bar.querySelector<HTMLInputElement>("[data-all]")!;
   const count = bar.querySelector<HTMLElement>(".cs-count")!;
 
-  // Recent successful searches (ADR 0071): kept on this device, only those that found something and were used.
-  const HISTORY_KEY = "canvast.search.recent";
-  const MAX_HISTORY = 12;
-  const PREFIX: Record<Mode, string> = { all: "", name: "/ ", tag: "# ", bookmark: "@ " };
-  type Recent = { q: string; m: Mode };
-  const loadHistory = (): Recent[] => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]") as unknown;
-      return Array.isArray(raw) ? (raw as Recent[]).filter((r) => r && typeof r.q === "string" && ["all", "name", "tag", "bookmark"].includes(r.m)).slice(0, MAX_HISTORY) : [];
-    } catch {
-      return [];
-    }
-  };
-  const saveHistory = (h: Recent[]): void => {
-    try {
-      if (h.length) localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
-      else localStorage.removeItem(HISTORY_KEY);
-    } catch {
-      // storage unavailable: history is a convenience
-    }
-  };
-  /** Remember the current search; called when the person acts on a result, never for an empty or fruitless search. */
   const remember = (): void => {
-    const q = input.value.trim();
-    if (!q || !results.length) return;
-    saveHistory([{ q, m: mode }, ...loadHistory().filter((r) => !(r.q === q && r.m === mode))].slice(0, MAX_HISTORY));
+    if (results.length) rememberSearch(CANVAS_RECENT, input.value, mode);
   };
 
   const idsOf = (r: Result): string[] => r.ids ?? [];
   const isChecked = (r: Result): boolean => idsOf(r).length > 0 && idsOf(r).every((id) => deps.editor.selection.has(id));
 
-  const paintRecent = (): void => {
-    const h = input.value.trim() ? [] : loadHistory();
-    recentBox.hidden = !h.length;
-    recentBox.innerHTML = h.length
-      ? `<span class="cs-recent-title">Recent</span>${h
-          .map((r, i) => `<span class="cs-chip"><button type="button" data-recent="${i}" title="Search again">${esc(PREFIX[r.m] + r.q)}</button><button type="button" data-forget="${i}" aria-label="Remove ${esc(r.q)} from recent searches" title="Remove">×</button></span>`)
-          .join("")}<button type="button" class="cs-clear-all" data-forget-all>Clear recent</button>`
-      : "";
-  };
+  const paintRecentBox = (): void => paintRecent(recentBox, CANVAS_RECENT, !input.value.trim());
 
   const paint = (): void => {
     clearBtn.hidden = !input.value;
-    paintRecent();
+    paintRecentBox();
     const pickable = results.filter((r) => idsOf(r).length);
     bar.hidden = !pickable.length;
     allBox.checked = pickable.length > 0 && pickable.every(isChecked);
@@ -297,29 +269,21 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     compute();
     input.focus();
   });
-  recentBox.addEventListener("click", (e) => {
-    const t = e.target as HTMLElement;
-    const h = loadHistory();
-    const pick = t.closest<HTMLElement>("[data-recent]");
-    const forget = t.closest<HTMLElement>("[data-forget]");
-    if (pick) {
-      const r = h[Number(pick.dataset["recent"])];
-      if (!r) return;
+  wireRecent(
+    recentBox,
+    CANVAS_RECENT,
+    (r) => {
       setMode(r.m);
       input.value = r.q;
       active = 0;
       compute();
       input.focus();
-    } else if (forget) {
-      saveHistory(h.filter((_, i) => i !== Number(forget.dataset["forget"])));
-      paintRecent();
+    },
+    () => {
+      paintRecentBox();
       input.focus();
-    } else if (t.closest("[data-forget-all]")) {
-      saveHistory([]);
-      paintRecent();
-      input.focus();
-    }
-  });
+    },
+  );
   document.addEventListener("pointerdown", (e) => {
     if (!root.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest(".search-help")) close();
   });

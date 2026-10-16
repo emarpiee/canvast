@@ -42,8 +42,12 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w));
   let top = r.bottom + 4;
   if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 4 - h);
-  menu.style.left = `${Math.round(left)}px`;
-  menu.style.top = `${Math.round(top)}px`;
+  // A menu inside a blurred or transformed panel is placed against that panel, not the window: measure where (0, 0) really is and correct for it.
+  menu.style.left = "0px";
+  menu.style.top = "0px";
+  const origin = menu.getBoundingClientRect();
+  menu.style.left = `${Math.round(left - origin.left)}px`;
+  menu.style.top = `${Math.round(top - origin.top)}px`;
 }
 
 /** Open the menu of `items` under `anchor` (the ⋯ button); a second press on the button closes it. */
