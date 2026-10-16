@@ -1,6 +1,7 @@
 import type { ViewState } from "../app/view-state";
 import { zoomByStep } from "../interaction/navigation";
 import type { DocumentStore } from "../doc/document-store";
+import type { Notice } from "./notices";
 
 /**
  * Developer navigation panel (shown only with #debug): fixed-size zoom jumps
@@ -15,8 +16,22 @@ const label = (j: number): string => {
 };
 const SPEEDS = [1, 10, 100, 1000] as const;
 
-/** `onCleared`: called after the canvas was cleared (to drop the selection). */
-export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentStore, onCleared: () => void): void {
+/** Sample notices, one set per kind, for trying how each looks and behaves (the Notice button). */
+const SAMPLES: ReadonlyArray<Notice> = [
+  { kind: "info", text: "Zoom 3,000 levels in. The view is saved with the canvas." },
+  { kind: "info", text: "Bookmark updated to this view." },
+  { kind: "success", text: "Imported 12 files." },
+  { kind: "success", text: "Exported “Board 1” (4.2 MB)." },
+  { kind: "warning", text: "Read-only: another tab is editing this workspace." },
+  { kind: "warning", text: "Select at least 3 items to distribute." },
+  { kind: "error", text: "Could not save: the browser refused to write (storage full?)." },
+  { kind: "error", text: "Import failed: “scene.png” is not a picture the browser can read." },
+];
+
+/**
+ * `onCleared`: called after the canvas was cleared (to drop the selection). `notify`: show a notice (for the Notice buttons).
+ */
+export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentStore, onCleared: () => void, notify: (n: Notice) => void): void {
   const panel = document.createElement("div");
   panel.className = "hud-dev";
   panel.dataset["testid"] = "dev-panel";
@@ -31,6 +46,10 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
         ${SPEEDS.map((v) => `<option value="${v}"${v === 10 ? " selected" : ""}>${v} lv/s</option>`).join("")}
       </select>
       <button type="button" data-clear aria-label="Clear canvas" title="Clear canvas: delete every object on this canvas (Ctrl+Z brings them back)">Clear</button>
+    </div>
+    <div class="dev-row dev-notices" role="group" aria-label="Notices">
+      <button type="button" data-notice="one" title="Show one random notice (info, success, warning, error or progress)">Notice</button>
+      <button type="button" data-notice="many" title="Show four at once, to see the stack">Notices ×4</button>
     </div>`;
   root.appendChild(panel);
   const select = panel.querySelector("select")!;
@@ -58,7 +77,14 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
   panel.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
-    if (b.dataset["clear"] !== undefined) {
+    if (b.dataset["notice"]) {
+      const pick = (): Notice => {
+        // One in six is a progress notice, at a random point, so the bar and the spinner are seen too.
+        if (Math.random() < 1 / 6) return { kind: "progress", text: "Importing 7 of 12 files", progress: Math.random(), channel: "dev" };
+        return SAMPLES[Math.floor(Math.random() * SAMPLES.length)]!;
+      };
+      for (let n = b.dataset["notice"] === "many" ? 4 : 1; n > 0; n--) notify(pick());
+    } else if (b.dataset["clear"] !== undefined) {
       // One undoable transaction, saved like any edit.
       const ids = [...doc.all()].map((o) => o.id);
       if (ids.length) doc.commit(doc.transaction("Clear canvas", [], ids));

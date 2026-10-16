@@ -1192,7 +1192,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   await app.frame();
   const thumb0 = await rows.nth(0).locator("img.bookmark-thumb").getAttribute("src");
   await p.keyboard.press("p");
-  await app.drag({ x: 300, y: 300 }, { x: 520, y: 360 }, 5);
+  await app.drag({ x: 480, y: 300 }, { x: 640, y: 360 }, 5);
   await p.keyboard.press("h");
   for (let i = 0; i < 2; i++) await p.keyboard.press("ArrowLeft");
   await app.frame();

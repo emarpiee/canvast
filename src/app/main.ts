@@ -533,7 +533,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
   });
   applyZen(); // the button beside Home exists now
-  if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor));
+  if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   mountNavigator(document.getElementById("workspace")!, session);
 
   // The selection action bar follows the selection box (updated after each drawn frame).

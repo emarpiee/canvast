@@ -110,3 +110,15 @@ test("dev panel: Clear canvas deletes every object, is saved, and Ctrl+Z brings 
   await p.evaluate(() => window.__canvastDebug.nextFrame());
   expect(await p.evaluate(() => window.__canvastDebug.objects())).toEqual([]);
 });
+
+test("dev panel: the Notice buttons show sample notices of every kind (to try how they look)", async ({ app }) => {
+  const panel = app.page.getByTestId("dev-panel");
+  const shown = app.page.locator("#notices .notice");
+  await panel.getByRole("button", { name: "Notices ×4" }).click();
+  await expect(app.page.getByTestId("toast")).toBeVisible();
+  expect(await shown.count()).toBeGreaterThan(0);
+  expect(await shown.count()).toBeLessThanOrEqual(3); // the stack keeps the newest three
+  await panel.getByRole("button", { name: "Notice", exact: true }).click();
+  await expect(shown.first()).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});

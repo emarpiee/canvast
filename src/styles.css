@@ -1838,3 +1838,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 
 /* The bottom-right controls in three groups: what is shown, zoom, and where to go. */
 .hud-controls .hud-sep { align-self: stretch; flex: none; width: 1px; margin: var(--sp-2) var(--sp-1); background: var(--hud-border); }
+
+/* The notice buttons sit beside the developer panel, not under it: the panel keeps its size (the tool rail and the canvas around it stay clear). */
+.hud-dev .dev-notices { position: absolute; left: 100%; top: 0; margin-left: var(--sp-2); flex-direction: column; flex-wrap: nowrap; padding: var(--sp-3); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }

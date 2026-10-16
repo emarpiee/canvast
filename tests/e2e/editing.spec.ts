@@ -669,7 +669,7 @@ test("Alt held as a drag starts carries a copy; the original stays; Alt tapped a
 
 test("Alt tapped again fits everything visible; a third tap returns to the selection; the fit buttons do the same (ADR 0063)", async ({ app }) => {
   const p = app.page;
-  const a = await penStroke(app, [[300, 300], [380, 330]]);
+  const a = await penStroke(app, [[480, 300], [560, 330]]); // clear of the developer panel
   const b = await penStroke(app, [[900, 500], [980, 530]]);
   await key(app, "v");
   const cam = async () => JSON.stringify(await p.evaluate(() => window.__canvastDebug.camera()));
