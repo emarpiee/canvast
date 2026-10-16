@@ -22,3 +22,10 @@
 ## Not built
 
 Drag to marquee-select, dragging assets onto the canvas, shuffle, per-slide durations, and a slideshow transition.
+
+## Amendment: click, keys, columns, zoom
+
+- A plain click picks a card and shows its details (restored to hidden if it was the first click of a double-click). The viewer opens by double-click or from the details picture.
+- Window-level keys while the library is open and the viewer is closed: arrows, Home, End, Ctrl+A, Esc. A `cursor` remembers where the arrows went so a quick second key does not wait for the pick to land.
+- List columns are data (`COLUMNS`), order and visibility kept in `canvast.assets.ui`.
+- Viewer zoom is a CSS transform over the contained picture (wheel at the pointer, drag, double-click Fit/100%).

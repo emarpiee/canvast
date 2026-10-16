@@ -84,6 +84,27 @@ test("shortcuts: tool keys can be changed and are refused when taken; the list o
   await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
   await p.keyboard.press("5");
   await expect(panel.locator("[data-key-note]")).toContainText("one plain letter");
+  // Waiting for a letter never gets stuck: a click elsewhere, another tab or closing ends it, and the letter works wherever the focus is.
+  const waiting = panel.getByText("press a letter");
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await expect(waiting).toBeVisible();
+  await panel.getByRole("tab").nth(1).click();
+  await expect(waiting).toHaveCount(0);
+  await panel.getByRole("tab", { name: "Shortcuts" }).click();
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await p.mouse.click(5, 5); // the focus leaves the panel
+  await expect(waiting).toHaveCount(0);
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await p.keyboard.press("Escape");
+  await expect(waiting).toHaveCount(0);
+  await expect(panel).toBeVisible(); // Escape ended the waiting, it did not close the view
+  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await p.keyboard.press("?");
+  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await panel.getByRole("button", { name: "Back to canvas" }).click();
+  await p.keyboard.press("?");
+  await expect(waiting).toHaveCount(0);
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (K)");
   await p.keyboard.press("v");

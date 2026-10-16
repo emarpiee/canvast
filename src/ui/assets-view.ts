@@ -36,6 +36,22 @@ export interface AssetsView {
   importFiles(files: File[]): Promise<void>;
 }
 
+/** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
+const COLUMNS = [
+  { id: "name", label: "Name", width: "minmax(140px, 2fr)" },
+  { id: "pixels", label: "Pixels", width: "110px" },
+  { id: "kind", label: "Type and size", width: "130px" },
+  { id: "used", label: "Used", width: "minmax(120px, 1.2fr)" },
+  { id: "tags", label: "Tags", width: "minmax(80px, 1fr)" },
+  { id: "added", label: "Added", width: "130px" },
+] as const;
+type ColumnId = (typeof COLUMNS)[number]["id"];
+const DEFAULT_COLUMN_ORDER: readonly ColumnId[] = COLUMNS.map((c) => c.id);
+const DEFAULT_HIDDEN: readonly ColumnId[] = ["added"];
+
+/** The default preview of a file that is not media: a plain sheet with a folded corner. */
+const FILE_PICTURE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150"><path d="M20 8h56l32 32v100a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8z" fill="#cfd8d6"/><path d="M76 8v24a8 8 0 0 0 8 8h24z" fill="#9fb0ad"/><rect x="28" y="70" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="88" width="64" height="6" rx="3" fill="#9fb0ad"/><rect x="28" y="106" width="40" height="6" rx="3" fill="#9fb0ad"/></svg>`;
+
 type UsageFilter = "all" | "used" | "unused";
 type SortKey = "newest" | "name" | "size" | "uses";
 
@@ -55,6 +71,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="newest">Newest first</option><option value="name">Name A–Z</option><option value="size">Largest first</option><option value="uses">Most used</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
+      <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
       <div class="assets-layout" role="group" aria-label="Layout">
         <button type="button" class="assets-btn is-icon" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
         <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.list}</button>
@@ -65,13 +82,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" accept="image/*,video/*,audio/*" multiple hidden data-testid="assets-import-input">
     </div>
+    <div class="assets-columns" role="dialog" aria-label="List columns" data-testid="columns-panel" hidden></div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span><span>Name</span><span>Pixels</span><span>Type and size</span><span>Used</span><span>Tags</span></div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head" aria-hidden="true"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}">${c.label}</span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
-          <div class="viewer-stage"><span class="viewer-progress" hidden></span><figure><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
+          <div class="viewer-stage"><span class="viewer-progress" hidden></span>
+            <div class="viewer-zoom" role="group" aria-label="Zoom">
+              <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (-)">${ICONS.minus}</button>
+              <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
+              <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
+            </div>
+            <figure><img alt="" draggable="false"><video controls hidden></video><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -133,12 +157,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list" } = { details: true, bar: true, layout: "grid" };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[] } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN] };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
     if (typeof saved.bar === "boolean") ui.bar = saved.bar;
     if (saved.layout === "grid" || saved.layout === "list") ui.layout = saved.layout;
+    const known = new Set<string>(DEFAULT_COLUMN_ORDER);
+    if (Array.isArray(saved.order)) {
+      const order = saved.order.filter((c, i, a) => known.has(c) && a.indexOf(c) === i);
+      ui.order = [...order, ...DEFAULT_COLUMN_ORDER.filter((c) => !order.includes(c))];
+    }
+    if (Array.isArray(saved.hidden)) ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
   } catch {
     // unreadable: shown
   }
@@ -149,19 +179,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // blocked: kept for this session
     }
   };
+  /** With the viewer open and its controls hidden the page is only the picture: the view tabs at the top fade away too (they come back near the top edge). */
+  const syncImmersive = (): void => {
+    document.body.toggleAttribute("data-immersive", visible && !viewer.hidden && !ui.bar);
+  };
   const applyUi = (): void => {
     body.classList.toggle("no-details", !ui.details);
     viewer.classList.toggle("no-bar", !ui.bar);
     root.classList.toggle("no-controls", !ui.bar);
+    syncImmersive();
     body.classList.toggle("is-list", ui.layout === "list");
     root.classList.toggle("is-list", ui.layout === "list");
     for (const b of root.querySelectorAll<HTMLElement>("[data-layout]")) b.setAttribute("aria-pressed", String(b.dataset["layout"] === ui.layout));
+    // The list's columns: their order (CSS `order`), which are shown, and the grid they sit on.
+    const shown = ui.order.filter((c) => !ui.hidden.includes(c));
+    ui.order.forEach((c, i) => body.style.setProperty(`--o-${c}`, String(i + 1)));
+    for (const c of DEFAULT_COLUMN_ORDER) body.classList.toggle(`hide-${c}`, ui.hidden.includes(c));
+    body.style.setProperty("--cols", ["56px", ...shown.map((c) => COLUMNS.find((x) => x.id === c)!.width)].join(" "));
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
   };
-  applyUi();
-
   let visible = false;
+  applyUi();
   let listing: CatalogListing | null = null;
   /** The asset the details describe (the last one picked), and every asset picked: a click picks one, Ctrl or Cmd adds or removes, Shift takes a range, a checkbox adds or removes. */
   let selected: string | null = null;
@@ -274,15 +313,145 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const i = list.findIndex((e) => e.hash === slideHash);
     pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
   };
+  // ---- zoom: the wheel (or a pinch) zooms at the pointer, a drag pans, a double-click toggles Fit and 100%, + - 0 1 work from the keyboard
+  const stage = viewer.querySelector<HTMLElement>(".viewer-stage")!;
+  const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;
+  const zoom = { s: 1, x: 0, y: 0 };
+  const shownMedia = (): HTMLElement | null => (!slideMedia.hidden && slideMedia.videoWidth ? slideMedia : !slideImg.hidden ? slideImg : null);
+  /** The picture's own size and how big "fit" draws it (CSS px). */
+  const sizes = (): { nw: number; nh: number; fw: number } | null => {
+    const el = shownMedia();
+    if (!el) return null;
+    const nw = el instanceof HTMLVideoElement ? el.videoWidth : (el as HTMLImageElement).naturalWidth;
+    const nh = el instanceof HTMLVideoElement ? el.videoHeight : (el as HTMLImageElement).naturalHeight;
+    if (!nw || !nh) return null;
+    const box = el.getBoundingClientRect();
+    const boxW = el.offsetWidth || box.width / zoom.s;
+    const boxH = el.offsetHeight || box.height / zoom.s;
+    return { nw, nh, fw: Math.min(boxW, (boxH * nw) / nh) };
+  };
+  const paintZoom = (): void => {
+    const el = shownMedia();
+    const z = sizes();
+    for (const m of [slideImg, slideMedia]) m.style.transform = m === el && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
+    zoomPct.textContent = z ? (zoom.s === 1 ? "Fit" : `${Math.round(((zoom.s * z.fw) / z.nw) * 100)}%`) : "Fit";
+    viewer.classList.toggle("is-zoomed", zoom.s !== 1);
+  };
+  const resetZoom = (): void => {
+    zoom.s = 1;
+    zoom.x = zoom.y = 0;
+    paintZoom();
+  };
+  /** Keep part of the picture on the stage whatever the zoom. */
+  const clampPan = (): void => {
+    const z = sizes();
+    if (!z) return;
+    const sr = stage.getBoundingClientRect();
+    const w = z.fw * zoom.s;
+    const h = ((z.fw * z.nh) / z.nw) * zoom.s;
+    const mx = Math.max(0, (w + sr.width) / 2 - 48);
+    const my = Math.max(0, (h + sr.height) / 2 - 48);
+    zoom.x = Math.max(-mx, Math.min(mx, zoom.x));
+    zoom.y = Math.max(-my, Math.min(my, zoom.y));
+  };
+  /** Set the zoom, keeping the point (px, py) of the page where it is on the screen. */
+  const zoomAt = (next: number, px: number, py: number): void => {
+    const z = sizes();
+    if (!z) return;
+    const lo = Math.min(1, z.nw / z.fw);
+    const hi = Math.max(8 * (z.nw / z.fw), 4);
+    next = Math.max(lo, Math.min(hi, next));
+    const sr = stage.getBoundingClientRect();
+    const cx = px - (sr.left + sr.width / 2);
+    const cy = py - (sr.top + sr.height / 2);
+    const k = next / zoom.s;
+    zoom.x = cx - (cx - zoom.x) * k;
+    zoom.y = cy - (cy - zoom.y) * k;
+    zoom.s = Math.abs(next - 1) < 0.02 ? 1 : next;
+    if (zoom.s === 1) zoom.x = zoom.y = 0;
+    clampPan();
+    paintZoom();
+  };
+  const centre = (): [number, number] => {
+    const r = stage.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  };
+  /** Fit, or the picture at its own size (100%) around a point. */
+  const toggleActual = (px?: number, py?: number): void => {
+    const z = sizes();
+    if (!z) return;
+    const [cx, cy] = px === undefined || py === undefined ? centre() : [px, py];
+    if (zoom.s === 1) zoomAt(z.nw / z.fw, cx, cy);
+    else resetZoom();
+  };
+  stage.addEventListener(
+    "wheel",
+    (e) => {
+      if (!shownMedia()) return;
+      e.preventDefault();
+      zoomAt(zoom.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), e.clientX, e.clientY);
+    },
+    { passive: false },
+  );
+  const pointers = new Map<number, { x: number; y: number }>();
+  let pinch = 0;
+  stage.addEventListener("pointerdown", (e) => {
+    if ((e.target as HTMLElement).closest("button, .viewer-zoom, video") && !(e.target as HTMLElement).closest("video[controls]:not(:hover)")) return;
+    if (!shownMedia()) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    stage.setPointerCapture(e.pointerId);
+    pinch = pointers.size === 2 ? Math.hypot(...[...pointers.values()].reduce((a, p, i) => (i ? [p.x - a[0]!, p.y - a[1]!] : [p.x, p.y]), [0, 0] as number[]) as [number, number]) : 0;
+  });
+  stage.addEventListener("pointermove", (e) => {
+    const prev = pointers.get(e.pointerId);
+    if (!prev) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()] as [{ x: number; y: number }, { x: number; y: number }];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch > 0) zoomAt(zoom.s * (d / pinch), (a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinch = d;
+    } else if (zoom.s !== 1) {
+      zoom.x += e.clientX - prev.x;
+      zoom.y += e.clientY - prev.y;
+      clampPan();
+      paintZoom();
+    }
+  });
+  const endPointer = (e: PointerEvent): void => {
+    pointers.delete(e.pointerId);
+    pinch = 0;
+  };
+  stage.addEventListener("pointerup", endPointer);
+  stage.addEventListener("pointercancel", endPointer);
+  stage.addEventListener("dblclick", (e) => {
+    if ((e.target as HTMLElement).closest("button, .viewer-zoom")) return;
+    toggleActual(e.clientX, e.clientY);
+  });
+  viewer.querySelector<HTMLElement>(".viewer-zoom")!.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-zoom]");
+    if (!b) return;
+    const [cx, cy] = centre();
+    if (b.dataset["zoom"] === "in") zoomAt(zoom.s * 1.25, cx, cy);
+    else if (b.dataset["zoom"] === "out") zoomAt(zoom.s / 1.25, cx, cy);
+    else toggleActual();
+  });
+  for (const m of [slideImg, slideMedia]) {
+    m.addEventListener("load", paintZoom);
+    m.addEventListener("loadedmetadata", paintZoom);
+  }
+
   const showSlide = async (hash: string): Promise<void> => {
     const e = listing?.entries.find((x) => x.hash === hash);
     if (!e) return;
     const token = ++slideToken;
     const opening = viewer.hidden;
+    resetZoom();
     slideHash = hash;
     body.classList.add("is-viewing");
     root.classList.add("is-viewing");
     viewer.hidden = false;
+    syncImmersive();
     viewer.focus();
     // The details beside the viewer describe the open asset (a picked set stays picked while a slideshow plays through it).
     selected = hash;
@@ -305,6 +474,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const label = `${e.name || "Untitled"}, ${e.pixelW} × ${e.pixelH} px, ${fmtBytes(e.size)}`;
     slideCaption.textContent = label;
     slideImg.className = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : "";
+    // A small original is not stretched across the page into a blur: it is shown up to three times its own size, centred.
+    slideImg.style.maxWidth = `${e.pixelW * 3}px`;
+    slideImg.style.maxHeight = `${e.pixelH * 3}px`;
     freeSlideUrl();
     slideMedia.pause();
     slideMedia.hidden = true;
@@ -317,6 +489,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
+    if (!/^(image|video|audio)\//.test(rec.type)) {
+      // Not media: the default preview, a plain file picture, and what it is.
+      slideImg.className = "is-file";
+      slideImg.removeAttribute("style");
+      slideImg.src = `data:image/svg+xml;utf8,${encodeURIComponent(FILE_PICTURE)}`;
+      slideCaption.textContent = `${label}. This kind of file has no preview.`;
+      armShow();
+      return;
+    }
     slideUrl = URL.createObjectURL(rec.blob);
     if (/^(video|audio)\//.test(rec.type)) {
       // A video or audio original plays here, with the browser's own controls (an audio file shows the picture of its waveform above them).
@@ -347,6 +528,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     viewer.hidden = true;
     body.classList.remove("is-viewing");
     root.classList.remove("is-viewing");
+    syncImmersive();
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
     slideMedia.pause();
@@ -407,7 +589,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideSet = only && only.size > 1 ? new Set(only) : null;
     void showSlide(hash).then(() => setShowing(true));
   };
+  /** The details panel was opened by a plain click on a card (so a double-click can undo it). */
+  let autoShown = false;
   const toggleDetails = (): void => {
+    autoShown = false;
     ui.details = !ui.details;
     saveUi();
     applyUi();
@@ -422,8 +607,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   viewer.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
-    // A click on the picture shows it at its own size and back (a small one is scaled up to fit otherwise).
-    if (t === slideImg || t === slideMedia) return void viewer.classList.toggle("is-actual");
     const film1 = t.closest<HTMLElement>(".film-item");
     if (film1) return void showSlide(film1.dataset["hash"]!);
     const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
@@ -447,7 +630,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === " " && !(e.target as HTMLElement).closest("button, video")) setShowing(!showing);
     else if (e.key === "i" || e.key === "I") toggleDetails();
     else if (e.key === "b" || e.key === "B") toggleBar();
-    else if (e.key === "f" || e.key === "F") viewer.classList.toggle("is-actual");
+    else if (e.key === "+" || e.key === "=") zoomAt(zoom.s * 1.25, ...centre());
+    else if (e.key === "-" || e.key === "_") zoomAt(zoom.s / 1.25, ...centre());
+    else if (e.key === "0") resetZoom();
+    else if (e.key === "1" || e.key === "f" || e.key === "F") toggleActual();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -537,6 +723,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
           <span class="asset-kind">${esc(kindOf(e.type))}, ${fmtBytes(e.size)}</span>
+          <span class="asset-added">${new Date(e.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `#${esc(t)}`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
         </span>
@@ -554,6 +741,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                 <span class="asset-name">Missing original</span>
                 <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
                 <span class="asset-kind"></span>
+                <span class="asset-added"></span>
                 <span class="asset-uses" data-testid="asset-uses">${usesText(m.instances, m.canvases)}</span>
                 <span class="asset-tags"></span>
               </span>
@@ -883,49 +1071,77 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hash = card.dataset["hash"]!;
     if (e.shiftKey) void select(hash, e.ctrlKey || e.metaKey ? "add-range" : "range");
     else if (e.ctrlKey || e.metaKey || selecting) void select(hash, "toggle");
-    else if (listing?.entries.some((x) => x.hash === hash)) {
-      // One click opens the viewer on it (with the filmstrip to move on).
-      slideSet = null;
-      void showSlide(hash);
-    } else void select(hash); // a missing original has no picture to show: its details open instead
+    else {
+      // A click picks it and shows its details; the viewer opens from a double-click or from the picture in the details.
+      if (!ui.details) {
+        ui.details = true;
+        autoShown = true;
+        saveUi();
+        applyUi();
+      } else if (e.detail <= 1) autoShown = false;
+      void select(hash);
+    }
   });
-  // Arrow keys move through the cards (Shift extends the pick, Ctrl moves without picking); Home and End jump; Enter or Space opens.
-  grid.addEventListener("keydown", (e) => {
-    const t = e.target as HTMLElement;
-    const cur = t.closest<HTMLElement>(".asset-cell");
-    if (!cur || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+  grid.addEventListener("dblclick", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (!card || e.shiftKey || e.ctrlKey || e.metaKey) return;
+    // The first click of this double-click showed the hidden details; opening the viewer puts them back as they were.
+    if (autoShown) {
+      autoShown = false;
+      ui.details = false;
+      saveUi();
+      applyUi();
+    }
+    // Any file: a missing original shows its thumbnail, a kind without a preview a plain file picture.
+    slideSet = null;
+    void showSlide(card.dataset["hash"]!);
+  });
+  /** Move the keyboard (and the pick) through the cards: left and right, up and down (rows in the list), Home and End. */
+  /** Where the arrow keys last went: the pick itself lands a moment later, and a quick second key must start from here. */
+  let cursor: string | null = null;
+  const moveBy = (e: KeyboardEvent): boolean => {
     const cells = [...grid.querySelectorAll<HTMLElement>(".asset-cell")];
-    const i = cells.indexOf(cur);
+    if (!cells.length) return false;
+    const active = document.activeElement as HTMLElement | null;
+    const focusedCell = active && grid.contains(active) ? active.closest<HTMLElement>(".asset-cell") : null;
+    const selectedCell = selected ? (grid.querySelector<HTMLElement>(`.asset-card[data-hash="${selected}"]`)?.closest<HTMLElement>(".asset-cell") ?? null) : null;
+    const cursorCell = cursor ? (grid.querySelector<HTMLElement>(`.asset-card[data-hash="${cursor}"]`)?.closest<HTMLElement>(".asset-cell") ?? null) : null;
+    const cur = focusedCell ?? cursorCell ?? selectedCell;
     const list = ui.layout === "list";
     let next: HTMLElement | undefined;
-    if (e.key === "Home") next = cells[0];
-    else if (e.key === "End") next = cells[cells.length - 1];
-    else if (e.key === "ArrowLeft" || (list && e.key === "ArrowUp")) next = cells[Math.max(0, i - 1)];
-    else if (e.key === "ArrowRight" || (list && e.key === "ArrowDown")) next = cells[Math.min(cells.length - 1, i + 1)];
+    if (!cur) next = e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "End" ? cells[cells.length - 1] : cells[0];
     else {
-      // Up and down in a justified gallery: the nearest card in the row above or below, by horizontal position.
-      const r = cur.getBoundingClientRect();
-      const cx = (r.left + r.right) / 2;
-      const down = e.key === "ArrowDown";
-      let best: { cell: HTMLElement; dy: number; dx: number } | null = null;
-      for (const c of cells) {
-        const b = c.getBoundingClientRect();
-        const dy = down ? b.top - r.bottom + 1 : r.top - b.bottom + 1;
-        if (dy < 0) continue;
-        const dx = Math.abs((b.left + b.right) / 2 - cx);
-        if (!best || dy < best.dy - 4 || (Math.abs(dy - best.dy) <= 4 && dx < best.dx)) best = { cell: c, dy, dx };
+      const i = cells.indexOf(cur);
+      if (e.key === "Home") next = cells[0];
+      else if (e.key === "End") next = cells[cells.length - 1];
+      else if (e.key === "ArrowLeft" || (list && e.key === "ArrowUp")) next = cells[Math.max(0, i - 1)];
+      else if (e.key === "ArrowRight" || (list && e.key === "ArrowDown")) next = cells[Math.min(cells.length - 1, i + 1)];
+      else {
+        // Up and down in a justified gallery: the nearest card in the row above or below, by horizontal position.
+        const r = cur.getBoundingClientRect();
+        const cx = (r.left + r.right) / 2;
+        const down = e.key === "ArrowDown";
+        let best: { cell: HTMLElement; dy: number; dx: number } | null = null;
+        for (const c of cells) {
+          const b = c.getBoundingClientRect();
+          const dy = down ? b.top - r.bottom + 1 : r.top - b.bottom + 1;
+          if (dy < 0) continue;
+          const dx = Math.abs((b.left + b.right) / 2 - cx);
+          if (!best || dy < best.dy - 4 || (Math.abs(dy - best.dy) <= 4 && dx < best.dx)) best = { cell: c, dy, dx };
+        }
+        next = best?.cell ?? cur;
       }
-      next = best?.cell;
     }
-    e.preventDefault();
-    if (!next) return;
+    if (!next) return false;
     const card = next.querySelector<HTMLElement>(".asset-card")!;
-    card.focus();
+    card.focus({ preventScroll: true });
     card.scrollIntoView({ block: "nearest" });
     const hash = card.dataset["hash"]!;
+    cursor = hash;
     if (e.shiftKey) void select(hash, "range");
     else if (!e.ctrlKey && !e.metaKey && !selecting) void select(hash);
-  });
+    return true;
+  };
 
   inspector.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
@@ -1136,28 +1352,111 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (e.key === "Escape" && (selected || picked.size)) {
       void select(null);
       e.stopPropagation();
-    } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A") && viewer.hidden && !(e.target as HTMLElement).closest(TYPING)) {
-      selectAll();
-      e.preventDefault();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {
       toggleDetails();
       e.preventDefault();
     }
   });
   root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails());
-  // Esc clears the selection wherever the keyboard is while the library is open (a click can leave focus on the page, not in the library).
+  // Keys that work anywhere in the library while it is open, whatever has the focus (a click can leave it on the page, not in the library):
+  // Esc clears the selection, Ctrl+A picks everything shown, the arrow keys, Home and End move through the items in either layout.
   window.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || !visible || !viewer.hidden || !(selected || picked.size)) return;
-    if ((e.target as HTMLElement | null)?.closest?.("dialog, " + TYPING)) return;
+    if (!visible || !viewer.hidden) return;
+    const target = e.target as HTMLElement | null;
     if (document.querySelector("dialog[open]")) return;
-    void select(null);
-    selecting = false;
+    // From the search box, Down steps into the items (the box keeps its other keys).
+    if (target?.closest?.('[data-testid="assets-search"]') && e.key === "ArrowDown" && !e.altKey) {
+      (target as HTMLElement).blur();
+      if (moveBy(e)) e.preventDefault();
+      return;
+    }
+    if (target?.closest?.("dialog, " + TYPING)) return;
+    if (e.altKey) return;
+    if (e.key === "Escape") {
+      if (!colPop.hidden) return void closeColumns();
+      cursor = null;
+      if (!(selected || picked.size)) return;
+      void select(null);
+      selecting = false;
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+      selectAll();
+      e.preventDefault();
+    } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
+      if (target?.closest?.("select, .assets-bar, .assets-side")) return; // arrows belong to a menu, the bar and the sidebar
+      if (moveBy(e)) e.preventDefault();
+    }
+  });
+  // ---- the list's columns: which are shown and in what order (remembered on this device)
+  const colPop = root.querySelector<HTMLElement>(".assets-columns")!;
+  const colBtn = root.querySelector<HTMLButtonElement>('[data-action="columns"]')!;
+  const renderColumns = (): void => {
+    const last = ui.order.length - 1;
+    colPop.innerHTML = `<h2>List columns</h2><p>Choose what each row shows and use the arrows to move a column. Name always shows.</p>
+      <ul>${ui.order
+        .map((id, i) => {
+          const c = COLUMNS.find((x) => x.id === id)!;
+          return `<li><label><input type="checkbox" data-col-show="${id}"${ui.hidden.includes(id) ? "" : " checked"}${id === "name" ? " disabled" : ""}><span>${c.label}</span></label>
+            <span class="cols-move"><button type="button" data-col-move="up" data-col="${id}" aria-label="Move ${c.label} earlier"${i === 0 ? " disabled" : ""}>${ICONS.chevronUp}</button><button type="button" data-col-move="down" data-col="${id}" aria-label="Move ${c.label} later"${i === last ? " disabled" : ""}>${ICONS.chevronDown}</button></span></li>`;
+        })
+        .join("")}</ul>
+      <button type="button" class="assets-btn" data-col-reset>Reset the columns</button>`;
+  };
+  const closeColumns = (): void => {
+    colPop.hidden = true;
+    colBtn.setAttribute("aria-expanded", "false");
+  };
+  const openColumns = (): void => {
+    renderColumns();
+    const r = colBtn.getBoundingClientRect();
+    colPop.style.top = `${Math.round(r.bottom + 6)}px`;
+    colPop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+    colPop.hidden = false;
+    colBtn.setAttribute("aria-expanded", "true");
+    colPop.querySelector<HTMLElement>("input:not(:disabled), button")?.focus();
+  };
+  colBtn.addEventListener("click", () => (colPop.hidden ? openColumns() : closeColumns()));
+  colPop.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+    if (!b) return;
+    if (b.hasAttribute("data-col-reset")) {
+      ui.order = [...DEFAULT_COLUMN_ORDER];
+      ui.hidden = [...DEFAULT_HIDDEN];
+    } else if (b.dataset["colMove"]) {
+      const id = b.dataset["col"] as ColumnId;
+      const i = ui.order.indexOf(id);
+      const j = b.dataset["colMove"] === "up" ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= ui.order.length) return;
+      [ui.order[i], ui.order[j]] = [ui.order[j]!, ui.order[i]!];
+    } else return;
+    saveUi();
+    applyUi();
+    renderColumns();
+    colPop.querySelector<HTMLElement>(`[data-col="${b.dataset["col"]}"][data-col-move="${b.dataset["colMove"]}"]:not(:disabled)`)?.focus();
+  });
+  colPop.addEventListener("change", (e) => {
+    const box = e.target as HTMLInputElement;
+    const id = box.dataset["colShow"] as ColumnId | undefined;
+    if (!id || id === "name") return;
+    ui.hidden = box.checked ? ui.hidden.filter((c) => c !== id) : [...ui.hidden, id];
+    saveUi();
+    applyUi();
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!colPop.hidden && !colPop.contains(e.target as Node) && !colBtn.contains(e.target as Node)) closeColumns();
+  });
+  colPop.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeColumns();
+      colBtn.focus();
+      e.stopPropagation();
+    }
   });
   for (const b of root.querySelectorAll<HTMLElement>(".assets-layout [data-layout]")) {
     b.addEventListener("click", () => {
       ui.layout = b.dataset["layout"] === "list" ? "list" : "grid";
       saveUi();
       applyUi();
+      closeColumns();
     });
   }
   // Slideshow from the library: the picked assets if several are picked, else everything shown, from the selected one (or the first).
@@ -1204,6 +1503,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       visible = true;
       root.hidden = false;
       status.textContent = "";
+      syncImmersive();
       void refresh();
       if (viewer.hidden) search.focus();
       else viewer.focus();
@@ -1214,6 +1514,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideMedia.pause();
       stopShow();
       root.hidden = true;
+      syncImmersive();
     },
     async importFiles(files) {
       if (session.editor.blockEdit()) return;

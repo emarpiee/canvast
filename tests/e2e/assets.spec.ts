@@ -380,7 +380,7 @@ test("a lost original is shown as missing and is restored everywhere by importin
   // The slide view shows the original full window, steps through the library and closes with Esc.
   await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: GREEN });
   await expect(card(p, GREEN_HASH)).toHaveCount(1);
-  await card(p, HASH).click();
+  await card(p, HASH).dblclick();
   const slide = p.getByTestId("slide-view");
   await expect(slide).toBeVisible();
   await expect.poll(() => slide.locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
@@ -407,7 +407,7 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await expect.poll(() => card(p, HASH).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card(p, HASH)).toContainText("Original missing");
   // Its slide view shows the thumbnail and says why.
-  await card(p, HASH).click();
+  await card(p, HASH).dblclick();
   await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The original is missing or damaged");
   await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await p.keyboard.press("Escape");
@@ -656,6 +656,7 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   // The slide view plays the original video (it is not "missing or damaged").
   await toAssets(p);
   await card(p, String((await objects(p))[0]!["assetId"])).click();
+  await p.getByTestId("asset-preview").click();
   const slide = p.getByTestId("slide-view");
   await expectSlow(slide.locator("video")).toBeVisible();
   await expectSlow(slide.locator("figcaption")).not.toContainText("missing");
@@ -870,7 +871,7 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
   // The cards carry the picture only until hovered or selected; a double-click opens the viewer beside the details.
-  await p.getByTestId("asset-card").nth(0).click();
+  await p.getByTestId("asset-card").nth(0).dblclick();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
@@ -893,7 +894,7 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await toAssets(p);
-  await p.getByTestId("asset-card").nth(0).click();
+  await p.getByTestId("asset-card").nth(0).dblclick();
   await expect(viewer).toBeVisible();
   await expect(p.getByTestId("asset-inspector")).toBeHidden();
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
@@ -914,10 +915,11 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(cards).toHaveCount(5);
   const picked = () => p.locator('[data-testid="asset-card"][aria-pressed="true"]');
   const viewer = p.getByTestId("slide-view");
-  // Ctrl adds and removes; Shift takes the range from the last pick. (A plain click opens the viewer.)
-  await cards.nth(0).click({ modifiers: ["Control"] });
+  // A click picks one and shows its details (it does not open the viewer); Ctrl adds and removes; Shift takes the range from the last pick.
+  await cards.nth(0).click();
   await expect(picked()).toHaveCount(1);
   await expect(viewer).toBeHidden();
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
   await cards.nth(2).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(2);
   await cards.nth(0).click({ modifiers: ["Control"] });
@@ -976,7 +978,7 @@ test("the viewer is still open when you come back from placing an asset (ADR 005
   await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "two.png", mimeType: "image/png", buffer: makePng(9, 6, () => [60, 200, 60, 255]) });
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
-  await p.getByTestId("asset-card").nth(0).click();
+  await p.getByTestId("asset-card").nth(0).dblclick();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   await p.keyboard.press("ArrowRight");
@@ -1086,5 +1088,172 @@ test("a drag that starts inside the app is never imported as a file; a file drop
   // From outside (no dragstart in the page) the same drop imports.
   await drop();
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("viewer with the controls hidden: the view tabs fade away and return near the top edge (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
+  await p.getByTestId("asset-card").first().dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  const nav = p.locator("#nav");
+  const opacity = () => nav.evaluate((e) => getComputedStyle(e).opacity);
+  expect(await opacity(), "shown while the controls are").toBe("1");
+  await p.keyboard.press("b");
+  await expect.poll(opacity).toBe("0");
+  await p.mouse.move(300, 24); // near the top edge: back
+  await expect.poll(opacity).toBe("1");
+  await p.mouse.move(640, 400);
+  await expect.poll(opacity).toBe("0");
+  // Closing the viewer brings them back for good.
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect.poll(opacity).toBe("1");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+/** Import a few small pictures into the library (the first view is the gallery). */
+async function libraryOf(p: Page, n: number): Promise<void> {
+  await toAssets(p);
+  for (let i = 0; i < n; i++) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: `item-${i}.png`, mimeType: "image/png", buffer: makePng(40 + i, 30, (x, y) => [(x * 5 + i * 40) % 256, (y * 6) % 256, 120 + i * 20, 255]) });
+  }
+  await expect(p.getByTestId("asset-card")).toHaveCount(n);
+}
+
+test("keyboard in the library, in either layout: arrows, Home and End move and pick; Ctrl+A picks everything; Shift extends (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await libraryOf(p, 5);
+  const cards = p.getByTestId("asset-card");
+  const picked = () => p.locator('[data-testid="asset-card"][aria-pressed="true"]');
+  const at = async () => (await picked().evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") ?? "").split(",")[0])))[0];
+  for (const layout of ["grid", "list"] as const) {
+    await p.locator(`[data-layout="${layout}"]`).click();
+    await expect(p.locator("#assets-view")).toHaveClass(layout === "list" ? /is-list/ : /^(?!.*is-list)/);
+    // With nothing picked the arrows start at the first item; focus need not be in the library.
+    await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await p.keyboard.press("Escape");
+    await expect(picked()).toHaveCount(0);
+    await p.keyboard.press("ArrowRight");
+    await expect(picked()).toHaveCount(1);
+    const first = await at();
+    await p.keyboard.press(layout === "list" ? "ArrowDown" : "ArrowRight");
+    await expect.poll(at, { message: "moved on" }).not.toBe(first);
+    await p.keyboard.press("End");
+    await expect.poll(at).toBe("item-0.png"); // newest first: the last card is the oldest
+    await p.keyboard.press("Home");
+    await expect.poll(at).toBe("item-4.png");
+    // Shift extends from where it is; Ctrl+A picks all.
+    await p.keyboard.press("Shift+End");
+    await expect(picked()).toHaveCount(5);
+    await p.keyboard.press("Escape");
+    await expect(picked()).toHaveCount(0);
+    await p.keyboard.press("Control+a");
+    await expect(picked()).toHaveCount(5);
+    await expect(p.getByTestId("asset-inspector").locator("h2")).toHaveText("5 selected");
+    await p.keyboard.press("Escape");
+    await expect(picked()).toHaveCount(0);
+  }
+  // From the search box, Down steps into the items.
+  await p.getByTestId("assets-search").focus();
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("ArrowDown");
+  await expect(picked()).toHaveCount(1);
+  // Shift-click takes a range in the list as in the gallery.
+  await p.locator('[data-layout="list"]').click();
+  await cards.nth(0).click();
+  await cards.nth(3).click({ modifiers: ["Shift"] });
+  await expect(picked()).toHaveCount(4);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("list columns: each can be hidden or moved, the header follows, and the choice is remembered (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await libraryOf(p, 2);
+  await expect(p.getByTestId("assets-columns")).toBeHidden(); // a list thing
+  await p.locator('[data-layout="list"]').click();
+  const head = (col: string) => p.locator(`.assets-list-head [data-col="${col}"]`);
+  await expect(head("pixels")).toBeVisible();
+  await expect(head("added")).toBeHidden(); // off by default
+  await p.getByTestId("assets-columns").click();
+  const panel = p.getByTestId("columns-panel");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("checkbox", { name: "Pixels" }).uncheck();
+  await panel.getByRole("checkbox", { name: "Added" }).check();
+  await expect(head("pixels")).toBeHidden();
+  await expect(head("added")).toBeVisible();
+  await expect(p.locator(".asset-cell").first().locator(".asset-meta")).toBeHidden();
+  await expect(p.locator(".asset-cell").first().locator(".asset-added")).toBeVisible();
+  // Move Tags to just after Name: its place in the order is second.
+  const order = (col: string) => p.locator(".assets-body").evaluate((e, c) => getComputedStyle(e).getPropertyValue(`--o-${c}`).trim(), col);
+  expect(await order("tags")).toBe("5");
+  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
+  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
+  await panel.getByRole("button", { name: "Move Tags earlier" }).click();
+  expect(await order("tags")).toBe("2");
+  expect(await order("pixels")).toBe("3");
+  await p.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  // Kept over a reload; Reset puts the columns back.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(head("pixels")).toBeHidden();
+  expect(await order("tags")).toBe("2");
+  await p.getByTestId("assets-columns").click();
+  await p.getByTestId("columns-panel").getByRole("button", { name: "Reset the columns" }).click();
+  await expect(head("pixels")).toBeVisible();
+  await expect(head("added")).toBeHidden();
+  expect(await order("tags")).toBe("5");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("viewer zoom: the wheel zooms at the pointer, a drag pans, a double-click toggles Fit and 100%, the keys and the control agree (ADR 0054)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "big.png", mimeType: "image/png", buffer: makePng(400, 300, (x, y) => [(x * 2) % 256, (y * 3) % 256, 160, 255]) });
+  await p.getByTestId("asset-card").first().dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  const img = viewer.locator("figure img");
+  await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(400);
+  const pct = viewer.locator(".viewer-zoom-pct");
+  // The element fills the stage and the picture is contained in it, so the drawn width follows the aspect (400 x 300).
+  const width = async () => {
+    const b = (await img.boundingBox())!;
+    return Math.min(b.width, (b.height * 400) / 300);
+  };
+  await expect(pct).toHaveText("Fit");
+  const fit = await width();
+  // The wheel zooms in at the pointer: the picture grows and the control says how much.
+  const box = (await img.boundingBox())!;
+  await p.mouse.move(box.x + box.width / 4, box.y + box.height / 4);
+  await p.mouse.wheel(0, -400);
+  await expect.poll(width).toBeGreaterThan(fit * 1.3);
+  await expect(pct).not.toHaveText("Fit");
+  // A drag pans the zoomed picture.
+  const before = (await img.boundingBox())!;
+  await p.mouse.move(640, 420);
+  await p.mouse.down();
+  await p.mouse.move(700, 450, { steps: 4 });
+  await p.mouse.up();
+  const after = (await img.boundingBox())!;
+  expect(Math.abs(after.x - before.x) + Math.abs(after.y - before.y)).toBeGreaterThan(20);
+  // 0 is Fit; a double-click shows the picture at 100% (its own 400 px), and again goes back to Fit.
+  await viewer.focus();
+  await p.keyboard.press("0");
+  await expect(pct).toHaveText("Fit");
+  await img.dblclick();
+  await expect(pct).toHaveText("100%");
+  expect(Math.abs((await width()) - 400)).toBeLessThan(2);
+  await img.dblclick();
+  await expect(pct).toHaveText("Fit");
+  // Keys and the buttons zoom too, and the zoom resets for the next picture.
+  await p.keyboard.press("+");
+  await expect(pct).not.toHaveText("Fit");
+  await viewer.getByRole("button", { name: "Zoom out" }).click();
+  await expect(pct).toHaveText("Fit");
   expect(app.consoleErrors).toEqual([]);
 });

@@ -1147,3 +1147,68 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .nav-actions { top: 0; right: calc(var(--ctl) - 2px); }
 /* List rows read as text on the page, not as the white text of a picture overlay. */
 .assets-body.is-list .asset-info { color: var(--hud-fg); }
+
+/* Immersive viewer: with the controls hidden the view tabs at the top fade out, and come back when the pointer is near the top edge or they have the keyboard. */
+body[data-immersive] #nav { opacity: 0; transition: opacity 200ms; }
+body[data-immersive] #nav:hover, body[data-immersive] #nav:focus-within { opacity: 1; }
+body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: calc(var(--ctl) + 2 * var(--pad) + var(--edge) + 14px); pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { body[data-immersive] #nav { transition: none; } }
+
+/* Viewer, third pass: the picture is centred in the stage whatever its size, and the caption is always in the same place (bottom centre, over the stage). */
+.viewer-stage { position: relative; display: block; padding: 0; overflow: hidden; }
+.viewer.is-actual .viewer-stage { overflow: auto; }
+.viewer figure { position: absolute; inset: 0; margin: 0; width: auto; height: auto; display: block; }
+.viewer figure img, .viewer figure video { position: absolute; inset: 16px 16px 52px; margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
+.viewer.no-bar figure img, .viewer.no-bar figure video { inset: 16px 16px 52px; }
+.viewer figcaption { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 5px 12px; font-size: 12px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: oklch(0.92 0.01 190); background: oklch(0.1 0.01 190 / 0.55); border-radius: 999px; }
+.viewer.is-actual figure { position: static; width: max-content; height: max-content; margin: auto; }
+.viewer.is-actual figure img { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
+
+/* Hover and selection rings are drawn inside the card (an outline, above the picture), so the cards at the edges are not clipped by the scroll area. */
+.asset-card:hover { box-shadow: none; outline: 2px solid var(--hud-muted); outline-offset: -2px; }
+.asset-card[aria-pressed="true"] { box-shadow: none; outline: 3px solid var(--hud-accent); outline-offset: -3px; }
+.assets-body.is-list .asset-card:hover, .assets-body.is-list .asset-card[aria-pressed="true"] { outline: none; }
+.assets-scroll { padding: 2px 2px 24px; }
+
+/* List columns: shown or hidden, and in the order chosen (the order and the grid are set on the library by app code). */
+.asset-added { display: none; }
+.assets-body.is-list .asset-added { display: block; }
+.assets-body.is-list .asset-name, .assets-body.is-list .assets-list-head [data-col="name"] { order: var(--o-name, 1); }
+.assets-body.is-list .asset-meta, .assets-body.is-list .assets-list-head [data-col="pixels"] { order: var(--o-pixels, 2); }
+.assets-body.is-list .asset-kind, .assets-body.is-list .assets-list-head [data-col="kind"] { order: var(--o-kind, 3); }
+.assets-body.is-list .asset-uses, .assets-body.is-list .assets-list-head [data-col="used"] { order: var(--o-used, 4); }
+.assets-body.is-list .asset-tags, .assets-body.is-list .assets-list-head [data-col="tags"] { order: var(--o-tags, 5); }
+.assets-body.is-list .asset-added, .assets-body.is-list .assets-list-head [data-col="added"] { order: var(--o-added, 6); }
+.assets-body.hide-pixels.is-list .asset-meta, .assets-body.hide-pixels .assets-list-head [data-col="pixels"],
+.assets-body.hide-kind.is-list .asset-kind, .assets-body.hide-kind .assets-list-head [data-col="kind"],
+.assets-body.hide-used.is-list .asset-uses, .assets-body.hide-used .assets-list-head [data-col="used"],
+.assets-body.hide-tags.is-list .asset-tags, .assets-body.hide-tags .assets-list-head [data-col="tags"],
+.assets-body.hide-added.is-list .asset-added, .assets-body.hide-added .assets-list-head [data-col="added"] { display: none; }
+.assets-body.is-list .asset-added { color: var(--hud-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#assets-view:not(.is-list) [data-action="columns"] { display: none; }
+.assets-columns { position: fixed; z-index: 30; width: 280px; padding: 12px; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(10px); }
+.assets-columns[hidden] { display: none; }
+.assets-columns h2 { margin: 0 0 4px; font-size: 14px; }
+.assets-columns p { margin: 0 0 10px; color: var(--hud-muted); font-size: 12px; }
+.assets-columns ul { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 2px; }
+.assets-columns li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl); }
+.assets-columns label { display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
+.cols-move { display: inline-flex; gap: 2px; }
+.cols-move button { display: inline-flex; align-items: center; justify-content: center; width: calc(var(--ctl) - 6px); height: calc(var(--ctl) - 6px); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.cols-move button svg { width: 16px; height: 16px; }
+.cols-move button:hover:not(:disabled) { background: var(--hud-hover); }
+.cols-move button:disabled { opacity: 0.3; cursor: default; }
+.viewer img.is-file { image-rendering: auto; max-width: 240px !important; max-height: 300px !important; }
+
+/* Viewer zoom: a small control over the picture (the wheel, a pinch, a drag and the keys do the work); the picture is moved with a transform. */
+.viewer-zoom { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 2px; padding: 3px; background: oklch(0.2 0.01 190 / 0.85); border: 1px solid oklch(1 0 0 / 0.14); border-radius: 999px; backdrop-filter: blur(8px); }
+.viewer-zoom button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 8px; color: inherit; font: 500 12px var(--font-ui); background: transparent; border: 0; border-radius: 999px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.viewer-zoom button svg { width: 16px; height: 16px; }
+.viewer-zoom button:hover { background: oklch(1 0 0 / 0.14); }
+.viewer-zoom .viewer-zoom-pct { min-width: 52px; }
+.viewer.no-bar .viewer-zoom { opacity: 0; transition: opacity 200ms; }
+.viewer.no-bar .viewer-zoom:hover, .viewer.no-bar .viewer-zoom:focus-within { opacity: 1; }
+.viewer figure img, .viewer figure video { cursor: grab; transition: none; will-change: transform; touch-action: none; }
+.viewer.is-zoomed figure img { cursor: grab; }
+.viewer-stage { touch-action: none; overflow: hidden; }
+.viewer.is-actual .viewer-stage { overflow: hidden; }

@@ -67,6 +67,8 @@ import gripIcon from "lucide-static/icons/grip.svg";
 import squareIcon from "lucide-static/icons/square.svg";
 import arrowUpDown from "lucide-static/icons/arrow-up-down.svg";
 import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
+import columns3 from "lucide-static/icons/columns-3.svg";
+import fileIcon from "lucide-static/icons/file.svg";
 import maximize from "lucide-static/icons/maximize.svg";
 import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
@@ -171,6 +173,8 @@ export const ICONS = {
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
   maximize: clean(maximize),
+  columns3: clean(columns3),
+  fileIcon: clean(fileIcon),
   ellipsis: clean(ellipsisIcon),
   arrowUpDown: clean(arrowUpDown),
   arrowDownAZ: clean(arrowDownAZ),

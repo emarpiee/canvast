@@ -142,6 +142,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       if (on && focus) t.focus();
     }
     for (const p of panels) p.hidden = p.dataset["panel"] !== id;
+    cancelCapture();
     if (id === "storage") void storage();
   };
 
@@ -236,8 +237,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
     if (t.closest("[data-done]")) onClose();
   });
-  root.addEventListener("keydown", (e) => {
-    if (capturing) {
+  /** Stop waiting for a letter (focus moved away, another tab, or the view closed): nothing changes. */
+  const cancelCapture = (): void => {
+    if (!capturing) return;
+    capturing = null;
+    renderKeys();
+  };
+  root.addEventListener("pointerdown", (e) => {
+    if (capturing && !(e.target as HTMLElement).closest(`[data-change-key="${capturing}"]`)) cancelCapture();
+  });
+  // While waiting for a letter every key is for the key being chosen, wherever the focus is (a click elsewhere cancels).
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (!capturing || root.hidden) return;
       // Any key is for the key being chosen: a letter sets it, Escape cancels, everything else is refused with a reason.
       const tool = capturing;
       e.preventDefault();
@@ -257,8 +270,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       }
       renderKeys();
       root.querySelector<HTMLElement>(`[data-change-key="${tool}"]`)?.focus();
-      return;
-    }
+    },
+    true,
+  );
+  root.addEventListener("keydown", (e) => {
     const tab = (e.target as HTMLElement).closest<HTMLElement>('[role="tab"]');
     if (tab && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End")) {
       const i = tabs.indexOf(tab as HTMLButtonElement);
@@ -283,6 +298,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       root.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
     },
     hide() {
+      cancelCapture();
       root.hidden = true;
     },
   };

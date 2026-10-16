@@ -31,12 +31,7 @@ async function libraryWithTwo(p: Page): Promise<void> {
 
 /** Select an asset and wait until the inspector shows it. */
 async function pick(p: Page, hash: string): Promise<void> {
-  // A click opens the viewer (with the details beside it); Esc closes it and the asset stays selected in the library.
   await card(p, hash).click();
-  const viewer = p.getByTestId("slide-view");
-  await expect(viewer).toBeVisible();
-  await p.keyboard.press("Escape");
-  await expect(viewer).toBeHidden();
   await expect(card(p, hash)).toHaveAttribute("aria-pressed", "true");
 }
 
