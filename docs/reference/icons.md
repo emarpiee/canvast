@@ -96,3 +96,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `undo-2` | Undo |
 | `waves` | Stabilizer |
 | `x` | Hide the Layers panel; Hide the Tags panel; Hide the Bookmarks panel; Close details; Close slide view |
+| (own inline icon in `src/colour-picker/picker.ts`, not lucide) | Pick a colour from the screen (the colour picker's eyedropper) |

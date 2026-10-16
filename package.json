@@ -9,8 +9,8 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:unit": "vitest run",
-    "test:e2e": "npm run build && playwright test",
-    "test:e2e:full": "npm run build && playwright test -c playwright.full.config.ts",
+    "test:e2e": "npm run build && npm run build:picker && playwright test",
+    "test:e2e:full": "npm run build && npm run build:picker && playwright test -c playwright.full.config.ts",
     "check:offline": "node scripts/check-offline.mjs dist/canvast.html",
     "check:tokens": "node scripts/check-tokens.mjs",
     "check:names": "node scripts/check-names.mjs dist/canvast.html",
@@ -18,7 +18,8 @@
     "test:full": "npm run typecheck && npm run test:unit && npm run test:e2e:full && npm run check:offline && npm run check:names && npm run check:tokens && npm run check:picker",
     "bench": "npm run build && playwright test -c playwright.bench.config.ts",
     "check:picker": "node scripts/check-picker.mjs",
-    "build:picker": "node scripts/build-picker.mjs"
+    "build:picker": "node scripts/build-picker.mjs",
+    "bench:picker": "node scripts/bench-picker.mjs"
   },
   "devDependencies": {
     "@expo-google-fonts/inter": "0.4.2",

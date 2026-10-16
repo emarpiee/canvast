@@ -85,6 +85,7 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
     value: o.value,
     model: store?.get("colour.model") ?? "okhsv",
     view: store?.get("colour.view") ?? "wheel",
+    format: store?.get("colour.format") ?? "hex",
     groups: groups(),
     display: swatchBackground,
     onInput: o.onInput,
@@ -94,6 +95,7 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
       picker.setGroups(groups());
     },
     onModel: (m) => void store?.set("colour.model", m),
+    onFormat: (f) => void store?.set("colour.format", f),
     onView: (v) => {
       void store?.set("colour.view", v);
       place(pop, anchor); // the two layouts differ in height

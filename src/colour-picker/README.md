@@ -1,62 +1,57 @@
 # colour-picker
 
-A colour picker with no dependencies and no link to the rest of canvast. Copy this folder into another project, or build it on its own (`npm run build:picker` writes `dist-picker/colour-picker.js` and a `demo.html` that opens from `file://`).
+A colour picker for the web with no dependencies and no link to the app it was made in (canvast). It is small (33 KiB minified, 12.6 KiB gzipped, all of it: maths, component, styles), fast (a drag does about half a millisecond of work a step), themed by CSS custom properties, and works from `file://`.
 
-* **Models:** OKHSL, OKHSV and OKHCL. Every slider stays inside the sRGB gamut, and a step looks like the same change of colour anywhere.
-* **Layouts:** sliders, or a hue ring around a box (the box shows the other two channels).
-* **Value:** `"#rrggbb"`. There is no alpha channel.
-* **Files:** `colour.ts` is pure maths (no DOM; runs in Node or a worker), `picker.ts` the component, `style.ts` its stylesheet, `index.ts` the exports.
+* **Three perceptual models:** OKHSL, OKHSV and OKHCL. Every slider stays inside the sRGB gamut, and the same step looks like the same change of colour anywhere.
+* **Four layouts:** a hue ring around a box, a plane with a hue bar, sliders, or the ring with sliders under it.
+* **Transparency** (optional), with a chequered preview.
+* **Text in three formats:** hex, `rgb()`, `oklch()`. Any of them can be typed or pasted, in any format, with or without `#`.
+* **Eyedropper** where the browser has one, **WCAG contrast** against a colour you choose, **colour harmonies**, **swatch groups** you supply, and a **before and after** preview.
+* **Keyboard and screen reader complete**, **translatable** (every word is an option), **light and dark** by default.
+* **Also a custom element:** `<colour-picker>`.
+
+![the four layouts](docs/layouts.png)
+
+## Use
 
 ```ts
 import { createColourPicker } from "./colour-picker";
 
 const picker = createColourPicker({
   value: "#2563eb",
-  model: "okhsv",          // "okhsl" | "okhsv" | "okhcl"
-  view: "wheel",           // "wheel" | "sliders"
-  groups: [{ label: "Recent", colours: ["#1f2329", "#dc2626"] }],
+  alpha: true,
   onInput: (hex) => preview(hex),   // every step of a drag or key press
   onChange: (hex) => save(hex),     // once, when a gesture ends
-  onModel: (m) => remember(m),      // so the host can reopen in the same model
-  onView: (v) => remember(v),
 });
-container.append(picker.el);
-picker.setValue("#ff0000");          // from outside: fires nothing
-picker.destroy();
+document.body.append(picker.el);
 ```
 
-## Options
+As a tag:
 
-| Option | Meaning |
+```html
+<colour-picker value="#2563eb" view="mixer" alpha contrast="#ffffff"></colour-picker>
+<script type="module">
+  import { defineColourPickerElement } from "./colour-picker";
+  defineColourPickerElement();
+  document.querySelector("colour-picker").addEventListener("change", (e) => console.log(e.detail.value));
+</script>
+```
+
+Without a bundler: `npm run build:picker` (in canvast) writes `dist-picker/colour-picker.js`, a single script that defines a global `ColourPicker`, and `dist-picker/demo.html`, a page with every option on that opens from `file://`.
+
+## Files
+
+| File | What it is |
 | --- | --- |
-| `value`, `model`, `view` | Start state. |
-| `size` | Side of the hue ring in CSS px (default 208). The sliders layout is the same width. |
-| `groups` | Swatch rows under the picker, each `{ label, colours }`; change them later with `setGroups`. |
-| `labels` | Every word the picker shows (model, layout, channel names, tooltips), to translate or rename. |
-| `display(hex)` | The CSS colour to show a stored colour as; for a host that draws one colour differently (a theme's ink). |
-| `injectStyles` | `false` when the host adds `PICKER_CSS` itself. |
+| `colour.ts` | The maths: models, conversions, parsing and formatting, contrast, harmonies, the fast plane painter. Pure functions, no DOM; runs in Node or a worker. |
+| `picker.ts` | The component: `createColourPicker`. |
+| `element.ts` | `<colour-picker>`, in a shadow root. |
+| `style.ts` | The stylesheet as a string (`PICKER_CSS`) and `ensureStyles()`. |
+| `index.ts` | The exports. |
+| `docs/` | [api.md](docs/api.md) options, methods and the maths API · [theming.md](docs/theming.md) · [performance.md](docs/performance.md) · [design.md](docs/design.md) why it is built this way, and what comes next. |
 
-## Theming
-
-The picker draws only with CSS custom properties. Set them on `.cp` or any ancestor; the module's defaults sit in `:where(.cp)` (specificity 0), so any rule of yours wins, and they follow `prefers-color-scheme`.
-
-| Group | Properties |
-| --- | --- |
-| Colour | `--cp-bg --cp-fg --cp-muted --cp-border --cp-field --cp-hover --cp-accent --cp-accent-fg --cp-focus` |
-| Type | `--cp-text --cp-text-sm --cp-font --cp-mono` |
-| Shape and space | `--cp-radius --cp-radius-sm --cp-gap --cp-gap-sm --cp-pad` |
-| Sizes | `--cp-thumb --cp-bar --cp-swatch` |
-
-canvast maps them to its own tokens in `src/styles.css` (ADR 0098).
-
-## Keyboard
-
-Tab reaches the model and layout switches (arrows move between them), the ring (arrows turn the hue by 1°, Shift 10°, Alt 0.1°, Page Up and Down 15°), the box (arrows move saturation and value or lightness by 1%, Shift 10%), each slider and number field, the hex field (Enter applies), and every swatch.
+A file in this folder may import only files in this folder (`npm run check:picker` in canvast fails otherwise).
 
 ## Credits
 
-OKHSL and OKHSV follow Bjorn Ottosson's reference code (MIT; the notice is in `THIRD_PARTY_NOTICES.md`). OKHCL is lightness and hue of OKLab with chroma as a fraction of the sRGB gamut.
-
-## Keeping it standalone
-
-`npm run check:picker` fails when a file in this folder imports anything outside it.
+OKHSL and OKHSV follow Bjorn Ottosson's reference code (MIT; the notice is in canvast's `THIRD_PARTY_NOTICES.md` and must travel with the code). OKHCL is lightness and hue of OKLab with chroma as a fraction of the sRGB gamut at that lightness and hue.

@@ -36,7 +36,7 @@ test("colour picker: ring, box, hex, models, layouts, recent colours, Settings (
   await chip.click();
   await pop.getByRole("radio", { name: "OKHSL" }).click();
   expect(await hex.inputValue()).toBe(picked);
-  await pop.getByRole("radio", { name: "Sliders" }).click();
+  await pop.locator("[data-view-select]").selectOption("sliders");
   await expect(pop.locator("[data-wheel]")).toBeHidden();
   await pop.locator('[data-slider="1"]').focus();
   await p.keyboard.press("PageDown");

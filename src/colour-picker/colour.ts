@@ -129,8 +129,7 @@ function midST(a: number, b: number): [number, number] {
 }
 
 /** The three chromas OKHSL is built on at a lightness and hue: [C0 (low end), Cmid, Cmax]. */
-function chromas(L: number, a: number, b: number): [number, number, number] {
-  const cu = cusp(a, b);
+function chromas(L: number, a: number, b: number, cu: [number, number] = cusp(a, b)): [number, number, number] {
   const cMax = gamutIntersection(a, b, L, 1, L, cu);
   const sMax = cu[1] / cu[0];
   const tMax = cu[1] / (1 - cu[0]);
@@ -315,4 +314,207 @@ export function convert(from: Model, to: Model, t: Triple): Triple {
 export function prefersDarkText(rgb: Rgb): boolean {
   const [L] = linearToOklab(toLinear(rgb[0] / 255), toLinear(rgb[1] / 255), toLinear(rgb[2] / 255));
   return L > 0.65;
+}
+
+// ---- Speed -------------------------------------------------------------------------------------------------------------------
+// A box of colours at one hue shares almost everything between its pixels: the gamut cusp is one number per hue, OKHSL's three
+// chromas are one set per row, OKHSV's scale one number per column. `paintPlane` computes those once and does a few multiplies per
+// pixel, with a table for the gamma curve, so a 96 x 96 box costs about what 200 single conversions do (scripts/bench-picker.mjs).
+
+const LUT_N = 8192;
+const GAMMA_LUT = (() => {
+  const t = new Uint8Array(LUT_N + 1);
+  for (let i = 0; i <= LUT_N; i++) t[i] = Math.round(gamma(i / LUT_N) * 255);
+  return t;
+})();
+const lutByte = (lin: number): number => GAMMA_LUT[lin <= 0 ? 0 : lin >= 1 ? LUT_N : Math.round(lin * LUT_N)]!;
+
+/**
+ * Fill `out` (RGBA bytes, `w` x `h`) with the plane of a model at one hue: saturation (or relative chroma) grows to the right,
+ * value (or lightness) upwards. Display only: the gamma curve is tabulated, so a byte can differ by one from `toRgb`.
+ */
+export function paintPlane(model: Model, hueDeg: number, w: number, h: number, out: Uint8ClampedArray): void {
+  const hue = (((hueDeg % 360) + 360) % 360 * TAU) / 360;
+  const a = Math.cos(hue);
+  const b = Math.sin(hue);
+  const kl = 0.3963377774 * a + 0.2158037573 * b;
+  const km = -0.1055613458 * a - 0.0638541728 * b;
+  const ks = -0.0894841775 * a - 1.291485548 * b;
+  const cu = cusp(a, b);
+  const put = (i: number, L: number, C: number): void => {
+    const l = (L + C * kl) ** 3;
+    const m = (L + C * km) ** 3;
+    const s = (L + C * ks) ** 3;
+    out[i] = lutByte(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
+    out[i + 1] = lutByte(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
+    out[i + 2] = lutByte(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s);
+    out[i + 3] = 255;
+  };
+  const black = (i: number): void => {
+    out[i] = out[i + 1] = out[i + 2] = 0;
+    out[i + 3] = 255;
+  };
+  const white = (i: number): void => {
+    out[i] = out[i + 1] = out[i + 2] = out[i + 3] = 255;
+  };
+  const cols = Math.max(1, w - 1);
+  const rows = Math.max(1, h - 1);
+  if (model === "okhsv") {
+    const sMax = cu[1] / cu[0];
+    const tMax = cu[1] / (1 - cu[0]);
+    const k = 1 - 0.5 / sMax;
+    const col = new Float64Array(w * 5); // Lv, Cv, Lvt-related factors, scale
+    for (let x = 0; x < w; x++) {
+      const s = x / cols;
+      const denom = 0.5 + tMax - tMax * k * s;
+      const Lv = 1 - (s * 0.5) / denom;
+      const Cv = (s * tMax * 0.5) / denom;
+      const Lvt = toeInv(Lv);
+      const Cvt = (Cv * Lvt) / Lv;
+      const [sr, sg, sb] = oklabToLinear(Lvt, a * Cvt, b * Cvt);
+      col[x * 5] = Lv;
+      col[x * 5 + 1] = Cv;
+      col[x * 5 + 2] = Math.cbrt(1 / Math.max(sr, sg, sb, 1e-9));
+    }
+    for (let y = 0; y < h; y++) {
+      const v = 1 - y / rows;
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (v <= 0) {
+          black(i);
+          continue;
+        }
+        const Lv = col[x * 5]!;
+        const scale = col[x * 5 + 2]!;
+        const L = v * Lv;
+        const Ln = toeInv(L);
+        put(i, Ln * scale, ((v * col[x * 5 + 1]! * Ln) / L) * scale);
+      }
+    }
+  } else if (model === "okhsl") {
+    for (let y = 0; y < h; y++) {
+      const l = 1 - y / rows;
+      if (l <= 0 || l >= 1) {
+        for (let x = 0; x < w; x++) (l <= 0 ? black : white)((y * w + x) * 4);
+        continue;
+      }
+      const L = toeInv(l);
+      const [c0, cMid, cMax] = chromas(L, a, b, cu);
+      const lowK1 = MID * c0;
+      const lowK2 = 1 - lowK1 / cMid;
+      const hiK1 = ((1 - MID) * cMid * cMid * MID_INV * MID_INV) / c0;
+      const hiK2 = 1 - hiK1 / (cMax - cMid);
+      for (let x = 0; x < w; x++) {
+        const s = x / cols;
+        let C: number;
+        if (s < MID) {
+          const t = MID_INV * s;
+          C = (t * lowK1) / (1 - lowK2 * t);
+        } else {
+          const t = (s - MID) / (1 - MID);
+          C = cMid + (t * hiK1) / (1 - hiK2 * t);
+        }
+        put((y * w + x) * 4, L, C);
+      }
+    }
+  } else {
+    for (let y = 0; y < h; y++) {
+      const L = 1 - y / rows;
+      if (L <= 0 || L >= 1) {
+        for (let x = 0; x < w; x++) (L <= 0 ? black : white)((y * w + x) * 4);
+        continue;
+      }
+      const cMax = gamutIntersection(a, b, L, 1, L, cu);
+      for (let x = 0; x < w; x++) put((y * w + x) * 4, L, (x / cols) * cMax);
+    }
+  }
+}
+
+// ---- Alpha, text formats, contrast, harmonies -------------------------------------------------------------------------------
+
+/** A colour with transparency: bytes and an alpha of 0..1. */
+export interface Colour {
+  rgb: Rgb;
+  alpha: number;
+}
+
+export type TextFormat = "hex" | "rgb" | "oklch";
+export const TEXT_FORMATS: readonly TextFormat[] = ["hex", "rgb", "oklch"];
+
+const hex2 = (v: number): string => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+
+/** "#rrggbb", or "#rrggbbaa" when alpha is below 1. */
+export function colourToHex(c: Colour): string {
+  return rgbToHex(c.rgb) + (c.alpha < 1 ? hex2(c.alpha * 255) : "");
+}
+
+export function rgbToOklch(rgb: Rgb): { L: number; C: number; h: number } {
+  const [L, a, b] = linearToOklab(toLinear(rgb[0] / 255), toLinear(rgb[1] / 255), toLinear(rgb[2] / 255));
+  return { L, C: Math.hypot(a, b), h: (((Math.atan2(b, a) * 180) / Math.PI) % 360 + 360) % 360 };
+}
+
+export function oklchToRgb(L: number, C: number, hDeg: number): Rgb {
+  const r = (hDeg * Math.PI) / 180;
+  return rgbOf(L, C * Math.cos(r), C * Math.sin(r));
+}
+
+const round = (v: number, d: number): number => Math.round(v * 10 ** d) / 10 ** d;
+
+/** A colour as CSS text: "#2563eb", "rgb(37 99 235 / 0.5)" or "oklch(0.55 0.19 262)". */
+export function formatColour(c: Colour, format: TextFormat): string {
+  const a = c.alpha < 1 ? ` / ${round(c.alpha, 3)}` : "";
+  if (format === "hex") return colourToHex(c);
+  if (format === "rgb") return `rgb(${c.rgb[0]} ${c.rgb[1]} ${c.rgb[2]}${a})`;
+  const o = rgbToOklch(c.rgb);
+  return `oklch(${round(o.L, 3)} ${round(o.C, 3)} ${round(o.C < 1e-4 ? 0 : o.h, 1)}${a})`;
+}
+
+const num = (t: string, scale: number): number => (t.endsWith("%") ? (parseFloat(t) / 100) * scale : parseFloat(t));
+
+/** Parse "#rgb", "#rgba", "#rrggbb", "#rrggbbaa" (the # is optional), "rgb()" / "rgba()" and "oklch()" (commas or spaces, "/ alpha"). */
+export function parseColour(text: string): Colour | null {
+  const t = text.trim().toLowerCase();
+  const hex = /^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(t);
+  if (hex) {
+    const h = hex[1]!.length <= 4 ? [...hex[1]!].map((c) => c + c).join("") : hex[1]!;
+    return { rgb: [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)], alpha: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1 };
+  }
+  const n = "(-?[\\d.]+%?)";
+  const sep = "(?:\\s*,\\s*|\\s+)";
+  const alpha = "(?:\\s*[,/]\\s*([\\d.]+%?))?";
+  const rgb = new RegExp(`^rgba?\\(\\s*${n}${sep}${n}${sep}${n}${alpha}\\s*\\)$`).exec(t);
+  if (rgb) {
+    const v = [1, 2, 3].map((i) => num(rgb[i]!, 255));
+    const al = rgb[4] === undefined ? 1 : num(rgb[4], 1);
+    if (v.some((x) => !Number.isFinite(x)) || !Number.isFinite(al)) return null;
+    return { rgb: [clamp255(v[0]!), clamp255(v[1]!), clamp255(v[2]!)], alpha: clamp01(al) };
+  }
+  const ok = new RegExp(`^oklch\\(\\s*${n}${sep}${n}${sep}(-?[\\d.]+)(?:deg)?${alpha}\\s*\\)$`).exec(t);
+  if (ok) {
+    const L = num(ok[1]!, 1);
+    const C = num(ok[2]!, 0.4);
+    const h = parseFloat(ok[3]!);
+    const al = ok[4] === undefined ? 1 : num(ok[4], 1);
+    if (![L, C, h, al].every(Number.isFinite)) return null;
+    return { rgb: oklchToRgb(clamp01(L), Math.max(0, C), h), alpha: clamp01(al) };
+  }
+  return null;
+}
+const clamp255 = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
+
+const luminance = (rgb: Rgb): number => 0.2126 * toLinear(rgb[0] / 255) + 0.7152 * toLinear(rgb[1] / 255) + 0.0722 * toLinear(rgb[2] / 255);
+
+/** WCAG 2 contrast ratio of two opaque colours, 1 to 21. */
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/** Colour harmonies: the colour with its hue turned (in OKHCL, so each stays inside sRGB and keeps its lightness and relative chroma). */
+export type Harmony = "complementary" | "split" | "triad" | "analogous" | "tetrad";
+export const HARMONIES: Record<Harmony, readonly number[]> = { complementary: [180], split: [150, 210], triad: [120, 240], analogous: [-30, 30], tetrad: [90, 180, 270] };
+export function harmonies(rgb: Rgb, kind: Harmony, hue = 0): Rgb[] {
+  const t = fromRgb("okhcl", rgb[0], rgb[1], rgb[2], hue);
+  return HARMONIES[kind].map((d) => toRgb("okhcl", t.h + d, t.s, t.x));
 }

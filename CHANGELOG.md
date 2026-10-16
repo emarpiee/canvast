@@ -2,6 +2,7 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- The colour picker grew into a package with its own documentation (`src/colour-picker/README.md`, `docs/`): four layouts (ring and box, plane and bar, sliders, ring and sliders), optional transparency, text in hex, rgb() or oklch() (typed or pasted), an eyedropper, a WCAG contrast readout, colour harmonies, a `<colour-picker>` element, and a faster painter (4 to 5 times; the ring and bars are CSS gradients). Settings > Colour picker layout and text.
 - Colour picker (ADR 0098): one picker for every colour choice, in OKHSL, OKHSV or OKHCL, as sliders or as a hue ring around a box, with hex, a before and after preview, the colours picked lately and a palette. It replaces the four fixed pen swatches (the toolbar now shows the colours you picked lately) and the browser's colour input in Settings (Pen colour, Colour picker model, Colour picker layout). It is a standalone module in `src/colour-picker/` that imports nothing from the app, is themed by `--cp-*` properties and builds on its own (`npm run build:picker`).
 
 - Rename assets (the details panel, the bulk bar, F2), one or many, with a file-manager-style dialog: enumerate, replace text, add text, change the extension, and a preview of every name in full. The rules and the dialog are a reusable module (ADR 0085).

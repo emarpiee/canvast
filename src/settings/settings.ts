@@ -40,7 +40,8 @@ export const SETTINGS = {
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   // The colour picker (ADR 0098): which colour model and layout it opens in, and the colours picked lately.
   "colour.model": { scope: "device", default: "okhsv", validate: oneOf("okhsl", "okhsv", "okhcl"), effect: "immediate" } as Def<"okhsl" | "okhsv" | "okhcl">,
-  "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "sliders"), effect: "immediate" } as Def<"wheel" | "sliders">,
+  "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "plane", "sliders", "mixer"), effect: "immediate" } as Def<"wheel" | "plane" | "sliders" | "mixer">,
+  "colour.format": { scope: "device", default: "hex", validate: oneOf("hex", "rgb", "oklch"), effect: "immediate" } as Def<"hex" | "rgb" | "oklch">,
   "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
   "pen.kind": { scope: "device", default: "fine", validate: oneOf("fine", "pencil", "ink", "marker"), effect: "immediate" } as Def<"fine" | "pencil" | "ink" | "marker">,
   "pen.widthPx": { scope: "device", default: 3, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
