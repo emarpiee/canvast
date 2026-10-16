@@ -398,11 +398,10 @@ html, body {
 .nav-crumb, .nav-chev { display: inline-flex; align-items: center; gap: var(--sp-3); height: 29px; color: inherit; font: inherit; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .nav-crumb { min-width: 0; padding: 0 var(--sp-5); overflow: hidden; }
 .nav-crumb svg { flex: none; width: 16px; height: 16px; }
-.nav-crumb-text { display: flex; align-items: center; min-width: 0; white-space: pre; }
-.nav-board, .nav-canvas { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-board { flex: 0 1 auto; min-width: 0; max-width: 11em; }
-.nav-canvas { flex: 0 1 auto; min-width: 0; max-width: 16em; }
-.nav-sep { flex: none; opacity: 0.7; }
+.nav-crumb-text { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.nav-crumb-board, .nav-crumb-canvas { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-crumb-board { flex: 0 1 auto; max-width: 11em; }
+.nav-crumb-canvas { flex: 0 1 auto; max-width: 16em; }
 #workspace { flex: 0 1 auto; min-width: 0; }
 .nav-chev { flex: none; justify-content: center; width: 28px; padding: 0; color: var(--hud-muted); }
 .nav-chev svg { width: 16px; height: 16px; }
