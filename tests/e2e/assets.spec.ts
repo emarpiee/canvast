@@ -1389,6 +1389,16 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await p.keyboard.press("Shift+Enter"); // checks every result
   expect((await selection()).length).toBe(2);
   await expect(box).toBeVisible();
+  // The first press outside only closes the search: the items picked here stay selected; the next press on empty canvas clears them.
+  await p.mouse.click(1100, 700);
+  await expect(box).toBeHidden();
+  expect((await selection()).length).toBe(2);
+  await p.mouse.click(1100, 700);
+  expect((await selection()).length).toBe(0);
+  await p.keyboard.press("/");
+  await box.fill("/.png");
+  await p.keyboard.press("Shift+Enter");
+  expect((await selection()).length).toBe(2);
   // AND, OR, XOR, NOT work here too (ADR 0069): by name, and over a picture's whole tag list.
   await box.fill("/blocks OR green");
   await expect(results.getByRole("option")).toHaveCount(2);

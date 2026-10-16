@@ -284,9 +284,22 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       input.focus();
     },
   );
-  document.addEventListener("pointerdown", (e) => {
-    if (!root.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest(".search-help")) close();
-  });
+  // A press outside closes the search. If it lands on the canvas while items are selected (the ones just picked here), that first press
+  // only closes the search: it does not also clear the selection. The next press works as usual.
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      const t = e.target as HTMLElement;
+      if (root.hidden || root.contains(t) || t.closest(".search-help")) return;
+      close();
+      if (t.id === "canvas" && deps.editor.selection.size > 0) {
+        e.stopPropagation();
+        e.preventDefault();
+        t.focus();
+      }
+    },
+    true,
+  );
 
   return {
     open(prefix = "") {

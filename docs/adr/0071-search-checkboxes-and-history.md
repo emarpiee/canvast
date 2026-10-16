@@ -14,6 +14,7 @@ The canvas search closed after one choice and forgot its text, so picking severa
 - A typed `/` or `@` first in the box still chooses the way; a typed `#` stays (ADR 0069).
 - **The library search matches it** (the scope is the only difference): the same ⓘ help, a clear ×, the ways All, Name and Tag (a first `/` chooses Name, Backspace on an empty box goes back to All), Recent chips of searches that found something and were used (Enter, or a card chosen), and `#tag` is an exact tag in both. Its tabs and chips are in a card under the box, shown while the box has the focus. Smart folders save the way (`SmartFolder.way`, absent = All). The library needs no checkbox column in the search because its gallery already has selection boxes.
 - A row's ⋯ menu inside a blurred panel (the workspace menu) is placed against the window: `placeMenu` measures where (0, 0) really is.
+- The press that closes the search from outside does not also clear the selection: if it lands on the canvas while items are selected, it only closes the search (the next press works as usual). A press on a button or panel does its own job as well.
 
 ## Consequences
 History is a per-device convenience (ADR 0068's rule for browser storage): if storage is blocked the list is simply empty.
