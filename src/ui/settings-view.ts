@@ -64,7 +64,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Navigation",
     rows: [
       { key: "nav.mode", label: "Next item (Ctrl+Arrow)", help: "How Ctrl+Arrow steps from the selected item to the next. Nearest in view: the nearest item you can see at this zoom (items too small or far larger than the window are skipped). Nearest anywhere: the nearest by position, at any zoom or depth. By layer: up and down the stacking order, top-most first.", control: { kind: "select", options: [["view", "Nearest in view"], ["anywhere", "Nearest anywhere"], ["layer", "By layer"]] } },
-      { key: "nav.zoom", label: "Zoom to the item", help: "Stepping, and the Alt key, zoom so the item fills the window. Off: only bring the item to the middle and keep the zoom.", control: { kind: "toggle" } },
+      { key: "nav.arrive", label: "On arriving at an item", help: "What the view does when Ctrl+Arrow (or a search) takes you to an item. Focus on it: zoom so the item fills the window. Keep the zoom level: only move the view so the item is in the middle.", control: { kind: "select", options: [["focus", "Focus on the item"], ["keep", "Keep the zoom level"]] } },
     ],
   },
   {

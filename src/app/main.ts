@@ -409,11 +409,11 @@ async function start(): Promise<void> {
       const e = await session.catalog?.entry(hash);
       return e ? { name: e.name, tags: e.tags ?? [] } : undefined;
     },
-    focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.zoom")),
+    focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
   });
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k),
-    navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.zoom")),
-    focusSelection: () => focusObjects(doc, view, [...editor.selection], settings.get("nav.zoom")),
+    navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
+    focusSelection: () => focusObjects(doc, view, [...editor.selection], true),
     openSearch: (prefix) => canvasSearch.open(prefix),
   });
   const side = document.createElement("div");

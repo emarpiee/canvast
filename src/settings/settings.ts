@@ -67,7 +67,7 @@ export const SETTINGS = {
   "ui.contrast": { scope: "device", default: "normal", validate: oneOf("normal", "high"), effect: "immediate" } as Def<"normal" | "high">,
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "full"), effect: "immediate" } as Def<"system" | "reduce" | "full">,
   "nav.mode": { scope: "device", default: "view", validate: oneOf("view", "anywhere", "layer"), effect: "immediate" } as Def<"view" | "anywhere" | "layer">,
-  "nav.zoom": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "nav.arrive": { scope: "device", default: "focus", validate: oneOf("focus", "keep"), effect: "immediate" } as Def<"focus" | "keep">,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

@@ -485,3 +485,39 @@ test("Ctrl+Arrow: 'nearest in view' skips an item too small to see at this zoom,
   await expect.poll(() => selection(app)).toEqual([a!.id]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Ctrl+Arrow on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level' only moves the view (ADR 0058)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "p");
+  for (const x of [300, 700]) await app.drag({ x, y: 450 }, { x: x + 60, y: 470 }, 4);
+  await key(app, "v");
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  const [a, b] = await objects(app);
+  const level = async () => await p.evaluate(() => window.__canvastDebug.camera());
+  const pick = async (id: string) => {
+    const s = (await screenOfObject(app, id))!.box;
+    await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+  };
+  const zoom0 = await level();
+  await pick(a!.id);
+  await key(app, "Control+ArrowRight");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  const focused = await level();
+  expect(focused.zi + focused.zf, "focus zoomed in on the item").toBeGreaterThan(zoom0.zi + zoom0.zf + 0.5);
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.arrive": "keep" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await key(app, "v");
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), zoom0);
+  await app.frame();
+  await pick(a!.id);
+  const before = await level();
+  await key(app, "Control+ArrowRight");
+  await expect.poll(() => selection(app)).toEqual([b!.id]);
+  await app.frame();
+  const after = await level();
+  expect(after.zi + after.zf, "the zoom level is kept").toBeCloseTo(before.zi + before.zf, 3);
+  const sb = (await screenOfObject(app, b!.id))!.box;
+  expect(Math.abs((sb.minX + sb.maxX) / 2 - p.viewportSize()!.width / 2), "and the item is in the middle").toBeLessThan(60);
+  expect(app.consoleErrors).toEqual([]);
+});

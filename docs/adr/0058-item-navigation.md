@@ -10,7 +10,7 @@ Status: accepted (owner request, 2026-10-16; the idea comes from the owner's oth
    - **Nearest anywhere**: nearest by position alone, exact in any depth and size; offsets are scaled so the nearest is about 1 before scoring (forward + 1.5 × sideways, as in the project this comes from).
    - **By layer**: up and down the paint order, top-most first, wherever the items are.
 3. **Alt, pressed and released alone,** brings the selection into view. Any other key or a pointer press while Alt is held cancels it (so Alt+drag and Alt+key keep their meaning); the keyup is prevented so the browser's menu bar does not open.
-4. **Zoom to the item** (`nav.zoom`, default on): fill 60% of the window (`fitRect`, exact at any depth, in the first item's own frame); off: bring the item to the middle and keep the zoom.
+4. **On arriving at an item** (`nav.arrive`: "Focus on the item", the default, or "Keep the zoom level"): focus fills 60% of the window (`fitRect`, exact at any depth, in the first item's own frame); keep: bring the item to the middle and keep the zoom. The Alt key always focuses.
 
 ## Tests
 
