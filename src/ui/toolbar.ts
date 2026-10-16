@@ -10,6 +10,8 @@ import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
 export interface ToolbarActions {
   importFiles(files: File[]): void;
+  /** Open the canvas search (ADR 0060). */
+  openSearch(prefix?: string): void;
   undo(): void;
   redo(): void;
   /** Copy the Markdown of the selected text objects. */
@@ -82,6 +84,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
       </div>
       <div class="tb-group">
+        <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (/ name, # tag, @ bookmark)">${ICONS.search}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
         <button type="button" data-action="import" aria-label="Import image" title="Import image, video or audio">${ICONS.imagePlus}</button>
@@ -211,6 +214,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.lassoFilter = d["filter"] as "strokes" | "all";
       editor.changed();
     } else if (d["action"] === "import") input.click();
+    else if (d["action"] === "search") actions.openSearch("/");
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
     else if (d["action"] === "show-all") actions.clearFlag("hidden");

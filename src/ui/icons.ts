@@ -18,6 +18,7 @@ import redo from "lucide-static/icons/redo-2.svg";
 import trash from "lucide-static/icons/trash-2.svg";
 import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
+import searchIcon from "lucide-static/icons/search.svg";
 import chevronsDownUp from "lucide-static/icons/chevrons-down-up.svg";
 import chevronsUpDown from "lucide-static/icons/chevrons-up-down.svg";
 import folderIcon from "lucide-static/icons/folder.svg";
@@ -131,6 +132,7 @@ export const ICONS = {
   trash: clean(trash),
   house: clean(house),
   plus: clean(plus),
+  search: clean(searchIcon),
   chevronsDownUp: clean(chevronsDownUp),
   chevronsUpDown: clean(chevronsUpDown),
   folder: clean(folderIcon),

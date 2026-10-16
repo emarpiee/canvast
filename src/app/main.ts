@@ -42,6 +42,7 @@ import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
 import { mountContextBar } from "../ui/context-bar";
+import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
@@ -399,14 +400,26 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
+  const bookmarkList = new BookmarkList(session, view, doc);
+  const canvasSearch = mountCanvasSearch(host, {
+    doc,
+    editor,
+    bookmarks: bookmarkList,
+    entry: async (hash) => {
+      const e = await session.catalog?.entry(hash);
+      return e ? { name: e.name, tags: e.tags ?? [] } : undefined;
+    },
+    focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.zoom")),
+  });
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.zoom")),
     focusSelection: () => focusObjects(doc, view, [...editor.selection], settings.get("nav.zoom")),
+    openSearch: (prefix) => canvasSearch.open(prefix),
   });
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);
-  mountBookmarksPanel(side, editor, new BookmarkList(session, view, doc), () => captureThumb(canvas));
+  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas));
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png) => void extractFrame(doc, editor, assets, id, png), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -436,6 +449,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
+    openSearch: (prefix) => canvasSearch.open(prefix),
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     clearFlag: (flag) => clearFlag(doc, editor, flag),

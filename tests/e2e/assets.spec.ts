@@ -1334,3 +1334,65 @@ test("the viewer follows the theme, and a picture with see-through pixels sits o
   await expect.poll(lightness).toBeLessThan(0.3);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes there, Shift+Enter selects every match (ADR 0060)", async ({ app }) => {
+  const p = app.page;
+  const id = await importOnCanvas(p);
+  await importOnCanvas(p, GREEN, "green.png");
+  // Tag the first picture in the library.
+  await toAssets(p);
+  await card(p, HASH).click();
+  await p.getByTestId("asset-tag-input").fill("sky");
+  await p.keyboard.press("Enter");
+  await expect(p.getByTestId("asset-tags")).toContainText("#sky");
+  await p.getByTestId("view-canvas").click();
+  await p.keyboard.press("Escape");
+  const box = p.getByRole("combobox", { name: "Search the canvas" });
+  const results = p.getByTestId("canvas-search");
+  const selection = () => p.evaluate(() => window.__canvastDebug.selection());
+  // "/": by file name; Enter selects it and brings it into view.
+  await p.keyboard.press("/");
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue("/");
+  await box.pressSequentially("blocks");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await expect(results.getByRole("option", { name: /blocks\.png/ })).toBeVisible();
+  await p.keyboard.press("Enter");
+  await expect(box).toBeHidden();
+  expect(await selection()).toEqual([id]);
+  // "#": by tag; only the tagged picture matches, and a tag nobody has finds nothing.
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("#");
+  await box.pressSequentially("sk");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await expect(results.getByRole("option", { name: /#sky/ })).toBeVisible();
+  await box.fill("#zzz");
+  await expect(p.getByText("Nothing matches.")).toBeVisible();
+  // The way can change while typing: the first character decides. Shift+Enter selects every match.
+  await box.fill(".png");
+  await expect(results.getByRole("option")).toHaveCount(2);
+  await p.keyboard.press("Shift+Enter");
+  expect((await selection()).length).toBe(2);
+  // "@": bookmarks. Save one, move away, and go back by name.
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await expect(p.getByTestId("bookmarks-panel")).toContainText("Bookmark 1");
+  const at = await p.evaluate(() => window.__canvastDebug.camera());
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  for (let i = 0; i < 4; i++) await p.keyboard.press("ArrowLeft");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.camera())).not.toEqual(at);
+  await p.keyboard.press("@");
+  await box.pressSequentially("mark");
+  await expect(results.getByRole("option", { name: /Bookmark 1/ })).toBeVisible();
+  await p.keyboard.press("Enter");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(at);
+  // The dock button opens it too, and the box never lets its keys reach the canvas (a "p" does not pick the pen).
+  await p.getByRole("button", { name: "Search the canvas" }).click();
+  await p.keyboard.press("p");
+  expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");
+  await p.keyboard.press("Escape");
+  await expect(box).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
