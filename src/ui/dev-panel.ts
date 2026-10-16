@@ -2,6 +2,7 @@ import type { ViewState } from "../app/view-state";
 import { zoomByStep } from "../interaction/navigation";
 import type { DocumentStore } from "../doc/document-store";
 import type { Notice } from "./notices";
+import { ICONS } from "./icons";
 
 /**
  * Developer navigation panel (shown only with #debug): fixed-size zoom jumps
@@ -46,10 +47,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
         ${SPEEDS.map((v) => `<option value="${v}"${v === 10 ? " selected" : ""}>${v} lv/s</option>`).join("")}
       </select>
       <button type="button" data-clear aria-label="Clear canvas" title="Clear canvas: delete every object on this canvas (Ctrl+Z brings them back)">Clear</button>
-    </div>
-    <div class="dev-row dev-notices" role="group" aria-label="Notices">
-      <button type="button" data-notice="one" title="Show one random notice (info, success, warning, error or progress)">Notice</button>
-      <button type="button" data-notice="many" title="Show four at once, to see the stack">Notices ×4</button>
+      <button type="button" data-notice aria-label="Show a sample notice" title="Show one random notice (info, success, warning, error or progress). Shift: four at once, to see the stack.">${ICONS.bell}</button>
     </div>`;
   root.appendChild(panel);
   const select = panel.querySelector("select")!;
@@ -77,13 +75,13 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
   panel.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
-    if (b.dataset["notice"]) {
+    if (b.dataset["notice"] !== undefined) {
       const pick = (): Notice => {
         // One in six is a progress notice, at a random point, so the bar and the spinner are seen too.
         if (Math.random() < 1 / 6) return { kind: "progress", text: "Importing 7 of 12 files", progress: Math.random(), channel: "dev" };
         return SAMPLES[Math.floor(Math.random() * SAMPLES.length)]!;
       };
-      for (let n = b.dataset["notice"] === "many" ? 4 : 1; n > 0; n--) notify(pick());
+      for (let n = (e as MouseEvent).shiftKey ? 4 : 1; n > 0; n--) notify(pick());
     } else if (b.dataset["clear"] !== undefined) {
       // One undoable transaction, saved like any edit.
       const ids = [...doc.all()].map((o) => o.id);

@@ -16,6 +16,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-down-z-a` | By name, Z to A |
 | `arrow-up-down` | Sorted: Newest first. Reverse the order |
 | `blocks` | Arrange and align |
+| `bell` | Show a sample notice (developer tools) |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |
 | `box-select` | Axis-aligned selection box |

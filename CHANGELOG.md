@@ -8,7 +8,7 @@
 
 - Icon audit: buttons with different functions no longer share an icon (Rename, Import and Export, Fit everything, New folder, Slideshow, Copy Markdown, Extract frame, board, list layout, and more); registry in docs/reference/icons.md and a rule in CLAUDE.md.
 
-- Developer tools: Notice and Notices ×4 buttons show sample notices of every kind (info, success, warning, error, progress).
+- Developer tools: a bell button shows sample notices (Shift: four) of every kind (info, success, warning, error, progress).
 
 - Notices redesigned to match the app's panels: a compact card, a small tinted icon badge, the same text size, a round close button (no more tinted gradient and thick side bar).
 
