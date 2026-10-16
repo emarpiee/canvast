@@ -44,30 +44,33 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.setAttribute("aria-label", "Search the canvas");
   root.hidden = true;
   root.innerHTML = `
-    <div class="cs-box">${ICONS.search}<span class="cs-mode" data-mode></span><input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false" placeholder="Search by name… or # tag or @ bookmark"></div>
+    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"></div>
+    <div class="cs-modes" role="tablist" aria-label="Search by">
+      <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
+      <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
+      <button type="button" role="tab" data-m="bookmark"><kbd>@</kbd>Bookmark</button>
+    </div>
     <ul id="cs-list" role="listbox" aria-label="Results"></ul>
-    <p class="cs-hint"><kbd>/</kbd> name <kbd>#</kbd> tag <kbd>@</kbd> bookmark · <kbd>Enter</kbd> go · <kbd>Shift+Enter</kbd> select all · <kbd>Esc</kbd> close</p>`;
+    <p class="cs-hint"><kbd>Enter</kbd> go to it · <kbd>Shift+Enter</kbd> select all · <kbd>Esc</kbd> close</p>`;
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
   const list = root.querySelector<HTMLElement>("ul")!;
-  const modeEl = root.querySelector<HTMLElement>("[data-mode]")!;
+  const PLACEHOLDER: Record<Mode, string> = { name: "File, layer or text name", tag: "Tag of a picture", bookmark: "Bookmark name" };
+  const EMPTY: Record<Mode, string> = { name: "Type a name to search this canvas.", tag: "Type a tag to find pictures with it.", bookmark: "Type a bookmark name, or leave it empty to list them." };
+  let mode: Mode = "name";
+  const setMode = (m: Mode): void => {
+    mode = m;
+    input.placeholder = PLACEHOLDER[m];
+    for (const t of root.querySelectorAll<HTMLElement>("[data-m]")) t.setAttribute("aria-selected", String(t.dataset["m"] === m));
+  };
   let results: Result[] = [];
   let active = 0;
   let names = new Map<string, string>();
   let tags = new Map<string, readonly string[]>();
   let token = 0;
 
-  const parse = (raw: string): { mode: Mode; q: string } => {
-    const t = raw.trimStart();
-    if (t.startsWith("#")) return { mode: "tag", q: t.slice(1).trim().toLowerCase() };
-    if (t.startsWith("@")) return { mode: "bookmark", q: t.slice(1).trim().toLowerCase() };
-    return { mode: "name", q: (t.startsWith("/") ? t.slice(1) : t).trim().toLowerCase() };
-  };
-
   const compute = (): void => {
-    const { mode, q } = parse(input.value);
-    modeEl.textContent = mode === "tag" ? "#" : mode === "bookmark" ? "@" : "/";
-    modeEl.dataset["kind"] = mode;
+    const q = input.value.trim().toLowerCase();
     const out: Result[] = [];
     if (mode === "bookmark") {
       for (const b of deps.bookmarks.items) {
@@ -104,7 +107,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       ? results
           .map((r, i) => `<li role="option" id="cs-${i}" data-i="${i}" aria-selected="${i === active}" class="cs-row${i === active ? " is-active" : ""}"><span class="cs-icon">${r.icon}</span><span class="cs-label">${esc(r.label)}</span><span class="cs-note">${esc(r.note)}</span></li>`)
           .join("")
-      : `<li class="cs-empty" role="presentation">${input.value.trim().length > 1 ? "Nothing matches." : "Type to search this canvas."}</li>`;
+      : `<li class="cs-empty" role="presentation">${input.value.trim() ? "Nothing matches." : EMPTY[mode]}</li>`;
     if (results.length) input.setAttribute("aria-activedescendant", `cs-${active}`);
     else input.removeAttribute("aria-activedescendant");
     list.querySelector<HTMLElement>(".is-active")?.scrollIntoView({ block: "nearest" });
@@ -131,8 +134,22 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   };
 
   input.addEventListener("input", () => {
+    // A first character of "/", "#" or "@" chooses the way and is not part of the search.
+    const c = input.value[0];
+    if (c === "/" || c === "#" || c === "@") {
+      setMode(c === "#" ? "tag" : c === "@" ? "bookmark" : "name");
+      input.value = input.value.slice(1);
+    }
     active = 0;
     compute();
+  });
+  root.querySelector(".cs-modes")!.addEventListener("click", (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
+    if (!t) return;
+    setMode(t.dataset["m"] as Mode);
+    active = 0;
+    compute();
+    input.focus();
   });
   input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -145,6 +162,10 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       e.preventDefault();
     } else if (e.key === "Enter") {
       go(results[active], e.shiftKey);
+      e.preventDefault();
+    } else if (e.key === "Backspace" && !input.value && mode !== "name") {
+      setMode("name"); // nothing left to delete: back to the plain name search
+      compute();
       e.preventDefault();
     }
     e.stopPropagation(); // typing here never reaches the canvas shortcuts
@@ -160,7 +181,8 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   return {
     open(prefix = "/") {
       root.hidden = false;
-      input.value = prefix;
+      setMode(prefix === "#" ? "tag" : prefix === "@" ? "bookmark" : "name");
+      input.value = "";
       active = 0;
       const my = ++token;
       names = new Map();

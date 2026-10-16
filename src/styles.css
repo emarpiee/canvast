@@ -1400,13 +1400,18 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .ctx-layout-menu { position: absolute; z-index: 6; width: 270px; max-height: calc(100% - 16px); overflow: auto; }
 .ctx-layout-menu button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: var(--ctl); padding: 0 12px; text-align: left; font-size: 13px; white-space: nowrap; border-radius: var(--r-md); }
 
-/* ---- Search the canvas (ADR 0060) ---- */
-.cs { position: absolute; z-index: 20; top: calc(var(--bar-bottom, 56px) + 12px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 24px)); display: grid; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); overflow: hidden; }
+/* ---- Search the canvas (ADR 0060): one type size (13px) throughout ---- */
+.cs { position: absolute; z-index: 20; top: calc(var(--bar-bottom, 56px) + 12px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 24px)); display: grid; font: 13px/1.4 var(--font-ui); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); overflow: hidden; }
 .cs[hidden] { display: none; }
-.cs-box { display: flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; border-bottom: 1px solid var(--hud-border); }
+.cs-box { display: flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; }
 .cs-box svg { width: 18px; height: 18px; flex: none; color: var(--hud-muted); }
-.cs-mode { flex: none; min-width: 20px; padding: 1px 6px; font: 600 12px var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: 999px; }
-.cs-box input { flex: 1; min-width: 0; height: 40px; font: inherit; font-size: 15px; color: inherit; background: transparent; border: 0; outline: 0; }
+.cs-box input { flex: 1; min-width: 0; height: 40px; font: inherit; color: inherit; background: transparent; border: 0; outline: 0; }
+.cs-box input::placeholder { color: var(--hud-muted); }
+.cs-modes { display: flex; gap: 4px; padding: 0 8px 8px; border-bottom: 1px solid var(--hud-border); }
+.cs-modes button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; font: inherit; color: var(--hud-muted); background: transparent; border: 0; border-radius: 999px; cursor: pointer; }
+.cs-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }
+.cs-modes button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+.cs kbd { font: inherit; font-size: 12px; opacity: 0.75; }
 .cs ul { list-style: none; margin: 0; padding: 4px; max-height: min(50vh, 360px); overflow: auto; }
 .cs-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border-radius: var(--r-md); cursor: pointer; }
 .cs-row.is-active, .cs-row:hover { background: var(--hud-hover); }
@@ -1414,10 +1419,10 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .cs-icon { display: inline-flex; flex: none; color: var(--hud-muted); }
 .cs-icon svg { width: 16px; height: 16px; }
 .cs-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cs-note { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--hud-muted); }
-.cs-empty { padding: 12px; color: var(--hud-muted); }
-.cs-hint { margin: 0; padding: 6px 12px; font-size: 11px; color: var(--hud-muted); border-top: 1px solid var(--hud-border); }
-.cs-hint kbd { font: inherit; padding: 0 5px; background: var(--hud-hover); border-radius: 4px; }
+.cs-note { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); }
+.cs-empty { padding: 10px; color: var(--hud-muted); }
+.cs-hint { margin: 0; padding: 6px 12px; color: var(--hud-muted); border-top: 1px solid var(--hud-border); }
+.cs-hint kbd { padding: 0 5px; background: var(--hud-hover); border-radius: 4px; opacity: 1; }
 
 /* ---- Phones (ADR 0061): the bars stack in rows instead of overlapping, the tools stay clear of them, panels sit beside the tools ---- */
 @media (max-width: 640px) {

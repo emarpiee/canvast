@@ -1353,7 +1353,8 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   // "/": by file name; Enter selects it and brings it into view.
   await p.keyboard.press("/");
   await expect(box).toBeFocused();
-  await expect(box).toHaveValue("/");
+  await expect(box).toHaveValue(""); // the key chose the way; it is not part of the search
+  await expect(results.getByRole("tab", { name: /Name/ })).toHaveAttribute("aria-selected", "true");
   await box.pressSequentially("blocks");
   await expect(results.getByRole("option")).toHaveCount(1);
   await expect(results.getByRole("option", { name: /blocks\.png/ })).toBeVisible();
@@ -1369,7 +1370,8 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await box.fill("#zzz");
   await expect(p.getByText("Nothing matches.")).toBeVisible();
   // The way can change while typing: the first character decides. Shift+Enter selects every match.
-  await box.fill(".png");
+  await box.fill("/.png");
+  await expect(box).toHaveValue(".png");
   await expect(results.getByRole("option")).toHaveCount(2);
   await p.keyboard.press("Shift+Enter");
   expect((await selection()).length).toBe(2);
@@ -1383,6 +1385,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.camera())).not.toEqual(at);
   await p.keyboard.press("@");
+  await expect(results.getByRole("tab", { name: /Bookmark/ })).toHaveAttribute("aria-selected", "true");
   await box.pressSequentially("mark");
   await expect(results.getByRole("option", { name: /Bookmark 1/ })).toBeVisible();
   await p.keyboard.press("Enter");
