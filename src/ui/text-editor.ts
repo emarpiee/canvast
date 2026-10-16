@@ -14,6 +14,7 @@ import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
 import { layoutText } from "../text/layout";
 import { TEXT_FONT_FAMILY } from "../render/draw-text";
+import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { labelOf } from "./layers-panel";
@@ -129,7 +130,7 @@ export function mountTextEditor(
     } else {
       box.style.transform = "";
     }
-    box.style.color = target.color;
+    box.style.color = paintColor(target.color);
     box.style.fontFamily = `${TEXT_FONT_FAMILY}, sans-serif`;
     bar.style.left = `${Math.max(4, s.x)}px`;
     bar.style.top = `${Math.max(4, s.y - 48)}px`;

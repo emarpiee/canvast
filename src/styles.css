@@ -1165,9 +1165,12 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer.is-actual figure img { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
 
 /* Hover and selection rings are drawn inside the card (an outline, above the picture), so the cards at the edges are not clipped by the scroll area. */
-.asset-card:hover { box-shadow: none; outline: 2px solid var(--hud-muted); outline-offset: -2px; }
-.asset-card[aria-pressed="true"] { box-shadow: none; outline: 3px solid var(--hud-accent); outline-offset: -3px; }
-.assets-body.is-list .asset-card:hover, .assets-body.is-list .asset-card[aria-pressed="true"] { outline: none; }
+/* The rings sit on a layer above the picture (an outline or inset shadow on the card itself is painted under its image). */
+.asset-card:hover, .asset-card[aria-pressed="true"] { box-shadow: none; outline: none; }
+.asset-card::after { content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit; }
+.asset-card:hover::after { box-shadow: inset 0 0 0 2px var(--hud-muted); }
+.asset-card[aria-pressed="true"]::after { box-shadow: inset 0 0 0 3px var(--hud-accent); background: color-mix(in oklch, var(--hud-accent) 14%, transparent); }
+.assets-body.is-list .asset-card::after { display: none; }
 .assets-scroll { padding: 2px 2px 24px; }
 
 /* List columns: shown or hidden, and in the order chosen (the order and the grid are set on the library by app code). */

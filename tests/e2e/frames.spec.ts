@@ -1356,9 +1356,19 @@ test("canvas pattern: one button cycles Grid, Dots, Multi-scale grid and None, a
       for (let i = 0; i < d.length; i += 4) if (`${d[i]},${d[i + 1]},${d[i + 2]}` !== bg) n++;
       return Math.round(n / (r * r));
     });
+  /** Reddish pixels anywhere on the canvas: the axis line (and the origin square) that only the multi-scale grid draws. */
+  const reddish = () =>
+    p.evaluate(() => {
+      const c = document.getElementById("canvas") as HTMLCanvasElement;
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i]! > d[i + 1]! + 25 && d[i]! > d[i + 2]! + 25) n++;
+      return n;
+    });
   // The default is the regular grid; dots are fewer marks than lines; the multi-scale grid is what the app always had; None is blank.
   await expect(button()).toHaveAttribute("data-pattern", "grid");
   await app.frame();
+  expect(await reddish(), "the plain grid has no axis line").toBe(0);
   const grid = await marked();
   expect(grid, "a grid of lines is drawn").toBeGreaterThan(300);
   await button().click();
@@ -1367,10 +1377,12 @@ test("canvas pattern: one button cycles Grid, Dots, Multi-scale grid and None, a
   const dots = await marked();
   expect(dots, "dots are drawn").toBeGreaterThan(20);
   expect(dots, "far fewer marks than lines").toBeLessThan(grid / 3);
+  expect(await reddish(), "dots have no axis line").toBe(0);
   await button().click();
   await expect(button()).toHaveAttribute("data-pattern", "scale");
   await app.frame();
   expect(await marked(), "the multi-scale grid is drawn").toBeGreaterThan(300);
+  expect(await reddish(), "the multi-scale grid keeps its axes").toBeGreaterThan(100);
   await button().click();
   await expect(button()).toHaveAttribute("data-pattern", "none");
   await app.frame();

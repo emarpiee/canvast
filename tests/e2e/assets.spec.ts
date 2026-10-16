@@ -1153,6 +1153,9 @@ test("keyboard in the library, in either layout: arrows, Home and End move and p
     await p.keyboard.press("Control+a");
     await expect(picked()).toHaveCount(5);
     await expect(p.getByTestId("asset-inspector").locator("h2")).toHaveText("5 selected");
+    // A picked card shows its ring above the picture (grid only; the list highlights the row).
+    const ring = await cards.first().evaluate((e) => getComputedStyle(e, "::after").boxShadow);
+    if (layout === "grid") expect(ring, "picked card has a ring").not.toBe("none");
     await p.keyboard.press("Escape");
     await expect(picked()).toHaveCount(0);
   }

@@ -335,3 +335,16 @@ test("text placed deep stays exact at any magnification: letter edge and fill, n
   recordMetric(info, "text-deep", { switchEdges: edges.map((e) => e - cx), depths });
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the text box shows the default ink in a readable colour on the dark canvas, while the stored colour stays the default (ADR 0052)", async ({ app }) => {
+  const p = app.page;
+  await p.emulateMedia({ colorScheme: "dark" });
+  await p.getByRole("radio", { name: "Text" }).click();
+  await p.mouse.click(400, 300);
+  const box = p.getByTestId("text-editor");
+  await expect(box).toBeFocused();
+  // The ink is drawn as a light oklch on the dark canvas (the stored colour is the near-black default).
+  const light = await box.evaluate((e) => Number(/oklch\(([\d.]+)/.exec(getComputedStyle(e).color)?.[1] ?? 0));
+  expect(light, "light enough to read on the dark canvas").toBeGreaterThan(0.7);
+  expect(app.consoleErrors).toEqual([]);
+});

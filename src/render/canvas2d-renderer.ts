@@ -59,10 +59,10 @@ export function renderFrame(
     gridLines = drawGrid(ctx, cam, vp, theme);
     drawAxes(ctx, cam, vp, theme, worldOrigin);
   } else if (pattern !== "none") {
+    // The plain patterns are just the pattern: no axes and no landmarks (those belong to the multi-scale grid).
     gridLines = drawRegularGrid(ctx, cam, vp, theme, pattern === "dots");
-    drawAxes(ctx, cam, vp, theme, worldOrigin);
   }
-  const landmarksDrawn = drawLandmarks(ctx, cam, vp, theme, landmarks);
+  const landmarksDrawn = pattern === "scale" ? drawLandmarks(ctx, cam, vp, theme, landmarks) : 0;
   return { gridLines, landmarksDrawn };
 }
 
