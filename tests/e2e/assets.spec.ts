@@ -1402,6 +1402,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(help).toBeHidden();
   await expect(box).toHaveValue("cat -dog");
   await expect(results).toBeVisible(); // choosing an example does not close the search
+  await results.getByRole("tab", { name: /Tag/ }).click();
   await box.fill("#sky XOR sky");
   await expect(results.getByRole("option")).toHaveCount(0);
   // "@": bookmarks. Save one, move away, and go back by name.
@@ -1426,6 +1427,9 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
   await box.fill("sky");
   await expect(results.getByRole("option")).toHaveCount(1); // the tag
+  await box.fill("#sky -#nothing"); // a typed "#" stays in the box: it is part of the search
+  await expect(box).toHaveValue("#sky -#nothing");
+  await expect(results.getByRole("option")).toHaveCount(1);
   await box.fill("blocks OR green");
   await expect(results.getByRole("option")).toHaveCount(2);
   await box.fill("png -sky");
@@ -1437,6 +1441,62 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");
   await p.keyboard.press("Escape");
   await expect(box).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("in-canvas tags: rename and delete a tag on every canvas, from a Layers chip or the Assets sidebar (ADR 0070)", async ({ app }) => {
+  const p = app.page;
+  const tagsOf = async (id: string) => ((await objects(p)) as Array<{ id: string; tags?: string[] }>).find((o) => o.id === id)?.tags;
+  const tagIt = async (id: string, text: string): Promise<void> => {
+    if (!(await p.getByTestId("layers-panel").isVisible())) await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+    await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${id}"]`).click();
+    await p.getByLabel("Add a tag to the selection").fill(text);
+    await p.keyboard.press("Enter");
+    await expect.poll(() => tagsOf(id)).toBeTruthy();
+    await saved(p);
+  };
+  const first = await importOnCanvas(p);
+  await tagIt(first, "Sky, keep");
+  await newCanvas(p, "Board 1 › Canvas 2");
+  const second = await importOnCanvas(p, GREEN, "green.png");
+  await tagIt(second, "sky");
+  await openCanvas(p, /Canvas 1/, "Board 1 › Canvas 1");
+  await p.locator(`[data-testid="layers-panel"] li.layer[data-key="${first}"]`).click();
+  // The chip's menu renames the tag on this canvas and on the other one.
+  await p.getByRole("button", { name: "More actions for tag Sky" }).click();
+  await p.getByRole("menuitem", { name: "Rename tag Sky" }).click();
+  const box = p.getByLabel("New name for tag Sky on every canvas");
+  await box.fill("cloud");
+  await p.keyboard.press("Enter");
+  await expect.poll(() => tagsOf(first)).toEqual(["cloud", "keep"]);
+  await saved(p);
+  // One undo takes it back on the open canvas.
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => tagsOf(first)).toEqual(["Sky", "keep"]);
+  await p.keyboard.press("Control+Shift+z");
+  await expect.poll(() => tagsOf(first)).toEqual(["cloud", "keep"]);
+  await saved(p);
+  await openCanvas(p, /Canvas 2/, "Board 1 › Canvas 2");
+  await expect.poll(() => tagsOf(second)).toEqual(["cloud"]);
+  // The Assets sidebar lists one canvas tag now; its menu renames it again and deletes it.
+  await toAssets(p);
+  const ctags = p.getByTestId("canvas-tag-list");
+  await expect(ctags.getByRole("button", { name: /^#cloud/ })).toBeVisible();
+  await expect(ctags.getByRole("button", { name: /^#Sky/ })).toHaveCount(0);
+  await p.getByRole("button", { name: "More actions for canvas tag cloud" }).click();
+  await p.getByRole("menuitem", { name: "Rename canvas tag cloud" }).click();
+  await p.getByLabel("New name for canvas tag cloud").fill("keep");
+  await p.keyboard.press("Enter");
+  await expect(ctags.getByRole("button", { name: /^#keep/ })).toBeVisible();
+  await expect(ctags.getByRole("button", { name: /^#cloud/ })).toHaveCount(0);
+  await p.getByRole("button", { name: "More actions for canvas tag keep" }).click();
+  await p.getByRole("menuitem", { name: "Delete canvas tag keep" }).click();
+  await p.getByRole("button", { name: "Delete tag" }).click();
+  await expect(ctags.getByRole("button", { name: /^#keep/ })).toHaveCount(0);
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => tagsOf(second)).toBeUndefined();
+  await openCanvas(p, /Canvas 1/, "Board 1 › Canvas 1");
+  await expect.poll(() => tagsOf(first)).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
 

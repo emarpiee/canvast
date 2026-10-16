@@ -238,7 +238,7 @@ or network connection.
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
 | Step to the next item | `Ctrl+Arrow` (Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
 | Bring the selection into view | `Alt` pressed and released alone; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
-| Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
+| Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
 | Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library, smart folders and canvas search; ADR 0069) |
 | Select several layers | `Ctrl`+click toggles · `Shift`+click selects a range · `Ctrl+Shift`+click adds a range |
 | Viewer (Assets) | `F` shows or hides the controls · arrows or edge clicks move between pictures · wheel zooms · drag pans |

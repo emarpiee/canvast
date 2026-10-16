@@ -390,6 +390,22 @@ export function tagObjects(doc: DocumentStore, editor: EditorState, ids: readonl
   return changed.length;
 }
 
+/** Rename (`target`) or remove (null) the in-canvas tag `key` (lower-cased) on every object of the open canvas, as one undo step (ADR 0070). */
+export function changeTagOnCanvas(doc: DocumentStore, editor: EditorState, key: string, target: string | null): number {
+  if (editor.blockEdit()) return 0;
+  const changed: CanvasObject[] = [];
+  for (const o of doc.ordered()) {
+    if (!(o.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
+    const next = normalizeTags((o.tags ?? []).flatMap((t) => (t.toLowerCase() !== key ? [t] : target ? [target] : [])));
+    const { tags: _old, ...rest } = o;
+    changed.push((next.length ? { ...rest, tags: next } : rest) as CanvasObject);
+  }
+  if (!changed.length) return 0;
+  doc.commit(doc.transaction(target ? "Rename tag" : "Remove tag", changed));
+  editor.changed();
+  return changed.length;
+}
+
 /**
  * Take the turn off the selected items (each about its own middle, so none moves) and, separately, give stretched pictures their
  * own proportions back (the same width and middle, the height of the original). One undo step each. Return how many changed.

@@ -248,11 +248,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
   let assetCanvasTags: string[] = [];
   /** The row whose "more" menu is open in the sidebar. */
-  let sideMenu: { kind: "folder" | "smart" | "tag"; id: string } | null = null;
+  let sideMenu: { kind: "folder" | "smart" | "tag" | "ctag"; id: string } | null = null;
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "new-smart" } | { kind: "rename-smart"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
 
   // ---- thumbnails: generated lazily from the stored original, kept in memory only
@@ -955,9 +955,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       else tagCounts.set(k, { label: t, n: 1 });
     }
     const ro = session.readOnly;
-    const kindWord = { folder: "folder", smart: "smart folder", tag: "tag" } as const;
+    const kindWord = { folder: "folder", smart: "smart folder", tag: "tag", ctag: "canvas tag" } as const;
     /** A row's "more" button and, when open, its labelled menu (Rename, Delete and so on): one button instead of a row of them. */
-    const more = (kind: "folder" | "smart" | "tag", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
+    const more = (kind: "folder" | "smart" | "tag" | "ctag", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
       if (ro) return "";
       const open = sideMenu?.kind === kind && sideMenu.id === id;
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>${
@@ -1086,7 +1086,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               [...canvasTags]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
                 .map(([k, c]) =>
-                  item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, { cls: "is-tag is-canvas-tag" }).replace("<button ", `<button title="On ${c.objects} item(s) across ${c.canvases.size} canvas(es); ${c.assets.size} from the library" `),
+                  naming?.kind === "rename-ctag" && naming.key === k
+                    ? nameInput(c.label, `New name for canvas tag ${c.label}`)
+                    : item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
+                        cls: "is-tag is-canvas-tag",
+                        extra: more("ctag", k, c.label, [
+                          { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.pencil, aria: `Rename canvas tag ${c.label}` },
+                          { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
+                        ]),
+                      }).replace("<button ", `<button title="On ${c.objects} item(s) across ${c.canvases.size} canvas(es); ${c.assets.size} from the library" `),
                 )
                 .join("") || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
@@ -1700,7 +1708,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.hasAttribute("data-side-more")) {
-      const kind = b.dataset["kind"] as "folder" | "smart" | "tag";
+      const kind = b.dataset["kind"] as "folder" | "smart" | "tag" | "ctag";
       const id = b.dataset["id"]!;
       sideMenu = sideMenu?.kind === kind && sideMenu.id === id ? null : { kind, id };
       renderSide();
@@ -1724,6 +1732,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           confirmLabel: "Delete tag",
         }).then(async (ok) => {
           if (ok && (await session.organize((c) => c.deleteTag(label))) && scope === `tag:${key}`) scope = "all";
+        });
+      }
+      return;
+    }
+    if (b.dataset["ctagAction"]) {
+      const key = b.dataset["key"]!;
+      const label = canvasTags.get(key)?.label ?? key;
+      if (b.dataset["ctagAction"] === "rename") {
+        naming = { kind: "rename-ctag", key, label };
+        renderSide();
+      } else {
+        const c = canvasTags.get(key);
+        void confirmDialog({
+          title: `Delete the canvas tag “${label}”?`,
+          lines: [`It is taken off ${c?.objects ?? 0} item(s) on ${c?.canvases.size ?? 0} canvas(es). The items stay. On the open canvas Undo brings it back; on the others it cannot be undone.`],
+          confirmLabel: "Delete tag",
+        }).then(async (ok) => {
+          if (ok) await session.changeCanvasTag(label, null);
         });
       }
       return;
@@ -1819,6 +1845,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const was = n.label;
         void session.organize((c) => c.renameTag(was, name)).then((ok) => {
           if (ok && scope === `tag:${n.key}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
+          renderSide();
+        });
+      } else if (n.kind === "rename-ctag") {
+        const was = n.label;
+        void session.changeCanvasTag(was, name).then((changed) => {
+          if (changed && scope === `ctag:${n.key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
           renderSide();
         });
       } else if (n.kind === "new-smart") {

@@ -1,13 +1,13 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
-import { AssetCatalog, AssetInUseError, CatalogInputError } from "../assets/asset-catalog";
+import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
 import { plainText } from "../text/markdown";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
-import { placeImage, placeImages } from "./actions";
+import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { applyImport, archiveFileName, buildArchive, readArchive } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
@@ -427,6 +427,41 @@ export class Session {
       cur.onerror = () => reject(cur.error);
     });
     return out;
+  }
+
+  /**
+   * Rename (`to` is a name) or delete (`to` is null) an in-canvas tag on every canvas of the workspace (ADR 0070). The open canvas goes
+   * through its document, so one undo brings it back; the other canvases are rewritten in storage. Renaming onto an existing tag merges.
+   * Returns how many items changed (0 when refused).
+   */
+  async changeCanvasTag(from: string, to: string | null): Promise<number> {
+    if (!this.guardWrite() || !this.repo) return 0;
+    let target: string | null = null;
+    if (to !== null) {
+      try {
+        target = normalizeTags([to])[0] ?? null;
+      } catch (e) {
+        this.tell(e instanceof CatalogInputError ? e.message[0]!.toUpperCase() + e.message.slice(1) + "." : "That is not a valid tag.");
+        return 0;
+      }
+      if (!target) {
+        this.tell("Type a name for the tag.");
+        return 0;
+      }
+    }
+    const key = from.replace(/^#+/, "").trim().toLowerCase();
+    await this.persistence.flush();
+    let n = changeTagOnCanvas(this.doc, this.editor, key, target);
+    await this.persistence.flush();
+    try {
+      const other = await this.repo.changeObjectTag(key, target, this.current?.canvasId ?? null);
+      n += other.objects;
+      for (const id of other.canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });
+    } catch (e) {
+      this.tell(`Could not change the tag on other canvases: ${(e as Error).message}`);
+    }
+    this.emitAssets();
+    return n;
   }
 
   /** The in-canvas tags carried by instances of one library asset, anywhere in the workspace. */

@@ -342,6 +342,55 @@ export class WorkspaceRepo {
     }
   }
 
+  /**
+   * Rename (`target` is a name) or remove (`target` is null) an in-canvas tag on the stored objects of every canvas except `skip`
+   * (the open one is changed through its document, so it can be undone) (ADR 0070). `key` is the lower-cased tag. One transaction:
+   * each touched canvas gets a new revision, so a tab that has it open sees the change as a commit from elsewhere.
+   * Returns the canvases touched and how many objects changed.
+   */
+  async changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }> {
+    const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    try {
+      const store = tx.objectStore("objects");
+      const hits: ObjectRecord[] = [];
+      await new Promise<void>((resolve, reject) => {
+        const cur = store.index("tags").openCursor();
+        cur.onsuccess = () => {
+          const c = cur.result;
+          if (!c) return resolve();
+          const rec = c.value as ObjectRecord;
+          if (String(c.key).toLowerCase() === key && rec.canvasId !== skip) hits.push(rec);
+          c.continue();
+        };
+        cur.onerror = () => reject(cur.error);
+      });
+      const touched = new Set<string>();
+      for (const rec of hits) {
+        const tags = ((rec.data as { tags?: string[] }).tags ?? []).map((t) => (t.toLowerCase() === key && target ? target : t)).filter((t) => t.toLowerCase() !== key || target);
+        const seen = new Set<string>();
+        const next = tags.filter((t) => !seen.has(t.toLowerCase()) && !!seen.add(t.toLowerCase()));
+        const { tags: _old, ...rest } = rec.data as SerializedObject & { tags?: string[] };
+        store.put({ ...rec, data: (next.length ? { ...rest, tags: next } : rest) as SerializedObject } satisfies ObjectRecord);
+        touched.add(rec.canvasId);
+      }
+      for (const id of touched) {
+        const canvas = await req(tx.objectStore("canvases").get(id) as IDBRequest<CanvasRecord | undefined>);
+        if (canvas) tx.objectStore("canvases").put({ ...canvas, revision: canvas.revision + 1, updatedAt: Date.now() } satisfies CanvasRecord);
+      }
+      await committed;
+      return { canvases: [...touched], objects: hits.length };
+    } catch (e) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      await committed.catch(() => undefined);
+      throw e;
+    }
+  }
+
   /** Texts that mention an object (stored index, ADR 0040). */
   async mentionedBy(targetId: ObjectId): Promise<ObjectRecord[]> {
     const tx = this.db.transaction("objects");

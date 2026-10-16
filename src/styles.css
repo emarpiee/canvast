@@ -1760,3 +1760,5 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .search-help td:last-child { padding-right: 0; }
 .search-help td button { font: inherit; font-size: var(--text-xs); color: var(--hud-accent-fg); background: var(--hud-accent); border: 0; border-radius: var(--r-sm); padding: var(--sp-1) var(--sp-3); cursor: pointer; white-space: nowrap; }
 .search-help p { margin: var(--sp-3) 0 0; color: var(--hud-muted); font-size: var(--text-xs); }
+.layers-tags .tag-chip .tag-chip-name { width: auto; height: 18px; padding: 0 var(--sp-1); font: inherit; border-radius: var(--r-pill); }
+.layers-tags .tag-chip .tag-chip-name:hover { background: var(--hud-hover); }

@@ -2,6 +2,9 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- In-canvas tags can be renamed or deleted on every canvas, from a Layers tag chip or the Assets sidebar's Canvas tags (ADR 0070).
+- Fix: a `#` typed first in the canvas search stays in the box (`#tag` is a search word); only `/` and `@` switch the way.
+
 - The canvas search opens on All (names, groups, tags and bookmarks together, with AND, OR, XOR, NOT); `/ # @` narrow it; a ? button explains the syntax.
 
 - Search takes AND, OR, XOR, NOT, `-`, brackets and "phrases" in the library, smart folders and the canvas search (ADR 0069).

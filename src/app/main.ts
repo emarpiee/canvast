@@ -43,6 +43,7 @@ import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
+import { confirmDialog } from "../ui/confirm";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, toolForKey, toolKeys } from "../settings/shortcuts";
@@ -430,6 +431,13 @@ async function start(): Promise<void> {
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOrder: (order, label) => setStackOrder(doc, editor, order, label),
     tag: (ids, change) => void tagObjects(doc, editor, ids, change),
+    renameTag: (from, to) => void session.changeCanvasTag(from, to),
+    deleteTag: (tag) =>
+      void confirmDialog({
+        title: `Delete the tag “${tag}” from every canvas?`,
+        lines: ["The items stay. On this canvas Undo brings it back; on the other canvases it cannot be undone."],
+        confirmLabel: "Delete tag",
+      }).then((ok) => (ok ? session.changeCanvasTag(tag, null) : 0)),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),

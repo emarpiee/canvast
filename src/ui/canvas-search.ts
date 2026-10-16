@@ -158,10 +158,10 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   };
 
   input.addEventListener("input", () => {
-    // A first character of "/", "#" or "@" chooses the way and is not part of the search.
+    // A first "/" or "@" chooses the way and is not part of the search. A "#" stays: it is a search word (`#tag`, `-#tag`).
     const c = input.value[0];
-    if (c === "/" || c === "#" || c === "@") {
-      setMode(c === "#" ? "tag" : c === "@" ? "bookmark" : "name");
+    if (c === "/" || c === "@") {
+      setMode(c === "@" ? "bookmark" : "name");
       input.value = input.value.slice(1);
     }
     active = 0;
