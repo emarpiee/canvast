@@ -76,8 +76,8 @@ export function adjustedSource(src: RasterSource, a: Adjust): CanvasImageSource 
   if (!per) cache.set(src.source as object, (per = new Map()));
   const hit = per.get(key);
   if (hit) return hit;
-  const k = src.scale ?? 1;
-  const w = Math.max(1, Math.round(src.pixelW * k)), h = Math.max(1, Math.round(src.pixelH * k));
+  // (`pixelW` and `pixelH` are the pixels this source really has: a reduced copy is already smaller than the picture)
+  const w = Math.max(1, src.pixelW), h = Math.max(1, src.pixelH);
   if (w * h > MAX_PIXELS) return src.source;
   const c = document.createElement("canvas");
   c.width = w;

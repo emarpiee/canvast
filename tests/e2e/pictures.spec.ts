@@ -108,3 +108,26 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("an adjusted picture too big to be decoded whole is still drawn whole when zoomed out (a reduced copy is adjusted at its own size)", async ({ app }) => {
+  const p = app.page;
+  const big = makePng(2400, 1600, (x, y) => [x % 256, y % 256, 120, 255]);
+  const pic = await place(app, "big.png", big);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  const pop = p.locator(".adjust-pop");
+  await pop.locator('[data-adj-num="contrast"]').fill("30");
+  await pop.locator('[data-adj-num="contrast"]').blur();
+  await p.keyboard.press("Escape");
+  await p.mouse.click(40, 700);
+  await p.evaluate(() => window.__canvastDebug.jump(-3)); // far enough out that a reduced copy is used
+  await app.frame();
+  const s = await boxOf(app, pic.id);
+  const bg = await px(app, 40, 700);
+  // the far corner of the picture is the picture, not the empty page
+  const corner = await px(app, Math.round(s.maxX - 3), Math.round(s.maxY - 3));
+  expect(corner).not.toEqual(bg);
+  expect(app.consoleErrors).toEqual([]);
+});
