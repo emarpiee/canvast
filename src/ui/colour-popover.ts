@@ -269,6 +269,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
       const ed = createGradientEditor({
         value: gradientToValue(g),
         picker: pickerOptions,
+        typeSwitch: false, // the chooser above already has Linear and Radial
         onInput: (v) => o.onInput((paint = gradientFromValue(paint as Gradient, v))),
         onChange: (v) => settle((paint = gradientFromValue(paint as Gradient, v))),
       });

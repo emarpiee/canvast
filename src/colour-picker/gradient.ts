@@ -47,6 +47,8 @@ export interface GradientEditorOptions {
   /** Options for the colour picker of the selected stop (model, view, format, groups, labels, size, display, …). Transparency is on. */
   picker?: Omit<PickerOptions, "value" | "alpha" | "onInput" | "onChange" | "injectStyles">;
   labels?: Partial<GradientLabels>;
+  /** Show the Linear / Radial switch (default true). A host that chooses the kind elsewhere turns it off. */
+  typeSwitch?: boolean;
   /** Fewest and most stops (default 2 and 16). */
   minStops?: number;
   maxStops?: number;
@@ -117,8 +119,10 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
   const root = document.createElement("div");
   root.className = "cp cg";
   root.dataset["type"] = v.type;
+  // As wide as the picker below it (a host that only embeds the editor gets the same width).
+  root.style.setProperty("--cp-size", `${options.picker?.size ?? 208}px`);
   root.innerHTML = `
-    <div class="cp-seg" role="radiogroup" aria-label="${esc(L.linear)} / ${esc(L.radial)}">
+    <div class="cp-seg" role="radiogroup" data-typeswitch aria-label="${esc(L.linear)} / ${esc(L.radial)}">
       <button type="button" role="radio" data-gtype="linear">${esc(L.linear)}</button>
       <button type="button" role="radio" data-gtype="radial">${esc(L.radial)}</button>
     </div>
@@ -144,6 +148,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
   const cy = q<HTMLInputElement>("[data-cy]");
   const rad = q<HTMLInputElement>("[data-r]");
   const removeBtn = q<HTMLButtonElement>("[data-remove]");
+  q("[data-typeswitch]").hidden = options.typeSwitch === false;
 
   let picker: ColourPicker | null = null;
   const pickerHost = q<HTMLElement>("[data-picker]");
