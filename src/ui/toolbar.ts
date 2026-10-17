@@ -61,6 +61,8 @@ export interface ToolbarActions {
   cropped(): boolean;
   uncrop(): void;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
+  /** The saved adjustments, and saving the numbers as one (ADR 0120). */
+  adjustStyles(): { items(): Array<{ id: string; name: string; adjust: Adjust; summary: string }>; save(name: string, a: Adjust): Promise<void> };
   previewAdjust(a: Adjust): void;
   commitAdjust(a: Adjust, label: string): void;
   copyAdjust(): void;
@@ -347,6 +349,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (!sel) return;
     openAdjustPopover(anchor, {
       ...sel,
+      styles: actions.adjustStyles(),
       onInput: (a) => actions.previewAdjust(a),
       onChange: (a, label) => actions.commitAdjust(a, label),
       onClose: () => {

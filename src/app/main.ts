@@ -69,6 +69,9 @@ import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
+import { ADJUSTMENT_KIND } from "../assets/styles";
+import { setColourStyles } from "../ui/colour-popover";
+import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import type { Command } from "../ui/command-palette";
@@ -603,6 +606,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     cropped: () => isCropped(doc, editor),
     uncrop: () => uncropPicture(doc, editor),
     selectedAdjust: () => selectedAdjust(doc, editor),
+    adjustStyles: () => ({
+      items: () => session.styles.of("adjustment").map((s) => ({ id: s.id, name: s.name, adjust: s.data as Adjust, summary: ADJUSTMENT_KIND.summary(s.data) })),
+      save: async (name, a) => {
+        if (!(await session.styles.add("adjustment", name, a))) {
+          editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
+          editor.changed();
+        }
+      },
+    }),
     previewAdjust: (a) => previewAdjust(doc, editor, a),
     commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
     copyAdjust: () => void copyAdjustments(doc, editor),
@@ -733,6 +745,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
   };
 
+  setColourStyles({
+    colours: () => session.styles.of("colour").map((s) => String(s.data)),
+    save: (hex) => void session.styles.add("colour", "", hex).then((made) => made && ((editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`), editor.changed())),
+  });
   const history = new CameraHistory(view);
   editor.subscribe(() => {
     if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)

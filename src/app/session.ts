@@ -3,6 +3,8 @@ import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
+import { StyleLibrary } from "../assets/styles";
+import { newObjectId } from "../doc/model";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
 import { plainText } from "../text/markdown";
@@ -28,6 +30,7 @@ import { WriterLease } from "../storage/writer-lease";
 type TabMessage =
   | { kind: "commit"; canvasId: string; revision: number }
   | { kind: "tree" }
+  | { kind: "styles" }
   | { kind: "assets" };
 
 /** Where an asset is used: one row per canvas, named for display. */
@@ -82,6 +85,8 @@ export class Session {
   readonly persistence: CanvasPersistence;
   readonly lease: WriterLease;
   readonly catalog: AssetCatalog | null;
+  /** The saved styles (ADR 0120): adjustments, colours, and what comes next. */
+  readonly styles: StyleLibrary;
   /** The last garbage-collection result (diagnostics and tests). */
   lastGc: GcReport | null = null;
   private readonly listeners = new Set<() => void>();
@@ -100,6 +105,11 @@ export class Session {
   ) {
     this.persistence = new CanvasPersistence(repo, doc, view);
     this.catalog = repo ? new AssetCatalog(repo.db) : null;
+    this.styles = new StyleLibrary(async (items) => {
+      if (!this.repo || this.readOnly) throw new Error("read-only");
+      await this.repo.saveStyles(items);
+      this.post({ kind: "styles" });
+    }, newObjectId);
     this.lease = new WriterLease();
     this.lease.subscribe(() => void this.onLease());
     this.persistence.onCommitted = (canvasId, revision) => {
@@ -129,6 +139,8 @@ export class Session {
         await this.load(this.current.canvasId);
       }
       this.emitAssets();
+    } else if (m.kind === "styles") {
+      this.styles.load(await this.repo?.styles().catch(() => undefined));
     } else if (m.kind === "tree") {
       await this.refreshTree();
       await this.leaveDeletedCanvas();
@@ -188,6 +200,7 @@ export class Session {
     this.editor.readOnly = this.readOnly;
     this.startup = await ensureWorkspace(this.repo);
     this.current = this.startup.current;
+    this.styles.load(await this.repo.styles().catch(() => undefined));
     await this.refreshTree();
     await this.load(this.current.canvasId);
     if (!this.readOnly && this.catalog) {

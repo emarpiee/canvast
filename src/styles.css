@@ -727,10 +727,25 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .adj-row { display: grid; grid-template-columns: 6.5rem 1fr 3.5rem; align-items: center; gap: var(--sp-4); font: var(--font-meta); color: var(--hud-muted); }
 .adj-row input[type="range"] { width: 100%; min-width: 0; }
 .adj-num { width: 100%; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.adj-styles { display: grid; grid-template-columns: 6.5rem 1fr; align-items: center; gap: var(--sp-4); font: var(--font-meta); color: var(--hud-muted); }
+.adj-chips { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.adj-chip { height: var(--sp-11); padding: 0 var(--sp-4); background: var(--hud-hover); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
+.adj-chip:hover { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.adj-save { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-3); }
+.adj-name { padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); min-width: 0; }
+.adj-save button { height: var(--sp-11); padding: 0 var(--sp-4); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.adj-save button:hover { background: var(--hud-hover); }
 .adj-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-3); }
 .adj-actions button { height: var(--sp-11); padding: 0 var(--sp-4); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .adj-actions button:hover:not(:disabled) { background: var(--hud-hover); }
 .adj-actions button:disabled { opacity: 0.4; cursor: default; }
+.styles-kind { display: flex; justify-content: space-between; margin: var(--sp-4) 0 var(--sp-2); color: var(--hud-muted); font: var(--font-meta); font-weight: 600; }
+.style-row { gap: var(--sp-4); padding: 0 var(--sp-3); min-height: var(--ctl); }
+.style-row .side-label { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.style-sum { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); font: var(--font-meta); }
+.style-dot { flex: none; width: var(--sp-6); height: var(--sp-6); border-radius: var(--r-sm); border: 1px solid var(--hud-border); background: var(--dot); }
+.colour-save { margin-top: var(--sp-4); height: var(--sp-11); padding: 0 var(--sp-5); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
+.colour-save:hover { background: var(--hud-hover); }
 .palette { position: fixed; top: 14vh; left: 50%; transform: translateX(-50%); z-index: var(--z-pop); width: min(34rem, calc(100vw - var(--sp-8))); display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); overflow: hidden; }
 .palette[hidden] { display: none; }
 .palette-input { padding: var(--sp-6) var(--sp-7); font: var(--font-value); color: var(--hud-fg); background: transparent; border: 0; border-bottom: 1px solid var(--hud-border); outline: none; }

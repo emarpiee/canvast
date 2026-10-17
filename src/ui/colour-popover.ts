@@ -4,6 +4,7 @@ import { createGradientEditor, type GradientValue } from "../colour-picker/gradi
 import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
+import { esc } from "./format";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { ADJUSTMENTS } from "../doc/adjust";
 import type { Adjust, AdjustKey } from "../doc/adjust";
@@ -86,15 +87,40 @@ export function closeColourPopover(refocus = false): void {
   if (refocus && anchor.isConnected) anchor.focus();
 }
 
+/** The saved colours of the library's Styles (ADR 0120): the colours now, and saving one. Set by the app. */
+let styleHooks: { colours(): string[]; save(hex: string): void } | null = null;
+export function setColourStyles(h: { colours(): string[]; save(hex: string): void } | null): void {
+  styleHooks = h;
+}
+
+/** The swatches under a picker: the colours picked lately, the saved ones (when there are any), the presets. */
+function swatchGroups(): SwatchGroup[] {
+  const saved = styleHooks?.colours() ?? [];
+  return [{ label: "Recent", colours: recentColours() }, ...(saved.length ? [{ label: "Saved", colours: saved }] : []), { label: "Presets", colours: presets() }];
+}
+
+/** A small "Save colour" button: the colour as it is now goes to the Styles of the library. */
+function saveColourButton(hex: () => string, after: () => void): HTMLButtonElement | null {
+  if (!styleHooks) return null;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "colour-save";
+  b.textContent = "Save colour";
+  b.title = "Keep this colour in the Styles of the library";
+  b.addEventListener("click", () => {
+    styleHooks?.save(hex());
+    after();
+  });
+  return b;
+}
+
 /** Open the picker under `anchor`; a second press on the same button closes it. */
 export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions): void {
   if (open && open.anchor === anchor) return closeColourPopover(true);
   closeColourPopover();
   installCloseRules();
-  const groups = (): SwatchGroup[] => [
-    { label: "Recent", colours: recentColours() },
-    { label: "Presets", colours: presets() },
-  ];
+  const groups = swatchGroups;
+  let lastHex = o.value;
   const picker = createColourPicker({
     value: o.value,
     model: store?.get("colour.model") ?? "okhsv",
@@ -104,6 +130,7 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
     display: swatchBackground,
     alpha: o.alpha === true,
     onInput: (hex) => {
+      lastHex = hex;
       if (none?.classList.contains("is-on")) {
         o.none!.set(false);
         none.classList.remove("is-on");
@@ -145,6 +172,8 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
     pop.append(none);
   }
   pop.append(picker.el);
+  const saveBtn = saveColourButton(() => lastHex, () => picker.setGroups(groups()));
+  if (saveBtn) pop.append(saveBtn);
   document.body.appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
@@ -225,10 +254,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   };
   let solid = typeof paint === "string" ? paint : isGradient(paint) ? paint.stops[0]!.c : "#2563eb";
   const modeOf = (): Mode => (paint === null ? "none" : isGradient(paint) ? paint.type : "solid");
-  const groups = (): SwatchGroup[] => [
-    { label: "Recent", colours: recentColours() },
-    { label: "Presets", colours: presets() },
-  ];
+  const groups = swatchGroups;
   const pickerOptions = {
     model: store?.get("colour.model") ?? "okhsv",
     view: store?.get("colour.view") ?? "wheel",
@@ -292,6 +318,8 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
         },
       });
       body.append(picker.el);
+      const saveBtn = saveColourButton(() => solid, () => picker.setGroups(groups()));
+      if (saveBtn) body.append(saveBtn);
       current = picker;
     }
   };
@@ -390,6 +418,8 @@ export interface AdjustOptions {
   count: number;
   /** Every step of a slider: the adjustments to show now (not stored). */
   onInput(a: Adjust): void;
+  /** The saved adjustments (Styles in the library, ADR 0120): the list now, and saving the numbers as a new one. */
+  styles: { items(): Array<{ id: string; name: string; adjust: Adjust; summary: string }>; save(name: string, a: Adjust): Promise<void> };
   /** A slider is let go, a number typed, or Reset pressed: store them. */
   onChange(a: Adjust, label: string): void;
   onClose?(): void;
@@ -412,8 +442,18 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
         (s) => `<div class="adj-row"><label class="adj-label" for="adj-${s.key}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`,
       )
       .join("") +
-    `<div class="adj-actions"><button type="button" data-adj-reset>Reset</button></div>`;
+    `<div class="adj-styles"><span class="adj-label">Saved</span><span class="adj-chips" data-adj-chips></span></div>
+    <div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save adjustment</button></div>
+    <div class="adj-actions"><button type="button" data-adj-reset>Reset</button></div>`;
   scrubNumbers(pop);
+  const chips = pop.querySelector<HTMLElement>("[data-adj-chips]")!;
+  const drawChips = (): void => {
+    const list = o.styles.items();
+    chips.innerHTML = list.length
+      ? list.map((s) => `<button type="button" class="adj-chip" data-adj-style="${esc(s.id)}" title="${esc(s.summary)}">${esc(s.name)}</button>`).join("")
+      : `<span class="adj-none">None yet</span>`;
+  };
+  drawChips();
   const set = (key: AdjustKey, v: number): void => {
     cur = { ...cur, [key]: v };
     const r = pop.querySelector<HTMLInputElement>(`[data-adj="${key}"]`)!, n = pop.querySelector<HTMLInputElement>(`[data-adj-num="${key}"]`)!;
@@ -434,7 +474,19 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
-    if (b.hasAttribute("data-adj-reset")) {
+    if (b.dataset["adjStyle"]) {
+      const saved = o.styles.items().find((s) => s.id === b.dataset["adjStyle"]);
+      if (!saved) return;
+      for (const s of rows) set(s.key, saved.adjust[s.key] ?? 0);
+      cur = { ...saved.adjust };
+      o.onChange(cur, `Apply the adjustment “${saved.name}”`);
+    } else if (b.hasAttribute("data-adj-save")) {
+      const name = pop.querySelector<HTMLInputElement>("[data-adj-name]")!;
+      void o.styles.save(name.value, cur).then(() => {
+        name.value = "";
+        drawChips();
+      });
+    } else if (b.hasAttribute("data-adj-reset")) {
       for (const s of rows) set(s.key, 0);
       cur = {};
       o.onChange(cur, "Reset adjustments");

@@ -232,3 +232,71 @@ test("a video has every adjustment: highlights, shadows, tint, sharpen and grain
   expect(parts).toContain("feTurbulence"); // grain
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Styles: an adjustment is saved from the Adjust panel into the library's Styles card, applied from there to another picture, renamed, kept over a reload and deleted (ADR 0120)", async ({ app }) => {
+  const p = app.page;
+  const first = await place(app, "one.png");
+  await p.keyboard.press("v");
+  const b = await boxOf(app, first.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  const pop = p.locator(".adjust-pop");
+  await pop.locator('[data-adj-num="contrast"]').fill("30");
+  await pop.locator('[data-adj-num="contrast"]').blur();
+  await pop.locator("[data-adj-name]").fill("Punchy");
+  await pop.getByRole("button", { name: "Save adjustment" }).click();
+  await expect(pop.locator(".adj-chip")).toHaveText(["Punchy"]);
+  await p.keyboard.press("Escape");
+
+  // the Styles card of the library lists it, with what it does
+  await p.getByTestId("view-assets").click();
+  const card = p.getByTestId("styles-card");
+  await expect(card.getByTestId("styles-adjustment")).toContainText("Punchy");
+  await expect(card.getByTestId("styles-adjustment")).toContainText("Contrast +30");
+  await expect(card.getByTestId("styles-colour")).toContainText("None yet");
+  // rename it
+  await card.getByRole("button", { name: /^More actions for style Punchy/ }).click();
+  await p.getByRole("menuitem", { name: /^Rename adjustment Punchy/ }).click();
+  await p.locator(".side-name").fill("Punchy 2");
+  await p.keyboard.press("Enter");
+  await expect(card.getByTestId("styles-adjustment")).toContainText("Punchy 2");
+  // kept over a reload
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("styles-card").getByTestId("styles-adjustment")).toContainText("Punchy 2");
+  await p.getByTestId("view-canvas").click();
+
+  // applied to another picture from the Adjust panel
+  const second = await place(app, "two.png", makePng(60, 60, () => [30, 80, 160, 255]));
+  await p.keyboard.press("v");
+  const sb = await boxOf(app, second.id);
+  await p.mouse.click(Math.round((sb.minX + sb.maxX) / 2), Math.round((sb.minY + sb.maxY) / 2));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await p.locator(".adjust-pop .adj-chip", { hasText: "Punchy 2" }).click();
+  expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
+  await p.keyboard.press("Escape");
+
+  // deleted from the card
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("styles-card").getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
+  await p.getByRole("menuitem", { name: /^Delete adjustment Punchy 2/ }).click();
+  await p.getByTestId("confirm-ok").click();
+  await expect(p.getByTestId("styles-card").getByTestId("styles-adjustment")).toContainText("None yet");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Styles: a colour is saved from the colour picker, listed in the Styles card and offered as Saved in the picker", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.locator("[data-colour-open]").click();
+  await p.getByRole("button", { name: "Save colour" }).click();
+  await p.keyboard.press("Escape");
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("styles-card").getByTestId("styles-colour")).toContainText("#1F2329");
+  await p.getByTestId("view-canvas").click();
+  await p.locator("[data-colour-open]").click();
+  await expect(p.locator(".colour-pop").getByText("Saved", { exact: true })).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});

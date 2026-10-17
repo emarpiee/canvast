@@ -103,6 +103,17 @@ export class WorkspaceRepo {
     return idbGet<CurrentMeta>(this.db, "meta", "current");
   }
 
+  /** The saved styles as stored (ADR 0120): checked by `cleanStyles`, whatever they are. */
+  async styles(): Promise<unknown> {
+    return idbGet<unknown>(this.db, "meta", "styles");
+  }
+
+  async saveStyles(items: readonly unknown[]): Promise<void> {
+    const tx = this.db.transaction("meta", "readwrite");
+    tx.objectStore("meta").put(items, "styles");
+    await done(tx);
+  }
+
   async setCurrent(cur: CurrentMeta): Promise<void> {
     const tx = this.db.transaction("meta", "readwrite");
     tx.objectStore("meta").put(cur, "current");
