@@ -51,6 +51,8 @@ export interface ToolbarActions {
   setPin(patch: { h?: string; v?: string }): void;
   canFitSheet(): boolean;
   sheetSelection(): void;
+  canDetach(): boolean;
+  detachSelection(): void;
   fitSheet(): void;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
@@ -165,6 +167,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
           <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
+        <button type="button" data-attach hidden aria-label="Attach the picked objects to another object" title="Attach: the picked objects follow the object you click next when it moves">${ICONS.link}</button>
+        <button type="button" data-detach hidden aria-label="Detach the picked objects" title="Detach: the picked objects stop following another object">${ICONS.unlink}</button>
         <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
         <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -299,6 +303,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLElement>("[data-fit-sheet]")!.addEventListener("click", () => actions.fitSheet());
   root.querySelector<HTMLElement>("[data-put-on-sheet]")!.addEventListener("click", () => actions.sheetSelection());
+  root.querySelector<HTMLElement>("[data-attach]")!.addEventListener("click", () => {
+    editor.attachMode = !editor.attachMode;
+    editor.changed();
+  });
+  root.querySelector<HTMLElement>("[data-detach]")!.addEventListener("click", () => actions.detachSelection());
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
@@ -576,6 +585,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (document.activeElement !== h) h.value = pin.h;
       if (document.activeElement !== v) v.value = pin.v;
     }
+    root.querySelector<HTMLElement>("[data-attach]")!.hidden = !(pick && still && editor.selection.size > 0);
+    root.querySelector<HTMLElement>("[data-attach]")!.setAttribute("aria-pressed", String(editor.attachMode));
+    root.querySelector<HTMLElement>("[data-detach]")!.hidden = !(pick && still && actions.canDetach());
     root.querySelector<HTMLElement>("[data-put-on-sheet]")!.hidden = !(pick && still && editor.selection.size > 0);
     root.querySelector<HTMLElement>("[data-fit-sheet]")!.hidden = !(pick && still && actions.canFitSheet());
     for (const [key, shown, value] of fields) {

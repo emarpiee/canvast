@@ -151,3 +151,35 @@ test("resizing a sheet moves and stretches what is on it by its pin; Fit to cont
   expect(fit.minX).toBeCloseTo(Math.min(ba.minX, bb.minX), 0);
   expect(fit.maxX).toBeCloseTo(Math.max(ba.maxX, bb.maxX), 0);
 });
+
+test("Attach: the picked objects follow the object clicked next when it moves; Detach lets them go (ADR 0109)", async ({ app }) => {
+  const p = app.page;
+  const left = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box.minX;
+  await key(app, "u");
+  await drag(app, [400, 300], [480, 380]);
+  const a = (await objs(app)).at(-1)!;
+  await drag(app, [600, 300], [680, 380]);
+  const b = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 440, 340); // A
+  await p.locator("[data-attach]").click();
+  await expect(p.getByText("Click the object to attach", { exact: false })).toBeVisible();
+  await click(app, 640, 340); // B is the target
+  expect((await objs(app)).find((o) => o.id === a.id)).toMatchObject({ attachmentTargetId: b.id });
+  await click(app, 150, 650);
+  const [a0, b0] = [await left(a.id), await left(b.id)];
+  await click(app, 640, 340);
+  expect((await selection(app)).sort(), "picking the target picks what follows it").toEqual([a.id, b.id].sort());
+  await drag(app, [640, 340], [700, 440]);
+  expect((await left(b.id)) - b0).toBeCloseTo(60, 0);
+  expect((await left(a.id)) - a0, "A went along").toBeCloseTo(60, 0);
+  await key(app, "Control+z");
+  // detach: A alone, then moving B leaves it
+  await click(app, 150, 650);
+  await click(app, 440, 340);
+  await p.locator("[data-detach]").click();
+  expect(((await objs(app)).find((o) => o.id === a.id) as unknown as { attachmentTargetId: string | null }).attachmentTargetId).toBeNull();
+  await click(app, 150, 650);
+  await click(app, 640, 340);
+  expect(await selection(app)).toEqual([b.id]);
+});

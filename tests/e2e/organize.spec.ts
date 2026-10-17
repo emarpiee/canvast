@@ -476,3 +476,46 @@ test("the board menu keeps long names and counts inside its edges (ADR 0079)", a
   expect(over).toEqual([]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("canvases and boards can be duplicated, moved up and down, and a canvas moved to another board (ADR 0110)", async ({ app }) => {
+  const p = app.page;
+  const objects = () => p.evaluate(() => window.__canvastDebug.objects().length);
+  const names = () => p.locator(".nav-canvas .nav-name").allTextContents();
+  await p.keyboard.press("p");
+  for (let i = 0; i < 3; i++) await app.drag({ x: 500 + i * 60, y: 420 }, { x: 530 + i * 60, y: 450 }, 3);
+  const n = await objects();
+  expect(n).toBeGreaterThan(0);
+  const first = (await p.evaluate(() => window.__canvastDebug.objects()))[0]!.id;
+  await p.getByTestId("workspace-chevron").click();
+  await p.getByRole("button", { name: /^More actions for canvas Canvas 1/ }).click();
+  await p.getByRole("menuitem", { name: /^Duplicate canvas/ }).click();
+  await expect(p.getByTestId("view-canvas")).toContainText("Canvas 1 copy"); // the copy is open
+  expect(await objects()).toBe(n);
+  expect((await p.evaluate(() => window.__canvastDebug.objects())).some((o) => o.id === first), "new ids").toBe(false);
+
+  // the copy sits after the original; move it up
+  await p.getByTestId("workspace-chevron").click();
+  expect(await names()).toEqual(["Canvas 1", "Canvas 1 copy"]);
+  await p.getByRole("button", { name: /^More actions for canvas Canvas 1 copy/ }).click();
+  await p.getByRole("menuitem", { name: /^Move canvas Canvas 1 copy up/ }).click();
+  await expect.poll(names).toEqual(["Canvas 1 copy", "Canvas 1"]);
+
+  // a second board; the copy moves to it (the open canvas stays open)
+  await p.getByRole("button", { name: "+ New board" }).click();
+  await p.getByTestId("workspace-chevron").click();
+  await p.getByRole("button", { name: /^More actions for canvas Canvas 1 copy/ }).click();
+  await p.getByRole("menuitem", { name: /^Move canvas Canvas 1 copy to board Board 2/ }).click();
+  await p.getByTestId("workspace-chevron").click();
+  await expect(p.locator(".nav-board").nth(1).locator(".nav-name")).toContainText(["Canvas 1", "Canvas 1 copy"]);
+  await expect(p.locator(".nav-board").first().locator(".nav-name")).toHaveText(["Canvas 1"]);
+
+  // a board is duplicated with its canvases, and moves
+  await p.getByRole("button", { name: /^More actions for board Board 1/ }).click();
+  await p.getByRole("menuitem", { name: /^Duplicate board/ }).click();
+  await p.getByTestId("workspace-chevron").click();
+  await expect(p.locator(".nav-board-name")).toHaveText(["Board 1", "Board 1 copy", "Board 2"]);
+  await p.getByRole("button", { name: /^More actions for board Board 2/ }).click();
+  await p.getByRole("menuitem", { name: /^Move board Board 2 up/ }).click();
+  await expect(p.locator(".nav-board-name")).toHaveText(["Board 1", "Board 2", "Board 1 copy"]);
+  expect(app.consoleErrors).toEqual([]);
+});

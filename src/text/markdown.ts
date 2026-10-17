@@ -169,6 +169,12 @@ export function relinkMention(md: string, oldId: string, newId: string, label: s
   return serialize(blocks);
 }
 
+/** The text with every mention of an id in `map` pointing at the id it maps to, its words kept (a copy of a canvas mentions its own items). */
+export function remapMentions(md: string, map: ReadonlyMap<string, string>): string {
+  const blocks = parse(md).map((b) => ({ ...b, spans: b.spans.map((sp) => (sp.ref !== undefined && map.has(sp.ref) ? { ...sp, ref: map.get(sp.ref)! } : sp)) }));
+  return serialize(blocks);
+}
+
 export function serialize(blocks: readonly Block[]): string {
   const out: string[] = [];
   let n = 0;

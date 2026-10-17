@@ -21,10 +21,14 @@ export function ancestorsOf(get: (id: ObjectId) => CanvasObject | undefined, o: 
   return out;
 }
 
-/** Every object on the sheets among `ids` (at any depth), not counting `ids` themselves. */
+/** Every object on the sheets among `ids`, or attached to them or to what is on them (ADR 0109), at any depth, not counting `ids` themselves. */
 export function descendantsOf(all: Iterable<CanvasObject>, ids: ReadonlySet<ObjectId>): ObjectId[] {
   const kids = new Map<ObjectId, ObjectId[]>();
-  for (const o of all) if (o.parent !== undefined) (kids.get(o.parent) ?? kids.set(o.parent, []).get(o.parent)!).push(o.id);
+  const hold = (up: ObjectId, id: ObjectId): void => void (kids.get(up) ?? kids.set(up, []).get(up)!).push(id);
+  for (const o of all) {
+    if (o.parent !== undefined) hold(o.parent, o.id);
+    if (o.attachmentTargetId !== null) hold(o.attachmentTargetId, o.id);
+  }
   const seen = new Set<ObjectId>(ids);
   const out: ObjectId[] = [];
   const stack = [...ids];
@@ -42,7 +46,7 @@ export function descendantsOf(all: Iterable<CanvasObject>, ids: ReadonlySet<Obje
 /** `ids` plus everything on the sheets among them. */
 export function withDescendants(all: Iterable<CanvasObject>, ids: readonly ObjectId[]): ObjectId[] {
   const list = [...all];
-  if (!list.some((o) => isContainer(o) && ids.includes(o.id))) return [...ids];
+  if (!list.some((o) => (isContainer(o) && ids.includes(o.id)) || o.attachmentTargetId !== null)) return [...ids];
   return [...ids, ...descendantsOf(list, new Set(ids))];
 }
 

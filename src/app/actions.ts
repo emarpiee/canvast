@@ -16,7 +16,7 @@ import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
-import { isContainer, rootsOf } from "../doc/containers";
+import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import type { Constraint } from "../doc/constraints";
 import { drawnParams, drawnSubs } from "../doc/path";
@@ -1367,5 +1367,40 @@ export function fitSheet(doc: DocumentStore, editor: EditorState): void {
   }
   if (!next.length) return;
   doc.commit(doc.transaction(next.length === 1 ? "Fit sheet to its contents" : `Fit ${next.length} sheets to their contents`, next));
+  editor.changed();
+}
+
+/**
+ * Attach the picked objects to `targetId` (ADR 0109): they follow it from now on when it moves (a move, turn or stretch of the target
+ * takes them along, as one picks them with it). The target itself and anything it already follows (which would make a loop) are left out.
+ */
+export function attachSelection(doc: DocumentStore, editor: EditorState, targetId: string): boolean {
+  const target = doc.get(targetId);
+  if (editor.blockEdit() || !target) return false;
+  // everything that follows the target, directly or not, would make a loop
+  const following = new Set(descendantsOf(doc.all(), new Set([targetId])));
+  const next = selected(doc, editor)
+    .filter((o) => o.id !== targetId && !following.has(o.id) && !o.locked && o.attachmentTargetId !== targetId)
+    .map((o) => ({ ...o, attachmentTargetId: targetId }) as CanvasObject);
+  if (!next.length) {
+    editor.message = "Nothing to attach: the picked objects already follow it, or it follows them.";
+    editor.changed();
+    return false;
+  }
+  doc.commit(doc.transaction(next.length === 1 ? "Attach" : `Attach ${next.length} objects`, next));
+  editor.select([targetId, ...next.map((o) => o.id)]);
+  editor.changed();
+  return true;
+}
+
+/** Whether a picked object is attached to another. */
+export const canDetach = (doc: DocumentStore, editor: EditorState): boolean => selected(doc, editor).some((o) => o.attachmentTargetId !== null);
+
+/** Let the picked objects go: they stay where they are and no longer follow anything. */
+export function detachSelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const next = selected(doc, editor).filter((o) => o.attachmentTargetId !== null).map((o) => ({ ...o, attachmentTargetId: null }) as CanvasObject);
+  if (!next.length) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Detach" : `Detach ${next.length} objects`, next));
   editor.changed();
 }

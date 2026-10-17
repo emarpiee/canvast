@@ -44,7 +44,7 @@ interface ObjectBase {
    * (see draw-objects.ts), so self-overlaps never double-blend.
    */
   readonly opacity: number;
-  /** Explicit attachment target. Always null until attach is implemented. */
+  /** The object this one follows when it moves (ADR 0109); null = not attached. A target that is gone counts as none. */
   readonly attachmentTargetId: ObjectId | null;
   /**
    * Rotation about the centre of the object's own (unrotated) bounds, in whole
@@ -387,7 +387,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   int(o.unit, "unit");
   finite(o.z, "z");
   if (!(finite(o.opacity, "opacity") > 0 && o.opacity <= 1)) throw new InvalidObjectError("opacity must be in (0, 1]");
-  if (o.attachmentTargetId !== null) throw new InvalidObjectError("attachment is not supported yet");
+  if (o.attachmentTargetId !== null && !(typeof o.attachmentTargetId === "string" && ID_RE.test(o.attachmentTargetId) && o.attachmentTargetId !== o.id)) throw new InvalidObjectError("bad attachment target");
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
   if (o.parent !== undefined && !(typeof o.parent === "string" && ID_RE.test(o.parent) && o.parent !== o.id)) throw new InvalidObjectError("bad parent");
   if (o.constraint !== undefined && !(typeof o.constraint === "object" && o.constraint !== null && ["left", "right", "both", "center", "scale"].includes(o.constraint.h) && ["top", "bottom", "both", "center", "scale"].includes(o.constraint.v))) throw new InvalidObjectError("bad constraint");

@@ -144,10 +144,10 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Groups, layers, hide, lock, reorder, stacking; Arrange in grid, align, distribute; import grid | Done | ADR 0020, 0021, 0030, 0036. |
 | Snapping and guides, rotation, side-handle resize, Alt-drag copy | Done | ADR 0018, 0019, 0063. |
 | Strokes drawn over media stay independent; lasso filters; select media from Layers; picking by alpha | Done | `editing.spec.ts`, U1, U2, U4, U5, U7, U8 recorded in `phase-0b.md`. |
-| Attach to object and Detach (explicit, undoable) | **Gap** | The schema has `attachmentTargetId` (always null); there is no command or button. |
+| Attach to object and Detach (explicit, undoable) | Done (ADR 0109) | Link and unlink buttons on the options bar of Select. |
 | Master and instance (symbols) | Decided | Not in the initial release; the plan asks for a decision. |
 | Create, rename, delete canvases and boards | Done | |
-| Duplicate, move and reorder canvases and boards | **Gap** | Scenario J asks for them; the menus offer new, rename, delete, export. |
+| Duplicate, move and reorder canvases and boards | Done (ADR 0110) | In the More menu of the navigator. |
 | Copy Object, duplicate, paste; Copy Markdown | Done | ADR 0038. |
 | Copy Original Asset, Copy Rendered Media, Copy Adjustments | **Gap** | |
 | System-clipboard image paste, directory import, remote URL import (optional) | Unverified | Drop and file import work; paste from the system clipboard and folders were not confirmed. |

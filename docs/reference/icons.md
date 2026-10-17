@@ -87,6 +87,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `square-dashed-x` | Release the sheet (keep what is inside) |
 | `crop` | Clip content of a sheet (Layers) |
 | `shrink` | Fit the sheet to what is on it |
+| `link` | Attach the picked objects to another object |
+| `unlink` | Detach the picked objects |
+| `arrow-up` | Move a board or canvas up in its list |
+| `arrow-down` | Move a board or canvas down in its list |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

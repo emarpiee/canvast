@@ -151,6 +151,8 @@ export class EditorState {
   shapeDash: DashChoice = "solid";
   shapeSides = 6;
   shapeTips = 5;
+  /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
+  attachMode = false;
   shapeDraft: DraftShape | null = null;
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */

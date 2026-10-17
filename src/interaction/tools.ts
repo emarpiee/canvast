@@ -35,7 +35,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, radiansFromAngle } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -776,6 +776,14 @@ export function attachTools(
 
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
+    // Attach (ADR 0109): the next press names the object the picked ones follow.
+    if (editor.attachMode) {
+      editor.attachMode = false;
+      const target = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
+      if (target) attachSelection(doc, editor, target.id);
+      editor.changed();
+      return;
+    }
     if (startGradientPress(e, s) || startCornerPress(e, s)) return;
     const vis = visible();
     // Rotate and resize handles take priority when a selection is visible.
@@ -1460,7 +1468,10 @@ export function attachTools(
     } else if (e.key === "Enter" && editor.tool === "select" && g.kind === "none" && editor.selection.size === 1 && doc.get([...editor.selection][0]!)?.kind === "path" && !doc.get([...editor.selection][0]!)?.locked) {
       editor.setTool("node"); // Enter on a shape edits its nodes
     } else if (e.key === "Escape") {
-      if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
+      if (editor.attachMode) {
+        editor.attachMode = false; // Esc leaves Attach first
+        editor.changed();
+      } else if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
       else if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool
       else if (editor.entered.length) {

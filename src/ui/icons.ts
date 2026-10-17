@@ -18,6 +18,10 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import arrowUpSvg from "lucide-static/icons/arrow-up.svg";
+import arrowDownSvg from "lucide-static/icons/arrow-down.svg";
+import linkSvg from "lucide-static/icons/link.svg";
+import unlinkSvg from "lucide-static/icons/unlink.svg";
 import shrinkSvg from "lucide-static/icons/shrink.svg";
 import cropSvg from "lucide-static/icons/crop.svg";
 import scanFrameSvg from "lucide-static/icons/scan.svg";
@@ -324,6 +328,10 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  arrowUp: clean(arrowUpSvg),
+  arrowDown: clean(arrowDownSvg),
+  link: clean(linkSvg),
+  unlink: clean(unlinkSvg),
   shrink: clean(shrinkSvg),
   crop: clean(cropSvg),
   sheetTool: clean(scanFrameSvg),

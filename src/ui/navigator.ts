@@ -50,7 +50,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         ? `<input class="nav-rename" data-rename="${kind}" data-id="${id}" value="${esc(name)}" aria-label="New ${kind} name">`
         : extra;
     /** The labelled actions of a board or canvas, opened by its More button: plain words, not icons to guess at. */
-    const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string): string => {
+    const boards = tree.boards;
+    const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string, first: boolean, last: boolean, here: string): string => {
       const open = actionsOf?.kind === kind && actionsOf.id === id;
       return `<button type="button" class="nav-more" data-action="more" data-kind="${kind}" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}"
           aria-label="More actions for ${kind} ${esc(name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>
@@ -58,6 +59,10 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
           open
             ? `<div class="nav-actions" role="menu" aria-label="Actions for ${kind} ${esc(name)}">
                  <button type="button" role="menuitem" data-action="rename-${kind}" data-id="${id}" aria-label="Rename ${kind} ${esc(name)}">${ICONS.textCursorInput}<span>Rename</span></button>
+                 <button type="button" role="menuitem" data-action="duplicate-${kind}" data-id="${id}" aria-label="Duplicate ${kind} ${esc(name)}">${ICONS.copy}<span>Duplicate</span></button>
+                 <button type="button" role="menuitem" data-action="up-${kind}" data-id="${id}" aria-label="Move ${kind} ${esc(name)} up"${first ? " disabled" : ""}>${ICONS.arrowUp}<span>Move up</span></button>
+                 <button type="button" role="menuitem" data-action="down-${kind}" data-id="${id}" aria-label="Move ${kind} ${esc(name)} down"${last ? " disabled" : ""}>${ICONS.arrowDown}<span>Move down</span></button>
+                 ${kind === "canvas" && boards.length > 1 ? boards.filter((b) => b.board.id !== here).map((b) => `<button type="button" role="menuitem" data-action="to-board" data-id="${id}" data-board="${b.board.id}" aria-label="Move canvas ${esc(name)} to board ${esc(b.board.name)}">${ICONS.squareStack}<span>Move to ${esc(b.board.name)}</span></button>`).join("") : ""}
                  <button type="button" role="menuitem" data-action="export-${kind}" data-id="${id}" aria-label="Export ${kind} ${esc(name)}">${ICONS.fileOutput}<span>Export to a file</span></button>
                  <button type="button" role="menuitem" data-action="export-files-${kind}" data-id="${id}" aria-label="Export the files of ${kind} ${esc(name)} as a ZIP">${ICONS.fileArchive}<span>Export files as ZIP</span></button>
                  <button type="button" role="menuitem" class="is-danger" data-action="delete-${kind}" data-id="${id}" aria-label="Delete ${kind} ${esc(name)}"${canDelete ? "" : ` disabled title="${why}"`}>${ICONS.trash2}<span>Delete</span></button>
@@ -73,7 +78,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
             board.id,
             board.name,
             `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
-             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board")}`,
+             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board", tree.boards[0]!.board.id === board.id, tree.boards[tree.boards.length - 1]!.board.id === board.id, board.id)}`,
           );
           const items = canvases
             .map((c) => {
@@ -83,7 +88,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
                 c.id,
                 c.name,
                 `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
-                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board needs at least one canvas; delete the board instead")}`,
+                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board needs at least one canvas; delete the board instead", canvases[0]!.id === c.id, canvases[canvases.length - 1]!.id === c.id, board.id)}`,
               )}</li>`;
             })
             .join("");
@@ -230,6 +235,33 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         setOpen(false);
         void runExport(session, { kind: "canvas", canvasId: id });
         break;
+      case "duplicate-canvas":
+        setOpen(false);
+        void session.duplicateCanvas(id);
+        break;
+      case "duplicate-board":
+        setOpen(false);
+        void session.duplicateBoard(id);
+        break;
+      case "up-canvas":
+      case "down-canvas": {
+        const entry = session.tree?.boards.find((bd) => bd.canvases.some((c) => c.id === id));
+        const at = entry?.canvases.findIndex((c) => c.id === id) ?? -1;
+        if (entry && at >= 0) void session.moveCanvas(id, entry.board.id, at + (b.dataset["action"] === "up-canvas" ? -1 : 1));
+        break;
+      }
+      case "up-board":
+      case "down-board": {
+        const at = session.tree?.boards.findIndex((bd) => bd.board.id === id) ?? -1;
+        if (at >= 0) void session.moveBoard(id, at + (b.dataset["action"] === "up-board" ? -1 : 1));
+        break;
+      }
+      case "to-board": {
+        const target = session.tree?.boards.find((bd) => bd.board.id === b.dataset["board"]);
+        if (target) void session.moveCanvas(id, target.board.id, target.canvases.length);
+        setOpen(false);
+        break;
+      }
       case "delete-canvas":
         void confirmDeleteCanvas(id);
         break;

@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- **Attach and Detach** (ADR 0109): objects follow the object they are attached to when it moves. **Duplicate, move up and down** for canvases and boards, and **move a canvas to another board** (ADR 0110), from the More menu of the navigator.
+
 - Sheets (ADR 0108): a **Sheet tool** (C) draws a fixed area that holds what you draw or move onto it and cuts it at its edge; **Ctrl+Alt+G** puts the picked objects on a new sheet and **Release the sheet** takes it away; the Layers panel shows each sheet with what is on it and a **clip toggle**; the name above a sheet picks it and moves it with its contents. (Real-unit sizes, constraints and auto layout come next.)
 
 - Vectors (ADR 0107): **SVG out and in** (Save as SVG on the selection bar; paste SVG text on the canvas; Make vector copy of an SVG picture), **dashes** (Solid, Dashed, Dotted in Outline options), **node snapping** (a dragged node lines up with other nodes), **drag a number's name** to change it in every number field that has no slider (Outline width, Sides and Points before drawing, gradient stops, centre and radius, colour strips, media steps, rename start), and **only a picked shape moves** (a slide on one that is not picked draws the selection box, as for pictures). The hint says what the pin does.

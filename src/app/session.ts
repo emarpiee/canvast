@@ -733,6 +733,56 @@ export class Session {
     await this.openCanvas(canvas.id);
   }
 
+  /** A copy of a canvas, opened (ADR 0110). */
+  async duplicateCanvas(id: string): Promise<void> {
+    if (!this.guardWrite()) return;
+    const src = this.tree?.boards.flatMap((b) => b.canvases).find((c) => c.id === id);
+    if (!src) return;
+    await this.persistence.flush(); // (the copy is made from what is stored)
+    const canvas = await this.repo!.duplicateCanvas(id, `${src.name} copy`.slice(0, 120));
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+    await this.openCanvas(canvas.id);
+  }
+
+  /** A copy of a board with all its canvases; its first canvas is opened. */
+  async duplicateBoard(id: string): Promise<void> {
+    if (!this.guardWrite()) return;
+    const src = this.tree?.boards.find((b) => b.board.id === id);
+    if (!src) return;
+    await this.persistence.flush();
+    const { canvas } = await this.repo!.duplicateBoard(id, `${src.board.name} copy`.slice(0, 120));
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+    await this.openCanvas(canvas.id);
+  }
+
+  /** Put a canvas at `index` of a board (another board too). The open canvas stays open, in its new board. */
+  async moveCanvas(id: string, boardId: string, index: number): Promise<void> {
+    if (!this.guardWrite()) return;
+    try {
+      await this.repo!.moveCanvas(id, boardId, index);
+    } catch (e) {
+      this.tell((e as Error).message);
+      return;
+    }
+    if (this.current?.canvasId === id) {
+      this.current = { ...this.current, boardId };
+      await this.repo!.setCurrent(this.current);
+    }
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+    this.emit();
+  }
+
+  /** Put a board at `index` of the workspace. */
+  async moveBoard(id: string, index: number): Promise<void> {
+    if (!this.guardWrite()) return;
+    await this.repo!.moveBoard(id, index);
+    await this.refreshTree();
+    this.post({ kind: "tree" });
+  }
+
   /** Called after assets are renamed, so the canvas draws its cards again (set by the app). */
   onAssetsRenamed: (() => void) | null = null;
 

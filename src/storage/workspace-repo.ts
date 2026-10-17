@@ -7,6 +7,7 @@ import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
 import { plainText } from "../text/markdown";
+import { duplicateRecords } from "../doc/duplicate";
 import { done, idbGet, req } from "./idb";
 
 /**
@@ -185,6 +186,92 @@ export class WorkspaceRepo {
     tx.objectStore("canvases").put(canvas);
     await done(tx);
     return canvas;
+  }
+
+  /** Copy a canvas (objects, frames, saved view, bookmarks) into a board, after `afterId` when given, in an open transaction. */
+  private async copyCanvasInto(tx: IDBTransaction, source: CanvasRecord, board: BoardRecord, name: string, afterId?: string): Promise<CanvasRecord> {
+    const range = IDBKeyRange.bound([source.id, ""], [source.id, "￿"]);
+    const records = await req(tx.objectStore("objects").getAll(range) as IDBRequest<ObjectRecord[]>);
+    const copies = duplicateRecords(records.map((r) => r.data));
+    const canvas: CanvasRecord = { id: newObjectId(), boardId: board.id, name, revision: 0, objectCount: copies.length, updatedAt: Date.now() };
+    for (const data of copies) tx.objectStore("objects").put({ canvasId: canvas.id, id: data.id, data } satisfies ObjectRecord);
+    for (const f of await req(tx.objectStore("frames").getAll(range) as IDBRequest<FrameStoreRecord[]>)) tx.objectStore("frames").put({ ...f, canvasId: canvas.id });
+    const view = await req(tx.objectStore("canvasViews").get(source.id) as IDBRequest<StoredView | undefined>);
+    if (view) tx.objectStore("canvasViews").put(view, canvas.id);
+    const marks = await req(tx.objectStore("bookmarks").get(source.id) as IDBRequest<{ canvasId: string } | undefined>);
+    if (marks) tx.objectStore("bookmarks").put({ ...marks, canvasId: canvas.id });
+    tx.objectStore("canvases").put(canvas);
+    const at = afterId ? board.canvasIds.indexOf(afterId) : -1;
+    board.canvasIds.splice(at < 0 ? board.canvasIds.length : at + 1, 0, canvas.id);
+    return canvas;
+  }
+
+  /** A copy of a canvas, named `name`, right after it in its board (ADR 0110). The open canvas must have been saved first. */
+  async duplicateCanvas(canvasId: string, name: string): Promise<CanvasRecord> {
+    const tx = this.db.transaction(["boards", "canvases", "objects", "frames", "canvasViews", "bookmarks"], "readwrite", { durability: "strict" });
+    const source = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
+    if (!source) throw new Error(`canvas ${canvasId} not found`);
+    const board = await req(tx.objectStore("boards").get(source.boardId) as IDBRequest<BoardRecord | undefined>);
+    if (!board) throw new Error(`board ${source.boardId} not found`);
+    const canvas = await this.copyCanvasInto(tx, source, board, name, canvasId);
+    tx.objectStore("boards").put(board);
+    await done(tx);
+    return canvas;
+  }
+
+  /** A copy of a board with a copy of each of its canvases, right after it in the workspace (ADR 0110). */
+  async duplicateBoard(boardId: string, name: string): Promise<{ board: BoardRecord; canvas: CanvasRecord }> {
+    const tx = this.db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks"], "readwrite", { durability: "strict" });
+    const source = await req(tx.objectStore("boards").get(boardId) as IDBRequest<BoardRecord | undefined>);
+    if (!source) throw new Error(`board ${boardId} not found`);
+    const ws = await req(tx.objectStore("workspaces").get(source.workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
+    if (!ws) throw new Error(`workspace ${source.workspaceId} not found`);
+    const board: BoardRecord = { id: newObjectId(), workspaceId: ws.id, name, canvasIds: [], createdAt: Date.now() };
+    let first: CanvasRecord | undefined;
+    for (const cid of source.canvasIds) {
+      const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
+      if (!c) continue;
+      const copy = await this.copyCanvasInto(tx, c, board, c.name);
+      first ??= copy;
+    }
+    tx.objectStore("boards").put(board);
+    const at = ws.boardIds.indexOf(boardId);
+    ws.boardIds.splice(at + 1, 0, board.id);
+    tx.objectStore("workspaces").put(ws);
+    await done(tx);
+    return { board, canvas: first! };
+  }
+
+  /** Put a canvas at `index` of a board, which may be another board (ADR 0110); a board keeps at least one canvas. */
+  async moveCanvas(canvasId: string, toBoardId: string, index: number): Promise<CanvasRecord> {
+    const tx = this.db.transaction(["boards", "canvases"], "readwrite", { durability: "strict" });
+    const canvas = await req(tx.objectStore("canvases").get(canvasId) as IDBRequest<CanvasRecord | undefined>);
+    if (!canvas) throw new Error(`canvas ${canvasId} not found`);
+    const from = await req(tx.objectStore("boards").get(canvas.boardId) as IDBRequest<BoardRecord | undefined>);
+    const to = canvas.boardId === toBoardId ? from : await req(tx.objectStore("boards").get(toBoardId) as IDBRequest<BoardRecord | undefined>);
+    if (!from || !to) throw new Error("board not found");
+    if (from !== to && from.canvasIds.length <= 1) throw new HierarchyError("A board needs at least one canvas.");
+    from.canvasIds = from.canvasIds.filter((id) => id !== canvasId);
+    to.canvasIds.splice(Math.max(0, Math.min(index, to.canvasIds.length)), 0, canvasId);
+    const moved = { ...canvas, boardId: toBoardId };
+    tx.objectStore("canvases").put(moved);
+    tx.objectStore("boards").put(from);
+    if (to !== from) tx.objectStore("boards").put(to);
+    await done(tx);
+    return moved;
+  }
+
+  /** Put a board at `index` of its workspace (ADR 0110). */
+  async moveBoard(boardId: string, index: number): Promise<void> {
+    const tx = this.db.transaction(["workspaces", "boards"], "readwrite", { durability: "strict" });
+    const board = await req(tx.objectStore("boards").get(boardId) as IDBRequest<BoardRecord | undefined>);
+    if (!board) throw new Error(`board ${boardId} not found`);
+    const ws = await req(tx.objectStore("workspaces").get(board.workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
+    if (!ws) throw new Error(`workspace ${board.workspaceId} not found`);
+    ws.boardIds = ws.boardIds.filter((id) => id !== boardId);
+    ws.boardIds.splice(Math.max(0, Math.min(index, ws.boardIds.length)), 0, boardId);
+    tx.objectStore("workspaces").put(ws);
+    await done(tx);
   }
 
   async renameWorkspace(id: string, name: string): Promise<void> {
