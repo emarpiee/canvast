@@ -408,3 +408,72 @@ test("Layers panel: sort by name (A to Z, Z to A; a group by its name, then what
   await expect.poll(names).toContain("kiwi");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("convert text to path (Ctrl+E and the selection bar): the same pixels, the same object, one undo, a layer named by the words", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 480, 380);
+  await p.keyboard.type("Hello");
+  await finish(p);
+  const [t] = await textObjects(p);
+  expect(t).toBeTruthy();
+  /** The brightness of every pixel of the text's box (the shape of the letters, antialiasing included). */
+  const picture = () =>
+    p.evaluate(() => {
+      const out: number[] = [];
+      for (let y = 366; y < 394; y++) for (let x = 476; x < 540; x++) {
+        const c = window.__canvastDebug.pixelAt(x, y);
+        out.push(c[0]! + c[1]! + c[2]!);
+      }
+      return out;
+    });
+  await p.keyboard.press("v");
+  await p.mouse.click(500, 380); // pick it (inside its box)
+  await app.frame();
+  await p.mouse.click(1000, 600); // (nothing selected: no outline over the letters)
+  await p.waitForFunction(() => document.fonts.check("16px canvast-inter")); // the bundled font, not a stand-in
+  await app.frame();
+  const before = await picture();
+  expect(before.filter((v) => v < 3 * 90).length, "dark pixels of the text").toBeGreaterThan(50);
+  await p.mouse.click(500, 380);
+  await app.frame();
+
+  // the selection bar offers it only for text
+  await expect(p.locator('[data-ctx="outline"]')).toBeVisible();
+  await p.keyboard.press("Control+e");
+  await app.frame();
+  const [o] = await objects(p);
+  expect(o).toMatchObject({ id: t!.id, kind: "path", fill: "#1f2329", stroke: null, name: "Hello" });
+  expect((o as unknown as { sub: unknown[] }).sub.length).toBeGreaterThan(4); // H, e and its eye, l, l, o and its counter
+  await expect(p.locator('[data-ctx="outline"]')).toBeHidden(); // nothing left to convert
+  await p.keyboard.press("Escape");
+  await p.mouse.click(1000, 600);
+  const after = await picture();
+  expect(after.filter((v) => v < 3 * 90).length, "dark pixels of the path").toBeGreaterThan(50);
+  // A browser draws thin text lighter than a filled path (Chromium: about a factor of two in ink at 16 px) and puts a glyph on a whole pixel,
+  // so edges differ; what must match is where the ink is (its middle) and that there is about as much, not the exact pixels.
+  const ink = (pic: number[]) => {
+    const w = 64;
+    let mass = 0, mx = 0, my = 0;
+    pic.forEach((v, i) => {
+      const d = Math.max(0, 3 * 232 - v); // against the canvas background
+      mass += d;
+      mx += d * (i % w);
+      my += d * Math.floor(i / w);
+    });
+    return { mass, x: mx / mass, y: my / mass };
+  };
+  const a1 = ink(before);
+  const a2 = ink(after);
+  expect(a2.mass / a1.mass, `ink ${a1.mass} -> ${a2.mass}`).toBeGreaterThan(0.6);
+  expect(a2.mass / a1.mass, `ink ${a1.mass} -> ${a2.mass}`).toBeLessThan(2.4);
+  expect(Math.hypot(a2.x - a1.x, a2.y - a1.y), `centre (${a1.x.toFixed(2)}, ${a1.y.toFixed(2)}) -> (${a2.x.toFixed(2)}, ${a2.y.toFixed(2)})`).toBeLessThan(1.5);
+
+  // one undo gives the text back, exactly
+  await p.keyboard.press("Control+z");
+  const [back] = await objects(p);
+  expect(back).toMatchObject({ id: t!.id, kind: "text", md: t!.md });
+  // and the bar's button does the same
+  await p.mouse.click(500, 380);
+  await p.locator('[data-ctx="outline"]').click();
+  expect((await objects(p))[0]!.kind).toBe("path");
+});

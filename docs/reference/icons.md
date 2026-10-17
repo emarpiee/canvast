@@ -87,6 +87,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `presentation` | Start the slideshow |
 | `rectangle-horizontal` | Rectangle shape |
 | `redo-2` | Redo |
+| `replace` | Convert text to path (the selection bar) |
 | `ruler` | By size, largest first |
 | `scaling` | Pen size follows zoom |
 | `search` | Search the canvas |

@@ -114,6 +114,7 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "Ctrl+D", does: "Duplicate" },
       { keys: "Ctrl+G, Ctrl+Shift+G", does: "Group, ungroup" },
       { keys: "Ctrl+] and Ctrl+[", does: "Bring to front, send to back" },
+      { keys: "Ctrl+E", does: "Convert the selected text to paths (its letters' own outlines)" },
       { keys: "Alt+drag the selection", does: "Drag a copy; the original stays" },
       { keys: "Drag a handle", does: "Resize (a corner or a side of a picture is free; strokes and text keep their proportions)" },
       { keys: "Shift+drag a handle", does: "Resize keeping the proportions" },

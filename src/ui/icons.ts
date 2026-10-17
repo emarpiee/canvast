@@ -13,6 +13,7 @@ import squaresUniteSvg from "lucide-static/icons/squares-unite.svg";
 import squaresIntersectSvg from "lucide-static/icons/squares-intersect.svg";
 import squaresSubtractSvg from "lucide-static/icons/squares-subtract.svg";
 import squaresExcludeSvg from "lucide-static/icons/squares-exclude.svg";
+import replaceIcon from "lucide-static/icons/replace.svg";
 import play from "lucide-static/icons/play.svg";
 import pause from "lucide-static/icons/pause.svg";
 import rewind from "lucide-static/icons/rewind.svg";
@@ -305,4 +306,5 @@ export const ICONS = {
   squaresIntersect: clean(squaresIntersectSvg),
   squaresSubtract: clean(squaresSubtractSvg),
   squaresExclude: clean(squaresExcludeSvg),
+  replace: clean(replaceIcon),
 } as const;

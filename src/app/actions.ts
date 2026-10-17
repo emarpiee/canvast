@@ -5,7 +5,8 @@ import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject } from "../doc/model";
+import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject, TextObject } from "../doc/model";
+import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp, Region } from "../doc/boolean";
 import { booleanOp } from "../doc/boolean";
@@ -724,4 +725,41 @@ export function combineSelection(doc: DocumentStore, editor: EditorState, op: Bo
   const made = homeObject(normalizeUnit(result), doc.space);
   doc.commit(doc.transaction(paths.length === 2 ? COMBINE_LABEL[op] : `${COMBINE_LABEL[op]} of ${paths.length} shapes`, [made], paths.map((o) => o.id)));
   editor.select([made.id]);
+}
+
+// ---- Text to path (ADR 0102) ----------------------------------------------------------------------------------------
+
+/** The selected text objects that can be turned into paths (not locked). */
+const outlinable = (doc: DocumentStore, editor: EditorState): TextObject[] => selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && !o.locked);
+
+export const canOutline = (doc: DocumentStore, editor: EditorState): boolean => outlinable(doc, editor).length > 0;
+
+/**
+ * Turn the selected text into paths, in place: the same object (its id, so a mention of it still finds it, its layer name, group, tags,
+ * place in the stacking order and opacity), now a filled compound path of the letters' own outlines. One undo step. Characters the
+ * bundled font lacks (drawn by the system font) have no outline and are left out, which is said.
+ */
+export function convertTextToPath(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const texts = outlinable(doc, editor);
+  if (!texts.length) return;
+  let missing = 0;
+  const made: CanvasObject[] = [];
+  for (const o of texts) {
+    const { sub, missing: m } = textOutline(o);
+    missing += m;
+    if (!sub.length) continue;
+    const { kind: _k, md, w: _w, size, color, rot: _r, ...base } = o;
+    const plain = md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
+    const path: PathObject = { ...base, kind: "path", sub, fill: color, stroke: null, width: Math.max(size * 0.05, Number.MIN_VALUE), ...(!base.name && plain ? { name: plain } : {}) };
+    made.push(homeObject(normalizeUnit(path), doc.space));
+  }
+  if (!made.length) {
+    editor.message = "There is nothing in that text to turn into a path.";
+    editor.changed();
+    return;
+  }
+  doc.commit(doc.transaction(made.length === 1 ? "Convert text to path" : `Convert ${made.length} texts to paths`, made));
+  editor.message = missing ? `${missing} character${missing === 1 ? "" : "s"} in a system font could not be turned into a path and ${missing === 1 ? "was" : "were"} left out.` : "";
+  editor.changed();
 }

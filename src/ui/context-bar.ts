@@ -38,6 +38,9 @@ export interface ContextActions {
   /** Combine the selected shapes into one (ADR 0101); whether two or more can be. */
   combine(op: BoolOp): void;
   canCombine(): boolean;
+  /** Turn the selected text into paths (ADR 0102), and whether any is selected. */
+  outline(): void;
+  canOutline(): boolean;
   /** Arrange in a grid, align or distribute the selection. */
   layout(cmd: LayoutCommand): void;
   /** The space between items in a grid (ADR 0074), and choosing another one (a grid just made is laid out again with it). */
@@ -68,6 +71,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("open", ICONS.externalLink, "Open in a new tab") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
+    btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)") +
     btn("combine", ICONS.combineIcon, "Combine shapes: union, intersect, subtract, exclude") +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
@@ -152,6 +156,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           { label: "Exclude overlap", icon: ICONS.squaresExclude, aria: "Exclude overlap: keep everything but where the shapes overlap", run: () => actions.combine("exclude") },
         ], "Combine shapes");
         break;
+      case "outline": actions.outline(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
@@ -186,6 +191,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
     q("layout").hidden = sel.length < 2;
     q("combine").hidden = !actions.canCombine();
+    q("outline").hidden = !actions.canOutline();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();

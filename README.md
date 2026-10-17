@@ -217,6 +217,7 @@ or network connection.
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
 - **Shapes and paths:** the Shape tool (rectangle, ellipse, line, polygon, star), the Path tool (Bézier curves) and Edit nodes; fills and
   outlines with transparency; picked, moved, stretched, turned, grouped and saved like everything else (ADR 0099).
+- **Text to path:** Ctrl+E or the selection bar turns text into editable outlines (ADR 0102).
 - **Combining shapes:** Union, Intersect, Subtract and Exclude overlap on the selection bar; curves stay curves (ADR 0101).
 - **Colour picker:** one picker for every colour choice (the pen colour in the toolbar and in Settings): OKHSL, OKHSV or
   OKHCL, as sliders or as a hue ring around a box, with hex, the colours picked lately and a palette (ADR 0098). It is a

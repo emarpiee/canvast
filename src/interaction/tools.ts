@@ -30,7 +30,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, commitPaint, deleteSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, commitPaint, convertTextToPath, deleteSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 
 /**
@@ -1198,6 +1198,9 @@ export function attachTools(
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);
+    } else if (mod && key === "e") {
+      e.preventDefault(); // not the browser's search
+      convertTextToPath(doc, editor);
     } else if (mod && (e.key === "]" || e.key === "[")) {
       arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
     } else if (mod || e.altKey) {
