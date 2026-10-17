@@ -3,6 +3,7 @@ import type { FrameCamera } from "../core/frames";
 import type { DocumentStore } from "../doc/document-store";
 import type { EditorState } from "../app/editor-state";
 import type { CanvasObject, ObjectId } from "../doc/model";
+import { isBoolMember, isResult, operandOf, operandsOf, previewResults } from "../doc/boolean-group";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
@@ -32,6 +33,22 @@ export interface VisibleStats {
  * moved or resized) are projected from their preview state instead, since the
  * index holds their committed position.
  */
+/** What of a boolean group (ADR 0103) the caller wants besides the plain objects: `pick`: the members of the innermost entered group, and not its result (so a click reaches the shape under it); `members`: only those members (to draw their outlines). */
+export interface BoolView {
+  readonly entered: readonly string[];
+  readonly mode: "pick" | "members";
+}
+
+const operandCache = new WeakMap<DocumentStore, { revision: number; byGroup: Map<string, CanvasObject[]> }>();
+/** The direct operands of a boolean group, back to front (cached until the document changes). */
+function operandsIn(doc: DocumentStore, gid: string): CanvasObject[] {
+  let c = operandCache.get(doc);
+  if (!c || c.revision !== doc.revision) operandCache.set(doc, (c = { revision: doc.revision, byGroup: new Map() }));
+  let list = c.byGroup.get(gid);
+  if (!list) c.byGroup.set(gid, (list = operandsOf(doc.all(), gid)));
+  return list;
+}
+
 export function visibleObjects(
   doc: DocumentStore,
   index: FrameIndex,
@@ -39,9 +56,34 @@ export function visibleObjects(
   fc: FrameCamera,
   vp: Viewport,
   stats?: VisibleStats,
+  bool?: BoolView,
 ): ProjectedObject[] {
-  const previewIds: ReadonlySet<ObjectId> = editor ? editor.previewIds() : new Set();
+  const previewIds0: ReadonlySet<ObjectId> = editor ? editor.previewIds() : new Set();
+  // A member being moved or edited changes its group's result: the result as it would be, shown while the gesture goes on (ADR 0103).
+  const derived = new Map<ObjectId, CanvasObject>();
+  if (editor && previewIds0.size) {
+    const shown = new Map<ObjectId, CanvasObject | null>();
+    for (const id of previewIds0) {
+      const o = doc.get(id);
+      if (o) shown.set(id, editor.previewed(o));
+    }
+    for (const o of previewResults(doc, shown)) derived.set(o.id, o);
+  }
+  const previewIds: ReadonlySet<ObjectId> = derived.size ? new Set([...previewIds0, ...derived.keys()]) : previewIds0;
   const out: ProjectedObject[] = [];
+  const entered = bool?.entered ?? [];
+  const inner = entered[entered.length - 1];
+  const project = (o: CanvasObject): void => {
+    const cam = cameraIn(fc, o.frame ?? doc.space.world);
+    const po = cam && projectObject(o, cam, vp);
+    if (po) out.push(po);
+  };
+  if (bool?.mode === "members") {
+    // Only the members of the entered group, as they are now (or as being moved).
+    if (inner) for (const o of operandsIn(doc, inner)) if (!o.hidden) { const v = editor && previewIds.has(o.id) ? editor.previewed(o) : o; if (v) project(v); }
+    out.sort((a, b) => a.obj.z - b.obj.z || (a.obj.id < b.obj.id ? -1 : 1));
+    return out;
+  }
   let levelsVisited = 0;
   let cellsProbed = 0;
   let candidates = 0;
@@ -54,6 +96,8 @@ export function visibleObjects(
       const cf = coarse ? null : cellFrame(cell, cam, vp);
       for (const e of cell.entries) {
         if (previewIds.has(e.obj.id)) continue;
+        // Inside a boolean group the shapes under the pointer are its members; its result is not what a click is after.
+        if (bool && inner && isResult(e.obj) && entered.includes(e.obj.result!)) continue;
         if (coarse) {
           // Far coarser than the camera: covers the view, misses it, or an edge is near (render/coarse.ts).
           const r = classifyCoarse(e.obj, coarse.center, coarse.info, vp, coarse.terms);
@@ -70,19 +114,18 @@ export function visibleObjects(
     }
   }
   for (const id of previewIds) {
-    const o = doc.get(id);
-    const moved = o && editor!.previewed(o);
-    if (!moved) continue;
+    const base = derived.get(id) ?? doc.get(id);
+    const moved = base && (derived.has(id) ? base : editor!.previewed(base));
+    if (!moved || (isBoolMember(moved) && !(inner && operandOf(moved) === inner && bool?.mode === "pick"))) continue;
     // While an object is moved, turned or stretched it is shown a little see-through, so what is behind it stays readable (ADR 0073).
     // Only the picture on screen: the committed object keeps its own opacity. A see-through stroke is drawn on its own, so a very large
     // selection stays opaque: it would lose the batching that keeps a drag at full frame rate.
-    // (Editing nodes is not a move: the path keeps its look while its shape changes.)
+    // (Editing nodes is not a move: the path keeps its look while its shape changes. A derived result is not either.)
     const pk = editor!.preview.kind;
-    const shown = previewIds.size <= GHOST_MAX && (pk === "move" || pk === "rotate" || pk === "scale") ? ({ ...moved, opacity: moved.opacity * GHOST_OPACITY } as CanvasObject) : moved;
-    const cam = cameraIn(fc, shown.frame ?? doc.space.world);
-    const po = cam && projectObject(shown, cam, vp);
-    if (po) out.push(po);
+    const shown = !derived.has(id) && previewIds.size <= GHOST_MAX && (pk === "move" || pk === "rotate" || pk === "scale") ? ({ ...moved, opacity: moved.opacity * GHOST_OPACITY } as CanvasObject) : moved;
+    project(shown);
   }
+  if (bool?.mode === "pick" && inner && !editor) for (const o of operandsIn(doc, inner)) if (!o.hidden) project(o);
   out.sort((a, b) => a.obj.z - b.obj.z || (a.obj.id < b.obj.id ? -1 : a.obj.id > b.obj.id ? 1 : 0));
   if (stats) {
     stats.levelsVisited = levelsVisited;

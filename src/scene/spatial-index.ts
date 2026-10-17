@@ -4,6 +4,7 @@ import { screenToWorld } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { DocumentStore } from "../doc/document-store";
 import { inkOf, localBounds, pathSubs, strokePoints } from "../doc/model";
+import { isBoolMember } from "../doc/boolean-group";
 
 /**
  * Multi-scale spatial index over exact world coordinates.
@@ -495,7 +496,7 @@ export async function fillCooperatively(objects: Iterable<CanvasObject>, insert:
 export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild" | "remove" | "insert">, coop?: Cooperative): (() => void) & { ready(): Promise<void>; building(): boolean } {
   // Hidden objects are not in the index, so nothing that reads it (drawing, picking, tiles, the density preview) sees them.
   const shown = function* (): IterableIterator<CanvasObject> {
-    for (const o of doc.all()) if (!o.hidden) yield o;
+    for (const o of doc.all()) if (!o.hidden && !isBoolMember(o)) yield o;
   };
   let epoch = 0;
   let pending: Promise<void> | null = null;
@@ -522,7 +523,7 @@ export function syncIndex(doc: DocumentStore, index: Pick<SpatialIndex, "rebuild
     for (const id of changed) {
       index.remove(id);
       const o = doc.get(id);
-      if (o && !o.hidden) index.insert(o);
+      if (o && !o.hidden && !isBoolMember(o)) index.insert(o);
     }
   });
   /** Resolves when no slice-by-slice build is running (the index holds every object). */

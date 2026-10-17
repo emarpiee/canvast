@@ -143,7 +143,28 @@ export function drawOverlays(
   fc: FrameCamera,
   vp: Viewport,
   theme: SceneTheme,
+  members: readonly ProjectedObject[] = [],
 ): void {
+  // The members of the boolean group that has been entered, as outlines over its result (ADR 0103).
+  if (members.length) {
+    ctx.save();
+    ctx.strokeStyle = theme.selection;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.85;
+    for (const po of members) {
+      if (po.cover || !po.path) continue;
+      ctx.beginPath();
+      for (const f of po.path) {
+        const p = f.pts;
+        if (p.length < 4) continue;
+        ctx.moveTo(p[0]!, p[1]!);
+        for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i]!, p[i + 1]!);
+        if (f.closed) ctx.closePath();
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   // Object eraser: the brush, and what the swipe has touched so far (it is removed when the pointer is released).
   if (editor.tool === "eraser" && editor.eraser) {
     ctx.save();

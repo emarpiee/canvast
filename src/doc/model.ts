@@ -8,6 +8,7 @@ import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
 import type { Cap, Join, ShapeKind, SubPath } from "./path";
 import type { Paint } from "./paint";
+import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
 import { NODE, SHAPE_KINDS, paintBounds, rotateSubs } from "./path";
 
@@ -55,6 +56,8 @@ interface ObjectBase {
   readonly name?: string;
   /** Names of the groups this object is in, by group id (ADR 0047); absent = none named. */
   readonly groupNames?: Readonly<Record<string, string>>;
+  /** Which of its groups are boolean groups (ADR 0103), and the operation of each; a member and the result of such a group both carry it. */
+  readonly boolOps?: Readonly<Record<string, BoolOp>>;
   /** How the object's paint mixes with what is behind it (ADR 0047); absent = normal. */
   readonly blend?: BlendMode;
   /** In-canvas tags (ADR 0062): labels of this instance, separate from an asset's library tags; absent = none. */
@@ -146,6 +149,8 @@ export interface PathObject extends ObjectBase {
   /** Fill rule: absent is non-zero. */
   readonly evenodd?: true;
   readonly shape?: ShapeKind;
+  /** The result of the boolean group with this id (ADR 0103): derived from the group's members, recomputed with every change to them. */
+  readonly result?: string;
 }
 
 export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
@@ -326,6 +331,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
+  if (o.boolOps !== undefined && !(typeof o.boolOps === "object" && o.boolOps !== null && Object.keys(o.boolOps).length > 0 && Object.entries(o.boolOps).every(([k, v]) => (o.groups ?? []).includes(k) && ["union", "intersect", "subtract", "exclude"].includes(v)))) throw new InvalidObjectError("bad boolean groups");
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
   if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && isTag(t)))) throw new InvalidObjectError("bad tags");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
@@ -356,6 +362,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
+    if (o.result !== undefined && !(typeof o.result === "string" && (o.groups ?? []).includes(o.result) && o.boolOps?.[o.result] !== undefined)) throw new InvalidObjectError("bad boolean result");
   } else if (o.kind === "text") {
     if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
     positive(o.w, "w");
@@ -410,6 +417,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["groups"] !== undefined ? { groups: s["groups"] as string[] } : {}),
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
+    ...(s["boolOps"] !== undefined ? { boolOps: s["boolOps"] as Record<string, BoolOp> } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
     ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
@@ -444,6 +452,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
+      ...(s["result"] !== undefined ? { result: s["result"] as string } : {}),
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.

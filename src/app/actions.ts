@@ -8,13 +8,12 @@ import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject, TextObject } from "../doc/model";
 import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
-import type { BoolOp, Region } from "../doc/boolean";
-import { booleanOp } from "../doc/boolean";
-import { mapSubs } from "../doc/path";
+import type { BoolOp } from "../doc/boolean";
+import { boolGroupsOf, isResult, resultOf } from "../doc/boolean-group";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, expressObjectIn, homeObject, newObjectId, pathSubs, validateObject } from "../doc/model";
+import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
-import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
+import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
 import type { ClipboardPayload } from "../doc/clipboard";
@@ -646,7 +645,9 @@ export async function importImages(
 // ---- Fill and outline of paths (ADR 0099) --------------------------------------------------------
 
 /** The selected paths that can be edited (not locked), in paint order. */
-const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked);
+const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] =>
+  // (the shapes inside a boolean group take no paint from outside it: the group's result has the look; they are painted when it is entered)
+  selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
 
 /** The fill and outline of the first selected path, or null when none is selected. */
 export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: Paint | null; stroke: Paint | null } | null {
@@ -679,52 +680,110 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
   editor.changed();
 }
 
-// ---- Combining shapes (ADR 0101) ------------------------------------------------------------------------------------
+// ---- Combining shapes (ADR 0101, 0103) ------------------------------------------------------------------------------
 
 const COMBINE_LABEL: Record<BoolOp, string> = { union: "Union", intersect: "Intersect", subtract: "Subtract", exclude: "Exclude" };
 
-/** The selected paths a Boolean operation can use (shapes that are not locked), in paint order. */
-const combinable = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked);
+/** The units (at the level being worked at) of the selection: each a plain path, or a boolean group; null when something else is selected. */
+function combineUnits(doc: DocumentStore, editor: EditorState): { objs: CanvasObject[]; units: number } | { problem: string } {
+  const level = editor.entered.length;
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  const keys = new Set<string>();
+  for (const o of objs) {
+    const key = o.groups?.[level] ?? o.id;
+    // a unit is a plain path or a boolean group (whose members and result are all selected with it)
+    if (key !== o.id && !o.boolOps?.[key]) return { problem: "Ungroup those first: only shapes, and boolean groups, can be combined." };
+    if (o.kind !== "path") return { problem: o.kind === "text" ? "Only shapes can be combined. Turn the text into a path first (Ctrl+E)." : "Only shapes can be combined." };
+    keys.add(key);
+  }
+  return { objs, units: keys.size };
+}
 
-export const canCombine = (doc: DocumentStore, editor: EditorState): boolean => combinable(doc, editor).length >= 2;
+/** The boolean group that is the whole selection (its members and result), if it is: its id and operation. */
+export function booleanSelection(doc: DocumentStore, editor: EditorState): { gid: string; op: BoolOp } | null {
+  const level = editor.entered.length;
+  const objs = selected(doc, editor);
+  const gid = objs[0]?.groups?.[level];
+  if (!gid || !objs.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid])) return null;
+  const op = objs[0]!.boolOps![gid]!;
+  return resultOf(doc.all(), gid) ? { gid, op } : null;
+}
+
+export const canCombine = (doc: DocumentStore, editor: EditorState): boolean => {
+  const u = combineUnits(doc, editor);
+  return ("units" in u && u.units >= 2) || booleanSelection(doc, editor) !== null;
+};
 
 /**
- * Combine the selected shapes into one (union, intersect, subtract the front ones from the back one, or exclude where they overlap):
- * one compound path with the look of the back shape, replacing them, as one undo step. The operands are put in the coordinates of the
- * back one exactly (anchors differ by an exact amount, the rest is one rounding) before the curves are cut and joined.
+ * Combine the selected shapes with a Boolean operation (union, intersect, subtract the front ones from the back one, exclude where they
+ * overlap), without destroying them (ADR 0103): they become a group with an operation, stay editable inside it, and
+ * the group's result, made in the same transaction, is what is drawn. One undo step. On a boolean group, it changes the operation instead.
  */
 export function combineSelection(doc: DocumentStore, editor: EditorState, op: BoolOp): void {
   if (editor.blockEdit()) return;
-  const paths = combinable(doc, editor);
   const say = (m: string): void => {
     editor.message = m;
     editor.changed();
   };
-  if (paths.length < 2) return say("Select two or more shapes to combine them.");
-  const base = paths[0]!;
-  const frame = base.frame ?? doc.space.world;
-  const regions: Region[] = [];
-  for (const o of paths) {
-    const e = expressObjectIn(o, frame) as PathObject;
-    const k = 2 ** (e.unit - base.unit);
-    const dx = D.toNumber(D.shift(D.sub(e.anchor.x, base.anchor.x), -base.unit));
-    const dy = D.toNumber(D.shift(D.sub(e.anchor.y, base.anchor.y), -base.unit));
-    if (!(k > 0 && Number.isFinite(k + dx + dy))) return say("Those shapes are too different in size to combine.");
-    regions.push({ subs: mapSubs(pathSubs(e), (x, y) => [x * k + dx, y * k + dy]), evenodd: !!o.evenodd });
-  }
-  const loops = booleanOp(op, regions);
-  if (!loops) return say("Those shapes could not be combined: their outlines meet in a way that cannot be told apart. Move one a little and try again.");
-  if (!loops.length) return say("Nothing is left of those shapes.");
-  const { rot: _r, name: _n, groupNames: _g, groups: _gr, tags: _t, shape: _s, evenodd: _e, ...style } = base;
-  const result: PathObject = { ...style, id: newObjectId(), sub: loops };
-  try {
-    validateObject(result);
-  } catch {
-    return say("Those shapes could not be combined.");
-  }
-  const made = homeObject(normalizeUnit(result), doc.space);
-  doc.commit(doc.transaction(paths.length === 2 ? COMBINE_LABEL[op] : `${COMBINE_LABEL[op]} of ${paths.length} shapes`, [made], paths.map((o) => o.id)));
-  editor.select([made.id]);
+  const current = booleanSelection(doc, editor);
+  if (current) return setBooleanOp(doc, editor, current.gid, op);
+  const u = combineUnits(doc, editor);
+  if ("problem" in u) return say(u.problem);
+  if (u.units < 2) return say("Select two or more shapes to combine them.");
+  const gid = newObjectId();
+  const next = groupObjects(u.objs, editor.entered.length, gid).map((o) => ({ ...o, boolOps: { ...(o.boolOps ?? {}), [gid]: op } }) as CanvasObject);
+  const tx = doc.transaction(u.units === 2 ? COMBINE_LABEL[op] : `${COMBINE_LABEL[op]} of ${u.units} shapes`, next);
+  const made = tx.after.get([...tx.after.keys()].find((id) => { const o = tx.after.get(id); return o && isResult(o) && o.result === gid; }) ?? "");
+  if (!made) return say("Those shapes could not be combined: their outlines meet in a way that cannot be told apart. Move one a little and try again.");
+  doc.commit(tx);
+  editor.select(expandToUnits(doc.ordered(), [made], editor.entered));
+}
+
+/** Change the operation of a boolean group (its members and its result carry it); the result follows. */
+export function setBooleanOp(doc: DocumentStore, editor: EditorState, gid: string, op: BoolOp): void {
+  if (editor.blockEdit()) return;
+  const members = [...doc.all()].filter((o) => o.boolOps?.[gid] && o.boolOps[gid] !== op);
+  if (!members.length) return;
+  doc.commit(doc.transaction(`Change to ${COMBINE_LABEL[op].toLowerCase()}`, members.map((o) => ({ ...o, boolOps: { ...o.boolOps, [gid]: op } }) as CanvasObject)));
+  editor.changed();
+}
+
+/** Take a boolean group apart: its shapes come back as they were (still where they are), and its result goes. */
+export function releaseBoolean(doc: DocumentStore, editor: EditorState, gid: string): void {
+  if (editor.blockEdit()) return;
+  const all = [...doc.all()].filter((o) => o.groups?.includes(gid));
+  const result = all.find((o) => isResult(o) && o.result === gid);
+  const members = all.filter((o) => o !== result).map((o): CanvasObject => {
+    const { boolOps, groupNames, groups, ...rest } = o;
+    const { [gid]: _op, ...ops } = boolOps ?? {};
+    const { [gid]: _name, ...names } = groupNames ?? {};
+    const chain = (groups ?? []).filter((g) => g !== gid);
+    return { ...rest, ...(chain.length ? { groups: chain } : {}), ...(Object.keys(ops).length ? { boolOps: ops } : {}), ...(Object.keys(names).length ? { groupNames: names } : {}) } as CanvasObject;
+  });
+  doc.commit(doc.transaction("Release the shapes", members, result ? [result.id] : []));
+  editor.select(members.map((o) => o.id));
+}
+
+/** Make a boolean group one plain path: its result stays (with its look), the shapes inside it go. One undo step brings them back. */
+export function flattenBoolean(doc: DocumentStore, editor: EditorState, gid: string): void {
+  if (editor.blockEdit()) return;
+  const all = [...doc.all()].filter((o) => o.groups?.includes(gid));
+  const result = all.find((o) => isResult(o) && o.result === gid) as PathObject | undefined;
+  if (!result) return;
+  const { boolOps, groupNames, groups, result: _r, ...rest } = result;
+  const { [gid]: _op, ...ops } = boolOps ?? {};
+  const { [gid]: _name, ...names } = groupNames ?? {};
+  const chain = (groups ?? []).filter((g) => g !== gid);
+  const flat = { ...rest, ...(chain.length ? { groups: chain } : {}), ...(Object.keys(ops).length ? { boolOps: ops } : {}), ...(Object.keys(names).length ? { groupNames: names } : {}) } as PathObject;
+  doc.commit(doc.transaction("Flatten", [flat], all.filter((o) => o !== result).map((o) => o.id)));
+  editor.select([flat.id]);
+}
+
+/** Flatten what is selected (Ctrl+E): a boolean group becomes one path, text becomes paths. */
+export function flattenSelection(doc: DocumentStore, editor: EditorState): void {
+  const b = booleanSelection(doc, editor);
+  if (b) flattenBoolean(doc, editor, b.gid);
+  else convertTextToPath(doc, editor);
 }
 
 // ---- Text to path (ADR 0102) ----------------------------------------------------------------------------------------

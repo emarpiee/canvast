@@ -2186,3 +2186,8 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .paint-modes button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .paint-modes button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .paint-none { padding: var(--sp-8) var(--sp-5); color: var(--hud-muted); font: var(--font-control); text-align: center; }
+
+/* A ticked choice in a menu (the current operation of a boolean group). */
+.pop-menu .menu-tick { margin-left: auto; display: inline-flex; }
+.pop-menu button.is-checked { background: var(--hud-hover); }
+.pop-menu .menu-tick svg { color: var(--hud-accent); }

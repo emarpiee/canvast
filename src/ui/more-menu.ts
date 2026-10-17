@@ -13,6 +13,8 @@ export interface MenuItem {
   icon?: string;
   danger?: boolean;
   disabled?: boolean;
+  /** A choice among several (the current operation): shown ticked, announced as a radio. */
+  checked?: boolean;
   /** The accessible name when the visible label is not enough (default: the label). */
   aria?: string;
   run(): void;
@@ -59,7 +61,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);
   menu.innerHTML = items
-    .map((it, i) => `<button type="button" role="menuitem" data-i="${i}" class="${it.danger ? "is-danger" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}<span>${esc(it.label)}</span></button>`)
+    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}" class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}<span>${esc(it.label)}</span>${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
     .join("");
   document.body.appendChild(menu);
   placeMenu(menu, anchor);

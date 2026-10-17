@@ -4,6 +4,8 @@ import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject } from "../doc/model";
 import { BLEND_MODES, MAX_NAME_LENGTH, inkOf } from "../doc/model";
 import { SHAPE_NAMES } from "../doc/path";
+import { isBoolMember, isResult } from "../doc/boolean-group";
+import type { BoolOp } from "../doc/boolean";
 import type { Backlink } from "../app/session";
 import { mentionIds, plainText } from "../text/markdown";
 import { esc } from "./format";
@@ -64,6 +66,7 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
   const groups = new Map<string, Node>();
   const sorted = [...objects].sort((a, b) => b.z - a.z || (a.id < b.id ? 1 : -1));
   for (const o of sorted) {
+    if (isResult(o)) continue; // what a boolean group looks like is not a layer of its own (ADR 0103): the group is the row
     let siblings = roots;
     for (const gid of o.groups ?? []) {
       let g = groups.get(gid);
@@ -103,6 +106,10 @@ export function splitName(text: string): string {
   if (text.length <= keep + 5) return esc(text);
   return `<span class="n-start">${esc(text.slice(0, -keep))}</span><span class="n-end">${esc(text.slice(-keep))}</span>`;
 }
+
+/** What a boolean group is called in the list, and its icon (ADR 0103). */
+const BOOL_NAME: Record<BoolOp, string> = { union: "Union", intersect: "Intersect", subtract: "Subtract", exclude: "Exclude" };
+const boolIcon = (op: BoolOp): string => (op === "union" ? ICONS.squaresUnite : op === "intersect" ? ICONS.squaresIntersect : op === "subtract" ? ICONS.squaresSubtract : ICONS.squaresExclude);
 
 /** Short name of an object for lists and mention labels. */
 export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
@@ -209,7 +216,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     if (!editor.layersOpen) return;
     // A name being typed is not redrawn under the cursor (a redraw would end the edit).
     if ((renaming && panel.querySelector("[data-rename]")) || (relinking && panel.querySelector("[data-relink-q]"))) return;
-    const all = doc.ordered();
+    const all = doc.ordered().filter((o) => !isResult(o));
     for (const o of all) {
       if (o.kind === "image" && !asked.has(o.assetId)) {
         asked.add(o.assetId);
@@ -246,7 +253,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       if (rows >= limit) return "";
       rows++;
       const first = n.members[0]!;
-      const lab = n.group ? { icon: ICONS.group, text: first.groupNames?.[n.id] ?? `Group (${n.members.length})`, swatch: undefined } : labelOf(first, names);
+      const bop = n.group ? first.boolOps?.[n.id] : undefined;
+      const lab = n.group ? { icon: bop ? boolIcon(bop) : ICONS.group, text: first.groupNames?.[n.id] ?? (bop ? BOOL_NAME[bop] : `Group (${n.members.length})`), swatch: undefined } : labelOf(first, names);
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);
@@ -502,7 +510,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     } else if (t.closest("[data-lock]")) {
       actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.every((o) => o.locked));
     } else {
-      editor.entered = [];
+      // A shape inside a boolean group is edited from inside it: its row takes you in (the group itself and everything else, out).
+      const inside = !li.dataset["group"] || li.dataset["group"] === "false" ? objs[0] : undefined;
+      editor.entered = inside && isBoolMember(inside) ? [...(inside.groups ?? [])] : [];
       const ids = objs.filter((o) => !o.hidden).map((o) => o.id);
       const rowKeys = [...panel.querySelectorAll<HTMLElement>("li.layer")].map((l) => l.dataset["key"]!);
       if (e.shiftKey && anchorKey && rowKeys.includes(anchorKey) && rowKeys.includes(key)) {

@@ -1,7 +1,7 @@
 # ADR 0101: Boolean operations on shapes
 
 ## Status
-Accepted (v0.17.0).
+Accepted (v0.17.0). The *destructive* behaviour described below (the shapes are replaced by one compound path) was replaced by boolean groups in [ADR 0103](0103-boolean-groups.md); the geometry here is still what computes the result.
 
 ## Decision
 **Union, Intersect, Subtract and Exclude overlap** combine the selected shapes (two or more paths that are not locked) into one compound path, as one undo step. The result takes the look of the shape at the back (fill, outline, width, join, cap, opacity, blend) and its place in the stacking order, replaces the operands and is selected. *Subtract* takes every shape in front away from the one at the back; the other three are folded pair by pair. An open sub-path is closed by a straight line, as when it is filled; each operand's own fill rule (non-zero or even-odd) decides what is inside it. The operands are put in the coordinates of the back shape exactly (the anchors differ by an exact amount, the rest is one rounding), so shapes made at different zoom levels, in different frames, turned, combine. Nothing left, shapes too different in size (a ratio past double range) and outlines that graze in a way the tolerances cannot tell apart are said in a notice and change nothing.

@@ -1,6 +1,7 @@
 import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId } from "./model";
 import { homeObject, validateObject, worldForm } from "./model";
+import { withDerived } from "./boolean-group";
 
 /**
  * The authoritative document: a set of canvas objects keyed by stable id.
@@ -71,6 +72,8 @@ export class DocumentStore {
 
   /** Build a transaction that replaces/creates `next` objects and deletes `removed` ids. */
   transaction(label: string, next: readonly CanvasObject[], removed: readonly ObjectId[] = []): Transaction {
+    // The results of boolean groups that the change reaches are brought up to date in the same transaction (ADR 0103).
+    ({ next, removed } = withDerived(this, next, removed));
     const before = new Map<ObjectId, CanvasObject | null>();
     const after = new Map<ObjectId, CanvasObject | null>();
     for (const o of next) {

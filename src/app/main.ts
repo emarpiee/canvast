@@ -11,7 +11,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, convertTextToPath, canOutline } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -350,8 +350,12 @@ async function start(): Promise<void> {
       drawObjects(ctx, visible, assets, vp, dpr, theme);
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
-    const selected = editor.selection.size ? (visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)) : [];
-    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme);
+    // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.
+    const members = editor.entered.length ? visibleObjects(doc, index, editor, fc, vp, undefined, { entered: editor.entered, mode: "members" }) : [];
+    const selected = editor.selection.size
+      ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
+      : [];
+    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members);
     const t3 = performance.now();
     const b: FrameBreakdown = {
       totalMs: t3 - t0,
@@ -670,6 +674,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       outline: () => convertTextToPath(doc, editor),
       canOutline: () => canOutline(doc, editor),
       combine: (op) => combineSelection(doc, editor, op),
+      booleanState: () => booleanSelection(doc, editor)?.op ?? null,
+      releaseBoolean: () => {
+        const b = booleanSelection(doc, editor);
+        if (b) releaseBoolean(doc, editor, b.gid);
+      },
+      flattenBoolean: () => {
+        const b = booleanSelection(doc, editor);
+        if (b) flattenBoolean(doc, editor, b.gid);
+      },
       canCombine: () => canCombine(doc, editor),
       resetRotation: () => void resetRotation(doc, editor),
       resetProportions: () => void resetProportions(doc, editor),

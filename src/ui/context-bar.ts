@@ -7,6 +7,7 @@ import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
 import { openMoreMenu } from "./more-menu";
+import type { MenuItem } from "./more-menu";
 import type { BoolOp } from "../doc/boolean";
 
 /**
@@ -38,6 +39,10 @@ export interface ContextActions {
   /** Combine the selected shapes into one (ADR 0101); whether two or more can be. */
   combine(op: BoolOp): void;
   canCombine(): boolean;
+  /** The operation of the boolean group that is the selection, if it is one (ADR 0103), and taking it apart or making it one path. */
+  booleanState(): BoolOp | null;
+  releaseBoolean(): void;
+  flattenBoolean(): void;
   /** Turn the selected text into paths (ADR 0102), and whether any is selected. */
   outline(): void;
   canOutline(): boolean;
@@ -72,7 +77,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
     btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)") +
-    btn("combine", ICONS.combineIcon, "Combine shapes: union, intersect, subtract, exclude") +
+    btn("combine", ICONS.combineIcon, "Combine shapes (union, intersect, subtract, exclude); on a boolean group: its operation, flatten, release") +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
@@ -148,14 +153,23 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           menu.querySelector<HTMLElement>("button")?.focus();
         }
         break;
-      case "combine":
+      case "combine": {
+        // On a selection of shapes: the four operations make a boolean group. On a boolean group: the same four change its operation (the
+        // current one ticked), and it can be flattened into one path or released into its shapes again.
+        const cur = actions.booleanState();
+        const pick = (op: BoolOp, label: string, icon: string, aria: string): MenuItem => ({ label, icon, aria, ...(cur ? { checked: cur === op } : {}), run: () => actions.combine(op) });
         openMoreMenu(b, [
-          { label: "Union", icon: ICONS.squaresUnite, aria: "Union: join the shapes into one", run: () => actions.combine("union") },
-          { label: "Intersect", icon: ICONS.squaresIntersect, aria: "Intersect: keep only where the shapes overlap", run: () => actions.combine("intersect") },
-          { label: "Subtract", icon: ICONS.squaresSubtract, aria: "Subtract: take the shapes in front away from the one at the back", run: () => actions.combine("subtract") },
-          { label: "Exclude overlap", icon: ICONS.squaresExclude, aria: "Exclude overlap: keep everything but where the shapes overlap", run: () => actions.combine("exclude") },
-        ], "Combine shapes");
+          pick("union", "Union", ICONS.squaresUnite, "Union: join the shapes into one"),
+          pick("intersect", "Intersect", ICONS.squaresIntersect, "Intersect: keep only where the shapes overlap"),
+          pick("subtract", "Subtract", ICONS.squaresSubtract, "Subtract: take the shapes in front away from the one at the back"),
+          pick("exclude", "Exclude overlap", ICONS.squaresExclude, "Exclude overlap: keep everything but where the shapes overlap"),
+          ...(cur ? [
+            { label: "Flatten", icon: ICONS.merge, aria: "Flatten: make it one path, without the shapes inside (Ctrl+E)", run: () => actions.flattenBoolean() },
+            { label: "Release shapes", icon: ICONS.ungroup, aria: "Release the shapes: take the group apart, the shapes stay as they are", run: () => actions.releaseBoolean() },
+          ] : []),
+        ], cur ? "Boolean group" : "Combine shapes");
         break;
+      }
       case "outline": actions.outline(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
@@ -188,7 +202,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       return;
     }
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
-    q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
+    q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
     q("layout").hidden = sel.length < 2;
     q("combine").hidden = !actions.canCombine();
     q("outline").hidden = !actions.canOutline();

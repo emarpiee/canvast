@@ -30,8 +30,9 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, commitPaint, convertTextToPath, deleteSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
+import { boolGroupsOf } from "../doc/boolean-group";
 
 /**
  * Pointer routing and tool behaviour.
@@ -225,7 +226,8 @@ export function attachTools(
   };
   /** The objects the pointer can act on (all visible ones, minus those that fill the view when that option is on). */
   const visible = () => {
-    const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
+    // Inside a boolean group the members are what a pointer reaches, not the group's result (ADR 0103).
+    const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport, undefined, { entered: editor.entered, mode: "pick" });
     return editor.ignoreFilling ? all.filter((po) => !fillsView(po)) : all;
   };
   /** What a click, lasso or box can take: locked objects are drawn but cannot be picked (ADR 0021). */
@@ -1163,6 +1165,13 @@ export function attachTools(
     const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
     if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {
       editor.entered = hit.groups.slice(0, editor.entered.length + 1);
+      const gid = editor.entered[editor.entered.length - 1]!;
+      if (hit.boolOps?.[gid]) {
+        // Into a boolean group (ADR 0103): what is under the pointer now is one of its shapes, not the result that was double-clicked.
+        const inner = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
+        editor.select(inner ? expandToUnits(doc.ordered(), [inner], editor.entered) : []);
+        return;
+      }
       editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
       return;
     }
@@ -1191,7 +1200,9 @@ export function attachTools(
     } else if (mod && key === "y") {
       if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
-      editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id));
+      // everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it)
+      const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
+      editor.select(expandToUnits(doc.ordered(), shown, editor.entered));
     } else if (mod && key === "d") {
       e.preventDefault(); // not the browser's bookmark
       duplicateSelection(doc, editor, view);
@@ -1200,7 +1211,7 @@ export function attachTools(
       else groupSelection(doc, editor);
     } else if (mod && key === "e") {
       e.preventDefault(); // not the browser's search
-      convertTextToPath(doc, editor);
+      flattenSelection(doc, editor);
     } else if (mod && (e.key === "]" || e.key === "[")) {
       arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
     } else if (mod || e.altKey) {

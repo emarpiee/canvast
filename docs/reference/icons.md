@@ -72,6 +72,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `magnet` | Snap to other objects |
 | `map-pin` | Place on Board 1 › Canvas 1 |
 | `maximize` | Full screen |
+| `merge` | Flatten a boolean group into one path (the Combine menu) |
 | `minus` | Zoom out |
 | `mouse-pointer-2` | Select |
 | `mouse-pointer-ban` | Ignore the object that fills the view |
