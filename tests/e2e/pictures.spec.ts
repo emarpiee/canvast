@@ -150,3 +150,48 @@ test("Make a new picture files it as an edited picture: its own folder, name and
   expect(listing.folders.map((f) => f.name)).not.toContain("Extracted frames");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Download: an edited still comes with its original, named as edited pictures are; a plain one comes alone; a video's adjustments are said to stay on the canvas", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app, "trip.png");
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  // plain: the file as it is, under its own name
+  const plain = p.waitForEvent("download");
+  await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
+  expect((await plain).suggestedFilename()).toBe("trip.png");
+  // adjusted: the original and the edited picture, in one ZIP
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await p.locator('.adjust-pop [data-adj-num="contrast"]').fill("30");
+  await p.locator('.adjust-pop [data-adj-num="contrast"]').blur();
+  await p.keyboard.press("Escape");
+  const both = p.waitForEvent("download");
+  await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
+  const dl = await both;
+  expect(dl.suggestedFilename()).toMatch(/\.zip$/);
+  const text = (await import("node:fs")).readFileSync((await dl.path())!).toString("latin1");
+  expect(text).toContain("trip.png");
+  expect(text).toContain("trip-edited.png");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Reset beside Adjust takes the adjustments off at once, and is there only while there are some", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  const reset = p.getByRole("button", { name: "Reset the adjustments" });
+  await expect(reset).toBeHidden();
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("25");
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
+  await p.keyboard.press("Escape");
+  await expect(reset).toBeVisible();
+  await reset.click();
+  expect((await objs(app)).find((o) => o.id === pic.id)!.adjust).toBeUndefined();
+  await expect(reset).toBeHidden();
+  await p.keyboard.press("Control+z");
+  expect((await objs(app)).find((o) => o.id === pic.id)!.adjust).toEqual({ exposure: 25 });
+});

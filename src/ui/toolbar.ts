@@ -190,6 +190,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
         <button type="button" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
+        <button type="button" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
         <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
         <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -339,6 +340,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.changed();
   });
   root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
+  root.querySelector<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
   root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", (e) => {
     const anchor = e.currentTarget as HTMLElement;
     const sel = actions.selectedAdjust();
@@ -651,7 +653,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     crop.hidden = !(pick && still && actions.croppable());
     crop.setAttribute("aria-pressed", String(editor.cropId !== null));
     root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
-    root.querySelector<HTMLElement>("[data-adjust]")!.hidden = !(pick && still && actions.selectedAdjust());
+    const adj = pick && still ? actions.selectedAdjust() : null;
+    root.querySelector<HTMLElement>("[data-adjust]")!.hidden = !adj;
+    root.querySelector<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
     root.querySelector<HTMLElement>("[data-attach]")!.hidden = !(pick && still && editor.selection.size > 0);
     root.querySelector<HTMLElement>("[data-attach]")!.setAttribute("aria-pressed", String(editor.attachMode));
     root.querySelector<HTMLElement>("[data-detach]")!.hidden = !(pick && still && actions.canDetach());

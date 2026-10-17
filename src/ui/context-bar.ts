@@ -27,6 +27,8 @@ export interface ContextActions {
   /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
   fileSelection(): { hash: string; open: boolean } | null;
+  /** Any file of the library is picked: its original can be downloaded (several as a ZIP; ADR 0119). */
+  canDownload(): boolean;
   /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
   releaseSheet(): void;
   canReleaseSheet(): boolean;
@@ -92,7 +94,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("tag", ICONS.tag, "Tag the selection") +
     btn("library", ICONS.library, "View in the library") +
-    btn("download", ICONS.download, "Download the original file") +
+    btn("download", ICONS.download, "Download the original file (several files: one ZIP; an edited picture comes with its original)") +
     btn("open", ICONS.externalLink, "Open in a new tab") +
     btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture") +
     btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures") +
@@ -276,7 +278,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();
-    q("download").hidden = !file;
+    q("download").hidden = !actions.canDownload();
     q("open").hidden = !file?.open;
     q("unsheet").hidden = !actions.canReleaseSheet();
     q("vectorise").hidden = !actions.svgPicture();

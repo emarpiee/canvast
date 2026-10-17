@@ -32,7 +32,16 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await expect.poll(async () => (await objects(p)).length).toBe(2);
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");
-  await expect(p.getByRole("button", { name: "Download the original file" })).toBeHidden(); // two selected: the file buttons are for one
+  await expect(p.getByRole("button", { name: "Open in a new tab" })).toBeHidden(); // two selected: opening is for one
+  // two selected: Download brings both originals in one ZIP
+  const zipDl = p.waitForEvent("download");
+  await p.getByRole("button", { name: "Download the original file" }).click();
+  const zip = await zipDl;
+  expect(zip.suggestedFilename()).toMatch(/^canvast-files-\d{8}-\d{4}\.zip$/);
+  const zbytes = readFileSync((await zip.path())!).toString("latin1");
+  expect(zbytes.startsWith("PK")).toBe(true);
+  expect(zbytes).toContain("robot.glb");
+  expect(zbytes).toContain("notes.txt");
   // The library: a card for each, the chip and what to do in the details, download there too.
   await p.getByTestId("view-assets").click();
   await expect(p.getByTestId("asset-card")).toHaveCount(2);

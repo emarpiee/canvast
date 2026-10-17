@@ -18,6 +18,7 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import listRestartSvg from "lucide-static/icons/list-restart.svg";
 import clipboardListSvg from "lucide-static/icons/clipboard-list.svg";
 import clipboardPasteSvg from "lucide-static/icons/clipboard-paste.svg";
 import clipboardPlainSvg from "lucide-static/icons/clipboard.svg";
@@ -340,6 +341,7 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  listRestart: clean(listRestartSvg),
   clipboardList: clean(clipboardListSvg),
   clipboardPaste: clean(clipboardPasteSvg),
   clipboardPlain: clean(clipboardPlainSvg),

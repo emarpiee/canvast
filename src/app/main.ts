@@ -69,6 +69,7 @@ import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
+import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import type { Command } from "../ui/command-palette";
 import { sheetLabels } from "../render/sheet-label";
@@ -871,10 +872,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       canExportSvg: () => canExportSvg(doc, editor),
       exportSvg: () => saveSelectionSvg(),
-      downloadFile: () => {
-        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
-        if (o?.kind === "image") void downloadOriginal(assets, o.assetId);
-      },
+      canDownload: () => pickedFiles(doc, editor).length > 0,
+      downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
       openFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind === "image") void openOriginalInTab(assets, o.assetId);
