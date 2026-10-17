@@ -264,10 +264,21 @@ export function mountTextEditor(
     e.preventDefault();
     document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") ?? "");
   });
+  // The options bar and its pop-ups (size, font, colour...) change the text while it is open: using them does not end the edit.
+  const OPTIONS = ".toolbar, .colour-pop";
+  const inside = (n: EventTarget | null): boolean => n instanceof Element && (box.contains(n) || bar.contains(n) || n.closest(OPTIONS) !== null);
   box.addEventListener("focusout", (e) => {
-    const to = e.relatedTarget as Node | null;
-    if (to && (box.contains(to) || bar.contains(to))) return;
+    if (inside(e.relatedTarget)) return;
     commit();
+  });
+  // ...so what ends it is a press anywhere else, or Escape from the options bar.
+  document.addEventListener("pointerdown", (e) => {
+    if (target && !inside(e.target)) commit();
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (!target || e.key !== "Escape" || box.contains(e.target as Node)) return;
+    commit();
+    host.querySelector<HTMLElement>("canvas")?.focus({ preventScroll: true });
   });
 
   return {

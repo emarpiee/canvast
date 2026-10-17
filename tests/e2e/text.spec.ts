@@ -157,6 +157,21 @@ test("a click makes a text as wide as its words, a dragged box one of that width
   expect(await width(a!.id)).toBeLessThan(200); // as wide as 16 words of 16 px, no wrapping
   expect(Math.abs((await width(b!.id)) - 260 - 2 * 16 * 0.25)).toBeLessThan(8); // the dragged width (and the padding the box has)
 
+  // The options bar works on a text while it is being edited, and the edit stays open until a press elsewhere.
+  await newText(p, 700, 300);
+  await p.keyboard.type("live");
+  const liveSize = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+  await liveSize.fill("40");
+  await liveSize.press("Enter");
+  await expect(p.getByTestId("text-editor")).toBeVisible();
+  await p.getByRole("radio", { name: "Align right" }).click();
+  await p.keyboard.press("Escape"); // (the focus is in the options bar)
+  await expect(p.getByTestId("text-editor")).toBeHidden();
+  const live = (await textObjects(p)).find((t) => t.md === "live")!;
+  expect(live).toMatchObject({ align: "right", autoWidth: true });
+  expect((live["size"] as number) * 2 ** (live["unit"] as number)).toBeCloseTo(40, 3);
+  await p.keyboard.press("v");
+
   // The options bar of a picked text: size, alignment, width mode.
   await p.keyboard.press("v");
   await p.mouse.click(310, 308);
