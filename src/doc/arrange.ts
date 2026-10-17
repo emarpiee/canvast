@@ -105,9 +105,10 @@ export function arrangeGrid(units: readonly Unit[], key: SortKey, gap: GapKey = 
 }
 
 /** Line the units up on one edge or centre of the whole selection. */
-export function alignUnits(units: readonly Unit[], how: AlignKey): CanvasObject[] {
-  if (units.length < 2) return [];
-  const all = unionBounds(units.flatMap((u) => u.objects))!;
+export function alignUnits(units: readonly Unit[], how: AlignKey, within?: { min: { x: D.Dyadic; y: D.Dyadic }; max: { x: D.Dyadic; y: D.Dyadic } }): CanvasObject[] {
+  // (one unit is lined up with the box it is in, when there is one: the group it is a shape of)
+  if (units.length < 2 && !within) return [];
+  const all = within ?? unionBounds(units.flatMap((u) => u.objects))!;
   return units.flatMap((u) => {
     const b = boxOf(u);
     const zero = D.ZERO;

@@ -1647,6 +1647,206 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
   expect(Math.abs((boxes[0]!.minX + boxes[0]!.maxX) / 2 - (boxes[1]!.minX + boxes[1]!.maxX) / 2)).toBeLessThan(1);
 });
 
+test("the colour picker and the outline options keep off the selected shape", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [380, 250], [820, 600]);
+  await key(app, "v");
+  await click(app, 600, 420);
+  const frame = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const xs = frame.corners.map((c) => c[0]), ys = frame.corners.map((c) => c[1]);
+  const covers = async (sel: string) => {
+    const r = (await p.locator(sel).boundingBox())!;
+    return r.x < Math.max(...xs) && r.x + r.width > Math.min(...xs) && r.y < Math.max(...ys) && r.y + r.height > Math.min(...ys);
+  };
+  await p.click('[data-paint="fill"]');
+  expect(await covers(".colour-pop"), "the colour picker is off the shape").toBe(false);
+  await key(app, "Escape");
+  await p.click("[data-outline-options]");
+  expect(await covers(".outline-pop"), "the outline options are off the shape").toBe(false);
+});
+
+test("Shift snaps a turned boolean group to steps of 15 degrees of its whole turn, so it can get back to 0", async ({ app }) => {
+  const p = app.page;
+  const deg = async () => ((await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.angle * 180) / Math.PI;
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const turn = async (to: number, shift: boolean) => {
+    // grab the rotate handle and move the pointer round the middle until the box shows about `to` degrees
+    const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+    const c = f.corners;
+    const cx = (c[0]![0] + c[2]![0]) / 2, cy = (c[0]![1] + c[2]![1]) / 2;
+    const top = [(c[0]![0] + c[1]![0]) / 2, (c[0]![1] + c[1]![1]) / 2];
+    const r = Math.hypot(top[0]! - cx, top[1]! - cy) + 26;
+    const a0 = f.angle;
+    await p.mouse.move(cx + Math.sin(a0) * r, cy - Math.cos(a0) * r);
+    if (shift) await p.keyboard.down("Shift");
+    await p.mouse.down();
+    const a1 = (to * Math.PI) / 180;
+    for (let k = 1; k <= 6; k++) {
+      const a = a0 + ((a1 - a0) * k) / 6;
+      await p.mouse.move(cx + Math.sin(a) * r, cy - Math.cos(a) * r);
+    }
+    await p.mouse.up();
+    if (shift) await p.keyboard.up("Shift");
+    await app.frame();
+  };
+  await turn(37, false); // somewhere that is not a step
+  expect(Math.abs((await deg()) - 37)).toBeLessThan(2);
+  await turn(3, true); // near 0, with Shift: snaps to exactly 0
+  expect(Math.abs(await deg())).toBeLessThan(0.01);
+  await turn(52, true); // and to steps of 15 from there
+  const d = await deg();
+  expect(Math.abs(d / 15 - Math.round(d / 15))).toBeLessThan(0.01);
+});
+
+test("a boolean group goes through the ordinary edits as one shape: stretch (turned too), move, duplicate, hide, undo; the result always follows its shapes", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { result?: string; opacity?: number; hidden?: boolean };
+  const all = async () => (await objs(app)) as unknown as G[];
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const widthOf = async () => { const f = await frame(); return Math.hypot(f.corners[1]![0] - f.corners[0]![0], f.corners[1]![1] - f.corners[0]![1]); };
+  const w0 = await widthOf();
+  // stretched by a side handle (unturned): the result is the union of the stretched shapes
+  let f = await frame();
+  let mid = [(f.corners[1]![0] + f.corners[2]![0]) / 2, (f.corners[1]![1] + f.corners[2]![1]) / 2];
+  await drag(app, [mid[0]!, mid[1]!], [mid[0]! + 100, mid[1]!]);
+  expect((await widthOf()) / w0).toBeGreaterThan(1.25);
+  expect((await all()).filter((o) => o.result !== undefined)).toHaveLength(1);
+  // turned, then stretched by a side handle again
+  const c = (await frame()).corners;
+  const cx = (c[0]![0] + c[2]![0]) / 2, cy = (c[0]![1] + c[2]![1]) / 2;
+  await p.mouse.move((c[0]![0] + c[1]![0]) / 2, (c[0]![1] + c[1]![1]) / 2 - 26);
+  await p.mouse.down();
+  await p.mouse.move(cx + 200, cy - 60, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  const turned = (await frame()).angle;
+  expect(Math.abs(turned)).toBeGreaterThan(0.2);
+  f = await frame();
+  const w1 = await widthOf();
+  mid = [(f.corners[1]![0] + f.corners[2]![0]) / 2, (f.corners[1]![1] + f.corners[2]![1]) / 2];
+  const ax = [f.corners[1]![0] - f.corners[0]![0], f.corners[1]![1] - f.corners[0]![1]];
+  const len = Math.hypot(ax[0]!, ax[1]!);
+  await drag(app, [mid[0]!, mid[1]!], [mid[0]! + (ax[0]! / len) * 70, mid[1]! + (ax[1]! / len) * 70]);
+  expect((await frame()).angle).toBeCloseTo(turned, 3); // still turned the same
+  expect((await widthOf()) / w1).toBeGreaterThan(1.15);
+  // moved, duplicated, made see-through, hidden, deleted
+  await drag(app, [cx, cy], [cx - 60, cy + 40]);
+  expect((await all()).length).toBe(3);
+  await p.keyboard.press("Control+d");
+  await app.frame();
+  expect((await all()).length).toBe(6);
+  expect((await all()).filter((o) => o.result !== undefined)).toHaveLength(2);
+  await p.locator('[data-ctx="hide"]').click();
+  await app.frame();
+  expect((await all()).filter((o) => o.hidden).length).toBeGreaterThan(0);
+  await key(app, "Control+z");
+  await key(app, "Control+z");
+  expect((await all()).length).toBe(3);
+});
+
+test("one shape inside a group aligns with the group, as in any design tool", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { result?: string; groups?: string[] };
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const shapes = ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
+  const [a, b] = shapes;
+  await p.mouse.dblclick(560, 330); // into the group
+  await app.frame();
+  await click(app, 800, 440); // the back/front shape's own area: one shape picked
+  const sel = await p.evaluate(() => window.__canvastDebug.selection());
+  expect(sel).toHaveLength(1);
+  await p.locator('[data-ctx="layout"]').click(); // the Arrange button is there for a single shape in a group
+  await p.getByRole("menuitem", { name: "Left" }).click();
+  await app.frame();
+  const left = async (id: string) => (await screenBox(app, id)).minX;
+  const moved = sel[0]!;
+  const other = [a!.id, b!.id].find((id) => id !== moved)!;
+  expect(Math.abs((await left(moved)) - (await left(other)))).toBeLessThan(1); // its left edge is the group's left edge
+});
+
+test("initial shape of a boolean group: its shapes, where each is in it, its operation and its radius come back; after a reload too", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { result?: string; boolOps?: Record<string, string>; radius?: number; groups?: string[] };
+  const all = async () => (await objs(app)) as unknown as G[];
+  const members = async () => (await all()).filter((o) => o.result === undefined);
+  const gap = async () => {
+    const [a, b] = await members();
+    const ba = await screenBox(app, a!.id), bb = await screenBox(app, b!.id);
+    return [(bb.minX + bb.maxX) / 2 - (ba.minX + ba.maxX) / 2, (bb.minY + bb.maxY) / 2 - (ba.minY + ba.maxY) / 2];
+  };
+  const menu = async (name: RegExp) => {
+    await p.click("[data-initial]");
+    await p.getByRole("menuitem", { name }).click();
+    await app.frame();
+  };
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  await menu(/^Set initial shape/); // the group picked whole
+  const saved = await gap();
+  // change it: one shape moved inside the group, another operation, a radius
+  await p.mouse.dblclick(560, 330);
+  await app.frame();
+  await click(app, 800, 440);
+  await app.page.mouse.move(800, 440);
+  await p.mouse.down();
+  await p.mouse.move(920, 520, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  expect(Math.abs((await gap())[0]! - saved[0]!)).toBeGreaterThan(50);
+  await key(app, "Escape");
+  await key(app, "Escape");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitemradio", { name: /^Subtract/ }).click();
+  await app.frame();
+  await p.locator("[data-sel-radius]").fill("12");
+  await p.locator("[data-sel-radius]").press("Enter");
+  await p.locator("[data-sel-radius]").blur();
+  await app.frame();
+  await reload(app);
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  await menu(/^Reset to initial shape/);
+  const back = await gap();
+  expect(Math.abs(back[0]! - saved[0]!)).toBeLessThan(1.5);
+  expect(Math.abs(back[1]! - saved[1]!)).toBeLessThan(1.5);
+  const list = await all();
+  const res = list.find((o) => o.result !== undefined)!;
+  expect(res.boolOps![res.result!]).toBe("union");
+  expect(res.radius).toBeUndefined();
+  await key(app, "Control+z"); // one step
+  expect(((await all()).find((o) => o.result !== undefined)!.boolOps![res.result!])).toBe("subtract");
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");

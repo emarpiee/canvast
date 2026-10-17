@@ -738,7 +738,8 @@ export function attachTools(
           about: single ? null : world(centre),
           centre,
           start: Math.atan2(s.y - centre.y, s.x - centre.x),
-          rot0: single?.rot ?? 0,
+          // the turn the box shows now: Shift snaps the whole angle to steps of 15 degrees, wherever it is from (a group is turned as its shapes are)
+          rot0: single ? (single.rot ?? 0) : Math.round(angleFromRadians(frame.angle)),
         };
         return;
       }

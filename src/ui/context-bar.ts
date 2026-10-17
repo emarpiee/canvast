@@ -120,7 +120,28 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const mh = menu.offsetHeight;
     let top = r.bottom - h.top + 6;
     if (top + mh > h.height - MARGIN) top = Math.max(MARGIN, r.top - h.top - 6 - mh);
-    const left = Math.max(MARGIN, Math.min(r.left - h.left + r.width / 2 - mw / 2, h.width - mw - MARGIN));
+    let left = Math.max(MARGIN, Math.min(r.left - h.left + r.width / 2 - mw / 2, h.width - mw - MARGIN));
+    // Not over the selected items: under the bar, above it, or beside the selection, whichever covers them least.
+    const sel = editor.selectionBoxOnScreen;
+    if (sel) {
+      const xs = sel.frame.corners.map((c) => c[0] - h.left);
+      const ys = sel.frame.corners.map((c) => c[1] - h.top);
+      const box = { l: Math.min(...xs) - MARGIN, t: Math.min(...ys) - MARGIN, r: Math.max(...xs) + MARGIN, b: Math.max(...ys) + MARGIN };
+      const over = (x: number, y: number): number => Math.max(0, Math.min(x + mw, box.r) - Math.max(x, box.l)) * Math.max(0, Math.min(y + mh, box.b) - Math.max(y, box.t));
+      const fit = (x: number, y: number): [number, number] => [Math.max(MARGIN, Math.min(h.width - mw - MARGIN, x)), Math.max(MARGIN, Math.min(h.height - mh - MARGIN, y))];
+      const opts: Array<[number, number]> = [
+        [left, top],
+        fit(left, r.top - h.top - 6 - mh),
+        fit(left, r.bottom - h.top + 6),
+        fit(box.r + MARGIN, top),
+        fit(box.l - MARGIN - mw, top),
+        fit(box.r + MARGIN, box.t),
+        fit(box.l - MARGIN - mw, box.t),
+      ];
+      const best = opts.reduce((a, c) => (over(c[0], c[1]) < over(a[0], a[1]) ? c : a));
+      left = best[0];
+      top = best[1];
+    }
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(top)}px`;
   };
@@ -219,7 +240,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     }
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
-    q("layout").hidden = sel.length < 2;
+    q("layout").hidden = sel.length < 2 && !(sel.length === 1 && (sel[0]!.groups?.length ?? 0) > 0); // (one shape inside a group is lined up with the group)
     q("combine").hidden = !(actions.canCombine() || actions.groupJoin() !== null);
     q("flatten").hidden = actions.booleanState() === null;
     q("outline").hidden = !actions.canOutline();

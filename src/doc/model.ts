@@ -216,6 +216,10 @@ export interface InitialShape {
   readonly params?: ShapeParams;
   readonly rot?: number;
   readonly unit: number;
+  /** A boolean group's result: the group's operation when it was saved (its shapes keep theirs); the radius and unit are the result's. */
+  readonly op?: string;
+  /** A shape of a boolean group saved with the group: where its middle was from the middle of the group, in multiples of 2^unit. */
+  readonly offset?: { readonly x: number; readonly y: number };
 }
 
 /** Margin around a text box (em) for italic overhang, bold and descenders past the line box. */

@@ -10,14 +10,14 @@ import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject, TextObject } from "../doc/model";
+import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, TextObject } from "../doc/model";
 import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, homeObject, localBounds, newObjectId } from "../doc/model";
-import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
+import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId } from "../doc/model";
+import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
@@ -91,26 +91,41 @@ export type LayoutCommand = { grid: SortKey; gap?: GapKey } | { align: AlignKey 
 
 const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z to A", date: "by date added", size: "by size", type: "by type", stack: "in stacking order" };
 
-/** The selection as units (a group at the level being worked at, else one object) in one frame, without locked ones. */
-function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, { name: string; date: number }>): Unit[] | string {
+/**
+ * The selection as units (a group at the level being worked at, else one object) in one frame, without locked ones. Items in different frames
+ * are put in the first one's frame exactly (`homed` says they were, so the results go back to the frames that suit them). `within`: the box of
+ * the group the unit is in (the one being worked in, or the boolean group the picked shapes are shapes of), which a single unit is lined up with.
+ */
+function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, { name: string; date: number }>): { units: Unit[]; within: ReturnType<typeof unionBounds>; homed: boolean } | string {
   // (a boolean group's result is derived from its shapes and never moves by itself)
-  const objs = selected(doc, editor).filter((o) => !o.locked && !isResult(o));
-  if (new Set(objs.map((o) => o.frame?.id ?? 0)).size > 1) return "These items are in different spaces; arrange them one space at a time.";
+  const picked = selected(doc, editor).filter((o) => !o.locked && !isResult(o));
   let level = editor.entered.length;
   // Shapes picked inside one boolean group (in the Layers list, say, without entering it) are lined up with each other, not as the one unit the group is.
-  const gid = objs[0]?.groups?.[level];
-  if (gid && objs.length >= 2 && objs.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid])) level += 1;
+  const gid = picked[0]?.groups?.[level];
+  if (gid && picked.length >= 1 && picked.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid])) level += 1;
+  const container = level > 0 ? picked[0]?.groups?.[level - 1] : undefined;
+  const f0 = picked[0]?.frame ?? doc.space.world;
+  const homed = new Set(picked.map((o) => o.frame?.id ?? 0)).size > 1;
+  let objs: CanvasObject[];
+  let around: CanvasObject[] = [];
+  try {
+    objs = homed ? picked.map((o) => expressObjectIn(o, f0)) : picked;
+    if (container) around = [...doc.all()].filter((o) => o.groups?.includes(container) && !isResult(o) && !o.hidden).map((o) => (homed || (o.frame ?? doc.space.world) !== f0 ? expressObjectIn(o, f0) : o));
+  } catch {
+    return "These items are too far apart in size to arrange together.";
+  }
   const byUnit = new Map<string, CanvasObject[]>();
   for (const o of objs) {
     const k = unitKey(o, level);
     (byUnit.get(k) ?? byUnit.set(k, []).get(k)!).push(o);
   }
   const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId)?.name ?? "") : o.kind === "text" ? o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : "");
-  return [...byUnit.values()].map((objects) => {
+  const units = [...byUnit.values()].map((objects) => {
     const first = objects[0]!;
     const date = first.kind === "image" ? names.get(first.assetId)?.date : undefined;
     return { objects, name: nameOf(first), ...(date !== undefined ? { date } : {}) };
   });
+  return { units, within: around.length ? unionBounds(around) : null, homed };
 }
 
 /**
@@ -119,20 +134,24 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
  */
 export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: LayoutCommand, names: ReadonlyMap<string, { name: string; date: number }> = new Map()): void {
   if (editor.blockEdit()) return;
-  const units = layoutUnits(doc, editor, names);
-  if (typeof units === "string") {
-    editor.message = units;
+  const laid = layoutUnits(doc, editor, names);
+  if (typeof laid === "string") {
+    editor.message = laid;
     editor.changed();
     return;
   }
+  const { units, within, homed } = laid;
   const need = "distribute" in cmd ? 3 : 2;
-  if (units.length < need) {
-    editor.message = `Select at least ${need} items to ${"distribute" in cmd ? "distribute" : "grid" in cmd ? "arrange" : "align"}.`;
+  // One item can still be aligned: with the group it is in (the group being worked in, or the boolean group it is a shape of).
+  const alone = "align" in cmd && units.length === 1 && within !== null;
+  if (units.length < need && !alone) {
+    editor.message = `Select at least ${need} items to ${"distribute" in cmd ? "distribute" : "grid" in cmd ? "arrange" : "align"}${"align" in cmd ? ", or one inside a group to line it up with the group" : ""}.`;
     editor.changed();
     return;
   }
-  const moved = "grid" in cmd ? arrangeGrid(units, cmd.grid, cmd.gap) : "align" in cmd ? alignUnits(units, cmd.align) : distributeUnits(units, cmd.distribute);
-  if (!moved.length) return; // already in place
+  const out = "grid" in cmd ? arrangeGrid(units, cmd.grid, cmd.gap) : "align" in cmd ? alignUnits(units, cmd.align, alone ? (within ?? undefined) : undefined) : distributeUnits(units, cmd.distribute);
+  if (!out.length) return; // already in place
+  const moved = homed ? out.map((o) => homeObject(o, doc.space)) : out;
   const label = "grid" in cmd ? `Arrange ${units.length} items in a grid ${LABELS[cmd.grid]}` : "align" in cmd ? `Align ${cmd.align}` : `Distribute ${cmd.distribute === "x" ? "horizontally" : "vertically"}`;
   doc.commit(doc.transaction(label, moved));
   editor.changed();
@@ -848,38 +867,113 @@ export function commitCorners(doc: DocumentStore, editor: EditorState, px: reado
 
 // ---- The initial shape (ADR 0106) -----------------------------------------------------------------------------------
 
-/** The picked paths that have a shape of their own to save (not a boolean group's result, which is derived), and how many already have an initial one. */
-export function initialShapeState(doc: DocumentStore, editor: EditorState): { count: number; saved: number } | null {
-  const paths = editablePaths(doc, editor).filter((o) => o.result === undefined);
-  return paths.length ? { count: paths.length, saved: paths.filter((o) => o.initial).length } : null;
+/** The boolean group picked whole (its result and every object in it, nested groups too), if the selection is one. */
+function pickedGroup(doc: DocumentStore, editor: EditorState): { top: PathObject; objs: PathObject[] } | null {
+  const b = booleanSelection(doc, editor);
+  const top = b ? resultOf(doc.all(), b.gid) : undefined;
+  if (!b || !top) return null;
+  return { top, objs: [...doc.all()].filter((o): o is PathObject => o.kind === "path" && !!o.groups?.includes(b.gid)) };
 }
 
-/** Save the picked shapes' shape as their initial one ("Set initial shape" where there is none, "Update initial shape" to replace it): kept with the object. One undo step. */
+/** Where the middle of an object's box is, in frame `f` (exactly). */
+function centreIn(o: CanvasObject, f: ReturnType<typeof expressObjectIn>["frame"]): { x: D.Dyadic; y: D.Dyadic } {
+  const e = expressObjectIn(o, f ?? o.frame!.space.world);
+  const b = localBounds(e);
+  return { x: D.add(e.anchor.x, D.shift(D.fromNumber((b.minX + b.maxX) / 2), e.unit)), y: D.add(e.anchor.y, D.shift(D.fromNumber((b.minY + b.maxY) / 2), e.unit)) };
+}
+
+/** The shape an object is saved as: its geometry in its own unit. */
+const snapshotOf = (o: PathObject): InitialShape => ({ sub: o.base ?? o.sub, ...(o.base ? { base: o.base, sub: o.sub } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.params ? { params: o.params } : {}), ...(o.rot ? { rot: o.rot } : {}), unit: o.unit });
+
+/** The object with its saved shape put back, its middle at `centre` (the same frame as the object). */
+function shapeBack(o: PathObject, init: InitialShape, centre: { x: D.Dyadic; y: D.Dyadic }): PathObject {
+  const { rot: _r, radius: _rad, base: _b, params: _p, ...rest } = o;
+  const back: PathObject = { ...rest, sub: init.sub, unit: init.unit, ...(init.base ? { base: init.base } : {}), ...(init.radius !== undefined ? { radius: init.radius } : {}), ...(init.params ? { params: init.params } : {}), ...(init.rot ? { rot: init.rot } : {}) };
+  const then = localBounds(back);
+  return { ...back, anchor: { x: D.sub(centre.x, D.shift(D.fromNumber((then.minX + then.maxX) / 2), init.unit)), y: D.sub(centre.y, D.shift(D.fromNumber((then.minY + then.maxY) / 2), init.unit)) } };
+}
+
+/**
+ * What can be saved and brought back for the picked items: each picked vector shape's own shape; or, with a boolean group picked whole, the
+ * group: its shapes, where each is in the group, its operation and its radius (the result is derived, so it is these that are saved).
+ */
+export function initialShapeState(doc: DocumentStore, editor: EditorState): { count: number; saved: number; group: boolean } | null {
+  const g = pickedGroup(doc, editor);
+  if (g) return { count: 1, saved: g.top.initial ? 1 : 0, group: true };
+  const paths = editablePaths(doc, editor).filter((o) => o.result === undefined);
+  return paths.length ? { count: paths.length, saved: paths.filter((o) => o.initial).length, group: false } : null;
+}
+
+/** Save the picked shapes' shape (or the picked boolean group, as a whole) as their initial one ("Set" where there is none, "Update" to replace it): kept with the objects. One undo step. */
 export function setInitialShape(doc: DocumentStore, editor: EditorState, onlyMissing = false): void {
   if (editor.blockEdit()) return;
+  const g = pickedGroup(doc, editor);
+  if (g) {
+    if (onlyMissing && g.top.initial) return;
+    const f0 = g.top.frame ?? doc.space.world;
+    const centre = centreIn(g.top, f0);
+    const next = g.objs.map((o): PathObject => {
+      if (o.result !== undefined) return { ...o, initial: { ...snapshotOf(o), op: o.boolOps?.[o.result] ?? "union" } };
+      const e = expressObjectIn(o, f0) as PathObject;
+      const c = centreIn(o, f0);
+      return { ...o, initial: { ...snapshotOf(o), offset: { x: D.toNumber(D.shift(D.sub(c.x, centre.x), -e.unit)), y: D.toNumber(D.shift(D.sub(c.y, centre.y), -e.unit)) } } };
+    });
+    doc.commit(doc.transaction(g.top.initial ? "Update initial shape of the group" : "Set initial shape of the group", next));
+    editor.changed();
+    return;
+  }
   const paths = editablePaths(doc, editor).filter((o) => o.result === undefined && !(onlyMissing && o.initial));
   if (!paths.length) return;
-  const next = paths.map((o): PathObject => ({ ...o, initial: { sub: o.sub, ...(o.base ? { base: o.base } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.params ? { params: o.params } : {}), ...(o.rot ? { rot: o.rot } : {}), unit: o.unit } }));
+  const next = paths.map((o): PathObject => ({ ...o, initial: snapshotOf(o) }));
   const updating = paths.every((o) => o.initial);
   doc.commit(doc.transaction(updating ? (paths.length === 1 ? "Update initial shape" : `Update initial shape of ${paths.length} shapes`) : paths.length === 1 ? "Set initial shape" : `Set initial shape of ${paths.length} shapes`, next));
   editor.changed();
 }
 
-/** Put the picked shapes back to their initial shape, about where their middle is now (its paint, its place and its layer are as they are). One undo step. */
+/**
+ * Put the picked shapes back to their initial shape, about where their middle is now (paint, place and layer are as they are); or, with a
+ * boolean group picked whole, the group back as it was saved: each shape of it as saved and where it was in the group (about the group's
+ * middle now), its operation and its radius. Shapes added to the group since, or taken from it, are not touched. One undo step.
+ */
 export function resetToInitialShape(doc: DocumentStore, editor: EditorState): void {
   if (editor.blockEdit()) return;
+  const g = pickedGroup(doc, editor);
+  if (g) {
+    if (!g.top.initial) return;
+    const f0 = g.top.frame ?? doc.space.world;
+    const centre = centreIn(g.top, f0);
+    const out = new Map<string, CanvasObject>();
+    for (const o of g.objs) {
+      if (o.result !== undefined) {
+        const init = o.initial;
+        if (!init) continue;
+        const { radius: _r, ...rest } = o;
+        out.set(o.id, init.radius !== undefined ? { ...rest, radius: init.radius } : (rest as PathObject));
+      } else if (o.initial?.offset) {
+        const e = expressObjectIn(o, f0) as PathObject;
+        const init = e.initial!;
+        const at = { x: D.add(centre.x, D.shift(D.fromNumber(init.offset!.x), init.unit)), y: D.add(centre.y, D.shift(D.fromNumber(init.offset!.y), init.unit)) };
+        out.set(o.id, homeObject(normalizeUnit(shapeBack(e, init, at)), doc.space));
+      }
+    }
+    // the operation of each group as saved, on every object that is in it
+    for (const r of g.objs) {
+      const op = r.result !== undefined ? r.initial?.op : undefined;
+      if (!op) continue;
+      for (const o of g.objs) if (o.groups?.includes(r.result!)) {
+        const cur = out.get(o.id) ?? o;
+        out.set(o.id, { ...cur, boolOps: { ...(cur.boolOps ?? {}), [r.result!]: op } } as CanvasObject);
+      }
+    }
+    if (!out.size) return;
+    doc.commit(doc.transaction("Reset to initial shape of the group", [...out.values()]));
+    editor.changed();
+    return;
+  }
   const next: PathObject[] = [];
   for (const o of editablePaths(doc, editor)) {
-    const init = o.initial;
-    if (!init || o.result !== undefined) continue;
-    const now = localBounds(o);
-    const cx = D.add(o.anchor.x, D.shift(D.fromNumber((now.minX + now.maxX) / 2), o.unit));
-    const cy = D.add(o.anchor.y, D.shift(D.fromNumber((now.minY + now.maxY) / 2), o.unit));
-    const { rot: _r, radius: _rad, base: _b, params: _p, ...rest } = o;
-    const back: PathObject = { ...rest, sub: init.sub, unit: init.unit, ...(init.base ? { base: init.base } : {}), ...(init.radius !== undefined ? { radius: init.radius } : {}), ...(init.params ? { params: init.params } : {}), ...(init.rot ? { rot: init.rot } : {}) };
-    const then = localBounds(back);
-    const placed: PathObject = { ...back, anchor: { x: D.sub(cx, D.shift(D.fromNumber((then.minX + then.maxX) / 2), init.unit)), y: D.sub(cy, D.shift(D.fromNumber((then.minY + then.maxY) / 2), init.unit)) } };
-    next.push(homeObject(normalizeUnit(placed), doc.space) as PathObject);
+    if (!o.initial || o.result !== undefined) continue;
+    next.push(homeObject(normalizeUnit(shapeBack(o, o.initial, centreIn(o, o.frame ?? doc.space.world))), doc.space) as PathObject);
   }
   if (!next.length) return;
   doc.commit(doc.transaction(next.length === 1 ? "Reset to initial shape" : `Reset ${next.length} shapes to their initial shape`, next));

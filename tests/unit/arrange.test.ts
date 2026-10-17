@@ -25,6 +25,21 @@ const unit = (o: CanvasObject, name = ""): Unit => ({ objects: [o], name });
 const apply = (units: readonly Unit[], moved: readonly CanvasObject[]): Unit[] => units.map((u) => ({ ...u, objects: u.objects.map((o) => moved.find((m) => m.id === o.id) ?? o) }));
 const edge = (u: Unit, side: "min" | "max", axis: "x" | "y"): number => D.toNumber(unionBounds(u.objects)![side][axis]);
 
+describe("align one unit with the box it is in", () => {
+  it("a single unit is lined up with a given box, on its edge or centre; without a box it stays", () => {
+    const u = unit(box(30, 40, 10, 20));
+    const within = { min: { x: D.fromNumber(0), y: D.fromNumber(0) }, max: { x: D.fromNumber(100), y: D.fromNumber(200) } };
+    expect(alignUnits([u], "left")).toEqual([]);
+    const at = (how: Parameters<typeof alignUnits>[1]): Unit => apply([u], alignUnits([u], how, within))[0]!;
+    expect(edge(at("left"), "min", "x")).toBe(0);
+    expect(edge(at("right"), "max", "x")).toBe(100);
+    expect(edge(at("centre"), "min", "x") + 5).toBe(50);
+    expect(edge(at("top"), "min", "y")).toBe(0);
+    expect(edge(at("bottom"), "max", "y")).toBe(200);
+    expect(edge(at("middle"), "min", "y") + 10).toBe(100);
+  });
+});
+
 describe("arrange, align and distribute", () => {
   it("align lines every unit up on the edge or centre of the whole selection, exactly", () => {
     const us = [unit(box(0, 0, 10, 10)), unit(box(50, 20, 30, 10)), unit(box(10, 90, 20, 40))];
