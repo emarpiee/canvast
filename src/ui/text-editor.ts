@@ -15,7 +15,7 @@ import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
 import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
-import { TEXT_FONT_FAMILY } from "../render/draw-text";
+import { FALLBACK_FAMILY, familyFor } from "../text/fonts";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
@@ -136,7 +136,7 @@ export function mountTextEditor(
       box.style.transform = "";
     }
     box.style.color = paintColor(target.color);
-    box.style.fontFamily = `${TEXT_FONT_FAMILY}, sans-serif`;
+    box.style.fontFamily = `${familyFor(target.assetId)}, ${FALLBACK_FAMILY}`;
     box.style.lineHeight = String(target.lineHeight ?? 1.3);
     box.style.letterSpacing = `${target.tracking ?? 0}em`;
     bar.style.left = `${Math.max(4, s.x)}px`;

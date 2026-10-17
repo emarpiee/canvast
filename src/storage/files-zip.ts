@@ -2,6 +2,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import { extOf } from "../assets/file-kind";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { folderPath, meta } from "../assets/asset-catalog";
+import { storedAssetOf } from "../doc/model";
 import { req } from "./idb";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
 import type { ExportScope } from "./archive";
@@ -74,7 +75,10 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
     for (const cid of canvasIds) {
       const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
       if (!c) continue;
-      for (const r of await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>)) if (r.data.kind === "image") hashes.add(String(r.data["assetId"]));
+      for (const r of await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>)) {
+        const a = storedAssetOf(r.data);
+        if (a) hashes.add(a);
+      }
     }
   }
   void workspaceId; // one workspace per profile today; kept so the scopes read the same as the archive's

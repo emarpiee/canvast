@@ -125,6 +125,12 @@ export interface ImageObject extends ObjectBase {
   readonly adjust?: Adjust;
 }
 
+/** The library asset an object uses: a picture's file, or the font file a text is set in (undefined: none). */
+export const assetOf = (o: CanvasObject): string | undefined => (o.kind === "image" || o.kind === "text" ? o.assetId : undefined);
+
+/** The same read off a stored record (`data`). */
+export const storedAssetOf = (d: Readonly<Record<string, unknown>>): string | undefined => (d["kind"] === "image" || d["kind"] === "text" ? (d["assetId"] as string | undefined) : undefined);
+
 /** Key of the decoded picture an image object draws: the poster of a video at its paused time, a GIF at its paused frame (an audio file always shows its waveform), else the asset itself. */
 export function rasterKey(o: ImageObject): string {
   if (!o.media || o.media.t <= 0) return o.assetId;
@@ -137,6 +143,8 @@ export interface TextObject extends ObjectBase {
   readonly lineHeight?: number;
   /** Extra space after every letter, in em (ADR 0113); absent = none. */
   readonly tracking?: number;
+  /** The font file the text is set in: the hash of a library asset (so the library, archives and the clean-up of unused originals know the text uses it). Absent = the bundled font. */
+  readonly assetId?: string;
   /** Horizontal alignment of the lines; absent = left. */
   readonly align?: Exclude<TextAlign, "left">;
   /** The width follows the words: no wrapping but at a new paragraph, and `w` is kept equal to the widest line. Absent = a set width the words wrap at. */
@@ -485,6 +493,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.size, "size");
     if (o.lineHeight !== undefined && !(Number.isFinite(o.lineHeight) && o.lineHeight >= 0.5 && o.lineHeight <= 5)) throw new InvalidObjectError("bad line height");
     if (o.tracking !== undefined && !(Number.isFinite(o.tracking) && o.tracking >= -0.5 && o.tracking <= 2)) throw new InvalidObjectError("bad letter spacing");
+    if (o.assetId !== undefined && !HASH_RE.test(o.assetId)) throw new InvalidObjectError("bad font");
     if (o.align !== undefined && !(o.align === "center" || o.align === "right" || o.align === "justify")) throw new InvalidObjectError("bad alignment");
     if (o.autoWidth !== undefined && o.autoWidth !== true) throw new InvalidObjectError("bad auto width");
     if (!TEXT_COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
@@ -585,7 +594,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["assetId"] !== undefined ? { assetId: String(s["assetId"]) } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

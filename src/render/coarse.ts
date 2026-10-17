@@ -9,7 +9,8 @@ import type { FlatPath } from "../doc/path";
 import { distanceToOutline, flatten, insideFill } from "../doc/path";
 import { paintAt } from "./gradient";
 import { cosSin } from "../core/angle";
-import { layoutOf, textFont } from "../text/layout";
+import { layoutOf } from "../text/layout";
+import { fontFor } from "../text/fonts";
 import { distToSegment } from "./geometry2d";
 
 /**
@@ -253,7 +254,7 @@ const textSampler: CoarseSampler<TextObject> = {
   classify(o, { lx, ly, m }) {
     let font;
     try {
-      font = textFont();
+      font = fontFor(o.assetId);
     } catch {
       return "exact"; // the font is not loaded yet
     }

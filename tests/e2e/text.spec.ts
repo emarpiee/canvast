@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
@@ -171,6 +172,37 @@ test("a click makes a text as wide as its words, a dragged box one of that width
   expect((await textObjects(p)).find((t) => t.id === a!.id)!.autoWidth).toBeUndefined();
   await expect(p.getByRole("radio", { name: "Fixed width" })).toHaveAttribute("aria-checked", "true");
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("a font file is imported from the options bar, a text is set in it, and it is still set in it after a reload (ADR 0127)", async ({ app }) => {
+  const p = app.page;
+  const width = async (id: string): Promise<number> => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return b.maxX - b.minX;
+  };
+  await newText(p, 300, 300);
+  await p.keyboard.type("Hello font");
+  await finish(p);
+  const [t] = await textObjects(p);
+  const before = await width(t!.id);
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  const bold = readFileSync("node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.ttf");
+  // A file that is not a font is refused with the reason, and nothing is stored.
+  await p.getByTestId("font-input").setInputFiles({ name: "notes.ttf", mimeType: "font/ttf", buffer: Buffer.from("not a font at all, really not") });
+  await expect(p.getByTestId("toast")).toContainText("not a font file");
+  await p.getByTestId("font-input").setInputFiles({ name: "Inter-Black.ttf", mimeType: "font/ttf", buffer: bold });
+  await expect.poll(async () => (await textObjects(p))[0]!["assetId"]).toMatch(/^[0-9a-f]{64}$/);
+  await expect.poll(async () => width(t!.id)).toBeGreaterThan(before * 1.03); // a heavier face is wider
+  const after = await width(t!.id);
+  await expect(p.getByRole("combobox", { name: "Font" }).locator("option:checked")).toHaveText("Inter-Black");
+  expect(app.consoleErrors).toEqual([]);
+
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  await expect.poll(async () => width(t!.id)).toBeCloseTo(after, 0); // the font came back from the library
 });
 
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {

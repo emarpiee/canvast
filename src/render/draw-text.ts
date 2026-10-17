@@ -4,7 +4,8 @@ import type { Viewport } from "../core/camera";
 import type { ImageObject, TextObject } from "../doc/model";
 import { TEXT_PAD_EM } from "../doc/model";
 import type { Line, PlacedGlyph } from "../text/layout";
-import { LINE_HEIGHT, layoutOf, textFont } from "../text/layout";
+import { LINE_HEIGHT, layoutOf } from "../text/layout";
+import { FALLBACK_FAMILY, faceReady, familyFor, fontFor } from "../text/fonts";
 import type { ProjectedObject, Projection } from "./projection";
 import { exactX, exactY, projX, projY, toPx } from "./projection";
 import type { RasterSource } from "./draw-objects";
@@ -30,8 +31,6 @@ import { drawImageObject, paint } from "./draw-objects";
  * system font, and at deep zoom are drawn from a raster, so they pixelate.
  */
 
-export const TEXT_FONT_FAMILY = "canvast-inter";
-export const FALLBACK_FONT_FAMILY = "sans-serif";
 /** Above this many CSS px per em, glyphs are drawn from exact outlines. */
 export const DEEP_EM_PX = 2000;
 /** Italic shear (x += SKEW · height above baseline), exact in binary (≈ 11.5°). */
@@ -92,14 +91,14 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
         if (!g.gid) {
           if (deep) drawFallbackRaster(ctx, p, vp, dpr, o, line, g);
           else {
-            setFont(`${g.bold ? "bold " : ""}${linePx}px ${FALLBACK_FONT_FAMILY}`);
+            setFont(`${g.bold ? "bold " : ""}${linePx}px ${FALLBACK_FAMILY}`);
             glyphText(String.fromCodePoint(g.cp), sx(g.x), sy(line.baseline), g.italic);
           }
         } else if (deep) {
           for (const d of shifts) addGlyphExact(path, o, line, g, d);
           filled = true;
-        } else if (opaque) {
-          setFont(`${linePx}px ${TEXT_FONT_FAMILY}`);
+        } else if (opaque && faceReady(o.assetId)) {
+          setFont(`${linePx}px ${familyFor(o.assetId)}`);
           for (const d of shifts) glyphText(String.fromCodePoint(g.cp), sx(g.x + d), sy(line.baseline), g.italic);
         } else {
           for (const d of shifts) addGlyphFast(ctx, p, o, line, g, d);
@@ -114,7 +113,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
 
 /** Glyph outline in doubles (bounded sizes only). */
 function addGlyphFast(ctx: CanvasRenderingContext2D, p: Projection, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
-  const f = textFont();
+  const f = fontFor(o.assetId);
   const c = (o.size * line.scale) / f.unitsPerEm;
   const ox = (g.x + shiftEm) * o.size;
   const oy = line.baseline * o.size;
@@ -136,7 +135,7 @@ interface Pt {
 }
 
 function addGlyphExact(path: ExactPath, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
-  const f = textFont();
+  const f = fontFor(o.assetId);
   const SIZE = D.fromNumber(o.size);
   const C = D.mul(SIZE, D.fromNumber(line.scale / f.unitsPerEm));
   const ox = D.mul(D.fromNumber(g.x + shiftEm), SIZE);
@@ -278,7 +277,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
     c.height = pixelH;
     const r = c.getContext("2d", { willReadFrequently: true })!;
     r.fillStyle = paintColor(o.color);
-    r.font = `${g.bold ? "bold " : ""}${R}px ${FALLBACK_FONT_FAMILY}`;
+    r.font = `${g.bold ? "bold " : ""}${R}px ${FALLBACK_FAMILY}`;
     r.translate(pad * R, ((line.baseline - line.top) / line.scale) * R);
     if (g.italic) r.transform(1, 0, -SKEW, 1, 0, 0);
     r.fillText(String.fromCodePoint(g.cp), 0, 0);

@@ -2,6 +2,7 @@ import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
 import { parse } from "./markdown";
+import { fontFor, onFontsChange, setBundledFont } from "./fonts";
 
 /**
  * Text layout, independent of the browser: greedy word wrap with advances
@@ -48,6 +49,8 @@ export interface TextStyle {
   readonly lineHeight?: number;
   readonly tracking?: number;
   readonly align?: TextAlign;
+  /** The font file (a library asset's hash) the text is set in; absent = the bundled font. */
+  readonly assetId?: string;
 }
 
 export const LINE_HEIGHT = 1.3;
@@ -56,15 +59,15 @@ export const ITEM_GAP = 0.2;
 export const LIST_INDENT = 1.5;
 export const BLOCK_SCALE: Record<BlockType, number> = { p: 1, h1: 2, h2: 1.5, h3: 1.25, ul: 1, ol: 1 };
 
-let font: Font | null = null;
 /** Advance in em of a character the bundled font lacks. */
 let fallbackAdvance: (cp: number) => number = () => 0.6;
 const cache = new Map<string, TextLayout>();
 const CACHE_MAX = 256;
 
+onFontsChange(() => cache.clear());
+
 export function setFont(f: Font): void {
-  font = f;
-  cache.clear();
+  setBundledFont(f);
 }
 
 export function setFallbackMeasure(fn: (cp: number) => number): void {
@@ -72,18 +75,18 @@ export function setFallbackMeasure(fn: (cp: number) => number): void {
   cache.clear();
 }
 
+/** The bundled font (a text's own font is `fontFor(o.assetId)`). */
 export function textFont(): Font {
-  if (!font) throw new Error("text font not loaded");
-  return font;
+  return fontFor();
 }
 
 export function layoutText(md: string, wrapEm: number, style: TextStyle = {}): TextLayout {
-  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left" } = style;
-  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${md}`;
+  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId } = style;
+  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm, lineHeight, tracking, align);
+    l = compute(md, wrapEm, lineHeight, tracking, align, assetId);
     cache.set(key, l);
   }
   return l;
@@ -100,8 +103,8 @@ interface Ch {
   italic: boolean;
 }
 
-function compute(md: string, wrapEm: number, lineHeight: number, tracking: number, align: TextAlign): TextLayout {
-  const f = textFont();
+function compute(md: string, wrapEm: number, lineHeight: number, tracking: number, align: TextAlign, assetId: string | undefined): TextLayout {
+  const f = fontFor(assetId);
   const upm = f.unitsPerEm;
   const advance = (cp: number): { gid: number; adv: number } => {
     const gid = f.glyphId(cp);

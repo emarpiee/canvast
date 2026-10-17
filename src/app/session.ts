@@ -4,7 +4,7 @@ import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames
 import type { AssetLibrary } from "../assets/asset-library";
 import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
-import { newObjectId } from "../doc/model";
+import { assetOf, newObjectId } from "../doc/model";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId } from "../doc/model";
 import { expressObjectIn } from "../doc/model";
@@ -260,7 +260,10 @@ export class Session {
   /** Hashes the open document can still bring back without storage: its objects and undo/redo states. */
   gcRoots(): Set<string> {
     const roots = new Set<string>();
-    for (const o of this.doc.retainedObjects()) if (o.kind === "image") roots.add(o.assetId);
+    for (const o of this.doc.retainedObjects()) {
+      const a = assetOf(o);
+      if (a) roots.add(a);
+    }
     return roots;
   }
 

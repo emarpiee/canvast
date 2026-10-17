@@ -15,6 +15,8 @@ export interface TextLook {
   readonly align?: TextAlign;
   readonly autoWidth?: boolean;
   readonly color?: string;
+  /** The font file (library asset hash); null = the bundled font. */
+  readonly assetId?: string | null;
 }
 
 /** Size of a new text, in screen px. */
@@ -32,6 +34,7 @@ export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "siz
     align: o.align ?? "left",
     autoWidth: o.autoWidth === true,
     color: o.color,
+    assetId: o.assetId ?? null,
   };
 }
 
@@ -44,6 +47,7 @@ export function toolLook(look: TextLook, penColor: string): ReturnType<typeof lo
     align: look.align ?? "left",
     autoWidth: false,
     color: look.color ?? penColor,
+    assetId: look.assetId ?? null,
   };
 }
 
@@ -56,11 +60,12 @@ export function fitWidth(o: TextObject): TextObject {
 
 /** The text with the given look fields applied: values kept in range, defaults left out of the stored form, the width refitted. */
 export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
-  const { lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, ...rest } = o;
+  const { lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, assetId: _i, ...rest } = o;
   const lineHeight = look.lineHeight !== undefined ? clamp(look.lineHeight, LOOK_LIMITS.lineHeight) : o.lineHeight;
   const tracking = look.tracking !== undefined ? clamp(look.tracking, LOOK_LIMITS.tracking) : o.tracking;
   const align = look.align !== undefined ? look.align : o.align;
   const autoWidth = look.autoWidth !== undefined ? look.autoWidth : o.autoWidth === true;
+  const assetId = look.assetId !== undefined ? (look.assetId ?? undefined) : o.assetId;
   let next: TextObject = {
     ...rest,
     ...(look.color !== undefined ? { color: look.color } : {}),
@@ -69,13 +74,14 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
     ...(tracking ? { tracking } : {}),
     ...(align && align !== "left" ? { align } : {}),
     ...(autoWidth ? { autoWidth: true as const } : {}),
+    ...(assetId ? { assetId } : {}),
   };
   next = fitWidth(next);
   return look.sizePx !== undefined ? (normalizeUnit(next) as TextObject) : next;
 }
 
 export const sameLook = (a: TextObject, b: TextObject): boolean =>
-  a.size === b.size && a.w === b.w && a.color === b.color && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth;
+  a.size === b.size && a.w === b.w && a.color === b.color && a.assetId === b.assetId && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth;
 
 /**
  * A look kept as a saved style (a Styles kind): size, line height, letter spacing, alignment and colour. The width mode is the text's own
@@ -93,6 +99,8 @@ export function cleanLook(d: unknown): TextLook | null {
   const sizePx = num("sizePx"), lineHeight = num("lineHeight"), tracking = num("tracking");
   const align = r["align"];
   const color = r["color"];
+  const assetId = r["assetId"];
+  if (assetId !== undefined && !(typeof assetId === "string" && /^[0-9a-f]{64}$/.test(assetId))) return null;
   if (sizePx === null || lineHeight === null || tracking === null) return null;
   if (align !== undefined && !(align === "left" || align === "center" || align === "right" || align === "justify")) return null;
   if (color !== undefined && !(typeof color === "string" && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(color))) return null;
@@ -102,11 +110,12 @@ export function cleanLook(d: unknown): TextLook | null {
     ...(tracking !== undefined ? { tracking } : {}),
     ...(align !== undefined ? { align } : {}),
     ...(color !== undefined ? { color: color.toLowerCase() } : {}),
+    ...(assetId !== undefined ? { assetId } : {}),
   };
   return Object.keys(out).length ? out : null;
 }
 
 /** The part of a look a saved style keeps (everything but the width mode, and a size only when it is known). */
 export function styleOf(look: ReturnType<typeof lookOf>): TextLook {
-  return { ...(look.sizePx !== null ? { sizePx: Math.round(look.sizePx * 100) / 100 } : {}), lineHeight: look.lineHeight, tracking: look.tracking, align: look.align, color: look.color };
+  return { ...(look.sizePx !== null ? { sizePx: Math.round(look.sizePx * 100) / 100 } : {}), lineHeight: look.lineHeight, tracking: look.tracking, align: look.align, color: look.color, ...(look.assetId ? { assetId: look.assetId } : {}) };
 }

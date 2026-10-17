@@ -5,7 +5,8 @@ import { booleanOp } from "../doc/boolean";
 import type { SubPath } from "../doc/path";
 import { rotateSubs } from "../doc/path";
 import { BOLD_SHIFT_EM, SKEW } from "../render/draw-text";
-import { layoutOf, textFont } from "./layout";
+import { layoutOf } from "./layout";
+import { fontFor } from "./fonts";
 
 /**
  * A text object as vector outlines (ADR 0102): every glyph of the layout (text/layout.ts) as closed sub-paths in the object's own local
@@ -21,7 +22,7 @@ export interface TextOutline {
 }
 
 export function textOutline(o: TextObject): TextOutline {
-  const f = textFont();
+  const f = fontFor(o.assetId);
   const lay = layoutOf(o);
   const subs: SubPath[] = [];
   let missing = 0;

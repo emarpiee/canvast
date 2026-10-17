@@ -70,6 +70,14 @@ export class DocumentStore {
     return () => this.listeners.delete(fn);
   }
 
+  /**
+   * Tell the listeners that what the given objects look like or measure has changed without their data changing (a font arrived): the
+   * index, the tiles and the lists read them again. Nothing is stored or put on the undo stack.
+   */
+  refresh(ids: ReadonlySet<ObjectId>): void {
+    if (ids.size) this.emit("load", ids);
+  }
+
   /** Build a transaction that replaces/creates `next` objects and deletes `removed` ids. */
   transaction(label: string, next: readonly CanvasObject[], removed: readonly ObjectId[] = []): Transaction {
     // The results of boolean groups that the change reaches are brought up to date in the same transaction (ADR 0103).

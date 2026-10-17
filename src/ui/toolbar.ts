@@ -1,4 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
+import { esc } from "./format";
 import type { TextLook, lookOf } from "../text/text-style";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
@@ -55,6 +56,9 @@ export interface ToolbarActions {
   /** The look of the text being edited, else of the Text tool (when it is the tool), else of the first picked text (null: none), and changing it (ADR 0126). */
   selectedTextStyle(): ReturnType<typeof lookOf> | null;
   setTextStyle(look: TextLook, final?: boolean): void;
+  /** The fonts in the library a text can be set in (ADR 0127), and importing a font file into it (null: it was refused, and the person was told why). */
+  fonts(): Promise<Array<{ hash: string; name: string; unusable: string }>>;
+  importFont(file: File): Promise<string | null>;
   setPin(patch: { h?: string; v?: string }): void;
   canFitSheet(): boolean;
   /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
@@ -218,6 +222,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="text select node">
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span><b class="swatch-name">Colour</b></button>
+        <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)">Font <select data-text-font aria-label="Font"></select></label>
+        <input type="file" hidden accept=".ttf,.otf,.woff" data-testid="font-input">
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
@@ -354,6 +360,42 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
     const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
     if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
+  });
+  // The font list is read from the library when the menu is opened (and after an import); the selected font is always shown.
+  const fontSelect = root.querySelector<HTMLSelectElement>("[data-text-font]")!;
+  const fontInput = root.querySelector<HTMLInputElement>("[data-testid=font-input]")!;
+  let fontList: Array<{ hash: string; name: string; unusable: string }> = [];
+  let fontHtml = "";
+  const paintFonts = (): void => {
+    const now = actions.selectedTextStyle()?.assetId ?? "";
+    const known = new Set(fontList.map((f) => f.hash));
+    const html = [`<option value="">Inter (built in)</option>`]
+      .concat(fontList.map((f) => `<option value="${f.hash}"${f.unusable ? " disabled" : ""}>${esc(f.name)}${f.unusable ? " (cannot be read)" : ""}</option>`))
+      .concat(now && !known.has(now) ? [`<option value="${now}">A font that is not in this library</option>`] : [])
+      .concat([`<option value="__import">Add a font file…</option>`])
+      .join("");
+    if (html !== fontHtml) fontSelect.innerHTML = fontHtml = html;
+    fontSelect.value = now;
+  };
+  const askFonts = (): void => void actions.fonts().then((l) => {
+    fontList = l;
+    if (document.activeElement !== fontSelect) paintFonts();
+  });
+  fontSelect.addEventListener("pointerdown", askFonts);
+  fontSelect.addEventListener("focus", askFonts);
+  fontSelect.addEventListener("change", () => {
+    if (fontSelect.value === "__import") {
+      fontSelect.value = actions.selectedTextStyle()?.assetId ?? "";
+      fontInput.click();
+    } else actions.setTextStyle({ assetId: fontSelect.value || null });
+  });
+  fontInput.addEventListener("change", () => {
+    const f = fontInput.files?.[0];
+    fontInput.value = "";
+    if (f) void actions.importFont(f).then((hash) => {
+      if (hash) actions.setTextStyle({ assetId: hash });
+      askFonts();
+    });
   });
   root.querySelector<HTMLInputElement>("[data-text-size]")!.addEventListener("change", (e) => {
     const v = Number((e.target as HTMLInputElement).value);
@@ -690,6 +732,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const txt = (pick && still) || editor.tool === "text" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
+      if (document.activeElement !== fontSelect) paintFonts();
       const size = root.querySelector<HTMLInputElement>("[data-text-size]")!;
       if (document.activeElement !== size) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
       for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));

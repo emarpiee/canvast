@@ -71,6 +71,9 @@ import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runExport, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
+import { FontLoader, whyNotFont } from "./font-loader";
+import { onFontsChange } from "../text/fonts";
+import { describeFile } from "../assets/file-kind";
 import { styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
@@ -338,6 +341,17 @@ async function start(): Promise<void> {
   });
   const assets = new AssetLibrary(db, () => {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
+    invalidate();
+  });
+  // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
+  const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
+  const wantFonts = (objs: Iterable<CanvasObject | undefined>): void => {
+    for (const o of objs) if (o?.kind === "text" && o.assetId && fontLoader.state(o.assetId) === undefined) void fontLoader.ensure(o.assetId);
+  };
+  doc.subscribe((_source, changed) => wantFonts(changed ? [...changed].map((id) => doc.get(id)) : doc.all()));
+  onFontsChange(() => {
+    doc.refresh(new Set([...doc.all()].filter((o) => o.kind === "text" && o.assetId).map((o) => o.id)));
+    tiles.clear();
     invalidate();
   });
   // Decoded images nothing has asked for lately are released when over budget, even if nothing is drawn (ADR 0027).
@@ -712,6 +726,23 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedPin: () => selectedPin(doc, editor),
+    fonts: async () => {
+      const list = (await session.catalog?.list())?.entries ?? [];
+      const fonts = list.filter((e) => e.present && describeFile(e.name, e.type).category === "Font").sort((a, b) => a.name.localeCompare(b.name));
+      await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
+      return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
+    },
+    importFont: async (file) => {
+      const why = await whyNotFont(new Uint8Array(await file.arrayBuffer()));
+      if (why) {
+        editor.message = `Could not use “${file.name}”: ${why}`;
+        editor.changed();
+        return null;
+      }
+      const { record } = await assets.importFileDetailed(file, false);
+      await fontLoader.ensure(record.hash);
+      return record.hash;
+    },
     selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, editor.penColor) : selectedTextStyle(doc, editor, textPpu)),
     setTextStyle: (look, final = true) => {
       if (editor.tool === "text") editor.textLook = { ...editor.textLook, ...look };

@@ -2,7 +2,7 @@
 import bytes from "@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf";
 import { parseFont } from "./font";
 import { setFallbackMeasure, setFont } from "./layout";
-import { FALLBACK_FONT_FAMILY, TEXT_FONT_FAMILY } from "../render/draw-text";
+import { BUNDLED_FAMILY, FALLBACK_FAMILY } from "./fonts";
 
 /**
  * Install the bundled font for layout and drawing. The browser gets it as a
@@ -13,14 +13,14 @@ import { FALLBACK_FONT_FAMILY, TEXT_FONT_FAMILY } from "../render/draw-text";
 export function installTextFont(onReady: () => void): void {
   setFont(parseFont(bytes));
   const m = document.createElement("canvas").getContext("2d")!;
-  m.font = `100px ${FALLBACK_FONT_FAMILY}`;
+  m.font = `100px ${FALLBACK_FAMILY}`;
   const widths = new Map<number, number>();
   setFallbackMeasure((cp) => {
     let w = widths.get(cp);
     if (w === undefined) widths.set(cp, (w = m.measureText(String.fromCodePoint(cp)).width / 100));
     return w;
   });
-  const face = new FontFace(TEXT_FONT_FAMILY, bytes);
+  const face = new FontFace(BUNDLED_FAMILY, bytes);
   document.fonts.add(face);
   face.load().then(onReady, () => undefined);
 }

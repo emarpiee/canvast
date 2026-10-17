@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADJUSTMENT_KIND, COLOUR_KIND, GRADIENT_KIND, PALETTE_KIND, STYLE_KINDS, StyleLibrary, cleanStyles, kindById } from "../../src/assets/styles";
+import { ADJUSTMENT_KIND, COLOUR_KIND, GRADIENT_KIND, PALETTE_KIND, STYLE_KINDS, TEXT_KIND, StyleLibrary, cleanStyles, kindById } from "../../src/assets/styles";
 import type { StyleItem } from "../../src/assets/styles";
 
 const id = (n: number): string => n.toString(16).padStart(32, "0");
@@ -12,7 +12,7 @@ const lib = () => {
 
 describe("styles (ADR 0120)", () => {
   it("has one registry: each kind says how to check, say and show its data", () => {
-    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette"]);
+    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text"]);
     expect(kindById("adjustment")).toBe(ADJUSTMENT_KIND);
     expect(ADJUSTMENT_KIND.validate({ exposure: 20.4, blur: 0, grain: 500 })).toEqual({ exposure: 20, grain: 100 });
     expect(ADJUSTMENT_KIND.validate({ exposure: 0 })).toBeNull();
@@ -20,6 +20,11 @@ describe("styles (ADR 0120)", () => {
     expect(COLOUR_KIND.validate("#2563EB")).toBe("#2563eb");
     expect(COLOUR_KIND.validate("blue")).toBeNull();
     expect(COLOUR_KIND.look!("#2563eb")).toEqual({ swatches: ["#2563eb"] });
+    expect(TEXT_KIND.validate({ sizePx: 24, align: "center", color: "#ABCDEF", lineHeight: 1.5 })).toEqual({ sizePx: 24, align: "center", color: "#abcdef", lineHeight: 1.5 });
+    expect(TEXT_KIND.validate({ sizePx: 0 })).toBeNull(); // out of range
+    expect(TEXT_KIND.validate({ align: "middle" })).toBeNull();
+    expect(TEXT_KIND.validate({})).toBeNull(); // nothing to keep
+    expect(TEXT_KIND.summary({ sizePx: 24, align: "center", lineHeight: 1.5 })).toBe("24 px · center · line 1.5");
   });
 
   it("saves, names, renames and removes, writing the list every time", async () => {

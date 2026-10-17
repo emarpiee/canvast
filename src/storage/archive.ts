@@ -4,7 +4,7 @@ import { deserializeCamera } from "../core/camera";
 import type { FrameRecord, StoredFrameView } from "../core/frames";
 import { FrameSpace, deserializeFrameCamera } from "../core/frames";
 import type { CanvasObject, SerializedObject } from "../doc/model";
-import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
+import { assetOf, deserializeObject, newObjectId, serializeObject, storedAssetOf } from "../doc/model";
 import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
@@ -138,7 +138,10 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
       const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
       const marks = readBookmarks(((await req(tx.objectStore("bookmarks").get(cid) as IDBRequest<{ items?: unknown } | undefined>)) ?? {}).items);
-      for (const r of records) if (r.data.kind === "image") hashes.add(String(r.data["assetId"]));
+      for (const r of records) {
+        const a = storedAssetOf(r.data);
+        if (a) hashes.add(a);
+      }
       const file = `canvases/${c.id}.json`;
       canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), frames, view, ...(marks.length ? { bookmarks: marks } : {}) }) });
       mb.canvases.push({ id: c.id, name: c.name, objectCount: records.length, file });
@@ -321,7 +324,8 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
           if (seen.has(o.id)) throw new Error("duplicate id");
           seen.add(o.id);
           objects.push(o);
-          if (o.kind === "image") referenced.add(o.assetId);
+          const a = assetOf(o);
+          if (a) referenced.add(a);
         } catch {
           bad++;
         }
