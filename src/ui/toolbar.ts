@@ -1,3 +1,5 @@
+import { toolHint } from "./tool-hint";
+import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
 import type { PaintPatch } from "../app/actions";
@@ -5,7 +7,7 @@ import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
-import { openColourPopover, openPaintPopover, recentColours } from "./colour-popover";
+import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -31,6 +33,10 @@ export interface ToolbarActions {
   selectedPaint(): { fill: Paint | null; stroke: Paint | null } | null;
   /** Show (final false: while the picker is dragged) or store (final true) a new fill or outline on the selected paths. */
   paintSelected(patch: PaintPatch, final: boolean): void;
+  /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
+  selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean; widthPx: number | null } | null;
+  /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
+  outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
 }
 
 const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
@@ -128,8 +134,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="shape path select node">
-        <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span></button>
-        <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span></button>
+        <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
+        <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
+      <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape path">
         <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom)">
@@ -175,6 +182,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
       </div>
+      <p class="tool-hint" data-testid="tool-hint" aria-live="polite" hidden></p>
     </div>
   `;
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
@@ -238,6 +246,34 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     });
   };
 
+  const openOutline = (anchor: HTMLElement): void => {
+    const sel = editsSelection() ? actions.selectedOutline() : null;
+    if (editsSelection() && !sel) return;
+    openOutlinePopover(anchor, {
+      widthPx: sel ? sel.widthPx : editor.shapeWidthPx,
+      join: sel ? sel.join : (editor.shapeJoin ?? "miter"),
+      cap: sel ? sel.cap : editor.shapeCap,
+      align: sel ? sel.align : editor.shapeAlign,
+      closed: sel ? sel.closed : editor.tool === "shape" && editor.shapeKind !== "line",
+      onWidth: (px) => {
+        if (sel) actions.setSelectedWidth(px);
+        else {
+          editor.shapeWidthPx = px;
+          editor.changed();
+        }
+      },
+      onStyle: (patch) => {
+        if (sel) actions.outlineSelected(patch);
+        else {
+          if (patch.join) editor.shapeJoin = patch.join;
+          if (patch.cap) editor.shapeCap = patch.cap;
+          if (patch.align) editor.shapeAlign = patch.align;
+          editor.changed();
+        }
+      },
+    });
+  };
+
   root.querySelector<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
     editor.eraserPx = Number((e.target as HTMLInputElement).value);
     editor.changed();
@@ -262,6 +298,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["shapeKind"]) {
       editor.shapeKind = d["shapeKind"] as ShapeKind;
       editor.changed();
+    } else if (d["outlineOptions"] !== undefined) {
+      openOutline(b);
     } else if (d["paint"]) {
       openPaint(b, d["paint"] as "fill" | "stroke");
     } else if (d["colourOpen"] !== undefined) {
@@ -347,6 +385,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
+    root.querySelector<HTMLElement>("[data-outline-options]")!.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
@@ -380,9 +419,17 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
     root.querySelector<HTMLButtonElement>('[data-action="copy-md"]')!.hidden = ![...editor.selection].some((id) => doc.get(id)?.kind === "text");
+    // On Select the pen-size slider sets the thickness of selected strokes: with only shapes (or pictures, text) picked it is not theirs to set
+    // (a shape's width is in Outline options), so it is not offered.
+    const penSize = root.querySelector<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
+    penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // The options bar shows what the current tool offers and is gone when there is nothing to show.
     for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool) || ![...g.children].some((c) => !(c as HTMLElement).hidden);
-    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
+    const hint = root.querySelector<HTMLElement>("[data-testid=tool-hint]")!;
+    const said = toolHint(editor, doc);
+    hint.hidden = said === null;
+    if (said !== null && hint.textContent !== said) hint.textContent = said;
+    root.querySelector<HTMLElement>(".toolbar")!.hidden = !said && ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
   };
   editor.subscribe(update);
   doc.subscribe(update);

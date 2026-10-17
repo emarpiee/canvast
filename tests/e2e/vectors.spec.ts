@@ -768,6 +768,98 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
   expect(nested.find((o) => o.result !== undefined && o.groups!.length === 1)!.sub).toHaveLength(2); // the inner result and the new shape, side by side
 });
 
+test("outline options: width, position inside, centre or outside the edge (drawn, picked and bounded), corners; one undo each; saved", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const dark = (c: number[] | null) => !!c && Math.abs(c[0]! - 31) < 12 && Math.abs(c[1]! - 35) < 12 && Math.abs(c[2]! - 41) < 12;
+  const pop = p.locator(".outline-pop");
+  const picked = () => p.evaluate(() => window.__canvastDebug.selection().length);
+  await key(app, "u");
+  // the next shape: 20 px wide, outside the edge
+  await p.click("[data-outline-options]");
+  await expect(pop).toBeVisible();
+  await pop.locator(".op-width").fill("20");
+  await pop.locator(".op-width").press("Enter");
+  await pop.locator('[data-align="outside"]').click();
+  await key(app, "Escape");
+  await expect(pop).toBeHidden();
+  await drag(app, [500, 300], [800, 500]);
+  const made = await last(app);
+  expect((made as Obj & { align?: string }).align).toBe("outside");
+  expect(made.join).toBe("miter"); // a rectangle keeps its sharp corners
+  expect(dark(await px(490, 400))).toBe(true); // the line is out there, 10 px left of the edge (x 500)
+  expect(dark(await px(510, 400))).toBe(false); // and none of it is over the fill
+  await key(app, "v");
+  await click(app, 487, 400); // picked on the line outside the edge
+  expect(await picked()).toBe(1);
+  await key(app, "Escape");
+  await click(app, 470, 400); // 30 px out: past the line
+  expect(await picked()).toBe(0);
+
+  // the selected shape: inside, then centred; one undo step each
+  await click(app, 650, 400);
+  await p.click("[data-outline-options]");
+  await pop.locator('[data-align="inside"]').click();
+  await key(app, "Escape");
+  expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
+  expect(dark(await px(510, 400))).toBe(true); // now it is over the fill
+  expect(dark(await px(490, 400))).toBe(false);
+  await p.click("[data-outline-options]");
+  await pop.locator('[data-align="centre"]').click();
+  await key(app, "Escape");
+  expect(((await last(app)) as Obj & { align?: string }).align).toBeUndefined();
+  await click(app, 200, 650); // (the selection's own frame is drawn on the edge: look at the shape alone)
+  expect(dark(await px(494, 400))).toBe(true); // half a width each side of the edge
+  expect(dark(await px(506, 400))).toBe(true);
+  await p.keyboard.press("Control+z");
+  expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
+
+  // corners: round
+  await click(app, 650, 400);
+  await p.click("[data-outline-options]");
+  await pop.locator('[data-join="round"]').click();
+  await key(app, "Escape");
+  expect((await last(app)).join).toBeUndefined();
+  await reload(app);
+  expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
+});
+
+test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
+  const p = app.page;
+  const hint = p.getByTestId("tool-hint");
+  await key(app, "u");
+  await expect(hint).toContainText("rectangle");
+  await p.click('[data-shape-kind="star"]');
+  await expect(hint).toContainText("star");
+  await key(app, "b");
+  await expect(hint).toContainText("Click to place a corner");
+  await key(app, "v");
+  await expect(hint).toBeHidden(); // nothing selected, nothing to say
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [500, 300], [700, 400]);
+  await drag(app, [640, 350], [840, 450]);
+  await key(app, "v");
+  await click(app, 560, 330);
+  await expect(hint).toContainText("Enter or double-click edits its nodes");
+  await key(app, "Enter");
+  expect(await tool(app)).toBe("node");
+  await expect(hint).toContainText("click a line to add a node");
+  await key(app, "Enter");
+  expect(await tool(app)).toBe("select");
+  // a boolean group, and inside it
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  await expect(hint).toContainText("Boolean group");
+  await p.mouse.dblclick(560, 330);
+  await app.frame();
+  await expect(hint).toContainText("Inside a boolean group");
+  await key(app, "Escape");
+  await expect(hint).not.toContainText("Inside a boolean group");
+});
+
 test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a big one, subtracts as a hole of its own size, however small", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);

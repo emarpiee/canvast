@@ -6,7 +6,7 @@ import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
-import type { Cap, Join, ShapeKind, SubPath } from "./path";
+import type { Align, Cap, Join, ShapeKind, SubPath } from "./path";
 import type { Paint } from "./paint";
 import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
@@ -146,6 +146,8 @@ export interface PathObject extends ObjectBase {
   readonly join?: Join;
   /** Absent: round. */
   readonly cap?: Cap;
+  /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
+  readonly align?: Align;
   /** Fill rule: absent is non-zero. */
   readonly evenodd?: true;
   readonly shape?: ShapeKind;
@@ -157,6 +159,15 @@ export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
 
 /** The outline style of a path as `paintBounds` takes it (null: no outline). */
 export const pathStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap } | null => (o.stroke === null ? null : { width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}) });
+
+/** Where the outline of a path sits: undefined (centred) unless every sub-path is closed and `align` says inside or outside. */
+export const alignOf = (o: PathObject): Align | undefined => (o.align && o.stroke !== null && o.sub.length > 0 && o.sub.every((s) => s.closed) ? o.align : undefined);
+
+/** The outline as the bounds of the paint take it: an outline outside the edge reaches its whole width past it, one inside reaches nothing past it. */
+export const inkStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap } | null => {
+  const a = alignOf(o);
+  return a === "inside" ? null : a === "outside" ? { ...pathStyle(o)!, width: o.width * 2 } : pathStyle(o);
+};
 
 const turnedPaths = new WeakMap<PathObject, readonly SubPath[]>();
 
@@ -221,7 +232,7 @@ export function strokePoints(o: StrokeObject): readonly number[] {
 
 /** Bounds of the object's own geometry before `rot` is applied. */
 export function unrotatedBounds(o: CanvasObject): LocalBounds {
-  if (o.kind === "path") return paintBounds(o.sub, pathStyle(o));
+  if (o.kind === "path") return paintBounds(o.sub, inkStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
     const l = layoutText(o.md, o.w / o.size);
@@ -250,7 +261,7 @@ export function pivotOf(o: CanvasObject): { x: number; y: number } {
 }
 
 export function localBounds(o: CanvasObject): LocalBounds {
-  if (o.kind === "path") return o.rot ? paintBounds(pathSubs(o), pathStyle(o)) : paintBounds(o.sub, pathStyle(o));
+  if (o.kind === "path") return o.rot ? paintBounds(pathSubs(o), inkStyle(o)) : paintBounds(o.sub, inkStyle(o));
   if (o.kind !== "stroke") {
     const b = unrotatedBounds(o);
     if (!o.rot) return b;
@@ -360,6 +371,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
+    if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
     if (o.result !== undefined && !(typeof o.result === "string" && (o.groups ?? []).includes(o.result) && o.boolOps?.[o.result] !== undefined)) throw new InvalidObjectError("bad boolean result");
@@ -450,6 +462,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       width: s["width"] as number,
       ...(s["join"] !== undefined ? { join: s["join"] as Join } : {}),
       ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
+      ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["result"] !== undefined ? { result: s["result"] as string } : {}),

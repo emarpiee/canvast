@@ -130,7 +130,7 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "U, then drag", does: "Draw the shape chosen in the options (Shift: a square, a circle or a 45 degree line; Alt: from the centre)" },
       { keys: "B, then click or drag", does: "Draw a path: a click is a corner, a drag pulls out a smooth node's handles; click the first node to close it" },
       { keys: "Enter, Escape or a double-click", does: "End the path being drawn, open (Backspace takes back its last node)" },
-      { keys: "N, or a double-click on a path", does: "Edit its nodes: drag a node or a handle, click a line to add a node, Alt-click a node for smooth or corner, Delete removes it" },
+      { keys: "N, Enter, or a double-click on a path", does: "Edit its nodes: drag a node or a handle, click a line to add a node, Alt-click a node for smooth or corner, Delete removes it; Enter or Escape finishes" },
     ],
   },
   {

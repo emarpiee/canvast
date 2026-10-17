@@ -1,3 +1,4 @@
+import { lookFromChoices } from "../doc/stroke-look";
 import type { Viewport } from "../core/camera";
 import type { FrameCamera } from "../core/frames";
 import { cameraIn } from "../scene/frame-index";
@@ -243,7 +244,7 @@ export function drawOverlays(
       fill: sd.fill,
       stroke: sd.stroke,
       width: sd.width,
-      ...(sd.kind === "rect" || sd.kind === "polygon" || sd.kind === "star" ? { join: "miter" as const } : {}),
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, sd.kind === "rect" || sd.kind === "polygon" || sd.kind === "star" ? "miter" : undefined),
     };
     const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
     if (po) drawPath(ctx, po, vp);
@@ -265,6 +266,7 @@ export function drawOverlays(
       fill: null,
       stroke: pd.stroke ?? "#1f2329",
       width: pd.width,
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, "centre"),
     };
     const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
     if (po && !po.cover) {

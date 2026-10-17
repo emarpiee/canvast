@@ -1,3 +1,5 @@
+import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
+import { alignChoice, capChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
 import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { isCard } from "../assets/file-kind";
@@ -677,6 +679,32 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
     const what = patch.fill !== undefined && patch.stroke !== undefined ? "fill and outline" : patch.fill !== undefined ? "fill" : "outline";
     doc.commit(doc.transaction(paths.length === 1 ? `Change ${what}` : `Change ${what} of ${paths.length} paths`, paths.map((o) => ({ ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) }))));
   }
+  editor.changed();
+}
+
+/** The corners, ends and place on the edge of the first selected path's outline (null: no path is selected). `closed`: every sub-path is closed, so the outline can be inside or outside. */
+export function selectedOutline(doc: DocumentStore, editor: EditorState): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean } | null {
+  const o = editablePaths(doc, editor)[0];
+  return o ? { join: joinChoice(o), cap: capChoice(o), align: alignChoice(o), closed: o.sub.length > 0 && o.sub.every((s) => s.closed) } : null;
+}
+
+export interface OutlinePatch {
+  join?: JoinChoice;
+  cap?: CapChoice;
+  align?: AlignChoice;
+}
+
+/** Change the corners, ends or place on the edge of the selected paths' outlines: one undo step. */
+export function commitOutline(doc: DocumentStore, editor: EditorState, patch: OutlinePatch): void {
+  const paths = editablePaths(doc, editor);
+  if (!paths.length || editor.blockEdit()) return;
+  const next = paths.map((o): PathObject => {
+    const { join: _j, cap: _c, align: _a, ...rest } = o;
+    const look = lookFromChoices(patch.join ?? joinChoice(o), patch.cap ?? capChoice(o), patch.align ?? alignChoice(o));
+    return { ...rest, ...look };
+  });
+  const label = patch.align !== undefined ? "Outline position" : patch.join !== undefined ? "Outline corners" : "Outline ends";
+  doc.commit(doc.transaction(paths.length === 1 ? label : `${label} of ${paths.length} paths`, next));
   editor.changed();
 }
 

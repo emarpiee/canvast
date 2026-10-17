@@ -1,5 +1,6 @@
 import type { Viewport } from "../core/camera";
 import type { CanvasObject, ImageObject, PathObject, StrokeObject } from "../doc/model";
+import { alignOf } from "../doc/model";
 import type { ProjectedObject } from "./projection";
 import { fromPx, toPx } from "./projection";
 import * as D from "../core/dyadic";
@@ -206,6 +207,8 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       // Too wide for the canvas to stroke: its exact coverage, as polygons.
       c.fillStyle = canvasPaint(c, o, o.stroke, po.proj, vp);
       fillPolygons(c, po.strokePolys as number[][]);
+    } else if (o.stroke !== null && alignOf(o)) {
+      drawAlignedOutline(c, po, vp, alignOf(o)!);
     } else if (o.stroke !== null) {
       c.strokeStyle = canvasPaint(c, o, o.stroke, po.proj, vp);
       c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
@@ -234,6 +237,44 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   paint(ctx, o, () => ctx.drawImage(layer!, 0, 0));
   ctx.restore();
+}
+
+let aligned: HTMLCanvasElement | null = null;
+
+/**
+ * An outline wholly inside or wholly outside the edge (PathObject.align): a centred line twice as wide, kept where the shape is (inside) or
+ * where it is not (outside), so exactly the width asked for is left on that side. It is made apart and put on, so the shape's own fill (and
+ * whatever is under it) is not touched by the cut.
+ */
+function drawAlignedOutline(c: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, side: "inside" | "outside"): void {
+  const o = po.obj as PathObject;
+  const w = c.canvas.width;
+  const h = c.canvas.height;
+  aligned ??= document.createElement("canvas");
+  if (aligned.width !== w || aligned.height !== h) {
+    aligned.width = w;
+    aligned.height = h;
+  }
+  const a = aligned.getContext("2d")!;
+  a.setTransform(1, 0, 0, 1, 0, 0);
+  a.clearRect(0, 0, w, h);
+  a.setTransform(c.getTransform());
+  a.strokeStyle = canvasPaint(a, o, o.stroke!, po.proj, vp);
+  a.lineWidth = 2 * Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
+  a.lineJoin = o.join ?? "round";
+  a.miterLimit = MITER_LIMIT;
+  a.beginPath();
+  addOutlinePath(a, po, vp);
+  a.stroke();
+  a.globalCompositeOperation = side === "inside" ? "destination-in" : "destination-out";
+  a.beginPath();
+  addFillPath(a, po, vp);
+  a.fill(o.evenodd ? "evenodd" : "nonzero");
+  a.globalCompositeOperation = "source-over";
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(aligned, 0, 0);
+  c.restore();
 }
 
 function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {

@@ -15,6 +15,7 @@ import squaresSubtractSvg from "lucide-static/icons/squares-subtract.svg";
 import squaresExcludeSvg from "lucide-static/icons/squares-exclude.svg";
 import replaceIcon from "lucide-static/icons/replace.svg";
 import mergeIcon from "lucide-static/icons/merge.svg";
+import outlineOptionsSvg from "lucide-static/icons/sliders-horizontal.svg";
 import play from "lucide-static/icons/play.svg";
 import pause from "lucide-static/icons/pause.svg";
 import rewind from "lucide-static/icons/rewind.svg";
@@ -309,4 +310,5 @@ export const ICONS = {
   squaresExclude: clean(squaresExcludeSvg),
   replace: clean(replaceIcon),
   merge: clean(mergeIcon),
+  outlineOptions: clean(outlineOptionsSvg),
 } as const;

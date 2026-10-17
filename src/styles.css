@@ -305,6 +305,8 @@ html, body {
 /* Tools and actions on the first row; the options of the current tool on a second row, so a long set of options never grows into the top-left controls. */
 .tb-options-row { flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--hud-border); }
 .tb-options-row[hidden] { display: none; }
+.tool-hint { flex: 1 1 100%; margin: 0; padding-top: var(--sp-2); font: var(--font-meta); color: var(--hud-muted); text-align: center; text-wrap: balance; }
+.tool-hint[hidden] { display: none; }
 .tb-options-row > .tb-group { padding-left: 0; border-left: 0; }
 .tb-options-row > .tb-group:not([hidden]) ~ .tb-group:not([hidden]) { padding-left: var(--sp-3); border-left: 1px solid var(--hud-border); }
 .tb-group { display: flex; gap: var(--sp-1); align-items: center; }
@@ -2173,6 +2175,8 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .set-colour-hex { font-family: var(--font-mono); font-size: var(--text-sm); }
 
 /* Shapes and paths (ADR 0099): the paint chips show a fill or outline over a chequer, and a slash when there is none. */
+.toolbar .swatch-paint { display: inline-flex; align-items: center; gap: var(--sp-2); width: auto; padding-inline: var(--sp-3); }
+.toolbar .swatch-name { font: var(--font-meta); font-weight: var(--weight-regular); color: var(--hud-muted); }
 .toolbar .swatch-paint span { background: var(--paint), var(--check); box-shadow: inset 0 0 0 1px var(--hud-border); }
 .toolbar .swatch-paint.is-none span { background: linear-gradient(to top right, transparent calc(50% - 1px), var(--canvas-danger) calc(50% - 1px), var(--canvas-danger) calc(50% + 1px), transparent calc(50% + 1px)), var(--check); }
 .toolbar .swatch-paint[data-paint="stroke"] span { background: linear-gradient(var(--hud-bg), var(--hud-bg)) content-box, var(--paint) border-box, var(--check); padding: var(--sp-2); box-sizing: border-box; border: 0; }
@@ -2180,6 +2184,14 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .tb-count { display: inline-flex; align-items: center; gap: var(--sp-3); font: var(--font-meta); color: var(--hud-muted); }
 .toolbar .tb-count input { width: var(--sp-14); height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 /* The paint chooser: none, a colour, a linear or a radial gradient. */
+.outline-pop { display: grid; gap: var(--sp-4); min-width: 0; }
+.op-row { display: grid; grid-template-columns: 4.5rem 1fr; align-items: center; gap: var(--sp-4); }
+.op-label { font: var(--font-meta); color: var(--hud-muted); }
+.op-choices { margin-bottom: 0; }
+.op-choices button[disabled] { opacity: 0.4; cursor: default; }
+.op-width { width: 5rem; padding: var(--sp-2) var(--sp-3); font: var(--font-meta); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.op-unit { display: none; }
+.op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
 .paint-modes { display: flex; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }
 .paint-modes button { flex: 1; padding: var(--sp-2) var(--sp-3); font: var(--font-meta); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; }
 .paint-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }

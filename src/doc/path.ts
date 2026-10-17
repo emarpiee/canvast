@@ -23,6 +23,8 @@ export const MAX_FLAT_POINTS = 60_000;
 
 export type Join = "miter" | "bevel";
 export type Cap = "butt" | "square";
+/** Where the outline sits on the edge: centred on it (absent), wholly inside the shape or wholly outside it. */
+export type Align = "inside" | "outside";
 export interface StrokeStyle {
   readonly width: number;
   /** Absent: round. */

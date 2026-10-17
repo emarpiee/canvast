@@ -2,6 +2,7 @@ import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
 import { newObjectId } from "../doc/model";
+import type { PathObject } from "../doc/model";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard } from "../assets/file-kind";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "../ui/file-actions";
@@ -11,7 +12,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -526,6 +527,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
     },
     selectedPaint: () => selectedPaint(doc, editor),
+    selectedOutline: () => {
+      const o = selectedOutline(doc, editor);
+      if (!o) return null;
+      const first = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "path") as PathObject | undefined;
+      const po = first && visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === first.id);
+      const ppu = po && !po.cover ? po.proj.ppu : 0;
+      return { ...o, widthPx: ppu > 0 && ppu < Infinity ? first!.width * ppu : null };
+    },
+    outlineSelected: (patch) => commitOutline(doc, editor, patch),
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));

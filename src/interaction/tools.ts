@@ -1,3 +1,4 @@
+import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
 import { canvasShortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
@@ -438,7 +439,7 @@ export function attachTools(
     fill: d.fill,
     stroke: d.stroke,
     width: d.width,
-    ...(d.kind === "rect" || d.kind === "polygon" || d.kind === "star" ? { join: "miter" as const } : {}),
+    ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, d.kind === "rect" || d.kind === "polygon" || d.kind === "star" ? "miter" : undefined),
     shape: d.kind,
   });
 
@@ -516,7 +517,7 @@ export function attachTools(
       fill: closed ? d.fill : null,
       stroke: closed ? d.stroke : (stroke ?? d.stroke),
       width: d.width,
-      ...(closed ? { join: "miter" as const } : {}),
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, closed ? editor.shapeAlign : "centre", closed ? "miter" : undefined),
     };
     const made = homeObject(normalizeUnit(obj), doc.space);
     doc.commit(doc.transaction(closed ? "Draw closed path" : "Draw path", [made]));
@@ -1227,6 +1228,10 @@ export function attachTools(
     else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
     else if (e.key === "Enter" && editor.pathDraft) {
       commitPath(false);
+    } else if (e.key === "Enter" && editor.tool === "node") {
+      editor.setTool("select"); // Enter finishes editing nodes, like Esc
+    } else if (e.key === "Enter" && editor.tool === "select" && g.kind === "none" && editor.selection.size === 1 && doc.get([...editor.selection][0]!)?.kind === "path" && !doc.get([...editor.selection][0]!)?.locked) {
+      editor.setTool("node"); // Enter on a shape edits its nodes
     } else if (e.key === "Escape") {
       if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
       else if (g.kind !== "none" && g.kind !== "pan") cancelGesture();

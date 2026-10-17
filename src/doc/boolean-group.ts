@@ -101,7 +101,7 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
   const chain = (base.groups ?? []).slice(0, (base.groups ?? []).indexOf(gid) + 1);
   const bools = Object.fromEntries(Object.entries(base.boolOps ?? {}).filter(([k]) => chain.includes(k)));
   // The result's own look is kept (it is the group's fill and outline); a new one starts as the back shape's.
-  const look = existing ?? { fill: base.fill, stroke: base.stroke, width: base.width, ...(base.join ? { join: base.join } : {}), ...(base.cap ? { cap: base.cap } : {}), opacity: base.opacity, ...(base.blend ? { blend: base.blend } : {}) };
+  const look = existing ?? { fill: base.fill, stroke: base.stroke, width: base.width, ...(base.join ? { join: base.join } : {}), ...(base.cap ? { cap: base.cap } : {}), ...(base.align ? { align: base.align } : {}), opacity: base.opacity, ...(base.blend ? { blend: base.blend } : {}) };
   const { sub: _s, rot: _r, shape: _sh, evenodd: _e, anchor: _a, unit: _u, frame: _f, groups: _g, boolOps: _b, ...keep } = look as PathObject;
   const result: PathObject = {
     ...keep,

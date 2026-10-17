@@ -2,7 +2,8 @@ import type { ProjectedObject } from "./projection";
 import type { Rect } from "./geometry2d";
 import { distToSegment, pointInPolygon, polygonsOverlap, polylineTouchesPolygon } from "./geometry2d";
 import { itemCorners } from "./selection-frame";
-import type { ObjectId } from "../doc/model";
+import type { ObjectId, PathObject } from "../doc/model";
+import { alignOf } from "../doc/model";
 import { exactStrokeEdgeDistancePx } from "./stroke-coverage";
 import { distanceToOutline, insideFill } from "../doc/path";
 
@@ -34,7 +35,12 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
       // An outline too wide for the canvas is measured exactly, as the stroke code does; otherwise on the flattened line.
       if (po.synth) {
         if (po.synth.some((s) => exactStrokeEdgeDistancePx(s, x, y) <= tol)) return true;
-      } else if (distanceToOutline(flats, x, y) <= po.radius + tol) return true;
+      } else {
+        const side = alignOf(po.obj as PathObject);
+        // centred: the line's own width; inside or outside: its whole width on that side of the edge
+        if (!side && distanceToOutline(flats, x, y) <= po.radius + tol) return true;
+        if (side && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd) === (side === "inside") && distanceToOutline(flats, x, y) <= 2 * po.radius + tol) return true;
+      }
     }
     return po.obj.fill !== null && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd);
   }

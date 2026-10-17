@@ -1,3 +1,4 @@
+import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
 import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
 import type { Gradient, Paint } from "../doc/paint";
@@ -313,4 +314,61 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   };
   open = { pop, anchor, picker: { destroy: () => current?.destroy() }, onClose };
   modes.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
+}
+
+
+// ---- Outline options: width, position, corners, ends (ADR 0104) ---------------------------------------------------------------------
+
+export interface OutlineOptions {
+  /** Width in screen px at this zoom (null: the object cannot be measured now, the field is left empty). */
+  widthPx: number | null;
+  join: JoinChoice;
+  cap: CapChoice;
+  align: AlignChoice;
+  /** Every sub-path is closed: the outline can sit inside or outside the edge, and corners matter more than ends. */
+  closed: boolean;
+  onWidth(px: number): void;
+  onStyle(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
+  onClose?(): void;
+}
+
+/** The Outline options under `anchor`: how wide, on which side of the edge, how its corners and ends look. */
+export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  const pop = document.createElement("div");
+  pop.className = "colour-pop outline-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Outline options");
+  const choices = <T extends string>(key: string, label: string, items: ReadonlyArray<[T, string, string]>, value: T, disabled = false): string =>
+    `<div class="op-row"><span class="op-label" id="op-${key}">${label}</span><div class="paint-modes op-choices" role="radiogroup" aria-labelledby="op-${key}">${items
+      .map(([v, text, tip]) => `<button type="button" role="radio" data-${key}="${v}" aria-checked="${v === value}" title="${tip}"${disabled ? " disabled" : ""}>${text}</button>`)
+      .join("")}</div></div>`;
+  pop.innerHTML =
+    `<div class="op-row"><label class="op-label" for="op-width">Width</label><input id="op-width" class="op-width" type="number" min="0.1" step="0.5" inputmode="decimal" value="${o.widthPx === null ? "" : String(Math.round(o.widthPx * 100) / 100)}"><span class="op-unit">px</span></div>` +
+    choices("align", "Position", [["inside", "Inside", "Inside: the whole width is inside the edge"], ["centre", "Centre", "Centre: half on each side of the edge"], ["outside", "Outside", "Outside: the whole width is outside the edge"]] as const, o.align, !o.closed) +
+    choices("join", "Corners", [["miter", "Sharp", "Sharp corners"], ["round", "Round", "Round corners"], ["bevel", "Cut", "Cut (bevelled) corners"]] as const, o.join) +
+    choices("cap", "Ends", [["butt", "Flat", "Flat ends, cut at the last node"], ["round", "Round", "Round ends"], ["square", "Square", "Square ends, reaching half the width past the last node"]] as const, o.cap) +
+    (o.closed ? "" : `<p class="op-note">An open line is always centred on its path.</p>`);
+  const width = pop.querySelector<HTMLInputElement>(".op-width")!;
+  width.addEventListener("change", () => {
+    const v = Number(width.value);
+    if (v > 0) o.onWidth(v);
+  });
+  pop.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
+    if (!b || b.disabled) return;
+    const group = b.closest("[role=radiogroup]")!;
+    for (const x of group.querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
+    const d = b.dataset;
+    if (d["align"]) o.onStyle({ align: d["align"] as AlignChoice });
+    else if (d["join"]) o.onStyle({ join: d["join"] as JoinChoice });
+    else if (d["cap"]) o.onStyle({ cap: d["cap"] as CapChoice });
+  });
+  document.body.appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
+  (pop.querySelector<HTMLElement>("[role=radio][aria-checked=true]:not(:disabled)") ?? width).focus();
 }

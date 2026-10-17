@@ -96,6 +96,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `settings` | Settings |
 | `shapes` | Erase whole groups |
 | `slash` | Line shape |
+| `sliders-horizontal` | Outline options (width, position, corners, ends) |
 | `sparkle` | Star shape |
 | `spline-pointer` | Path tool (curves) |
 | `squares-exclude` | Exclude overlap |

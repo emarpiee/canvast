@@ -9,6 +9,7 @@ import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 import type { ShapeKind, SubPath } from "../doc/path";
 import type { Paint } from "../doc/paint";
+import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 
 export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser" | "shape" | "path" | "node";
 
@@ -128,6 +129,10 @@ export class EditorState {
   shapeFill: Paint | null = "#2563eb";
   shapeStroke: Paint | null = "#1f2329";
   shapeWidthPx = 2;
+  /** The outline's corners, ends and place on the edge for the next shape (null join: the tool's own, sharp for shapes with corners). */
+  shapeJoin: JoinChoice | null = null;
+  shapeCap: CapChoice = "round";
+  shapeAlign: AlignChoice = "centre";
   shapeSides = 6;
   shapeTips = 5;
   shapeDraft: DraftShape | null = null;
