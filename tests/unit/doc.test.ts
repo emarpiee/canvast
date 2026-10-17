@@ -56,7 +56,9 @@ describe("object model", () => {
     expect(() => validateObject(stroke({ width: 0 }))).toThrow(InvalidObjectError);
     expect(() => validateObject(stroke({ unit: 1.5 }))).toThrow(InvalidObjectError);
     expect(() => validateObject(stroke({ color: "red" }))).toThrow(InvalidObjectError);
-    expect(() => validateObject(stroke({ attachmentTargetId: newObjectId() }))).toThrow(InvalidObjectError);
+    expect(() => validateObject(stroke({ attachmentTargetId: "not an id" }))).toThrow(InvalidObjectError); // (attaching to another object is allowed: ADR 0109)
+    expect(() => { const s = stroke({}); validateObject({ ...s, attachmentTargetId: s.id }); }).toThrow(InvalidObjectError);
+    expect(() => validateObject(stroke({ attachmentTargetId: newObjectId() }))).not.toThrow();
     expect(() => validateObject(image({ pixelW: 0 }))).toThrow(InvalidObjectError);
     expect(() => validateObject(image({ assetId: "x" }))).toThrow(InvalidObjectError);
     expect(() => deserializeObject({ id: newObjectId(), kind: "blob", ax: "0p0", ay: "0p0" })).toThrow(InvalidObjectError);
