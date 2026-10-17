@@ -27,7 +27,7 @@ export type LocalGradient =
 /** The turn of a path (about the centre of its unturned paint bounds, as `pathSubs`) and its inverse, in local units. */
 export function turner(o: PathObject): { turn(x: number, y: number): [number, number]; unturn(x: number, y: number): [number, number] } {
   if (!o.rot) return { turn: (x, y) => [x, y], unturn: (x, y) => [x, y] };
-  const b = paintBounds(o.sub, pathStyle(o));
+  const b = paintBounds(o.base ?? o.sub, pathStyle(o));
   const px = (b.minX + b.maxX) / 2;
   const py = (b.minY + b.maxY) / 2;
   const { c, s } = cosSin(o.rot);
@@ -39,13 +39,13 @@ export function turner(o: PathObject): { turn(x: number, y: number): [number, nu
 
 /** A point in box units of the shape's geometry box, as a local point (turned with the path). */
 export function boxToLocal(o: PathObject, u: number, v: number): [number, number] {
-  const b = geometryBounds(o.sub);
+  const b = geometryBounds(o.base ?? o.sub);
   return turner(o).turn(b.minX + u * (b.maxX - b.minX), b.minY + v * (b.maxY - b.minY));
 }
 
 /** A local point (turned) as box units: the inverse of `boxToLocal` (a box with no width or no height maps to 0 on that axis). */
 export function localToBox(o: PathObject, x: number, y: number): [number, number] {
-  const b = geometryBounds(o.sub);
+  const b = geometryBounds(o.base ?? o.sub);
   const [ux, uy] = turner(o).unturn(x, y);
   const w = b.maxX - b.minX;
   const h = b.maxY - b.minY;
@@ -58,7 +58,7 @@ export function localGradient(o: PathObject, g: Gradient): LocalGradient {
     const [x1, y1] = boxToLocal(o, g.x1, g.y1);
     return { type: "linear", x0, y0, x1, y1 };
   }
-  const b = geometryBounds(o.sub);
+  const b = geometryBounds(o.base ?? o.sub);
   const [cx, cy] = boxToLocal(o, g.cx, g.cy);
   return { type: "radial", cx, cy, R: g.r * Math.max(b.maxX - b.minX, b.maxY - b.minY) };
 }

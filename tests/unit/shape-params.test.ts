@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
-import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
+import { deserializeObject, localBounds, newObjectId, serializeObject } from "../../src/doc/model";
 import type { PathObject } from "../../src/doc/model";
 import { drawnParams, drawnSubs, geometryBounds, nodeCount, polygonSubs, rectSubs, scaleParams } from "../../src/doc/path";
 import { hasCorners, paramsOf, withRadius, withShapeParams } from "../../src/doc/shape-params";
@@ -87,6 +87,17 @@ describe("parametric shapes", () => {
     expect(maxFor(star, radii, 0)).toBeGreaterThan(max);
     radii[1] = max;
     expect(maxFor(star, radii, 0)).toBeLessThan(maxFor(star, new Array<number>(10).fill(0), 0));
+  });
+  it("the box of a shape is its sharp box: rounding it, or changing a star's ratio, never resizes it", () => {
+    const star = drawn("star");
+    const box = (o: PathObject) => JSON.stringify(Object.values(localBounds(o)).map((v) => Math.round((v as number) * 1e6) / 1e6));
+    const sharp = box(star);
+    const rounded = withRadius(star, 1e6); // as round as it can be: the tips are cut right back
+    expect(geometryBounds(rounded.sub).maxX - geometryBounds(rounded.sub).minX).toBeLessThan(geometryBounds(star.sub).maxX - geometryBounds(star.sub).minX);
+    expect(box(rounded)).toBe(sharp);
+    expect(box(withShapeParams(rounded, { inner: 0.05 })!)).toBe(sharp);
+    const turned = { ...rounded, rot: 123456789 };
+    expect(box({ ...star, rot: 123456789 })).toBe(box(turned)); // and the same turned
   });
   it("a shape drawn before parameters were kept is found out from its nodes, and one edited by hand is not", () => {
     const legacy: PathObject = { ...base, id: newObjectId(), sub: polygonSubs(0, 0, 100, 100, 5), shape: "polygon" };

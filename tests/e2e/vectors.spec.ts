@@ -1322,6 +1322,41 @@ test("resizing a rounded shape: the radius goes with it, and stays the same size
   expect(c.r / b.r).toBeCloseTo(1, 3);
 });
 
+test("a rounded star keeps its box when its radius, points or ratio change, and resizes like any shape", async ({ app }) => {
+  const p = app.page;
+  const frame = async () => {
+    const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+    return { w: f.corners[1]![0] - f.corners[0]![0], h: f.corners[2]![1] - f.corners[1]![1], x: f.corners[0]![0], y: f.corners[0]![1] };
+  };
+  const set = async (sel: string, v: string) => {
+    await p.locator(sel).fill(v);
+    await p.locator(sel).press("Enter");
+    await p.locator(sel).blur();
+    await app.frame();
+  };
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [400, 300], [800, 700]);
+  await key(app, "v");
+  await click(app, 600, 520);
+  const plain = await frame();
+  for (const [sel, v] of [["[data-sel-radius]", "14"], ["[data-sel-inner]", "9"], ["[data-sel-inner]", "5"], ["[data-sel-radius]", "60"], ["[data-sel-tips]", "7"]] as const) {
+    await set(sel, v);
+    const f = await frame();
+    expect(Math.abs(f.w - plain.w), `${sel} = ${v}`).toBeLessThan(8); // (a hair for the outline's own tips)
+    expect(Math.abs(f.x - plain.x)).toBeLessThan(8);
+  }
+  // resized with a handle, it is the shape that is resized: half the size, half the radius
+  await set("[data-sel-inner]", "40");
+  await set("[data-sel-radius]", "30");
+  const before = await frame();
+  const radius0 = parseFloat(await p.locator("[data-sel-radius]").inputValue());
+  await drag(app, [before.x + before.w, before.y + before.h], [before.x + before.w / 2, before.y + before.h / 2]);
+  const after = await frame();
+  expect(after.w / before.w).toBeCloseTo(0.5, 1);
+  expect(parseFloat(await p.locator("[data-sel-radius]").inputValue()) / radius0).toBeCloseTo(0.5, 1);
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");

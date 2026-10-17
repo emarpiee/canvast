@@ -144,7 +144,7 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
     boolOps: bools,
     result: gid,
   } as PathObject;
-  const place = turn ? unturner(result, turn) : null;
+  const place = turn ? unturner({ ...result, sub: raw }, turn) : null; // (about the sharp outline: a radius does not move the pivot)
   // Under a radius the sharp outline is kept too (`base`): what the radius can be limited by, and what the corner controls are drawn on.
   const placed: PathObject = place
     ? { ...result, sub: place(result.sub), ...(radius > 0 ? { base: place(raw) } : {}) }

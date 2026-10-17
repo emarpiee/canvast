@@ -2,6 +2,7 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- A rounded shape's box is its sharp box: changing a star's radius, points or ratio no longer shrinks its selection box (rounding cut the tips back, and the box followed).
 - Resizing a rounded shape keeps its look: the corner radius scales with it. **Lock corner radius** (a button beside the thickness lock, when a picked shape has corners) keeps the radius its size instead. An outline width of 0 in Outline options is no outline.
 - Selection colours (ADR 0104): with several shapes picked, one chip per colour or gradient they use (outline-only ones as a ring); changing a chip changes it everywhere in the selection, as one undo step. The largest corner radius is now where more would change nothing (corners share a segment in proportion to what they ask), so a star can be rounded much further.
 - Corner radius, finished (ADR 0105): rounds corners between curves as well as lines, so it works on every shape and on a boolean group's result whatever its operation; **one radius per corner** on any shape (the field takes several values; double-click or hold the big main dot on the shape and each corner gets its own dot, the main one moves to the middle and sets them all); the main dot is larger and ringed; a radius is never kept above what its corner can use, which fixes the dot and field that could not be pulled back after being pushed to the limit. Boolean groups now turn with their shapes (their box stays turned instead of snapping upright after each turn).
