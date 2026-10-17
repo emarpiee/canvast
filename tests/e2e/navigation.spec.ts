@@ -276,7 +276,7 @@ test("touch pinch zooms about a fractional finger centroid and returns", async (
   expect(distance(after, before)).toBeLessThan(LIMITS.roundTripPx);
 });
 
-test("previous view and next view: Alt+Left and Alt+Right go back to where the camera rested, gliding when it is on; a new move forgets what was ahead (ADR 0116)", async ({ app }) => {
+test("previous view and next view: Alt+Shift+Left and Alt+Shift+Right go back to where the camera rested, gliding when it is on; a new move forgets what was ahead (ADR 0116)", async ({ app }) => {
   const p = app.page;
   const zoom = async () => {
     const c = await app.camera();
@@ -288,9 +288,9 @@ test("previous view and next view: Alt+Left and Alt+Right go back to where the c
   await p.waitForTimeout(900);
   expect(await zoom()).toBeCloseTo(11, 3);
   await expect(p.getByRole("button", { name: "Previous view" })).toBeEnabled();
-  await p.keyboard.press("Alt+ArrowLeft");
+  await p.keyboard.press("Alt+Shift+ArrowLeft");
   expect(await zoom()).toBeCloseTo(6, 3);
-  await p.keyboard.press("Alt+ArrowLeft");
+  await p.keyboard.press("Alt+Shift+ArrowLeft");
   expect(await zoom()).toBeCloseTo(0, 3);
   await expect(p.getByRole("button", { name: "Previous view" })).toBeDisabled();
   await p.getByRole("button", { name: "Next view" }).click();
@@ -301,7 +301,7 @@ test("previous view and next view: Alt+Left and Alt+Right go back to where the c
   await expect(p.getByRole("button", { name: "Next view" })).toBeDisabled();
   // with gliding on, the view reaches the same place a moment later, never jumping past it
   await p.evaluate(() => window.__canvastDebug.glide(250));
-  await p.keyboard.press("Alt+ArrowLeft");
+  await p.keyboard.press("Alt+Shift+ArrowLeft");
   await expect.poll(zoom, { timeout: 3000 }).toBeCloseTo(6, 3);
   await p.evaluate(() => window.__canvastDebug.glide(0));
   expect(app.consoleErrors).toEqual([]);

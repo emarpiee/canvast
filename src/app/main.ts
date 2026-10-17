@@ -960,9 +960,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
-  // Alt+Left and Alt+Right: previous and next view (ADR 0116), on the canvas.
+  // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
-    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault(); // (not the browser's Back and Forward)
     if (e.key === "ArrowLeft") history.back();
@@ -1076,8 +1076,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },
       { group: "View", title: "Fit the selection in view", keys: "Alt", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
       { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
-      { group: "View", title: "Previous view", keys: "Alt+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
-      { group: "View", title: "Next view", keys: "Alt+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
+      { group: "View", title: "Previous view", keys: "Alt+Shift+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
+      { group: "View", title: "Next view", keys: "Alt+Shift+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
       { group: "View", title: "Zen mode", keys: key(settings.get("key.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
       { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },

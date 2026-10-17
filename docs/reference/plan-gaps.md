@@ -132,7 +132,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Privacy tab, Collaboration tab | Partial | Explanations only. Nothing to set while there is no network and no collaboration. |
 | Command palette; Settings reachable from it | Done (ADR 0117) | Ctrl+K. |
 | Minimap or overview, tours or presentation paths, camera transitions | Partial (ADR 0116) | Tour of the bookmarks and gliding done; a minimap is decided against (no bounds, objects at every depth). |
-| Navigation history (previous view) | Done (ADR 0116) | Alt+Left and Alt+Right. |
+| Navigation history (previous view) | Done (ADR 0116) | Alt+Shift+Left and Alt+Shift+Right. |
 | Context menus, drag between panels, detachable surfaces | Unverified | Not confirmed in this check. |
 | Contrast validated against actual ratios | Unverified | ADR 0050 audited by hand; no automated contrast test found. |
 

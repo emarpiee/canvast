@@ -4,7 +4,7 @@
 
 - **Crop** a picture (its handles move its window of the source; pull back out to restore) and **adjust** it without changing the original: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, blur, sharpen, grain; copy and paste adjustments, copy or make a new picture as it looks (ADR 0118).
 
-- **Command palette** (Ctrl+K, ADR 0117); **previous and next view** (Alt+Left and Alt+Right and two buttons), **gliding** between views, and a **tour of the bookmarks** (ADR 0116).
+- **Command palette** (Ctrl+K, ADR 0117); **previous and next view** (Alt+Shift+Left and Alt+Shift+Right and two buttons), **gliding** between views, and a **tour of the bookmarks** (ADR 0116).
 
 - **ZIP64** (ADR 0115): archives with more than 65,535 entries or 4 GiB or more are written and read; smaller ones are unchanged.
 

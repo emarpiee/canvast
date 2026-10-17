@@ -111,8 +111,8 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
       <span class="hud-sep" role="separator"></span>
-      <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Left)">${ICONS.cornerUpLeft}</button>
-      <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Right)">${ICONS.cornerUpRight}</button>
+      <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
+      <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Shift+Right)">${ICONS.cornerUpRight}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.frame}</button>
