@@ -25,14 +25,19 @@ function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyad
   return D.roundTo(D.add(f, D.mul(D.sub(a, f), k)), unit - ANCHOR_GUARD_BITS);
 }
 
-/** A path stretched: its geometry and shape numbers scale; a corner radius does not (a bigger rectangle keeps its corner), the rounding is made again. */
-function stretched(o: PathObject, kx: number, ky: number): Partial<PathObject> {
+/**
+ * A path stretched: its geometry and shape numbers scale, and so does its corner radius (by the mean of the two scales), so a shape keeps its
+ * look; with the radius lock on (`keepRadius`) it stays the size it is. The rounding is made again.
+ */
+function stretched(o: PathObject, kx: number, ky: number, keepRadius: boolean): Partial<PathObject> {
   const params = o.params ? { params: scaleParams(o.params, kx, ky) } : {};
+  const radius = o.radius === undefined ? undefined : keepRadius ? o.radius : scaleRadius(o.radius, Math.sqrt(kx * ky));
+  const own = radius === undefined ? {} : { radius };
   if (o.base) {
     const base = scaleSubs(o.base, kx, ky);
-    return { ...params, base, sub: roundCorners(base, o.radius!) };
+    return { ...params, ...own, base, sub: roundCorners(base, radius!) };
   }
-  return { ...params, sub: scaleSubs(o.sub, kx, ky) };
+  return { ...params, ...own, sub: scaleSubs(o.sub, kx, ky) };
 }
 
 /** A path with its local units renamed (s times as many units for the same size): everything in local units follows. */
@@ -51,7 +56,7 @@ function renamed(o: PathObject, s: number): Partial<PathObject> {
  * may be stretched (its outline width follows the geometric mean of the two).
  * `keepWidth` (thickness lock): a stroke's shape scales but its line width does not.
  */
-export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false): CanvasObject {
+export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false, keepRadius = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
   const anchor = {
     x: scaleCoord(o.anchor.x, fixed.x, D.fromNumber(kx), o.unit),
@@ -67,7 +72,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   }
   if (o.kind === "path") {
     if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
-    return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
+    return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
 }

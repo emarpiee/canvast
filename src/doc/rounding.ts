@@ -113,18 +113,33 @@ function roundSub(s: SubPath, r: Radius, flat0: number): SubPath {
   const segs = s.closed ? c : c - 1;
   const cubic: Cubic[] = Array.from({ length: segs }, (_, j) => cubicOf(s.n, j, (j + 1) % c));
   const len = cubic.map((q) => lengths(q));
-  const trimStart = new Array<number>(segs).fill(0);
-  const trimEnd = new Array<number>(segs).fill(0);
-  const rounded = new Array<boolean>(c).fill(false);
+  // What each corner asks of the segments next to it (the length along them its arc starts at), and how far a segment can give to both of its ends.
+  const demand = new Array<number>(c).fill(0);
+  const corners: Array<Corner | null> = new Array(c).fill(null);
   for (let k = 0; k < c; k++) {
     const rad = radiusFor(r, flat0 + k);
     if (!(rad > 0)) continue;
     const corner = cornerAt(s, k);
     if (!corner) continue;
-    const { t } = trimOf(corner, rad);
+    corners[k] = corner;
+    demand[k] = rad / Math.tan(corner.theta / 2);
+  }
+  // A segment that cannot hold what both its ends ask shares itself out in proportion to what they asked, so the one that asks for little
+  // is not held to half of it just because its neighbour asks for a lot (a star's tip next to a blunt inner corner).
+  const share = (j: number): number => {
+    const a = demand[j]!, b = demand[(j + 1) % c]!, total = len[j]!.total;
+    return a + b > total ? total / (a + b) : 1;
+  };
+  const trimStart = new Array<number>(segs).fill(0);
+  const trimEnd = new Array<number>(segs).fill(0);
+  const rounded = new Array<boolean>(c).fill(false);
+  for (let k = 0; k < c; k++) {
+    if (!corners[k]) continue;
+    const jin = (k + segs - 1) % segs;
+    const t = demand[k]! * Math.min(share(jin), share(k));
     if (!(t > 0)) continue;
     rounded[k] = true;
-    trimEnd[(k + segs - 1) % segs] = t; // the segment arriving at k ends early
+    trimEnd[jin] = t; // the segment arriving at k ends early
     trimStart[k] = t; // the one leaving it starts late
   }
   // Each segment as it is left after trimming, and where on it the trimmed ends are.
@@ -167,24 +182,66 @@ export function roundCorners(subs: readonly SubPath[], r: Radius): SubPath[] {
 /** How many nodes the sub-paths have in all: the length of an array radius. */
 export const nodesIn = (subs: readonly SubPath[]): number => subs.reduce((a, s) => a + nodeCount(s), 0);
 
-/**
- * The largest radius each node's corner can use (0 where there is no corner): half of the shorter adjacent segment, as an arc of that
- * tangent length. A radius above it looks the same as it, so it is not kept above it (a control that could be pushed past this would have
- * nowhere to come back from).
- */
-export function maxRadii(subs: readonly SubPath[]): number[] {
-  const out: number[] = [];
-  for (const s of subs) {
-    for (let k = 0; k < nodeCount(s); k++) {
-      const c = cornerAt(s, k);
-      out.push(c ? (Math.min(c.lenIn, c.lenOut) / 2) * Math.tan(c.theta / 2) : 0);
-    }
-  }
+/** The corners of the sub-paths in one list (a node that is not one is null), with the segment lengths each sits between. */
+function flatCorners(subs: readonly SubPath[]): Array<{ corner: Corner | null; sub: number; k: number }> {
+  const out: Array<{ corner: Corner | null; sub: number; k: number }> = [];
+  subs.forEach((s, si) => {
+    for (let k = 0; k < nodeCount(s); k++) out.push({ corner: cornerAt(s, k), sub: si, k });
+  });
   return out;
 }
 
-/** A radius cut to what the corners of `sharp` can use: one number to the largest of them, an array node by node. */
+/**
+ * The largest single radius that still changes how the corners look. Where a segment cannot hold what both its ends ask, they share it out,
+ * so a corner stops changing as soon as one of its two segments is full, and once every corner has stopped more radius changes nothing; that radius is the limit (a control that could be pushed past it would have
+ * nowhere to come back from). A segment is full when its two corners ask for all of it: radius * (1 / tan(half angle at one end) + 1 / tan(half angle at the other)) = its length.
+ */
+export function maxUniform(subs: readonly SubPath[]): number {
+  let max = 0;
+  subs.forEach((s) => {
+    const c = nodeCount(s);
+    const segs = s.closed ? c : c - 1;
+    if (c < 3) return;
+    const cot = (k: number): number => {
+      const q = cornerAt(s, k);
+      return q ? 1 / Math.tan(q.theta / 2) : 0;
+    };
+    // the radius at which segment j is full
+    const full = Array.from({ length: segs }, (_, j) => {
+      const k = cot(j) + cot((j + 1) % c);
+      return k > 0 ? lengths(cubicOf(s.n, j, (j + 1) % c)).total / k : Infinity;
+    });
+    // a corner stops changing when the first of its two segments is full
+    for (let k = 0; k < c; k++) {
+      if (!cornerAt(s, k)) continue;
+      const r = Math.min(full[(k + segs - 1) % segs]!, full[k % segs]!);
+      if (Number.isFinite(r)) max = Math.max(max, r);
+    }
+  });
+  return max;
+}
+
+/** The largest radius corner `i` (its place among all the nodes) can have with the others at `radii`: what is left of the two segments beside it. */
+export function maxFor(subs: readonly SubPath[], radii: ArrayLike<number>, i: number): number {
+  const flat = flatCorners(subs);
+  const me = flat[i]?.corner;
+  if (!me) return 0;
+  const { sub, k } = flat[i]!;
+  const s = subs[sub]!, c = nodeCount(s);
+  const base = i - k;
+  const demandOf = (n: number): number => {
+    const q = flat[base + n]?.corner;
+    return q ? (radii[base + n] ?? 0) / Math.tan(q.theta / 2) : 0;
+  };
+  const before = s.closed || k > 0 ? demandOf((k + c - 1) % c) : 0;
+  const after = s.closed || k < c - 1 ? demandOf((k + 1) % c) : 0;
+  return Math.max(0, Math.min(me.lenIn - before, me.lenOut - after)) * Math.tan(me.theta / 2);
+}
+
+/** A radius cut to what the corners of `sharp` can use: one number to the largest the corners can all have, an array corner by corner. */
 export function clampRadius(sharp: readonly SubPath[], r: Radius): Radius {
-  const max = maxRadii(sharp);
-  return typeof r === "number" ? Math.min(r, Math.max(0, ...max)) : r.map((v, i) => Math.min(v, max[i] ?? 0));
+  if (typeof r === "number") return Math.min(r, maxUniform(sharp));
+  const out = [...r];
+  for (let i = 0; i < out.length; i++) out[i] = Math.min(out[i]!, maxFor(sharp, out, i));
+  return out;
 }

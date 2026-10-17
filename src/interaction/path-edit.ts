@@ -2,7 +2,7 @@ import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { SubPath } from "../doc/path";
 import { NODE, isLine, nodeCount, segmentsOf } from "../doc/path";
-import { cornerAt } from "../doc/rounding";
+import { cornerAt, maxFor, maxUniform } from "../doc/rounding";
 import type { ProjectedObject } from "../render/projection";
 import { exactX, exactY, fromPx } from "../render/projection";
 import * as D from "../core/dyadic";
@@ -222,8 +222,9 @@ export interface CornerDot {
   uy: number;
   sinHalf: number;
   px: number;
-  /** The most px radius this corner can use. */
+  /** The most px radius this corner can use with the others as they are, and the most every corner can have at once. */
   max: number;
+  maxAll: number;
 }
 export interface CornerHandles {
   main: CornerDot | null;
@@ -243,7 +244,7 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
   const subs = editSubs(o);
   const p = po.proj;
   const dots: CornerDot[] = [];
-  let index = 0;
+  const screenSubs: SubPath[] = [];
   let sx = 0, sy = 0, sn = 0;
   for (const sub of subs) {
     // the sub-path on screen, to measure the corners in px
@@ -255,8 +256,14 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
       sy += n[k * NODE + 1]!;
       sn++;
     }
-    const screen: SubPath = { n, closed: sub.closed };
-    for (let k = 0; k < nodeCount(sub); k++, index++) {
+    screenSubs.push({ n, closed: sub.closed });
+  }
+  // the radius every corner has now, in px (a number for all, or each its own)
+  const total = screenSubs.reduce((a, s) => a + nodeCount(s), 0);
+  const radiiPx = Array.from({ length: total }, (_, i) => (typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[i] ?? 0) : 0) * p.ppu);
+  let index = 0;
+  for (const screen of screenSubs) {
+    for (let k = 0; k < nodeCount(screen); k++, index++) {
       if (dots.length >= MAX_CORNER_DOTS) continue;
       const corner = cornerAt(screen, k);
       if (!corner) continue;
@@ -266,11 +273,11 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
       ux /= ul;
       uy /= ul;
       const sinHalf = Math.sin(corner.theta / 2);
-      const raw = typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[index] ?? 0) : 0;
-      const max = (Math.min(corner.lenIn, corner.lenOut) / 2) * Math.tan(corner.theta / 2);
-      const px = Math.min(raw * p.ppu, max);
+      // what this corner can use: with the others as they are for its own dot, what they can all have together for the main dot
+      const max = maxFor(screenSubs, radiiPx, index);
+      const px = Math.min(radiiPx[index]!, max);
       const d = Math.max(MIN_DOT_PX, px / sinHalf);
-      dots.push({ index, x: corner.x + ux * d, y: corner.y + uy * d, cx: corner.x, cy: corner.y, ux, uy, sinHalf, px, max });
+      dots.push({ index, x: corner.x + ux * d, y: corner.y + uy * d, cx: corner.x, cy: corner.y, ux, uy, sinHalf, px, max, maxAll: maxUniform(screenSubs) });
     }
   }
   let ratio: CornerHandles["ratio"] = null;

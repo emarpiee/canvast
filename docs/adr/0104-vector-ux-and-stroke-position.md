@@ -17,5 +17,11 @@ Accepted (v0.17.0). The audit is `docs/reference/vector-ux-audit.md`.
 ## Second pass
 Corners, ends and position for the next shape are remembered (`shape.join`, `shape.cap`, `shape.align`). A **Flatten** button is on the selection bar for a boolean group. Shape and Path are one rail button, **Shape and path**; the Path tool is chosen beside the shape kinds and stays lit under the Shape button (U and B keep working).
 
+## Width 0
+Typing 0 in Outline options' width (or setting it on several shapes) is no outline: the stroke is switched off and the width is kept for when it is turned on; a width typed on a shape without an outline turns one on in the default colour. For the next shape the same applies to the Shape tool's defaults.
+
+## Selection colours
+With two or more shapes picked, the Fill and Outline chips (which spoke for the first shape only) give way to one chip per paint the shapes use (`selectionPaints`): a colour, or a gradient (equal gradients are one paint), in order of first use; an outline-only paint is drawn as a ring. A chip opens the same paint chooser, and a change is made everywhere the picked shapes use that paint, fills and outlines alike (`recolour`: shown while dragged through the `replace` preview, stored once as one undo step). A gradient keeps working per shape: each shape has its own box, so the same gradient lands on each shape's own geometry. Nothing is added to the bar for one shape.
+
 ## Tests
 `tests/unit/stroke-look.test.ts` (choices stored as differences; only closed outlines can be inside or outside; the ink's reach per position; saved and refused when bad), `tests/e2e/vectors.spec.ts` ("outline options": width, outside, inside, centre drawn and picked, one undo each, corners, saved; "the line under the tool options": per tool, picked shape, boolean group, entered; Enter).

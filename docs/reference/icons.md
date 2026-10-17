@@ -99,6 +99,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `sliders-horizontal` | Outline options (width, position, corners, ends) |
 | `sparkle` | Star shape |
 | `spline-pointer` | Path tool (curves) |
+| `square-round-corner` | Lock corner radius (resizing keeps the radius) |
 | `squares-exclude` | Exclude overlap |
 | `squares-intersect` | Intersect |
 | `squares-subtract` | Subtract |

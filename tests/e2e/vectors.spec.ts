@@ -669,20 +669,20 @@ test("Boolean groups: enter one to edit its shapes, the result follows as you dr
   expect(back.groups).toEqual([gid]);
 
   // drag it: the result follows live (the pixel under the pointer's old place empties while it is still held), and one undo takes the move back
-  const before = await px(520, 320);
+  const before = await px(540, 320);
   expect(before).toEqual([37, 99, 235]);
   await p.mouse.move(550, 350);
   await p.mouse.down();
   await p.mouse.move(350, 350, { steps: 8 });
   await app.frame();
-  expect(await px(520, 320), "the result follows the shape while it is dragged").not.toEqual([37, 99, 235]);
+  expect(await px(540, 320), "the result follows the shape while it is dragged").not.toEqual([37, 99, 235]);
   await p.mouse.up();
   await app.frame();
-  expect(await px(520, 320)).not.toEqual([37, 99, 235]);
+  expect(await px(540, 320)).not.toEqual([37, 99, 235]);
   expect(await px(350, 330)).toEqual([37, 99, 235]); // where it is now
   await p.keyboard.press("Control+z");
   await app.frame();
-  expect(await px(520, 320)).toEqual([37, 99, 235]);
+  expect(await px(540, 320)).toEqual([37, 99, 235]);
   expect((await all()).find((o) => o.id === back.id)!.ax).toBe(back.ax);
 
   // out again; the group's own paint changes the result and leaves the shapes alone
@@ -820,6 +820,20 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   await pop.locator('[data-join="round"]').click();
   await key(app, "Escape");
   expect((await last(app)).join).toBeUndefined();
+
+  // a width of 0 is no outline (its width is kept); a width on a shape without one turns one on
+  const w0 = (await last(app)).width;
+  await p.click("[data-outline-options]");
+  await pop.locator(".op-width").fill("0");
+  await pop.locator(".op-width").press("Enter");
+  await key(app, "Escape");
+  expect((await last(app)).stroke).toBeNull();
+  expect((await last(app)).width).toBe(w0);
+  await p.click("[data-outline-options]");
+  await pop.locator(".op-width").fill("6");
+  await pop.locator(".op-width").press("Enter");
+  await key(app, "Escape");
+  expect((await last(app)).stroke).toBe("#1f2329");
   await reload(app);
   expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
   // what the next shape gets is remembered too (it was set to Outside, Sharp corners were then left alone)
@@ -1221,6 +1235,91 @@ test("nested boolean groups: a group inside a group; moving, turning, rounding a
   await reload(app);
   expect((await results()).every((o) => (o.rot ?? 0) > 0)).toBe(true);
   expect((await results()).find((o) => o.groups!.length === 1)!.radius as number).toBeGreaterThan(0);
+});
+
+test("selection colours: the colours of several picked shapes as chips; one change reaches every shape that uses it, a gradient too; one undo step", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  const chips = p.locator("[data-sel-colour]");
+  type G = { type: string; x0: number; y0: number; x1: number; y1: number; stops: Array<{ c: string }> };
+  const fills = async () => (await objs(app)).map((o) => o.fill as unknown as string | G);
+  await key(app, "u");
+  await drag(app, [300, 300], [420, 380]);
+  await drag(app, [500, 300], [620, 380]);
+  await drag(app, [700, 300], [820, 380]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  // two paints: the blue of the fills and the dark of the outlines (shown as a ring); the Fill and Outline chips make way for them
+  await expect(chips).toHaveCount(2);
+  await expect(p.locator('[data-paint="fill"]')).toBeHidden();
+  await expect(chips.nth(1)).toHaveAttribute("data-ring", "");
+  await chips.first().click();
+  await pop.locator("[data-hex]").fill("e11d48");
+  await pop.locator("[data-hex]").press("Enter");
+  await key(app, "Escape");
+  expect(await fills()).toEqual(["#e11d48", "#e11d48", "#e11d48"]);
+  await p.keyboard.press("Control+z");
+  expect(await fills()).toEqual(["#2563eb", "#2563eb", "#2563eb"]); // one step for the three shapes
+  await p.keyboard.press("Control+Shift+z");
+
+  // a gradient on two of them: it is one chip, and editing it edits both (each keeps its own box)
+  await click(app, 360, 340);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await key(app, "Escape");
+  await click(app, 560, 340);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await key(app, "Escape");
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  await expect(chips).toHaveCount(3); // the red, the gradient the two share (one chip), the dark of the outlines
+  const before = (await fills())[0] as G;
+  expect(before.type).toBe("linear");
+  await chips.first().click(); // (in the order they first appear: the gradient of the first shape)
+  await pop.locator(".cg [data-angle]").fill("90");
+  await key(app, "Escape");
+  const now = await fills();
+  expect((now[0] as G).y1).not.toBe(before.y1); // turned
+  expect(now[1]).toEqual(now[0]); // both, the same
+  expect(now[2]).toBe("#e11d48"); // the plain one untouched
+  await p.keyboard.press("Control+z");
+  expect((await fills())[0]).toEqual(before);
+  expect((await fills())[1]).toEqual(before);
+});
+
+test("resizing a rounded shape: the radius goes with it, and stays the same size with the radius lock", async ({ app }) => {
+  const p = app.page;
+  type R = Obj & { radius?: number };
+  const world = async () => {
+    const o = (await last(app)) as R;
+    return { r: o.radius! * 2 ** o.unit, w: size(o).w * 2 ** o.unit };
+  };
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await key(app, "v");
+  await click(app, 600, 360);
+  await p.locator("[data-sel-radius]").fill("20");
+  await p.locator("[data-sel-radius]").press("Enter");
+  await p.locator("[data-sel-radius]").blur();
+  await app.frame();
+  const a = await world();
+  expect(a.r).toBeCloseTo(20, 4);
+  // the bottom right handle, to twice the size
+  await drag(app, [700, 420], [900, 540]);
+  const b = await world();
+  expect(b.w / a.w).toBeCloseTo(2, 1);
+  expect(b.r / a.r).toBeCloseTo(b.w / a.w, 1); // it keeps its look: the radius grew as the shape did
+  // with the radius lock on, the corner keeps its size
+  await p.click("[data-lock-radius]");
+  await key(app, "Escape");
+  await click(app, 700, 480);
+  const box = await screenBox(app, (await last(app)).id);
+  await drag(app, [box.maxX, box.maxY], [box.maxX + 200, box.maxY + 120]);
+  const c = await world();
+  expect(c.w / b.w).toBeGreaterThan(1.3);
+  expect(c.r / b.r).toBeCloseTo(1, 3);
 });
 
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {

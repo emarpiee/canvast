@@ -2,6 +2,7 @@ import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
 import { newObjectId } from "../doc/model";
+import type { CanvasObject } from "../doc/model";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
@@ -13,7 +14,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -170,6 +171,7 @@ async function start(): Promise<void> {
   editor.shapeJoin = settings.get("shape.join") === "default" ? null : settings.get("shape.join") as JoinChoice;
   editor.shapeCap = settings.get("shape.cap");
   editor.shapeAlign = settings.get("shape.align");
+  editor.lockRadius = settings.get("shape.lockRadius");
   editor.shapeSides = settings.get("shape.sides");
   editor.shapeTips = settings.get("shape.tips");
   editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") };
@@ -194,6 +196,7 @@ async function start(): Promise<void> {
     settings.set("shape.join", editor.shapeJoin ?? "default");
     settings.set("shape.cap", editor.shapeCap);
     settings.set("shape.align", editor.shapeAlign);
+    settings.set("shape.lockRadius", editor.lockRadius);
     settings.set("shape.sides", editor.shapeSides);
     settings.set("shape.tips", editor.shapeTips);
     settings.set("pen.stabilizer.on", editor.stabilizer.on);
@@ -527,9 +530,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     depth: () => depthOf(view.frameCamera),
     setSelectedWidth: (px) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes and paths out of double range are skipped.
-      const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po) => {
+      const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po): CanvasObject[] => {
         const ppu = po.cover ? 0 : po.proj.ppu;
-        return (po.obj.kind === "stroke" || po.obj.kind === "path") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity ? [{ ...po.obj, width: px / ppu }] : [];
+        if (!((po.obj.kind === "stroke" || po.obj.kind === "path") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity)) return [];
+        // A shape's outline of 0 is no outline (its width is kept for when it is turned on again); a width on one without an outline turns one on.
+        if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: "#1f2329" } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
+        return px > 0 ? [{ ...po.obj, width: px / ppu }] : [];
       });
       if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
     },
@@ -543,6 +549,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return { ...o, widthPx: ppu > 0 && ppu < Infinity ? first!.width * ppu : null };
     },
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
+    selectionPaints: () => selectionPaints(doc, editor),
+    recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;

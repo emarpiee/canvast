@@ -4,7 +4,7 @@ import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/m
 import type { PathObject } from "../../src/doc/model";
 import { drawnParams, drawnSubs, geometryBounds, nodeCount, polygonSubs, rectSubs, scaleParams } from "../../src/doc/path";
 import { hasCorners, paramsOf, withRadius, withShapeParams } from "../../src/doc/shape-params";
-import { canRound, roundCorners } from "../../src/doc/rounding";
+import { canRound, cornerAt, maxFor, maxUniform, roundCorners } from "../../src/doc/rounding";
 import { scaleAbout } from "../../src/doc/edit-ops";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -74,6 +74,20 @@ describe("parametric shapes", () => {
     expect(roundCorners(ellipse, 20)).toEqual(ellipse); // every node is smooth: nothing to round
     expect(canRound(ellipse)).toBe(false);
   });
+  it("the largest radius shares a segment between the corners at its two ends, so a star can go further than half a segment, and more changes nothing", () => {
+    const star = drawn("star").sub;
+    const old = Math.min(...Array.from({ length: nodeCount(star[0]!) }, (_, k) => { const c = cornerAt(star[0]!, k)!; return (Math.min(c.lenIn, c.lenOut) / 2) * Math.tan(c.theta / 2); }));
+    const max = maxUniform(star);
+    expect(max).toBeGreaterThan(old * 1.2);
+    const same = (a: number, b: number) => roundCorners(star, a)[0]!.n.every((v, i) => Math.abs(v - roundCorners(star, b)[0]!.n[i]!) < 1e-6);
+    expect(same(max, max * 3)).toBe(true);
+    expect(same(max * 0.9, max)).toBe(false);
+    // one corner on its own may use what its neighbours leave
+    const radii = new Array<number>(10).fill(0);
+    expect(maxFor(star, radii, 0)).toBeGreaterThan(max);
+    radii[1] = max;
+    expect(maxFor(star, radii, 0)).toBeLessThan(maxFor(star, new Array<number>(10).fill(0), 0));
+  });
   it("a shape drawn before parameters were kept is found out from its nodes, and one edited by hand is not", () => {
     const legacy: PathObject = { ...base, id: newObjectId(), sub: polygonSubs(0, 0, 100, 100, 5), shape: "polygon" };
     const p = paramsOf(legacy)!;
@@ -83,13 +97,20 @@ describe("parametric shapes", () => {
     expect(paramsOf(moved)).toBeNull();
     expect(withShapeParams(moved, { sides: 7 })).toBeNull();
   });
-  it("stretching scales the box and the radius with the shape", () => {
+  it("stretching scales the box and the radius with the shape, so it keeps its look; with the radius lock it keeps its size", () => {
     const o = withRadius(drawn("rect"), 10);
-    const s = scaleAbout(o, { x: D.ZERO, y: D.ZERO }, 2, 2) as PathObject;
+    const at = { x: D.ZERO, y: D.ZERO };
+    const s = scaleAbout(o, at, 2, 2) as PathObject;
     const f = 2 ** (o.unit - s.unit); // (the unit may be renormalised: sizes in local units follow it)
     expect(s.params!.box.map((v) => v * f)).toEqual([20, 40, 400, 200]);
-    expect(s.radius as number).toBeCloseTo(10 / f, 9); // a bigger rectangle keeps its corner (the same size in the world)
+    expect((s.radius as number) * f).toBeCloseTo(20, 9); // scaled with it
     expect(nodeCount(s.sub[0]!)).toBe(8);
+    const locked = scaleAbout(o, at, 2, 2, false, true) as PathObject;
+    expect((locked.radius as number) * 2 ** (o.unit - locked.unit)).toBeCloseTo(10, 9); // the same size on the canvas
+    // there and back again gives the same shape
+    const back = scaleAbout(scaleAbout(o, at, 0.2, 0.2), at, 5, 5) as PathObject;
+    const g = 2 ** (o.unit - back.unit);
+    expect(back.sub[0]!.n.every((v, i) => Math.abs(v * g - o.sub[0]!.n[i]!) < 1e-6)).toBe(true);
     expect(scaleParams(o.params!, 1, 4).box[3]).toBe(400);
   });
   it("is saved and read back, and bad numbers are refused", () => {

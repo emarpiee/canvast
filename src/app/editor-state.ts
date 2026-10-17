@@ -25,7 +25,7 @@ export type Preview =
   | { kind: "none" }
   /** `dx`, `dy` and `fixed` are in the units of `frame` (ADR 0014); each object gets them in its own frame. */
   | { kind: "move"; ids: readonly ObjectId[]; frame: Frame; dx: Dyadic; dy: Dyadic }
-  | { kind: "scale"; ids: readonly ObjectId[]; frame: Frame; fixed: WorldPoint; kx: number; ky: number; keepWidth?: boolean }
+  | { kind: "scale"; ids: readonly ObjectId[]; frame: Frame; fixed: WorldPoint; kx: number; ky: number; keepWidth?: boolean; keepRadius?: boolean }
   /** Rotate strokes by `delta` (core/angle.ts). `about` null: each stroke about its own centre (a single selection); otherwise a point in `frame`. */
   | { kind: "rotate"; ids: readonly ObjectId[]; frame: Frame; about: WorldPoint | null; delta: number }
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
@@ -132,6 +132,8 @@ export class EditorState {
   shapeFill: Paint | null = "#2563eb";
   shapeStroke: Paint | null = "#1f2329";
   shapeWidthPx = 2;
+  /** Resizing keeps the corner radius its size (off: the radius scales with the shape, so it keeps its look). */
+  lockRadius = false;
   /** Which paint's gradient the canvas handles belong to when both the fill and the outline have one (the last chip opened). */
   /** The shape whose corner radius dots are opened out to one per corner (a double-click or long press on the main dot); closes when another is picked. */
   cornersOpen: ObjectId | null = null;
@@ -228,7 +230,7 @@ export class EditorState {
     if (p.kind === "scale" && p.ids.includes(o.id)) {
       const f = o.frame ?? p.frame.space.world;
       const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
-      return scaleAbout(o, fixed, p.kx, o.kind === "image" || (o.kind === "path" && !o.rot) ? p.ky : p.kx, p.keepWidth);
+      return scaleAbout(o, fixed, p.kx, o.kind === "image" || (o.kind === "path" && !o.rot) ? p.ky : p.kx, p.keepWidth, p.keepRadius);
     }
     return o;
   }

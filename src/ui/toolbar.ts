@@ -35,6 +35,10 @@ export interface ToolbarActions {
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
   selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean; widthPx: number | null } | null;
+  /** The paints the picked shapes use (each once, gradients included) and how many shapes are picked. */
+  selectionPaints(): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number }> };
+  /** Change one paint to another everywhere the picked shapes use it. */
+  recolourSelected(from: Paint, to: Paint | null, final: boolean): void;
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
@@ -147,6 +151,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
+      <div class="tb-group tb-options" data-for="select node" data-sel-colours hidden></div>
       <div class="tb-group tb-options" data-for="shape path select node">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
@@ -177,6 +182,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
       <div class="tb-group tb-options" data-for="select">
+        <button type="button" class="lock" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
         <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
         <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
         <button type="button" class="snap" data-align-box aria-pressed="false" aria-label="Axis-aligned selection box" title="Selection box: by default it turns with the selected objects when they share a rotation. On: it stays aligned to the canvas axes.">${ICONS.boxSelect}</button>
@@ -327,6 +333,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
+  let colourEditing = false;
   const openOutline = (anchor: HTMLElement): void => {
     const sel = editsSelection() ? actions.selectedOutline() : null;
     if (editsSelection() && !sel) return;
@@ -339,7 +346,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onWidth: (px) => {
         if (sel) actions.setSelectedWidth(px);
         else {
-          editor.shapeWidthPx = px;
+          // 0 is no outline for the next shape (the width is kept for when it is turned on); a width turns one on
+          if (px === 0) editor.shapeStroke = null;
+          else {
+            editor.shapeWidthPx = px;
+            if (editor.shapeStroke === null && editor.shapeKind !== "line") editor.shapeStroke = "#1f2329";
+          }
           editor.changed();
         }
       },
@@ -380,6 +392,26 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.shapeKind = d["shapeKind"] as ShapeKind;
       if (editor.tool === "path") editor.setTool("shape");
       editor.changed();
+    } else if (d["selColour"] !== undefined) {
+      const item = actions.selectionPaints().items[Number(d["selColour"])];
+      if (!item) return;
+      let current: Paint = item.paint;
+      colourEditing = true;
+      openPaintPopover(b, {
+        name: "Selection colour",
+        paint: item.paint,
+        noneLabel: "No colour",
+        onInput: (p) => actions.recolourSelected(current, p, false),
+        onChange: (p) => {
+          actions.recolourSelected(current, p, true);
+          if (p !== null) current = p;
+        },
+        onClose: () => {
+          colourEditing = false;
+          editor.preview = { kind: "none" };
+          editor.changed();
+        },
+      });
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
     } else if (d["paint"]) {
@@ -424,6 +456,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["follow"] !== undefined) {
       editor.followZoom = !editor.followZoom;
+      editor.changed();
+    } else if (d["lockRadius"] !== undefined) {
+      editor.lockRadius = !editor.lockRadius;
       editor.changed();
     } else if (d["lock"] !== undefined) {
       editor.lock = editor.lock ? null : { ...actions.depth(), px: editor.penWidthPx };
@@ -482,16 +517,35 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (shown && document.activeElement !== input) input.value = value;
       if (key === "radius") input.placeholder = crn?.mixed ? "Mixed" : "";
     }
+    // The colours the picked shapes use, as chips (several shapes picked): one change reaches every shape that uses that colour or gradient.
+    const colours = root.querySelector<HTMLElement>("[data-sel-colours]")!;
+    if (pick && still && !colourEditing) {
+      const used = actions.selectionPaints();
+      const items = used.count >= 2 ? used.items.slice(0, 8) : [];
+      const key = JSON.stringify(items);
+      if (colours.dataset["list"] !== key) {
+        colours.dataset["list"] = key;
+        colours.innerHTML = items
+          .map((it, i) => {
+            const n = it.fills + it.strokes;
+            const what = it.fills && it.strokes ? "fill and outline" : it.fills ? (it.fills === 1 ? "fill" : "fills") : it.strokes === 1 ? "outline" : "outlines";
+            return `<button type="button" class="swatch swatch-paint" data-sel-colour="${i}"${it.fills ? "" : " data-ring"} aria-haspopup="dialog" aria-expanded="false" aria-label="Colour used by ${n} ${what}" title="${typeof it.paint === "string" ? it.paint.toUpperCase() : "Gradient"}: used by ${n} ${what}; change it everywhere in the selection"><span data-paint-chip style="--paint:${typeof it.paint === "string" ? `linear-gradient(${swatchBackground(it.paint)}, ${swatchBackground(it.paint)})` : paintCss(it.paint)}"></span></button>`;
+          })
+          .join("");
+      }
+      if (items.length === 0) colours.dataset["list"] = key;
+    }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
     if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));
     root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
+    const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;
     root.querySelector<HTMLElement>("[data-outline-options]")!.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
-      b.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
+      b.hidden = (editor.tool === "select" || editor.tool === "node") && (!sel || several);
       b.classList.toggle("is-none", value === null);
       (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${swatchBackground(value)}, ${swatchBackground(value)})` : paintCss(value));
     }
@@ -515,6 +569,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
+    const lockR = root.querySelector<HTMLElement>("[data-lock-radius]")!;
+    lockR.setAttribute("aria-pressed", String(editor.lockRadius));
+    if (editor.preview.kind === "none") lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }

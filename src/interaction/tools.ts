@@ -620,7 +620,7 @@ export function attachTools(
     if (!dot) return;
     // Along the corner's bisector, from where the dot was taken (so it never jumps); the main dot in the middle of an opened-out shape: sideways.
     const delta = g.what === "main" && open ? s.x - g.x0 : ((s.x - dot.cx) * dot.ux + (s.y - dot.cy) * dot.uy - g.proj0) * dot.sinHalf;
-    const px = Math.max(0, Math.min(dot.max, g.r0 + delta));
+    const px = Math.max(0, Math.min(g.what === "corner" ? dot.max : dot.maxAll, g.r0 + delta));
     if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
     else commitCorners(doc, editor, [px], () => ppu, final);
   };
@@ -1125,7 +1125,7 @@ export function attachTools(
         break;
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
-        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null };
+        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };
         editor.changed();
         break;
       }

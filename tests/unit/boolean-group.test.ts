@@ -275,7 +275,7 @@ describe("corner radius of a boolean group", () => {
     doc.commit(doc.transaction("Radius", [{ ...result(doc, gid), radius: 6 } as PathObject]));
     expect(nodeCount(result(doc, gid).sub[0]!)).toBeGreaterThan(sharp);
   });
-  it("is kept when the group is stretched and when the result's units are renamed", () => {
+  it("goes with the group when it is stretched (the same look), or keeps its size with the radius lock", () => {
     const a = rect(0, 0, 100, 100, 1);
     const b = rect(50, 50, 100, 100, 2);
     const { doc, gid } = combined([a, b], "union");
@@ -284,7 +284,10 @@ describe("corner radius of a boolean group", () => {
     const r = result(doc, gid);
     expect(nodeCount(r.sub[0]!)).toBe(16);
     const f = 2 ** (r.unit); // local units to world units
-    expect((r.radius as number) * f).toBeCloseTo(10, 6); // a bigger group keeps its corner
+    expect((r.radius as number) * f).toBeCloseTo(30, 6); // three times the group, three times the corner
+    doc.undo();
+    doc.commit(doc.transaction("Stretch", [...doc.all()].map((o) => scaleAbout(o, { x: D.ZERO, y: D.ZERO }, 3, 3, false, true))));
+    expect((result(doc, gid).radius as number) * 2 ** result(doc, gid).unit).toBeCloseTo(10, 6); // radius locked: a bigger group keeps its corner
   });
   it("a nested group's radius rounds its own result, which the outer group then combines as it is", () => {
     const a = rect(0, 0, 100, 100, 1);

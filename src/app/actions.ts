@@ -711,6 +711,42 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   editor.changed();
 }
 
+const paintKey = (p: Paint | null): string => JSON.stringify(p);
+
+/** The paints the picked shapes use, each once (a gradient counts as one paint, equal ones together), in the order they first appear, with how many fills and outlines use it; `count`: how many shapes. */
+export function selectionPaints(doc: DocumentStore, editor: EditorState): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number }> } {
+  const paths = editablePaths(doc, editor);
+  const seen = new Map<string, { paint: Paint; fills: number; strokes: number }>();
+  for (const o of paths) {
+    for (const which of ["fill", "stroke"] as const) {
+      const v = o[which];
+      if (v === null) continue;
+      const k = paintKey(v);
+      const e = seen.get(k) ?? { paint: v, fills: 0, strokes: 0 };
+      if (which === "fill") e.fills++;
+      else e.strokes++;
+      seen.set(k, e);
+    }
+  }
+  return { count: paths.length, items: [...seen.values()] };
+}
+
+/** Change one paint to another everywhere the picked shapes use it (fills and outlines): a colour, a gradient (each shape keeps its own box), or none. Shown while a picker is dragged, stored once. */
+export function recolour(doc: DocumentStore, editor: EditorState, from: Paint, to: Paint | null, final: boolean): void {
+  if (editor.blockEdit()) return;
+  const key = paintKey(from);
+  const next: PathObject[] = [];
+  for (const o of editablePaths(doc, editor)) {
+    const fill = paintKey(o.fill) === key;
+    const stroke = paintKey(o.stroke) === key;
+    if (fill || stroke) next.push({ ...o, ...(fill ? { fill: to } : {}), ...(stroke ? { stroke: to } : {}) });
+  }
+  if (!final) return showReplaced(editor, next);
+  editor.preview = { kind: "none" };
+  if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Change colour" : `Change colour of ${next.length} shapes`, next));
+  editor.changed();
+}
+
 /** Show these objects as they would be (a number being dragged), without storing them. */
 function showReplaced(editor: EditorState, next: readonly PathObject[]): void {
   editor.preview = next.length ? { kind: "replace", ids: next.map((o) => o.id), objs: new Map(next.map((o) => [o.id, o] as const)) } : { kind: "none" };
