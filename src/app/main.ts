@@ -14,7 +14,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, canDetach, detachSelection } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -204,6 +204,7 @@ async function start(): Promise<void> {
   editor.tagsOpen = settings.get("ui.tagsOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
+  editor.eraseParts = settings.get("eraser.parts");
   editor.subscribe(() => {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
@@ -231,6 +232,7 @@ async function start(): Promise<void> {
     settings.set("ui.tagsOpen", editor.tagsOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
+    settings.set("eraser.parts", editor.eraseParts);
   });
   // Theme chosen in Settings (ui.theme): "system" leaves the attribute off so the operating system decides.
   const applyThemeAttribute = (): void => {
@@ -580,6 +582,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedPin: () => selectedPin(doc, editor),
+    selectedTextStyle: () => selectedTextStyle(doc, editor),
+    setTextStyle: (patch) => setTextStyle(doc, editor, patch),
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
     canFitSheet: () => canFitSheet(doc, editor),
     fitSheet: () => fitSheet(doc, editor),
@@ -966,6 +970,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "select.alignBox": editor.alignBox = settings.get(key); break;
       case "eraser.diameterPx": editor.eraserPx = settings.get(key); break;
       case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
+      case "eraser.parts": editor.eraseParts = settings.get(key); break;
       case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
       case "ui.textScale":
       case "ui.density":

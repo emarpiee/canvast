@@ -66,12 +66,12 @@ export function textFont(): Font {
   return font;
 }
 
-export function layoutText(md: string, wrapEm: number): TextLayout {
-  const key = `${wrapEm}|${md}`;
+export function layoutText(md: string, wrapEm: number, lineHeight: number = LINE_HEIGHT, tracking = 0): TextLayout {
+  const key = `${wrapEm}|${lineHeight}|${tracking}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm);
+    l = compute(md, wrapEm, lineHeight, tracking);
     cache.set(key, l);
   }
   return l;
@@ -83,12 +83,12 @@ interface Ch {
   italic: boolean;
 }
 
-function compute(md: string, wrapEm: number): TextLayout {
+function compute(md: string, wrapEm: number, lineHeight: number, tracking: number): TextLayout {
   const f = textFont();
   const upm = f.unitsPerEm;
   const advance = (cp: number): { gid: number; adv: number } => {
     const gid = f.glyphId(cp);
-    return { gid, adv: gid ? f.glyph(gid).advance / upm : fallbackAdvance(cp) };
+    return { gid, adv: (gid ? f.glyph(gid).advance / upm : fallbackAdvance(cp)) + tracking };
   };
   const lines: Line[] = [];
   let width = wrapEm;
@@ -106,7 +106,7 @@ function compute(md: string, wrapEm: number): TextLayout {
     let line: Array<Ch & { gid: number; adv: number }> = [];
     let first = true;
     const emit = (glyphs: typeof line): void => {
-      const lh = LINE_HEIGHT * s;
+      const lh = lineHeight * s;
       const placed: PlacedGlyph[] = [];
       if (first && list) {
         let mx = 0.4;
@@ -148,5 +148,5 @@ function compute(md: string, wrapEm: number): TextLayout {
     const next = blocks[bi + 1];
     if (next) y += list && next.type === b.type ? ITEM_GAP : BLOCK_GAP;
   });
-  return { lines, width, height: Math.max(y, LINE_HEIGHT) };
+  return { lines, width, height: Math.max(y, lineHeight) };
 }

@@ -50,7 +50,7 @@ const RASTER_EM_PX = 128;
 export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, dpr: number): void {
   const o = po.obj as TextObject;
   const p = po.proj;
-  const lay = layoutText(o.md, o.w / o.size);
+  const lay = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
   const SIZE = D.fromNumber(o.size);
   const emPx = toPx(p, SIZE);
   // Screen position of a layout coordinate (em).
@@ -268,7 +268,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
   const pad = TEXT_PAD_EM;
   const R = RASTER_EM_PX;
   const pixelW = Math.ceil((g.adv / line.scale + 2 * pad) * R);
-  const pixelH = Math.ceil(LINE_HEIGHT * R);
+  const pixelH = Math.ceil((o.lineHeight ?? LINE_HEIGHT) * R);
   const key = `${g.cp}|${g.bold}|${g.italic}|${paintColor(o.color)}|${pixelW}`;
   let src = rasters.get(key);
   if (!src) {

@@ -13,6 +13,11 @@
  * All values are in the draft's local units (the same unit as `points` and `width`); nothing here knows the zoom.
  */
 
+/** A lean of this many degrees counts as fully tilted. */
+export const TILT_FULL_DEG = 70;
+/** Below this lean the pen is taken as upright: the nib keeps its fixed angle. */
+const TILT_UPRIGHT = 0.12;
+
 export const PEN_KINDS = ["fine", "pencil", "ink", "marker"] as const;
 export type PenKind = (typeof PEN_KINDS)[number];
 
@@ -25,6 +30,9 @@ export interface RawStroke {
   pressure?: readonly number[];
   /** Per point, CSS px per ms, when known. */
   speed?: readonly number[];
+  /** Per point, how far the pen leans (0..1) and the way (radians), when the device reports it (ADR 0113). */
+  tilt?: readonly number[];
+  tiltAz?: readonly number[];
 }
 
 /** One generated stroke. */
@@ -75,7 +83,10 @@ function pencil(s: RawStroke): Piece[] {
   const arc: number[] = [0];
   for (let i = 1; i < n; i++) arc.push(arc[i - 1]! + Math.hypot(s.points[2 * i]! - s.points[2 * i - 2]!, s.points[2 * i + 1]! - s.points[2 * i - 1]!));
   const seed = Math.round((s.points[0]! * 1e3) % 1e6) ^ n;
-  return PENCIL_PASSES.map((p, j) => {
+  // A leaning pencil lays down a broader, softer line (the side of the lead).
+  const lean = s.tilt && s.tilt.length ? s.tilt.reduce((a, b) => a + b, 0) / s.tilt.length : 0;
+  return PENCIL_PASSES.map((p0, j) => {
+    const p = { w: p0.w * (1 + 1.2 * lean), a: p0.a * (1 + 0.8 * lean), o: p0.o * (1 - 0.35 * lean) };
     const out: number[] = [];
     for (let i = 0; i < n; i++) {
       const a = Math.max(0, i - 1);
@@ -102,12 +113,15 @@ function ink(s: RawStroke): Piece[] {
     const y0 = s.points[2 * i - 1]!;
     const x1 = s.points[2 * i]!;
     const y1 = s.points[2 * i + 1]!;
-    const across = Math.abs(Math.sin(Math.atan2(y1 - y0, x1 - x0) - NIB_ANGLE));
+    const lean = s.tilt?.[i] ?? 0;
+    // A leaning pen sets the nib: it is held at the angle of the lean, and a stronger lean is a broader nib.
+    const nib = lean > TILT_UPRIGHT && s.tiltAz?.[i] !== undefined ? s.tiltAz[i]! : NIB_ANGLE;
+    const across = Math.abs(Math.sin(Math.atan2(y1 - y0, x1 - x0) - nib));
     const p = s.pressure?.[i];
     const v = s.speed?.[i];
     // Pressure where the device has it; otherwise a quick stroke is thinner than a slow one.
     const dynamics = p !== undefined && p > 0 ? 0.4 + 1.1 * Math.min(1, p) : v !== undefined ? 1.25 - 0.6 * Math.min(1, v / INK_SPEED_REF) : 1;
-    const raw = (NIB_MIN + (1 - NIB_MIN) * across) * dynamics;
+    const raw = (NIB_MIN + (1 - NIB_MIN) * across) * dynamics * (1 + 0.8 * lean);
     smooth = Number.isNaN(smooth) ? raw : INK_SMOOTH * smooth + (1 - INK_SMOOTH) * raw;
     // A level changes only once the width is clearly past it (hysteresis), so a wobble does not chop the line into pieces.
     const exact = Math.log(smooth) / Math.log(INK_STEP);

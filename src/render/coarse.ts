@@ -254,7 +254,7 @@ const textSampler: CoarseSampler<TextObject> = {
     } catch {
       return "exact"; // the font is not loaded yet
     }
-    const lay = layoutText(o.md, o.w / o.size);
+    const lay = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
     const upm = font.unitsPerEm;
     let inside = false;
     for (const line of lay.lines) {

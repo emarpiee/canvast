@@ -64,3 +64,25 @@ describe("pens (ADR 0037)", () => {
     expect(new Set([sig("fine"), sig("pencil"), sig("ink"), sig("marker")]).size).toBe(4);
   });
 });
+
+describe("pen tilt (ADR 0113)", () => {
+  const n = 30;
+  const horizontal: RawStroke = { points: Array.from({ length: n }, (_, i) => [i * 3, 0]).flat(), width: 4 };
+  const lean = (mag: number, az: number): RawStroke => ({ ...horizontal, tilt: Array(n).fill(mag), tiltAz: Array(n).fill(az) });
+  const inkWidth = (s: RawStroke): number => Math.max(...expandStroke("ink", s).map((p) => p.width));
+
+  it("a leaning pencil lays a broader, fainter line than an upright one", () => {
+    const upright = expandStroke("pencil", horizontal);
+    const leaning = expandStroke("pencil", lean(1, 0));
+    expect(leaning[0]!.width).toBeGreaterThan(upright[0]!.width * 1.5);
+    expect(leaning[0]!.opacity).toBeLessThan(upright[0]!.opacity);
+  });
+  it("a leaning pen sets the ink nib: across the line it is broad, along it thin, whichever way it is leant", () => {
+    const along = inkWidth(lean(0.5, 0)); // leant the way the line runs: the nib edge is along it
+    const across = inkWidth(lean(0.5, Math.PI / 2)); // leant across the line
+    expect(across).toBeGreaterThan(along * 1.8);
+  });
+  it("an upright pen keeps the fixed nib, and a stroke with no tilt is as before", () => {
+    expect(inkWidth(lean(0, 1.2))).toBeCloseTo(inkWidth(horizontal), 6);
+  });
+});

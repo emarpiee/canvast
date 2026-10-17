@@ -81,6 +81,9 @@ export interface DraftStroke {
   /** The pen drawing it (interaction/pens.ts), and the extra per-point input that pen may use. */
   kind: PenKind;
   pressure?: number[];
+  /** Per point when the pen leans (ADR 0113): how far, 0..1, and which way (radians). */
+  tilt?: number[];
+  tiltAz?: number[];
   speed?: number[];
 }
 
@@ -115,6 +118,8 @@ export class EditorState {
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */
   eraserPx = 16;
   eraseWholeGroups = true;
+  /** The eraser cuts parts out of strokes instead of taking whole objects (ADR 0111). */
+  eraseParts = false;
   /** While the eraser is active: the brush position, and the boxes of what the swipe has touched so far. */
   eraser: { at: { x: number; y: number } | null; boxes: Array<{ minX: number; minY: number; maxX: number; maxY: number }> } | null = null;
   /** The selection box and rotate handle as last drawn (for the pointer hover; null when nothing is selected). */

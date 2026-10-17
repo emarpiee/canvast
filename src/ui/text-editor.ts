@@ -134,6 +134,8 @@ export function mountTextEditor(
     }
     box.style.color = paintColor(target.color);
     box.style.fontFamily = `${TEXT_FONT_FAMILY}, sans-serif`;
+    box.style.lineHeight = String(target.lineHeight ?? 1.3);
+    box.style.letterSpacing = `${target.tracking ?? 0}em`;
     bar.style.left = `${Math.max(4, s.x)}px`;
     bar.style.top = `${Math.max(4, s.y - 48)}px`;
   };
@@ -148,7 +150,7 @@ export function mountTextEditor(
     const zi = Math.floor(level);
     const zf = level - zi;
     const vp = view.viewport;
-    const l = layoutText(o.md, o.w / o.size);
+    const l = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
     const dx = Math.min((o.w / o.size) * NEW_TEXT_PX, vp.width - 64) / 2;
     const dy = Math.min(l.height * NEW_TEXT_PX, vp.height - 160) / 2;
     const off = (px: number): D.Dyadic => D.shift(D.fromNumber(px / 2 ** zf), -zi);

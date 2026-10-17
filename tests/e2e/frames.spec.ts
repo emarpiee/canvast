@@ -998,6 +998,26 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   expect((await sel()).length).toBe(1);
 });
 
+test("stroke eraser: with Erase parts on, a swipe cuts what it sweeps out of a freehand stroke and leaves the rest as pieces; one undo step (ADR 0111)", async ({ app }) => {
+  const p = app.page;
+  const strokes = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "stroke").length);
+  await p.keyboard.press("p");
+  await app.drag({ x: 400, y: 400 }, { x: 800, y: 400 }, 12);
+  expect(await strokes()).toBe(1);
+  await p.keyboard.press("e");
+  await p.getByRole("button", { name: "Erase parts of strokes" }).click();
+  await app.drag({ x: 600, y: 360 }, { x: 600, y: 440 }, 10); // across the middle of the line
+  const after = await p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "stroke").map((o) => ({ id: o.id })));
+  expect(after.length, "two pieces, one each side of the cut").toBe(2);
+  const boxes = await Promise.all(after.map((o) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, o.id)));
+  boxes.sort((a, b) => a.minX - b.minX);
+  expect(boxes[0]!.maxX).toBeLessThan(600);
+  expect(boxes[1]!.minX).toBeGreaterThan(600);
+  expect(boxes[1]!.minX - boxes[0]!.maxX, "a gap about the brush wide").toBeGreaterThan(8);
+  await p.keyboard.press("Control+z");
+  expect(await strokes(), "one undo brings the whole stroke back").toBe(1);
+});
+
 test("object eraser: a fast swipe takes what the brush crosses once, whole groups or only members, never locked objects, in one undo step (ADR 0022)", async ({ app }) => {
   const p = app.page;
   const count = () => p.evaluate(() => window.__canvastDebug.objects().length);

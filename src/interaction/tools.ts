@@ -8,7 +8,7 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { editSubs, homeObject, newObjectId } from "../doc/model";
+import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
@@ -20,13 +20,14 @@ import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
-import { expandStroke } from "./pens";
+import { TILT_FULL_DEG, expandStroke } from "./pens";
 import { normalizeUnit, restack, worldBounds } from "../doc/edit-ops";
 import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
 import { isContainer } from "../doc/containers";
+import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { sheetLabelAt, sheetLabels } from "../render/sheet-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
@@ -143,7 +144,7 @@ type Gesture =
   | { kind: "pan" }
   | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number; at: number }
   | { kind: "lasso"; pointerId: number }
-  | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId> }
+  | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId>; trail: ScreenPoint[] }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
@@ -289,7 +290,9 @@ export function attachTools(
     const items = unlocked(visible());
     const r = editor.eraserPx / 2;
     let added = false;
+    if (gs.trail.length < 20_000) gs.trail.push(to);
     for (const po of items) {
+      if (editor.eraseParts && po.obj.kind !== "stroke") continue; // (parts of a stroke only: everything else is left alone)
       if (!gs.picked.has(po.obj.id) && sweepHits(po, gs.last.x, gs.last.y, to.x, to.y, r)) {
         gs.picked.add(po.obj.id);
         added = true;
@@ -300,6 +303,28 @@ export function attachTools(
     const taken = added ? erasing(gs.picked) : null;
     const next = taken ? items.filter((po) => taken.has(po.obj.id)).map((po) => ({ ...po.box })) : boxes;
     editor.eraser = { at: to, boxes: next };
+  };
+
+  /** Cut what the brush swept out of the strokes it touched (ADR 0111): each stroke becomes the pieces that are left, in one undo step. */
+  const erasePartsOf = (gs: Extract<Gesture, { kind: "erase" }>): void => {
+    if (editor.blockEdit()) return;
+    const puts: CanvasObject[] = [];
+    const removes: ObjectId[] = [];
+    const items = new Map(visible().map((po) => [po.obj.id, po]));
+    for (const id of gs.picked) {
+      const po = items.get(id);
+      const o = po?.obj;
+      if (!po || !o || o.kind !== "stroke" || o.locked || po.cover || !(po.proj.ppu > 0) || !Number.isFinite(po.proj.ppu)) continue;
+      const reach = (editor.eraserPx / 2 + po.radius) / po.proj.ppu;
+      const runs = cutStroke(strokePoints(o), reach, gs.trail.map((p) => localOf(po, p.x, p.y)));
+      if (!runs) continue;
+      removes.push(o.id);
+      const { rot: _turned, ...flat } = o;
+      for (const run of runs) puts.push(normalizeUnit({ ...flat, id: newObjectId(), points: run } as CanvasObject));
+    }
+    if (!removes.length) return;
+    doc.commit(doc.transaction("Erase part of a stroke", puts, removes));
+    for (const id of removes) editor.selection.delete(id);
   };
 
   const cancelGesture = (): void => {
@@ -322,6 +347,11 @@ export function attachTools(
     const d = editor.draft!;
     // Extra input for the pens that use it: pressure where the device has it, and speed.
     if (d.pressure) d.pressure.push(e && e.pointerType !== "mouse" && e.pressure > 0 ? e.pressure : 0);
+    if (d.tilt) {
+      const tx = e && e.pointerType === "pen" ? e.tiltX : 0, ty = e && e.pointerType === "pen" ? e.tiltY : 0;
+      d.tilt.push(Math.min(1, Math.hypot(tx, ty) / TILT_FULL_DEG));
+      d.tiltAz!.push(Math.atan2(ty, tx));
+    }
     if (d.speed) d.speed.push(e && last && e.timeStamp > last.t ? Math.hypot(s.x - last.p.x, s.y - last.p.y) / (e.timeStamp - last.t) : 0);
     const w = worldIn(s, d.frame);
     // Local units relative to the stroke anchor (exact difference, then one rounding).
@@ -357,6 +387,7 @@ export function attachTools(
       color: d.color,
       kind: d.kind,
       ...(d.pressure ? { pressure: [0], speed: [0] } : {}),
+      ...(d.tilt ? { tilt: [0], tiltAz: [0] } : {}),
     };
     g.depth = depth;
     g.px = px;
@@ -371,7 +402,7 @@ export function attachTools(
     let at = 0;
     // A pen can make several strokes from one gesture (pencil passes, ink pieces); they are grouped to act as one.
     const strokes = pieces.flatMap((d) =>
-      expandStroke(d.kind, { points: d.points, width: d.width, ...(d.pressure ? { pressure: d.pressure } : {}), ...(d.speed ? { speed: d.speed } : {}) }).map((piece): CanvasObject => {
+      expandStroke(d.kind, { points: d.points, width: d.width, ...(d.pressure ? { pressure: d.pressure } : {}), ...(d.speed ? { speed: d.speed } : {}), ...(d.tilt ? { tilt: d.tilt, tiltAz: d.tiltAz! } : {}) }).map((piece): CanvasObject => {
         const stroke: StrokeObject = {
           id: newObjectId(),
           kind: "stroke",
@@ -1110,7 +1141,7 @@ export function attachTools(
         const depth = depthOf(view.frameCamera);
         const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
         sheetStart = sheetAt(s.x, s.y)?.id;
-        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor, kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}) };
+        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor, kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}), ...(editor.penKind === "ink" || editor.penKind === "pencil" ? { tilt: [], tiltAz: [] } : {}) };
         editor.draftDone = [];
         penPoint(s, e);
         g = { kind: "pen", pointerId: e.pointerId, last: s, tip: s, depth, px, at: e.timeStamp };
@@ -1124,7 +1155,7 @@ export function attachTools(
         break;
       case "eraser": {
         if (editor.blockEdit()) break;
-        const gs = { kind: "erase" as const, pointerId: e.pointerId, last: s, picked: new Set<ObjectId>() };
+        const gs = { kind: "erase" as const, pointerId: e.pointerId, last: s, picked: new Set<ObjectId>(), trail: [s] };
         g = gs;
         sweep(gs, s);
         editor.changed();
@@ -1286,6 +1317,11 @@ export function attachTools(
     const s = local(e);
     switch (g.kind) {
       case "erase": {
+        if (editor.eraseParts) {
+          editor.eraser = { at: s, boxes: [] };
+          if (!cancelled) erasePartsOf(g);
+          break;
+        }
         const ids = cancelled ? new Set<ObjectId>() : erasing(g.picked);
         editor.eraser = { at: s, boxes: [] };
         if (ids.size) {

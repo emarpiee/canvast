@@ -239,7 +239,7 @@ export function installDebugHook(
     const o = stored && worldForm(stored); // the hook speaks world coordinates
     if (!o || o.kind !== "text") throw new Error(`no text ${id}`);
     let i = 0;
-    for (const line of layoutText(o.md, o.w / o.size).lines) {
+    for (const line of layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking).lines) {
       for (const g of line.glyphs) if (g.cp !== 32 && i++ === n) return { o, line, g };
     }
     throw new Error(`text ${id} has no character ${n}`);

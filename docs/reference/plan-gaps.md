@@ -42,17 +42,17 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Dashes | Done (ADR 0107) | Solid, Dashed, Dotted; custom lengths and offset are not offered. |
 | Clipping | **Gap** | Next slice of the vector plan (ADR 0099). |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
-| Tilt | **Gap** | Pressure is read; tilt is not. |
+| Tilt | Done (ADR 0113) | Ink nib angle and pencil breadth follow the lean; mouse and touch unchanged. |
 | Object eraser (swept, one undoable step, never deletes the original) | Done | ADR 0022. Whole-group option. |
-| Stroke / path eraser (distinct from the object eraser) | **Gap** | Only the object eraser exists. |
+| Stroke / path eraser (distinct from the object eraser) | Done for strokes (ADR 0111) | Scissors mode on the eraser; vector paths are not trimmed. |
 | Rich text: WYSIWYG with a Markdown source, mentions, backlinks, Copy Markdown | Done | ADR 0013, 0039, 0040. |
-| Text: font selection, line height, letter spacing, text boxes with several fonts | Partial | One bundled font and a size; no font choice found in the UI. |
+| Text: font selection, line height, letter spacing, text boxes with several fonts | Partial | Line height and letter spacing done (ADR 0113). Font choice needs a decision: each font is bundled outlines (size of the single file). |
 | Text: bidirectional text, IME, text-to-path export | Unverified | Not tested in this check. |
 | Video: on-canvas player, repeat, seek step (3 s), Extract Frame, paused frame persisted, decoder budget, unsupported codecs | Done | ADR 0041 to 0046. |
 | Video: crop, adjustments, playback speed | **Gap** | No crop or adjustments. Speed control not found. |
 | Animated GIF: real frame parser, 1-frame step, Extract Frame | Done | ADR 0042. |
 | Audio: player, waveform, volume, repeat, 1 s step | Done | |
-| Audio: trimming or range selection | **Gap** | No in or out range. |
+| Audio: trimming or range selection | Done (ADR 0112) | Start here, End here, Whole file; video has it too. |
 | Content-type adapter architecture, future types (PDF, 3D) | Partial | Any file is kept and shown as a card with its kind (ADR 0078); nothing renders a PDF page or a 3D model. |
 
 ## §5 Non-destructive editing

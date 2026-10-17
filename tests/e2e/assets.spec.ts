@@ -724,6 +724,36 @@ test("audio is placed as its waveform; its player steps 1 s and keeps the paused
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("audio plays only its range: Start here and End here from the player's settings, a play from the start of the range, a stop at its end; Whole file clears it (ADR 0112)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(5) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  const [o] = await objects(p);
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), o!.id))!.box;
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));
+  const bar = p.getByTestId("media-bar");
+  await expect(bar.locator(".media-time")).toHaveText("0:00 / 0:05"); // (loaded: a step before that would be overwritten by the load)
+  const media = async () => (await objects(p))[0]!["media"] as { t: number; range?: number[] };
+  await bar.getByRole("button", { name: "Media & Playback settings" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click(); // 1 s
+  await bar.getByRole("button", { name: "Start here" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click();
+  await bar.getByRole("button", { name: "Step forward" }).click(); // 3 s
+  await bar.getByRole("button", { name: "End here" }).click();
+  await expect.poll(async () => (await media()).range).toEqual([1, 3]);
+  await expect(bar.locator("[data-range-text]")).toHaveText("0:01 to 0:03");
+  // from before the range, play starts at its start and stops at its end
+  await p.keyboard.press("Control+z"); // (the position back to 0 is not needed: play from 3 starts over at 1)
+  await bar.getByRole("button", { name: "Play", exact: true }).click();
+  await expect.poll(async () => (await media()).t, { timeout: 8000 }).toBeCloseTo(3, 0);
+  await expect(bar.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+  await bar.getByRole("button", { name: "Whole file" }).click();
+  await expect.poll(async () => (await media()).range).toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("audio that is playing carries on after it leaves the view (ADR 0044)", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(8) });

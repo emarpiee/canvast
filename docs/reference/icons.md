@@ -91,6 +91,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `unlink` | Detach the picked objects |
 | `arrow-up` | Move a board or canvas up in its list |
 | `arrow-down` | Move a board or canvas down in its list |
+| `scissors` | Eraser: cut parts out of strokes |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

@@ -25,7 +25,7 @@ import { ICONS } from "./icons";
  * deleted or leaves the view.
  */
 export interface MediaPlayerActions {
-  setMedia(id: string, patch: { t?: number; repeat?: boolean }, label: string): void;
+  setMedia(id: string, patch: { t?: number; repeat?: boolean; range?: readonly [number, number] | null }, label: string): void;
   /** The picture shown now, as a PNG, to become a new image next to the instance. */
   extract(id: string, png: Blob, label: string): void;
   /** Draw the instance again (its picture was replaced). */
@@ -275,6 +275,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     <div class="media-settings" role="group" aria-label="Media &amp; Playback" hidden>
       <label>Video step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.video"></label>
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
+      <div class="media-range" data-range-row><span>Play only</span><output data-range-text></output>
+        <button type="button" data-cmd="rin" title="Start playing from the position now">Start here</button><button type="button" data-cmd="rout" title="Stop playing at the position now">End here</button><button type="button" data-cmd="rclear" title="Play the whole file">Whole file</button></div>
       <label>GIF step (frames) <input type="number" min="1" max="1000" step="1" data-step="media.step.gif"></label>
     </div>`;
   scrubNumbers(bar);
@@ -305,7 +307,10 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
     const len = eng.len();
     if (document.activeElement !== scrub) scrub.value = String(len ? eng.pos() / len : 0);
-    time.textContent = eng.label();
+    const range = o.media?.range;
+    time.textContent = eng.label(); // (the range is told in the settings: a longer label would move the buttons under the pointer)
+    bar.querySelector<HTMLElement>("[data-range-row]")!.hidden = o.media?.kind === "gif";
+    bar.querySelector<HTMLElement>("[data-range-text]")!.textContent = range ? `${formatTime(range[0])} to ${formatTime(range[1])}` : "the whole file";
     const playing = eng.playing();
     playBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
     playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
@@ -530,6 +535,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         // A few at once: starting one more stops the one that has played longest.
         const others = [...players.values()].filter((q) => q !== sel && q.eng.playing());
         if (others.length >= MAX_PLAYING) release(others[0]!);
+        const r = o.media!.range;
+        if (r && (eng.pos() < r[0] || eng.pos() >= r[1] - 0.05)) eng.seek(r[0]); // (from the start of the range, as from the start of a file)
         eng.play();
       } else {
         eng.pause();
@@ -539,7 +546,15 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       const kind = o.media!.kind;
       eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), o.media!.repeat);
       if (!eng.playing()) actions.setMedia(o.id, { t: eng.pos() }, "Step media");
-    } else if (cmd === "repeat") actions.setMedia(o.id, { repeat: !o.media!.repeat }, "Repeat media");
+    } else if (cmd === "rin" || cmd === "rout") {
+      const at = eng.pos();
+      const r = o.media!.range;
+      const len = eng.len();
+      const from = cmd === "rin" ? at : (r?.[0] ?? 0);
+      const to = cmd === "rout" ? at : (r?.[1] ?? len);
+      if (to > from + 0.05) actions.setMedia(o.id, { range: [from, to] }, "Set the playing range");
+    } else if (cmd === "rclear") actions.setMedia(o.id, { range: null }, "Play the whole file");
+    else if (cmd === "repeat") actions.setMedia(o.id, { repeat: !o.media!.repeat }, "Repeat media");
     else if (cmd === "download") {
       void assets.record(o.assetId).then((rec) => {
         if (!rec) return;
@@ -571,6 +586,22 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
     refresh();
   });
+  // A playing instance with a range stops, or goes back to its start, when it reaches the end of the range (the element only reports
+  // its time a few times a second, so this looks at it often).
+  window.setInterval(() => {
+    for (const p of players.values()) {
+      const r = p.o.media?.range;
+      if (!r || !p.eng.playing() || p.o.media!.kind === "gif") continue;
+      const t = p.eng.pos();
+      if (t < r[1] - 0.03 && t >= r[0] - 0.03) continue;
+      if (p.o.media!.repeat || t < r[0]) p.eng.seek(r[0]);
+      else {
+        p.eng.pause();
+        actions.setMedia(p.o.id, { t: r[1] }, "Pause media");
+      }
+      if (p === sel) refresh();
+    }
+  }, 50);
   view.subscribe(positionAll);
   doc.subscribe(sync);
   editor.subscribe(sync);

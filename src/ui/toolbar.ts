@@ -48,6 +48,9 @@ export interface ToolbarActions {
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
   /** How the first picked object on a sheet follows it (null: none is on one), and changing it; fitting a picked sheet to what is on it (ADR 0108). */
   selectedPin(): { h: string; v: string } | null;
+  /** The line height and letter spacing (em) of the first picked text, and changing them for every picked text. */
+  selectedTextStyle(): { lineHeight: number; tracking: number } | null;
+  setTextStyle(patch: { lineHeight?: number; tracking?: number }): void;
   setPin(patch: { h?: string; v?: string }): void;
   canFitSheet(): boolean;
   sheetSelection(): void;
@@ -164,6 +167,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+        <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
+        <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
         <label class="tb-count" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
           <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
@@ -215,6 +220,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="eraser" data-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
         <span class="size-out" data-eraser-out></span>
+        <button type="button" class="snap" data-erase-parts aria-pressed="false" aria-label="Erase parts of strokes" title="On: the eraser cuts out only what it sweeps over of a freehand stroke. Off: it takes whole objects.">${ICONS.scissors}</button>
         <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.shapes}</button>
       </div>
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects" data-label="Select">
@@ -298,6 +304,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
     const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
     if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
+  });
+  root.querySelector<HTMLInputElement>("[data-text-line]")!.addEventListener("change", (e) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (Number.isFinite(v)) actions.setTextStyle({ lineHeight: v });
+  });
+  root.querySelector<HTMLInputElement>("[data-text-track]")!.addEventListener("change", (e) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (Number.isFinite(v)) actions.setTextStyle({ tracking: v / 100 });
   });
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
@@ -499,6 +513,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["layers"] !== undefined) {
       editor.layersOpen = !editor.layersOpen;
       editor.changed();
+    } else if (d["eraseParts"] !== undefined) {
+      editor.eraseParts = !editor.eraseParts;
+      editor.changed();
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
@@ -578,6 +595,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
+    const txt = pick && still ? actions.selectedTextStyle() : null;
+    for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
+    if (txt) {
+      const line = root.querySelector<HTMLInputElement>("[data-text-line]")!, track = root.querySelector<HTMLInputElement>("[data-text-track]")!;
+      if (document.activeElement !== line) line.value = String(Math.round(txt.lineHeight * 100) / 100);
+      if (document.activeElement !== track) track.value = String(Math.round(txt.tracking * 100));
+    }
     const pin = pick && still ? actions.selectedPin() : null;
     root.querySelector<HTMLElement>("[data-pin-wrap]")!.hidden = !pin;
     if (pin) {
@@ -648,6 +672,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (document.activeElement !== es) es.value = String(editor.eraserPx);
     root.querySelector<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
     root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
+    root.querySelector<HTMLElement>("[data-erase-parts]")!.setAttribute("aria-pressed", String(editor.eraseParts));
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));

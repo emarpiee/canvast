@@ -22,7 +22,7 @@ export interface TextOutline {
 
 export function textOutline(o: TextObject): TextOutline {
   const f = textFont();
-  const lay = layoutText(o.md, o.w / o.size);
+  const lay = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
   const subs: SubPath[] = [];
   let missing = 0;
   for (const line of lay.lines) {

@@ -365,12 +365,16 @@ export function renameLayer(doc: DocumentStore, editor: EditorState, key: string
 }
 
 /** Change a media instance's paused position or repeat mode (one undo step); a no-op when nothing changes. */
-export function setMedia(doc: DocumentStore, editor: EditorState, id: string, patch: Partial<Pick<MediaState, "t" | "repeat">>, label = "Media"): void {
+export function setMedia(doc: DocumentStore, editor: EditorState, id: string, patch: Partial<Pick<MediaState, "t" | "repeat">> & { range?: readonly [number, number] | null }, label = "Media"): void {
   if (editor.blockEdit()) return;
   const o = doc.get(id);
   if (!o || o.kind !== "image" || !o.media) return;
-  const media = { ...o.media, ...patch };
-  if (media.t === o.media.t && media.repeat === o.media.repeat) return;
+  const { range, ...rest } = patch;
+  const { range: oldRange, ...kept } = o.media;
+  const next = range === undefined ? oldRange : (range ?? undefined);
+  const media: MediaState = { ...kept, ...rest, ...(next ? { range: next } : {}) };
+  const same = (a?: readonly [number, number], b?: readonly [number, number]): boolean => a?.[0] === b?.[0] && a?.[1] === b?.[1];
+  if (media.t === o.media.t && media.repeat === o.media.repeat && same(next, oldRange)) return;
   doc.commit(doc.transaction(label, [{ ...o, media }]));
 }
 
@@ -1402,5 +1406,27 @@ export function detachSelection(doc: DocumentStore, editor: EditorState): void {
   const next = selected(doc, editor).filter((o) => o.attachmentTargetId !== null).map((o) => ({ ...o, attachmentTargetId: null }) as CanvasObject);
   if (!next.length) return;
   doc.commit(doc.transaction(next.length === 1 ? "Detach" : `Detach ${next.length} objects`, next));
+  editor.changed();
+}
+
+/** The line height (a multiple of the size) and letter spacing (em) of the first picked text (null: no text is picked). */
+export function selectedTextStyle(doc: DocumentStore, editor: EditorState): { lineHeight: number; tracking: number } | null {
+  const t = selected(doc, editor).find((o): o is TextObject => o.kind === "text");
+  return t ? { lineHeight: t.lineHeight ?? 1.3, tracking: t.tracking ?? 0 } : null;
+}
+
+/** Change the line height or letter spacing of the picked texts (ADR 0113): one undo step. */
+export function setTextStyle(doc: DocumentStore, editor: EditorState, patch: { lineHeight?: number; tracking?: number }, final = true): void {
+  const texts = selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && !o.locked);
+  if (!texts.length || editor.blockEdit()) return;
+  const next = texts.map((t): TextObject => {
+    const { lineHeight: _l, tracking: _t, ...rest } = t;
+    const lineHeight = patch.lineHeight !== undefined ? Math.min(5, Math.max(0.5, patch.lineHeight)) : t.lineHeight;
+    const tracking = patch.tracking !== undefined ? Math.min(2, Math.max(-0.5, patch.tracking)) : t.tracking;
+    return { ...rest, ...(lineHeight !== undefined && lineHeight !== 1.3 ? { lineHeight } : {}), ...(tracking ? { tracking } : {}) };
+  });
+  if (next.every((n, i) => n.lineHeight === texts[i]!.lineHeight && n.tracking === texts[i]!.tracking)) return;
+  doc.commit(doc.transaction(texts.length === 1 ? "Change text spacing" : `Change text spacing of ${texts.length} texts`, next));
+  void final;
   editor.changed();
 }

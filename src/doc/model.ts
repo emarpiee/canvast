@@ -101,6 +101,8 @@ export interface MediaState {
   readonly t: number;
   /** Start again at the end instead of stopping. */
   readonly repeat: boolean;
+  /** Video and audio: play only from the first second to the second (ADR 0112); absent = the whole file. */
+  readonly range?: readonly [number, number];
 }
 
 export interface ImageObject extends ObjectBase {
@@ -124,6 +126,10 @@ export function rasterKey(o: ImageObject): string {
 
 export interface TextObject extends ObjectBase {
   readonly kind: "text";
+  /** Line height as a multiple of the font size (ADR 0113); absent = the standard 1.3. */
+  readonly lineHeight?: number;
+  /** Extra space after every letter, in em (ADR 0113); absent = none. */
+  readonly tracking?: number;
   /** Canonical Markdown (text/markdown.ts); the anchor is the top-left corner. */
   readonly md: string;
   /** Wrap width in local units. */
@@ -284,7 +290,7 @@ export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "path") return paintBounds(o.base ?? o.sub, inkStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
-    const l = layoutText(o.md, o.w / o.size);
+    const l = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
     const p = TEXT_PAD_EM * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
   }
@@ -408,7 +414,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.w, "w");
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
-    if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean")) throw new InvalidObjectError("bad media state");
+    if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean" && (o.media.range === undefined || (Array.isArray(o.media.range) && o.media.range.length === 2 && Number.isFinite(o.media.range[0]) && Number.isFinite(o.media.range[1]) && o.media.range[0] >= 0 && o.media.range[1] > o.media.range[0])))) throw new InvalidObjectError("bad media state");
   } else if (o.kind === "path") {
     if (!Array.isArray(o.sub) || o.sub.length < 1 || o.sub.length > MAX_SUBPATHS) throw new InvalidObjectError("a path needs 1 to 4096 sub-paths");
     let nodes = 0;
@@ -462,6 +468,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
     positive(o.w, "w");
     positive(o.size, "size");
+    if (o.lineHeight !== undefined && !(Number.isFinite(o.lineHeight) && o.lineHeight >= 0.5 && o.lineHeight <= 5)) throw new InvalidObjectError("bad line height");
+    if (o.tracking !== undefined && !(Number.isFinite(o.tracking) && o.tracking >= -0.5 && o.tracking <= 2)) throw new InvalidObjectError("bad letter spacing");
     if (!COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
@@ -560,7 +568,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }
