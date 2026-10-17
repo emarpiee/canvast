@@ -18,6 +18,11 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import shrinkSvg from "lucide-static/icons/shrink.svg";
+import cropSvg from "lucide-static/icons/crop.svg";
+import scanFrameSvg from "lucide-static/icons/scan.svg";
+import squareDashedSvg from "lucide-static/icons/square-dashed.svg";
+import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
 import fileCodeSvg from "lucide-static/icons/file-code.svg";
 import vectorPolygonSvg from "lucide-static/icons/vector-polygon.svg";
 import squareRoundCornerSvg from "lucide-static/icons/square-round-corner.svg";
@@ -319,6 +324,11 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  shrink: clean(shrinkSvg),
+  crop: clean(cropSvg),
+  sheetTool: clean(scanFrameSvg),
+  sheetSelection: clean(squareDashedSvg),
+  releaseSheet: clean(squareDashedXSvg),
   fileCode: clean(fileCodeSvg),
   vectorPolygon: clean(vectorPolygonSvg),
   squareRoundCorner: clean(squareRoundCornerSvg),

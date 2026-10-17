@@ -46,6 +46,12 @@ export interface ToolbarActions {
   /** Change one paint to another everywhere the picked shapes use it. */
   recolourSelected(from: Paint, to: Paint | null, final: boolean): void;
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
+  /** How the first picked object on a sheet follows it (null: none is on one), and changing it; fitting a picked sheet to what is on it (ADR 0108). */
+  selectedPin(): { h: string; v: string } | null;
+  setPin(patch: { h?: string; v?: string }): void;
+  canFitSheet(): boolean;
+  sheetSelection(): void;
+  fitSheet(): void;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -63,6 +69,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "node", icon: ICONS.nodeTool, label: "Edit nodes", key: "N" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "shape", icon: ICONS.shapeTool, label: "Shape and path", key: "U" },
+  { tool: "sheet", icon: ICONS.sheetTool, label: "Sheet", key: "C" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
@@ -155,6 +162,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+        <label class="tb-count" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
+          <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
+          <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
+        <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
+        <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node">
@@ -283,6 +295,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
     if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
   });
+  root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
+  root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
+  root.querySelector<HTMLElement>("[data-fit-sheet]")!.addEventListener("click", () => actions.fitSheet());
+  root.querySelector<HTMLElement>("[data-put-on-sheet]")!.addEventListener("click", () => actions.sheetSelection());
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
@@ -553,6 +569,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
+    const pin = pick && still ? actions.selectedPin() : null;
+    root.querySelector<HTMLElement>("[data-pin-wrap]")!.hidden = !pin;
+    if (pin) {
+      const h = root.querySelector<HTMLSelectElement>("[data-pin-h]")!, v = root.querySelector<HTMLSelectElement>("[data-pin-v]")!;
+      if (document.activeElement !== h) h.value = pin.h;
+      if (document.activeElement !== v) v.value = pin.v;
+    }
+    root.querySelector<HTMLElement>("[data-put-on-sheet]")!.hidden = !(pick && still && editor.selection.size > 0);
+    root.querySelector<HTMLElement>("[data-fit-sheet]")!.hidden = !(pick && still && actions.canFitSheet());
     for (const [key, shown, value] of fields) {
       if (!still && pick) continue;
       root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;

@@ -9,6 +9,8 @@ import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
 import { cellFrame, coverObject, projectEntry, projectObject } from "./projection";
 import { approxCoarse, classifyCoarse } from "./coarse";
+import { ancestorsOf } from "../doc/containers";
+import type { FrameCamera as FC } from "../core/frames";
 
 /** How see-through a moving selection looks, and the largest selection that gets it (above that, drawing it one by one would slow the drag). */
 export const GHOST_OPACITY = 0.6;
@@ -131,6 +133,46 @@ export function visibleObjects(
     stats.levelsVisited = levelsVisited;
     stats.cellsProbed = cellsProbed;
     stats.candidates = candidates;
+  }
+  return withClips(doc, fc, vp, out);
+}
+
+/**
+ * Give what sits on a clipping sheet (ADR 0108) the sheet's projected shape to be cut by. The sheet is taken from the list when it is
+ * there, else projected on its own (a sheet too small or off screen is not in it); what is on a hidden sheet, or a sheet that is
+ * off screen altogether, is dropped, and a sheet that covers the view cuts nothing.
+ */
+function withClips(doc: DocumentStore, fc: FC, vp: Viewport, list: ProjectedObject[]): ProjectedObject[] {
+  if (!list.some((po) => po.obj.parent !== undefined)) return list;
+  const byId = new Map(list.map((po) => [po.obj.id, po]));
+  const own = new Map<ObjectId, ProjectedObject | null>();
+  const body = (f: CanvasObject): ProjectedObject | null => {
+    const listed = byId.get(f.id);
+    if (listed) return listed;
+    if (!own.has(f.id)) {
+      const cam = cameraIn(fc, f.frame ?? doc.space.world);
+      own.set(f.id, cam ? projectObject(f, cam, vp, { keepTiny: true }) : null);
+    }
+    return own.get(f.id)!;
+  };
+  const out: ProjectedObject[] = [];
+  for (const po of list) {
+    if (po.obj.parent === undefined) {
+      out.push(po);
+      continue;
+    }
+    const chain = ancestorsOf((id) => doc.get(id), po.obj);
+    if (chain.some((a) => a.hidden)) continue;
+    const clip: ProjectedObject[] = [];
+    let gone = false;
+    for (const a of chain.filter((c) => c.container.clip).reverse()) {
+      const b = body(a);
+      if (!b) { gone = true; break; }
+      if (!b.cover) clip.push(b);
+    }
+    if (gone) continue;
+    if (clip.length) po.clip = clip;
+    out.push(po);
   }
   return out;
 }

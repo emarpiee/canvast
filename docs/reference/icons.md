@@ -82,6 +82,11 @@ One icon per function: two buttons that do different things never share an icon,
 | `pen-line` | Ink pen |
 | `pen-tool` | Fine pen |
 | `vector-polygon` | Make editable vector shapes from an SVG picture |
+| `scan` | Sheet tool |
+| `square-dashed` | Put the picked objects on a sheet |
+| `square-dashed-x` | Release the sheet (keep what is inside) |
+| `crop` | Clip content of a sheet (Layers) |
+| `shrink` | Fit the sheet to what is on it |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

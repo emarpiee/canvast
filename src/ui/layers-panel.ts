@@ -1,10 +1,11 @@
 import type { EditorState } from "../app/editor-state";
 import { plural } from "../doc/plural";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject } from "../doc/model";
+import type { BlendMode, CanvasObject, PathObject } from "../doc/model";
 import { BLEND_MODES, MAX_NAME_LENGTH, inkOf } from "../doc/model";
 import { SHAPE_NAMES } from "../doc/path";
 import { isBoolMember, isResult } from "../doc/boolean-group";
+import { ancestorsOf, isContainer, withDescendants } from "../doc/containers";
 import type { BoolOp } from "../doc/boolean";
 import type { Backlink } from "../app/session";
 import { mentionIds, plainText } from "../text/markdown";
@@ -21,6 +22,8 @@ import { swatchBackground } from "../render/ink";
  */
 export interface LayersActions {
   setFlagOn(ids: readonly string[], flag: "hidden" | "locked", on: boolean): void;
+  /** Whether a sheet hides what lies outside it (ADR 0108). */
+  setClip(id: string, clip: boolean): void;
   moveAbove(ids: readonly string[], aboveId: string): void;
   /** Put the stacking order in name order (ADR 0059); only the order changes, never a position. `order` is front to back. */
   setOrder(order: readonly string[], label: string): void;
@@ -58,16 +61,49 @@ interface Node {
   children: Node[];
   /** Highest z among the members: the row's place in the stack. */
   z: number;
+  /** A sheet (ADR 0108): `id` is its object's id, `members[0]` is the sheet itself, and the rest is what is on it. */
+  sheet?: PathObject;
 }
 
 /** The tree of groups and objects, front first. */
 export function layerTree(objects: readonly CanvasObject[]): Node[] {
   const roots: Node[] = [];
   const groups = new Map<string, Node>();
+  const byId = new Map(objects.map((o) => [o.id, o]));
+  const sheets = new Map<string, Node>();
+  /** The row of a sheet, made (inside its own sheet's row) when first needed. */
+  const sheetNode = (f: PathObject & { container: { clip: boolean } }): Node => {
+    let n = sheets.get(f.id);
+    if (!n) {
+      n = { id: f.id, group: true, sheet: f, members: [f], children: [], z: f.z };
+      sheets.set(f.id, n);
+      const up = ancestorsOf((id) => byId.get(id), f);
+      (up[0] ? sheetNode(up[0]).children : roots).push(n);
+      for (const a of up) {
+        const an = sheetNode(a);
+        an.members.push(f);
+        an.z = Math.max(an.z, f.z);
+      }
+    }
+    return n;
+  };
   const sorted = [...objects].sort((a, b) => b.z - a.z || (a.id < b.id ? 1 : -1));
   for (const o of sorted) {
     if (isResult(o)) continue; // what a boolean group looks like is not a layer of its own (ADR 0103): the group is the row
+    if (isContainer(o)) {
+      sheetNode(o);
+      continue;
+    }
     let siblings = roots;
+    const chain = ancestorsOf((id) => byId.get(id), o);
+    if (chain.length) {
+      for (const f of chain.reverse()) {
+        const fn = sheetNode(f);
+        fn.members.push(o);
+        fn.z = Math.max(fn.z, o.z);
+        siblings = fn.children;
+      }
+    }
     for (const gid of o.groups ?? []) {
       let g = groups.get(gid);
       if (!g) {
@@ -254,7 +290,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       rows++;
       const first = n.members[0]!;
       const bop = n.group ? first.boolOps?.[n.id] : undefined;
-      const lab = n.group ? { icon: bop ? boolIcon(bop) : ICONS.group, text: first.groupNames?.[n.id] ?? (bop ? BOOL_NAME[bop] : `Group (${n.members.length})`), swatch: undefined } : labelOf(first, names);
+      const lab = n.sheet ? { icon: ICONS.sheetTool, text: n.sheet.name ?? "Sheet", swatch: undefined } : n.group ? { icon: bop ? boolIcon(bop) : ICONS.group, text: first.groupNames?.[n.id] ?? (bop ? BOOL_NAME[bop] : `Group (${n.members.length})`), swatch: undefined } : labelOf(first, names);
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);
@@ -263,8 +299,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
         ${guides(depth, last, conts)}${n.group ? `<button type="button" class="layer-twist" data-twist aria-label="${expanded ? "Collapse" : "Expand"}">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</button>` : ""}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
-        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
-        ${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}
+        ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group && !n.sheet ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
+        ${n.sheet ? `<button type="button" class="layer-state layer-clip" data-clip aria-pressed="${n.sheet.container!.clip}" aria-label="Clip content of ${esc(lab.text)}" title="${n.sheet.container!.clip ? "Clipping: what is outside the frame is hidden. Press to show it" : "Not clipping: press to hide what is outside the sheet"}">${ICONS.crop}</button>` : ""}${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}
       </li>`;
       return head + (expanded ? n.children.map((c, i) => row(c, depth + 1, i === n.children.length - 1, depth >= 1 ? [...conts, !last] : conts)).join("") : "");
     };
@@ -330,6 +366,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
 
   const members = (key: string): CanvasObject[] => {
     const o = doc.get(key);
+    if (isContainer(o)) {
+      const ids = new Set(withDescendants(doc.all(), [o.id]));
+      return doc.ordered().filter((x) => ids.has(x.id)); // a sheet's row is the sheet and what is in it
+    }
     return o ? [o] : doc.ordered().filter((x) => x.groups?.includes(key));
   };
 
@@ -505,6 +545,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       if (open.has(key)) open.delete(key);
       else open.add(key);
       render();
+    } else if (t.closest("[data-clip]")) {
+      const f = doc.get(key);
+      if (isContainer(f)) actions.setClip(f.id, !f.container.clip);
     } else if (t.closest("[data-eye]")) {
       actions.setFlagOn(objs.map((o) => o.id), "hidden", !objs.every((o) => o.hidden));
     } else if (t.closest("[data-lock]")) {

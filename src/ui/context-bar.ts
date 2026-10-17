@@ -27,6 +27,9 @@ export interface ContextActions {
   /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
   fileSelection(): { hash: string; open: boolean } | null;
+  /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
+  releaseSheet(): void;
+  canReleaseSheet(): boolean;
   /** A picked SVG picture: its shapes can be made into vectors (a copy beside it). */
   svgPicture(): boolean;
   vectorise(): void;
@@ -95,6 +98,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("flatten", ICONS.merge, "Flatten the boolean group into one path (Ctrl+E)") +
     btn("combine", ICONS.combineIcon, "Combine shapes (union, intersect, subtract, exclude); on a boolean group: its operation, flatten, release") +
     `<span class="ctx-sep" aria-hidden="true"></span>` +
+    btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away") +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
@@ -220,6 +224,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
       case "open": actions.openFile(); break;
+      case "unsheet": actions.releaseSheet(); break;
       case "vectorise": actions.vectorise(); break;
       case "exportsvg": actions.exportSvg(); break;
       case "unrotate": actions.resetRotation(); break;
@@ -259,6 +264,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const file = actions.fileSelection();
     q("download").hidden = !file;
     q("open").hidden = !file?.open;
+    q("unsheet").hidden = !actions.canReleaseSheet();
     q("vectorise").hidden = !actions.svgPicture();
     q("exportsvg").hidden = !actions.canExportSvg();
     q("unrotate").hidden = !reset.turned;

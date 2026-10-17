@@ -6,7 +6,7 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
-import { batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
+import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
 import { cornerHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
@@ -14,10 +14,14 @@ import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
+import { LABEL_FONT } from "./sheet-label";
+import type { SheetLabel } from "./sheet-label";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
   selection: string;
+  /** The names of sheets, and of landmarks. */
+  landmarkLabel: string;
   handleFill: string;
   lasso: string;
   imagePlaceholder: string;
@@ -95,6 +99,15 @@ export function drawObjects(
       continue;
     }
     flush();
+    // On a clipping sheet (ADR 0108): cut by the sheet's shape (rounded corners, turned, exact at depth, as it is drawn itself).
+    if (po.clip) {
+      ctx.save();
+      for (const c of po.clip) {
+        ctx.beginPath();
+        addFillPath(ctx, c, vp);
+        ctx.clip(c.obj.kind === "path" && c.obj.evenodd ? "evenodd" : "nonzero");
+      }
+    }
     if (po.rotated) {
       // A turned image or text: draw the unturned one into the widened viewport, with the canvas turned.
       const t = po.rotated;
@@ -127,6 +140,7 @@ export function drawObjects(
       if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
       drawImageObject(ctx, po, vp, dpr, src, theme.imagePlaceholder);
     }
+    if (po.clip) ctx.restore();
   }
   flush();
   return pending;
@@ -145,7 +159,24 @@ export function drawOverlays(
   vp: Viewport,
   theme: SceneTheme,
   members: readonly ProjectedObject[] = [],
+  labels: readonly SheetLabel[] = [],
 ): void {
+  // The names of the sheets (ADR 0108).
+  if (labels.length) {
+    ctx.save();
+    ctx.font = LABEL_FONT;
+    ctx.textBaseline = "middle";
+    for (const l of labels) {
+      ctx.fillStyle = editor.selection.has(l.id) ? theme.selection : theme.landmarkLabel;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(l.x, l.y, l.w, l.h);
+      ctx.clip();
+      ctx.fillText(l.text, l.x + 4, l.y + l.h / 2);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
   // The members of the boolean group that has been entered, as outlines over its result (ADR 0103).
   if (members.length) {
     ctx.save();

@@ -1,5 +1,6 @@
 import type { CanvasObject, ObjectId } from "./model";
 import { newObjectId } from "./model";
+import { withDescendants } from "./containers";
 
 /**
  * Groups (ADR 0020). A group is membership, not a transform: every object
@@ -21,8 +22,12 @@ export const unitKey = (o: CanvasObject, level: number): string => o.groups?.[le
 /** Whether `o` lies inside the entered groups (a path from the outermost). */
 export const isInside = (o: CanvasObject, entered: readonly string[]): boolean => entered.every((id, i) => o.groups?.[i] === id);
 
-/** Every object whose unit (at the level it is selected at) is that of one of `ids`. */
+/** Every object whose unit (at the level it is selected at) is that of one of `ids`, and what is on a sheet among them (ADR 0108). */
 export function expandToUnits(all: readonly CanvasObject[], picked: readonly CanvasObject[], entered: readonly string[]): ObjectId[] {
+  return withDescendants(all, expandGroups(all, picked, entered));
+}
+
+function expandGroups(all: readonly CanvasObject[], picked: readonly CanvasObject[], entered: readonly string[]): ObjectId[] {
   const level = (o: CanvasObject): number => (isInside(o, entered) ? entered.length : 0);
   const keys = new Set(picked.map((o) => `${level(o)}|${unitKey(o, level(o))}`));
   if (picked.every((o) => !o.groups?.length)) return picked.map((o) => o.id); // nothing grouped: no scan

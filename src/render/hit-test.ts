@@ -16,7 +16,16 @@ import { distanceToOutline, insideFill } from "../doc/path";
 /** Pointer tolerance in CSS px around strokes. */
 export const HIT_TOLERANCE_PX = 4;
 
+/** Whether the point is inside a sheet's shape, whatever its paint (a sheet with no fill still holds what is on it). */
+export function insideBody(po: ProjectedObject, x: number, y: number): boolean {
+  if (po.cover) return true;
+  const b = po.box;
+  if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) return false;
+  return insideFill(po.fillPath ?? po.path!, x, y, !!(po.obj as PathObject).evenodd);
+}
+
 export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_TOLERANCE_PX): boolean {
+  if (po.clip && !po.clip.every((c) => insideBody(c, x, y))) return false; // cut away by a sheet: not there to be picked
   const b = po.box;
   const t = po.rotated;
   if (t) {

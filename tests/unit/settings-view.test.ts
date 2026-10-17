@@ -30,7 +30,7 @@ describe("tool key settings (ADR 0049)", () => {
   it("default to the letters the toolbar has always shown, one tool each", async () => {
     const { TOOL_ORDER, TOOL_KEY_SETTING } = await import("../../src/settings/shortcuts");
     const keys = TOOL_ORDER.map((t) => (SETTINGS[TOOL_KEY_SETTING[t]] as Def<string>).default);
-    expect(keys).toEqual(["h", "v", "n", "p", "u", "b", "l", "t", "e"]);
+    expect(keys).toEqual(["h", "v", "n", "p", "u", "b", "c", "l", "t", "e"]);
     expect(new Set(keys).size).toBe(keys.length);
     const def = SETTINGS["key.pen"] as Def<string>;
     expect(def.validate("k")).toBe("k");

@@ -139,6 +139,9 @@ export interface ProjectedObject {
    * Drawing turns the canvas by the object's angle; picking turns the point back.
    */
   readonly rotated?: RotatedView;
+  /** The frames this object is cut by, outermost first (ADR 0108): each frame's own projection; what lies outside any of them is neither drawn nor picked. */
+  // (set in place after projecting: a projected object keeps lazy parts that a copy would lose)
+  clip?: readonly ProjectedObject[] | undefined;
 }
 
 export interface RotatedView {

@@ -71,6 +71,8 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
   const k = sameFrame ? Math.round(p.depth - target!.depth) : 0;
   const centre = sameFrame ? { x: D.parse(p.centre![0]), y: D.parse(p.centre![1]) } : null;
   const ordered = [...objs].sort((a, b) => a.z - b.z);
+  // (a frame copied with what is inside it: the copies name the copied frame; one copied alone keeps its frame)
+  const copyId = new Map(ordered.map((o) => [o.id, newObjectId()]));
   const out = ordered.map((o, i): CanvasObject => {
     const moved: CanvasObject = centre
       ? {
@@ -80,7 +82,7 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
           anchor: { x: D.add(target!.at.x, D.shift(D.sub(o.anchor.x, centre.x), k)), y: D.add(target!.at.y, D.shift(D.sub(o.anchor.y, centre.y), k)) },
         }
       : o;
-    return homeObject({ ...moved, id: newObjectId(), z: zTop + 1 + i, ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
+    return homeObject({ ...moved, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
   });
   return { objects: out, moved: sameFrame };
 }

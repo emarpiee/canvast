@@ -16,6 +16,10 @@ import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
+import { isContainer, rootsOf } from "../doc/containers";
+import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
+import type { Constraint } from "../doc/constraints";
+import { drawnParams, drawnSubs } from "../doc/path";
 import { exportSvg } from "./svg-export";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
@@ -1230,4 +1234,138 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
   editor.select(objs.map((o) => o.id));
   editor.changed();
   return true;
+}
+
+/** Whether a sheet hides what lies outside it (ADR 0108): one undo step. */
+export function setSheetClip(doc: DocumentStore, editor: EditorState, id: string, clip: boolean): void {
+  const f = doc.get(id);
+  if (editor.blockEdit() || !isContainer(f) || f.container.clip === clip) return;
+  doc.commit(doc.transaction(clip ? "Clip content" : "Show content outside the sheet", [{ ...f, container: { clip } }]));
+  editor.changed();
+}
+
+/** The next free "Sheet n" name. */
+const nextSheetName = (all: Iterable<CanvasObject>): string => {
+  let n = 0;
+  for (const o of all) if (isContainer(o)) n = Math.max(n, Number(/^Sheet (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
+  return `Sheet ${n + 1}`;
+};
+
+/**
+ * Put the picked objects on a sheet (ADR 0108): a sheet exactly the size of the objects, put behind them, which holds them. What is inside another
+ * sheet goes on the new one, which is itself on that sheet. The picked objects must be in one space.
+ */
+export function sheetSelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const picked = selected(doc, editor).filter((o) => !o.locked);
+  const roots = rootsOf(picked);
+  if (!roots.length) return;
+  const f0 = roots[0]!.frame ?? doc.space.world;
+  if (!roots.every((o) => (o.frame ?? doc.space.world) === f0)) {
+    editor.message = "Putting objects on a sheet needs objects that are in one space.";
+    editor.changed();
+    return;
+  }
+  const b = unionBounds(roots)!;
+  const unit = roots[0]!.unit;
+  const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
+  const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
+  if (!(w > 0 && h > 0 && Number.isFinite(w + h))) {
+    editor.message = "Those objects have no size to put on a sheet.";
+    editor.changed();
+    return;
+  }
+  const parents = new Set(roots.map((o) => o.parent));
+  const parent = parents.size === 1 ? [...parents][0] : undefined;
+  const all = doc.ordered();
+  const lowest = Math.min(...roots.map((o) => o.z));
+  const below = [...all].filter((o) => o.z < lowest).pop();
+  const body0: PathObject = {
+    id: newObjectId(),
+    kind: "path",
+    ...(f0 === doc.space.world ? {} : { frame: f0 }),
+    anchor: b.min,
+    unit,
+    z: lowest - 1,
+    opacity: 1,
+    attachmentTargetId: null,
+    sub: drawnSubs("rect", 0, 0, w, h, 6, 5),
+    fill: "#ffffff",
+    stroke: null,
+    width: Math.max(Math.min(w, h) / 100, Number.MIN_VALUE),
+    shape: "rect",
+    container: { clip: true },
+    name: nextSheetName(all),
+    ...(parent !== undefined ? { parent } : {}),
+  };
+  const params = drawnParams("rect", 0, 0, w, h, 6, 5);
+  const body = homeObject(normalizeUnit(params ? { ...body0, params } : body0), doc.space) as PathObject;
+  const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : body;
+  const inside = roots.map((o) => ({ ...o, parent: body.id }) as CanvasObject);
+  doc.commit(doc.transaction("Put on a sheet", [placed, ...inside]));
+  editor.select([placed.id, ...picked.map((o) => o.id)]);
+  editor.changed();
+}
+
+/** Release the picked sheets (ADR 0108): what is on them stays where it is, on the sheet around them (or on the canvas); the sheets go. */
+export function releaseSheets(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const frames = selected(doc, editor).filter(isContainer);
+  if (!frames.length) return;
+  const gone = new Map(frames.map((f) => [f.id, f]));
+  const next: CanvasObject[] = [];
+  for (const o of doc.all()) {
+    if (gone.has(o.id) || o.parent === undefined || !gone.has(o.parent)) continue;
+    let up = gone.get(o.parent)!.parent;
+    while (up !== undefined && gone.has(up)) up = gone.get(up)!.parent; // (a released sheet inside a released sheet)
+    const { parent: _p, ...rest } = o;
+    next.push((up !== undefined ? { ...rest, parent: up } : rest) as CanvasObject);
+  }
+  doc.commit(doc.transaction(frames.length === 1 ? "Release sheet" : `Release ${frames.length} sheets`, next, [...gone.keys()]));
+  editor.select(next.map((o) => o.id));
+  editor.changed();
+}
+
+/** The constraint of the first picked object that is directly on a sheet (null: none is). */
+export function selectedPin(doc: DocumentStore, editor: EditorState): Constraint | null {
+  const on = selected(doc, editor).find((o) => o.parent !== undefined && isContainer(doc.get(o.parent)));
+  return on ? constraintOf(on) : null;
+}
+
+/** Change how the picked objects that are on a sheet follow it when it is resized (ADR 0108): one undo step. */
+export function setPin(doc: DocumentStore, editor: EditorState, patch: { h?: Constraint["h"]; v?: Constraint["v"] }): void {
+  const on = selected(doc, editor).filter((o) => o.parent !== undefined && isContainer(doc.get(o.parent)) && !o.locked);
+  if (!on.length || editor.blockEdit()) return;
+  const next = on.map((o): CanvasObject => {
+    const c = constraintOf(o);
+    const h = patch.h ?? c.h, v = patch.v ?? c.v;
+    const { constraint: _c, ...rest } = o;
+    return (h === DEFAULT_CONSTRAINT.h && v === DEFAULT_CONSTRAINT.v ? rest : { ...rest, constraint: { h, v } }) as CanvasObject;
+  });
+  doc.commit(doc.transaction(on.length === 1 ? "Change pin" : `Change pin of ${on.length} objects`, next));
+  editor.changed();
+}
+
+/** Whether a sheet that has things on it is picked (Fit to contents applies). */
+export const canFitSheet = (doc: DocumentStore, editor: EditorState): boolean =>
+  selected(doc, editor).some((o) => isContainer(o) && !o.rot && o.radius === undefined && [...doc.all()].some((k) => k.parent === o.id));
+
+/** Make each picked sheet exactly as large as what is directly on it (ADR 0108): one undo step. */
+export function fitSheet(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const next: CanvasObject[] = [];
+  for (const s of selected(doc, editor).filter(isContainer)) {
+    if (s.rot || s.radius !== undefined) continue;
+    const kids = [...doc.all()].filter((k) => k.parent === s.id && !k.hidden && (k.frame ?? doc.space.world) === (s.frame ?? doc.space.world));
+    const b = kids.length ? unionBounds(kids) : null;
+    if (!b) continue;
+    const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -s.unit));
+    const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -s.unit));
+    if (!(w > 0 && h > 0 && Number.isFinite(w + h))) continue;
+    const params = drawnParams("rect", 0, 0, w, h, 6, 5);
+    next.push(homeObject(normalizeUnit({ ...s, anchor: b.min, sub: drawnSubs("rect", 0, 0, w, h, 6, 5), ...(params ? { params } : {}) }), doc.space));
+  }
+  if (!next.length) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Fit sheet to its contents" : `Fit ${next.length} sheets to their contents`, next));
+  editor.changed();
 }

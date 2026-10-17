@@ -51,6 +51,10 @@ interface ObjectBase {
    * 2^-32 turns (core/angle.ts, ADR 0018); absent = not rotated.
    */
   readonly rot?: number;
+  /** How this object follows its sheet when the sheet is resized (ADR 0108); absent = left and top. */
+  readonly constraint?: { readonly h: "left" | "right" | "both" | "center" | "scale"; readonly v: "top" | "bottom" | "both" | "center" | "scale" };
+  /** The sheet (a path with `container`, ADR 0108) this object is on; absent = on the canvas itself. A sheet that is gone counts as absent. */
+  readonly parent?: ObjectId;
   /** The groups containing this object, outermost first (doc/groups.ts, ADR 0020); absent = not grouped. */
   readonly groups?: readonly string[];
   /** Layer name shown in the Layers panel (ADR 0047); absent = the automatic label. */
@@ -147,6 +151,8 @@ export interface PathObject extends ObjectBase {
   readonly join?: Join;
   /** Absent: round. */
   readonly cap?: Cap;
+  /** Present: this path is a sheet (ADR 0108): a rectangle that holds objects (they name it as their `parent`) and, with `clip`, hides what lies outside it. */
+  readonly container?: { readonly clip: boolean };
   /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
   readonly dash?: Dash;
   /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
@@ -383,6 +389,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (!(finite(o.opacity, "opacity") > 0 && o.opacity <= 1)) throw new InvalidObjectError("opacity must be in (0, 1]");
   if (o.attachmentTargetId !== null) throw new InvalidObjectError("attachment is not supported yet");
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
+  if (o.parent !== undefined && !(typeof o.parent === "string" && ID_RE.test(o.parent) && o.parent !== o.id)) throw new InvalidObjectError("bad parent");
+  if (o.constraint !== undefined && !(typeof o.constraint === "object" && o.constraint !== null && ["left", "right", "both", "center", "scale"].includes(o.constraint.h) && ["top", "bottom", "both", "center", "scale"].includes(o.constraint.v))) throw new InvalidObjectError("bad constraint");
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
   if (o.boolOps !== undefined && !(typeof o.boolOps === "object" && o.boolOps !== null && Object.keys(o.boolOps).length > 0 && Object.entries(o.boolOps).every(([k, v]) => (o.groups ?? []).includes(k) && ["union", "intersect", "subtract", "exclude"].includes(v)))) throw new InvalidObjectError("bad boolean groups");
@@ -414,6 +422,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
+    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean")) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
     if (o.radius !== undefined) {
@@ -500,6 +509,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     opacity: (s["opacity"] ?? 1) as number,
     attachmentTargetId: (s["attachmentTargetId"] ?? null) as ObjectId | null,
     ...(s["rot"] !== undefined ? { rot: s["rot"] as number } : {}),
+    ...(s["parent"] !== undefined ? { parent: String(s["parent"]) } : {}),
+    ...(s["constraint"] !== undefined ? { constraint: s["constraint"] as { h: "left"; v: "top" } } : {}),
     ...(s["groups"] !== undefined ? { groups: s["groups"] as string[] } : {}),
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
@@ -538,6 +549,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["dash"] !== undefined ? { dash: s["dash"] as Dash } : {}),
+      ...(s["container"] !== undefined ? { container: s["container"] as { clip: boolean } } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),

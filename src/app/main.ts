@@ -14,7 +14,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -65,6 +65,9 @@ import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
+import { descendantsOf, isContainer } from "../doc/containers";
+import { sheetLabels } from "../render/sheet-label";
+import type { SheetLabel } from "../render/sheet-label";
 import { SettingsStore } from "../settings/settings";
 import { setThemeInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
@@ -140,7 +143,20 @@ async function start(): Promise<void> {
   );
   // Content too small to draw individually is shown as a density preview (ADR 0010).
   const density = new DensityLayer();
-  doc.subscribe((_source, changed) => tiles.invalidate(changed));
+  /** Which objects are sheets (kept up to date from the changes), and the names drawn above them as last painted. */
+  const sheetIds = new Set<string>();
+  let labels: SheetLabel[] = [];
+  doc.subscribe((_source, changed) => {
+    if (!changed) {
+      sheetIds.clear();
+      for (const o of doc.all()) if (isContainer(o)) sheetIds.add(o.id);
+    } else for (const id of changed) (isContainer(doc.get(id)) ? sheetIds.add(id) : sheetIds.delete(id));
+  });
+  doc.subscribe((_source, changed) => {
+    // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
+    const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
+    tiles.invalidate(sheets.length ? new Set([...changed!, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
+  });
   // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.
   const blended = new Set<string>();
   doc.subscribe((_source, changed) => {
@@ -366,11 +382,14 @@ async function start(): Promise<void> {
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
     // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.
+    // The names of the sheets (ADR 0108): only looked for when the canvas has a sheet.
+    const sheetList = sheetIds.size ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
+    labels = sheetLabels(sheetList, editor.selection, vp);
     const members = editor.entered.length ? visibleObjects(doc, index, editor, fc, vp, undefined, { entered: editor.entered, mode: "members" }) : [];
     const selected = editor.selection.size
       ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
       : [];
-    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members);
+    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
     const t3 = performance.now();
     const b: FrameBreakdown = {
       totalMs: t3 - t0,
@@ -487,6 +506,7 @@ async function start(): Promise<void> {
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
+    setClip: (id, clip) => setSheetClip(doc, editor, id, clip),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOrder: (order, label) => setStackOrder(doc, editor, order, label),
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
@@ -559,6 +579,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     resetToInitialShape: () => resetToInitialShape(doc, editor),
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
+    selectedPin: () => selectedPin(doc, editor),
+    setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
+    canFitSheet: () => canFitSheet(doc, editor),
+    fitSheet: () => fitSheet(doc, editor),
+    sheetSelection: () => sheetSelection(doc, editor),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
@@ -817,6 +842,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         void assetsView.reveal(hashes);
       },
       group: () => groupSelection(doc, editor),
+      releaseSheet: () => releaseSheets(doc, editor),
+      canReleaseSheet: () => [...editor.selection].some((id) => isContainer(doc.get(id))),
       ungroup: () => ungroupSelection(doc, editor),
       arrange: (to) => arrangeSelection(doc, editor, to),
       layout: (cmd) => void runLayout(cmd),

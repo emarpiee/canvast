@@ -21,18 +21,21 @@ import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
 import { expandStroke } from "./pens";
-import { normalizeUnit, worldBounds } from "../doc/edit-ops";
+import { normalizeUnit, restack, worldBounds } from "../doc/edit-ops";
 import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
-import { boxSelect, hitsObject, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
+import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
+import { isContainer } from "../doc/containers";
+import { planSheetScale } from "../doc/constraints";
+import { sheetLabelAt, sheetLabels } from "../render/sheet-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, radiansFromAngle } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -159,6 +162,8 @@ type Gesture =
       kind: "scale";
       pointerId: number;
       ids: ObjectId[];
+      /** A sheet is among them (ADR 0108): it is resized and what is on it follows its constraints, instead of everything being scaled. */
+      sheets: boolean;
       fixed: ScreenPoint;
       frame: Frame;
       fixedWorld: WorldPoint;
@@ -217,9 +222,11 @@ export function attachTools(
   /** Last position of every pointer that is down, for handing touches to navigation. */
   const active = new Map<number, { p: ScreenPoint; touch: boolean }>();
 
+  /** Where the pointer was last (canvas px): where a move lets go, to find the frame it lands in. */
+  let pointer: ScreenPoint = { x: 0, y: 0 };
   const local = (e: { clientX: number; clientY: number }): ScreenPoint => {
     const r = el.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    return (pointer = { x: e.clientX - r.left, y: e.clientY - r.top });
   };
   /** A screen point in the coordinates of the camera's frame (`view.frame`). */
   const world = (s: ScreenPoint): WorldPoint => screenToWorld(view.camera, view.viewport, s);
@@ -239,6 +246,23 @@ export function attachTools(
   };
   /** What a click, lasso or box can take: locked objects are drawn but cannot be picked (ADR 0021). */
   const unlocked = (list: readonly ProjectedObject[]): ProjectedObject[] => list.filter((po) => !po.obj.locked);
+  /** The innermost sheet (ADR 0108) holding the point, other than `except` and what is inside them: where a new or moved object is put. */
+  const sheetAt = (x: number, y: number, except: ReadonlySet<ObjectId> = new Set()): PathObject | null => {
+    const list = visible();
+    for (let i = list.length - 1; i >= 0; i--) {
+      const po = list[i]!;
+      const o = po.obj;
+      if (!isContainer(o) || o.hidden || o.locked || except.has(o.id) || (o.parent !== undefined && except.has(o.parent))) continue;
+      if (po.clip && !po.clip.every((c) => insideBody(c, x, y))) continue;
+      if (insideBody(po, x, y)) return o;
+    }
+    return null;
+  };
+  const nextSheetName = (): string => {
+    let n = 0;
+    for (const o of doc.all()) if (isContainer(o)) n = Math.max(n, Number(/^Sheet (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
+    return `Sheet ${n + 1}`;
+  };
   const textAt = (s: ScreenPoint): TextObject | null =>
     (pickAll(unlocked(visible()), s.x, s.y).find((po) => po.obj.kind === "text")?.obj as TextObject | undefined) ?? null;
 
@@ -360,6 +384,7 @@ export function attachTools(
           points: piece.points,
           width: piece.width,
           color: d.color,
+          ...(sheetStart && doc.get(sheetStart) ? { parent: sheetStart } : {}),
         };
         return homeObject(normalizeUnit(stroke), doc.space);
       }),
@@ -401,6 +426,8 @@ export function attachTools(
     return { bx: dx < 0 ? -w : 0, by: dy < 0 ? -h : 0, bw: w, bh: h };
   };
 
+  /** The frame a shape, frame or stroke being drawn started in (ADR 0108). */
+  let sheetStart: ObjectId | undefined;
   const startShape = (s: ScreenPoint, e: PointerEvent): void => {
     if (editor.blockEdit()) return;
     const cam = view.camera;
@@ -409,17 +436,18 @@ export function attachTools(
       frame: view.frame,
       anchor: world(s),
       unit: -cam.zi,
-      kind: editor.shapeKind,
+      kind: editor.tool === "sheet" ? "rect" : editor.shapeKind,
       bx: 0,
       by: 0,
       bw: 0,
       bh: 0,
       sides: editor.shapeSides,
       tips: editor.shapeTips,
-      fill: editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
-      stroke: editor.shapeKind === "line" && editor.shapeStroke === null ? "#1f2329" : paintOf(editor.shapeStroke),
+      fill: editor.tool === "sheet" ? "#ffffff" : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
+      stroke: editor.tool === "sheet" ? null : editor.shapeKind === "line" && editor.shapeStroke === null ? "#1f2329" : paintOf(editor.shapeStroke),
       width,
     };
+    sheetStart = sheetAt(s.x, s.y)?.id;
     g = { kind: "shape", pointerId: e.pointerId, start: s };
     editor.changed();
   };
@@ -456,17 +484,21 @@ export function attachTools(
     editor.shapeDraft = null;
     // A press without a drag makes nothing (a stray click must not leave a shape behind).
     if (cancelled || !d || Math.hypot(s.x - start.x, s.y - start.y) < DRAG_THRESHOLD_PX || !(Math.abs(d.bw) > 0 || Math.abs(d.bh) > 0)) return;
-    const obj = homeObject(normalizeUnit(shapeObject(d, doc.topZ() + 1)), doc.space);
-    doc.commit(doc.transaction(`Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
+    const drawn = shapeObject(d, doc.topZ() + 1);
+    const made: PathObject = editor.tool === "sheet" ? { ...drawn, stroke: null, container: { clip: true }, name: nextSheetName() } : drawn;
+    const obj = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...made, parent: sheetStart } : made), doc.space);
+    doc.commit(doc.transaction(editor.tool === "sheet" ? "Draw sheet" : `Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
     editor.select([obj.id]);
   };
 
   // The Path tool: a click adds a corner, a drag pulls a smooth node's handles out, a click on the first node closes the path;
   // Enter or a double-click ends it open.
+  let pathSheet: ObjectId | undefined;
   const startPathNode = (s: ScreenPoint, e: PointerEvent): void => {
     if (editor.blockEdit()) return;
     let d = editor.pathDraft;
     if (!d) {
+      pathSheet = sheetAt(s.x, s.y)?.id;
       const cam = view.camera;
       d = editor.pathDraft = { frame: view.frame, anchor: world(s), unit: -cam.zi, n: [], cursor: null, fill: paintOf(editor.shapeFill), stroke: paintOf(editor.shapeStroke), width: editor.shapeWidthPx / 2 ** cam.zf };
     }
@@ -525,6 +557,7 @@ export function attachTools(
       stroke: closed ? d.stroke : (stroke ?? d.stroke),
       width: d.width,
       ...lookFromChoices(editor.shapeJoin, editor.shapeCap, closed ? editor.shapeAlign : "centre", closed ? "miter" : undefined, editor.shapeDash),
+      ...(pathSheet && doc.get(pathSheet) ? { parent: pathSheet } : {}),
     };
     const made = homeObject(normalizeUnit(obj), doc.space);
     doc.commit(doc.transaction(closed ? "Draw closed path" : "Draw path", [made]));
@@ -777,7 +810,10 @@ export function attachTools(
         const turnOf = (rot: number | undefined): number => ((radiansFromAngle(rot ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const boxTurn = ((sel.frame.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const same = (rot: number | undefined): boolean => Math.abs(turnOf(rot) - boxTurn) < 1e-6 || Math.abs(Math.abs(turnOf(rot) - boxTurn) - 2 * Math.PI) < 1e-6;
-        const free = ids.length > 0 && ids.every((id) => {
+        // (with a sheet, what is on it follows constraints: only the top objects decide whether the box may be stretched)
+        const sheets = ids.some((id) => isContainer(doc.get(id)));
+        const decide = sheets ? ids.filter((id) => !ids.includes(doc.get(id)!.parent ?? "")) : ids;
+        const free = decide.length > 0 && decide.every((id) => {
           const o = doc.get(id)!;
           return o.kind === "path" ? same(o.rot) : o.kind === "image" && !o.rot && sel.frame.angle === 0;
         });
@@ -785,6 +821,7 @@ export function attachTools(
           kind: "scale",
           pointerId: e.pointerId,
           ids,
+          sheets: (sheetResize = false, sheets),
           fixed: { x: h.fixed[0], y: h.fixed[1] },
           frame: view.frame,
           fixedWorld: world({ x: h.fixed[0], y: h.fixed[1] }),
@@ -798,6 +835,14 @@ export function attachTools(
         };
         return;
       }
+    }
+    // The name above a sheet picks the sheet (and what is on it), and a drag from it moves them (ADR 0108).
+    const named = sheetLabelAt(sheetLabels(vis, editor.selection, view.viewport), s.x, s.y);
+    const sheet = named ? doc.get(named.id) : undefined;
+    if (sheet && !sheet.locked) {
+      if (!editor.selection.has(sheet.id)) pick([sheet.id], e.shiftKey);
+      g = { kind: "press", pointerId: e.pointerId, start: s, target: sheet, additive: false };
+      return;
     }
     const hits = pickAll(unlocked(vis), s.x, s.y);
     let target: CanvasObject | null = hits[0]?.obj ?? null;
@@ -966,13 +1011,46 @@ export function attachTools(
     }
   };
 
+  /**
+   * What was moved goes into the sheet under the pointer where it was let go, or onto the canvas when there is none (ADR 0108): the objects
+   * not already inside another moved one change their `parent`, and what changed parent is put in front so that it is not under its frame.
+   */
+  const intoFrame = (moved: CanvasObject[]): CanvasObject[] => {
+    if (![...doc.all()].some((o) => isContainer(o)) || editor.readOnly) return moved;
+    const ids = new Set(moved.map((o) => o.id));
+    const target = sheetAt(pointer.x, pointer.y, ids)?.id;
+    const changed = new Set<ObjectId>();
+    const reparented = moved.map((o) => {
+      if (o.parent !== undefined && ids.has(o.parent)) return o;
+      if (o.parent === target) return o;
+      changed.add(o.id);
+      const { parent: _p, ...rest } = o;
+      return (target ? { ...rest, parent: target } : rest) as CanvasObject;
+    });
+    if (!changed.size) return moved;
+    const front = restack(reparented, doc.ordered().filter((o) => !ids.has(o.id)), "front");
+    const z = new Map(front.map((o) => [o.id, o.z]));
+    return reparented.map((o) => ({ ...o, z: z.get(o.id) ?? o.z }) as CanvasObject);
+  };
+
+  /** The preview now on screen is the resize of a sheet and what is on it (a `replace` of every object it changes). */
+  let sheetResize = false;
   const commitPreviewNow = (): void => {
     const p = editor.preview;
+    if (sheetResize) {
+      sheetResize = false;
+      if (p.kind === "replace") {
+        const n = [...p.objs.values()].map((o) => homeObject(o, doc.space));
+        editor.preview = { kind: "none" };
+        doc.commit(doc.transaction("Resize", n));
+        return;
+      }
+    }
     // The committed state is exactly the previewed one, then re-homed if it left its frame's bounds.
     const next = (ids: readonly ObjectId[]): CanvasObject[] =>
       ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o).map((o) => homeObject(editor.previewed(o)!, doc.space));
     if (p.kind === "move" && !(p.dx.m === 0n && p.dy.m === 0n)) {
-      const n = next(p.ids);
+      const n = intoFrame(next(p.ids));
       editor.preview = { kind: "none" };
       doc.commit(doc.transaction(n.length === 1 ? `Move ${n[0]!.kind}` : `Move ${n.length} objects`, n));
     } else if (p.kind === "rotate" && p.delta !== 0) {
@@ -1023,6 +1101,7 @@ export function attachTools(
         const f = 2 ** cam.zf;
         const depth = depthOf(view.frameCamera);
         const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
+        sheetStart = sheetAt(s.x, s.y)?.id;
         editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor, kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}) };
         editor.draftDone = [];
         penPoint(s, e);
@@ -1050,6 +1129,7 @@ export function attachTools(
         g = { kind: "text", pointerId: e.pointerId, start: s };
         break;
       case "shape":
+      case "sheet":
         startShape(s, e);
         break;
       case "path":
@@ -1172,7 +1252,11 @@ export function attachTools(
         break;
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
-        editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };
+        if (g.sheets) {
+          const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
+          editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
+          sheetResize = true;
+        } else editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };
         editor.changed();
         break;
       }
@@ -1347,6 +1431,9 @@ export function attachTools(
     } else if (mod && key === "d") {
       e.preventDefault(); // not the browser's bookmark
       duplicateSelection(doc, editor, view);
+    } else if (mod && e.altKey && key === "g") {
+      e.preventDefault();
+      sheetSelection(doc, editor);
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);

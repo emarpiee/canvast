@@ -2193,6 +2193,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .tb-group[data-label]::before { content: attr(data-label); margin-right: var(--sp-3); font: var(--font-meta); color: var(--hud-muted); }
 .toolbar .tb-count { display: inline-flex; align-items: center; gap: var(--sp-3); font: var(--font-meta); color: var(--hud-muted); }
 .toolbar .tb-count[hidden] { display: none; }
+.toolbar .tb-count select { height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .toolbar .tb-count[data-scrub], label[data-scrubbable] { cursor: ew-resize; user-select: none; }
 label[data-scrubbable] input { cursor: text; user-select: text; }
 .toolbar .tb-count[data-scrub] input { cursor: text; }

@@ -61,6 +61,7 @@ export const SETTINGS = {
   "shape.sides": { scope: "device", default: 6, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "shape.tips": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "key.shape": { scope: "device", default: "u", validate: letter, effect: "immediate" } as Def<string>,
+  "key.sheet": { scope: "device", default: "c", validate: letter, effect: "immediate" } as Def<string>,
   "key.path": { scope: "device", default: "b", validate: letter, effect: "immediate" } as Def<string>,
   "key.node": { scope: "device", default: "n", validate: letter, effect: "immediate" } as Def<string>,
   "pen.kind": { scope: "device", default: "fine", validate: oneOf("fine", "pencil", "ink", "marker"), effect: "immediate" } as Def<"fine" | "pencil" | "ink" | "marker">,

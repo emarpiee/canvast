@@ -25,6 +25,8 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
   switch (editor.tool) {
     case "shape":
       return editor.shapeDraft ? null : SHAPE_HINT[editor.shapeKind];
+    case "sheet":
+      return "Drag to draw a sheet · what you draw or move into it is held and cut by it · Ctrl+Alt+G puts the picked objects on a sheet";
     case "path":
       return editor.pathDraft
         ? "Click the first node to close the shape · Enter or double-click to finish · Backspace takes back a node · Esc ends it open"

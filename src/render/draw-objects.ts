@@ -89,7 +89,7 @@ export function strokeLineWidth(po: ProjectedObject): number {
 
 /** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
 export function batchable(po: ProjectedObject): boolean {
-  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1 && !po.obj.blend;
+  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1 && !po.obj.blend && !po.clip;
 }
 
 /**
@@ -143,7 +143,7 @@ const inReach = (pts: Float64Array, vp: Viewport, margin: number): boolean => {
 };
 
 /** Add every outline to the current path as a filled polygon (clipped to the view when it reaches far outside it). */
-function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
+export function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
   for (const f of po.fillPath ?? po.path!) {
     let p: ArrayLike<number> = f.pts;
     if (p.length < 6) continue;
