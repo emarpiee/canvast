@@ -608,8 +608,9 @@ test("colour at depth: zoomed 10^6, 10^9 and 10^12 levels into an image or a let
   // A letter: inside its stem the view is the text colour at any depth.
   await p.keyboard.press("Control+a");
   await p.keyboard.press("Delete");
+  await p.keyboard.press("p");
+  await p.getByRole("button", { name: "Pen colour #dc2626" }).click(); // (new text takes the pen colour until it is given its own)
   await p.keyboard.press("t");
-  await p.getByRole("button", { name: "Pen colour #dc2626" }).click();
   await p.mouse.click(600, 400);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await p.keyboard.type("HHH");
