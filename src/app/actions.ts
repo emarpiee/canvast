@@ -7,8 +7,11 @@ import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject } from "../doc/model";
 import type { Paint } from "../doc/paint";
+import type { BoolOp, Region } from "../doc/boolean";
+import { booleanOp } from "../doc/boolean";
+import { mapSubs } from "../doc/path";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
+import { MAX_NAME_LENGTH, expressObjectIn, homeObject, newObjectId, pathSubs, validateObject } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
@@ -673,4 +676,52 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
     doc.commit(doc.transaction(paths.length === 1 ? `Change ${what}` : `Change ${what} of ${paths.length} paths`, paths.map((o) => ({ ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) }))));
   }
   editor.changed();
+}
+
+// ---- Combining shapes (ADR 0101) ------------------------------------------------------------------------------------
+
+const COMBINE_LABEL: Record<BoolOp, string> = { union: "Union", intersect: "Intersect", subtract: "Subtract", exclude: "Exclude" };
+
+/** The selected paths a Boolean operation can use (shapes that are not locked), in paint order. */
+const combinable = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked);
+
+export const canCombine = (doc: DocumentStore, editor: EditorState): boolean => combinable(doc, editor).length >= 2;
+
+/**
+ * Combine the selected shapes into one (union, intersect, subtract the front ones from the back one, or exclude where they overlap):
+ * one compound path with the look of the back shape, replacing them, as one undo step. The operands are put in the coordinates of the
+ * back one exactly (anchors differ by an exact amount, the rest is one rounding) before the curves are cut and joined.
+ */
+export function combineSelection(doc: DocumentStore, editor: EditorState, op: BoolOp): void {
+  if (editor.blockEdit()) return;
+  const paths = combinable(doc, editor);
+  const say = (m: string): void => {
+    editor.message = m;
+    editor.changed();
+  };
+  if (paths.length < 2) return say("Select two or more shapes to combine them.");
+  const base = paths[0]!;
+  const frame = base.frame ?? doc.space.world;
+  const regions: Region[] = [];
+  for (const o of paths) {
+    const e = expressObjectIn(o, frame) as PathObject;
+    const k = 2 ** (e.unit - base.unit);
+    const dx = D.toNumber(D.shift(D.sub(e.anchor.x, base.anchor.x), -base.unit));
+    const dy = D.toNumber(D.shift(D.sub(e.anchor.y, base.anchor.y), -base.unit));
+    if (!(k > 0 && Number.isFinite(k + dx + dy))) return say("Those shapes are too different in size to combine.");
+    regions.push({ subs: mapSubs(pathSubs(e), (x, y) => [x * k + dx, y * k + dy]), evenodd: !!o.evenodd });
+  }
+  const loops = booleanOp(op, regions);
+  if (!loops) return say("Those shapes could not be combined: their outlines meet in a way that cannot be told apart. Move one a little and try again.");
+  if (!loops.length) return say("Nothing is left of those shapes.");
+  const { rot: _r, name: _n, groupNames: _g, groups: _gr, tags: _t, shape: _s, evenodd: _e, ...style } = base;
+  const result: PathObject = { ...style, id: newObjectId(), sub: loops };
+  try {
+    validateObject(result);
+  } catch {
+    return say("Those shapes could not be combined.");
+  }
+  const made = homeObject(normalizeUnit(result), doc.space);
+  doc.commit(doc.transaction(paths.length === 2 ? COMBINE_LABEL[op] : `${COMBINE_LABEL[op]} of ${paths.length} shapes`, [made], paths.map((o) => o.id)));
+  editor.select([made.id]);
 }

@@ -6,6 +6,8 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
+import { openMoreMenu } from "./more-menu";
+import type { BoolOp } from "../doc/boolean";
 
 /**
  * The selection action bar (ADR 0051): a small bar next to the selected objects with what is most often wanted next: duplicate,
@@ -33,6 +35,9 @@ export interface ContextActions {
   group(): void;
   ungroup(): void;
   arrange(to: "front" | "back"): void;
+  /** Combine the selected shapes into one (ADR 0101); whether two or more can be. */
+  combine(op: BoolOp): void;
+  canCombine(): boolean;
   /** Arrange in a grid, align or distribute the selection. */
   layout(cmd: LayoutCommand): void;
   /** The space between items in a grid (ADR 0074), and choosing another one (a grid just made is laid out again with it). */
@@ -63,6 +68,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("open", ICONS.externalLink, "Open in a new tab") +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
+    btn("combine", ICONS.combineIcon, "Combine shapes: union, intersect, subtract, exclude") +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
@@ -138,6 +144,14 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           menu.querySelector<HTMLElement>("button")?.focus();
         }
         break;
+      case "combine":
+        openMoreMenu(b, [
+          { label: "Union", icon: ICONS.squaresUnite, aria: "Union: join the shapes into one", run: () => actions.combine("union") },
+          { label: "Intersect", icon: ICONS.squaresIntersect, aria: "Intersect: keep only where the shapes overlap", run: () => actions.combine("intersect") },
+          { label: "Subtract", icon: ICONS.squaresSubtract, aria: "Subtract: take the shapes in front away from the one at the back", run: () => actions.combine("subtract") },
+          { label: "Exclude overlap", icon: ICONS.squaresExclude, aria: "Exclude overlap: keep everything but where the shapes overlap", run: () => actions.combine("exclude") },
+        ], "Combine shapes");
+        break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
@@ -171,6 +185,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups![0])).size === 1);
     q("layout").hidden = sel.length < 2;
+    q("combine").hidden = !actions.canCombine();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();

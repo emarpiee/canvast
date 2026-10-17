@@ -31,6 +31,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `chevrons-up-down` | In stacking order |
 | `circle` | Ellipse shape |
 | `circle-help` | How to combine search words |
+| `combine` | Combine shapes (the selection bar) |
 | `copy` | Duplicate |
 | `download` | Download original (library details and selection bar) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
@@ -95,6 +96,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `slash` | Line shape |
 | `sparkle` | Star shape |
 | `spline-pointer` | Path tool (curves) |
+| `squares-exclude` | Exclude overlap |
+| `squares-intersect` | Intersect |
+| `squares-subtract` | Subtract |
+| `squares-unite` | Union |
 | `star` | Favourites0; Add to favourites |
 | `tag` | Tags panel; Tag the selection |
 | `text-cursor-input` | Rename the selected layer (double-click its name t; Rename canvas Canvas 1 |

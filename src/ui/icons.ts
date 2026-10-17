@@ -8,6 +8,11 @@ import shapeToolSvg from "lucide-static/icons/pentagon.svg";
 import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
 import nodeToolSvg from "lucide-static/icons/waypoints.svg";
 import vectorSquareSvg from "lucide-static/icons/vector-square.svg";
+import combineIconSvg from "lucide-static/icons/combine.svg";
+import squaresUniteSvg from "lucide-static/icons/squares-unite.svg";
+import squaresIntersectSvg from "lucide-static/icons/squares-intersect.svg";
+import squaresSubtractSvg from "lucide-static/icons/squares-subtract.svg";
+import squaresExcludeSvg from "lucide-static/icons/squares-exclude.svg";
 import play from "lucide-static/icons/play.svg";
 import pause from "lucide-static/icons/pause.svg";
 import rewind from "lucide-static/icons/rewind.svg";
@@ -295,4 +300,9 @@ export const ICONS = {
   pathTool: clean(pathToolSvg),
   nodeTool: clean(nodeToolSvg),
   vectorSquare: clean(vectorSquareSvg),
+  combineIcon: clean(combineIconSvg),
+  squaresUnite: clean(squaresUniteSvg),
+  squaresIntersect: clean(squaresIntersectSvg),
+  squaresSubtract: clean(squaresSubtractSvg),
+  squaresExclude: clean(squaresExcludeSvg),
 } as const;

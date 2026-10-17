@@ -558,3 +558,139 @@ test("gradients: Linear and Radial in the paint chooser, stops, angle, handles o
     expect(Math.abs(c[0]! - 191) + Math.abs(c[1]!) + Math.abs(c[2]! - 64), `at ${zi} levels: ${c}`).toBeLessThanOrEqual(8);
   }
 });
+
+test("Booleans: union, intersect, subtract and exclude from the selection bar, as one undo step, with curves kept", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const fill = [37, 99, 235];
+  const filled = async (x: number, y: number) => {
+    const c = await px(x, y);
+    return Math.abs(c[0]! - fill[0]!) + Math.abs(c[1]! - fill[1]!) + Math.abs(c[2]! - fill[2]!) < 12;
+  };
+  const combine = async (item: string) => {
+    await p.keyboard.press("Control+a");
+    await p.locator('[data-ctx="combine"]').click();
+    await p.getByRole("menuitem", { name: new RegExp(`^${item}`) }).click();
+    await app.frame();
+  };
+
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 400]); // at the back
+  await drag(app, [600, 350], [800, 450]); // in front, overlapping its bottom right
+  await key(app, "v");
+  expect(await objs(app)).toHaveLength(2);
+  await expect(p.locator('[data-ctx="combine"]')).toBeHidden(); // nothing selected yet
+  await p.keyboard.press("Control+a");
+  await expect(p.locator('[data-ctx="combine"]')).toBeVisible();
+
+  await combine("Union");
+  let all = await objs(app);
+  expect(all).toHaveLength(1);
+  expect(all[0]!.sub[0]!.n).toHaveLength(8 * 6); // an L-shaped union of two rectangles: eight corners, one loop
+  expect(all[0]!.fill).toBe("#2563eb");
+  expect(await filled(550, 350)).toBe(true); // the back one only
+  expect(await filled(650, 375)).toBe(true); // the overlap
+  expect(await filled(750, 430)).toBe(true); // the front one only
+  expect(await filled(550, 430)).toBe(false); // the notch
+  await p.keyboard.press("Control+z");
+  expect(await objs(app)).toHaveLength(2); // one undo
+  await app.frame();
+  expect(await filled(550, 430)).toBe(false);
+
+  await combine("Intersect");
+  all = await objs(app);
+  expect(all).toHaveLength(1);
+  expect(all[0]!.sub[0]!.n).toHaveLength(4 * 6);
+  expect(await filled(650, 375)).toBe(true);
+  expect(await filled(550, 350)).toBe(false);
+  expect(await filled(750, 430)).toBe(false);
+  await p.keyboard.press("Control+z");
+
+  await combine("Subtract"); // the front one taken from the back one
+  all = await objs(app);
+  expect(all).toHaveLength(1);
+  expect(await filled(550, 350)).toBe(true);
+  expect(await filled(650, 375)).toBe(false); // taken away
+  expect(await filled(750, 430)).toBe(false);
+  await p.keyboard.press("Control+z");
+
+  await combine("Exclude");
+  expect(await filled(550, 350)).toBe(true);
+  expect(await filled(650, 375)).toBe(false); // the overlap is out
+  expect(await filled(750, 430)).toBe(true);
+  await p.keyboard.press("Control+z");
+
+  // a circle and a rectangle: the arcs stay arcs, so zooming in does not show corners
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await key(app, "u");
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 300], [700, 500]);
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [600, 380], [820, 430]);
+  await key(app, "v");
+  await combine("Union");
+  all = await objs(app);
+  expect(all).toHaveLength(1);
+  const n = all[0]!.sub[0]!.n;
+  let curved = 0;
+  for (let i = 0; i < n.length; i += 6) if (n[i + 4] !== n[i] || n[i + 5] !== n[i + 1]) curved++;
+  expect(curved).toBeGreaterThan(2);
+
+  // nothing left: two far apart shapes intersected leave the shapes alone
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await key(app, "u");
+  await drag(app, [450, 300], [520, 360]);
+  await drag(app, [900, 500], [980, 580]);
+  await key(app, "v");
+  await combine("Intersect");
+  expect(await objs(app)).toHaveLength(2);
+  await expect(p.locator(".notice .notice-text").last()).toContainText(/Nothing is left/);
+});
+
+test("Booleans across zoom levels: a shape drawn 30 levels in, inside a big one, subtracts as a hole and unites to nothing new", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await p.click('[data-paint="stroke"]');
+  await p.locator(".colour-pop .colour-none").click(); // fill only: a 2 unit wide outline would cover a hole this small
+  await key(app, "Escape");
+  await drag(app, [420, 260], [860, 540]); // the big one, at home, centred on the view's middle (640, 400)
+  await p.evaluate(() => window.__canvastDebug.jump(30));
+  await app.frame();
+  await drag(app, [600, 370], [680, 430]); // a small one in the middle of the view, 2^-30 the size: about 10^-10 of the big one
+  await p.evaluate(() => window.__canvastDebug.jump(-30));
+  await app.frame();
+  expect(await objs(app)).toHaveLength(2);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Subtract/ }).click();
+  await app.frame();
+  let all = await objs(app);
+  expect(all).toHaveLength(1);
+  expect(all[0]!.sub).toHaveLength(2); // the outer loop and the hole, however small
+  await p.evaluate(() => window.__canvastDebug.jump(30));
+  await app.frame();
+  // 30 levels in the hole is the 80 px box the shape was drawn as; inside it (off the axes through the middle) it is the background
+  expect(await px(5, 5)).toEqual([37, 99, 235]);
+  const hole = await px(615, 385);
+  expect(hole).not.toEqual([37, 99, 235]);
+  expect(await px(665, 415)).toEqual(hole);
+  await p.evaluate(() => window.__canvastDebug.jump(-30));
+  await app.frame();
+  expect(await px(500, 300)).toEqual([37, 99, 235]); // and the big shape is filled round it
+  await p.keyboard.press("Control+z");
+  expect(await objs(app)).toHaveLength(2);
+  // union is the big one alone
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  all = await objs(app);
+  expect(all).toHaveLength(1);
+  expect(all[0]!.sub).toHaveLength(1);
+  expect(await px(640, 400)).toEqual([37, 99, 235]);
+});

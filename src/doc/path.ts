@@ -72,7 +72,7 @@ const grow = (b: Box, x: number, y: number): void => {
 };
 
 /** Where the derivative of the 1D cubic through p0..p3 is zero, inside (0, 1): the extremes of a curve along one axis. */
-function extrema(p0: number, p1: number, p2: number, p3: number): number[] {
+export function extrema(p0: number, p1: number, p2: number, p3: number): number[] {
   const a = -p0 + 3 * p1 - 3 * p2 + p3;
   const b = 2 * (p0 - 2 * p1 + p2);
   const c = p1 - p0;
