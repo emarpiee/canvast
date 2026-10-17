@@ -6,6 +6,8 @@ import type { FlatPath } from "../doc/path";
 import { FLAT_TOLERANCE_PX, flatten } from "../doc/path";
 import { cosSin } from "../core/angle";
 import { approxPath, classifyPath } from "./coarse";
+import { exactPath, isStraight, outlineStrokes } from "./path-exact";
+import { exactStrokeCoverage } from "./stroke-coverage";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
 import type { Cover } from "./coarse";
@@ -124,6 +126,11 @@ export interface ProjectedObject {
   readonly cover?: Cover;
   /** A path: its outlines flattened in screen space (`q` holds all their vertices, for the selection box and lasso). */
   readonly path?: readonly FlatPath[] | undefined;
+  /** A path seen at a depth doubles cannot place (render/path-exact.ts): the polygons to fill (the outline round the view included). Absent: fill `path`. */
+  readonly fillPath?: readonly FlatPath[] | undefined;
+  /** The same, for the outline when it is too wide for the canvas (its capsules as polygons to fill), and the strokes they came from (for picking). */
+  readonly strokePolys?: readonly (readonly number[])[] | undefined;
+  readonly synth?: readonly ProjectedObject[] | undefined;
   /** The four corners of the object's own (turned) bounds on screen, when that is not the bounding box (turned paths). */
   readonly corners?: readonly (readonly [number, number])[] | undefined;
   /**
@@ -159,6 +166,9 @@ class Projected implements ProjectedObject {
     proj: Projection | null,
     readonly path?: readonly FlatPath[] | undefined,
     readonly corners?: readonly (readonly [number, number])[] | undefined,
+    readonly fillPath?: readonly FlatPath[] | undefined,
+    readonly strokePolys?: readonly (readonly number[])[] | undefined,
+    readonly synth?: readonly ProjectedObject[] | undefined,
   ) {
     this.p = proj;
   }
@@ -326,6 +336,21 @@ function projectPath(o: Extract<CanvasObject, { kind: "path" }>, cam: Camera, vp
     const r = classifyPath(o, lx, ly, m);
     if (r === "miss") return null;
     if (r !== "exact") return coverObject(o, vp, r);
+    // An edge is in view. Exact when the outline can be drawn: thin enough for the canvas, or straight-edged (its capsules are polygons).
+    const thin = radius <= EXACT_RADIUS_THRESHOLD;
+    if (thin || (isStraight(o) && o.stroke !== null)) {
+      const ex = exactPath(o, p, vp, thin ? radius : 0);
+      const q = new Float64Array(ex.lines.reduce((n, l) => n + l.pts.length, 0));
+      let at = 0;
+      for (const l of ex.lines) {
+        q.set(l.pts, at);
+        at += l.pts.length;
+      }
+      if (thin) return new Projected(o, box, q, radius, true, cam, vp, p, ex.lines, undefined, ex.fill);
+      const synth = outlineStrokes(o).map((s): ProjectedObject => ({ obj: s, proj: p, box, q: new Float64Array(0), radius, exact: true }));
+      const polys = synth.flatMap((s) => exactStrokeCoverage(s, vp));
+      return new Projected(o, box, q, radius, true, cam, vp, p, ex.lines, undefined, ex.fill, polys, synth);
+    }
     const cover = approxPath(o, lx, ly);
     return cover ? coverObject(o, vp, { ...cover, dim: true }) : null;
   }

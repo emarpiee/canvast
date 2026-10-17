@@ -142,7 +142,7 @@ const inReach = (pts: Float64Array, vp: Viewport, margin: number): boolean => {
 
 /** Add every outline to the current path as a filled polygon (clipped to the view when it reaches far outside it). */
 function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
-  for (const f of po.path!) {
+  for (const f of po.fillPath ?? po.path!) {
     let p: ArrayLike<number> = f.pts;
     if (p.length < 6) continue;
     if (!inReach(f.pts, vp, PATH_REACH)) {
@@ -201,7 +201,11 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       addFillPath(c, po, vp);
       c.fill(o.evenodd ? "evenodd" : "nonzero");
     }
-    if (o.stroke !== null) {
+    if (o.stroke !== null && po.strokePolys) {
+      // Too wide for the canvas to stroke: its exact coverage, as polygons.
+      c.fillStyle = paintColor(o.stroke);
+      fillPolygons(c, po.strokePolys as number[][]);
+    } else if (o.stroke !== null) {
       c.strokeStyle = paintColor(o.stroke);
       c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
       c.lineJoin = o.join ?? "round";

@@ -297,6 +297,27 @@ export function flatten(subs: readonly SubPath[], q: readonly Float64Array[], to
   return out;
 }
 
+/** Append the interior points and the end of a small cubic (control points in screen space) to `out`, within `tol` of the curve (Wang's bound, even steps in t). */
+export function cubicPoints(out: number[], x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, tol: number): void {
+  const ax = x0 - 2 * x1 + x2;
+  const ay = y0 - 2 * y1 + y2;
+  const bx = x1 - 2 * x2 + x3;
+  const by = y1 - 2 * y2 + y3;
+  const m = Math.sqrt(Math.max(ax * ax + ay * ay, bx * bx + by * by));
+  const steps = Math.min(4096, Math.max(1, Math.ceil(Math.sqrt((0.75 * m) / tol))));
+  const cx = 3 * (x1 - x0);
+  const cy = 3 * (y1 - y0);
+  const dx = 3 * (x2 - x1) - cx;
+  const dy = 3 * (y2 - y1) - cy;
+  const ex = x3 - x0 - cx - dx;
+  const ey = y3 - y0 - cy - dy;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    out.push(x0 + t * (cx + t * (dx + t * ex)), y0 + t * (cy + t * (dy + t * ey)));
+  }
+  out.push(x3, y3);
+}
+
 // ---- Picking ----------------------------------------------------------------------------------------------------------------------
 
 /** The winding number of the closed polylines around (x, y); open ones count as closed (a fill closes its outline). */

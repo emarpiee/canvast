@@ -30,8 +30,13 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
   if (po.obj.kind === "path") {
     // Its outline within the pen's reach, or its inside when it is filled (an unfilled shape is picked by its line only).
     const flats = po.path!;
-    if (po.obj.stroke !== null && distanceToOutline(flats, x, y) <= po.radius + tol) return true;
-    return po.obj.fill !== null && insideFill(flats, x, y, !!po.obj.evenodd);
+    if (po.obj.stroke !== null) {
+      // An outline too wide for the canvas is measured exactly, as the stroke code does; otherwise on the flattened line.
+      if (po.synth) {
+        if (po.synth.some((s) => exactStrokeEdgeDistancePx(s, x, y) <= tol)) return true;
+      } else if (distanceToOutline(flats, x, y) <= po.radius + tol) return true;
+    }
+    return po.obj.fill !== null && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd);
   }
   if (po.obj.kind !== "stroke") {
     // Bounds-based picking (images and text boxes). Alpha-aware picking is not implemented yet.

@@ -413,3 +413,56 @@ test("shapes work with the rest of the canvas: duplicate, copy and paste, group,
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.pixelAt(600, 350))).toEqual([37, 99, 235]);
 });
+
+test("exact edges: past what doubles can place (2^45 and 2^3000 times in), a fill's edge and an outline's both stay where they are", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const fill = [37, 99, 235];
+  const ink = [31, 35, 41];
+  const at = async (sx: number, zi: number) => {
+    const w = await app.worldAt(sx, 400); // read at home
+    return { cx: w.x, cy: w.y, zi, zf: 0, pz: zi };
+  };
+  const home = () => p.evaluate(() => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: 0, zf: 0, pz: 0 }));
+  await key(app, "u");
+  await drag(app, [420, 260], [860, 540]); // 2 px outline, the right edge at x = 860
+  const cams = { edge: await at(860, 45), outer: await at(861, 45), inner: await at(859, 45), deep: await at(861, 3000) };
+
+  // on the geometric edge the whole view is inside the 2 unit wide outline: its colour, exactly
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cams.edge);
+  await app.frame();
+  expect(await px(300, 400)).toEqual(ink);
+  expect(await px(980, 400)).toEqual(ink);
+
+  // on the outer border of the outline: dark to the left, the background to the right
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cams.outer);
+  await app.frame();
+  expect(await px(630, 400), "just left of the outer border").toEqual(ink);
+  expect(await px(650, 400), "just right of it").not.toEqual(ink);
+  expect(await px(650, 400)).not.toEqual(fill);
+
+  // on its inner border: the fill to the left, the outline to the right
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cams.inner);
+  await app.frame();
+  expect(await px(630, 400), "inside the fill").toEqual(fill);
+  expect(await px(650, 400), "inside the outline").toEqual(ink);
+
+  // the same border 3000 levels in
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cams.deep);
+  await app.frame();
+  expect(await px(630, 400)).toEqual(ink);
+  expect(await px(650, 400)).not.toEqual(ink);
+
+  // and the fill's own edge, with no outline, 45 levels in
+  await home();
+  await p.click('[data-paint="stroke"]');
+  await p.locator(".colour-pop .colour-none").click();
+  await key(app, "Escape");
+  await drag(app, [420, 600], [860, 700]); // a second rectangle with no outline, right edge at 860
+  await home();
+  const w2 = await app.worldAt(860, 650);
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), { cx: w2.x, cy: w2.y, zi: 45, zf: 0, pz: 45 });
+  await app.frame();
+  expect(await px(630, 400)).toEqual(fill);
+  expect(await px(650, 400)).not.toEqual(fill);
+});

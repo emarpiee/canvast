@@ -34,7 +34,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Partial | Reduced copies and tiles exist; no mipmap pyramid; EXIF and colour profiles are not read (the browser decides). |
 | SVG import | Partial | An SVG is kept as a picture (the browser draws it). It is not turned into editable vector objects. |
 | SVG export | **Gap** | Not present. |
-| Vector shapes, custom paths, Bézier points and handles, fills, strokes, node editing | Done (ADR 0099) | Shape, Path and Edit nodes tools; fill and outline with transparency; join, cap and fill rule are stored (the tools set round or miter). Edges are exact up to about 1.7 x 10^10 times an object's size; beyond that an edge in view is a dimmed approximation. |
+| Vector shapes, custom paths, Bézier points and handles, fills, strokes, node editing | Done (ADR 0099) | Shape, Path and Edit nodes tools; fill and outline with transparency; join, cap and fill rule are stored (the tools set round or miter). Edges are exact at any depth (fill and thin outline; wide outlines of straight shapes); only a curved shape's outline wider than 2^14 px at the view is a dimmed approximation. |
 | Gradients, Booleans, clipping, dashes, corner radius | **Gap (large)** | Next slices of the vector plan (ADR 0099). |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | **Gap** | Pressure is read; tilt is not. |
@@ -166,7 +166,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Order | Gap | Why |
 | --- | --- | --- |
 | 1 | Non-destructive editing: crop, then the adjustment stack and Copy and Paste Adjustments (masks are dropped) | The largest plan item with nothing built; it blocks U12, Copy Rendered Media and video and GIF adjustments. |
-| 2 | Vector objects: shapes, paths and node editing are done (ADR 0099); left: exact edges at extreme depth, gradients, Booleans, SVG import as vectors and export | Large; the plan sets a professional vector editor bar. |
+| 2 | Vector objects: shapes, paths and node editing are done (ADR 0099); left: gradients, Booleans, SVG import as vectors and export | Large; the plan sets a professional vector editor bar. |
 | 3 | Attach and Detach, duplicate, move and reorder canvases and boards | Small, and the plan names each in a test scenario. |
 | 4 | Stroke eraser, audio range, text fonts, tilt | Each small to medium. |
 | 5 | Size and orientation filters, colour filter (the colour picker, ADR 0098, now exists to choose the colour), duplicate review | Library depth (ratings and saved searches are dropped). |

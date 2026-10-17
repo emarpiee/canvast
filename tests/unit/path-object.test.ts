@@ -130,14 +130,16 @@ describe("path objects on screen", () => {
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(100, 6); // 200 x 100, quarter turn
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(200, 6);
   });
-  it("a path out of reach of doubles: exact colour where the whole view is inside it, nothing where it misses, dimmed only with an edge in view", () => {
+  it("a path out of reach of doubles: exact colour where the whole view is inside it, nothing where it misses, an edge in view placed exactly", () => {
     // 2^76 px wide: far past what doubles can place an edge of.
     const huge = path(rectSubs(0, 0, 2 ** 16, 2 ** 16), { fill: "#ff0000" });
     const at = (x: number, y: number) => projectObject(huge, lookAt({ x: D.fromNumber(x), y: D.fromNumber(y) }, 60, 0), VP, { keepTiny: true });
     expect(at(2 ** 15, 2 ** 15)!.cover).toEqual({ color: "#ff0000" }); // deep inside: exact, not dimmed
     const outside = at(2 ** 16 + 8, 2 ** 15);
     expect(outside === null || outside.cover === undefined).toBe(true); // outside it: nothing drawn
-    expect(at(2 ** 16 - 1e-10, 2 ** 15)!.cover).toEqual({ color: "#ff0000", dim: true }); // the edge is in the view: the approximation, dimmed
+    const edge = at(2 ** 16 - 1e-10, 2 ** 15)!; // the edge is in the view: placed exactly (render/path-exact.ts), not approximated
+    expect(edge.cover).toBeUndefined();
+    expect(edge.fillPath).toBeDefined();
   });
 });
 
