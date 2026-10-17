@@ -355,7 +355,11 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const selKey = [...editor.selection].sort().join(",");
     if (selKey === lastSelection) return;
     lastSelection = selKey;
-    for (const id of editor.selection) for (const g of doc.get(id)?.groups ?? []) open.add(g);
+    for (const id of editor.selection) {
+      const o = doc.get(id);
+      for (const g of o?.groups ?? []) open.add(g);
+      if (o) for (const f of ancestorsOf((x) => doc.get(x), o)) open.add(f.id); // (a picked object's sheets open to show it)
+    }
   };
   doc.subscribe(schedule);
   editor.subscribe(() => {

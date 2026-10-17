@@ -1,4 +1,4 @@
-# Gaps against the engineering plan (checked 2026-10-17, v0.17.0, `main`)
+# Gaps against the engineering plan (checked 2026-10-17, updated 2026-10-18, v0.17.0, `main`)
 
 Owner decisions of 2026-10-17: **masks, ratings and saved searches are out of scope**; they are listed as Decided against, not as gaps.
 
@@ -12,15 +12,15 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 
 | Area | Done | Partial | Gap | Decided | Unverified | Not started |
 | --- | --- | --- | --- | --- | --- | --- |
-| §4 Content types | 8 | 4 | 8 | 1 | 1 | 0 |
-| §5 Non-destructive editing | 0 | 1 | 4 | 1 | 0 | 0 |
-| §6 Assets and search | 6 | 2 | 2 | 4 | 0 | 0 |
-| §7 Storage and portability | 5 | 1 | 4 | 1 | 0 | 0 |
+| §4 Content types | 21 | 4 | 1 | 1 | 1 | 0 |
+| §5 Non-destructive editing | 2 | 3 | 0 | 1 | 0 | 0 |
+| §6 Assets and search | 8 | 2 | 0 | 4 | 0 | 0 |
+| §7 Storage and portability | 6 | 2 | 2 | 1 | 0 | 0 |
 | §8 Performance | 3 | 1 | 1 | 2 | 1 | 0 |
-| §9 UI, Settings and accessibility | 8 | 4 | 3 | 0 | 2 | 0 |
-| §14 Hierarchy, selection, clipboard and tests | 7 | 3 | 3 | 1 | 2 | 0 |
+| §9 UI, Settings and accessibility | 10 | 5 | 0 | 0 | 2 | 0 |
+| §14 Hierarchy, selection, clipboard and tests | 9 | 4 | 0 | 1 | 2 | 0 |
 | §14.41 and roadmap | 0 | 1 | 1 | 0 | 0 | 2 |
-| **Rows counted** | **37** | **17** | **26** | **10** | **6** | **2** |
+| **Rows counted** | **59** | **22** | **5** | **10** | **6** | **2** |
 
 ## §4 Content types
 
@@ -170,10 +170,8 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 
 | Order | Gap | Why |
 | --- | --- | --- |
-| 1 | Non-destructive editing: crop, then the adjustment stack and Copy and Paste Adjustments (masks are dropped) | The largest plan item with nothing built; it blocks U12, Copy Rendered Media and video and GIF adjustments. |
-| 2 | Vector objects: shapes, paths and node editing are done (ADR 0099); left: SVG import as vectors and export | Large; the plan sets a professional vector editor bar. |
-| 3 | Attach and Detach, duplicate, move and reorder canvases and boards | Small, and the plan names each in a test scenario. |
-| 4 | Stroke eraser, audio range, text fonts, tilt | Each small to medium. |
-| 5 | Size and orientation filters, colour filter (the colour picker, ADR 0098, now exists to choose the colour), duplicate review | Library depth (ratings and saved searches are dropped). |
-| 6 | ZIP64, streaming export, incremental backup | Needed before very large libraries. |
-| 7 | Phase 8 and 9 checks, a Firefox pass and the full suite | Not run since v0.16.0 (the full suite) and not yet for the latest UI work (Firefox). |
+| 1 | Text fonts: which fonts to bundle (each is outlines in the single file) | Needs the owner's choice; line height and letter spacing are done |
+| 2 | Incremental backup chain; save straight to a chosen file for very large archives | ZIP64 removed the format limit; the rest needs archives matched to what they came from |
+| 3 | Video and GIF crop and speed; RGB, curves and levels; an adjustment stack | The first slice of pictures (crop, adjust) is done for stills |
+| 4 | Vector: clipping masks of arbitrary shapes (dropped by decision), dashes custom, miter angle, arrow ends, outline stroke, shape builder | See the vector research report |
+| 5 | Phase 8 and 9 checks, the full suite and a Firefox pass of the whole | The full suite has not run since v0.16.0 |

@@ -1336,6 +1336,7 @@ export function releaseSheets(doc: DocumentStore, editor: EditorState): void {
 
 /** The constraint of the first picked object that is directly on a sheet (null: none is). */
 export function selectedPin(doc: DocumentStore, editor: EditorState): Constraint | null {
+  if (selected(doc, editor).some(isContainer)) return null; // (a sheet picked with what is on it: the pins are the objects', not shown)
   const on = selected(doc, editor).find((o) => o.parent !== undefined && isContainer(doc.get(o.parent)));
   return on ? constraintOf(on) : null;
 }
