@@ -8,7 +8,10 @@ import type { CanvasObject, PathObject } from "../../src/doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 import { instantiate } from "../../src/doc/clipboard";
 import { FLAT_TOLERANCE_PX, flatten, geometryBounds, insideFill, rectSubs, type SubPath } from "../../src/doc/path";
-import { translate } from "../../src/doc/edit-ops";
+import { rotateAbout, scaleAbout, translate } from "../../src/doc/edit-ops";
+import { pathSubs } from "../../src/doc/model";
+import { nodeCount, ellipseSubs } from "../../src/doc/path";
+import { TURN } from "../../src/core/angle";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
 const rect = (x: number, y: number, w: number, h: number, z: number, extra: Partial<PathObject> = {}): PathObject => ({ id: newObjectId(), kind: "path", anchor: ORIGIN, unit: 0, z, opacity: 1, attachmentTargetId: null, sub: rectSubs(x, y, w, h), fill: "#2563eb", stroke: "#1f2329", width: 2, ...extra });
@@ -182,5 +185,122 @@ describe("boolean groups nest", () => {
     doc.commit(doc.transaction("Move", [translate(doc.get(c.id)!, D.fromNumber(-150), D.ZERO)]));
     expect(inside(result(doc, outer), 60, 60)).toBe(false);
     expect(result(doc, inner)).toBeDefined();
+  });
+});
+
+/** As drawn: the turn of a path included. */
+const drawnInside = (o: PathObject, x: number, y: number) => {
+  // (x, y) in the world: each object has its own anchor and unit, and a turned one has been moved by the turn)
+  const lx = D.toNumber(D.shift(D.sub(D.fromNumber(x), o.anchor.x), -o.unit));
+  const ly = D.toNumber(D.shift(D.sub(D.fromNumber(y), o.anchor.y), -o.unit));
+  return insideFill(flat(pathSubs(o)), lx, ly, !!o.evenodd);
+};
+const turnAll = (doc: DocumentStore, about: { x: D.Dyadic; y: D.Dyadic }, delta: number) =>
+  doc.commit(doc.transaction("Rotate", [...doc.all()].map((o) => rotateAbout(o, about, delta))));
+
+describe("boolean groups turn with their shapes", () => {
+  const points = Array.from({ length: 13 * 13 }, (_, i) => [-100 + (i % 13) * 20 + 3, -100 + Math.floor(i / 13) * 20 + 3] as const);
+  const agrees = (doc: DocumentStore, gid: string, ids: string[]) => {
+    const members = ids.map((id) => doc.get(id) as PathObject);
+    const r = result(doc, gid);
+    for (const [x, y] of points) expect(drawnInside(r, x, y), `at ${x},${y}`).toBe(members.some((m) => drawnInside(m, x, y)));
+  };
+  it("the result is turned like the shapes (so its box turns with them) and is exactly their union as drawn", () => {
+    const a = rect(0, 0, 100, 60, 1);
+    const b = rect(50, 30, 100, 60, 2);
+    const { doc, gid } = combined([a, b], "union");
+    const about = { x: D.fromNumber(60), y: D.fromNumber(40) };
+    turnAll(doc, about, Math.round(TURN / 8)); // 45 degrees
+    expect(result(doc, gid).rot).toBe(doc.get(a.id)!.rot);
+    expect(result(doc, gid).rot).toBeGreaterThan(0);
+    agrees(doc, gid, [a.id, b.id]);
+    turnAll(doc, about, Math.round(TURN / 12)); // and again: it goes on from where it is
+    expect(result(doc, gid).rot).toBe(doc.get(b.id)!.rot);
+    agrees(doc, gid, [a.id, b.id]);
+    doc.undo();
+    agrees(doc, gid, [a.id, b.id]);
+  });
+  it("shapes turned differently make an upright result, and it follows when one is turned", () => {
+    const a = rect(0, 0, 100, 60, 1);
+    const b = rect(50, 30, 100, 60, 2);
+    const { doc, gid } = combined([a, b], "subtract");
+    doc.commit(doc.transaction("Turn", [rotateAbout(doc.get(b.id)!, { x: D.fromNumber(100), y: D.fromNumber(60) }, Math.round(TURN / 6))]));
+    expect(result(doc, gid).rot).toBeUndefined();
+    const r = result(doc, gid);
+    for (const [x, y] of points) expect(drawnInside(r, x, y)).toBe(drawnInside(doc.get(a.id) as PathObject, x, y) && !drawnInside(doc.get(b.id) as PathObject, x, y));
+  });
+  it("a turned group inside another turns with it, at both levels", () => {
+    const a = rect(0, 0, 100, 60, 1);
+    const b = rect(50, 30, 100, 60, 2);
+    const c = rect(120, 0, 60, 60, 3);
+    const doc = new DocumentStore();
+    doc.load([a, b, c]);
+    const inner = newObjectId();
+    doc.commit(doc.transaction("Union", groupObjects([a, b], 0, inner).map((o) => ({ ...o, boolOps: { [inner]: "union" } }) as CanvasObject)));
+    const outer = newObjectId();
+    const unit = [...doc.all()].filter((o) => o.groups?.includes(inner) || o.id === c.id);
+    doc.commit(doc.transaction("Union", groupObjects(unit, 0, outer).map((o) => ({ ...o, boolOps: { ...(o.boolOps ?? {}), [outer]: "union" } }) as CanvasObject)));
+    turnAll(doc, { x: D.fromNumber(90), y: D.fromNumber(45) }, Math.round(TURN / 5));
+    expect(resultOf(doc.all(), inner)!.rot).toBe(doc.get(a.id)!.rot);
+    expect(resultOf(doc.all(), outer)!.rot).toBe(doc.get(a.id)!.rot);
+    const ro = resultOf(doc.all(), outer)!;
+    const ri = resultOf(doc.all(), inner)!;
+    for (const [x, y] of points) expect(drawnInside(ro, x, y), `${x},${y}`).toBe(drawnInside(ri, x, y) || drawnInside(doc.get(c.id) as PathObject, x, y));
+  });
+});
+
+describe("corner radius of a boolean group", () => {
+  it("rounds the corners of the result only, between lines and curves, and the shapes keep theirs", () => {
+    const a = rect(0, 0, 100, 100, 1);
+    const b = rect(50, 50, 100, 100, 2);
+    const { doc, gid } = combined([a, b], "union");
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBe(8);
+    doc.commit(doc.transaction("Radius", [{ ...result(doc, gid), radius: 10 } as PathObject]));
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBe(16);
+    expect(nodeCount((doc.get(a.id) as PathObject).sub[0]!)).toBe(4);
+    doc.commit(doc.transaction("Move", [translate(doc.get(b.id)!, D.fromNumber(10), D.ZERO)]));
+    expect(result(doc, gid).radius).toBe(10); // it stays with the group as the shapes change
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBe(16);
+    doc.undo();
+    doc.undo();
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBe(8);
+    doc.redo();
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBe(16);
+  });
+  it("rounds the corners where a curve meets a line, which a union of a rectangle and an ellipse has", () => {
+    const a = rect(0, 0, 100, 100, 1);
+    const ell: PathObject = { ...rect(0, 0, 1, 1, 2), sub: ellipseSubs(60, 20, 100, 60) };
+    const { doc, gid } = combined([a, ell], "union");
+    const sharp = nodeCount(result(doc, gid).sub[0]!);
+    doc.commit(doc.transaction("Radius", [{ ...result(doc, gid), radius: 6 } as PathObject]));
+    expect(nodeCount(result(doc, gid).sub[0]!)).toBeGreaterThan(sharp);
+  });
+  it("is kept when the group is stretched and when the result's units are renamed", () => {
+    const a = rect(0, 0, 100, 100, 1);
+    const b = rect(50, 50, 100, 100, 2);
+    const { doc, gid } = combined([a, b], "union");
+    doc.commit(doc.transaction("Radius", [{ ...result(doc, gid), radius: 10 } as PathObject]));
+    doc.commit(doc.transaction("Stretch", [...doc.all()].map((o) => scaleAbout(o, { x: D.ZERO, y: D.ZERO }, 3, 3))));
+    const r = result(doc, gid);
+    expect(nodeCount(r.sub[0]!)).toBe(16);
+    const f = 2 ** (r.unit); // local units to world units
+    expect((r.radius as number) * f).toBeCloseTo(10, 6); // a bigger group keeps its corner
+  });
+  it("a nested group's radius rounds its own result, which the outer group then combines as it is", () => {
+    const a = rect(0, 0, 100, 100, 1);
+    const b = rect(50, 50, 100, 100, 2);
+    const c = rect(300, 0, 50, 50, 3);
+    const doc = new DocumentStore();
+    doc.load([a, b, c]);
+    const inner = newObjectId();
+    doc.commit(doc.transaction("Union", groupObjects([a, b], 0, inner).map((o) => ({ ...o, boolOps: { [inner]: "union" } }) as CanvasObject)));
+    doc.commit(doc.transaction("Radius", [{ ...resultOf(doc.all(), inner)!, radius: 10 } as PathObject]));
+    const outer = newObjectId();
+    const unit = [...doc.all()].filter((o) => o.groups?.includes(inner) || o.id === c.id);
+    doc.commit(doc.transaction("Union", groupObjects(unit, 0, outer).map((o) => ({ ...o, boolOps: { ...(o.boolOps ?? {}), [outer]: "union" } }) as CanvasObject)));
+    const ro = resultOf(doc.all(), outer)!;
+    expect(ro.sub.reduce((n, s) => n + nodeCount(s), 0)).toBe(16 + 4); // the rounded inner result and the plain rectangle
+    doc.commit(doc.transaction("Radius", [{ ...ro, radius: 5 } as PathObject]));
+    expect(resultOf(doc.all(), outer)!.sub.reduce((n, s) => n + nodeCount(s), 0)).toBeGreaterThan(20);
   });
 });

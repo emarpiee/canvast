@@ -2,6 +2,7 @@ import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { SubPath } from "../doc/path";
 import { NODE, isLine, nodeCount, segmentsOf } from "../doc/path";
+import { cornerAt } from "../doc/rounding";
 import type { ProjectedObject } from "../render/projection";
 import { exactX, exactY, fromPx } from "../render/projection";
 import * as D from "../core/dyadic";
@@ -204,53 +205,79 @@ export function moveGradientHandle(o: PathObject, g: Gradient, handle: GradHandl
 
 
 /**
- * The two handles that change a shape's numbers on the canvas: a dot inside its first corner that sets the corner radius (drag towards the
- * middle for more), and, on a star, the first inner corner, dragged along its spoke for the ratio. null when the object has neither.
- * Positions are where they are on screen (a turned shape's are the turned ones); the sharp base is what they are measured on.
+ * The handles that change a shape's numbers on the canvas (ADR 0105). The *main* dot sets one corner radius for every corner: inside the
+ * first corner, and when the corners have been opened out (`expanded`) in the middle of the shape. Each *corner* dot sets the radius of its own
+ * corner, at the middle of that corner's arc. A star also has a ratio handle on its first inner corner. Positions are on screen (a turned
+ * shape's are the turned ones), measured on the sharp base, so a radius pushed past what a corner can use does not move its dot out of reach.
  */
+export interface CornerDot {
+  /** The node's place among all the nodes of the sharp outline (what an array radius is indexed by). */
+  index: number;
+  x: number;
+  y: number;
+  /** The corner on screen, the unit vector towards where its arc's middle is, the sine of half its angle, and the radius it has now in px (never above what it can use). */
+  cx: number;
+  cy: number;
+  ux: number;
+  uy: number;
+  sinHalf: number;
+  px: number;
+  /** The most px radius this corner can use. */
+  max: number;
+}
 export interface CornerHandles {
-  radius: { x: number; y: number; cx: number; cy: number; ux: number; uy: number; sinHalf: number; px: number } | null;
+  main: CornerDot | null;
+  /** Every corner (only for a path whose corners can each have their own: not the result of a boolean group). */
+  corners: CornerDot[];
+  /** Where the main dot is when the corners are opened out: the middle of the shape. */
+  centre: { x: number; y: number } | null;
   ratio: { x: number; y: number; cx: number; cy: number; outer: number } | null;
 }
 
 const MIN_DOT_PX = 18;
+const MAX_CORNER_DOTS = 64;
 
-export function cornerHandles(po: ProjectedObject): CornerHandles | null {
+export function cornerHandles(po: ProjectedObject, expanded = false): CornerHandles | null {
   const o = po.obj as PathObject;
-  if (po.cover || o.kind !== "path" || o.result !== undefined) return null;
-  const sub = editSubs(o)[0];
-  if (!sub || nodeCount(sub) < 3) return null;
-  const c = nodeCount(sub);
+  if (po.cover || o.kind !== "path") return null;
+  const subs = editSubs(o);
   const p = po.proj;
-  const at = (k: number): [number, number] => [exactX(p, sub.n[((k + c) % c) * NODE]!), exactY(p, sub.n[((k + c) % c) * NODE + 1]!)];
-  const sharp = (k: number): boolean => {
-    const b = ((k + c) % c) * NODE;
-    return sub.n[b + 2] === sub.n[b] && sub.n[b + 3] === sub.n[b + 1] && sub.n[b + 4] === sub.n[b] && sub.n[b + 5] === sub.n[b + 1];
-  };
-  let radius: CornerHandles["radius"] = null;
-  for (let k = sub.closed ? 0 : 1; k < (sub.closed ? c : c - 1); k++) {
-    if (!(sharp(k) && sharp(k - 1) && sharp(k + 1))) continue;
-    const [px, py] = at(k);
-    const [ax, ay] = at(k - 1);
-    const [bx, by] = at(k + 1);
-    const l1 = Math.hypot(ax - px, ay - py), l2 = Math.hypot(bx - px, by - py);
-    if (!(l1 > 0 && l2 > 0)) continue;
-    const e1x = (ax - px) / l1, e1y = (ay - py) / l1, e2x = (bx - px) / l2, e2y = (by - py) / l2;
-    let ux = e1x + e2x, uy = e1y + e2y;
-    const ul = Math.hypot(ux, uy);
-    if (ul < 1e-6) continue;
-    ux /= ul;
-    uy /= ul;
-    const theta = Math.acos(Math.max(-1, Math.min(1, e1x * e2x + e1y * e2y)));
-    const sinHalf = Math.sin(theta / 2);
-    const rLocal = typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[k] ?? 0) : 0;
-    const rPx = rLocal * p.ppu;
-    const d = Math.max(MIN_DOT_PX, Math.min(rPx / sinHalf, Math.min(l1, l2) / 2 / Math.max(1e-6, Math.cos(theta / 2))));
-    radius = { x: px + ux * d, y: py + uy * d, cx: px, cy: py, ux, uy, sinHalf, px: rPx };
-    break;
+  const dots: CornerDot[] = [];
+  let index = 0;
+  let sx = 0, sy = 0, sn = 0;
+  for (const sub of subs) {
+    // the sub-path on screen, to measure the corners in px
+    const n: number[] = [];
+    for (let k = 0; k < nodeCount(sub); k++) {
+      const b = k * NODE;
+      for (let h = 0; h < 6; h += 2) n.push(exactX(p, sub.n[b + h]!), exactY(p, sub.n[b + h + 1]!));
+      sx += n[k * NODE]!;
+      sy += n[k * NODE + 1]!;
+      sn++;
+    }
+    const screen: SubPath = { n, closed: sub.closed };
+    for (let k = 0; k < nodeCount(sub); k++, index++) {
+      if (dots.length >= MAX_CORNER_DOTS) continue;
+      const corner = cornerAt(screen, k);
+      if (!corner) continue;
+      let ux = corner.e1[0] + corner.e2[0], uy = corner.e1[1] + corner.e2[1];
+      const ul = Math.hypot(ux, uy);
+      if (ul < 1e-6) continue;
+      ux /= ul;
+      uy /= ul;
+      const sinHalf = Math.sin(corner.theta / 2);
+      const raw = typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[index] ?? 0) : 0;
+      const max = (Math.min(corner.lenIn, corner.lenOut) / 2) * Math.tan(corner.theta / 2);
+      const px = Math.min(raw * p.ppu, max);
+      const d = Math.max(MIN_DOT_PX, px / sinHalf);
+      dots.push({ index, x: corner.x + ux * d, y: corner.y + uy * d, cx: corner.x, cy: corner.y, ux, uy, sinHalf, px, max });
+    }
   }
   let ratio: CornerHandles["ratio"] = null;
-  if (o.shape === "star" && o.params && c >= 6 && c % 2 === 0) {
+  const sub = subs[0];
+  if (o.shape === "star" && o.params && sub && nodeCount(sub) >= 6 && nodeCount(sub) % 2 === 0) {
+    const c = nodeCount(sub);
+    const at = (k: number): [number, number] => [exactX(p, sub.n[k * NODE]!), exactY(p, sub.n[k * NODE + 1]!)];
     let mx = 0, my = 0;
     for (let k = 0; k < c; k += 2) {
       const [x, y] = at(k);
@@ -263,14 +290,29 @@ export function cornerHandles(po: ProjectedObject): CornerHandles | null {
     const [ix, iy] = at(1);
     ratio = { x: ix, y: iy, cx: mx, cy: my, outer: Math.hypot(ox - mx, oy - my) };
   }
-  const out: CornerHandles = { radius, ratio };
-  return radius || ratio ? (Math.abs(radius?.x ?? 0) < FAR && Math.abs(radius?.y ?? 0) < FAR ? out : null) : null;
+  const first = dots[0] ?? null;
+  if (!first && !ratio) return null;
+  const centre = sn ? { x: sx / sn, y: sy / sn } : null;
+  const main = first && expanded && centre ? { ...first, x: centre.x, y: centre.y } : first;
+  const out: CornerHandles = { main, corners: o.result !== undefined ? [] : dots, centre, ratio };
+  return !main || (Math.abs(main.x) < FAR && Math.abs(main.y) < FAR) ? out : null;
 }
 
-/** Which of the two handles a press takes. */
-export function hitCornerHandle(h: CornerHandles, x: number, y: number): "radius" | "ratio" | null {
-  const d = (q: { x: number; y: number } | null): number => (q ? Math.hypot(q.x - x, q.y - y) : Infinity);
-  const dr = d(h.radius), di = d(h.ratio);
-  if (Math.min(dr, di) > NODE_REACH_PX) return null;
-  return dr <= di ? "radius" : "ratio";
+export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" };
+
+/** Which handle a press takes: a corner's own dot (when opened out), the ratio handle, or the main dot. */
+export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded: boolean): CornerPick | null {
+  const near = (q: { x: number; y: number } | null): number => (q ? Math.hypot(q.x - x, q.y - y) : Infinity);
+  let best: CornerPick | null = null;
+  let bestD = NODE_REACH_PX;
+  const consider = (pick: CornerPick, d: number): void => {
+    if (d <= bestD) {
+      best = pick;
+      bestD = d;
+    }
+  };
+  if (h.main) consider({ what: "main" }, near(h.main) - 2); // the main one wins a tie: it is the bigger
+  if (expanded) for (const dot of h.corners) consider({ what: "corner", dot }, near(dot));
+  if (h.ratio) consider({ what: "ratio" }, near(h.ratio));
+  return best;
 }

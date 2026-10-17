@@ -349,23 +349,44 @@ function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedOb
   ctx.restore();
 }
 
-/** The corner radius dot, and a star's ratio handle, of the one picked shape (ADR 0105). */
+/** The main corner radius dot (large, filled), one small dot per corner when the corners are opened out, and a star's ratio handle (ADR 0105). */
 function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
-  if (selected.length !== 1 || selected[0]!.obj.kind !== "path" || editor.selection.size !== 1) return;
-  const h = cornerHandles(selected[0]!);
+  if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
+  const po = selected[0]!;
+  if (editor.selection.size !== 1 && (po.obj as PathObject).result === undefined) return; // (a group picked whole is its result alone on screen)
+  const open = editor.cornersOpen === po.obj.id;
+  const h = cornerHandles(po, open);
   if (!h) return;
   ctx.save();
   ctx.lineWidth = 1.25;
   ctx.strokeStyle = theme.selection;
-  ctx.fillStyle = theme.handleFill;
-  if (h.radius) {
+  if (open) {
+    ctx.fillStyle = theme.handleFill;
+    for (const d of h.corners) {
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  if (h.main) {
+    // The one that sets them all: bigger than the rest, filled, with a ring round it.
+    ctx.fillStyle = theme.selection;
     ctx.beginPath();
-    ctx.arc(h.radius.x, h.radius.y, HANDLE_SIZE_PX / 2, 0, Math.PI * 2);
+    ctx.arc(h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 3, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = theme.handleFill;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = theme.selection;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 6, 0, Math.PI * 2);
     ctx.stroke();
   }
   if (h.ratio) {
     ctx.fillStyle = theme.selection;
+    ctx.lineWidth = 1.25;
     ctx.beginPath();
     ctx.arc(h.ratio.x, h.ratio.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
     ctx.fill();

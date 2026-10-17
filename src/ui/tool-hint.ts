@@ -9,6 +9,7 @@ import type { EditorState } from "../app/editor-state";
 import type { PathObject } from "../doc/model";
 import type { ShapeKind } from "../doc/path";
 import { isGradient } from "../doc/paint";
+import { hasCorners } from "../doc/shape-params";
 
 const SHAPE_HINT: Record<ShapeKind, string> = {
   rect: "Drag to draw a rectangle · Shift: square · Alt: from the centre",
@@ -41,7 +42,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases" + handles;
       if (paths.length === 1 && sel.length === 1) {
         const shape = (paths[0] as PathObject).shape;
-        const dots = shape === "star" ? " · Drag the dots to round a corner or change the ratio" : shape === "rect" || shape === "polygon" ? " · Drag the dot in a corner to round it" : "";
+        const dots = !hasCorners(paths[0] as PathObject) ? "" : shape === "star" ? " · Drag the big dot to round every corner (double-click it for one dot per corner) or the small one for the ratio" : " · Drag the big dot to round every corner (double-click it for one dot per corner)";
         return "Enter or double-click edits its nodes · Fill and Outline are in the bar above" + dots + handles;
       }
       return null;

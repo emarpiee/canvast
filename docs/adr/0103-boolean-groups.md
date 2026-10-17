@@ -16,6 +16,10 @@ Accepted (v0.17.0). Supersedes the destructive behaviour of [ADR 0101](0101-bool
 
 **Actions.** The Combine button on a boolean group shows the four operations with the current one ticked (choosing another changes the operation), **Flatten** (the result becomes one plain path and the shapes go; also Ctrl+E) and **Release shapes** (the shapes come back as they were; the result goes). Copy and paste remap `boolOps` keys and `result` to the new ids. The Layers list shows the group with its operation's icon and hides the result row.
 
+**Turning.** When all of a group's shapes share one turn (as they do after the group is turned), the result carries that turn too (`unturner`: the combined outline turned back about the pivot that `pathSubs` will use, and moved so that the object's own turn lands exactly on it). Its selection box stays turned with the shapes and the next turn goes on from there; before, the result was always upright, so the box snapped upright after every turn. Shapes turned differently give an upright result, as before.
+
+**Radius.** A group has its own corner radius, stored on the result (a number, in the result's units) and applied as the result is derived, between lines and curves alike; the result keeps its sharp outline in `base` while rounded (ADR 0105). The shapes inside keep theirs.
+
 ## Consequences
 The document grows by one path per boolean group. Boolean precision limits are those of ADR 0101 (crossings to about 1e-14 of the size; features below 1e-6 of an interacting group are dropped). A selection of a group together with a plain shape no longer throws in the selection bar (found while testing nesting: the Group button read `groups[0]` of an ungrouped object).
 

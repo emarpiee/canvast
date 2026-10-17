@@ -1054,6 +1054,175 @@ test("numbers without typing: drag a name (Radius, Points, Ratio) or a dot on th
   expect((await lastP()).params!.inner!).toBeLessThan(inner0 - 0.1);
 });
 
+test("corner radius dots: a radius pushed to its limit comes back; one dot per corner (double-click or hold the main dot); a star's every corner", async ({ app }) => {
+  const p = app.page;
+  type P = Obj & { radius?: number | number[] };
+  const lastP = async () => (await last(app)) as P;
+  const nodes = async () => (await last(app)).sub[0]!.n.length / 6;
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [500, 300], [700, 500]);
+  await key(app, "v");
+  await click(app, 600, 420);
+  // the main dot is inside the first corner (the top tip); push it as far as it goes
+  const dot = async () => (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  const radiusAt = async () => (await lastP()).radius as number;
+  const d0 = await dot();
+  await drag(app, [d0[0], d0[1]], [d0[0], d0[1] + 200]);
+  const big = await radiusAt();
+  expect(big).toBeGreaterThan(5);
+  await click(app, 900, 650); // away, and back
+  await click(app, 600, 420);
+  // the dot sits at the limit, not beyond it: pulling it back changes the radius at once
+  const d1 = await dot();
+  await drag(app, [d1[0], d1[1]], [d1[0], d1[1] - 12]);
+  expect(await radiusAt()).toBeLessThan(big - 2);
+  // and the typed value cannot go past it either
+  await p.locator("[data-sel-radius]").fill("100000");
+  await p.locator("[data-sel-radius]").press("Enter");
+  await p.locator("[data-sel-radius]").blur();
+  expect(await radiusAt()).toBeLessThan(200);
+
+  // a rectangle: open the corners out with a double-click on the main dot, and set one corner alone
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [300, 560], [500, 680]);
+  await key(app, "v");
+  await click(app, 400, 620);
+  const main0 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  await p.mouse.dblclick(main0[0], main0[1]);
+  await app.frame();
+  expect(await tool(app)).toBe("select"); // (not Edit nodes)
+  // each corner has a dot at the middle of its arc: the bottom right one
+  const dots = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!;
+  expect(dots.corners).toHaveLength(4);
+  const br = dots.corners[2]!; // (nodes run clockwise from the top left)
+  await drag(app, [br[0], br[1]], [br[0] - 20, br[1] - 20]);
+  const r = (await lastP()).radius as number[];
+  expect(Array.isArray(r)).toBe(true);
+  expect(r.filter((v) => v > 0)).toHaveLength(1);
+  expect(r[2]!).toBeGreaterThan(10);
+  expect(await nodes()).toBe(5); // one corner rounded: five nodes
+  await key(app, "Control+z");
+  expect((await lastP()).radius).toBeUndefined();
+  await key(app, "Control+Shift+z");
+  // the main dot, now in the middle, sets them all (dragging right is more)
+  const mid = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  await drag(app, [mid[0], mid[1]], [mid[0] + 25, mid[1]]);
+  const all = (await lastP()).radius;
+  expect(typeof all).toBe("number");
+  expect(all as number).toBeGreaterThan(15);
+  expect(await nodes()).toBe(8);
+  // held still, the main dot closes the corners again
+  const mid2 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!;
+  await p.mouse.move(mid2.main[0], mid2.main[1]);
+  await p.mouse.down();
+  await p.waitForTimeout(650);
+  await p.mouse.up();
+  await app.frame();
+  expect(await nodes()).toBe(8); // (a hold changes no number)
+  expect((await p.evaluate(() => window.__canvastDebug.cornerDots()))!.corners.length).toBe(4); // it opened or closed: either way the dots are asked for
+  const held = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!;
+  expect(held.main[0]).not.toBeCloseTo(mid2.main[0], 0); // the main dot is back inside the first corner
+});
+
+test("a boolean group turns with its shapes: its box stays turned instead of snapping upright, and it goes on from there", async ({ app }) => {
+  const p = app.page;
+  const angle = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.angle;
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [600, 360], [800, 480]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const turn = async (deg: number) => {
+    const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+    const c = f.corners;
+    const cx = (c[0]![0] + c[2]![0]) / 2, cy = (c[0]![1] + c[2]![1]) / 2;
+    const top = [(c[0]![0] + c[1]![0]) / 2, (c[0]![1] + c[1]![1]) / 2];
+    const start = Math.atan2(top[1]! - 26 * Math.cos(f.angle) - cy, top[0]! + 26 * Math.sin(f.angle) - cx);
+    const r = Math.hypot(top[0]! - cx, top[1]! - cy) + 26;
+    await p.mouse.move(cx + Math.cos(start) * r, cy + Math.sin(start) * r);
+    await p.mouse.down();
+    for (let k = 1; k <= 5; k++) {
+      const a = start + (((deg * k) / 5) * Math.PI) / 180;
+      await p.mouse.move(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    await p.mouse.up();
+    await app.frame();
+  };
+  expect(await angle()).toBe(0);
+  await turn(30);
+  expect((await angle()) * (180 / Math.PI)).toBeCloseTo(30, 0);
+  await turn(20);
+  expect((await angle()) * (180 / Math.PI)).toBeCloseTo(50, 0);
+  await key(app, "Control+z");
+  expect((await angle()) * (180 / Math.PI)).toBeCloseTo(30, 0);
+});
+
+test("nested boolean groups: a group inside a group; moving, turning, rounding and undoing reach both levels; saved", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { result?: string; groups?: string[]; radius?: number; rot?: number };
+  const all = async () => (await objs(app)) as unknown as G[];
+  const results = async () => (await all()).filter((o) => o.result !== undefined);
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  // a third shape, subtracted from the group as a whole
+  await key(app, "u");
+  await drag(app, [560, 380], [660, 440]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Subtract/ }).click();
+  await app.frame();
+  expect(await all()).toHaveLength(5); // three shapes and two results
+  const rs = await results();
+  expect(rs).toHaveLength(2);
+  const outer = rs.find((o) => o.groups!.length === 1)!;
+  const inner = rs.find((o) => o.groups!.length === 2)!;
+  expect(outer.sub.length).toBeGreaterThan(inner.sub.length - 1); // the hole is another loop
+  // round the outer one; the inner result and the shapes are as they were
+  await p.locator("[data-sel-radius]").fill("10");
+  await p.locator("[data-sel-radius]").press("Enter");
+  await p.locator("[data-sel-radius]").blur();
+  await app.frame();
+  const after = await results();
+  expect(after.find((o) => o.groups!.length === 1)!.radius as number).toBeGreaterThan(0);
+  expect(after.find((o) => o.groups!.length === 2)!.radius).toBeUndefined();
+  const nodesOf = (o: G) => o.sub.reduce((n, s) => n + s.n.length / 6, 0);
+  expect(nodesOf(after.find((o) => o.groups!.length === 1)!)).toBeGreaterThan(nodesOf(outer));
+  // turn the whole thing: every level turns with it
+  const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const c = f.corners;
+  const cx = (c[0]![0] + c[2]![0]) / 2, cy = (c[0]![1] + c[2]![1]) / 2;
+  const hx = (c[0]![0] + c[1]![0]) / 2, hy = (c[0]![1] + c[1]![1]) / 2 - 26;
+  await p.mouse.move(hx, hy);
+  await p.mouse.down();
+  await p.mouse.move(cx + (cy - hy), cy - (hx - cx) * 0 + 0, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  const turned = await results();
+  expect(turned.every((o) => (o.rot ?? 0) > 0)).toBe(true);
+  expect(new Set((await all()).map((o) => o.rot)).size).toBe(1); // every object turned by the same angle
+  await key(app, "Control+z");
+  expect((await results()).every((o) => !o.rot)).toBe(true);
+  await key(app, "Control+z"); // the radius
+  expect((await results()).find((o) => o.groups!.length === 1)!.radius).toBeUndefined();
+  await key(app, "Control+Shift+z");
+  await key(app, "Control+Shift+z");
+  await reload(app);
+  expect((await results()).every((o) => (o.rot ?? 0) > 0)).toBe(true);
+  expect((await results()).find((o) => o.groups!.length === 1)!.radius as number).toBeGreaterThan(0);
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");

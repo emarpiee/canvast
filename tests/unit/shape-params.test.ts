@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
 import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 import type { PathObject } from "../../src/doc/model";
-import { drawnParams, drawnSubs, geometryBounds, nodeCount, polygonSubs, rectSubs, roundCorners, scaleParams } from "../../src/doc/path";
+import { drawnParams, drawnSubs, geometryBounds, nodeCount, polygonSubs, rectSubs, scaleParams } from "../../src/doc/path";
 import { hasCorners, paramsOf, withRadius, withShapeParams } from "../../src/doc/shape-params";
+import { canRound, roundCorners } from "../../src/doc/rounding";
 import { scaleAbout } from "../../src/doc/edit-ops";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -65,9 +66,13 @@ describe("parametric shapes", () => {
     expect(result.radius).toBe(6);
     expect(result.base).toBeUndefined(); // derived, never stored
   });
-  it("rounding leaves nodes with handles, and corners next to a curve, alone", () => {
-    const smooth = [{ n: [0, 0, 0, 0, 20, 0, 100, 0, 80, 0, 120, 0, 50, 80, 50, 80, 50, 80], closed: true }];
-    expect(roundCorners(smooth, 10)).toEqual(smooth); // every corner of this triangle touches the curved edge or has handles
+  it("corners between curves are rounded too, and a smooth node is not a corner", () => {
+    const lens = { n: [0, 0, 0, 0, 40, -40, 100, 0, 60, -40, 100, 0, 100, 80, 100, 80, 100, 80, 0, 80, 0, 80, 0, 80], closed: true }; // two curved edges meeting at a point
+    const r = roundCorners([lens], 10)[0]!;
+    expect(r.n.length).toBeGreaterThan(lens.n.length);
+    const ellipse = drawn("rect") && drawnSubs("ellipse", 0, 0, 100, 60, 6, 5);
+    expect(roundCorners(ellipse, 20)).toEqual(ellipse); // every node is smooth: nothing to round
+    expect(canRound(ellipse)).toBe(false);
   });
   it("a shape drawn before parameters were kept is found out from its nodes, and one edited by hand is not", () => {
     const legacy: PathObject = { ...base, id: newObjectId(), sub: polygonSubs(0, 0, 100, 100, 5), shape: "polygon" };

@@ -1,5 +1,6 @@
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
-import { DEFAULT_INNER, canRound, type Radius } from "../doc/path";
+import { DEFAULT_INNER, type Radius } from "../doc/path";
+import { canRound, nodesIn } from "../doc/rounding";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import { alignChoice, capChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
@@ -756,9 +757,27 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
  * The corner radius of the first selected path that has corners to round (a rectangle, polygon, star, any path with sharp nodes between
  * straight lines, a boolean group's result): in local units, with whether it takes one radius per corner (a rectangle made as one).
  */
-export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: string; radius: Radius; perCorner: boolean } | null {
-  for (const o of editablePaths(doc, editor)) if (hasCorners(o) || (o.result !== undefined && canRound(o.sub))) return { id: o.id, radius: o.radius ?? 0, perCorner: o.shape === "rect" && paramsOf(o) !== null };
+export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: string; radius: Radius; nodes: number; mixed: boolean } | null {
+  for (const o of editablePaths(doc, editor)) {
+    if (!(hasCorners(o) || (o.result !== undefined && canRound(o.sub)))) continue;
+    const r = o.radius ?? 0;
+    return { id: o.id, radius: r, nodes: o.result !== undefined ? 0 : nodesIn(o.base ?? o.sub), mixed: typeof r !== "number" && new Set(r).size > 1 };
+  }
   return null;
+}
+
+/** Set the radius of one corner (its place among the nodes of the sharp outline) of one path, the others as they are: one undo step. */
+export function commitCornerAt(doc: DocumentStore, editor: EditorState, id: string, index: number, px: number, ppu: number, final = true): void {
+  const o = doc.get(id);
+  if (editor.blockEdit() || !o || o.kind !== "path" || o.locked || !(ppu > 0 && ppu < Infinity)) return;
+  const nodes = nodesIn(o.base ?? o.sub);
+  const now = o.radius === undefined ? new Array<number>(nodes).fill(0) : typeof o.radius === "number" ? new Array<number>(nodes).fill(o.radius) : [...o.radius];
+  now[index] = Math.max(0, px / ppu);
+  const made = withRadius(o, now);
+  if (!final) return showReplaced(editor, [made]);
+  editor.preview = { kind: "none" };
+  doc.commit(doc.transaction("Corner radius", [made]));
+  editor.changed();
 }
 
 /** Round the corners of the selected paths (px at this zoom: one value, or four for a rectangle: top left, top right, bottom right, bottom left): one undo step. */
@@ -769,8 +788,8 @@ export function commitCorners(doc: DocumentStore, editor: EditorState, px: reado
     if (!(hasCorners(o) || (o.result !== undefined && canRound(o.sub)))) continue;
     const ppu = ppuOf(o.id);
     if (!(ppu > 0 && ppu < Infinity)) continue;
-    const four = px.length === 4 && o.shape === "rect" && paramsOf(o) !== null;
-    next.push(withRadius(o, four ? px.map((v) => v / ppu) : px[0]! / ppu));
+    const each = o.result === undefined && px.length > 1 && px.length === nodesIn(o.base ?? o.sub); // one for every corner (a rectangle: four)
+    next.push(withRadius(o, each ? px.map((v) => v / ppu) : px[0]! / ppu));
   }
   if (!final) return showReplaced(editor, next);
   editor.preview = { kind: "none" };
@@ -869,7 +888,7 @@ export function flattenBoolean(doc: DocumentStore, editor: EditorState, gid: str
   const all = [...doc.all()].filter((o) => o.groups?.includes(gid));
   const result = all.find((o) => isResult(o) && o.result === gid) as PathObject | undefined;
   if (!result) return;
-  const { boolOps, groupNames, groups, result: _r, radius: _rad, ...rest } = result;
+  const { boolOps, groupNames, groups, result: _r, radius: _rad, base: _base, ...rest } = result;
   const { [gid]: _op, ...ops } = boolOps ?? {};
   const { [gid]: _name, ...names } = groupNames ?? {};
   const chain = (groups ?? []).filter((g) => g !== gid);

@@ -553,8 +553,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (!o) return null;
       const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === o.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
-      if (!(ppu > 0 && ppu < Infinity)) return { radiusPx: [0], perCorner: o.perCorner };
-      return { radiusPx: typeof o.radius === "number" ? [o.radius * ppu] : o.radius.map((v) => v * ppu), perCorner: o.perCorner };
+      if (!(ppu > 0 && ppu < Infinity)) return { radiusPx: [0], nodes: o.nodes, mixed: false };
+      return { radiusPx: typeof o.radius === "number" ? [o.radius * ppu] : o.radius.map((v) => v * ppu), nodes: o.nodes, mixed: o.mixed };
     },
     cornersSelected: (px, final = true) => {
       const visible = visibleObjects(doc, index, null, view.frameCamera, view.viewport);

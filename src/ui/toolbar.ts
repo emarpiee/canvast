@@ -40,8 +40,8 @@ export interface ToolbarActions {
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
   /** The corner radius (px at this zoom) of the first picked path that has corners to round; `perCorner`: a rectangle, which takes one per corner. */
-  selectedCorners(): { radiusPx: number[]; perCorner: boolean } | null;
-  /** Round the corners of the picked paths: one value, or four for a rectangle (top left, top right, bottom right, bottom left). */
+  selectedCorners(): { radiusPx: number[]; nodes: number; mixed: boolean } | null;
+  /** Round the corners of the picked paths: one value, or one for every corner (four for a rectangle: top left, top right, bottom right, bottom left). */
   cornersSelected(px: number[], final?: boolean): void;
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
@@ -142,7 +142,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. A rectangle also takes four values: top left, top right, bottom right, bottom left."></label>
+        <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -271,7 +271,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
     const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
-    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === 4)) actions.cornersSelected(parts);
+    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
   });
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
@@ -470,7 +470,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const crn = pick && still ? actions.selectedCorners() : null;
     const round2 = (v: number): string => String(Math.round(v * 100) / 100);
     const fields: Array<[string, boolean, string]> = [
-      ["radius", !!crn, crn ? (crn.perCorner && crn.radiusPx.length === 4 ? crn.radiusPx.map(round2).join(" ") : round2(crn.radiusPx[0] ?? 0)) : ""],
+      ["radius", !!crn, crn && !crn.mixed ? round2(crn.radiusPx[0] ?? 0) : ""],
       ["sides", shp?.shape === "polygon", String(shp?.sides ?? 0)],
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
@@ -480,6 +480,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
       const input = root.querySelector<HTMLInputElement>(`[data-sel-${key}]`)!;
       if (shown && document.activeElement !== input) input.value = value;
+      if (key === "radius") input.placeholder = crn?.mixed ? "Mixed" : "";
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
     if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));

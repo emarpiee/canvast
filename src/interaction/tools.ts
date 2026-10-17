@@ -11,7 +11,8 @@ import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } fro
 import { editSubs, homeObject, newObjectId } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
-import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, roundCorners, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { nodesIn, roundCorners } from "../doc/rounding";
 import { cornerHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
@@ -31,7 +32,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -53,6 +54,7 @@ import { boolGroupsOf, isResult } from "../doc/boolean-group";
  */
 
 /** Pointer travel (CSS px) that turns a press into a drag. */
+const LONG_PRESS_MS = 450;
 const DRAG_THRESHOLD_PX = 3;
 /** Minimum pen sample spacing in CSS px. */
 const PEN_MIN_STEP_PX = 0.75;
@@ -146,7 +148,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "radius" | "ratio"; r0: number; proj0: number }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio"; index: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -556,7 +558,9 @@ export function attachTools(
   const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
     const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
     // a rounded path keeps its radius: the nodes are the sharp ones, and the rounding is made again
-    const next = homeObject(normalizeUnit(o.base && o.radius !== undefined ? { ...flat, base: sub, sub: roundCorners(sub, o.radius) } : { ...flat, sub }), doc.space);
+    // (a radius for each corner no longer fits when nodes were added or taken away: it becomes the largest of them)
+    const radius = o.radius !== undefined && typeof o.radius !== "number" && o.radius.length !== nodesIn(sub) ? Math.max(...o.radius) : o.radius;
+    const next = homeObject(normalizeUnit(o.base && radius !== undefined ? { ...flat, radius, base: sub, sub: roundCorners(sub, radius) } : { ...flat, sub }), doc.space);
     doc.commit(doc.transaction(label, [next]));
   };
 
@@ -570,30 +574,55 @@ export function attachTools(
     g = { kind: "grad", pointerId: e.pointerId, id: tgt.o.id, which: h.which, handle, g: h.g };
     return true;
   };
-  /** A press on the corner radius dot or the star's ratio handle of the one picked shape takes it. */
+  /** A press on the main radius dot, one of the corners' own dots (when opened out) or the star's ratio handle takes it; held still, the main dot opens the corners out (or closes them). */
+  const toggleCorners = (id: ObjectId): void => {
+    editor.cornersOpen = editor.cornersOpen === id ? null : id;
+    editor.changed();
+  };
   const startCornerPress = (e: PointerEvent, s: ScreenPoint): boolean => {
-    const tgt = nodeTarget();
+    const tgt = gradientTarget();
     if (!tgt || editor.blockEdit() || editor.tool !== "select") return false;
-    const h = cornerHandles(tgt.po);
-    const what = h && hitCornerHandle(h, s.x, s.y);
-    if (!h || !what) return false;
-    const r = h.radius;
-    g = { kind: "round", pointerId: e.pointerId, id: tgt.o.id, what, r0: r?.px ?? 0, proj0: r ? (s.x - r.cx) * r.ux + (s.y - r.cy) * r.uy : 0 };
+    const open = editor.cornersOpen === tgt.o.id;
+    const h = cornerHandles(tgt.po, open);
+    const pick = h && hitCornerHandle(h, s.x, s.y, open);
+    if (!h || !pick) return false;
+    const dot = pick.what === "corner" ? pick.dot : pick.what === "main" ? h.main : null;
+    const along = dot ? (s.x - dot.cx) * dot.ux + (s.y - dot.cy) * dot.uy : 0;
+    const id = tgt.o.id;
+    const timer = pick.what === "main" ? window.setTimeout(() => {
+      if (g.kind === "round" && !g.moved && g.timer === timer) {
+        g.opened = true;
+        toggleCorners(id);
+      }
+    }, LONG_PRESS_MS) : 0;
+    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, index: pick.what === "corner" ? pick.dot.index : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
     return true;
   };
   const updateCorner = (s: ScreenPoint, final: boolean): void => {
     if (g.kind !== "round") return;
-    const tgt = nodeTarget();
-    const h = tgt && cornerHandles(tgt.po);
+    if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) {
+      g.moved = true;
+      window.clearTimeout(g.timer);
+    }
+    if (!g.moved) return;
+    const tgt = gradientTarget();
+    const open = !!tgt && editor.cornersOpen === tgt.o.id;
+    const h = tgt && cornerHandles(tgt.po, open);
     if (!tgt || !h) return;
-    if (g.what === "radius" && h.radius) {
-      const r = h.radius;
-      const proj = (s.x - r.cx) * r.ux + (s.y - r.cy) * r.uy;
-      commitCorners(doc, editor, [Math.max(0, g.r0 + (proj - g.proj0) * r.sinHalf)], () => tgt.po.proj.ppu, final);
-    } else if (g.what === "ratio" && h.ratio) {
+    const ppu = tgt.po.proj.ppu;
+    if (g.what === "ratio" && h.ratio) {
       const q = h.ratio;
       commitShapeNumbers(doc, editor, { inner: Math.max(0.05, Math.min(0.95, Math.hypot(s.x - q.cx, s.y - q.cy) / Math.max(1e-6, q.outer))) }, final);
+      return;
     }
+    const which = g.index;
+    const dot = g.what === "corner" ? h.corners.find((d) => d.index === which) : h.main;
+    if (!dot) return;
+    // Along the corner's bisector, from where the dot was taken (so it never jumps); the main dot in the middle of an opened-out shape: sideways.
+    const delta = g.what === "main" && open ? s.x - g.x0 : ((s.x - dot.cx) * dot.ux + (s.y - dot.cy) * dot.uy - g.proj0) * dot.sinHalf;
+    const px = Math.max(0, Math.min(dot.max, g.r0 + delta));
+    if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
+    else commitCorners(doc, editor, [px], () => ppu, final);
   };
   const updateGradient = (s: ScreenPoint): void => {
     if (g.kind !== "grad") return;
@@ -1182,7 +1211,8 @@ export function attachTools(
         break;
       }
       case "round":
-        if (cancelled) editor.preview = { kind: "none" };
+        window.clearTimeout(g.timer);
+        if (cancelled || !g.moved) editor.preview = { kind: "none" };
         else updateCorner(s, true);
         break;
       case "shape":
@@ -1213,6 +1243,17 @@ export function attachTools(
     }
     if (effectiveTool() !== "select" || editor.readOnly) return;
     const s = local(e);
+    // A double-click on the main radius dot opens the corners out (or closes them): it is not a double-click on the shape.
+    const unit = gradientTarget();
+    if (unit) {
+      const open = editor.cornersOpen === unit.o.id;
+      const dots = cornerHandles(unit.po, open);
+      const pick = dots && hitCornerHandle(dots, s.x, s.y, open);
+      if (pick?.what === "main") {
+        toggleCorners(unit.o.id);
+        return;
+      }
+    }
     // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
     const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
     if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {

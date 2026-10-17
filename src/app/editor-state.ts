@@ -7,7 +7,8 @@ import type { CanvasObject, ObjectId } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
-import { roundCorners, type ShapeKind, type SubPath } from "../doc/path";
+import type { ShapeKind, SubPath } from "../doc/path";
+import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 
@@ -132,6 +133,8 @@ export class EditorState {
   shapeStroke: Paint | null = "#1f2329";
   shapeWidthPx = 2;
   /** Which paint's gradient the canvas handles belong to when both the fill and the outline have one (the last chip opened). */
+  /** The shape whose corner radius dots are opened out to one per corner (a double-click or long press on the main dot); closes when another is picked. */
+  cornersOpen: ObjectId | null = null;
   gradientFocus: "fill" | "stroke" | null = null;
   /** The outline's corners, ends and place on the edge for the next shape (null join: the tool's own, sharp for shapes with corners). */
   shapeJoin: JoinChoice | null = null;

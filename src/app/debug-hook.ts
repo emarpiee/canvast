@@ -40,6 +40,7 @@ import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
 import type { QualityGovernor } from "./quality";
 import { selectedFrame } from "../render/scene-renderer";
+import { cornerHandles } from "../interaction/path-edit";
 import { visibleObjects } from "../render/scene-view";
 
 /**
@@ -122,6 +123,8 @@ export interface DebugHook {
   decodedStats(): { count: number; bytes: number; budget: number; maxRunning: number };
   /** The box of the selection on screen: its rotation (radians) and corners (top-left first, in the box's own axes). */
   selectionFrame(): { angle: number; corners: Array<[number, number]> } | null;
+  /** Where the main corner radius dot and each corner's own dot are on screen for the one picked shape (null: none). */
+  cornerDots(): { main: [number, number]; corners: Array<[number, number]> } | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;
@@ -388,6 +391,11 @@ export function installDebugHook(
     selectionFrame: () => {
       const sel = selectedFrame(visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport), editor, view.viewport);
       return sel ? { angle: sel.frame.angle, corners: sel.frame.corners.map(([x, y]) => [x, y] as [number, number]) } : null;
+    },
+    cornerDots: () => {
+      const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
+      const h = po && cornerHandles(po, editor.cornersOpen === po.obj.id);
+      return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]) } : null;
     },
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),

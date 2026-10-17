@@ -18,8 +18,10 @@ import { normalizeUnit } from "./edit-ops";
 import type { FrameSpace } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { CanvasObject, ObjectId, PathObject } from "./model";
-import { expressObjectIn, homeObject, newObjectId, pathSubs } from "./model";
-import { mapSubs, roundCorners } from "./path";
+import { expressObjectIn, homeObject, newObjectId, pathStyle, pathSubs } from "./model";
+import { geometryBounds, mapSubs, paintBounds, rotateSubs, type SubPath } from "./path";
+import { cosSin } from "../core/angle";
+import { roundCorners } from "./rounding";
 
 /** The boolean groups an object is in, outermost first, each with whether the object is that group's own result. */
 export function boolGroupsOf(o: CanvasObject): Array<{ gid: string; op: BoolOp; own: boolean }> {
@@ -76,6 +78,22 @@ function regionIn(o: PathObject, base: PathObject, space: FrameSpace): Region | 
   return { subs: mapSubs(pathSubs(e), (x, y) => [x * k + dx, y * k + dy]), evenodd: !!o.evenodd };
 }
 
+/**
+ * The way to put an outline (as it should look) into an object that is turned by `rot`: turned back by `rot` about a pivot, then moved so that
+ * the object's own turn (about the centre of its paint bounds, as `pathSubs` does) lands exactly on it. The same map serves any outline of
+ * the same object (the sharp one under a radius too).
+ */
+export function unturner(o: PathObject, rot: number): (subs: readonly SubPath[]) => SubPath[] {
+  const { c, s } = cosSin(rot);
+  const b = geometryBounds(rotateSubs(o.sub, 0, 0, c, -s));
+  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+  const qx = c * cx - s * cy, qy = s * cx + c * cy; // the pivot: the centre of the bounds of the turned-back outline, turned forward
+  const pb = paintBounds(rotateSubs(o.sub, qx, qy, c, -s), pathStyle(o));
+  const dx = qx - (pb.minX + pb.maxX) / 2, dy = qy - (pb.minY + pb.maxY) / 2;
+  const tx = dx - (c * dx - s * dy), ty = dy - (s * dx + c * dy);
+  return (subs) => mapSubs(rotateSubs(subs, qx, qy, c, -s), (x, y) => [x + tx, y + ty]);
+}
+
 export type Derivation = { upsert: PathObject[]; remove: ObjectId[] } | null;
 
 /**
@@ -106,6 +124,10 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
   // The result's own look is kept (it is the group's fill and outline); a new one starts as the back shape's.
   const look = existing ?? { fill: base.fill, stroke: base.stroke, width: base.width, ...(base.join ? { join: base.join } : {}), ...(base.cap ? { cap: base.cap } : {}), ...(base.align ? { align: base.align } : {}), opacity: base.opacity, ...(base.blend ? { blend: base.blend } : {}) };
   const { sub: _s, rot: _r, shape: _sh, evenodd: _e, anchor: _a, unit: _u, frame: _f, groups: _g, boolOps: _b, radius: _rad, base: _bs, params: _pm, ...keep } = look as PathObject;
+  // Shapes that all share one turn give a result that has it too: the group's box stays turned with them (and a turned group goes on turning
+  // from where it is), instead of snapping upright after every turn. The result's own geometry is the combined outline turned back, placed so
+  // that turning it by its angle about its own pivot (the centre of its paint bounds, as `pathSubs` does) lands exactly on the outline.
+  const turn = ops.every((o) => (o.rot ?? 0) === (ops[0]!.rot ?? 0)) ? (ops[0]!.rot ?? 0) : 0;
   const result: PathObject = {
     ...keep,
     id: existing?.id ?? newObjectId(),
@@ -116,12 +138,18 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
     z: existing?.z ?? base.z,
     attachmentTargetId: null,
     sub: loops,
+    ...(turn ? { rot: turn } : {}),
     ...(radius > 0 ? { radius } : {}),
     groups: chain,
     boolOps: bools,
     result: gid,
   } as PathObject;
-  return { upsert: [homeObject(normalizeUnit(result), space) as PathObject], remove: [] };
+  const place = turn ? unturner(result, turn) : null;
+  // Under a radius the sharp outline is kept too (`base`): what the radius can be limited by, and what the corner controls are drawn on.
+  const placed: PathObject = place
+    ? { ...result, sub: place(result.sub), ...(radius > 0 ? { base: place(raw) } : {}) }
+    : radius > 0 ? { ...result, base: raw } : result;
+  return { upsert: [homeObject(normalizeUnit(placed), space) as PathObject], remove: [] };
 }
 
 /** What changing objects does to the boolean groups they are in: the results to store and to remove, innermost group first (an inner result is an operand of the outer). */

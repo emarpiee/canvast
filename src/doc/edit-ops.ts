@@ -3,7 +3,8 @@ import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
 import type { CanvasObject, PathObject } from "./model";
 import { localBounds, pivotOf } from "./model";
-import { roundCorners, scaleParams, scaleRadius, scaleSubs } from "./path";
+import { scaleParams, scaleRadius, scaleSubs } from "./path";
+import { roundCorners } from "./rounding";
 
 /**
  * Pure geometric edits. Each returns a new object; the document applies them

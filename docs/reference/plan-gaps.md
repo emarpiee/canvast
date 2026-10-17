@@ -38,7 +38,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Gradients on paths (ADR 0100) | Done | Linear and radial, on fills and outlines, with a gradient editor in the colour package and handles on the canvas. |
 | Boolean operations (ADR 0101, 0103) | Done | Union, intersect, subtract, exclude on the selection bar as non-destructive boolean groups (members stay editable, result derived, flatten and release); curves stay curves. |
 | Stroke position (inside, centre, outside), outline corners and ends | Done | ADR 0104; Outline options on the options bar. |
-| Corner radius (every shape with corners, boolean groups, four values on a rectangle), sides, points and ratio editable after drawing | Done | ADR 0105; corners next to curves and per-corner radii on other paths are not. |
+| Corner radius (every shape with corners, curves included, per corner, boolean groups), sides, points and ratio editable after drawing | Done | ADR 0105; per-corner radii on a boolean group's result are not. |
 | Clipping, dashes | **Gap** | Next slices of the vector plan (ADR 0099). |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | **Gap** | Pressure is read; tilt is not. |

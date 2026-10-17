@@ -476,63 +476,6 @@ export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams
 /** A corner radius: one for every corner, or (a rectangle) one per node of its first sub-path. */
 export type Radius = number | readonly number[];
 
-const isSharp = (q: readonly number[]): boolean => q[2] === q[0] && q[3] === q[1] && q[4] === q[0] && q[5] === q[1];
-
-/** Whether any corner could be rounded: a sharp node between two straight lines (the ends of an open sub-path have none). */
-export function canRound(subs: readonly SubPath[]): boolean {
-  return subs.some((s) => {
-    const c = nodeCount(s);
-    for (let k = s.closed ? 0 : 1; k < (s.closed ? c : c - 1); k++) {
-      const at = (i: number): number[] => s.n.slice(((i + c) % c) * NODE, ((i + c) % c) * NODE + NODE);
-      if (isSharp(at(k)) && isSharp(at(k - 1)) && isSharp(at(k + 1))) return true;
-    }
-    return false;
-  });
-}
-
-/**
- * The corners of sub-paths rounded with a circular arc (as a cubic) of radius `r`: a sharp node between two straight lines becomes two
- * nodes. The radius is cut down where a line is too short to hold it (each corner may use half of each line), so neighbours never overlap
- * and a large radius on a rectangle makes a pill. The ends of an open sub-path, and nodes with handles, are left as they are.
- */
-export function roundCorners(subs: readonly SubPath[], r: Radius): SubPath[] {
-  return subs.map((s, si) => {
-    const c = nodeCount(s);
-    if (c < 3) return s;
-    const at = (k: number): number[] => s.n.slice(((k + c) % c) * NODE, ((k + c) % c) * NODE + NODE);
-    const out: number[] = [];
-    for (let k = 0; k < c; k++) {
-      const P = at(k);
-      const rad = typeof r === "number" ? r : si === 0 && r.length === c ? r[k]! : 0;
-      const A = at(k - 1);
-      const B = at(k + 1);
-      if (!(rad > 0) || (!s.closed && (k === 0 || k === c - 1)) || !(isSharp(P) && isSharp(A) && isSharp(B))) {
-        out.push(...P);
-        continue;
-      }
-      const ux = A[0]! - P[0]!, uy = A[1]! - P[1]!, vx = B[0]! - P[0]!, vy = B[1]! - P[1]!;
-      const l1 = Math.hypot(ux, uy), l2 = Math.hypot(vx, vy);
-      if (!(l1 > 0 && l2 > 0)) {
-        out.push(...P);
-        continue;
-      }
-      const e1x = ux / l1, e1y = uy / l1, e2x = vx / l2, e2y = vy / l2;
-      const theta = Math.acos(Math.max(-1, Math.min(1, e1x * e2x + e1y * e2y)));
-      if (theta < 1e-3 || theta > Math.PI - 1e-3) {
-        out.push(...P);
-        continue;
-      }
-      const t = Math.min(rad / Math.tan(theta / 2), Math.min(l1, l2) / 2);
-      const rr = t * Math.tan(theta / 2);
-      const hh = (4 / 3) * Math.tan((Math.PI - theta) / 4) * rr;
-      const p1x = P[0]! + e1x * t, p1y = P[1]! + e1y * t, p2x = P[0]! + e2x * t, p2y = P[1]! + e2y * t;
-      out.push(p1x, p1y, p1x, p1y, p1x - e1x * hh, p1y - e1y * hh);
-      out.push(p2x, p2y, p2x - e2x * hh, p2y - e2y * hh, p2x, p2y);
-    }
-    return { n: out, closed: s.closed };
-  });
-}
-
 /** The radius after the object's local units are renamed by a factor (the same world size). */
 export const scaleRadius = (r: Radius, k: number): Radius => (typeof r === "number" ? r * k : r.map((v) => v * k));
 
