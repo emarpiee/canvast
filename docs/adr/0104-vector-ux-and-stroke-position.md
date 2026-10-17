@@ -14,8 +14,8 @@ Accepted (v0.17.0). The audit is `docs/reference/vector-ux-audit.md`.
 
 **Telling the person what to do.** A hint line under the tool options (`ui/tool-hint.ts`, pure and unit-testable): per tool, while drawing a path, with one shape picked, with a boolean group picked, inside one. Fill and Outline are named. Enter edits the nodes of a picked shape and finishes node editing (as Esc does). On Select the pen-size slider is hidden unless a stroke is picked, since it set a shape's width without saying so.
 
-## Not done
-Join, ends and position for the next shape are session state (not remembered across reloads). A Flatten button outside the Combine menu, and merging Shape and Path into one tool, are in the audit as open items.
+## Second pass
+Corners, ends and position for the next shape are remembered (`shape.join`, `shape.cap`, `shape.align`). A **Flatten** button is on the selection bar for a boolean group. Shape and Path are one rail button, **Shape and path**; the Path tool is chosen beside the shape kinds and stays lit under the Shape button (U and B keep working).
 
 ## Tests
 `tests/unit/stroke-look.test.ts` (choices stored as differences; only closed outlines can be inside or outside; the ink's reach per position; saved and refused when bad), `tests/e2e/vectors.spec.ts` ("outline options": width, outside, inside, centre drawn and picked, one undo each, corners, saved; "the line under the tool options": per tool, picked shape, boolean group, entered; Enter).

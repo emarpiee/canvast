@@ -77,6 +77,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
     btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)") +
+    btn("flatten", ICONS.merge, "Flatten the boolean group into one path (Ctrl+E)") +
     btn("combine", ICONS.combineIcon, "Combine shapes (union, intersect, subtract, exclude); on a boolean group: its operation, flatten, release") +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
@@ -170,6 +171,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         ], cur ? "Boolean group" : "Combine shapes");
         break;
       }
+      case "flatten": actions.flattenBoolean(); break;
       case "outline": actions.outline(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
@@ -205,6 +207,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
     q("layout").hidden = sel.length < 2;
     q("combine").hidden = !actions.canCombine();
+    q("flatten").hidden = actions.booleanState() === null;
     q("outline").hidden = !actions.canOutline();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();

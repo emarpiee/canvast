@@ -1783,8 +1783,8 @@ test("panels stack without squeezing each other; many layers get a filter, the l
   // A selection brings the settings under the list.
   await layers.locator("li.layer").first().click();
   await expect(layers.locator("[data-opacity]")).toBeVisible();
-  const list = (await layers.locator('ul[role="tree"]').boundingBox())!;
-  expect(list.height).toBeGreaterThan(100);
+  // (the list is rebuilt as the panel settles: measure it until it stays)
+  await expect.poll(async () => (await layers.locator('ul[role="tree"]').boundingBox())?.height ?? 0).toBeGreaterThan(100);
   // The Tags panel joins the stack: below the others, inside the screen, and the Layers list still has room (ADR 0076).
   await p.getByRole("button", { name: "Tags panel", exact: true }).click();
   const tags = p.getByTestId("tags-panel");

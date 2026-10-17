@@ -44,8 +44,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "select", icon: ICONS.pointer, label: "Select", key: "V" },
   { tool: "node", icon: ICONS.nodeTool, label: "Edit nodes", key: "N" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
-  { tool: "shape", icon: ICONS.shapeTool, label: "Shape", key: "U" },
-  { tool: "path", icon: ICONS.pathTool, label: "Path (curves)", key: "B" },
+  { tool: "shape", icon: ICONS.shapeTool, label: "Shape and path", key: "U" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
@@ -126,8 +125,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen and text colour: open the colour picker"><span data-colour-chip></span></button>
       </div>
-      <div class="tb-group tb-options" data-for="shape" role="radiogroup" aria-label="Shape">
+      <div class="tb-group tb-options" data-for="shape path" role="radiogroup" aria-label="Shape or path">
         ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
+        <button type="button" role="radio" class="shape-kind" data-tool="path" aria-label="Path (curves)" title="Path (curves): click corners, drag for a curve, click the first node to close (B)">${ICONS.pathTool}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -297,6 +297,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["shapeKind"]) {
       editor.shapeKind = d["shapeKind"] as ShapeKind;
+      if (editor.tool === "path") editor.setTool("shape");
       editor.changed();
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
@@ -360,7 +361,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
 
   const update = (): void => {
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
-      b.setAttribute("aria-checked", String(b.dataset["tool"] === editor.tool));
+      // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
+      const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options"));
+      b.setAttribute("aria-checked", String(on));
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
     const recent = recentColours();
@@ -373,7 +376,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", (b.dataset["color"] ?? "").toLowerCase() === editor.penColor.toLowerCase());
     root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = swatchBackground(editor.penColor);
-    for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(b.dataset["shapeKind"] === editor.shapeKind));
+    for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));
     const sides = root.querySelector<HTMLInputElement>("[data-sides]")!;
     const tips = root.querySelector<HTMLInputElement>("[data-tips]")!;
     root.querySelector<HTMLElement>("[data-sides-wrap]")!.hidden = editor.shapeKind !== "polygon";

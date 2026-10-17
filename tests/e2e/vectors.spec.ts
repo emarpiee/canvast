@@ -822,6 +822,11 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   expect((await last(app)).join).toBeUndefined();
   await reload(app);
   expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
+  // what the next shape gets is remembered too (it was set to Outside, Sharp corners were then left alone)
+  await key(app, "u");
+  await p.click("[data-outline-options]");
+  await expect(pop.locator('[data-align="outside"]')).toHaveAttribute("aria-checked", "true");
+  await expect(pop.locator("#op-width")).toHaveValue("20");
 });
 
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
@@ -831,8 +836,13 @@ test("the line under the tool options says what to do: per tool, with a shape pi
   await expect(hint).toContainText("rectangle");
   await p.click('[data-shape-kind="star"]');
   await expect(hint).toContainText("star");
-  await key(app, "b");
+  await p.locator('[role=radiogroup][aria-label="Shape or path"] [data-tool="path"]').click(); // the Path tool is chosen beside the shapes
+  expect(await tool(app)).toBe("path");
   await expect(hint).toContainText("Click to place a corner");
+  await p.click('[data-shape-kind="rect"]');
+  expect(await tool(app)).toBe("shape");
+  await key(app, "b");
+  expect(await tool(app)).toBe("path");
   await key(app, "v");
   await expect(hint).toBeHidden(); // nothing selected, nothing to say
   await key(app, "u");
@@ -853,6 +863,7 @@ test("the line under the tool options says what to do: per tool, with a shape pi
   await p.getByRole("menuitem", { name: /^Union/ }).click();
   await app.frame();
   await expect(hint).toContainText("Boolean group");
+  await expect(p.locator('[data-ctx="flatten"]')).toBeVisible(); // Flatten is on the bar, not only in the menu
   await p.mouse.dblclick(560, 330);
   await app.frame();
   await expect(hint).toContainText("Inside a boolean group");

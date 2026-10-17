@@ -3,6 +3,7 @@ import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
 import { newObjectId } from "../doc/model";
 import type { PathObject } from "../doc/model";
+import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard } from "../assets/file-kind";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "../ui/file-actions";
@@ -166,6 +167,9 @@ async function start(): Promise<void> {
   editor.shapeFill = paintFromText(settings.get("shape.fill")) ?? null;
   editor.shapeStroke = paintFromText(settings.get("shape.stroke")) ?? null;
   editor.shapeWidthPx = settings.get("shape.widthPx");
+  editor.shapeJoin = settings.get("shape.join") === "default" ? null : settings.get("shape.join") as JoinChoice;
+  editor.shapeCap = settings.get("shape.cap");
+  editor.shapeAlign = settings.get("shape.align");
   editor.shapeSides = settings.get("shape.sides");
   editor.shapeTips = settings.get("shape.tips");
   editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") };
@@ -187,6 +191,9 @@ async function start(): Promise<void> {
     settings.set("shape.fill", paintToText(editor.shapeFill));
     settings.set("shape.stroke", paintToText(editor.shapeStroke));
     settings.set("shape.widthPx", editor.shapeWidthPx);
+    settings.set("shape.join", editor.shapeJoin ?? "default");
+    settings.set("shape.cap", editor.shapeCap);
+    settings.set("shape.align", editor.shapeAlign);
     settings.set("shape.sides", editor.shapeSides);
     settings.set("shape.tips", editor.shapeTips);
     settings.set("pen.stabilizer.on", editor.stabilizer.on);
