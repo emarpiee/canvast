@@ -130,9 +130,9 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Performance tab | Partial | Adaptive quality, Animation and speed; no backend choice, quality tier or cache limits. |
 | About and Diagnostics tab | Partial | The Develop tab shows the version (fixed in this check; it was blank), developer tools; no error log, capability results, licences list or diagnostic export. |
 | Privacy tab, Collaboration tab | Partial | Explanations only. Nothing to set while there is no network and no collaboration. |
-| Command palette; Settings reachable from it | **Gap** | |
-| Minimap or overview, tours or presentation paths, camera transitions | **Gap** | Slideshow exists for library assets only. |
-| Navigation history (previous view) | **Gap** | Bookmarks and search-and-reveal exist; no back and forward of camera positions. |
+| Command palette; Settings reachable from it | Done (ADR 0117) | Ctrl+K. |
+| Minimap or overview, tours or presentation paths, camera transitions | Partial (ADR 0116) | Tour of the bookmarks and gliding done; a minimap is decided against (no bounds, objects at every depth). |
+| Navigation history (previous view) | Done (ADR 0116) | Alt+Left and Alt+Right. |
 | Context menus, drag between panels, detachable surfaces | Unverified | Not confirmed in this check. |
 | Contrast validated against actual ratios | Unverified | ADR 0050 audited by hand; no automated contrast test found. |
 

@@ -53,6 +53,8 @@ export interface DebugHook {
   camera(): SerializedCamera;
   /** Zoom by any number of levels (≤ 2^50) about the centre, in frames: cheap at any depth (ADR 0014). */
   jump(levels: number): void;
+  /** Gliding between views, in ms (0: off; the test session starts with it off). */
+  glide(ms: number): void;
   /** Absolute zoom level as a BigInt string (exact at any depth). */
   depth(): string;
   /** Each object's frame: level (BigInt string, K-steps below the world frame) and id; world-frame objects have level "0". */
@@ -251,6 +253,7 @@ export function installDebugHook(
   const hook: DebugHook = {
     camera: () => serializeCamera(view.worldCamera()),
     jump: (levels) => view.zoomBy(levels),
+    glide: (ms) => void (view.glideMs = ms),
     depth: () => {
       const d = depthOf(view.frameCamera);
       return `${d.levels}`;

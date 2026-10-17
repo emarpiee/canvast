@@ -10,7 +10,7 @@ import { moreButton, openMoreMenu } from "./more-menu";
  * the view as it is, with a fresh picture) and Delete. Hidden by default, like the Layers panel. Built for touch too: the buttons are
  * large, always shown on a touch screen, and the card never needs hover.
  */
-export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined): void {
+export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined, tour: () => void = () => undefined): void {
   const panel = document.createElement("aside");
   panel.className = "layers-panel bookmarks-panel";
   panel.setAttribute("aria-label", "Bookmarks");
@@ -43,7 +43,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       .join("");
     panel.innerHTML = `
       <header><h2>Bookmarks <span class="layers-count">${list.items.length}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
+        <span class="layers-tools"><button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
         <button type="button" class="layer-btn" data-close aria-label="Hide the Bookmarks panel" title="Hide the Bookmarks panel">${ICONS.x}</button></span></header>
       <ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`;
   };
@@ -98,6 +98,8 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     if (t.closest("[data-close]")) {
       editor.bookmarksOpen = false;
       editor.changed();
+    } else if (t.closest("[data-tour]")) {
+      tour();
     } else if (t.closest("[data-add]")) {
       void list.add(capture());
     } else if (li && t.closest("[data-bm-more]")) {

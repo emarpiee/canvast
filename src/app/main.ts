@@ -50,7 +50,8 @@ import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
 import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
-import { mountSettingsView } from "../ui/settings-view";
+import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
+import { goHome, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
 import { setMenuAvoid } from "../ui/more-menu";
 import { mountContextBar } from "../ui/context-bar";
@@ -62,10 +63,14 @@ import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
-import { isArchiveFile, runImport } from "../ui/archive-ui";
+import { isArchiveFile, runExport, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
+import { CameraHistory } from "./camera-history";
+import { mountTour } from "./tour";
+import { mountCommandPalette } from "../ui/command-palette";
+import type { Command } from "../ui/command-palette";
 import { sheetLabels } from "../render/sheet-label";
 import type { SheetLabel } from "../render/sheet-label";
 import { SettingsStore } from "../settings/settings";
@@ -263,6 +268,9 @@ async function start(): Promise<void> {
     // How long animations take: the speed choice, and shorter again for "subtle".
     const speed = { slow: 1.6, normal: 1, fast: 0.6 }[settings.get("ui.animSpeed")];
     root.style.setProperty("--anim-speed", String(m === "subtle" ? speed * 0.6 : speed));
+    // Gliding between views (ADR 0116): off for reduced motion, and in the test session (a test reads the camera the moment it asks).
+    const still = m === "reduce" || (m === "system" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    view.glideMs = debug || still ? 0 : Math.round(420 * (m === "subtle" ? speed * 0.6 : speed));
   };
   applyAppearance();
   applyZen();
@@ -504,7 +512,8 @@ async function start(): Promise<void> {
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);
-  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas));
+  const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
+  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -712,8 +721,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
   };
 
+  const history = new CameraHistory(view);
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     fit: (kind) => focusCycle.fit(kind),
+    canCameraBack: () => history.canBack(),
+    canCameraForward: () => history.canForward(),
+    cameraBack: () => history.back(),
+    cameraForward: () => history.forward(),
+    subscribeCamera: (fn) => history.subscribe(fn),
     hasSelection: () => editor.selection.size > 0,
     toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
     screenshot: () => void takeScreenshot(),
@@ -747,6 +762,16 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
 
+  /** Save the picked paths as an SVG file (ADR 0107). */
+  const saveSelectionSvg = (): void => {
+    const text = svgOfSelection(doc, editor);
+    if (text === null) {
+      editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
+      editor.changed();
+      return;
+    }
+    saveFile("canvast-shapes.svg", new Blob([text], { type: "image/svg+xml" }));
+  };
   const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
@@ -823,15 +848,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         });
       },
       canExportSvg: () => canExportSvg(doc, editor),
-      exportSvg: () => {
-        const text = svgOfSelection(doc, editor);
-        if (text === null) {
-          editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
-          editor.changed();
-          return;
-        }
-        saveFile("canvast-shapes.svg", new Blob([text], { type: "image/svg+xml" }));
-      },
+      exportSvg: () => saveSelectionSvg(),
       downloadFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind === "image") void downloadOriginal(assets, o.assetId);
@@ -929,6 +946,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
+  // Alt+Left and Alt+Right: previous and next view (ADR 0116), on the canvas.
+  window.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault(); // (not the browser's Back and Forward)
+    if (e.key === "ArrowLeft") history.back();
+    else history.forward();
+  });
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== settings.get("key.zen")) return;
@@ -1011,6 +1036,59 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     editor.changed();
   });
   mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
+
+  // The command palette (ADR 0117): Ctrl+K or Ctrl+Shift+P finds any command by words.
+  const palette = mountCommandPalette(() => {
+    const sel = editor.selection.size > 0;
+    const onCanvas = appView === "canvas";
+    const key = (k: string): string => k.toUpperCase();
+    const list: Command[] = [
+      ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(settings.get(TOOL_KEY_SETTING[t]) as string), enabled: () => onCanvas, run: () => editor.setTool(t) })),
+      { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
+      { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
+      { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
+      { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
+      { group: "Edit", title: "Select everything", keys: "Ctrl+A", words: "all", enabled: () => onCanvas, run: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)) },
+      { group: "Arrange", title: "Group", keys: "Ctrl+G", enabled: () => onCanvas && sel, run: () => groupSelection(doc, editor) },
+      { group: "Arrange", title: "Ungroup", keys: "Ctrl+Shift+G", enabled: () => onCanvas && sel, run: () => ungroupSelection(doc, editor) },
+      { group: "Arrange", title: "Put the selection on a sheet", keys: "Ctrl+Alt+G", words: "frame wrap", enabled: () => onCanvas && sel, run: () => sheetSelection(doc, editor) },
+      { group: "Arrange", title: "Release the sheet", words: "unframe", enabled: () => onCanvas && [...editor.selection].some((id) => isContainer(doc.get(id))), run: () => releaseSheets(doc, editor) },
+      { group: "Arrange", title: "Bring to front", keys: "Ctrl+]", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "front") },
+      { group: "Arrange", title: "Send to back", keys: "Ctrl+[", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "back") },
+      { group: "Arrange", title: "Detach from what it follows", enabled: () => onCanvas && canDetach(doc, editor), run: () => detachSelection(doc, editor) },
+      { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
+      { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
+      { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },
+      { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },
+      { group: "View", title: "Fit the selection in view", keys: "Alt", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
+      { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
+      { group: "View", title: "Previous view", keys: "Alt+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
+      { group: "View", title: "Next view", keys: "Alt+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
+      { group: "View", title: "Zen mode", keys: key(settings.get("key.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
+      { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
+      { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
+      { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
+      { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
+      { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
+      { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
+      { group: "Go to", title: "Assets view", words: "library", run: () => setView("assets") },
+      { group: "Go to", title: "Shortcuts", keys: "?", words: "keys keyboard help", run: () => { setView("settings"); settingsView.show("shortcuts"); } },
+      { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
+      { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
+      { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
+      ...SETTINGS_TABS.flatMap((t) => [
+        { group: "Settings", title: t.label, words: "preferences options", run: () => { setView("settings"); settingsView.show(t.id); } } as Command,
+        ...(t.rows ?? []).map((r): Command => ({ group: "Setting", title: `${r.label}`, words: `${t.label} ${r.help ?? ""}`, run: () => { setView("settings"); settingsView.show(t.id); } })),
+      ]),
+    ];
+    return list;
+  });
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.key.toLowerCase() !== "k" && !(e.shiftKey && e.key.toLowerCase() === "p"))) return;
+    if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault();
+    palette.open();
+  }, true);
 
   // "?" opens the shortcut list (not while typing).
   window.addEventListener("keydown", (e) => {

@@ -275,3 +275,96 @@ test("touch pinch zooms about a fractional finger centroid and returns", async (
   expect(maxDrift).toBeLessThan(LIMITS.anchorDriftPx);
   expect(distance(after, before)).toBeLessThan(LIMITS.roundTripPx);
 });
+
+test("previous view and next view: Alt+Left and Alt+Right go back to where the camera rested, gliding when it is on; a new move forgets what was ahead (ADR 0116)", async ({ app }) => {
+  const p = app.page;
+  const zoom = async () => {
+    const c = await app.camera();
+    return Number(c.zi) + Number(c.zf);
+  };
+  await p.evaluate(() => window.__canvastDebug.jump(6));
+  await p.waitForTimeout(900); // the camera rests: that is a place
+  await p.evaluate(() => window.__canvastDebug.jump(5));
+  await p.waitForTimeout(900);
+  expect(await zoom()).toBeCloseTo(11, 3);
+  await expect(p.getByRole("button", { name: "Previous view" })).toBeEnabled();
+  await p.keyboard.press("Alt+ArrowLeft");
+  expect(await zoom()).toBeCloseTo(6, 3);
+  await p.keyboard.press("Alt+ArrowLeft");
+  expect(await zoom()).toBeCloseTo(0, 3);
+  await expect(p.getByRole("button", { name: "Previous view" })).toBeDisabled();
+  await p.getByRole("button", { name: "Next view" }).click();
+  expect(await zoom()).toBeCloseTo(6, 3);
+  // a new move from the middle forgets the way forward
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+  await p.waitForTimeout(900);
+  await expect(p.getByRole("button", { name: "Next view" })).toBeDisabled();
+  // with gliding on, the view reaches the same place a moment later, never jumping past it
+  await p.evaluate(() => window.__canvastDebug.glide(250));
+  await p.keyboard.press("Alt+ArrowLeft");
+  await expect.poll(zoom, { timeout: 3000 }).toBeCloseTo(6, 3);
+  await p.evaluate(() => window.__canvastDebug.glide(0));
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a tour plays the bookmarks in order: Right and Left step, the bars fade, Escape ends it and brings them back (ADR 0116)", async ({ app }) => {
+  const p = app.page;
+  const zoom = async () => {
+    const c = await app.camera();
+    return Number(c.zi) + Number(c.zf);
+  };
+  await p.getByRole("button", { name: "Bookmarks" }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click(); // at home
+  await p.evaluate(() => window.__canvastDebug.jump(4));
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await p.evaluate(() => window.__canvastDebug.jump(4));
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await expect(p.locator("li.bookmark")).toHaveCount(3);
+  await p.getByRole("button", { name: "Play the bookmarks as a tour" }).click();
+  const cap = p.getByTestId("tour-caption");
+  await expect(cap).toContainText("1 / 3");
+  expect(await zoom()).toBeCloseTo(0, 3);
+  await p.keyboard.press("ArrowRight");
+  await expect(cap).toContainText("2 / 3");
+  expect(await zoom()).toBeCloseTo(4, 3);
+  await p.keyboard.press(" ");
+  await expect(cap).toContainText("3 / 3");
+  expect(await zoom()).toBeCloseTo(8, 3);
+  await p.keyboard.press("ArrowLeft");
+  expect(await zoom()).toBeCloseTo(4, 3);
+  expect(await p.evaluate(() => document.documentElement.dataset["zen"])).toBe("on");
+  await p.keyboard.press("Escape");
+  await expect(cap).toBeHidden();
+  expect(await p.evaluate(() => document.documentElement.dataset["zen"])).toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the command palette: Ctrl+K finds a command by its words, shows its key, offers only what can be done now, runs it with Enter and closes with Escape (ADR 0117)", async ({ app }) => {
+  const p = app.page;
+  const palette = p.getByTestId("command-palette");
+  await p.keyboard.press("Control+k");
+  await expect(palette).toBeVisible();
+  await expect(p.locator(".palette-input")).toBeFocused();
+  // nothing is selected: commands that need a selection are not offered
+  await p.locator(".palette-input").fill("delete");
+  await expect(palette.getByText("No command matches.")).toBeVisible();
+  await p.locator(".palette-input").fill("zoom in");
+  await expect(palette.locator(".palette-title").first()).toHaveText("Zoom in");
+  await expect(palette.locator("kbd").first()).toHaveText("+");
+  const z0 = Number((await app.camera()).zi);
+  await p.keyboard.press("Enter");
+  await expect(palette).toBeHidden();
+  await expect.poll(async () => Number((await app.camera()).zi) + Number((await app.camera()).zf)).toBeGreaterThan(z0);
+  // settings are found too, and open their tab
+  await p.keyboard.press("Control+k");
+  await p.locator(".palette-input").fill("animation");
+  await p.keyboard.press("ArrowDown");
+  await p.keyboard.press("ArrowUp");
+  await p.keyboard.press("Enter");
+  await expect(p.getByTestId("settings-search")).toBeVisible();
+  await p.keyboard.press("Control+k");
+  await expect(palette).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});

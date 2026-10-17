@@ -71,6 +71,12 @@ export interface HudStatus {
   /** Bring the selection, or everything visible at this zoom, into view (the buttons beside zoom in and out). */
   fit(kind: "selection" | "all"): void;
   hasSelection(): boolean;
+  /** Previous view and next view (ADR 0116): whether each is there, going, and a way to hear that they changed. */
+  canCameraBack(): boolean;
+  canCameraForward(): boolean;
+  cameraBack(): void;
+  cameraForward(): void;
+  subscribeCamera(fn: () => void): void;
   /** Zen mode (ADR 0075): the floating bars and panels fade out until the pointer is over them. */
   toggleZen(): void;
   /** Save a screenshot of the canvas to the library (ADR 0080). */
@@ -105,6 +111,9 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
       <span class="hud-sep" role="separator"></span>
+      <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Left)">${ICONS.cornerUpLeft}</button>
+      <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Right)">${ICONS.cornerUpRight}</button>
+      <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.frame}</button>
       <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
@@ -136,12 +145,23 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   };
   status.subscribeSelection(syncFit);
   syncFit();
+  const camBack = root.querySelector<HTMLButtonElement>('[data-action="cam-back"]')!;
+  const camFwd = root.querySelector<HTMLButtonElement>('[data-action="cam-fwd"]')!;
+  const syncCam = (): void => {
+    camBack.disabled = !status.canCameraBack();
+    camFwd.disabled = !status.canCameraForward();
+  };
+  status.subscribeCamera(syncCam);
+  view.subscribe(syncCam);
+  syncCam();
   root.querySelector(".hud-controls")!.addEventListener("click", (e) => {
     const action = (e.target as HTMLElement).closest("button")?.dataset["action"];
     if (action === "zoom-in") zoomByStep(view, 1);
     else if (action === "zoom-out") zoomByStep(view, -1);
     else if (action === "fit-selection") status.fit("selection");
     else if (action === "fit-all") status.fit("all");
+    else if (action === "cam-back") status.cameraBack();
+    else if (action === "cam-fwd") status.cameraForward();
     else if (action === "home") goHome(view);
     else if (action === "zen") status.toggleZen();
     else if (action === "screenshot") status.screenshot();

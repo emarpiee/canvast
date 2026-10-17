@@ -93,6 +93,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-down` | Move a board or canvas down in its list |
 | `scissors` | Eraser: cut parts out of strokes |
 | `copy-check` | Similar images (the library) |
+| `corner-up-left` | Previous view (camera history) |
+| `corner-up-right` | Next view (camera history) |
+| `projector` | Play the bookmarks as a tour |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

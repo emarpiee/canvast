@@ -69,7 +69,7 @@ export class BookmarkList {
     const b = this.items.find((x) => x.id === id);
     if (!b) return false;
     try {
-      this.view.setFrameCamera(deserializeFrameCamera(this.doc.space, b.view));
+      this.view.flyTo(deserializeFrameCamera(this.doc.space, b.view));
       return true;
     } catch {
       return false;

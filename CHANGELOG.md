@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- **Command palette** (Ctrl+K, ADR 0117); **previous and next view** (Alt+Left and Alt+Right and two buttons), **gliding** between views, and a **tour of the bookmarks** (ADR 0116).
+
 - **ZIP64** (ADR 0115): archives with more than 65,535 entries or 4 GiB or more are written and read; smaller ones are unchanged.
 
 - **Library filters** by size, ratio, orientation and colour (`width>1000`, `ratio:16x9`, `orientation:portrait`, `colour:red`), and a **Similar images** list that puts look-alikes side by side (ADR 0114).
