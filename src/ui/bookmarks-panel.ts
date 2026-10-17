@@ -10,7 +10,12 @@ import { moreButton, openMoreMenu } from "./more-menu";
  * the view as it is, with a fresh picture) and Delete. Hidden by default, like the Layers panel. Built for touch too: the buttons are
  * large, always shown on a touch screen, and the card never needs hover.
  */
-export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined, tour: () => void = () => undefined): void {
+export interface BookmarkThumbs {
+  /** Give bookmarks fresh pictures by visiting their places (ADR 0124): the ones named, or all of them. */
+  update(ids?: readonly string[]): void;
+}
+
+export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined, tour: () => void = () => undefined, thumbs: BookmarkThumbs = { update: () => undefined }): void {
   const panel = document.createElement("aside");
   panel.className = "layers-panel bookmarks-panel";
   panel.setAttribute("aria-label", "Bookmarks");
@@ -30,6 +35,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     if (!editor.bookmarksOpen) return;
     // A name being typed is not redrawn under the cursor.
     if (panel.querySelector("li.bookmark input")) return;
+    const missing = list.items.filter((b) => !b.thumb);
     const rows = list.items
       .map(
         (b) => `<li class="bookmark" data-id="${b.id}">
@@ -44,7 +50,9 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     panel.innerHTML = `
       <header><h2>Bookmarks <span class="layers-count">${list.items.length}</span></h2>
         <span class="layers-tools"><button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
+        <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.galleryThumbnails}</button>
         <button type="button" class="layer-btn" data-close aria-label="Hide the Bookmarks panel" title="Hide the Bookmarks panel">${ICONS.x}</button></span></header>
+      ${missing.length ? `<p class="bm-missing" data-testid="bm-missing"><span>${missing.length} bookmark${missing.length === 1 ? " has" : "s have"} no picture.</span><button type="button" data-fill>Fill in</button></p>` : ""}
       <ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`;
   };
   const schedule = (): void => {
@@ -100,6 +108,18 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       editor.changed();
     } else if (t.closest("[data-tour]")) {
       tour();
+    } else if (t.closest("[data-fill]")) {
+      thumbs.update(list.items.filter((b) => !b.thumb).map((b) => b.id));
+    } else if (t.closest("[data-thumbs]")) {
+      const missing = list.items.filter((b) => !b.thumb);
+      openMoreMenu(
+        t.closest<HTMLElement>("[data-thumbs]")!,
+        [
+          { label: `Update all ${list.items.length} pictures`, icon: ICONS.galleryThumbnails, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
+          { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
+        ],
+        "Update the bookmark pictures",
+      );
     } else if (t.closest("[data-add]")) {
       void list.add(capture());
     } else if (li && t.closest("[data-bm-more]")) {
@@ -119,6 +139,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
                 editor.changed();
               }),
           },
+          { label: "Update its picture", icon: ICONS.galleryThumbnails, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
           { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
         ],
         `Actions for bookmark ${name}`,

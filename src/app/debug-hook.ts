@@ -90,6 +90,9 @@ export interface DebugHook {
   canUndo(): boolean;
   canRedo(): boolean;
   flushSave(): Promise<string>;
+  /** The pictures of the bookmarks ("" where one has none), and taking them all away (to test filling them in). */
+  bookmarkThumbs(): string[];
+  dropBookmarkThumbs(): Promise<void>;
   saveStatus(): string;
   /** Workspace/session state for storage tests. */
   session(): {
@@ -341,6 +344,11 @@ export function installDebugHook(
     },
     canUndo: () => doc.canUndo,
     canRedo: () => doc.canRedo,
+    bookmarkThumbs: () => session.persistence.bookmarks.map((b) => b.thumb ?? ""),
+    dropBookmarkThumbs: async () => {
+      await session.persistence.saveBookmarks(session.persistence.bookmarks.map(({ thumb: _t, ...b }) => b));
+      editor.changed();
+    },
     flushSave: async () => {
       await writer.flush();
       await writer.saveCamera();

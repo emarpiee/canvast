@@ -49,6 +49,7 @@ import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
 import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
 import { BookmarkList, captureThumb } from "./bookmarks";
+import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
@@ -536,7 +537,7 @@ async function start(): Promise<void> {
     if (key === "panel.autoFold" || key === "panel.keep") dock.apply();
   });
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
-  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
+  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) });
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -841,6 +842,36 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     save: (hex) => void session.styles.add("colour", "", hex).then((made) => made && ((editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`), editor.changed())),
   });
   const history = new CameraHistory(view);
+  // Fresh pictures for the bookmarks (ADR 0124): the canvas visits each place, one at a time, and comes back.
+  let thumbsRunning = false;
+  const refreshThumbs = async (ids?: readonly string[]): Promise<void> => {
+    const list = ids ? bookmarkList.items.filter((b) => ids.includes(b.id)) : bookmarkList.items;
+    if (thumbsRunning || !list.length || appView !== "canvas") return;
+    thumbsRunning = true;
+    try {
+      await updateThumbs({
+        bookmarks: list,
+        space: doc.space,
+        canvas,
+        getCamera: () => view.frameCamera,
+        setCamera: (fc) => view.setFrameCamera(fc),
+        renderClean: () => void renderNow({ pattern: true, overlays: false, transparent: false }),
+        assetsIdle: () => {
+          const q = assets.decodeLoad();
+          return q.running + q.queued === 0;
+        },
+        hold: (on) => history.hold(on),
+        save: (thumbs) => bookmarkList.setThumbs(thumbs),
+        say: (text) => {
+          editor.message = text;
+          editor.changed();
+        },
+        redraw: () => invalidate(),
+      });
+    } finally {
+      thumbsRunning = false;
+    }
+  };
   editor.subscribe(() => {
     if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
     document.body.classList.toggle("is-cropping", editor.cropId !== null); // (the floating bars and panels step aside, ADR 0118)

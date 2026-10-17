@@ -2360,3 +2360,10 @@ label[data-scrubbable] input { cursor: text; user-select: text; }
 .dock-zone[hidden] { display: none; }
 .dock-zone.is-left { left: 0; }
 .dock-zone.is-right { right: 0; }
+
+/* Bookmark pictures (app/bookmark-thumbs.ts, ADR 0124) */
+.thumb-veil { position: fixed; inset: 0; z-index: var(--z-pop); display: grid; place-items: end center; padding-bottom: var(--sp-15); background: color-mix(in oklch, var(--hud-bg) 30%, transparent); cursor: progress; }
+.thumb-veil p { margin: 0; padding: var(--sp-4) var(--sp-8); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); box-shadow: var(--hud-lift); font: var(--font-control); }
+.bm-missing { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin: var(--sp-3) var(--sp-4) 0; padding: var(--sp-3) var(--sp-4); background: var(--hud-hover); border-radius: var(--r-md); color: var(--hud-muted); font: var(--font-meta); }
+.bm-missing span { flex: 1; min-width: 0; }
+.bm-missing button { flex: none; white-space: nowrap; height: var(--sp-11); padding: 0 var(--sp-5); background: var(--hud-accent); color: var(--hud-accent-fg); border: 0; border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }

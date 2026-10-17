@@ -60,6 +60,12 @@ export class BookmarkList {
     await this.set(this.items.map((b) => (b.id === id ? { ...b, view, ...(thumb ? { thumb } : {}), at: Date.now() } : b)));
   }
 
+  /** Give bookmarks new pictures (by id), keeping their places, names and dates: one write for all. */
+  async setThumbs(thumbs: ReadonlyMap<string, string>): Promise<void> {
+    if (!thumbs.size) return;
+    await this.set(this.items.map((b) => (thumbs.has(b.id) ? { ...b, thumb: thumbs.get(b.id)! } : b)));
+  }
+
   async remove(id: string): Promise<void> {
     await this.set(this.items.filter((b) => b.id !== id));
   }

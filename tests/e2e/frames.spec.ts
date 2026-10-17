@@ -1206,7 +1206,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   const mb = (await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).boundingBox())!;
   expect(mb.x + mb.width).toBeLessThanOrEqual(pbox.x + pbox.width - 4);
   await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).click();
-  await expect(p.getByRole("menuitem")).toHaveText(["Rename", "Update to the current view", "Delete"]);
+  await expect(p.getByRole("menuitem")).toHaveText(["Rename", "Update to the current view", "Update its picture", "Delete"]);
   await p.keyboard.press("Escape");
   await expect(p.getByRole("menu")).toHaveCount(0);
   // Rename with the button (no double-click needed), and the card shows when it was saved.
@@ -1822,7 +1822,8 @@ test("panels stack without squeezing each other; many layers get a filter, the l
   const tb = (await tags.boundingBox())!;
   const lb2 = (await layers.boundingBox())!;
   const bb2 = (await bookmarks.boundingBox())!;
-  expect(tb.y, "stacked, not overlapping").toBeGreaterThanOrEqual(bb2.y + bb2.height - 1);
+  // The dock puts the last used panel on top, so either order is fine as long as they do not overlap.
+  expect(tb.y >= bb2.y + bb2.height - 1 || bb2.y >= tb.y + tb.height - 1, "stacked, not overlapping").toBe(true);
   expect(tb.y + tb.height, "clear of the bottom controls").toBeLessThan(vh - 60);
   expect(lb2.height, "Layers keeps a usable list").toBeGreaterThan(150);
   expect(app.consoleErrors).toEqual([]);

@@ -36,7 +36,17 @@ export class CameraHistory {
     for (const fn of this.listeners) fn();
   }
 
+  private held = false;
+
+  /** While held, camera moves are not remembered (a job that visits places and comes back, such as updating the bookmark pictures). */
+  hold(on: boolean): void {
+    this.held = on;
+    window.clearTimeout(this.timer);
+    this.timer = 0;
+  }
+
   private moved(): void {
+    if (this.held) return;
     window.clearTimeout(this.timer);
     this.timer = window.setTimeout(() => this.settle(), this.idleMs);
   }

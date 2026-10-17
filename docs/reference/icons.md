@@ -18,6 +18,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `bell` | Show a sample notice (developer tools) |
 | `blocks` | Arrange and align |
 | `swatchBook` | Styles panel |
+| `galleryThumbnails` | Bookmarks panel: Update the pictures of the bookmarks |
 | `slidersHorizontal` | Styles panel: Adjustments tab |
 | `blend` | Styles panel: Gradients tab |
 | `droplet` | Styles panel: Colours tab |
