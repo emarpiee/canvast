@@ -93,9 +93,13 @@ const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z 
 
 /** The selection as units (a group at the level being worked at, else one object) in one frame, without locked ones. */
 function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, { name: string; date: number }>): Unit[] | string {
-  const objs = selected(doc, editor).filter((o) => !o.locked);
+  // (a boolean group's result is derived from its shapes and never moves by itself)
+  const objs = selected(doc, editor).filter((o) => !o.locked && !isResult(o));
   if (new Set(objs.map((o) => o.frame?.id ?? 0)).size > 1) return "These items are in different spaces; arrange them one space at a time.";
-  const level = editor.entered.length;
+  let level = editor.entered.length;
+  // Shapes picked inside one boolean group (in the Layers list, say, without entering it) are lined up with each other, not as the one unit the group is.
+  const gid = objs[0]?.groups?.[level];
+  if (gid && objs.length >= 2 && objs.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid])) level += 1;
   const byUnit = new Map<string, CanvasObject[]>();
   for (const o of objs) {
     const k = unitKey(o, level);

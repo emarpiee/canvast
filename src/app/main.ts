@@ -52,6 +52,7 @@ import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
 import { mountHintLine } from "../ui/hint-line";
+import { setMenuAvoid } from "../ui/more-menu";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { confirmDialog } from "../ui/confirm";
@@ -715,6 +716,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
 
   const fileKinds = new Map<string, { card: boolean; open: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
+  // Menus and pickers keep off the selected items.
+  setMenuAvoid(() => {
+    const b = editor.selectionBoxOnScreen;
+    if (!b || editor.selection.size === 0) return null;
+    const xs = b.frame.corners.map((c) => c[0]);
+    const ys = b.frame.corners.map((c) => c[1]);
+    return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+  });
   hintLine.current = mountHintLine(editor, doc, () => settings.get("ui.hints"));
   const contextBar = mountContextBar(
     host,

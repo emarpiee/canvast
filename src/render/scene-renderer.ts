@@ -557,13 +557,15 @@ function drawSelection(
     ctx.fillStyle = theme.handleFill;
     ctx.lineWidth = 1.25;
     const handles: Array<[number, number]> = [...frame.corners.map((c) => [c[0], c[1]] as [number, number])];
-    if (frame.angle === 0) {
-      // The middle of each side, when the side is long enough to hold a handle beside the corners (tools.ts resizeHandles).
+    {
+      // The middle of each side, turned box or not, when the side is long enough to hold a handle beside the corners (tools.ts resizeHandles).
       const [c0, c1, c2, c3] = frame.corners;
-      if (Math.abs(c1![0] - c0![0]) >= 3 * HANDLE_SIZE_PX && Math.abs(c3![1] - c0![1]) >= 3 * HANDLE_SIZE_PX) {
-        handles.push([(c0![0] + c1![0]) / 2, c0![1]], [(c3![0] + c2![0]) / 2, c3![1]], [c1![0], (c1![1] + c2![1]) / 2], [c0![0], (c0![1] + c3![1]) / 2]);
+      if (Math.hypot(c1![0] - c0![0], c1![1] - c0![1]) >= 3 * HANDLE_SIZE_PX && Math.hypot(c3![0] - c0![0], c3![1] - c0![1]) >= 3 * HANDLE_SIZE_PX) {
+        const mid = (a: readonly number[], b: readonly number[]): [number, number] => [(a[0]! + b[0]!) / 2, (a[1]! + b[1]!) / 2];
+        handles.push(mid(c0!, c1!), mid(c3!, c2!), mid(c1!, c2!), mid(c0!, c3!));
       }
     }
+    editor.drawnHandles = handles;
     for (const [x, y] of handles) {
       const h = HANDLE_SIZE_PX;
       ctx.fillRect(x - h / 2, y - h / 2, h, h);

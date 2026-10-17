@@ -138,6 +138,8 @@ export class EditorState {
   /** The shape whose corner radius dots are opened out to one per corner (a double-click or long press on the main dot); closes when another is picked. */
   /** Shapes lit up on the canvas while the pointer is on a colour that they use (Selection colours). */
   highlight: ReadonlySet<ObjectId> | null = null;
+  /** The resize handles of the selection box as last drawn (screen px): the corners, then the middles of the sides when they fit. */
+  drawnHandles: Array<[number, number]> = [];
   /** A few words beside a handle that is being dragged ("Radius 12", "Count 8"). */
   handleLabel: { x: number; y: number; text: string } | null = null;
   cornersOpen: ObjectId | null = null;

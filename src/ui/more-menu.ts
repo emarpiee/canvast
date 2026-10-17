@@ -36,14 +36,42 @@ export function closeMoreMenu(refocus = false): void {
   if (refocus && anchor.isConnected) anchor.focus();
 }
 
-/** Keep a menu inside the window, under its button (above it when there is no room), right edges aligned. */
+/** What a menu or popover should not cover: the box of the selected items on screen (set by the app), or null. */
+let avoidBox: () => { left: number; top: number; right: number; bottom: number } | null = () => null;
+export const setMenuAvoid = (f: typeof avoidBox): void => {
+  avoidBox = f;
+};
+
+/**
+ * Keep a menu inside the window, under its button (above it when there is no room), right edges aligned; and not over the selected items:
+ * if that is where it would land it goes beside them instead (right, then left), or as far from them as the window allows.
+ */
 export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const r = anchor.getBoundingClientRect();
   const w = menu.offsetWidth;
   const h = menu.offsetHeight;
-  const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w));
+  const gap = 8;
+  const left0 = Math.max(gap, Math.min(window.innerWidth - w - gap, r.right - w));
   let top = r.bottom + 4;
-  if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 4 - h);
+  if (top + h > window.innerHeight - gap) top = Math.max(gap, r.top - 4 - h);
+  let left = left0;
+  const avoid = avoidBox();
+  if (avoid) {
+    const overlap = (l: number, t: number): number => Math.max(0, Math.min(l + w, avoid.right + gap) - Math.max(l, avoid.left - gap)) * Math.max(0, Math.min(t + h, avoid.bottom + gap) - Math.max(t, avoid.top - gap));
+    const fit = (l: number, t: number): { l: number; t: number } => ({ l: Math.max(gap, Math.min(window.innerWidth - w - gap, l)), t: Math.max(gap, Math.min(window.innerHeight - h - gap, t)) });
+    const options = [
+      { l: left0, t: top },
+      fit(left0, r.top - 4 - h),
+      fit(left0, r.bottom + 4),
+      fit(avoid.right + gap * 2, top),
+      fit(avoid.left - gap * 2 - w, top),
+      fit(avoid.right + gap * 2, avoid.top),
+      fit(avoid.left - gap * 2 - w, avoid.top),
+    ];
+    const best = options.reduce((a, b) => (overlap(b.l, b.t) < overlap(a.l, a.t) ? b : a));
+    left = best.l;
+    top = best.t;
+  }
   // A menu inside a blurred or transformed panel is placed against that panel, not the window: measure where (0, 0) really is and correct for it.
   menu.style.left = "0px";
   menu.style.top = "0px";

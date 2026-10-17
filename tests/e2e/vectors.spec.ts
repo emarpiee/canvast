@@ -1570,6 +1570,11 @@ test("a turned shape can be stretched along its own sides: the side handles stay
   await app.frame();
   f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
   expect(Math.abs(f.angle)).toBeGreaterThan(0.2);
+  // drawn: the four corners and the middle of each side, also when it is turned
+  const shown = await p.evaluate(() => window.__canvastDebug.drawnHandles());
+  expect(shown).toHaveLength(8);
+  const mids = [[0, 1], [1, 2], [2, 3], [3, 0]].map(([a, b]) => [(f.corners[a!]![0] + f.corners[b!]![0]) / 2, (f.corners[a!]![1] + f.corners[b!]![1]) / 2]);
+  for (const m of mids) expect(shown.some((h) => Math.hypot(h[0] - m[0]!, h[1] - m[1]!) < 1)).toBe(true);
   const before = (await last(app)) as T;
   const w0 = size(before).w, h0 = size(before).h;
   const c = f.corners;
@@ -1609,6 +1614,37 @@ test("a boolean group's corner radius updates live while it is dragged, like a p
   await app.frame();
   expect(await px(507, 307)).not.toEqual(corner);
   expect((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!.sub[0]!.n.length / 6).toBeGreaterThan(8);
+});
+
+test("align works on the shapes of a boolean group, and menus keep off the selected items", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { result?: string };
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const members = async () => ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
+  const centreX = (o: G) => (o.sub[0]!.n[0]! + o.sub[0]!.n[6]!) / 2 * 2 ** o.unit + parseFloat(o.ax.replace("p", "e")) * 0; // (local, in the object's own units)
+  void centreX;
+  const before = (await members()).map((o) => o.ax);
+  expect(new Set(before).size).toBe(2);
+  // the arrange menu does not cover the selection
+  await p.locator('[data-ctx="layout"]').click();
+  const menu = (await p.locator(".ctx-layout-menu").boundingBox())!;
+  const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const xs = f.corners.map((c) => c[0]), ys = f.corners.map((c) => c[1]);
+  const overlaps = menu.x < Math.max(...xs) && menu.x + menu.width > Math.min(...xs) && menu.y < Math.max(...ys) && menu.y + menu.height > Math.min(...ys);
+  expect(overlaps, "the menu is off the selected shapes").toBe(false);
+  await p.getByRole("menuitem", { name: "Centre" }).click();
+  await app.frame();
+  const after = await members();
+  // each member now has its middle at the same x on the screen
+  const boxes = await Promise.all(after.map((o) => screenBox(app, o.id)));
+  expect(Math.abs((boxes[0]!.minX + boxes[0]!.maxX) / 2 - (boxes[1]!.minX + boxes[1]!.maxX) / 2)).toBeLessThan(1);
 });
 
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {

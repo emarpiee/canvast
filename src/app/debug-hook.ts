@@ -125,6 +125,8 @@ export interface DebugHook {
   selectionFrame(): { angle: number; corners: Array<[number, number]> } | null;
   /** Where the main corner radius dot and each corner's own dot are on screen for the one picked shape (null: none). */
   cornerDots(): { main: [number, number]; corners: Array<[number, number]>; count: [number, number] | null; countCentre: [number, number] | null } | null;
+  /** The resize handles of the selection box as last drawn. */
+  drawnHandles(): Array<[number, number]>;
   /** The words beside a handle being dragged, or null. */
   handleLabel(): string | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
@@ -400,6 +402,7 @@ export function installDebugHook(
       return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
     },
     handleLabel: () => editor.handleLabel?.text ?? null,
+    drawnHandles: () => editor.drawnHandles.map(([x, y]) => [x, y] as [number, number]),
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),
