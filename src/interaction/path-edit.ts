@@ -201,3 +201,76 @@ export function moveGradientHandle(o: PathObject, g: Gradient, handle: GradHandl
   const side = l.type === "radial" && g.r > 0 ? l.R / g.r : 1;
   return { ...g, r: Math.max(0.005, Math.hypot(x - (l.type === "radial" ? l.cx : 0), y - (l.type === "radial" ? l.cy : 0)) / side) };
 }
+
+
+/**
+ * The two handles that change a shape's numbers on the canvas: a dot inside its first corner that sets the corner radius (drag towards the
+ * middle for more), and, on a star, the first inner corner, dragged along its spoke for the ratio. null when the object has neither.
+ * Positions are where they are on screen (a turned shape's are the turned ones); the sharp base is what they are measured on.
+ */
+export interface CornerHandles {
+  radius: { x: number; y: number; cx: number; cy: number; ux: number; uy: number; sinHalf: number; px: number } | null;
+  ratio: { x: number; y: number; cx: number; cy: number; outer: number } | null;
+}
+
+const MIN_DOT_PX = 18;
+
+export function cornerHandles(po: ProjectedObject): CornerHandles | null {
+  const o = po.obj as PathObject;
+  if (po.cover || o.kind !== "path" || o.result !== undefined) return null;
+  const sub = editSubs(o)[0];
+  if (!sub || nodeCount(sub) < 3) return null;
+  const c = nodeCount(sub);
+  const p = po.proj;
+  const at = (k: number): [number, number] => [exactX(p, sub.n[((k + c) % c) * NODE]!), exactY(p, sub.n[((k + c) % c) * NODE + 1]!)];
+  const sharp = (k: number): boolean => {
+    const b = ((k + c) % c) * NODE;
+    return sub.n[b + 2] === sub.n[b] && sub.n[b + 3] === sub.n[b + 1] && sub.n[b + 4] === sub.n[b] && sub.n[b + 5] === sub.n[b + 1];
+  };
+  let radius: CornerHandles["radius"] = null;
+  for (let k = sub.closed ? 0 : 1; k < (sub.closed ? c : c - 1); k++) {
+    if (!(sharp(k) && sharp(k - 1) && sharp(k + 1))) continue;
+    const [px, py] = at(k);
+    const [ax, ay] = at(k - 1);
+    const [bx, by] = at(k + 1);
+    const l1 = Math.hypot(ax - px, ay - py), l2 = Math.hypot(bx - px, by - py);
+    if (!(l1 > 0 && l2 > 0)) continue;
+    const e1x = (ax - px) / l1, e1y = (ay - py) / l1, e2x = (bx - px) / l2, e2y = (by - py) / l2;
+    let ux = e1x + e2x, uy = e1y + e2y;
+    const ul = Math.hypot(ux, uy);
+    if (ul < 1e-6) continue;
+    ux /= ul;
+    uy /= ul;
+    const theta = Math.acos(Math.max(-1, Math.min(1, e1x * e2x + e1y * e2y)));
+    const sinHalf = Math.sin(theta / 2);
+    const rLocal = typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[k] ?? 0) : 0;
+    const rPx = rLocal * p.ppu;
+    const d = Math.max(MIN_DOT_PX, Math.min(rPx / sinHalf, Math.min(l1, l2) / 2 / Math.max(1e-6, Math.cos(theta / 2))));
+    radius = { x: px + ux * d, y: py + uy * d, cx: px, cy: py, ux, uy, sinHalf, px: rPx };
+    break;
+  }
+  let ratio: CornerHandles["ratio"] = null;
+  if (o.shape === "star" && o.params && c >= 6 && c % 2 === 0) {
+    let mx = 0, my = 0;
+    for (let k = 0; k < c; k += 2) {
+      const [x, y] = at(k);
+      mx += x;
+      my += y;
+    }
+    mx /= c / 2;
+    my /= c / 2;
+    const [ox, oy] = at(0);
+    const [ix, iy] = at(1);
+    ratio = { x: ix, y: iy, cx: mx, cy: my, outer: Math.hypot(ox - mx, oy - my) };
+  }
+  const out: CornerHandles = { radius, ratio };
+  return radius || ratio ? (Math.abs(radius?.x ?? 0) < FAR && Math.abs(radius?.y ?? 0) < FAR ? out : null) : null;
+}
+
+/** Which of the two handles a press takes. */
+export function hitCornerHandle(h: CornerHandles, x: number, y: number): "radius" | "ratio" | null {
+  const d = (q: { x: number; y: number } | null): number => (q ? Math.hypot(q.x - x, q.y - y) : Infinity);
+  const dr = d(h.radius), di = d(h.ratio);
+  if (Math.min(dr, di) > NODE_REACH_PX) return null;
+  return dr <= di ? "radius" : "ratio";
+}

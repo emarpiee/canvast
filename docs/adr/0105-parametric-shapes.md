@@ -23,10 +23,12 @@ Accepted (v0.17.0).
 
 **Rounding** (`roundCorners`): a circular arc as a cubic of the standard handle length; the tangent length is cut so each corner uses at most half of each adjacent line.
 
-**One field, no new buttons.** *Radius* sits in the options bar of Select and Edit nodes, shown only when a picked path has corners; it takes one value or four. Sides, Points and Ratio appear only for a picked polygon or star. Nothing is added to the selection bar, the rail or the Shape tool.
+**One field, no new buttons.** *Radius* sits in the options bar of Select and Edit nodes, shown only when a picked path has corners; it takes one value or four. Sides, Points and Ratio appear only for a picked polygon or star. Nothing is added to the selection bar, the rail or the Shape tool; the dots appear only on the picked shape.
+
+**Setting numbers without typing.** Dragging the *name* of a number (Radius, Sides, Points, Ratio) changes it live, one undo step when released (`data-scrub`; a plain click still goes to the field). On the canvas a picked shape shows a **dot inside its first corner** (drag towards the middle for a bigger radius; delta-based, so it never jumps) and a star a handle on its **first inner corner** (drag along the spoke for the ratio). Both preview through a `replace` preview (the changed objects shown, stored once on release), the same path the scrub uses. The dots show on the Select tool for one picked shape; the hint line names them.
 
 ## Not done
-Corners next to curved edges, a radius handle on the canvas, smoothing other than circular arcs (continuous curvature), per-node radii on a general path (the model allows an array; only rectangles get the field), an ellipse's arc and inner radius.
+Corners next to curved edges, smoothing other than circular arcs (continuous curvature), per-node radii on a general path (the model allows an array; only rectangles get the field), an ellipse's arc and inner radius.
 
 ## Tests
 `tests/unit/shape-params.test.ts` (a drawn shape fills its box; sides, points, ratio remake it in the same box; the radius rounds, keeps a rectangle's bounds, is cut down to a pill; open paths untouched; legacy shapes found out, hand-edited ones refused; stretching scales box and radius; saved and bad numbers refused), `tests/e2e/vectors.spec.ts` ("shapes stay editable": sides with undo and redo, radius, saved over a reload; a star's points and ratio; a rectangle's corner cut away; a node moved by hand ends it).

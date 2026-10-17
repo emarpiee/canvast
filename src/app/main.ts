@@ -547,7 +547,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const o = selectedShape(doc, editor);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
     },
-    shapeSelected: (change) => commitShape(doc, editor, change),
+    shapeSelected: (change, final = true) => commitShape(doc, editor, change, final),
     selectedCorners: () => {
       const o = selectedCorners(doc, editor);
       if (!o) return null;
@@ -556,12 +556,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (!(ppu > 0 && ppu < Infinity)) return { radiusPx: [0], perCorner: o.perCorner };
       return { radiusPx: typeof o.radius === "number" ? [o.radius * ppu] : o.radius.map((v) => v * ppu), perCorner: o.perCorner };
     },
-    cornersSelected: (px) => {
+    cornersSelected: (px, final = true) => {
       const visible = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
       commitCorners(doc, editor, px, (id) => {
         const po = visible.find((p) => p.obj.id === id);
         return po && !po.cover ? po.proj.ppu : 0;
-      });
+      }, final);
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
     copyMarkdown: () => {

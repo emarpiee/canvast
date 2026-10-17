@@ -9,7 +9,7 @@ import { projectObject } from "./projection";
 import { batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
-import { gradientHandles, nodesOnScreen } from "../interaction/path-edit";
+import { cornerHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
@@ -287,6 +287,7 @@ export function drawOverlays(
 
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
+  if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme);
   if (editor.tool === "select" || editor.tool === "node") drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
 
   if (editor.lasso && editor.lasso.length >= 4) {
@@ -344,6 +345,31 @@ function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedOb
     ctx.fillStyle = on ? theme.selection : theme.handleFill;
     ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
     ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
+  }
+  ctx.restore();
+}
+
+/** The corner radius dot, and a star's ratio handle, of the one picked shape (ADR 0105). */
+function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
+  if (selected.length !== 1 || selected[0]!.obj.kind !== "path" || editor.selection.size !== 1) return;
+  const h = cornerHandles(selected[0]!);
+  if (!h) return;
+  ctx.save();
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = theme.selection;
+  ctx.fillStyle = theme.handleFill;
+  if (h.radius) {
+    ctx.beginPath();
+    ctx.arc(h.radius.x, h.radius.y, HANDLE_SIZE_PX / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  if (h.ratio) {
+    ctx.fillStyle = theme.selection;
+    ctx.beginPath();
+    ctx.arc(h.ratio.x, h.ratio.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }

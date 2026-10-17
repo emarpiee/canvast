@@ -12,7 +12,7 @@ import { editSubs, homeObject, newObjectId } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, roundCorners, splitSegment, toggleSmooth, withNode } from "../doc/path";
-import { gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
+import { cornerHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -31,7 +31,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -145,6 +145,8 @@ type Gesture =
   | { kind: "text"; pointerId: number; start: ScreenPoint }
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
+  /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "radius" | "ratio"; r0: number; proj0: number }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -568,6 +570,31 @@ export function attachTools(
     g = { kind: "grad", pointerId: e.pointerId, id: tgt.o.id, which: h.which, handle, g: h.g };
     return true;
   };
+  /** A press on the corner radius dot or the star's ratio handle of the one picked shape takes it. */
+  const startCornerPress = (e: PointerEvent, s: ScreenPoint): boolean => {
+    const tgt = nodeTarget();
+    if (!tgt || editor.blockEdit() || editor.tool !== "select") return false;
+    const h = cornerHandles(tgt.po);
+    const what = h && hitCornerHandle(h, s.x, s.y);
+    if (!h || !what) return false;
+    const r = h.radius;
+    g = { kind: "round", pointerId: e.pointerId, id: tgt.o.id, what, r0: r?.px ?? 0, proj0: r ? (s.x - r.cx) * r.ux + (s.y - r.cy) * r.uy : 0 };
+    return true;
+  };
+  const updateCorner = (s: ScreenPoint, final: boolean): void => {
+    if (g.kind !== "round") return;
+    const tgt = nodeTarget();
+    const h = tgt && cornerHandles(tgt.po);
+    if (!tgt || !h) return;
+    if (g.what === "radius" && h.radius) {
+      const r = h.radius;
+      const proj = (s.x - r.cx) * r.ux + (s.y - r.cy) * r.uy;
+      commitCorners(doc, editor, [Math.max(0, g.r0 + (proj - g.proj0) * r.sinHalf)], () => tgt.po.proj.ppu, final);
+    } else if (g.what === "ratio" && h.ratio) {
+      const q = h.ratio;
+      commitShapeNumbers(doc, editor, { inner: Math.max(0.05, Math.min(0.95, Math.hypot(s.x - q.cx, s.y - q.cy) / Math.max(1e-6, q.outer))) }, final);
+    }
+  };
   const updateGradient = (s: ScreenPoint): void => {
     if (g.kind !== "grad") return;
     const tgt = gradientTarget();
@@ -650,7 +677,7 @@ export function attachTools(
 
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
-    if (startGradientPress(e, s)) return;
+    if (startGradientPress(e, s) || startCornerPress(e, s)) return;
     const vis = visible();
     // Rotate and resize handles take priority when a selection is visible.
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
@@ -1054,6 +1081,9 @@ export function attachTools(
       case "grad":
         updateGradient(s);
         break;
+      case "round":
+        updateCorner(s, false);
+        break;
       case "shape":
         updateShape(s, e);
         break;
@@ -1151,6 +1181,10 @@ export function attachTools(
         else commitPaint(doc, editor, { [g.which]: p[g.which] as Gradient });
         break;
       }
+      case "round":
+        if (cancelled) editor.preview = { kind: "none" };
+        else updateCorner(s, true);
+        break;
       case "shape":
         commitShape(s, cancelled, e, g.start);
         break;

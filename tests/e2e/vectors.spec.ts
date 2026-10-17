@@ -997,6 +997,63 @@ test("corner radius on every kind of shape: one value or four on a rectangle, an
   expect(await nodes((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!)).toBe(8);
 });
 
+test("numbers without typing: drag a name (Radius, Points, Ratio) or a dot on the canvas; live, one undo step", async ({ app }) => {
+  const p = app.page;
+  type P = Obj & { radius?: number | number[]; params?: { inner?: number; tips?: number } };
+  const lastP = async () => (await last(app)) as P;
+  const labelBox = async (name: string) => (await p.locator(`[data-scrub="${name}"]`).boundingBox())!;
+  // a rectangle: drag the Radius name to the right
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await key(app, "v");
+  await click(app, 600, 360);
+  const lb = await labelBox("radius");
+  await p.mouse.move(lb.x + 8, lb.y + lb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(lb.x + 8 + 20, lb.y + lb.height / 2, { steps: 4 });
+  expect((await lastP()).radius).toBeUndefined(); // shown while dragging, not stored yet
+  await p.mouse.move(lb.x + 8 + 30, lb.y + lb.height / 2, { steps: 4 });
+  await p.mouse.up();
+  await app.frame();
+  expect((await lastP()).radius as number).toBeGreaterThan(20);
+  expect(await p.locator("[data-sel-radius]").inputValue()).toMatch(/^\d+(\.\d+)?$/);
+  await key(app, "Control+z");
+  expect((await lastP()).radius).toBeUndefined(); // one step
+  await key(app, "Control+Shift+z");
+
+  // the dot inside the corner: drag it towards the middle
+  const before = (await lastP()).radius as number;
+  await drag(app, [500 + before, 300 + before], [530 + before, 330 + before]); // (the dot is at the middle of the corner's arc)
+  expect((await lastP()).radius as number).toBeGreaterThan(before + 5);
+  await key(app, "Control+z");
+  expect((await lastP()).radius as number).toBeCloseTo(before, 6);
+
+  // a star: the Points name, and the handle on its first inner corner
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [800, 300], [960, 460]);
+  await key(app, "v");
+  await click(app, 880, 390);
+  const pb = await labelBox("tips");
+  await p.mouse.move(pb.x + 8, pb.y + pb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(pb.x + 8 + 48, pb.y + pb.height / 2, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  expect((await lastP()).params!.tips).toBe(9); // 4 more at 12 px each
+  const star = await lastP();
+  const box = await screenBox(app, star.id);
+  const w = box.maxX - box.minX;
+  // inner corner 1 sits at -90 + 180/9 = -70 degrees from the top, at the ratio of the radius, about the middle of the box
+  const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
+  const inner0 = star.params!.inner!;
+  const R = w / 2;
+  const hx = cx + Math.cos((-70 * Math.PI) / 180) * R * inner0;
+  const hy = cy + Math.sin((-70 * Math.PI) / 180) * R * inner0;
+  await drag(app, [hx, hy], [cx + (hx - cx) * 0.4, cy + (hy - cy) * 0.4]);
+  expect((await lastP()).params!.inner!).toBeLessThan(inner0 - 0.1);
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");

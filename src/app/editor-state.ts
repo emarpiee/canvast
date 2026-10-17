@@ -32,7 +32,9 @@ export type Preview =
   /** Nodes of one path being dragged (ADR 0099): the path as it would be (a turned path is baked, so `rot` goes). */
   | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[] }
   /** The fill and/or outline of paths being changed in the colour picker (ADR 0099); committed once when the picker settles. */
-  | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null };
+  | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null }
+  /** Objects shown as they would be after a change being dragged (a corner radius, a star's ratio): replaced whole, stored once when it ends. */
+  | { kind: "replace"; ids: readonly ObjectId[]; objs: ReadonlyMap<ObjectId, CanvasObject> };
 
 /** A shape being dragged out (the Shape tool): its box in local units of its own anchor, like a stroke's draft. */
 export interface DraftShape {
@@ -201,6 +203,7 @@ export class EditorState {
   previewed(o: CanvasObject): CanvasObject | null {
     const p = this.preview;
     if (p.kind === "edit" && p.ids.includes(o.id)) return null;
+    if (p.kind === "replace") return p.objs.get(o.id) ?? o;
     if (p.kind === "paint" && p.ids.includes(o.id) && o.kind === "path") {
       return { ...o, ...(p.fill !== undefined ? { fill: p.fill } : {}), ...(p.stroke !== undefined ? { stroke: p.stroke } : {}) };
     }

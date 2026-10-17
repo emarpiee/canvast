@@ -38,11 +38,11 @@ export interface ToolbarActions {
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
-  shapeSelected(change: { sides?: number; tips?: number; inner?: number }): void;
+  shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
   /** The corner radius (px at this zoom) of the first picked path that has corners to round; `perCorner`: a rectangle, which takes one per corner. */
   selectedCorners(): { radiusPx: number[]; perCorner: boolean } | null;
   /** Round the corners of the picked paths: one value, or four for a rectangle (top left, top right, bottom right, bottom left). */
-  cornersSelected(px: number[]): void;
+  cornersSelected(px: number[], final?: boolean): void;
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
 }
@@ -142,10 +142,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <label class="tb-count" data-sel-radius-wrap hidden>Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. A rectangle also takes four values: top left, top right, bottom right, bottom left."></label>
-        <label class="tb-count" data-sel-sides-wrap hidden>Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
-        <label class="tb-count" data-sel-tips-wrap hidden>Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
-        <label class="tb-count" data-sel-inner-wrap hidden>Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
+        <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. A rectangle also takes four values: top left, top right, bottom right, bottom left."></label>
+        <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
+        <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+        <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="shape path select node">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
@@ -276,6 +276,56 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
+
+  // Drag a number's name to change it, live (one undo step when released): the quick way to a radius, a count, a ratio.
+  const scrubs: Record<string, { to(start: number, dx: number): number; apply(v: number, final: boolean): void }> = {
+    radius: { to: (v, dx) => Math.max(0, v + dx), apply: (v, f) => actions.cornersSelected([v], f) },
+    sides: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ sides: v }, f) },
+    tips: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ tips: v }, f) },
+    inner: { to: (v, dx) => Math.max(5, Math.min(95, Math.round(v + dx / 2))), apply: (v, f) => actions.shapeSelected({ inner: v / 100 }, f) },
+  };
+  let scrub: { label: HTMLElement; input: HTMLInputElement; key: string; start: number; x: number; moved: boolean; last: number } | null = null;
+  root.addEventListener("pointerdown", (e) => {
+    const label = (e.target as HTMLElement).closest<HTMLElement>("[data-scrub]");
+    if (!label || (e.target as HTMLElement).tagName === "INPUT" || e.button !== 0) return;
+    const input = label.querySelector<HTMLInputElement>("input")!;
+    scrub = { label, input, key: label.dataset["scrub"]!, start: parseFloat(input.value) || 0, x: e.clientX, moved: false, last: NaN };
+    label.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  root.addEventListener("pointermove", (e) => {
+    if (!scrub) return;
+    const dx = e.clientX - scrub.x;
+    if (!scrub.moved && Math.abs(dx) < 3) return;
+    scrub.moved = true;
+    const v = scrubs[scrub.key]!.to(scrub.start, dx);
+    if (v === scrub.last) return;
+    scrub.last = v;
+    scrub.input.value = String(Math.round(v * 100) / 100);
+    scrubs[scrub.key]!.apply(v, false);
+  });
+  const endScrub = (e: PointerEvent, cancelled: boolean): void => {
+    const sc = scrub;
+    scrub = null;
+    if (!sc) return;
+    if (sc.label.hasPointerCapture(e.pointerId)) sc.label.releasePointerCapture(e.pointerId);
+    if (!sc.moved) return sc.input.focus(); // a plain click on the name goes to the field
+    if (cancelled || Number.isNaN(sc.last)) {
+      editor.preview = { kind: "none" };
+      editor.changed();
+    } else scrubs[sc.key]!.apply(sc.last, true);
+  };
+  // (the click that ends a drag on a name would focus its field: not after a drag)
+  let dragged = false;
+  root.addEventListener("click", (e) => {
+    if (dragged && (e.target as HTMLElement).closest("[data-scrub]") && (e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
+    dragged = false;
+  }, true);
+  root.addEventListener("pointerup", (e) => {
+    dragged = scrub?.moved ?? false;
+    endScrub(e, false);
+  });
+  root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
   const openOutline = (anchor: HTMLElement): void => {
     const sel = editsSelection() ? actions.selectedOutline() : null;

@@ -39,7 +39,11 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       const gradient = paths.some((o) => !boolGroupsOf(o!).some((g) => !g.own && !editor.entered.includes(g.gid)) && (isGradient((o as PathObject).fill) || isGradient((o as PathObject).stroke)));
       const handles = gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline picks which one)" : "";
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases" + handles;
-      if (paths.length === 1 && sel.length === 1) return "Enter or double-click edits its nodes · Fill and Outline are in the bar above" + handles;
+      if (paths.length === 1 && sel.length === 1) {
+        const shape = (paths[0] as PathObject).shape;
+        const dots = shape === "star" ? " · Drag the dots to round a corner or change the ratio" : shape === "rect" || shape === "polygon" ? " · Drag the dot in a corner to round it" : "";
+        return "Enter or double-click edits its nodes · Fill and Outline are in the bar above" + dots + handles;
+      }
       return null;
     }
     default:

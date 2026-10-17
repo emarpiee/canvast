@@ -710,6 +710,12 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   editor.changed();
 }
 
+/** Show these objects as they would be (a number being dragged), without storing them. */
+function showReplaced(editor: EditorState, next: readonly PathObject[]): void {
+  editor.preview = next.length ? { kind: "replace", ids: next.map((o) => o.id), objs: new Map(next.map((o) => [o.id, o] as const)) } : { kind: "none" };
+  editor.changed();
+}
+
 /** What the first selected shape whose numbers can still be changed (a polygon or star made from them) is made of. */
 export function selectedShape(doc: DocumentStore, editor: EditorState): { id: string; shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null {
   for (const o of editablePaths(doc, editor)) {
@@ -726,7 +732,7 @@ export interface ShapeChange {
 }
 
 /** Change the sides, points or ratio of the selected polygons and stars: one undo step. */
-export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange): void {
+export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange, final = true): void {
   if (editor.blockEdit()) return;
   const next: PathObject[] = [];
   for (const o of editablePaths(doc, editor)) {
@@ -738,7 +744,9 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
     const made = withShapeParams(o, patch);
     if (made) next.push(made);
   }
-  if (!next.length) return;
+  if (!final) return showReplaced(editor, next);
+  editor.preview = { kind: "none" };
+  if (!next.length) return editor.changed();
   const what = change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
   doc.commit(doc.transaction(next.length === 1 ? what : `${what} of ${next.length} shapes`, next));
   editor.changed();
@@ -754,7 +762,7 @@ export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: 
 }
 
 /** Round the corners of the selected paths (px at this zoom: one value, or four for a rectangle: top left, top right, bottom right, bottom left): one undo step. */
-export function commitCorners(doc: DocumentStore, editor: EditorState, px: readonly number[], ppuOf: (id: string) => number): void {
+export function commitCorners(doc: DocumentStore, editor: EditorState, px: readonly number[], ppuOf: (id: string) => number, final = true): void {
   if (editor.blockEdit() || !px.length) return;
   const next: PathObject[] = [];
   for (const o of editablePaths(doc, editor)) {
@@ -764,7 +772,9 @@ export function commitCorners(doc: DocumentStore, editor: EditorState, px: reado
     const four = px.length === 4 && o.shape === "rect" && paramsOf(o) !== null;
     next.push(withRadius(o, four ? px.map((v) => v / ppu) : px[0]! / ppu));
   }
-  if (!next.length) return;
+  if (!final) return showReplaced(editor, next);
+  editor.preview = { kind: "none" };
+  if (!next.length) return editor.changed();
   doc.commit(doc.transaction(next.length === 1 ? "Corner radius" : `Corner radius of ${next.length} shapes`, next));
   editor.changed();
 }
