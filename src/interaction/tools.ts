@@ -6,8 +6,11 @@ import { screenToWorld } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ObjectId, StrokeObject, TextObject } from "../doc/model";
-import { homeObject, newObjectId } from "../doc/model";
+import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
+import { homeObject, newObjectId, pathSubs } from "../doc/model";
+import type { ShapeKind, SubPath } from "../doc/path";
+import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, shapeSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { hitNodes, isSmoothNode, localOf } from "./path-edit";
 import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
@@ -135,6 +138,12 @@ type Gesture =
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint }
+  /** Dragging a shape out (Shape tool). */
+  | { kind: "shape"; pointerId: number; start: ScreenPoint }
+  /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
+  | { kind: "pathnode"; pointerId: number; start: ScreenPoint; dragging: boolean }
+  /** A node, a handle or a segment of the selected path (Edit nodes tool); `base` is the path's geometry when the press began. */
+  | { kind: "node"; pointerId: number; id: ObjectId; what: "point" | "in" | "out" | "seg"; s: number; k: number; t: number; base: readonly SubPath[]; start: ScreenPoint; startLocal: { x: number; y: number }; moved: boolean; smooth: boolean }
   | {
       kind: "scale";
       pointerId: number;
@@ -260,6 +269,7 @@ export function attachTools(
     editor.preview = { kind: "none" };
     editor.draft = null;
     editor.draftDone = [];
+    editor.shapeDraft = null;
     editor.lasso = null;
     editor.marquee = null;
     editor.guides = null;
@@ -345,6 +355,256 @@ export function attachTools(
     doc.commit(doc.transaction("Draw stroke", made));
   };
 
+  // ---- shapes and paths (ADR 0099) ---------------------------------------
+  /** A screen point as local units of an anchor in frame `frame` (exact difference, then one rounding). */
+  const localIn = (frame: Frame, anchor: WorldPoint, unit: number, s: ScreenPoint): { x: number; y: number } => {
+    const w = worldIn(s, frame);
+    return { x: D.toNumber(D.shift(D.sub(w.x, anchor.x), -unit)), y: D.toNumber(D.shift(D.sub(w.y, anchor.y), -unit)) };
+  };
+  /** Local units that make one screen pixel at `s` (to measure a distance on screen in a draft's own units). */
+  const localPerPx = (frame: Frame, anchor: WorldPoint, unit: number, s: ScreenPoint): number => {
+    const a = localIn(frame, anchor, unit, s);
+    const b = localIn(frame, anchor, unit, { x: s.x + 1, y: s.y });
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  };
+  const paintOf = (c: string | null): string | null => c;
+
+  /** The box of a shape dragged by (dx, dy) from its start: Shift keeps it square (a line: to 45 degree steps), Alt grows it from the start as its centre. */
+  const shapeBox = (kind: ShapeKind, dx: number, dy: number, shift: boolean, alt: boolean): { bx: number; by: number; bw: number; bh: number } => {
+    if (kind === "line") {
+      if (shift) {
+        const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+        const len = Math.hypot(dx, dy);
+        dx = len * Math.cos(a);
+        dy = len * Math.sin(a);
+      }
+      return alt ? { bx: -dx, by: -dy, bw: 2 * dx, bh: 2 * dy } : { bx: 0, by: 0, bw: dx, bh: dy };
+    }
+    let w = Math.abs(dx);
+    let h = Math.abs(dy);
+    if (shift) w = h = Math.max(w, h);
+    if (alt) return { bx: -w, by: -h, bw: 2 * w, bh: 2 * h };
+    return { bx: dx < 0 ? -w : 0, by: dy < 0 ? -h : 0, bw: w, bh: h };
+  };
+
+  const startShape = (s: ScreenPoint, e: PointerEvent): void => {
+    if (editor.blockEdit()) return;
+    const cam = view.camera;
+    const width = editor.shapeWidthPx / 2 ** cam.zf;
+    editor.shapeDraft = {
+      frame: view.frame,
+      anchor: world(s),
+      unit: -cam.zi,
+      kind: editor.shapeKind,
+      bx: 0,
+      by: 0,
+      bw: 0,
+      bh: 0,
+      sides: editor.shapeSides,
+      tips: editor.shapeTips,
+      fill: editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
+      stroke: editor.shapeKind === "line" && editor.shapeStroke === null ? "#1f2329" : paintOf(editor.shapeStroke),
+      width,
+    };
+    g = { kind: "shape", pointerId: e.pointerId, start: s };
+    editor.changed();
+  };
+
+  const updateShape = (s: ScreenPoint, e: PointerEvent): void => {
+    const d = editor.shapeDraft;
+    if (!d) return;
+    const l = localIn(d.frame, d.anchor, d.unit, s);
+    editor.shapeDraft = { ...d, ...shapeBox(d.kind, l.x, l.y, e.shiftKey, e.altKey) };
+    editor.changed();
+  };
+
+  const shapeObject = (d: NonNullable<typeof editor.shapeDraft>, z: number): PathObject => ({
+    id: newObjectId(),
+    kind: "path",
+    ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
+    anchor: d.anchor,
+    unit: d.unit,
+    z,
+    opacity: 1,
+    attachmentTargetId: null,
+    sub: d.kind === "line" ? lineSubs(d.bx, d.by, d.bx + d.bw, d.by + d.bh) : shapeSubs(d.kind, d.bx, d.by, d.bw, d.bh, d.sides, d.tips),
+    fill: d.fill,
+    stroke: d.stroke,
+    width: d.width,
+    ...(d.kind === "rect" || d.kind === "polygon" || d.kind === "star" ? { join: "miter" as const } : {}),
+    shape: d.kind,
+  });
+
+  const commitShape = (s: ScreenPoint, cancelled: boolean, e: PointerEvent, start: ScreenPoint): void => {
+    updateShape(s, e);
+    const d = editor.shapeDraft;
+    editor.shapeDraft = null;
+    // A press without a drag makes nothing (a stray click must not leave a shape behind).
+    if (cancelled || !d || Math.hypot(s.x - start.x, s.y - start.y) < DRAG_THRESHOLD_PX || !(Math.abs(d.bw) > 0 || Math.abs(d.bh) > 0)) return;
+    const obj = homeObject(normalizeUnit(shapeObject(d, doc.topZ() + 1)), doc.space);
+    doc.commit(doc.transaction(`Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
+    editor.select([obj.id]);
+  };
+
+  // The Path tool: a click adds a corner, a drag pulls a smooth node's handles out, a click on the first node closes the path;
+  // Enter or a double-click ends it open.
+  const startPathNode = (s: ScreenPoint, e: PointerEvent): void => {
+    if (editor.blockEdit()) return;
+    let d = editor.pathDraft;
+    if (!d) {
+      const cam = view.camera;
+      d = editor.pathDraft = { frame: view.frame, anchor: world(s), unit: -cam.zi, n: [], cursor: null, fill: paintOf(editor.shapeFill), stroke: paintOf(editor.shapeStroke), width: editor.shapeWidthPx / 2 ** cam.zf };
+    }
+    const l = localIn(d.frame, d.anchor, d.unit, s);
+    if (d.n.length >= 3 * NODE) {
+      const reach = 8 * localPerPx(d.frame, d.anchor, d.unit, s);
+      if (Math.hypot(l.x - d.n[0]!, l.y - d.n[1]!) <= reach) {
+        commitPath(true);
+        return;
+      }
+    }
+    d.n.push(l.x, l.y, l.x, l.y, l.x, l.y);
+    d.cursor = l;
+    g = { kind: "pathnode", pointerId: e.pointerId, start: s, dragging: false };
+    editor.changed();
+  };
+
+  const dragPathHandle = (s: ScreenPoint): void => {
+    const d = editor.pathDraft;
+    if (!d || g.kind !== "pathnode") return;
+    const l = localIn(d.frame, d.anchor, d.unit, s);
+    const b = d.n.length - NODE;
+    const x = d.n[b]!;
+    const y = d.n[b + 1]!;
+    // The handle follows the pointer; the other side mirrors it (a smooth node).
+    d.n[b + 4] = l.x;
+    d.n[b + 5] = l.y;
+    d.n[b + 2] = 2 * x - l.x;
+    d.n[b + 3] = 2 * y - l.y;
+    d.cursor = l;
+    editor.changed();
+  };
+
+  /** End the path being built: closed (the first node was clicked) or open. Fewer than two nodes make nothing. */
+  const commitPath = (closed: boolean): void => {
+    const d = editor.pathDraft;
+    editor.pathDraft = null;
+    g = { kind: "none" };
+    if (!d || d.n.length < 2 * NODE) {
+      editor.changed();
+      return;
+    }
+    // A closed path is a shape to fill; an open one is a line, and never goes unpainted.
+    const stroke = d.stroke ?? (closed || d.fill !== null ? null : "#1f2329");
+    const obj: PathObject = {
+      id: newObjectId(),
+      kind: "path",
+      ...(d.frame === doc.space.world ? {} : { frame: d.frame }),
+      anchor: d.anchor,
+      unit: d.unit,
+      z: doc.topZ() + 1,
+      opacity: 1,
+      attachmentTargetId: null,
+      sub: [{ n: d.n, closed }],
+      fill: closed ? d.fill : null,
+      stroke: closed ? d.stroke : (stroke ?? d.stroke),
+      width: d.width,
+      ...(closed ? { join: "miter" as const } : {}),
+    };
+    const made = homeObject(normalizeUnit(obj), doc.space);
+    doc.commit(doc.transaction(closed ? "Draw closed path" : "Draw path", [made]));
+    editor.select([made.id]);
+    editor.changed();
+  };
+
+  // The Edit nodes tool.
+  const nodeTarget = (): { po: ProjectedObject; o: PathObject } | null => {
+    if (editor.selection.size !== 1) return null;
+    const po = visible().find((p) => editor.selection.has(p.obj.id));
+    return po && po.obj.kind === "path" && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
+  };
+  /** The geometry as it is drawn (a turn baked in), and the object without its turn. */
+  const baked = (o: PathObject): { sub: readonly SubPath[]; flat: PathObject } => {
+    const { rot: _turn, ...flat } = o;
+    return { sub: pathSubs(o), flat: { ...flat, sub: pathSubs(o) } };
+  };
+  const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
+    const next = homeObject(normalizeUnit({ ...baked(o).flat, sub }), doc.space);
+    doc.commit(doc.transaction(label, [next]));
+  };
+
+  const startNodePress = (e: PointerEvent, s: ScreenPoint): boolean => {
+    const tgt = nodeTarget();
+    if (!tgt || editor.blockEdit()) return false;
+    const hit = hitNodes(tgt.po, s.x, s.y, editor.nodeSel);
+    if (!hit) return false;
+    const base = baked(tgt.o).sub;
+    editor.nodeSel = { s: hit.s, k: hit.k };
+    g = {
+      kind: "node",
+      pointerId: e.pointerId,
+      id: tgt.o.id,
+      what: hit.kind,
+      s: hit.s,
+      k: hit.k,
+      t: hit.kind === "seg" ? hit.t : 0,
+      base,
+      start: s,
+      startLocal: localOf(tgt.po, s.x, s.y),
+      moved: false,
+      smooth: isSmoothNode(base[hit.s]!, hit.k),
+    };
+    editor.changed();
+    return true;
+  };
+
+  const updateNode = (s: ScreenPoint, alt: boolean): void => {
+    if (g.kind !== "node" || g.what === "seg") return;
+    if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) < DRAG_THRESHOLD_PX) return;
+    const tgt = nodeTarget();
+    if (!tgt) return;
+    g.moved = true;
+    const l = localOf(tgt.po, s.x, s.y);
+    const dx = l.x - g.startLocal.x;
+    const dy = l.y - g.startLocal.y;
+    const sp = g.base[g.s]!;
+    const b = g.k * NODE;
+    const sub =
+      g.what === "point"
+        ? moveNode(g.base, g.s, g.k, dx, dy)
+        : moveHandle(g.base, g.s, g.k, g.what === "in" ? 2 : 4, sp.n[b + (g.what === "in" ? 2 : 4)]! + dx, sp.n[b + (g.what === "in" ? 3 : 5)]! + dy, g.smooth && !alt);
+    editor.preview = { kind: "nodes", ids: [g.id], sub };
+    editor.changed();
+  };
+
+  const finishNode = (cancelled: boolean): void => {
+    if (g.kind !== "node") return;
+    const gs = g;
+    const p = editor.preview;
+    editor.preview = { kind: "none" };
+    const o = doc.get(gs.id);
+    if (cancelled || !o || o.kind !== "path") return;
+    if (gs.moved && p.kind === "nodes") return commitSub(o, p.sub, gs.what === "point" ? "Move node" : "Move handle");
+    if (gs.what === "seg") {
+      commitSub(o, splitSegment(gs.base, gs.s, gs.k, gs.t), "Add node");
+      editor.nodeSel = { s: gs.s, k: gs.k + 1 };
+    } else if (gs.what === "point" && altHeld) commitSub(o, toggleSmooth(gs.base, gs.s, gs.k), "Change node");
+  };
+  /** Alt held at the release of a press on a node: the click turns the node between a corner and smooth. */
+  let altHeld = false;
+
+  /** Delete the selected node (the path goes with its last one). Returns whether there was one. */
+  const deleteNode = (): boolean => {
+    const tgt = nodeTarget();
+    const sel = editor.nodeSel;
+    if (!tgt || !sel || editor.blockEdit()) return false;
+    const sub = withNode(baked(tgt.o).sub, sel.s, sel.k, null);
+    editor.nodeSel = null;
+    if (!sub.length) deleteSelection(doc, editor);
+    else commitSub(tgt.o, sub, "Delete node");
+    return true;
+  };
+
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
     const vis = visible();
@@ -378,7 +638,7 @@ export function attachTools(
         // Free (one-axis, or both axes apart) only for upright pictures in an upright box: strokes and text keep their shape.
         const free = sel.frame.angle === 0 && ids.length > 0 && ids.every((id) => {
           const o = doc.get(id)!;
-          return o.kind === "image" && !o.rot;
+          return (o.kind === "image" || o.kind === "path") && !o.rot;
         });
         g = {
           kind: "scale",
@@ -410,7 +670,7 @@ export function attachTools(
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
-    const draggable = t && (t.kind === "stroke" || editor.selection.has(t.id)) && !editor.readOnly;
+    const draggable = t && (t.kind === "stroke" || t.kind === "path" || editor.selection.has(t.id)) && !editor.readOnly;
     if (t && draggable) {
       if (!editor.selection.has(t.id)) pick([t.id], gp.additive);
       // Alt held as the drag starts: the drag carries a copy (placed exactly on the original) and the original stays.
@@ -642,6 +902,19 @@ export function attachTools(
       case "text":
         g = { kind: "text", pointerId: e.pointerId, start: s };
         break;
+      case "shape":
+        startShape(s, e);
+        break;
+      case "path":
+        startPathNode(s, e);
+        break;
+      case "node": {
+        if (startNodePress(e, s)) break;
+        // Not on a node: a click picks the path to edit (or clears), a drag from nothing is a box.
+        const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null;
+        g = { kind: "press", pointerId: e.pointerId, start: s, target: hit, additive: e.shiftKey };
+        break;
+      }
       default:
         break;
     }
@@ -675,6 +948,13 @@ export function attachTools(
     }
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
+      editor.changed();
+      return;
+    }
+    if (g.kind === "none" && effectiveTool() === "path" && editor.pathDraft) {
+      // The line from the last node follows the pointer.
+      const d = editor.pathDraft;
+      editor.pathDraft = { ...d, cursor: localIn(d.frame, d.anchor, d.unit, local(e)) };
       editor.changed();
       return;
     }
@@ -727,6 +1007,16 @@ export function attachTools(
         editor.changed();
         break;
       }
+      case "shape":
+        updateShape(s, e);
+        break;
+      case "pathnode":
+        if (!g.dragging && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) g.dragging = true;
+        if (g.dragging) dragPathHandle(s);
+        break;
+      case "node":
+        updateNode(s, e.altKey);
+        break;
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
         editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null };
@@ -808,6 +1098,15 @@ export function attachTools(
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();
         break;
+      case "shape":
+        commitShape(s, cancelled, e, g.start);
+        break;
+      case "pathnode":
+        break; // the node stays; the path goes on until it is closed or ended
+      case "node":
+        altHeld = e.altKey;
+        finishNode(cancelled);
+        break;
       case "text":
         // Opened after the pointer is released, so the editor keeps the focus.
         if (!cancelled && !editor.blockEdit()) hooks.editText(textAt(g.start), world(g.start));
@@ -818,6 +1117,13 @@ export function attachTools(
   };
 
   const onDoubleClick = (e: MouseEvent): void => {
+    if (effectiveTool() === "path" && editor.pathDraft) {
+      // The two presses of the double-click each placed a node on the same spot: keep one, and end the path.
+      const d = editor.pathDraft;
+      if (d.n.length > NODE) d.n.splice(d.n.length - NODE, NODE);
+      commitPath(false);
+      return;
+    }
     if (effectiveTool() !== "select" || editor.readOnly) return;
     const s = local(e);
     // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
@@ -825,6 +1131,12 @@ export function attachTools(
     if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {
       editor.entered = hit.groups.slice(0, editor.entered.length + 1);
       editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
+      return;
+    }
+    // A double-click on a path edits its nodes.
+    if (hit?.kind === "path") {
+      editor.select([hit.id]);
+      editor.setTool("node");
       return;
     }
     const t = textAt(s);
@@ -866,8 +1178,11 @@ export function attachTools(
       }
     } else if (hooks.navForKey(key)) hooks.navigate(hooks.navForKey(key)!);
     else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
-    else if (e.key === "Escape") {
-      if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
+    else if (e.key === "Enter" && editor.pathDraft) {
+      commitPath(false);
+    } else if (e.key === "Escape") {
+      if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
+      else if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool
       else if (editor.entered.length) {
         // Leave the group entered last; what was picked inside it stays selected.
@@ -875,7 +1190,13 @@ export function attachTools(
         editor.changed();
       } else editor.select([]);
     } else if (e.key === "Delete" || e.key === "Backspace") {
-      deleteSelection(doc, editor);
+      const d = editor.pathDraft;
+      if (d) {
+        // While a path is being drawn, Backspace takes back its last node.
+        d.n.splice(d.n.length - NODE, NODE);
+        if (!d.n.length) editor.pathDraft = null;
+        editor.changed();
+      } else if (!(editor.tool === "node" && deleteNode())) deleteSelection(doc, editor);
     } else {
       return;
     }
@@ -912,6 +1233,10 @@ export function attachTools(
     delete el.dataset["hover"];
   };
   el.addEventListener("pointerleave", onLeave);
+  // Leaving the Path tool ends the path being drawn (open).
+  const unsubscribe = editor.subscribe(() => {
+    if (editor.pathDraft && editor.tool !== "path") commitPath(false);
+  });
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
   window.addEventListener("blur", () => {
@@ -928,5 +1253,6 @@ export function attachTools(
     el.removeEventListener("pointerleave", onLeave);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
+    unsubscribe();
   };
 }

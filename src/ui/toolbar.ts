@@ -1,5 +1,8 @@
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
+import type { PaintPatch } from "../app/actions";
+import { SHAPE_KINDS } from "../doc/path";
+import type { ShapeKind } from "../doc/path";
 import { openColourPopover, recentColours } from "./colour-popover";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
@@ -20,14 +23,21 @@ export interface ToolbarActions {
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
   clearFlag(flag: "hidden" | "locked"): void;
-  /** Set the thickness (screen px at this zoom) of the selected strokes: one undo step. */
+  /** Set the thickness (screen px at this zoom) of the selected strokes and paths: one undo step. */
   setSelectedWidth(px: number): void;
+  /** The fill and outline of the first selected path, or null when no path is selected. */
+  selectedPaint(): { fill: string | null; stroke: string | null } | null;
+  /** Show (final false: while the picker is dragged) or store (final true) a new fill or outline on the selected paths. */
+  paintSelected(patch: PaintPatch, final: boolean): void;
 }
 
 const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "hand", icon: ICONS.hand, label: "Hand (pan)", key: "H" },
   { tool: "select", icon: ICONS.pointer, label: "Select", key: "V" },
+  { tool: "node", icon: ICONS.nodeTool, label: "Edit nodes", key: "N" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
+  { tool: "shape", icon: ICONS.shapeTool, label: "Shape", key: "U" },
+  { tool: "path", icon: ICONS.pathTool, label: "Path (curves)", key: "B" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
@@ -39,6 +49,15 @@ const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string 
   { id: "ink", label: "Ink pen", title: "Ink pen: a broad nib, thick across it and thin along it; pressure or speed thins and thickens the line", icon: ICONS.penLine },
   { id: "marker", label: "Marker", title: "Marker: a wide, translucent line", icon: ICONS.highlighter },
 ];
+
+const SHAPE_MENU: Array<{ id: ShapeKind; label: string; title: string; icon: string }> = [
+  { id: "rect", label: "Rectangle", title: "Rectangle: drag; Shift for a square, Alt to draw from the centre", icon: ICONS.rectangleHorizontal },
+  { id: "ellipse", label: "Ellipse", title: "Ellipse: drag; Shift for a circle, Alt to draw from the centre", icon: ICONS.ellipseShape },
+  { id: "line", label: "Line", title: "Line: drag; Shift for steps of 45 degrees, Alt to draw from the middle", icon: ICONS.lineShape },
+  { id: "polygon", label: "Polygon", title: "Polygon: drag; the number of sides is set beside it", icon: ICONS.polygonShape },
+  { id: "star", label: "Star", title: "Star: drag; the number of points is set beside it", icon: ICONS.starShape },
+];
+void SHAPE_KINDS;
 
 export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string }> }> = [
   {
@@ -98,6 +117,21 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen text">
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen and text colour: open the colour picker"><span data-colour-chip></span></button>
+      </div>
+      <div class="tb-group tb-options" data-for="shape" role="radiogroup" aria-label="Shape">
+        ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
+      </div>
+      <div class="tb-group tb-options" data-for="shape">
+        <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
+        <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+      </div>
+      <div class="tb-group tb-options" data-for="shape path select node">
+        <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span></button>
+        <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span></button>
+      </div>
+      <div class="tb-group tb-options" data-for="shape path">
+        <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom)">
+        <span class="size-out" data-shape-out></span>
       </div>
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
@@ -159,6 +193,54 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx);
   });
 
+  root.querySelector<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
+    editor.shapeWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
+    editor.changed();
+  });
+  root.querySelector<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => {
+    const v = Math.round(Number((e.target as HTMLInputElement).value));
+    if (v >= 3 && v <= 24) {
+      editor.shapeSides = v;
+      editor.changed();
+    }
+  });
+  root.querySelector<HTMLInputElement>("[data-tips]")!.addEventListener("input", (e) => {
+    const v = Math.round(Number((e.target as HTMLInputElement).value));
+    if (v >= 3 && v <= 24) {
+      editor.shapeTips = v;
+      editor.changed();
+    }
+  });
+
+  // The fill and outline chips: the colours the next shape gets (Shape and Path tools), or those of the selected paths.
+  const lastPaint = { fill: "#2563eb", stroke: "#1f2329" };
+  const editsSelection = (): boolean => editor.tool === "select" || editor.tool === "node";
+  const paintNow = (which: "fill" | "stroke"): string | null => (editsSelection() ? (actions.selectedPaint()?.[which] ?? null) : which === "fill" ? editor.shapeFill : editor.shapeStroke);
+  const setPaint = (which: "fill" | "stroke", value: string | null, final: boolean): void => {
+    if (value !== null) lastPaint[which] = value;
+    if (editsSelection()) actions.paintSelected({ [which]: value }, final);
+    else {
+      if (which === "fill") editor.shapeFill = value;
+      else editor.shapeStroke = value;
+      editor.changed();
+    }
+  };
+  const openPaint = (anchor: HTMLElement, which: "fill" | "stroke"): void => {
+    const cur = paintNow(which);
+    if (cur !== null) lastPaint[which] = cur;
+    openColourPopover(anchor, {
+      name: which === "fill" ? "Fill" : "Outline",
+      value: cur ?? lastPaint[which],
+      alpha: true,
+      none: { label: which === "fill" ? "No fill" : "No outline", active: cur === null, set: (on) => setPaint(which, on ? null : lastPaint[which], true) },
+      onInput: (hex) => setPaint(which, hex, false),
+      onChange: (hex) => setPaint(which, hex, true),
+      onClose: () => {
+        if (editsSelection()) actions.paintSelected({}, true); // drop a preview that was never stored
+      },
+    });
+  };
+
   root.querySelector<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
     editor.eraserPx = Number((e.target as HTMLInputElement).value);
     editor.changed();
@@ -180,6 +262,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["color"]) {
       editor.penColor = d["color"];
       editor.changed();
+    } else if (d["shapeKind"]) {
+      editor.shapeKind = d["shapeKind"] as ShapeKind;
+      editor.changed();
+    } else if (d["paint"]) {
+      openPaint(b, d["paint"] as "fill" | "stroke");
     } else if (d["colourOpen"] !== undefined) {
       openColourPopover(b, {
         name: "Pen colour",
@@ -251,6 +338,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", (b.dataset["color"] ?? "").toLowerCase() === editor.penColor.toLowerCase());
     root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = swatchBackground(editor.penColor);
+    for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(b.dataset["shapeKind"] === editor.shapeKind));
+    const sides = root.querySelector<HTMLInputElement>("[data-sides]")!;
+    const tips = root.querySelector<HTMLInputElement>("[data-tips]")!;
+    root.querySelector<HTMLElement>("[data-sides-wrap]")!.hidden = editor.shapeKind !== "polygon";
+    root.querySelector<HTMLElement>("[data-tips-wrap]")!.hidden = editor.shapeKind !== "star";
+    if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
+    if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
+    const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
+    if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));
+    root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = `${editor.shapeWidthPx} px`;
+    // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
+    const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
+    for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
+      const which = b.dataset["paint"] as "fill" | "stroke";
+      const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
+      b.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
+      b.classList.toggle("is-none", value === null);
+      (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "transparent" : swatchBackground(value));
+    }
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;
     if (document.activeElement !== size) size.value = String(sliderFromPen(editor.penWidthPx));

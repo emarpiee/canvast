@@ -4,6 +4,7 @@ import { distToSegment, pointInPolygon, polygonsOverlap, polylineTouchesPolygon 
 import { itemCorners } from "./selection-frame";
 import type { ObjectId } from "../doc/model";
 import { exactStrokeEdgeDistancePx } from "./stroke-coverage";
+import { distanceToOutline, insideFill } from "../doc/path";
 
 /**
  * Object-specific hit tests over projected geometry. Callers pass candidates
@@ -26,6 +27,12 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
   }
   if (x < b.minX - tol || x > b.maxX + tol || y < b.minY - tol || y > b.maxY + tol) return false;
   if (po.cover) return true; // the view is inside the object
+  if (po.obj.kind === "path") {
+    // Its outline within the pen's reach, or its inside when it is filled (an unfilled shape is picked by its line only).
+    const flats = po.path!;
+    if (po.obj.stroke !== null && distanceToOutline(flats, x, y) <= po.radius + tol) return true;
+    return po.obj.fill !== null && insideFill(flats, x, y, !!po.obj.evenodd);
+  }
   if (po.obj.kind !== "stroke") {
     // Bounds-based picking (images and text boxes). Alpha-aware picking is not implemented yet.
     return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
@@ -41,6 +48,15 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
   return false;
 }
 
+/** A closed outline as a polyline that returns to its first vertex. */
+function closedLine(p: Float64Array): Float64Array {
+  const out = new Float64Array(p.length + 2);
+  out.set(p);
+  out[p.length] = p[0]!;
+  out[p.length + 1] = p[1]!;
+  return out;
+}
+
 /** Whether a disc of radius `r` px at (x, y) touches the object's geometry (not just its bounding box, for strokes). */
 function discHits(po: ProjectedObject, x: number, y: number, r: number): boolean {
   const t = po.rotated;
@@ -50,7 +66,7 @@ function discHits(po: ProjectedObject, x: number, y: number, r: number): boolean
     return discHits(t.inner, t.vvp.width / 2 + t.c * ox + t.s * oy, t.vvp.height / 2 - t.s * ox + t.c * oy, r);
   }
   if (po.cover) return true;
-  if (po.obj.kind === "stroke") return hitsObject(po, x, y, r);
+  if (po.obj.kind === "stroke" || po.obj.kind === "path") return hitsObject(po, x, y, r);
   const b = po.box;
   return Math.hypot(Math.max(b.minX - x, 0, x - b.maxX), Math.max(b.minY - y, 0, y - b.maxY)) <= r;
 }
@@ -91,6 +107,8 @@ export type LassoFilter = "strokes" | "all";
 function touches(po: ProjectedObject, poly: ArrayLike<number>, filter: LassoFilter): boolean {
   if (po.cover) return false;
   if (po.obj.kind === "stroke") return polylineTouchesPolygon(po.q, poly);
+  // A path is drawing, like a stroke: the lasso takes it when it touches its outline (the closing line of a closed one included).
+  if (po.obj.kind === "path") return po.path!.some((f) => polylineTouchesPolygon(f.closed && f.pts.length >= 4 ? closedLine(f.pts) : f.pts, poly));
   if (filter !== "all") return false;
   const quad = itemCorners(po).flatMap((p) => [p[0], p[1]]);
   if (!polygonsOverlap(quad, poly)) return false;

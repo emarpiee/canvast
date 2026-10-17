@@ -1,8 +1,11 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
-import { localBounds, pivotOf, strokePoints } from "../doc/model";
+import { localBounds, pathSubs, pivotOf, strokePoints, unrotatedBounds } from "../doc/model";
+import type { FlatPath } from "../doc/path";
+import { FLAT_TOLERANCE_PX, flatten } from "../doc/path";
 import { cosSin } from "../core/angle";
+import { approxPath, classifyPath } from "./coarse";
 import type { IndexCell, IndexEntry } from "../scene/spatial-index";
 import { MIN_CELL_PX, objectLevel } from "../scene/spatial-index";
 import type { Cover } from "./coarse";
@@ -119,6 +122,10 @@ export interface ProjectedObject {
   readonly exact: boolean;
   /** A coarse object covering the whole view (render/coarse.ts): drawn as one fill, with no projection. */
   readonly cover?: Cover;
+  /** A path: its outlines flattened in screen space (`q` holds all their vertices, for the selection box and lasso). */
+  readonly path?: readonly FlatPath[] | undefined;
+  /** The four corners of the object's own (turned) bounds on screen, when that is not the bounding box (turned paths). */
+  readonly corners?: readonly (readonly [number, number])[] | undefined;
   /**
    * A turned image or text (ADR 0018): `inner` is the object as if not turned,
    * seen by a camera that is moved and widened so the turned view fits in it.
@@ -150,6 +157,8 @@ class Projected implements ProjectedObject {
     private readonly cam: Camera,
     private readonly vp: Viewport,
     proj: Projection | null,
+    readonly path?: readonly FlatPath[] | undefined,
+    readonly corners?: readonly (readonly [number, number])[] | undefined,
   ) {
     this.p = proj;
   }
@@ -233,6 +242,7 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
     return null;
   }
   if (!opts.keepTiny && tooSmallToDraw(o, cam)) return null;
+  if (o.kind === "path") return projectPath(o, cam, vp, p, box, b);
   if (o.kind !== "stroke" && o.rot) return projectRotated(o, cam, vp, p, box, opts);
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
   const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
@@ -251,6 +261,77 @@ export function projectObject(o: CanvasObject, cam: Camera, vp: Viewport, opts: 
     q[i + 1] = exact ? exactY(p, pts[i + 1]!) : projY(p, pts[i + 1]!);
   }
   return new Projected(o, box, q, radius, exact, cam, vp, p);
+}
+
+/** Farthest outside the viewport (px) a path is flattened precisely: a curve entirely beyond this becomes its chord. */
+const PATH_CULL_MARGIN = 4096;
+/** A path is drawn only while its bounds stay within this many px and its outline half-width within EXACT_RADIUS_THRESHOLD; beyond that it is approximated (render/coarse.ts). */
+const PATH_MAX_EXTENT = 2 ** 44;
+
+/**
+ * A path's screen geometry from a projection of its local x and y: every node (and handle) is projected, then the curves are
+ * flattened in screen space until within FLAT_TOLERANCE_PX of the true curve. `proj` is the full projection when there is one.
+ */
+function pathFromScreen(
+  o: Extract<CanvasObject, { kind: "path" }>,
+  cam: Camera,
+  vp: Viewport,
+  box: ScreenBox,
+  px: (x: number) => number,
+  py: (y: number) => number,
+  proj: Projection | null,
+): ProjectedObject {
+  const subs = pathSubs(o);
+  const q = subs.map((s) => {
+    const a = new Float64Array(s.n.length);
+    for (let i = 0; i < a.length; i += 2) {
+      a[i] = px(s.n[i]!);
+      a[i + 1] = py(s.n[i + 1]!);
+    }
+    return a;
+  });
+  const flats = flatten(subs, q, FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN);
+  let total = 0;
+  for (const f of flats) total += f.pts.length;
+  const all = new Float64Array(total);
+  let at = 0;
+  for (const f of flats) {
+    all.set(f.pts, at);
+    at += f.pts.length;
+  }
+  // The object's own bounds, turned with it: what the selection box is built on.
+  const ub = localBoundsUnturned(o);
+  const c = o.rot ? cosSin(o.rot) : { c: 1, s: 0 };
+  const cx0 = (ub.minX + ub.maxX) / 2;
+  const cy0 = (ub.minY + ub.maxY) / 2;
+  const corner = (x: number, y: number): [number, number] => [px(cx0 + c.c * (x - cx0) - c.s * (y - cy0)), py(cy0 + c.s * (x - cx0) + c.c * (y - cy0))];
+  const corners = o.rot ? [corner(ub.minX, ub.minY), corner(ub.maxX, ub.minY), corner(ub.maxX, ub.maxY), corner(ub.minX, ub.maxY)] : undefined;
+  const radius = o.stroke === null ? 0 : (proj ? toPx(proj, D.fromNumber(o.width / 2)) : (px(o.width / 2) - px(0)));
+  return new Projected(o, box, all, radius, false, cam, vp, proj, flats, corners);
+}
+
+const localBoundsUnturned = (o: Extract<CanvasObject, { kind: "path" }>): LocalBounds => unrotatedBounds(o);
+
+function projectPath(o: Extract<CanvasObject, { kind: "path" }>, cam: Camera, vp: Viewport, p: Projection, box: ScreenBox, b: LocalBounds): ProjectedObject | null {
+  const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
+  const localMag = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY));
+  const radius = o.stroke === null ? 0 : toPx(p, D.fromNumber(o.width / 2));
+  if (!(extent <= PATH_MAX_EXTENT) || !(radius <= EXACT_RADIUS_THRESHOLD)) {
+    // Zoomed so far into a large path (or its outline) that doubles cannot place its edges. Where the whole view is inside the fill or the
+    // outline it is that colour, exactly; where it misses, nothing; only with an edge in view is it the colour at the centre, dimmed.
+    const lx = D.toNumber(p.lx);
+    const ly = D.toNumber(p.ly);
+    const view = Math.hypot(vp.width, vp.height) / 2 + 8;
+    const m = (Number.isFinite(p.ppu) && p.ppu > 0 ? view / p.ppu : 0) + Math.max(Math.abs(lx), Math.abs(ly), localMag) * 2 ** -46;
+    const r = classifyPath(o, lx, ly, m);
+    if (r === "miss") return null;
+    if (r !== "exact") return coverObject(o, vp, r);
+    const cover = approxPath(o, lx, ly);
+    return cover ? coverObject(o, vp, { ...cover, dim: true }) : null;
+  }
+  // Whole-object accuracy: the double-double projection while its error is far below a pixel, the exact one otherwise.
+  const precise = fastPathError(p, localMag) <= 2 ** -40 && extent <= EXACT_COORD_THRESHOLD;
+  return pathFromScreen(o, cam, vp, box, precise ? (x) => projX(p, x) : (x) => exactX(p, x), precise ? (y) => projY(p, y) : (y) => exactY(p, y), p);
 }
 
 /**
@@ -285,7 +366,7 @@ const FAST_MAX_PX_PER_CELL = 2 ** 30;
 
 export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: Viewport): ProjectedObject | null {
   const o = e.obj;
-  if (cf.pxPerCell > FAST_MAX_PX_PER_CELL || (o.kind !== "stroke" && o.rot)) return projectObject(o, cam, vp);
+  if (cf.pxPerCell > FAST_MAX_PX_PER_CELL || (o.kind !== "stroke" && o.kind !== "path" && o.rot)) return projectObject(o, cam, vp);
   const s = e.scale * cf.pxPerCell; // px per local unit
   const ox = cf.x + e.ax * cf.pxPerCell;
   const oy = cf.y + e.ay * cf.pxPerCell;
@@ -296,6 +377,10 @@ export function projectEntry(e: IndexEntry, cf: CellFrame, cam: Camera, vp: View
   }
   // No size cull here: the index only returns cells of levels drawn individually.
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minY), Math.abs(box.maxY));
+  if (o.kind === "path") {
+    if (!(extent <= EXACT_COORD_THRESHOLD) || !((o.stroke === null ? 0 : (o.width / 2) * s) <= EXACT_RADIUS_THRESHOLD)) return projectObject(o, cam, vp);
+    return pathFromScreen(o, cam, vp, box, (x) => ox + x * s, (y) => oy + y * s, null);
+  }
   if (o.kind !== "stroke") {
     if (o.kind === "text" && !(extent <= EXACT_COORD_THRESHOLD)) return projectObject(o, cam, vp);
     return new Projected(o, box, Float64Array.of(box.minX, box.minY, box.maxX, box.maxY), 0, false, cam, vp, null);

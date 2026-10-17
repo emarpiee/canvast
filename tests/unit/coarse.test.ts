@@ -81,7 +81,7 @@ describe("classifyCoarse (objects far coarser than the camera)", () => {
   });
 
   it("every kind of object has a sampler, and the default one keeps an unknown kind's colour", () => {
-    expect(Object.keys(SAMPLERS).sort()).toEqual(["image", "stroke", "text"]);
+    expect(Object.keys(SAMPLERS).sort()).toEqual(["image", "path", "stroke", "text"]);
     const probe = { lx: 5, ly: 5, m: 0.01, vp: VP, info: INFO, terms: () => null };
     const box = bboxSampler<StrokeObject>(() => "#abcdef");
     expect(box.classify(stroke([0, 0, 10, 10], 20), probe)).toEqual({ color: "#abcdef" });

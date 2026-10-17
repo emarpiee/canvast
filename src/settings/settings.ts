@@ -32,7 +32,10 @@ const text = (max: number) => (v: unknown): string | undefined => (typeof v === 
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
 
 /** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
-const colourList = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 8 * 8 && (v === "" || v.split(",").every((c) => /^#[0-9a-f]{6}$/.test(c))) ? v : undefined);
+const colourList = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 8 * 10 && (v === "" || v.split(",").every((c) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(c))) ? v : undefined);
+
+/** A shape's fill or outline: "none", or "#rrggbb" / "#rrggbbaa". */
+const paint = (v: unknown): string | undefined => (typeof v === "string" && (v === "none" || /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) ? v : undefined);
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
@@ -43,6 +46,16 @@ export const SETTINGS = {
   "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "plane", "sliders", "mixer"), effect: "immediate" } as Def<"wheel" | "plane" | "sliders" | "mixer">,
   "colour.format": { scope: "device", default: "hex", validate: oneOf("hex", "rgb", "oklch"), effect: "immediate" } as Def<"hex" | "rgb" | "oklch">,
   "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
+  // Shapes and paths (ADR 0099): what the Shape and Path tools make.
+  "shape.kind": { scope: "device", default: "rect", validate: oneOf("rect", "ellipse", "line", "polygon", "star"), effect: "immediate" } as Def<"rect" | "ellipse" | "line" | "polygon" | "star">,
+  "shape.fill": { scope: "device", default: "#2563eb", validate: paint, effect: "immediate" } as Def<string>,
+  "shape.stroke": { scope: "device", default: "#1f2329", validate: paint, effect: "immediate" } as Def<string>,
+  "shape.widthPx": { scope: "device", default: 2, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
+  "shape.sides": { scope: "device", default: 6, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
+  "shape.tips": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
+  "key.shape": { scope: "device", default: "u", validate: letter, effect: "immediate" } as Def<string>,
+  "key.path": { scope: "device", default: "b", validate: letter, effect: "immediate" } as Def<string>,
+  "key.node": { scope: "device", default: "n", validate: letter, effect: "immediate" } as Def<string>,
   "pen.kind": { scope: "device", default: "fine", validate: oneOf("fine", "pencil", "ink", "marker"), effect: "immediate" } as Def<"fine" | "pencil" | "ink" | "marker">,
   "pen.widthPx": { scope: "device", default: 3, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
   "pen.stabilizer.on": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,

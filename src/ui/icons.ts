@@ -1,4 +1,13 @@
 // Lucide icons (ISC license, see THIRD_PARTY_NOTICES.md), inlined at build time.
+import rectangleHorizontalSvg from "lucide-static/icons/rectangle-horizontal.svg";
+import ellipseShapeSvg from "lucide-static/icons/circle.svg";
+import lineShapeSvg from "lucide-static/icons/slash.svg";
+import polygonShapeSvg from "lucide-static/icons/hexagon.svg";
+import starShapeSvg from "lucide-static/icons/sparkle.svg";
+import shapeToolSvg from "lucide-static/icons/pentagon.svg";
+import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
+import nodeToolSvg from "lucide-static/icons/waypoints.svg";
+import vectorSquareSvg from "lucide-static/icons/vector-square.svg";
 import play from "lucide-static/icons/play.svg";
 import pause from "lucide-static/icons/pause.svg";
 import rewind from "lucide-static/icons/rewind.svg";
@@ -277,4 +286,13 @@ export const ICONS = {
   circleCheck: clean(circleCheck),
   loader: clean(loaderCircle),
   triangleAlert: clean(triangleAlert),
+  rectangleHorizontal: clean(rectangleHorizontalSvg),
+  ellipseShape: clean(ellipseShapeSvg),
+  lineShape: clean(lineShapeSvg),
+  polygonShape: clean(polygonShapeSvg),
+  starShape: clean(starShapeSvg),
+  shapeTool: clean(shapeToolSvg),
+  pathTool: clean(pathToolSvg),
+  nodeTool: clean(nodeToolSvg),
+  vectorSquare: clean(vectorSquareSvg),
 } as const;

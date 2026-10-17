@@ -76,7 +76,9 @@ export function visibleObjects(
     // While an object is moved, turned or stretched it is shown a little see-through, so what is behind it stays readable (ADR 0073).
     // Only the picture on screen: the committed object keeps its own opacity. A see-through stroke is drawn on its own, so a very large
     // selection stays opaque: it would lose the batching that keeps a drag at full frame rate.
-    const shown = previewIds.size <= GHOST_MAX ? ({ ...moved, opacity: moved.opacity * GHOST_OPACITY } as CanvasObject) : moved;
+    // (Editing nodes is not a move: the path keeps its look while its shape changes.)
+    const pk = editor!.preview.kind;
+    const shown = previewIds.size <= GHOST_MAX && (pk === "move" || pk === "rotate" || pk === "scale") ? ({ ...moved, opacity: moved.opacity * GHOST_OPACITY } as CanvasObject) : moved;
     const cam = cameraIn(fc, shown.frame ?? doc.space.world);
     const po = cam && projectObject(shown, cam, vp);
     if (po) out.push(po);

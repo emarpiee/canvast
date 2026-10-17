@@ -1,10 +1,11 @@
 import type { Viewport } from "../core/camera";
-import type { CanvasObject, ImageObject, StrokeObject } from "../doc/model";
+import type { CanvasObject, ImageObject, PathObject, StrokeObject } from "../doc/model";
 import type { ProjectedObject } from "./projection";
 import { fromPx, toPx } from "./projection";
 import * as D from "../core/dyadic";
 import type { Rect } from "./geometry2d";
-import { clipSegment } from "./geometry2d";
+import { clipPolygon, clipSegment } from "./geometry2d";
+import { MITER_LIMIT } from "../doc/path";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
 
@@ -127,6 +128,107 @@ function addStrokePath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: V
     penX = c[2];
     penY = c[3];
   }
+}
+
+/** Farthest a path's vertex may lie outside the viewport (px) before its outline is clipped: canvas rasterizers lose precision far out. */
+const PATH_REACH = 2 ** 13;
+
+const inReach = (pts: Float64Array, vp: Viewport, margin: number): boolean => {
+  for (let i = 0; i < pts.length; i += 2) {
+    if (!(pts[i]! > -margin && pts[i]! < vp.width + margin && pts[i + 1]! > -margin && pts[i + 1]! < vp.height + margin)) return false;
+  }
+  return true;
+};
+
+/** Add every outline to the current path as a filled polygon (clipped to the view when it reaches far outside it). */
+function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
+  for (const f of po.path!) {
+    let p: ArrayLike<number> = f.pts;
+    if (p.length < 6) continue;
+    if (!inReach(f.pts, vp, PATH_REACH)) {
+      p = clipPolygon(Array.from(f.pts), viewRect(vp, 64));
+      if (p.length < 6) continue;
+    }
+    ctx.moveTo(p[0]!, p[1]!);
+    for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i]!, p[i + 1]!);
+    ctx.closePath();
+  }
+}
+
+/** Add every outline to the current path as a line: whole when it stays in reach, else segment by segment, clipped (breaks fall outside the view). */
+function addOutlinePath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
+  const view = viewRect(vp, po.radius + 2);
+  for (const f of po.path!) {
+    const p = f.pts;
+    const n = p.length / 2;
+    if (n === 1) {
+      ctx.moveTo(p[0]!, p[1]!);
+      ctx.lineTo(p[0]! + 1e-3, p[1]!);
+      continue;
+    }
+    if (inReach(p, vp, PATH_REACH)) {
+      ctx.moveTo(p[0]!, p[1]!);
+      for (let i = 1; i < n; i++) ctx.lineTo(p[i * 2]!, p[i * 2 + 1]!);
+      if (f.closed) ctx.closePath();
+      continue;
+    }
+    let penX = NaN;
+    let penY = NaN;
+    for (let i = 0; i < (f.closed ? n : n - 1); i++) {
+      const j = (i + 1) % n;
+      const c = clipSegment(p[i * 2]!, p[i * 2 + 1]!, p[j * 2]!, p[j * 2 + 1]!, view);
+      if (!c) continue;
+      if (c[0] !== penX || c[1] !== penY) ctx.moveTo(c[0], c[1]);
+      ctx.lineTo(c[2], c[3]);
+      penX = c[2];
+      penY = c[3];
+    }
+  }
+}
+
+let layer: HTMLCanvasElement | null = null;
+
+/**
+ * A vector path: its fill, then its outline, painted once with the object's opacity and blend mode. A path that has both and is
+ * see-through (or blended) is drawn on a scratch layer first, so the outline does not show the fill through itself or blend twice.
+ */
+export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
+  const o = po.obj as PathObject;
+  const body = (c: CanvasRenderingContext2D): void => {
+    if (o.fill !== null) {
+      c.fillStyle = paintColor(o.fill);
+      c.beginPath();
+      addFillPath(c, po, vp);
+      c.fill(o.evenodd ? "evenodd" : "nonzero");
+    }
+    if (o.stroke !== null) {
+      c.strokeStyle = paintColor(o.stroke);
+      c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
+      c.lineJoin = o.join ?? "round";
+      c.lineCap = o.cap ?? "round";
+      c.miterLimit = MITER_LIMIT;
+      c.beginPath();
+      addOutlinePath(c, po, vp);
+      c.stroke();
+    }
+  };
+  if (!(o.fill !== null && o.stroke !== null && (o.opacity < 1 || o.blend))) return paint(ctx, o, () => body(ctx));
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  layer ??= document.createElement("canvas");
+  if (layer.width !== w || layer.height !== h) {
+    layer.width = w;
+    layer.height = h;
+  }
+  const lc = layer.getContext("2d")!;
+  lc.setTransform(1, 0, 0, 1, 0, 0);
+  lc.clearRect(0, 0, w, h);
+  lc.setTransform(ctx.getTransform());
+  body(lc);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  paint(ctx, o, () => ctx.drawImage(layer!, 0, 0));
+  ctx.restore();
 }
 
 function fillPolygons(ctx: CanvasRenderingContext2D, polys: number[][]): void {

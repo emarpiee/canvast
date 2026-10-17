@@ -3,6 +3,7 @@ import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
 import type { CanvasObject } from "./model";
 import { localBounds, pivotOf } from "./model";
+import { scaleSubs } from "./path";
 
 /**
  * Pure geometric edits. Each returns a new object; the document applies them
@@ -25,7 +26,8 @@ function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyad
 
 /**
  * Scale about a fixed world point by (kx, ky). Strokes and text require
- * kx === ky (they scale uniformly, including stroke width and font size).
+ * kx === ky (they scale uniformly, including stroke width and font size); a path
+ * may be stretched (its outline width follows the geometric mean of the two).
  * `keepWidth` (thickness lock): a stroke's shape scales but its line width does not.
  */
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false): CanvasObject {
@@ -41,6 +43,10 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   if (o.kind === "text") {
     if (kx !== ky) throw new RangeError("text scales uniformly");
     return normalizeUnit({ ...o, anchor, w: o.w * kx, size: o.size * kx });
+  }
+  if (o.kind === "path") {
+    if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
+    return normalizeUnit({ ...o, anchor, sub: scaleSubs(o.sub, kx, ky), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
 }
@@ -126,6 +132,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   const unit = o.unit + n;
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
   if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s };
+  if (o.kind === "path") return { ...o, unit, sub: scaleSubs(o.sub, s, s), width: o.width * s };
   return { ...o, unit, w: o.w * s, h: o.h * s };
 }
 

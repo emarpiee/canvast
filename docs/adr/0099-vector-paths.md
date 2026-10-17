@@ -1,0 +1,38 @@
+# ADR 0099: Vector paths and shapes
+
+## Status
+Accepted (v0.17.0). First slice of the vector plan: shapes, Bézier paths, fills and outlines, node editing. Gradients, Booleans, SVG as vectors, SVG export and exact edges at extreme depth are the next slices (below).
+
+## Decision
+**One new kind of object, `path`** (`src/doc/model.ts`, geometry in `src/doc/path.ts`). It has the same exact placement as every object (an exact dyadic anchor, an integer unit, optional `rot`, `frame`, groups, opacity, blend, tags, hide, lock), and local geometry in doubles:
+
+* `sub`: sub-paths (`{ n, closed }`). Nodes are six numbers each, `[x, y, inX, inY, outX, outY]`, handles as absolute local coordinates, so a move, a stretch or a turn is one map over all three points and stays exact. A handle equal to its point is no handle; a segment with none at both ends is a line, else a cubic Bézier. Several sub-paths make holes and compound shapes (the base for Booleans and SVG).
+* `fill`, `stroke`: `#rrggbb` or `#rrggbbaa`, or null. `width` in local units (so it scales with the object, like a stroke's), `join` (miter or bevel; absent: round), `cap` (butt or square; absent: round), `evenodd`, and `shape` (rect, ellipse, line, polygon, star) only for the name and the tool's defaults. A shape is a path made by a generator, not a separate kind: after the first node edit it is simply a path.
+
+**Rotation** is the stroke's way: `rot` is stored and `pathSubs(o)` turns the sub-paths about the centre of the unturned bounds (cached), so turning by an angle and back is exact. **Bounds** are tight: curve extremes, plus half the outline width, plus the tips of mitered corners (within the miter limit 4) and the corners of square caps. A stretch scales the nodes on each axis (outline by the geometric mean; thickness lock keeps it); a turned path scales uniformly only.
+
+**Drawing.** A path is projected through the shared projection like everything else (`render/projection.ts`): every node and handle is projected (the double-double fast path, or exact projection when the fast path is not accurate), then each cubic is flattened in screen space to within 0.2 px. The count of pieces is Wang's bound, ceil(sqrt(3/4 · M / tol)) with M the larger second difference of the control points; a curve that needs more than 24 pieces is halved and each half culled against the view (grown by 4096 px), so only the visible part of a huge curve costs anything, and a piece wholly beyond one side of the view is its chord. One `Path2D`-style path is filled, then stroked, once, with the object's opacity and blend mode; a see-through or blended object with both is drawn on a scratch layer first, so the outline does not show the fill through itself. Outlines past 8192 px outside the view are clipped (fill: Sutherland-Hodgman; line: per segment) so the rasterizer never sees large coordinates. 1000 ellipses flatten in 4.5 ms, 1000 rectangles in 2 ms.
+
+**Picking.** `hitsObject` for a path: the outline within the pen's reach plus the pointer tolerance, or the inside of the fill by winding (non-zero or even-odd) on the same flattened outline that is drawn; an unfilled shape is picked by its line only. Lasso and box take a path when they touch its outline, not when they sit wholly inside its fill (the rule that keeps a drawing over a picture safe). The eraser and the selection box use the same projection. A turned path's selection box is its own turned bounds.
+
+**Deep zoom.** Every kind needs a coarse sampler (`render/coarse.ts`): a path's classifies a point of the view against the flattened outline, in local units, with the usual margin (the size of the view and the rounding error): inside the fill, or inside the outline band, covers the view with that colour; outside both misses; near an edge asks for the exact path. When the object cannot be placed in doubles (its bounds past 2^44 px, or an outline wider than 2^14 px), `projectPath` first classifies the same way: a view wholly inside the fill or the outline is that colour **exactly**, a miss draws nothing, and only an edge in view falls back to the colour at the centre drawn dimmed (the same stand-in strokes use past the coarse limit, ADR 0016).
+
+**Known limit (next slice, "exact edges").** With an edge in view and the path larger than 2^44 px (about 1.7 x 10^10 times the object's own size), the edge is the dimmed approximation, not a line: placing it needs the visible part of each curve clipped in exact dyadic arithmetic before it is turned into doubles. Edges are exact below that (tested: an edge at 2^34 magnification is within a pixel, and the corner of a rectangle too).
+
+**Tools.** *Shape* (key U, rebindable): drag out a rectangle, ellipse, line, polygon (sides) or star (points); Shift keeps a square, a circle or a 45-degree line, Alt draws from the centre; a click without a drag makes nothing. *Path* (B): a click adds a corner, a drag pulls the handles of a smooth node, a click on the first node closes the path (filled), Enter, Escape, a double-click or leaving the tool ends it open (stroked), Backspace takes back the last node. *Edit nodes* (N, or a double-click on a path with Select): drag a node (its handles with it), drag a handle (the other follows when the node is smooth; Alt breaks it), click a segment to add a node on it (the curve does not change), Alt-click a node to turn it smooth or back to a corner, Delete removes the selected node. Every gesture is a preview that becomes one transaction, so one undo takes it back; a turned path is baked (its turn goes into the nodes, the look unchanged) on its first edit.
+
+**Paint.** The Fill and Outline chips in the options row (the colour picker, with transparency and a "No fill" / "No outline" toggle) set what the next shape or path gets, or, with Select or Edit nodes, the paint of the selected paths: shown live while the picker is dragged (a `paint` preview) and stored as one undo step when it settles. The outline width slider is the Select tool's thickness slider (now for paths too) or the Shape and Path tools' own. Defaults persist as device settings (`shape.*`).
+
+**Files.** Objects serialize through `serializeObject` unchanged in kind (`sub` is plain JSON), so IndexedDB, `.canvast` archives and the clipboard carry paths without a format change; validation rejects bad paint, empty or ragged sub-paths, non-finite numbers and more than 4096 sub-paths or 200,000 nodes.
+
+## Tests
+`tests/unit/path.test.ts` (bounds incl. miter tips and square caps, flattening accuracy and cost, culling, the budget, winding with holes, node edits that must not change the curve), `tests/unit/path-object.test.ts` (validation, serialization, rotation, scale and normalize, projection, picking, lasso, turned selection box, the out-of-range fallbacks, the coarse sampler), `tests/e2e/vectors.spec.ts` (every tool with real input, selection and transforms, node editing, colours, an edge at 2^34 magnification, a shape drawn 40 levels deep, a view 5000 levels below a shape, duplicate/paste/group/eraser/Layers), Chromium and Firefox.
+
+## Next slices
+| # | Slice | Notes |
+| --- | --- | --- |
+| 1b | Exact edges at any depth | Exact dyadic clipping of each visible curve piece; removes the known limit above. |
+| 2 | Gradients | Linear and radial fills and outlines; a gradient editor in the colour package (stops, angle), reusing the picker per stop. |
+| 3 | Booleans | Union, intersect, subtract and exclude of closed paths into a compound path. |
+| 4 | SVG | Import as paths and shapes (with their paint and transforms); export of a selection as SVG. |
+| 5 | Rounded rectangles, dashes, a corner-radius handle, align to nodes, snapping to nodes | Quality of life. |

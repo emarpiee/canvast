@@ -7,8 +7,9 @@ import type { CanvasObject, ObjectId } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
+import type { ShapeKind, SubPath } from "../doc/path";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser" | "shape" | "path" | "node";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -25,7 +26,44 @@ export type Preview =
   /** Rotate strokes by `delta` (core/angle.ts). `about` null: each stroke about its own centre (a single selection); otherwise a point in `frame`. */
   | { kind: "rotate"; ids: readonly ObjectId[]; frame: Frame; about: WorldPoint | null; delta: number }
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
-  | { kind: "edit"; ids: readonly ObjectId[] };
+  | { kind: "edit"; ids: readonly ObjectId[] }
+  /** Nodes of one path being dragged (ADR 0099): the path as it would be (a turned path is baked, so `rot` goes). */
+  | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[] }
+  /** The fill and/or outline of paths being changed in the colour picker (ADR 0099); committed once when the picker settles. */
+  | { kind: "paint"; ids: readonly ObjectId[]; fill?: string | null; stroke?: string | null };
+
+/** A shape being dragged out (the Shape tool): its box in local units of its own anchor, like a stroke's draft. */
+export interface DraftShape {
+  frame: Frame;
+  anchor: WorldPoint;
+  unit: number;
+  kind: ShapeKind;
+  /** Box (kinds but a line) or the line's two ends (x, y, x + w, y + h), local. */
+  bx: number;
+  by: number;
+  bw: number;
+  bh: number;
+  sides: number;
+  tips: number;
+  fill: string | null;
+  stroke: string | null;
+  /** Outline width in local units. */
+  width: number;
+}
+
+/** A Bézier path being built, node by node (the Path tool). */
+export interface DraftPath {
+  frame: Frame;
+  anchor: WorldPoint;
+  unit: number;
+  /** Nodes so far, six numbers each (doc/path.ts), local. */
+  n: number[];
+  /** The pointer, local, for the line that follows it (null until it moves). */
+  cursor: { x: number; y: number } | null;
+  fill: string | null;
+  stroke: string | null;
+  width: number;
+}
 
 export interface DraftStroke {
   /** The frame the stroke started in: its points stay there if the camera rebases mid-stroke (ADR 0014). */
@@ -84,6 +122,17 @@ export class EditorState {
   guides: { x?: number; y?: number } | null = null;
   /** Select tool: ignore an object that fills the whole view (zoomed far into it), so it cannot be picked or deleted by accident. */
   ignoreFilling = false;
+  /** The Shape and Path tools (ADR 0099): what they make. Fill and outline null: none. */
+  shapeKind: ShapeKind = "rect";
+  shapeFill: string | null = "#2563eb";
+  shapeStroke: string | null = "#1f2329";
+  shapeWidthPx = 2;
+  shapeSides = 6;
+  shapeTips = 5;
+  shapeDraft: DraftShape | null = null;
+  pathDraft: DraftPath | null = null;
+  /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */
+  nodeSel: { s: number; k: number } | null = null;
   /** Pen stabilizer (interaction/stabilizer.ts): on/off and strength 0–100. */
   stabilizer = { on: false, strength: 50 };
   preview: Preview = { kind: "none" };
@@ -129,6 +178,7 @@ export class EditorState {
 
   select(ids: Iterable<ObjectId>, additive = false): void {
     if (!additive) this.selection.clear();
+    this.nodeSel = null;
     for (const id of ids) this.selection.add(id);
     this.changed();
   }
@@ -143,6 +193,13 @@ export class EditorState {
   previewed(o: CanvasObject): CanvasObject | null {
     const p = this.preview;
     if (p.kind === "edit" && p.ids.includes(o.id)) return null;
+    if (p.kind === "paint" && p.ids.includes(o.id) && o.kind === "path") {
+      return { ...o, ...(p.fill !== undefined ? { fill: p.fill } : {}), ...(p.stroke !== undefined ? { stroke: p.stroke } : {}) };
+    }
+    if (p.kind === "nodes" && p.ids.includes(o.id) && o.kind === "path") {
+      const { rot: _turned, ...flat } = o;
+      return { ...flat, sub: p.sub };
+    }
     if (p.kind === "move" && p.ids.includes(o.id)) {
       // A displacement only scales between frames: exact shift.
       const L = levelsBetween(o.frame ?? p.frame.space.world, p.frame);
@@ -157,7 +214,7 @@ export class EditorState {
     if (p.kind === "scale" && p.ids.includes(o.id)) {
       const f = o.frame ?? p.frame.space.world;
       const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
-      return scaleAbout(o, fixed, p.kx, o.kind === "image" ? p.ky : p.kx, p.keepWidth);
+      return scaleAbout(o, fixed, p.kx, o.kind === "image" || (o.kind === "path" && !o.rot) ? p.ky : p.kx, p.keepWidth);
     }
     return o;
   }

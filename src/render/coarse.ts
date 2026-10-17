@@ -2,8 +2,10 @@ import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { TermSum } from "../core/frames";
 import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
-import type { CanvasObject, ImageObject, StrokeObject, TextObject } from "../doc/model";
-import { localBounds, pivotOf, strokePoints } from "../doc/model";
+import type { CanvasObject, ImageObject, PathObject, StrokeObject, TextObject } from "../doc/model";
+import { localBounds, pathSubs, pivotOf, strokePoints } from "../doc/model";
+import type { FlatPath } from "../doc/path";
+import { distanceToOutline, flatten, insideFill } from "../doc/path";
 import { cosSin } from "../core/angle";
 import { layoutText, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
@@ -94,7 +96,7 @@ export function classifyCoarse(
   const m = (2 ** info.errLog2 + 2 ** viewLog2) / scale + mag * ROUND;
   if (lx < b.minX - m || lx > b.maxX + m || ly < b.minY - m || ly > b.maxY + m) return "miss";
   const sampler = SAMPLERS[o.kind] as CoarseSampler<CanvasObject>;
-  if (o.kind !== "stroke" && o.rot) {
+  if (o.kind !== "stroke" && o.kind !== "path" && o.rot) {
     // Undo the turn about the pivot, then test the unturned object. Exact pixel boundaries need the unturned centre, so they are not available.
     const { x, y } = unturn(o, lx, ly);
     return sampler.classify(o, { lx: x, ly: y, m, vp, info, terms: () => null });
@@ -120,7 +122,7 @@ export function approxCoarse(o: CanvasObject, center: WorldPoint, info: CoarseIn
   const lx = D.toNumber(D.sub(center.x, o.anchor.x)) / scale;
   const ly = D.toNumber(D.sub(center.y, o.anchor.y)) / scale;
   const sampler = SAMPLERS[o.kind] as CoarseSampler<CanvasObject>;
-  const at = o.kind !== "stroke" && o.rot ? unturn(o, lx, ly) : { x: lx, y: ly };
+  const at = o.kind !== "stroke" && o.kind !== "path" && o.rot ? unturn(o, lx, ly) : { x: lx, y: ly };
   return { ...sampler.approx(o, { lx: at.x, ly: at.y, m: 0, vp, info, terms: () => null }), dim: true };
 }
 
@@ -137,6 +139,49 @@ const strokeSampler: CoarseSampler<StrokeObject> = {
   },
   approx: (o) => ({ color: o.color }),
 };
+
+// A path is tested against its own flattened outline, in local units, at a tolerance that is a fraction of its size.
+const flatCache = new WeakMap<PathObject, readonly FlatPath[]>();
+const EVERYWHERE = { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
+
+function flatOf(o: PathObject): readonly FlatPath[] {
+  let f = flatCache.get(o);
+  if (!f) {
+    const b = localBounds(o);
+    const size = Math.max(b.maxX - b.minX, b.maxY - b.minY) || 1;
+    const subs = pathSubs(o);
+    f = flatten(subs, subs.map((s) => Float64Array.from(s.n)), size * 2e-4, EVERYWHERE, 0);
+    flatCache.set(o, f);
+  }
+  return f;
+}
+
+const pathSampler: CoarseSampler<PathObject> = {
+  classify(o, { lx, ly, m }) {
+    const f = flatOf(o);
+    const d = distanceToOutline(f, lx, ly);
+    if (o.stroke !== null) {
+      const h = o.width / 2;
+      if (d <= h - m) return { color: o.stroke };
+      if (d < h + m) return "exact"; // the edge of the outline is within the view
+    } else if (d < m) return "exact"; // the edge of the fill is
+    return o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? { color: o.fill } : "miss";
+  },
+  approx(o, { lx, ly }) {
+    const f = flatOf(o);
+    if (o.stroke !== null && distanceToOutline(f, lx, ly) <= o.width / 2) return { color: o.stroke };
+    return { color: o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? o.fill : "transparent" };
+  },
+};
+
+/** Where a point of a path's own units lies, with a margin `m` of doubt (the size of the view in those units): see `CoarseSampler.classify`. */
+export const classifyPath = (o: PathObject, lx: number, ly: number, m: number): CoarseResult => pathSampler.classify(o, { lx, ly, m, vp: { width: 0, height: 0 }, info: { errLog2: 0, zTrue: 0 }, terms: () => null });
+
+/** What a path shows at a point in its own units when its edges are too far out of range to place: its colour there, or null for nothing. */
+export function approxPath(o: PathObject, lx: number, ly: number): Cover | null {
+  const c = pathSampler.approx(o, { lx, ly, m: 0, vp: { width: 0, height: 0 }, info: { errLog2: 0, zTrue: 0 }, terms: () => null });
+  return c.color === "transparent" ? null : c;
+}
 
 /** Source pixel boundaries of one image axis near the view: [lo, hi] px offsets from the view centre, per pixel index. */
 function axisRuns(t: TermSum, count: number, size: number, ctr: number, unit: number, zTrue: number, half: number): Array<{ lo: number; hi: number; index: number }> {
@@ -298,4 +343,5 @@ export const SAMPLERS: { [K in CanvasObject["kind"]]: CoarseSampler<Extract<Canv
   stroke: strokeSampler,
   image: imageSampler,
   text: textSampler,
+  path: pathSampler,
 };

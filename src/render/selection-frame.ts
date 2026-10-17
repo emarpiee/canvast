@@ -28,6 +28,7 @@ export function itemCorners(po: ProjectedObject): Pt[] {
       return [t.cx + ox, t.cy + oy] as Pt;
     });
   }
+  if (po.corners && !po.cover) return po.corners.map(([x, y]) => [x, y] as Pt); // a turned path: its own bounds, turned with it
   const o = po.obj;
   if (o.kind === "stroke" && !po.cover) {
     // The oriented bounding rectangle of its points, in the direction of its own rotation, grown by the pen radius.

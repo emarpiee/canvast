@@ -45,6 +45,12 @@ export interface ColourPopoverOptions {
   onInput(hex: string): void;
   /** Once, when a gesture ends or a swatch is chosen (the colour is also added to the recent list). */
   onChange?(hex: string): void;
+  /** Offer transparency (the colour may be "#rrggbbaa"). */
+  alpha?: boolean;
+  /** A toggle above the picker for "no colour" (no fill, no outline): choosing any colour switches it off. */
+  none?: { label: string; active: boolean; set(on: boolean): void };
+  /** The popover closed (Escape, a press elsewhere, another popover). */
+  onClose?(): void;
 }
 
 /** Under the button, or above it when that fits better; when neither fits, under it with a scroll (never over the button). */
@@ -60,15 +66,16 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
   }
 }
 
-let open: { pop: HTMLElement; anchor: HTMLElement; picker: ColourPicker } | null = null;
+let open: { pop: HTMLElement; anchor: HTMLElement; picker: ColourPicker; onClose: (() => void) | undefined } | null = null;
 
 export function closeColourPopover(refocus = false): void {
   if (!open) return;
-  const { pop, anchor, picker } = open;
+  const { pop, anchor, picker, onClose } = open;
   open = null;
   picker.destroy();
   pop.remove();
   anchor.setAttribute("aria-expanded", "false");
+  onClose?.();
   if (refocus && anchor.isConnected) anchor.focus();
 }
 
@@ -88,7 +95,15 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
     format: store?.get("colour.format") ?? "hex",
     groups: groups(),
     display: swatchBackground,
-    onInput: o.onInput,
+    alpha: o.alpha === true,
+    onInput: (hex) => {
+      if (none?.classList.contains("is-on")) {
+        o.none!.set(false);
+        none.classList.remove("is-on");
+        none.setAttribute("aria-pressed", "false");
+      }
+      o.onInput(hex);
+    },
     onChange: (hex) => {
       rememberColour(hex);
       o.onChange?.(hex);
@@ -105,11 +120,28 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
   pop.className = "colour-pop";
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", o.name);
+  // "No colour": a toggle above the picker (a fill or an outline can be left off).
+  let none: HTMLButtonElement | null = null;
+  if (o.none) {
+    none = document.createElement("button");
+    none.type = "button";
+    none.className = "colour-none";
+    none.textContent = o.none.label;
+    none.setAttribute("aria-pressed", String(o.none.active));
+    none.classList.toggle("is-on", o.none.active);
+    none.addEventListener("click", () => {
+      const on = !none!.classList.contains("is-on");
+      none!.classList.toggle("is-on", on);
+      none!.setAttribute("aria-pressed", String(on));
+      o.none!.set(on);
+    });
+    pop.append(none);
+  }
   pop.append(picker.el);
   document.body.appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
-  open = { pop, anchor, picker };
+  open = { pop, anchor, picker, onClose: o.onClose };
   picker.el.querySelector<HTMLElement>("[role=radio][aria-checked=true]")?.focus();
 }
 

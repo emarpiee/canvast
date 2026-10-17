@@ -5,7 +5,7 @@ import * as D from "../core/dyadic";
 import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject, ImageObject, MediaState } from "../doc/model";
+import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -636,4 +636,40 @@ export async function importImages(
   editor.message = notice ?? (cardNote || (list.length > 3 ? `Imported ${records.length} files.` : ""));
   editor.changed();
   return placed;
+}
+
+// ---- Fill and outline of paths (ADR 0099) --------------------------------------------------------
+
+/** The selected paths that can be edited (not locked), in paint order. */
+const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked);
+
+/** The fill and outline of the first selected path, or null when none is selected. */
+export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: string | null; stroke: string | null } | null {
+  const o = editablePaths(doc, editor)[0];
+  return o ? { fill: o.fill, stroke: o.stroke } : null;
+}
+
+export interface PaintPatch {
+  fill?: string | null;
+  stroke?: string | null;
+}
+
+/** Show a new fill or outline on the selected paths without storing it (the picker is still being dragged). */
+export function previewPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
+  const ids = editablePaths(doc, editor).map((o) => o.id);
+  if (!ids.length || editor.blockEdit()) return;
+  editor.preview = { kind: "paint", ids, ...patch };
+  editor.changed();
+}
+
+/** Store a new fill or outline on the selected paths: one undo step. */
+export function commitPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
+  editor.preview = { kind: "none" };
+  const differs = (o: PathObject): boolean => (patch.fill !== undefined && o.fill !== patch.fill) || (patch.stroke !== undefined && o.stroke !== patch.stroke);
+  const paths = editablePaths(doc, editor).filter(differs);
+  if (paths.length && !editor.blockEdit()) {
+    const what = patch.fill !== undefined && patch.stroke !== undefined ? "fill and outline" : patch.fill !== undefined ? "fill" : "outline";
+    doc.commit(doc.transaction(paths.length === 1 ? `Change ${what}` : `Change ${what} of ${paths.length} paths`, paths.map((o) => ({ ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) }))));
+  }
+  editor.changed();
 }

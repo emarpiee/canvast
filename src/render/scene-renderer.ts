@@ -5,8 +5,10 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
-import { batchable, drawCover, drawImageObject, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
-import type { StrokeObject } from "../doc/model";
+import { batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
+import type { PathObject, StrokeObject } from "../doc/model";
+import { NODE, shapeSubs } from "../doc/path";
+import { nodesOnScreen } from "../interaction/path-edit";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
@@ -115,6 +117,7 @@ export function drawObjects(
       drawCover(ctx, po, vp, src, theme.imagePlaceholder);
     } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
     else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
+    else if (po.obj.kind === "path") drawPath(ctx, po, vp);
     else {
       const shown = shownEdge(po);
       const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
@@ -203,7 +206,64 @@ export function drawOverlays(
     }
   }
 
+  // The shape being dragged out and the path being drawn, through the same projection as committed paths.
+  const sd = editor.shapeDraft;
+  if (sd && (sd.bw || sd.bh)) {
+    const cam = cameraIn(fc, sd.frame);
+    const draft: PathObject = {
+      id: DRAFT_ID,
+      kind: "path",
+      anchor: sd.anchor,
+      unit: sd.unit,
+      z: Infinity,
+      opacity: 1,
+      attachmentTargetId: null,
+      sub: shapeSubs(sd.kind, sd.bx, sd.by, sd.bw, sd.bh, sd.sides, sd.tips),
+      fill: sd.fill,
+      stroke: sd.stroke,
+      width: sd.width,
+      ...(sd.kind === "rect" || sd.kind === "polygon" || sd.kind === "star" ? { join: "miter" as const } : {}),
+    };
+    const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
+    if (po) drawPath(ctx, po, vp);
+  }
+  const pd = editor.pathDraft;
+  if (pd && pd.n.length) {
+    const cam = cameraIn(fc, pd.frame);
+    // The nodes so far, and a last segment running to the pointer.
+    const n = pd.cursor ? [...pd.n, pd.cursor.x, pd.cursor.y, pd.cursor.x, pd.cursor.y, pd.cursor.x, pd.cursor.y] : pd.n;
+    const draft: PathObject = {
+      id: DRAFT_ID,
+      kind: "path",
+      anchor: pd.anchor,
+      unit: pd.unit,
+      z: Infinity,
+      opacity: 1,
+      attachmentTargetId: null,
+      sub: [{ n, closed: false }],
+      fill: null,
+      stroke: pd.stroke ?? "#1f2329",
+      width: pd.width,
+    };
+    const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
+    if (po && !po.cover) {
+      drawPath(ctx, po, vp);
+      ctx.save();
+      ctx.strokeStyle = theme.selection;
+      ctx.fillStyle = theme.handleFill;
+      ctx.lineWidth = 1.25;
+      const nodes = nodesOnScreen(po);
+      nodes.slice(0, pd.n.length / NODE).forEach((m, i) => {
+        const h = i === 0 ? HANDLE_SIZE_PX + 2 : HANDLE_SIZE_PX - 2; // the first is larger: pressing it closes the path
+        ctx.fillRect(m.p[0] - h / 2, m.p[1] - h / 2, h, h);
+        ctx.strokeRect(m.p[0] - h / 2, m.p[1] - h / 2, h, h);
+      });
+      ctx.restore();
+    }
+  }
+
   drawSelection(ctx, selected, editor, theme, vp);
+  if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
 
   if (editor.lasso && editor.lasso.length >= 4) {
     ctx.save();
@@ -226,6 +286,42 @@ export function drawOverlays(
     ctx.strokeRect(Math.min(m.x0, m.x1) + 0.5, Math.min(m.y0, m.y1) + 0.5, Math.abs(m.x1 - m.x0), Math.abs(m.y1 - m.y0));
     ctx.restore();
   }
+}
+
+/** Nodes and handles of the one selected path, for the Edit nodes tool: squares for nodes, circles for the handles of the selected one. */
+function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
+  if (selected.length !== 1) return;
+  const po = selected[0]!;
+  if (po.obj.kind !== "path" || po.cover) return;
+  const half = HANDLE_SIZE_PX / 2;
+  const sel = editor.nodeSel;
+  ctx.save();
+  ctx.strokeStyle = theme.selection;
+  ctx.lineWidth = 1.25;
+  const nodes = nodesOnScreen(po);
+  for (const n of nodes) {
+    if (!sel || n.s !== sel.s || n.k !== sel.k) continue;
+    // The handles of the selected node, each on a line from it.
+    ctx.fillStyle = theme.handleFill;
+    for (const [on, h] of [[n.hasIn, n.i], [n.hasOut, n.o]] as const) {
+      if (!on) continue;
+      ctx.beginPath();
+      ctx.moveTo(n.p[0], n.p[1]);
+      ctx.lineTo(h[0], h[1]);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(h[0], h[1], half - 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  for (const n of nodes) {
+    const on = !!sel && n.s === sel.s && n.k === sel.k;
+    ctx.fillStyle = on ? theme.selection : theme.handleFill;
+    ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
+    ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
+  }
+  ctx.restore();
 }
 
 /** Placeholder id for the in-progress stroke; never stored. */
@@ -285,7 +381,9 @@ function drawSelection(
     ctx.closePath();
     ctx.stroke();
   }
-  const sel = selectedFrame(visible, editor, vp);
+  // Editing nodes: the nodes are the handles; the selection's own handles would sit on top of them.
+  const sel = editor.tool === "node" ? null : selectedFrame(visible, editor, vp);
+  if (editor.tool === "node") editor.selectionBoxOnScreen = null;
   if (sel && sel.frame.corners.every(finite)) {
     const { frame, handle } = sel;
     // The box the handles sit on, always drawn: for one object in an axis-aligned box it is not the object's own outline.

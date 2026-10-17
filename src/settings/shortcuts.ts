@@ -7,14 +7,17 @@ import type { SettingKey, SettingsStore } from "./settings";
  * fixed and listed there so the list is the one place to look. A tool key is one plain letter (no modifier), so it never clashes
  * with the Ctrl and Shift combinations below.
  */
-export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "pen", "lasso", "text", "eraser"];
+export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "node", "pen", "shape", "path", "lasso", "text", "eraser"];
 
-export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", pen: "Pen", lasso: "Lasso", text: "Text", eraser: "Object eraser" };
+export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", node: "Edit nodes", pen: "Pen", shape: "Shape", path: "Path (curves)", lasso: "Lasso", text: "Text", eraser: "Object eraser" };
 
 export const TOOL_KEY_SETTING: Record<Tool, SettingKey> = {
   hand: "key.hand",
   select: "key.select",
+  node: "key.node",
   pen: "key.pen",
+  shape: "key.shape",
+  path: "key.path",
   lasso: "key.lasso",
   text: "key.text",
   eraser: "key.eraser",
@@ -118,6 +121,15 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "Ctrl+drag a handle", does: "Resize without snapping" },
       { keys: "Delete or Backspace", does: "Delete the selection" },
       { keys: "Escape", does: "Cancel the gesture, then back to Select, then leave a group, then clear the selection" },
+    ],
+  },
+  {
+    group: "Shapes and paths",
+    items: [
+      { keys: "U, then drag", does: "Draw the shape chosen in the options (Shift: a square, a circle or a 45 degree line; Alt: from the centre)" },
+      { keys: "B, then click or drag", does: "Draw a path: a click is a corner, a drag pulls out a smooth node's handles; click the first node to close it" },
+      { keys: "Enter, Escape or a double-click", does: "End the path being drawn, open (Backspace takes back its last node)" },
+      { keys: "N, or a double-click on a path", does: "Edit its nodes: drag a node or a handle, click a line to add a node, Alt-click a node for smooth or corner, Delete removes it" },
     ],
   },
   {

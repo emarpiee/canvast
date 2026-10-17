@@ -3,7 +3,7 @@ import type { Camera, Viewport } from "../core/camera";
 import { screenToWorld } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { DocumentStore } from "../doc/document-store";
-import { localBounds, strokePoints } from "../doc/model";
+import { inkOf, localBounds, pathSubs, strokePoints } from "../doc/model";
 
 /**
  * Multi-scale spatial index over exact world coordinates.
@@ -69,13 +69,28 @@ const TEXT_INK_PER_CHAR = 0.3;
  */
 function objectInk(o: CanvasObject): { area: number; rgb: readonly [number, number, number] } {
   if (o.kind === "image") return { area: o.w * o.h * o.opacity, rgb: IMAGE_INK_RGB };
-  const c = parseInt(o.color.slice(1), 16);
+  const c = parseInt(inkOf(o).rgb.slice(1), 16);
   const rgb = [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+  if (o.kind === "path") return { area: pathInkArea(o) * inkOf(o).alpha * o.opacity, rgb };
   if (o.kind === "text") return { area: o.md.replace(/\s/g, "").length * o.size * o.size * TEXT_INK_PER_CHAR * o.opacity, rgb };
   const p = strokePoints(o);
   let len = 0;
   for (let i = 2; i + 1 < p.length; i += 2) len += Math.hypot(p[i]! - p[i - 2]!, p[i + 1]! - p[i - 1]!);
   return { area: (len * o.width + (Math.PI * o.width * o.width) / 4) * o.opacity, rgb };
+}
+
+/** Covered area of a path in local units²: its fill (the area of the bounds, scaled by a sample of how much of them it fills) or its outline. */
+function pathInkArea(o: Extract<CanvasObject, { kind: "path" }>): number {
+  const b = localBounds(o);
+  const box = Math.max(0, b.maxX - b.minX) * Math.max(0, b.maxY - b.minY);
+  let outline = 0;
+  for (const s of pathSubs(o)) {
+    const n = s.n;
+    for (let i = 6; i + 1 < n.length; i += 6) outline += Math.hypot(n[i]! - n[i - 6]!, n[i + 1]! - n[i - 5]!);
+    if (s.closed && n.length >= 12) outline += Math.hypot(n[0]! - n[n.length - 6]!, n[1]! - n[n.length - 5]!);
+  }
+  if (o.fill === null) return outline * o.width;
+  return box * 0.7; // a shape fills about this much of its box (a rectangle all of it, an ellipse 0.79, a star 0.4): good enough for a preview
 }
 
 function addInk(t: Ink, area: number, rgb: readonly [number, number, number], sign: 1 | -1): void {

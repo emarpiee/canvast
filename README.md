@@ -215,6 +215,8 @@ or network connection.
 - **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Alt` brings the
   selection into view, bookmarks save places and zooms, the canvas search finds
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
+- **Shapes and paths:** the Shape tool (rectangle, ellipse, line, polygon, star), the Path tool (Bézier curves) and Edit nodes; fills and
+  outlines with transparency; picked, moved, stretched, turned, grouped and saved like everything else (ADR 0099).
 - **Colour picker:** one picker for every colour choice (the pen colour in the toolbar and in Settings): OKHSL, OKHSV or
   OKHCL, as sliders or as a hue ring around a box, with hex, the colours picked lately and a palette (ADR 0098). It is a
   standalone module in `src/colour-picker/` (`npm run build:picker` builds it alone).

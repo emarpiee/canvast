@@ -11,7 +11,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -160,6 +160,12 @@ async function start(): Promise<void> {
   editor.penColor = settings.get("pen.color");
   editor.penWidthPx = settings.get("pen.widthPx");
   editor.penKind = settings.get("pen.kind");
+  editor.shapeKind = settings.get("shape.kind");
+  editor.shapeFill = settings.get("shape.fill") === "none" ? null : settings.get("shape.fill");
+  editor.shapeStroke = settings.get("shape.stroke") === "none" ? null : settings.get("shape.stroke");
+  editor.shapeWidthPx = settings.get("shape.widthPx");
+  editor.shapeSides = settings.get("shape.sides");
+  editor.shapeTips = settings.get("shape.tips");
   editor.stabilizer = { on: settings.get("pen.stabilizer.on"), strength: settings.get("pen.stabilizer.strength") };
   editor.followZoom = settings.get("pen.followZoom");
   editor.ignoreFilling = settings.get("select.ignoreFilling");
@@ -175,6 +181,12 @@ async function start(): Promise<void> {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
     settings.set("pen.kind", editor.penKind);
+    settings.set("shape.kind", editor.shapeKind);
+    settings.set("shape.fill", editor.shapeFill ?? "none");
+    settings.set("shape.stroke", editor.shapeStroke ?? "none");
+    settings.set("shape.widthPx", editor.shapeWidthPx);
+    settings.set("shape.sides", editor.shapeSides);
+    settings.set("shape.tips", editor.shapeTips);
     settings.set("pen.stabilizer.on", editor.stabilizer.on);
     settings.set("pen.stabilizer.strength", editor.stabilizer.strength);
     settings.set("pen.followZoom", editor.followZoom);
@@ -501,13 +513,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     clearFlag: (flag) => clearFlag(doc, editor, flag),
     depth: () => depthOf(view.frameCamera),
     setSelectedWidth: (px) => {
-      // Width in the stroke's own units: screen px / (screen px per local unit). Strokes out of double range are skipped.
+      // Width in the stroke's own units: screen px / (screen px per local unit). Strokes and paths out of double range are skipped.
       const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po) => {
         const ppu = po.cover ? 0 : po.proj.ppu;
-        return po.obj.kind === "stroke" && editor.selection.has(po.obj.id) && ppu > 0 && ppu < Infinity ? [{ ...po.obj, width: px / ppu }] : [];
+        return (po.obj.kind === "stroke" || po.obj.kind === "path") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity ? [{ ...po.obj, width: px / ppu }] : [];
       });
-      if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Stroke thickness" : `Thickness of ${next.length} strokes`, next));
+      if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
     },
+    selectedPaint: () => selectedPaint(doc, editor),
+    paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
       if (!md.length) return;

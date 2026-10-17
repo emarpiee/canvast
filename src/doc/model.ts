@@ -6,6 +6,8 @@ import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
+import type { Cap, Join, ShapeKind, SubPath } from "./path";
+import { NODE, SHAPE_KINDS, paintBounds, rotateSubs } from "./path";
 
 /**
  * Authoritative canvas objects.
@@ -121,7 +123,47 @@ export interface TextObject extends ObjectBase {
   readonly color: string;
 }
 
-export type CanvasObject = StrokeObject | ImageObject | TextObject;
+/**
+ * A vector path (ADR 0099): sub-paths of nodes with Bézier handles (doc/path.ts), filled and/or stroked. The geometry is local
+ * doubles like a stroke's, placed by the exact anchor and unit; `rot` turns it (see `pathSubs`). Shapes (rectangle, ellipse, line,
+ * polygon, star) are made as paths and remember what they were in `shape`, only for their label and tool defaults.
+ */
+export interface PathObject extends ObjectBase {
+  readonly kind: "path";
+  readonly sub: readonly SubPath[];
+  /** "#rrggbb" or "#rrggbbaa"; null: not filled. */
+  readonly fill: string | null;
+  /** "#rrggbb" or "#rrggbbaa"; null: no outline. */
+  readonly stroke: string | null;
+  /** Outline width in local units (kept positive even without an outline, so turning one on has a width to show). */
+  readonly width: number;
+  /** Absent: round. */
+  readonly join?: Join;
+  /** Absent: round. */
+  readonly cap?: Cap;
+  /** Fill rule: absent is non-zero. */
+  readonly evenodd?: true;
+  readonly shape?: ShapeKind;
+}
+
+export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
+
+/** The outline style of a path as `paintBounds` takes it (null: no outline). */
+export const pathStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap } | null => (o.stroke === null ? null : { width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}) });
+
+const turnedPaths = new WeakMap<PathObject, readonly SubPath[]>();
+
+/** The sub-paths that are drawn, hit and indexed: `sub` turned by `rot` about the centre of the unturned bounds (the same array when not turned). */
+export function pathSubs(o: PathObject): readonly SubPath[] {
+  if (!o.rot) return o.sub;
+  let r = turnedPaths.get(o);
+  if (!r) {
+    const b = paintBounds(o.sub, pathStyle(o));
+    const { c, s } = cosSin(o.rot);
+    turnedPaths.set(o, (r = rotateSubs(o.sub, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
+  }
+  return r;
+}
 
 /** Margin around a text box (em) for italic overhang, bold and descenders past the line box. */
 export const TEXT_PAD_EM = 0.25;
@@ -172,6 +214,7 @@ export function strokePoints(o: StrokeObject): readonly number[] {
 
 /** Bounds of the object's own geometry before `rot` is applied. */
 export function unrotatedBounds(o: CanvasObject): LocalBounds {
+  if (o.kind === "path") return paintBounds(o.sub, pathStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
     const l = layoutText(o.md, o.w / o.size);
@@ -200,6 +243,7 @@ export function pivotOf(o: CanvasObject): { x: number; y: number } {
 }
 
 export function localBounds(o: CanvasObject): LocalBounds {
+  if (o.kind === "path") return o.rot ? paintBounds(pathSubs(o), pathStyle(o)) : paintBounds(o.sub, pathStyle(o));
   if (o.kind !== "stroke") {
     const b = unrotatedBounds(o);
     if (!o.rot) return b;
@@ -230,6 +274,13 @@ export function localBounds(o: CanvasObject): LocalBounds {
   return { minX: minX - r, minY: minY - r, maxX: maxX + r, maxY: maxY + r };
 }
 
+/** The one colour that stands for an object where only one fits (the density preview, the layers list): "#rrggbb" and its opacity, 0 to 1. */
+export function inkOf(o: StrokeObject | TextObject | PathObject): { rgb: string; alpha: number } {
+  if (o.kind !== "path") return { rgb: o.color, alpha: 1 };
+  const paint = o.fill ?? o.stroke ?? "#000000";
+  return { rgb: paint.slice(0, 7), alpha: paint.length === 9 ? parseInt(paint.slice(7), 16) / 255 : 1 };
+}
+
 export function newObjectId(): ObjectId {
   const b = new Uint8Array(16);
   crypto.getRandomValues(b);
@@ -244,6 +295,10 @@ export class InvalidObjectError extends Error {}
 const ID_RE = /^[0-9a-f]{32}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
+const PAINT_RE = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
+/** Most sub-paths in a path, and most nodes in all of them (a guard against a hand-edited or hostile file). */
+export const MAX_SUBPATHS = 4096;
+export const MAX_PATH_NODES = 200_000;
 
 function finite(x: unknown, what: string): number {
   if (typeof x !== "number" || !Number.isFinite(x)) throw new InvalidObjectError(`${what} is not a finite number`);
@@ -286,6 +341,21 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean")) throw new InvalidObjectError("bad media state");
+  } else if (o.kind === "path") {
+    if (!Array.isArray(o.sub) || o.sub.length < 1 || o.sub.length > MAX_SUBPATHS) throw new InvalidObjectError("a path needs 1 to 4096 sub-paths");
+    let nodes = 0;
+    for (const s of o.sub) {
+      if (!s || !Array.isArray(s.n) || s.n.length === 0 || s.n.length % NODE !== 0 || typeof s.closed !== "boolean") throw new InvalidObjectError("bad sub-path");
+      nodes += s.n.length / NODE;
+      s.n.forEach((v: number, i: number) => finite(v, `node[${i}]`));
+    }
+    if (nodes > MAX_PATH_NODES) throw new InvalidObjectError("too many nodes");
+    for (const [what, v] of [["fill", o.fill], ["stroke", o.stroke]] as const) if (v !== null && !(typeof v === "string" && PAINT_RE.test(v))) throw new InvalidObjectError(`bad ${what} ${String(v)}`);
+    if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
+    if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
+    if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
+    if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
+    if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
   } else if (o.kind === "text") {
     if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
     positive(o.w, "w");
@@ -310,7 +380,7 @@ export function serializeObject(o: CanvasObject): SerializedObject {
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
   // `refs` is derived from the Markdown for the storage index of backlinks (ADR 0040); never read back.
   const refs = o.kind === "text" ? mentionIds(o.md) : [];
-  const s = { ...rest, ...(refs.length ? { refs } : {}), unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  const s = { ...rest, ...(refs.length ? { refs } : {}), unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, sub: o.kind === "path" ? o.sub.map((p) => ({ n: [...p.n], closed: p.closed })) : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
   if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
   return s;
 }
@@ -360,6 +430,20 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       pixelW: s["pixelW"] as number,
       pixelH: s["pixelH"] as number,
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
+    };
+  } else if (s.kind === "path") {
+    if (!Array.isArray(s["sub"])) throw new InvalidObjectError("sub-paths missing");
+    o = {
+      ...base,
+      kind: "path",
+      sub: (s["sub"] as Array<{ n: number[]; closed: boolean }>).map((p) => ({ n: p?.n as number[], closed: p?.closed as boolean })),
+      fill: (s["fill"] ?? null) as string | null,
+      stroke: (s["stroke"] ?? null) as string | null,
+      width: s["width"] as number,
+      ...(s["join"] !== undefined ? { join: s["join"] as Join } : {}),
+      ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
+      ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
+      ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.

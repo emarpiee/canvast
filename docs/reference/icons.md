@@ -15,29 +15,29 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-down-a-z` | Sort the layers by name; By name, A to Z |
 | `arrow-down-z-a` | By name, Z to A |
 | `arrow-up-down` | Sorted: Newest first. Reverse the order |
-| `blocks` | Arrange and align |
-| `camera` | Screenshot (bottom-right controls) |
-| `image-down` | Extract frame (media player) |
 | `bell` | Show a sample notice (developer tools) |
+| `blocks` | Arrange and align |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |
 | `box-select` | Axis-aligned selection box |
 | `bring-to-front` | Bring to front |
 | `calendar-days` | By date added, newest first |
+| `camera` | Screenshot (bottom-right controls) |
 | `check` | Canvas 1empty |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |
 | `chevron-left` | Previous |
 | `chevron-right` | Next |
 | `chevrons-down-up` | Collapse all groups |
 | `chevrons-up-down` | In stacking order |
+| `circle` | Ellipse shape |
 | `circle-help` | How to combine search words |
 | `copy` | Duplicate |
+| `download` | Download original (library details and selection bar) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
 | `eraser` | Object eraser |
+| `external-link` | Open in a new tab |
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
-| `download` | Download original (library details and selection bar) |
-| `external-link` | Open in a new tab |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |
@@ -50,8 +50,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `group` | Group |
 | `hand` | Hand (pan) |
 | `hard-drive-download` | Export a backup (.canvast) |
+| `hexagon` | Polygon shape |
 | `highlighter` | Marker |
 | `house` | Return to origin |
+| `image-down` | Extract frame (media player) |
 | `image-plus` | Import image |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |
@@ -61,8 +63,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `layout-grid` | Thumbnails |
 | `layout-list` | List |
 | `leaf` | Zen mode |
-| `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
 | `library` | View in the library (selection bar) |
+| `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
 | `lock` | Lock thickness |
 | `lock-keyhole` | Lock the selection: it is drawn, but cannot be pic; Lock selection |
 | `lock-keyhole-open` | Unlock all |
@@ -78,9 +80,11 @@ One icon per function: two buttons that do different things never share an icon,
 | `pen-tool` | Fine pen |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
+| `pentagon` | Shape tool |
 | `play` | Slideshow |
 | `plus` | Zoom in |
 | `presentation` | Start the slideshow |
+| `rectangle-horizontal` | Rectangle shape |
 | `redo-2` | Redo |
 | `ruler` | By size, largest first |
 | `scaling` | Pen size follows zoom |
@@ -88,12 +92,17 @@ One icon per function: two buttons that do different things never share an icon,
 | `send-to-back` | Send to back |
 | `settings` | Settings |
 | `shapes` | Erase whole groups |
+| `slash` | Line shape |
+| `sparkle` | Star shape |
+| `spline-pointer` | Path tool (curves) |
 | `star` | Favourites0; Add to favourites |
 | `tag` | Tags panel; Tag the selection |
 | `text-cursor-input` | Rename the selected layer (double-click its name t; Rename canvas Canvas 1 |
 | `trash-2` | Delete selection; Delete canvas Canvas 1; Delete from library |
 | `type` | Text |
 | `undo-2` | Undo |
+| `vector-square` | A path or shape in the Layers list |
 | `waves` | Stabilizer |
+| `waypoints` | Edit nodes tool |
 | `x` | Hide the Layers panel; Hide the Tags panel; Hide the Bookmarks panel; Close details; Close slide view |
 | (own inline icon in `src/colour-picker/picker.ts`, not lucide) | Pick a colour from the screen (the colour picker's eyedropper) |

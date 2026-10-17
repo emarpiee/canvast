@@ -40,7 +40,7 @@ function scaleOf(boxes: readonly Box[]): number {
 const rel = (d: D.Dyadic, e: number): number => D.toNumber(D.shift(d, -e));
 const unrel = (v: number, e: number): D.Dyadic => D.shift(D.fromNumber(v), e);
 
-const TYPE_ORDER: Record<CanvasObject["kind"], number> = { image: 0, text: 1, stroke: 2 };
+const TYPE_ORDER: Record<CanvasObject["kind"], number> = { image: 0, text: 1, stroke: 2, path: 3 };
 const firstZ = (u: Unit): number => Math.min(...u.objects.map((o) => o.z));
 
 /** The units in the order a grid reads them. A name that is empty (strokes) comes last either way. */
