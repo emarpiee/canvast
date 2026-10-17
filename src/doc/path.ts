@@ -444,6 +444,98 @@ export function shapeSubs(kind: ShapeKind, x: number, y: number, w: number, h: n
   }
 }
 
+// ---- Parametric shapes: sides, points, ratio and corner radius, editable after drawing (ADR 0105) -----------------------------------
+
+/** What a drawn shape is made from, kept so it can be changed later: its box and the numbers its kind takes (lengths in the object's local units). */
+export interface ShapeParams {
+  /** x, y, width, height of the unrounded shape's bounds. */
+  readonly box: readonly [number, number, number, number];
+  readonly sides?: number;
+  readonly tips?: number;
+  /** A star's inner radius as a fraction of the outer one. */
+  readonly inner?: number;
+  /** Corner radius; 0 or absent: sharp corners. */
+  readonly radius?: number;
+}
+
+export const DEFAULT_INNER = 0.45;
+/** Shapes with corners that can be rounded. */
+export const CORNERED: readonly ShapeKind[] = ["rect", "polygon", "star"];
+
+/** A shape filling `box` exactly (a polygon or star is stretched so that its bounds, not its circle, are the box). */
+export function fittedShape(kind: ShapeKind, p: ShapeParams): SubPath[] {
+  const g = shapeSubs(kind, 0, 0, 1, 1, p.sides ?? 6, p.tips ?? 5, p.inner ?? DEFAULT_INNER);
+  const b = geometryBounds(g);
+  const [x, y, w, h] = p.box;
+  const sx = b.maxX > b.minX ? w / (b.maxX - b.minX) : 1;
+  const sy = b.maxY > b.minY ? h / (b.maxY - b.minY) : 1;
+  return mapSubs(g, (px, py) => [x + (px - b.minX) * sx, y + (py - b.minY) * sy]);
+}
+
+/** The geometry of a shape from its parameters: the fitted shape with its corners rounded. */
+export const shapeFromParams = (kind: ShapeKind, p: ShapeParams): SubPath[] => (p.radius && CORNERED.includes(kind) ? roundCorners(fittedShape(kind, p), p.radius) : fittedShape(kind, p));
+
+/** The parameters after the object's local coordinates are scaled (a corner radius follows the mean of the two scales). */
+export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams => ({
+  ...p,
+  box: [p.box[0] * kx, p.box[1] * ky, p.box[2] * kx, p.box[3] * ky],
+  ...(p.radius ? { radius: p.radius * Math.sqrt(kx * ky) } : {}),
+});
+
+/**
+ * The corners of closed sub-paths rounded with a circular arc (as a cubic) of radius `r`: a corner node between two straight lines becomes two
+ * nodes. The radius is cut down where a line is too short to hold it (each corner may use half of each line), so neighbours never overlap.
+ * Nodes with handles, and the ends of open sub-paths, are left alone.
+ */
+export function roundCorners(subs: readonly SubPath[], r: number): SubPath[] {
+  if (!(r > 0)) return [...subs];
+  return subs.map((s) => {
+    const c = nodeCount(s);
+    if (!s.closed || c < 3) return s;
+    const at = (k: number): number[] => s.n.slice(k * NODE, k * NODE + NODE);
+    const sharp = (q: number[]): boolean => q[2] === q[0] && q[3] === q[1] && q[4] === q[0] && q[5] === q[1];
+    const out: number[] = [];
+    for (let k = 0; k < c; k++) {
+      const P = at(k);
+      const A = at((k + c - 1) % c);
+      const B = at((k + 1) % c);
+      if (!(sharp(P) && sharp(A) && sharp(B))) {
+        out.push(...P);
+        continue;
+      }
+      const ux = A[0]! - P[0]!, uy = A[1]! - P[1]!, vx = B[0]! - P[0]!, vy = B[1]! - P[1]!;
+      const l1 = Math.hypot(ux, uy), l2 = Math.hypot(vx, vy);
+      if (!(l1 > 0 && l2 > 0)) {
+        out.push(...P);
+        continue;
+      }
+      const e1x = ux / l1, e1y = uy / l1, e2x = vx / l2, e2y = vy / l2;
+      const theta = Math.acos(Math.max(-1, Math.min(1, e1x * e2x + e1y * e2y)));
+      if (theta < 1e-3 || theta > Math.PI - 1e-3) {
+        out.push(...P);
+        continue;
+      }
+      const t = Math.min(r / Math.tan(theta / 2), Math.min(l1, l2) / 2);
+      const rr = t * Math.tan(theta / 2);
+      const hh = (4 / 3) * Math.tan((Math.PI - theta) / 4) * rr;
+      const p1x = P[0]! + e1x * t, p1y = P[1]! + e1y * t, p2x = P[0]! + e2x * t, p2y = P[1]! + e2y * t;
+      out.push(p1x, p1y, p1x, p1y, p1x - e1x * hh, p1y - e1y * hh);
+      out.push(p2x, p2y, p2x - e2x * hh, p2y - e2y * hh, p2x, p2y);
+    }
+    return { n: out, closed: true };
+  });
+}
+
+/** The parameters of a shape just drawn into a box (null for kinds that have none). */
+export const drawnParams = (kind: ShapeKind, x: number, y: number, w: number, h: number, sides: number, tips: number): ShapeParams | null =>
+  CORNERED.includes(kind) ? { box: [x, y, w, h], ...(kind === "polygon" ? { sides } : {}), ...(kind === "star" ? { tips, inner: DEFAULT_INNER } : {}) } : null;
+
+/** The geometry of a shape being drawn: the same as it will be once drawn (fitted to its box). */
+export const drawnSubs = (kind: ShapeKind, x: number, y: number, w: number, h: number, sides: number, tips: number): SubPath[] => {
+  const p = drawnParams(kind, x, y, w, h, sides, tips);
+  return p ? fittedShape(kind, p) : shapeSubs(kind, x, y, w, h, sides, tips);
+};
+
 // ---- Editing nodes ----------------------------------------------------------------------------------------------------------------
 
 /** The sub-paths with node `k` of sub-path `s` replaced (`node` null removes it; a sub-path left with no node is dropped). */

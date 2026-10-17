@@ -1,3 +1,5 @@
+import { paramsOf, withShapeParams, type ShapePatch } from "../doc/shape-params";
+import { DEFAULT_INNER } from "../doc/path";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import { alignChoice, capChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
@@ -705,6 +707,46 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   });
   const label = patch.align !== undefined ? "Outline position" : patch.join !== undefined ? "Outline corners" : "Outline ends";
   doc.commit(doc.transaction(paths.length === 1 ? label : `${label} of ${paths.length} paths`, next));
+  editor.changed();
+}
+
+/** What the first selected shape that can still be changed (a rectangle, polygon or star made from its numbers) is made of; radius in local units. */
+export function selectedShape(doc: DocumentStore, editor: EditorState): { id: string; shape: "rect" | "polygon" | "star"; sides: number; tips: number; inner: number; radius: number } | null {
+  for (const o of editablePaths(doc, editor)) {
+    const p = o.shape === "rect" || o.shape === "polygon" || o.shape === "star" ? paramsOf(o) : null;
+    if (p && (o.shape === "rect" || o.shape === "polygon" || o.shape === "star")) return { id: o.id, shape: o.shape, sides: p.sides ?? 6, tips: p.tips ?? 5, inner: p.inner ?? DEFAULT_INNER, radius: p.radius ?? 0 };
+  }
+  return null;
+}
+
+export interface ShapeChange {
+  sides?: number;
+  tips?: number;
+  inner?: number;
+  /** Screen px at this zoom; `ppuOf` turns it into the object's own units. */
+  radiusPx?: number;
+}
+
+/** Change the sides, points, ratio or corner radius of the selected shapes that have them: one undo step. */
+export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange, ppuOf: (id: string) => number): void {
+  if (editor.blockEdit()) return;
+  const next: PathObject[] = [];
+  for (const o of editablePaths(doc, editor)) {
+    const patch: ShapePatch = {};
+    if (change.sides !== undefined && o.shape === "polygon") patch.sides = change.sides;
+    if (change.tips !== undefined && o.shape === "star") patch.tips = change.tips;
+    if (change.inner !== undefined && o.shape === "star") patch.inner = change.inner;
+    if (change.radiusPx !== undefined && (o.shape === "rect" || o.shape === "polygon" || o.shape === "star")) {
+      const ppu = ppuOf(o.id);
+      if (ppu > 0 && ppu < Infinity) patch.radius = change.radiusPx / ppu;
+    }
+    if (!Object.keys(patch).length) continue;
+    const made = withShapeParams(o, patch);
+    if (made) next.push(made);
+  }
+  if (!next.length) return;
+  const what = change.radiusPx !== undefined ? "Corner radius" : change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
+  doc.commit(doc.transaction(next.length === 1 ? what : `${what} of ${next.length} shapes`, next));
   editor.changed();
 }
 

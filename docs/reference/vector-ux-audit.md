@@ -25,7 +25,8 @@ The vector tools work; the owner's report is that they are *confusing*: where th
 | 7 | **Three buttons for turning one thing into another** live in different places: Combine (menu with Flatten and Release hidden in it), Convert text to path, Ctrl+E for two different things. | Flatten is hard to find; Ctrl+E means one thing for text and another for groups. | ✅ a **Flatten** button on the selection bar when a boolean group is picked (the menu entry stays); Ctrl+E is the same |
 | 8 | **Shape and Path are separate tools, and the rail has Pen next to them.** Three ways of drawing, with icons that read alike at 20 px (pencil, pentagon, spline-pointer). | Which one makes a thing I can edit later? | ✅ one rail button, **Shape and path**: the Path tool is the last choice beside the shapes (B still works), the rail button stays lit on it |
 | 9 | **Defaults for the next shape are invisible state.** Fill, outline, width and now corners and position stay from the last use, and are shown only in the options bar. | A new shape comes out in last week's colour. | ✅ the bar and Outline options show them, and corners, ends and position are remembered with the rest |
-| 10 | **Rounded rectangles, dashes, node snapping, alignment of nodes** are not there. | These are the next things a person looks for. | 🔜 later (plan-gaps) |
+| 10 | **Polygon sides, star points and corner radius could not be changed after drawing** (owner feedback). | You had to redraw the shape. | ✅ ADR 0105: Radius, Sides, Points and Ratio in the options bar for a picked shape |
+| 11 | **Dashes, node snapping, per-corner radii** are not there. | These are the next things a person looks for. | 🔜 later (plan-gaps) |
 
 ## What changed in the first pass
 
@@ -39,4 +40,4 @@ The vector tools work; the owner's report is that they are *confusing*: where th
 
 - An outline wider than 2^14 px at the view (the exact-coverage stand-in) is drawn centred whatever its position; hit-testing there is exact for the centred line only.
 - Inside and outside are drawn as a centred line twice as wide, kept where the shape is (or is not), through a scratch canvas the size of the view; many aligned outlines on screen at once cost a view-sized blit each. If that ever shows in the frame time, limit the blit to the object's box.
-- Items 7 to 9 are done. Left: item 10 (rounded corners, dashes, node snapping), and the Pen tooltip could say it draws strokes, not shapes.
+- Items 7 to 9 are done. Left: item 11 (dashes, node snapping, per-corner radii), and the Pen tooltip could say it draws strokes, not shapes.

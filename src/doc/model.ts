@@ -6,7 +6,7 @@ import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
-import type { Align, Cap, Join, ShapeKind, SubPath } from "./path";
+import type { Align, Cap, Join, ShapeKind, ShapeParams, SubPath } from "./path";
 import type { Paint } from "./paint";
 import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
@@ -151,6 +151,8 @@ export interface PathObject extends ObjectBase {
   /** Fill rule: absent is non-zero. */
   readonly evenodd?: true;
   readonly shape?: ShapeKind;
+  /** What the shape is made from (box, sides, points, ratio, corner radius), present while its nodes are still the shape's own (ADR 0105). */
+  readonly params?: ShapeParams;
   /** The result of the boolean group with this id (ADR 0103): derived from the group's members, recomputed with every change to them. */
   readonly result?: string;
 }
@@ -374,6 +376,15 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
+    if (o.params !== undefined) {
+      const q = o.params;
+      if (o.shape === undefined || !Array.isArray(q.box) || q.box.length !== 4) throw new InvalidObjectError("bad shape parameters");
+      q.box.forEach((v, i) => finite(v, `params.box[${i}]`));
+      for (const [k, lo, hi] of [["sides", 3, 24], ["tips", 3, 24], ["inner", 0.01, 0.99], ["radius", 0, Infinity]] as const) {
+        const v = q[k];
+        if (v !== undefined && !(typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (k === "inner" || k === "radius" || Number.isInteger(v)))) throw new InvalidObjectError(`bad ${k}`);
+      }
+    }
     if (o.result !== undefined && !(typeof o.result === "string" && (o.groups ?? []).includes(o.result) && o.boolOps?.[o.result] !== undefined)) throw new InvalidObjectError("bad boolean result");
   } else if (o.kind === "text") {
     if (typeof o.md !== "string" || !o.md || o.md.length > MAX_MARKDOWN_LENGTH) throw new InvalidObjectError("bad text");
@@ -465,6 +476,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
+      ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),
       ...(s["result"] !== undefined ? { result: s["result"] as string } : {}),
     };
   } else if (s.kind === "text") {

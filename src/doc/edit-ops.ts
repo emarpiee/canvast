@@ -3,7 +3,7 @@ import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
 import type { CanvasObject } from "./model";
 import { localBounds, pivotOf } from "./model";
-import { scaleSubs } from "./path";
+import { scaleParams, scaleSubs } from "./path";
 
 /**
  * Pure geometric edits. Each returns a new object; the document applies them
@@ -46,7 +46,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   }
   if (o.kind === "path") {
     if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
-    return normalizeUnit({ ...o, anchor, sub: scaleSubs(o.sub, kx, ky), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
+    return normalizeUnit({ ...o, anchor, sub: scaleSubs(o.sub, kx, ky), ...(o.params ? { params: scaleParams(o.params, kx, ky) } : {}), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
 }
@@ -132,7 +132,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   const unit = o.unit + n;
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
   if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s };
-  if (o.kind === "path") return { ...o, unit, sub: scaleSubs(o.sub, s, s), width: o.width * s };
+  if (o.kind === "path") return { ...o, unit, sub: scaleSubs(o.sub, s, s), ...(o.params ? { params: scaleParams(o.params, s, s) } : {}), width: o.width * s };
   return { ...o, unit, w: o.w * s, h: o.h * s };
 }
 

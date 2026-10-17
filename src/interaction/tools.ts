@@ -11,7 +11,7 @@ import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } fro
 import { homeObject, newObjectId, pathSubs } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
-import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, shapeSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
@@ -435,7 +435,8 @@ export function attachTools(
     z,
     opacity: 1,
     attachmentTargetId: null,
-    sub: d.kind === "line" ? lineSubs(d.bx, d.by, d.bx + d.bw, d.by + d.bh) : shapeSubs(d.kind, d.bx, d.by, d.bw, d.bh, d.sides, d.tips),
+    sub: drawnSubs(d.kind, d.bx, d.by, d.bw, d.bh, d.sides, d.tips),
+    ...(drawnParams(d.kind, d.bx, d.by, d.bw, d.bh, d.sides, d.tips) ? { params: drawnParams(d.kind, d.bx, d.by, d.bw, d.bh, d.sides, d.tips)! } : {}),
     fill: d.fill,
     stroke: d.stroke,
     width: d.width,
@@ -537,7 +538,8 @@ export function attachTools(
     return { sub: pathSubs(o), flat: { ...flat, sub: pathSubs(o) } };
   };
   const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
-    const next = homeObject(normalizeUnit({ ...baked(o).flat, sub }), doc.space);
+    const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
+    const next = homeObject(normalizeUnit({ ...flat, sub }), doc.space);
     doc.commit(doc.transaction(label, [next]));
   };
 

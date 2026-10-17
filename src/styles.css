@@ -2182,6 +2182,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .swatch-paint[data-paint="stroke"] span { background: linear-gradient(var(--hud-bg), var(--hud-bg)) content-box, var(--paint) border-box, var(--check); padding: var(--sp-2); box-sizing: border-box; border: 0; }
 .toolbar .swatch-paint[data-paint="stroke"].is-none span { background: linear-gradient(to top right, transparent calc(50% - 1px), var(--canvas-danger) calc(50% - 1px), var(--canvas-danger) calc(50% + 1px), transparent calc(50% + 1px)), var(--check); }
 .toolbar .tb-count { display: inline-flex; align-items: center; gap: var(--sp-3); font: var(--font-meta); color: var(--hud-muted); }
+.toolbar .tb-count[hidden] { display: none; }
 .toolbar .tb-count input { width: var(--sp-14); height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 /* The paint chooser: none, a colour, a linear or a radial gradient. */
 .outline-pop { display: grid; gap: var(--sp-4); min-width: 0; }

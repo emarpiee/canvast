@@ -829,6 +829,76 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   await expect(pop.locator("#op-width")).toHaveValue("20");
 });
 
+test("shapes stay editable after drawing: a polygon's sides, a star's points and ratio, a corner radius; one undo each; saved; nodes edited by hand end it", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const nodes = async () => ((await last(app)).sub[0]!.n.length / 6);
+  const set = async (sel: string, v: string) => {
+    await p.locator(sel).fill(v);
+    await p.locator(sel).press("Enter");
+    await p.locator(sel).blur(); // (the keys go to the canvas again)
+    await app.frame();
+  };
+  await key(app, "u");
+  await p.click('[data-shape-kind="polygon"]');
+  await drag(app, [500, 300], [700, 460]);
+  await key(app, "v");
+  await click(app, 600, 400);
+  await expect(p.locator("[data-sel-sides]")).toBeVisible();
+  await expect(p.locator("[data-sel-sides]")).toHaveValue("6");
+  await set("[data-sel-sides]", "8");
+  expect(await nodes()).toBe(8);
+  await key(app, "Control+z");
+  expect(await nodes()).toBe(6);
+  await key(app, "Control+Shift+z");
+  expect(await nodes()).toBe(8);
+  await set("[data-sel-radius]", "12");
+  expect(await nodes()).toBe(16); // every corner is two nodes now
+  await reload(app);
+  await click(app, 600, 400);
+  await expect(p.locator("[data-sel-sides]")).toHaveValue("8");
+  await expect(p.locator("[data-sel-radius]")).toHaveValue("12");
+
+  // a star: points and ratio
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [800, 300], [960, 460]);
+  await key(app, "v");
+  await click(app, 880, 390);
+  await set("[data-sel-tips]", "7");
+  expect(await nodes()).toBe(14);
+  await set("[data-sel-inner]", "20");
+  const n = (await last(app)).sub[0]!.n;
+  const cx = n.filter((_, i) => i % 6 === 0).reduce((a, b) => a + b, 0) / 14;
+  const cy = n.filter((_, i) => i % 6 === 1).reduce((a, b) => a + b, 0) / 14;
+  const radius = (k: number) => Math.hypot(n[k * 6]! - cx, n[k * 6 + 1]! - cy);
+  expect(radius(1) / radius(0)).toBeCloseTo(0.2, 1); // an inner corner sits at 20% of the outer radius
+
+  // a rectangle: the corner is cut away (the pixel just inside the old corner is no longer the fill)
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [300, 520], [500, 640]);
+  await key(app, "v");
+  await click(app, 400, 580);
+  await expect(p.locator("[data-sel-sides]")).toBeHidden();
+  await p.click("[data-paint=\"stroke\"]");
+  await p.locator(".colour-pop .colour-none").click();
+  await key(app, "Escape");
+  await set("[data-sel-radius]", "30");
+  await click(app, 900, 700); // look at the shape alone
+  expect(await px(304, 524)).not.toEqual([37, 99, 235]); // the corner is gone
+  expect(await px(330, 550)).toEqual([37, 99, 235]); // the middle is not
+
+  // moving a node by hand makes it an ordinary path: the numbers go
+  await click(app, 400, 580);
+  await key(app, "Enter"); // Edit nodes
+  const box = await screenBox(app, (await last(app)).id);
+  await drag(app, [box.minX + 70, box.minY + 0.5], [box.minX + 70, box.minY - 20]);
+  await key(app, "Escape");
+  await click(app, 400, 600);
+  await expect(p.locator("[data-sel-radius]")).toBeHidden();
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");

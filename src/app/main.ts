@@ -13,7 +13,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -543,6 +543,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return { ...o, widthPx: ppu > 0 && ppu < Infinity ? first!.width * ppu : null };
     },
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
+    selectedShape: () => {
+      const o = selectedShape(doc, editor);
+      if (!o) return null;
+      const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === o.id);
+      const ppu = po && !po.cover ? po.proj.ppu : 0;
+      return { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner, radiusPx: ppu > 0 && ppu < Infinity ? o.radius * ppu : 0 };
+    },
+    shapeSelected: (change) => {
+      const visible = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
+      commitShape(doc, editor, change, (id) => {
+        const po = visible.find((p) => p.obj.id === id);
+        return po && !po.cover ? po.proj.ppu : 0;
+      });
+    },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
     copyMarkdown: () => {
       const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));

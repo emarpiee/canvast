@@ -8,7 +8,7 @@ import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
 import { batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
-import { NODE, shapeSubs } from "../doc/path";
+import { NODE, drawnSubs } from "../doc/path";
 import { gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
@@ -240,7 +240,7 @@ export function drawOverlays(
       z: Infinity,
       opacity: 1,
       attachmentTargetId: null,
-      sub: shapeSubs(sd.kind, sd.bx, sd.by, sd.bw, sd.bh, sd.sides, sd.tips),
+      sub: drawnSubs(sd.kind, sd.bx, sd.by, sd.bw, sd.bh, sd.sides, sd.tips),
       fill: sd.fill,
       stroke: sd.stroke,
       width: sd.width,
