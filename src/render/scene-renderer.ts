@@ -15,8 +15,8 @@ import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
-import { LABEL_FONT } from "./sheet-label";
-import type { SheetLabel } from "./sheet-label";
+import { LABEL_FONT } from "./item-label";
+import type { ItemLabel } from "./item-label";
 import { cropOf } from "../doc/adjust";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
@@ -166,9 +166,9 @@ export function drawOverlays(
   vp: Viewport,
   theme: SceneTheme,
   members: readonly ProjectedObject[] = [],
-  labels: readonly SheetLabel[] = [],
+  labels: readonly ItemLabel[] = [],
 ): void {
-  // The names of the sheets (ADR 0108).
+  // The names above the items (ADR 0108, 0125).
   if (labels.length) {
     ctx.save();
     ctx.font = LABEL_FONT;

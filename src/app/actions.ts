@@ -8,7 +8,6 @@ import { normalizeTags } from "../assets/asset-catalog";
 import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { isCard } from "../assets/file-kind";
 import * as D from "../core/dyadic";
-import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, TextObject } from "../doc/model";
@@ -332,16 +331,6 @@ export function setBlendOn(doc: DocumentStore, editor: EditorState, ids: readonl
       }),
     ),
   );
-}
-
-/** Point the mentions of a missing item in a text at another item; one undo step (ADR 0047). */
-export function relinkMentionOn(doc: DocumentStore, editor: EditorState, textId: string, oldId: string, newId: string, label: string): void {
-  if (editor.blockEdit()) return;
-  const t = doc.get(textId);
-  if (!t || t.kind !== "text" || oldId === newId) return;
-  const md = relinkMention(t.md, oldId, newId, label);
-  if (md === t.md) return;
-  doc.commit(doc.transaction("Relink mention", [{ ...t, md }]));
 }
 
 /** Name a layer (an object id) or a group (a group id); an empty name goes back to the automatic label. One undo step (ADR 0047). */

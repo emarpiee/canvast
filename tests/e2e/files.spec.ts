@@ -17,6 +17,8 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await expect(p.getByTestId("toast")).toContainText("no preview");
   const [card] = await objects(p);
   expect(card!.kind).toBe("image"); // a card is an ordinary instance of the stored original
+  // Its file name is drawn above it, like a sheet's name (ADR 0125).
+  await expect.poll(async () => p.evaluate(() => window.__canvastDebug.itemLabels().map((l) => l.text))).toEqual(["robot.glb"]);
   // Selected, the bar offers to download the original (a 3D model cannot be opened in a tab).
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");

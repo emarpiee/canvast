@@ -85,14 +85,6 @@ describe("markdown", () => {
     expect(serialize([{ type: "p", spans: [{ text: "  ", bold: true, italic: false }] }, { type: "p", spans: [{ text: "k", bold: false, italic: false }] }])).toBe("k");
   });
 
-  it("reads and writes mentions by stable id", () => {
-    const md = "see [[item:ab12|the \\] plan]] now";
-    const [b] = parse(md);
-    expect(b!.spans.map((s) => [s.text, s.ref])).toEqual([["see ", undefined], ["the ] plan", "ab12"], [" now", undefined]]);
-    expect(canonical(md)).toBe(md);
-    expect(canonical("\\[\\[item:ab12|x]]")).toBe("\\[\\[item:ab12|x\\]\\]"); // plain brackets stay text
-  });
-
   it("reads hand-written Markdown into canonical form", () => {
     expect(canonical("Hello\nworld  \n\n* item\n+ item 2\n3) three\n\n#### deep\n__b__ _i_")).toBe("Hello world\n\n- item\n- item 2\n\n1. three\n\n### deep\n\n**b** *i*");
     expect(canonical("****")).toBe("\\*\\*\\*\\*");
@@ -110,8 +102,7 @@ describe("markdown", () => {
         for (let s = rnd(4) + 1; s > 0; s--) {
           let text = "";
           for (let c = rnd(6) + 1; c > 0; c--) text += alphabet[rnd(alphabet.length)];
-          if (rnd(5) === 0) spans.push({ text: "x" + text, bold: false, italic: false, ref: `id${rnd(9)}-_` }); // a mention
-          else spans.push({ text, bold: rnd(2) === 1, italic: rnd(2) === 1 });
+          spans.push({ text, bold: rnd(2) === 1, italic: rnd(2) === 1 });
         }
         bs.push({ type: types[rnd(types.length)]!, spans });
       }

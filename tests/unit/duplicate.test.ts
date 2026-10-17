@@ -12,7 +12,7 @@ describe("a copy of a canvas's stored objects (ADR 0110)", () => {
       [
         rec("a1", { container: { clip: true } }),
         rec("b2", { parent: "a1", attachmentTargetId: "a1", groups: ["g1"], groupNames: { g1: "Pair" }, boolOps: { g1: "union" } }),
-        { id: "c3", kind: "text", ax: "0", ay: "0", md: "see [[item:b2|the box]] and [[item:zzz|elsewhere]]", refs: ["b2", "zzz"] },
+        { id: "c3", kind: "text", ax: "0", ay: "0", md: "plain words" },
       ],
       gen,
     );
@@ -24,8 +24,5 @@ describe("a copy of a canvas's stored objects (ADR 0110)", () => {
     expect(g).not.toBe("g1");
     expect(kid!["groupNames"]).toEqual({ [g]: "Pair" });
     expect(kid!["boolOps"]).toEqual({ [g]: "union" });
-    expect(text!["md"]).toContain(`[[item:${kid!.id}|the box]]`);
-    expect(text!["md"]).toContain("[[item:zzz|elsewhere]]"); // an item of another canvas keeps pointing there
-    expect(text!["refs"]).toEqual([kid!.id, "zzz"]);
   });
 });

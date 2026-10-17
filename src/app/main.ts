@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -81,8 +81,9 @@ import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import type { Command } from "../ui/command-palette";
-import { sheetLabels } from "../render/sheet-label";
-import type { SheetLabel } from "../render/sheet-label";
+import { AssetNames } from "./asset-names";
+import { isLabelled, itemLabels } from "../render/item-label";
+import type { ItemLabel } from "../render/item-label";
 import { SettingsStore } from "../settings/settings";
 import { setThemeInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
@@ -159,13 +160,17 @@ async function start(): Promise<void> {
   // Content too small to draw individually is shown as a density preview (ADR 0010).
   const density = new DensityLayer();
   /** Which objects are sheets (kept up to date from the changes), and the names drawn above them as last painted. */
-  const sheetIds = new Set<string>();
-  let labels: SheetLabel[] = [];
+  const labelIds = new Set<string>(); // the items that can carry a name above them (item-label.ts)
+  let labels: ItemLabel[] = [];
   doc.subscribe((_source, changed) => {
     if (!changed) {
-      sheetIds.clear();
-      for (const o of doc.all()) if (isContainer(o)) sheetIds.add(o.id);
-    } else for (const id of changed) (isContainer(doc.get(id)) ? sheetIds.add(id) : sheetIds.delete(id));
+      labelIds.clear();
+      for (const o of doc.all()) if (isLabelled(o)) labelIds.add(o.id);
+    } else for (const id of changed) {
+      const o = doc.get(id);
+      if (o && isLabelled(o)) labelIds.add(id);
+      else labelIds.delete(id);
+    }
   });
   doc.subscribe((_source, changed) => {
     // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
@@ -404,9 +409,9 @@ async function start(): Promise<void> {
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
     // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.
-    // The names of the sheets (ADR 0108): only looked for when the canvas has a sheet.
-    const sheetList = sheetIds.size ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
-    labels = sheetLabels(sheetList, editor.selection, vp);
+    // The names above the items (ADR 0108, 0125): only looked for when the canvas has an item that can carry one.
+    const labelList = labelIds.size ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
+    labels = itemLabels(labelList, editor.selection, vp, (h) => assetNames.get(h));
     const members = editor.entered.length ? visibleObjects(doc, index, editor, fc, vp, undefined, { entered: editor.entered, mode: "members" }) : [];
     const selected = editor.selection.size
       ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
@@ -444,6 +449,8 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor, assets);
+  const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
+  assetNames.subscribe(() => invalidate());
   if (db) {
     try {
       await session.start();
@@ -504,7 +511,7 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  const textEditor = mountTextEditor(host, view, doc, editor, (q) => session.mentionableElsewhere(q, 6), async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
+  const textEditor = mountTextEditor(host, view, doc, editor);
   const bookmarkList = new BookmarkList(session, view, doc);
   installMenuKeys();
   const focusCycle = createFocusCycle(doc, view, editor, () => true);
@@ -521,6 +528,7 @@ async function start(): Promise<void> {
   attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k), navForKey: (k) => navForKey(settings, k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
     focusSelection: () => focusCycle.tap(),
+    labels: () => labels,
     openSearch: (prefix) => canvasSearch.open(prefix),
   });
   const side = document.createElement("div");
@@ -547,12 +555,7 @@ async function start(): Promise<void> {
     setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),
-    relink: (textId, oldId, newId, label) => relinkMentionOn(doc, editor, textId, oldId, newId, label),
-    mentionable: (query) => session.mentionableElsewhere(query, 6),
-    backlinksElsewhere: (id) => session.backlinksElsewhere(id),
-    locateMentions: (ids) => session.locateMentions(ids),
-    assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
-    reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
+    names: assetNames,
   });
   mountStylesPanel(side, editor, session.styles, {
     adjustment: {
@@ -1333,7 +1336,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready() },
+      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
     );
   }
   resize();

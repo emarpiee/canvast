@@ -1,14 +1,14 @@
 import type { EditorState } from "../app/editor-state";
 import { plural } from "../doc/plural";
 import type { DocumentStore } from "../doc/document-store";
+import type { AssetNames } from "../app/asset-names";
 import type { BlendMode, CanvasObject, PathObject } from "../doc/model";
 import { BLEND_MODES, MAX_NAME_LENGTH, inkOf } from "../doc/model";
 import { SHAPE_NAMES } from "../doc/path";
 import { isBoolMember, isResult } from "../doc/boolean-group";
 import { ancestorsOf, isContainer, withDescendants } from "../doc/containers";
 import type { BoolOp } from "../doc/boolean";
-import type { Backlink } from "../app/session";
-import { mentionIds, plainText } from "../text/markdown";
+import { plainText } from "../text/markdown";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { swatchBackground } from "../render/ink";
@@ -30,20 +30,10 @@ export interface LayersActions {
   setOpacity(ids: readonly string[], opacity: number): void;
   /** Blend mode of objects (null = normal), ADR 0047. */
   setBlend(ids: readonly string[], blend: BlendMode | null): void;
-  /** Point a text's mentions of a missing item at another item (ADR 0047). */
-  relink(textId: string, oldId: string, newId: string, label: string): void;
-  /** Items on the board's other canvases matching a query (for relinking). */
-  mentionable(query: string): Promise<Backlink[]>;
   /** Name an object or a group (its id); empty = automatic label. */
   rename(key: string, name: string): void;
-  /** Texts on the board's other canvases that mention an object (stored index). */
-  backlinksElsewhere(id: string): Promise<Backlink[]>;
-  /** Open a canvas (null = this one) and select and frame objects there. */
-  /** The file name of an original (empty when unknown). */
-  assetName(hash: string): Promise<string>;
-  reveal(canvasId: string | null, ids: readonly string[]): void;
-  /** Where mentioned objects are on the board's other canvases. */
-  locateMentions(ids: readonly string[]): Promise<Map<string, Backlink>>;
+  /** The file names of the originals (shared with the names above pictures). */
+  names: AssetNames;
 }
 
 /** Lowest opacity the slider sets (the model needs more than 0; use Hide for nothing). */
@@ -174,15 +164,11 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   let lastSelection = "";
   /** Groups the panel has already listed: a group seen for the first time (just made) opens. */
   const seenGroups = new Set<string>();
-  // File names of the originals (the catalog is read once per original).
-  const names = new Map<string, string>();
-  const asked = new Set<string>();
+  const names = actions.names.map;
   let scheduled = false;
   let dragged: string[] = [];
   /** The row being renamed (kept across redraws) and what has been typed. */
   let renaming: { key: string; value: string } | null = null;
-  /** A missing mention of a text being pointed at another item. */
-  let relinking: { textId: string; oldId: string } | null = null;
 
   const selectedObjs = (): CanvasObject[] => [...editor.selection].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
   /** Opacity of the selection (the first object's when they differ). */
@@ -201,69 +187,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     return `${actionsRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
   };
 
-  // Links of the one selected object (ADR 0040): texts that mention it, and what a selected text mentions.
-  let elsewhere: { id: string; list: Backlink[] } | null = null;
-  let located: { id: string; md: string; map: Map<string, Backlink> | null } | null = null; // map null = asked, not answered
-  const linkRow = (canvasId: string, id: string, label: string, where: string): string =>
-    `<li><button type="button" data-go="${esc(id)}" data-canvas="${esc(canvasId)}">${esc(label || "Text")}</button><span>${esc(where)}</span></li>`;
-  const linksHtml = (): string => {
-    const sel = selectedObjs();
-    const one = sel.length === 1 ? sel[0]! : null;
-    if (!one || elsewhere?.id !== one.id) elsewhere = null; // reselecting asks the store again
-    if (!one) return "";
-    const here = doc.ordered().filter((o) => o.kind === "text" && o.id !== one.id && mentionIds(o.md).includes(one.id));
-    const rows = here.map((o) => linkRow("", o.id, plainText((o as { md: string }).md), "this canvas"));
-    if (elsewhere?.id === one.id) for (const b of elsewhere.list) rows.push(linkRow(b.canvasId, b.id, b.label, b.canvasName));
-    else void actions.backlinksElsewhere(one.id).then((list) => {
-      elsewhere = { id: one.id, list };
-      if (editor.selection.size === 1 && editor.selection.has(one.id)) schedule();
-    });
-    const out: string[] = [];
-    if (rows.length) out.push(`<h3>Mentioned in</h3><ul>${rows.join("")}</ul>`);
-    if (one.kind === "text") {
-      const ids = mentionIds(one.md);
-      if (ids.length) {
-        if (located?.id !== one.id || located.md !== one.md) {
-          const { id, md } = one;
-          located = { id, md, map: null };
-          void actions.locateMentions(ids.filter((i) => !doc.get(i))).then((map) => {
-            located = { id, md, map };
-            if (editor.selection.size === 1 && editor.selection.has(id)) schedule();
-          });
-        }
-        const id0 = one.id;
-        const items = ids.map((id) => {
-          const t = doc.get(id);
-          if (t) return linkRow("", id, labelOf(t).text, "");
-          const b = located?.map?.get(id);
-          if (b) return linkRow(b.canvasId, id, b.label, b.canvasName);
-          if (relinking?.textId === id0 && relinking.oldId === id) return `<li class="relink"><input type="text" data-relink-q placeholder="Find an item…" aria-label="Find an item to relink" autocomplete="off"><button type="button" data-relink-cancel>Cancel</button><ul data-relink-results aria-label="Items to relink to"></ul></li>`;
-          return located?.map ? `<li class="broken"><span>Missing item</span><button type="button" data-relink="${esc(id)}">Relink</button></li>` : "";
-        });
-        out.push(`<h3>Mentions</h3><ul>${items.join("")}</ul>`);
-      }
-    }
-    return out.join("");
-  };
-
   const render = (): void => {
     scheduled = false;
     panel.hidden = !editor.layersOpen;
     if (!editor.layersOpen) return;
     // A name being typed is not redrawn under the cursor (a redraw would end the edit).
-    if ((renaming && panel.querySelector("[data-rename]")) || (relinking && panel.querySelector("[data-relink-q]"))) return;
+    if ((renaming && panel.querySelector("[data-rename]"))) return;
     const all = doc.ordered().filter((o) => !isResult(o));
-    for (const o of all) {
-      if (o.kind === "image" && !asked.has(o.assetId)) {
-        asked.add(o.assetId);
-        void actions.assetName(o.assetId).then((n) => {
-          if (n) {
-            names.set(o.assetId, n);
-            schedule();
-          }
-        });
-      }
-    }
+    for (const o of all) if (o.kind === "image") actions.names.get(o.assetId);
     const tree = layerTree(all);
     for (const g of new Set(all.flatMap((o) => o.groups ?? []))) {
       if (!seenGroups.has(g)) {
@@ -323,7 +254,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       ${all.length > 12 || filter ? `<div class="layers-filter"><input type="search" data-layers-filter placeholder="Filter ${all.length} layers by name" aria-label="Filter the layers by name" autocomplete="off" value="${esc(filter)}"></div>` : ""}
       ${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}
       <ul role="tree" aria-label="Objects, front to back">${list || `<li class="layers-empty">${q ? "No layer has that name." : "Nothing on this canvas yet."}</li>`}${rows >= limit ? `<li class="layers-more-row"><button type="button" data-more>Show ${MAX_ROWS} more rows</button></li>` : ""}</ul>
-      <div class="layers-links" data-links>${linksHtml()}</div>
       ${footer()}
 `;
     if (refocusFilter) {
@@ -334,7 +264,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
         f.setSelectionRange(f.value.length, f.value.length);
       }
     }
-    if (relinking) panel.querySelector<HTMLInputElement>("[data-relink-q]")?.focus();
     if (renaming) {
       const input = panel.querySelector<HTMLInputElement>("[data-rename]");
       if (input && document.activeElement !== input) {
@@ -349,6 +278,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       requestAnimationFrame(render);
     }
   };
+  actions.names.subscribe(schedule);
   // A newly selected item deep in groups is shown: its groups open (once per selection, so they can still be closed). Noted on every
   // change of the selection, not at drawing time, so a quick deselect and reselect is never missed.
   const noteSelection = (): void => {
@@ -443,19 +373,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-rename]") && renaming) renaming.value = t.value;
-    if (t.matches("[data-relink-q]") && relinking) {
-      const q = t.value.trim().toLowerCase();
-      const out = panel.querySelector<HTMLElement>("[data-relink-results]")!;
-      const textId = relinking.textId;
-      const here = doc.ordered().filter((o) => o.id !== textId && labelOf(o, names).text.toLowerCase().includes(q)).slice(0, 6);
-      const item = (id: string, label: string, where: string): string => `<li><button type="button" data-relink-pick="${esc(id)}" data-label="${esc(label)}">${esc(label)}</button><span>${esc(where)}</span></li>`;
-      out.innerHTML = here.map((o) => item(o.id, labelOf(o, names).text, "this canvas")).join("");
-      const asked = q;
-      void actions.mentionable(t.value).then((list) => {
-        if (relinking?.textId !== textId || t.value.trim().toLowerCase() !== asked) return;
-        out.insertAdjacentHTML("beforeend", list.map((b) => item(b.id, b.label, b.canvasName)).join(""));
-      });
-    }
     if (t.matches("[data-layers-filter]")) {
       filter = t.value;
       limit = MAX_ROWS;
@@ -473,31 +390,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
 
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
-    const go = t.closest<HTMLElement>("[data-go]");
-    if (go) {
-      actions.reveal(go.dataset["canvas"] || null, [go.dataset["go"]!]);
-      return;
-    }
-    const rl = t.closest<HTMLElement>("[data-relink]");
-    if (rl && editor.selection.size === 1) {
-      relinking = { textId: [...editor.selection][0]!, oldId: rl.dataset["relink"]! };
-      render();
-      return;
-    }
-    const pick = t.closest<HTMLElement>("[data-relink-pick]");
-    if (pick && relinking) {
-      const r = relinking;
-      relinking = null;
-      located = null;
-      actions.relink(r.textId, r.oldId, pick.dataset["relinkPick"]!, pick.dataset["label"] ?? "");
-      render();
-      return;
-    }
-    if (t.closest("[data-relink-cancel]")) {
-      relinking = null;
-      render();
-      return;
-    }
     const doBtn = t.closest<HTMLButtonElement>("[data-do]");
     if (doBtn && !doBtn.disabled) {
       const sel = selectedObjs();

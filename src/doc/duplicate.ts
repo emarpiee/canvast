@@ -1,9 +1,8 @@
 /**
  * A copy of a canvas's stored objects (ADR 0110): every object gets a new id, and everything that names an object or a group follows (the
- * sheet it is on, the object it is attached to, its groups and their names, boolean groups and their result, mentions in text), so the copy
+ * sheet it is on, the object it is attached to, its groups and their names, boolean groups and their result), so the copy
  * is a canvas of its own whose links never lead back to the original. Pure: it works on the stored form.
  */
-import { mentionIds, remapMentions } from "../text/markdown";
 import { newObjectId } from "./model";
 import type { SerializedObject } from "./model";
 
@@ -22,11 +21,6 @@ export function duplicateRecords(records: readonly SerializedObject[], newId: ()
     if (r["groupNames"]) s["groupNames"] = mapKeys(r["groupNames"]);
     if (r["boolOps"]) s["boolOps"] = mapKeys(r["boolOps"]);
     if (typeof r["result"] === "string") s["result"] = gid(r["result"]);
-    if (r.kind === "text" && typeof r["md"] === "string") {
-      const md = remapMentions(r["md"], ids);
-      s["md"] = md;
-      s["refs"] = mentionIds(md);
-    }
     return s;
   });
 }

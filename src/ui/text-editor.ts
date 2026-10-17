@@ -17,7 +17,6 @@ import { TEXT_FONT_FAMILY } from "../render/draw-text";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
-import { labelOf } from "./layers-panel";
 
 /**
  * WYSIWYG text editing with a native contenteditable overlay placed exactly
@@ -81,10 +80,6 @@ export function mountTextEditor(
   view: ViewState,
   doc: DocumentStore,
   editor: EditorState,
-  /** Texts and images on the board's other canvases matching a query (the picker's second list). */
-  elsewhere: (query: string) => Promise<Array<{ id: string; label: string; canvasName: string }>> = () => Promise.resolve([]),
-  /** The file name of an original (an image is listed by it, not by its pixel size). */
-  assetName: (hash: string) => Promise<string> = () => Promise.resolve(""),
 ): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
@@ -101,13 +96,7 @@ export function mountTextEditor(
   bar.setAttribute("aria-label", "Text format");
   bar.hidden = true;
   bar.innerHTML = FORMATS.map((f) => `<button type="button" data-cmd="${f.cmd}" aria-label="${f.label}" title="${f.label}">${f.icon}</button>`).join("");
-  const picker = document.createElement("div");
-  picker.className = "mention-picker";
-  picker.hidden = true;
-  picker.innerHTML = `<input type="text" aria-label="Mention an item" placeholder="Mention an item…" autocomplete="off"><ul role="listbox" aria-label="Items on this canvas"></ul>`;
-  host.append(box, bar, picker);
-  const pickInput = picker.querySelector("input")!;
-  const pickList = picker.querySelector("ul")!;
+  host.append(box, bar);
 
   let target: TextObject | null = null;
   let isNew = false;
@@ -157,106 +146,7 @@ export function mountTextEditor(
     view.setFrameCamera(fromLocal(of, lookAt({ x: D.add(o.anchor.x, off(dx)), y: D.add(o.anchor.y, off(dy)) }, zi, zf)));
   };
 
-  // `@` opens a picker of this canvas's objects; the pick becomes an atomic mention span (ADR 0039).
-  let pickAt: Range | null = null;
-  let choices: Array<{ id: string; label: string; canvasName?: string }> = [];
-  let asked = 0;
-  let active = 0;
-  const closePicker = (refocus: boolean): void => {
-    picker.hidden = true;
-    pickAt = null;
-    if (refocus) box.focus({ preventScroll: true });
-  };
-  const fileNames = new Map<string, string>();
-  const askedNames = new Set<string>();
-  const fillPicker = (): void => {
-    const q = pickInput.value.trim().toLowerCase();
-    for (const o of doc.ordered()) {
-      if (o.kind !== "image" || askedNames.has(o.assetId)) continue;
-      askedNames.add(o.assetId);
-      void assetName(o.assetId).then((n) => {
-        if (!n) return;
-        fileNames.set(o.assetId, n);
-        if (!picker.hidden) fillPicker();
-      });
-    }
-    choices = [...doc.ordered()].reverse().filter((o) => o.id !== target?.id).map((o) => ({ id: o.id, label: labelOf(o, fileNames).text })).filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
-    const ask = ++asked;
-    void elsewhere(q).then((more) => {
-      if (ask !== asked || picker.hidden) return; // a newer query, or closed
-      choices = [...choices.filter((c) => !c.canvasName), ...more.filter((m) => !choices.some((c) => c.id === m.id))];
-      paint();
-    });
-    paint();
-  };
-  const paint = (): void => {
-    active = Math.min(active, Math.max(0, choices.length - 1));
-    pickList.innerHTML = choices.length
-      ? choices.map((c, i) => `<li role="option" aria-selected="${i === active}" data-id="${c.id}">${esc(c.label)}${c.canvasName ? ` <small>${esc(c.canvasName)}</small>` : ""}</li>`).join("")
-      : `<li class="empty">Nothing matches.</li>`;
-  };
-  const openPicker = (): void => {
-    const sel = getSelection();
-    if (!sel?.rangeCount || sel.anchorNode?.nodeType !== Node.TEXT_NODE) return;
-    pickAt = sel.getRangeAt(0).cloneRange();
-    const r = box.getBoundingClientRect();
-    picker.style.left = `${Math.max(4, r.left)}px`;
-    picker.style.top = `${r.bottom + 6}px`;
-    pickInput.value = "";
-    active = 0;
-    fillPicker();
-    picker.hidden = false;
-    pickInput.focus();
-  };
-  const choose = (i: number): void => {
-    const c = choices[i];
-    const r = pickAt;
-    closePicker(true);
-    if (!c || !r) return;
-    const sel = getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(r);
-    const t = r.startContainer;
-    if (t.nodeType === Node.TEXT_NODE && r.startOffset > 0 && (t as Text).data[r.startOffset - 1] === "@") r.setStart(t, r.startOffset - 1); // the typed @
-    r.deleteContents();
-    const m = document.createElement("span");
-    m.className = "mention";
-    m.contentEditable = "false";
-    m.dataset["ref"] = c.id;
-    m.textContent = c.label;
-    const gap = document.createTextNode(" ");
-    r.insertNode(gap);
-    r.insertNode(m);
-    r.setStartAfter(gap);
-    r.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(r);
-  };
-  box.addEventListener("input", (e) => {
-    if ((e as InputEvent).data === "@") openPicker();
-  });
-  pickInput.addEventListener("input", () => {
-    active = 0;
-    fillPicker();
-  });
-  pickInput.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closePicker(true);
-    else if (e.key === "Enter") choose(active);
-    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      active = (active + (e.key === "ArrowDown" ? 1 : -1) + choices.length) % Math.max(1, choices.length);
-      paint();
-    } else return;
-    e.preventDefault();
-    e.stopPropagation(); // Esc closes the picker, not the editor
-  });
-  pickList.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const li = (e.target as HTMLElement).closest<HTMLElement>("li[data-id]");
-    if (li) choose(choices.findIndex((c) => c.id === li.dataset["id"]));
-  });
-
   const close = (): void => {
-    closePicker(false);
     target = null; // first: hiding the focused box fires focusout (and commit) synchronously
     box.hidden = bar.hidden = true;
     box.innerHTML = "";
@@ -358,7 +248,7 @@ export function mountTextEditor(
   });
   box.addEventListener("focusout", (e) => {
     const to = e.relatedTarget as Node | null;
-    if (to && (box.contains(to) || bar.contains(to) || picker.contains(to))) return;
+    if (to && (box.contains(to) || bar.contains(to))) return;
     commit();
   });
 
@@ -376,7 +266,6 @@ function blocksToHtml(blocks: readonly Block[]): string {
   let list: "ul" | "ol" | null = null;
   const spans = (ss: readonly Span[]): string =>
     ss.map((s) => {
-      if (s.ref !== undefined) return `<span class="mention" contenteditable="false" data-ref="${esc(s.ref)}">${esc(s.text)}</span>`;
       let h = esc(s.text);
       if (s.italic) h = `<i>${h}</i>`;
       if (s.bold) h = `<b>${h}</b>`;
@@ -420,11 +309,6 @@ export function domToBlocks(root: HTMLElement): Block[] {
       return;
     }
     if (!(n instanceof HTMLElement)) return;
-    if (n.dataset["ref"] !== undefined) {
-      if (!cur) start(type);
-      cur!.spans.push({ text: n.textContent ?? "", bold: false, italic: false, ref: n.dataset["ref"] });
-      return;
-    }
     const tag = n.tagName;
     if (tag === "BR") return end();
     if (tag === "UL" || tag === "OL") {

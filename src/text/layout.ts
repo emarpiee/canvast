@@ -102,7 +102,7 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
     n = b.type === "ol" && blocks[bi - 1]?.type === "ol" ? n + 1 : 1;
     const avail = wrapEm - indent;
     const chars: Ch[] = [];
-    for (const sp of b.spans) for (const c of sp.text) chars.push({ cp: c.codePointAt(0)!, bold: sp.bold || sp.ref !== undefined, italic: sp.italic || sp.ref !== undefined });
+    for (const sp of b.spans) for (const c of sp.text) chars.push({ cp: c.codePointAt(0)!, bold: sp.bold, italic: sp.italic });
     let line: Array<Ch & { gid: number; adv: number }> = [];
     let first = true;
     const emit = (glyphs: typeof line): void => {

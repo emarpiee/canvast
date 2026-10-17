@@ -1,6 +1,6 @@
 # ADR 0039 — Mentions in text (`[[item:<id>|label]]`)
 
-- Status: accepted (Phase 5, slice 5)
+- Status: superseded by ADR 0125 (mentions removed)
 - Related: ADR 0013 (text editing), engineering plan §14.38 (mentions and backlinks)
 
 ## Decision

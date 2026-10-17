@@ -6,7 +6,6 @@ import { readBookmarks } from "./bookmarks";
 import { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
-import { plainText } from "../text/markdown";
 import { duplicateRecords } from "../doc/duplicate";
 import { done, idbGet, req } from "./idb";
 
@@ -536,55 +535,6 @@ export class WorkspaceRepo {
       await committed.catch(() => undefined);
       throw e;
     }
-  }
-
-  /** Texts that mention an object (stored index, ADR 0040). */
-  async mentionedBy(targetId: ObjectId): Promise<ObjectRecord[]> {
-    const tx = this.db.transaction("objects");
-    const all = await new Promise<ObjectRecord[]>((res, rej) => {
-      const r = tx.objectStore("objects").index("refs").getAll(targetId);
-      r.onsuccess = () => res(r.result as ObjectRecord[]);
-      r.onerror = () => rej(r.error);
-    });
-    return all;
-  }
-
-  /** Texts and images on the given canvases whose name contains `query` (case-insensitive), at most `limit`; read with cursors, never all at once. */
-  async findMentionable(canvasIds: ReadonlySet<string>, query: string, limit: number): Promise<Array<{ canvasId: string; id: ObjectId; label: string; assetId?: string }>> {
-    const q = query.trim().toLowerCase();
-    const out: Array<{ canvasId: string; id: ObjectId; label: string; assetId?: string }> = [];
-    for (const kind of ["text", "image"]) {
-      const idx = this.db.transaction("objects").objectStore("objects").index("kind");
-      await new Promise<void>((res, rej) => {
-        const c = idx.openCursor(IDBKeyRange.only(kind));
-        c.onerror = () => rej(c.error);
-        c.onsuccess = () => {
-          const cur = c.result;
-          if (!cur || out.length >= limit) return res();
-          const r = cur.value as ObjectRecord;
-          if (canvasIds.has(r.canvasId)) {
-            if (kind === "image") {
-              // Images are named by their file, which only the catalog knows: the caller filters by name.
-              out.push({ canvasId: r.canvasId, id: r.id, label: `Image ${String(r.data["pixelW"])}×${String(r.data["pixelH"])}`, assetId: String(r.data["assetId"]) });
-            } else {
-              const label = plainText(String(r.data["md"]), 28);
-              if (label.toLowerCase().includes(q)) out.push({ canvasId: r.canvasId, id: r.id, label: label || "Text" });
-            }
-          }
-          cur.continue();
-        };
-      });
-    }
-    return out;
-  }
-
-  /** The record of an object on one of the given canvases, if any. */
-  async locate(canvasIds: readonly string[], id: ObjectId): Promise<ObjectRecord | undefined> {
-    for (const canvasId of canvasIds) {
-      const r = await idbGet<ObjectRecord>(this.db, "objects", [canvasId, id]);
-      if (r) return r;
-    }
-    return undefined;
   }
 
   /** Read back a canvas revision (used to report "verified"). */

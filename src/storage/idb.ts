@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 8 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 9 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -10,9 +10,8 @@
  *   canvases     keyPath "id"      → CanvasRecord            (index "boardId")
  *   objects      keyPath [canvasId, id] → ObjectRecord        (one record per canvas object;
  *                                                             index "assetId" on data.assetId, v3;
- *                                                             multi-entry index "refs" on data.refs: the ids a text mentions, and
- *                                                             index "kind" on data.kind, for the mention picker; v7;
- *                                                             multi-entry index "tags" on data.tags: in-canvas tags, ADR 0062; v8)
+ * *                                                             multi-entry index "tags" on data.tags: in-canvas tags, ADR 0062; v8;
+ *                                                             v9 dropped the mention indexes "refs" and "kind" and the `refs` field)
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
  *   assets       key sha256        → AssetRecord              (original bytes, stored once)
  *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
@@ -31,7 +30,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 8;
+export const DB_VERSION = 9;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -47,7 +46,7 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       return;
     }
     const req = indexedDB.open(name, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
       const has = (s: string): boolean => db.objectStoreNames.contains(s);
       if (!has("snapshots")) db.createObjectStore("snapshots"); // legacy v1, kept for migration
@@ -61,11 +60,22 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       // v3: usage lookups. Strokes have no assetId, so the index holds image instances only.
       const objects = req.transaction!.objectStore("objects");
       if (!objects.indexNames.contains("assetId")) objects.createIndex("assetId", "data.assetId");
-      // v7: backlinks (ADR 0040). A derived index over texts' mentions; texts saved before it have none.
-      if (!objects.indexNames.contains("refs")) objects.createIndex("refs", "data.refs", { multiEntry: true });
+      // v9: mentions were removed (ADR 0125): drop their indexes and the derived `refs` field of stored texts.
+      for (const name of ["refs", "kind"]) if (objects.indexNames.contains(name)) objects.deleteIndex(name);
+      if (event.oldVersion > 0 && event.oldVersion < 9) {
+        objects.openCursor().onsuccess = (e) => {
+          const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+          if (!c) return;
+          const v = c.value as { data?: Record<string, unknown> };
+          if (v.data && "refs" in v.data) {
+            delete v.data["refs"];
+            c.update(v);
+          }
+          c.continue();
+        };
+      }
       // v8: in-canvas tags (ADR 0062), listed across the workspace from this index.
       if (!objects.indexNames.contains("tags")) objects.createIndex("tags", "data.tags", { multiEntry: true });
-      if (!objects.indexNames.contains("kind")) objects.createIndex("kind", "data.kind");
       if (!has("assetCatalog")) db.createObjectStore("assetCatalog", { keyPath: "hash" });
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
       if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });

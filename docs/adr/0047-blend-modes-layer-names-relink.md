@@ -1,7 +1,7 @@
 # ADR 0047 — Blend modes, layer and group names, relinking missing mentions, audio out of view
 
 - Status: accepted (Phase 6, closes the gaps left by Phase 5 and ADR 0044)
-- Related: ADR 0009 (tiles), 0020 (groups), 0024 (Layers panel), 0039–0040 (mentions), 0044 (background playback)
+- Related: ADR 0009 (tiles), 0020 (groups), 0024 (Layers panel), 0039–0040 (mentions; the relink part is superseded by ADR 0125), 0044 (background playback)
 
 ## Decisions
 

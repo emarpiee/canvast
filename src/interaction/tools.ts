@@ -30,7 +30,8 @@ import { isContainer } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { cropEdges } from "../doc/crop";
-import { sheetLabelAt, sheetLabels } from "../render/sheet-label";
+import { itemLabelAt } from "../render/item-label";
+import type { ItemLabel } from "../render/item-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
@@ -207,6 +208,8 @@ export interface ToolHooks {
   navigate(dir: NavDir): void;
   /** Alt: bring the selection into view. */
   focusSelection(): void;
+  /** The names above the items as last drawn (what you see is what you press). */
+  labels(): readonly ItemLabel[];
   /** "#" or "@": search the canvas by name, tag or bookmark (ADR 0060). */
   openSearch(prefix: string): void;
 }
@@ -887,8 +890,8 @@ export function attachTools(
         return;
       }
     }
-    // The name above a sheet picks the sheet (and what is on it), and a drag from it moves them (ADR 0108).
-    const named = sheetLabelAt(sheetLabels(vis, editor.selection, view.viewport), s.x, s.y);
+    // The name above an item picks it (a sheet and what is on it), and a drag from it moves them (ADR 0108, 0125).
+    const named = itemLabelAt(hooks.labels(), s.x, s.y);
     const sheet = named ? doc.get(named.id) : undefined;
     if (sheet && !sheet.locked) {
       if (!editor.selection.has(sheet.id)) pick([sheet.id], e.shiftKey);

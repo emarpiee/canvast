@@ -79,6 +79,8 @@ export interface DebugHook {
   tool(): Tool;
   setTool(t: Tool): void;
   setLassoFilter(f: LassoFilter): void;
+  /** The names drawn above items at the last frame (sheets, pictures, named items). */
+  itemLabels(): Array<{ id: string; text: string }>;
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
   /** Save the view and collect stored frames nothing refers to (normally done after many frames were written). */
@@ -191,6 +193,8 @@ export interface DebugDeps {
   quality: QualityGovernor;
   /** Resolves when the index of a big document has been built slice by slice. */
   indexReady: () => Promise<void>;
+  /** The names above the items as last drawn. */
+  labels: () => readonly { id: string; text: string }[];
 }
 
 /**
@@ -318,6 +322,7 @@ export function installDebugHook(
       editor.lassoFilter = f;
       editor.changed();
     },
+    itemLabels: () => deps.labels().map((l) => ({ id: l.id, text: l.text })),
     objectScreen: (id) => {
       const o = doc.get(id);
       if (!o) throw new Error(`no object ${id}`);

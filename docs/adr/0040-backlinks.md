@@ -1,6 +1,6 @@
 # ADR 0040 — Backlinks, mention targets and the mention picker across a board
 
-- Status: accepted (Phase 5, slice 6)
+- Status: superseded by ADR 0125 (mentions removed)
 - Related: ADR 0039 (mentions), ADR 0024 (Layers panel), ADR 0006 (storage), engineering plan §14.38
 
 ## Decision
