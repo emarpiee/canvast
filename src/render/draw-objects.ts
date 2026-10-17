@@ -271,7 +271,14 @@ function drawAlignedOutline(c: CanvasRenderingContext2D, po: ProjectedObject, vp
   a.lineWidth = 2 * Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
   a.lineJoin = o.join ?? "round";
   a.miterLimit = MITER_LIMIT;
-  if (o.dash) a.setLineDash(dashPattern(o.dash, a.lineWidth / 2));
+  a.lineCap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round");
+  if (o.dash) {
+    // The line is twice as wide as asked, so its end caps reach twice as far past a dash as a centred line's do: the dash is cut shorter by
+    // the difference and the gap longer by as much, so the pattern repeats as often and looks as it does on a centred line.
+    const unit = a.lineWidth / 2;
+    const dash = Math.max(0, o.dash[0] * unit - (a.lineCap === "butt" ? 0 : unit));
+    a.setLineDash([dash, (o.dash[0] + o.dash[1]) * unit - dash]);
+  }
   a.beginPath();
   addOutlinePath(a, po, vp);
   a.stroke();

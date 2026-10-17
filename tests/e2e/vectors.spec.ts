@@ -1939,6 +1939,35 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   expect(await px(640, 400)).toEqual([37, 99, 235]);
 });
 
+test("outline ends (flat, round, square) show on a dashed outline inside, centred and outside the edge alike", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await key(app, "v");
+  await click(app, 600, 360);
+  await p.click("[data-outline-options]");
+  await p.locator(".outline-pop .op-width").fill("14");
+  await p.locator(".outline-pop .op-width").press("Enter");
+  await p.click('.outline-pop [data-dash="dashed"]');
+  // (the picture of the shape, with the selection box cropped away by looking at the inside of it only)
+  const look = async (cap: string, pos: string): Promise<Buffer> => {
+    await p.click(`.outline-pop [data-align="${pos}"]`);
+    await p.click(`.outline-pop [data-cap="${cap}"]`);
+    await app.frame();
+    const o = (await objs(app)).at(-1) as unknown as { cap?: string; align?: string; dash?: number[] };
+    expect([o.cap ?? "round", o.align ?? "centre", o.dash?.[0]], `${cap} ${pos}`).toEqual([cap, pos, 3]);
+    return p.screenshot({ clip: { x: 480, y: 280, width: 240, height: 160 } });
+  };
+  for (const pos of ["centre", "inside", "outside"]) {
+    const flat = await look("butt", pos);
+    const round = await look("round", pos);
+    const square = await look("square", pos);
+    expect(flat.equals(round), `${pos}: round ends differ from flat`).toBe(false);
+    expect(round.equals(square), `${pos}: square ends differ from round`).toBe(false);
+  }
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("only a picked shape moves (a press-and-slide on another draws the selection box); dashes from Outline options; a node snaps to another shape's node", async ({ app }) => {
   const p = app.page;
   await key(app, "u");

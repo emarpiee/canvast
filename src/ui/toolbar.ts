@@ -188,7 +188,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
-      <div class="tb-group tb-options" data-for="pen" data-label="Colour">
+      <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
@@ -250,18 +250,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="pen select" data-label="Size">
+      <div class="tb-group tb-options" data-for="pen select" role="group" aria-label="Size">
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-pen-only data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
         <input type="range" class="size" data-size min="0" max="100" step="1" aria-label="Pen size" title="Pen size (screen px at this zoom); on Select it sets the thickness of the selected strokes">
         <span class="size-out" data-size-out></span>
       </div>
-      <div class="tb-group tb-options" data-for="pen" data-label="Smooth">
+      <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Smooth">
         <button type="button" class="stab" data-stab aria-pressed="false" aria-label="Stabilizer" title="Stabilizer: smooths hand wobble; the brush follows the pointer on a rope">${ICONS.waves}</button>
         <input type="range" class="size" data-strength min="1" max="100" step="1" aria-label="Stabilizer strength" title="Stabilizer strength (rope length)" hidden>
       </div>
-      <div class="tb-group tb-options" data-for="pen select" data-label="Keep size">
+      <div class="tb-group tb-options" data-for="pen select" role="group" aria-label="Keep size">
         <button type="button" class="follow" data-pen-only data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
         <button type="button" class="lock" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
@@ -273,13 +273,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="select text">
         <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.clipboardCopy}</button>
       </div>
-      <div class="tb-group tb-options" data-for="eraser" data-label="Size">
+      <div class="tb-group tb-options" data-for="eraser" role="group" aria-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
         <span class="size-out" data-eraser-out></span>
         <button type="button" class="snap" data-erase-parts aria-pressed="false" aria-label="Erase parts of strokes" title="On: the eraser cuts out only what it sweeps over of a freehand stroke. Off: it takes whole objects.">${ICONS.scissors}</button>
         <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.shapes}</button>
       </div>
-      <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects" data-label="Select">
+      <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
