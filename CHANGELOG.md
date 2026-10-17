@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- **Panel dock** (ADR 0123): the floating panels (Layers, Bookmarks, Styles, Tags, and Adjust, now a panel instead of a popover) stack on the left or right of the view in the order they were last used (the last used on top), fold to their title bar when it is pressed, float anywhere when it is dragged, dock again at a side edge, and take any width from 240 to 480 px; the layout is remembered and the same moves are in the command palette. Settings > Panels can minimize the inactive panels (all of them, or all but the latest few). A new panel is one `dock.add` call.
+
 - **Styles grow** (ADR 0122): **gradients** (Save gradient in the fill and outline picker), **colours** and **palettes** (made from the selection, a picture or a colour with a harmony; open one to use or edit its colours: change, name, add, remove, sort, copy as CSS), all applied from the Styles panel (asking fill, outline or both when several shapes are picked); **GIMP `.ggr` gradients and `.gpl` palettes** import (several at once) and export (a ZIP for several); a **gradient map** adjustment for pictures and video.
 - **Sheets in real units** (ADR 0121): a picked sheet shows its size in px, in, mm or cm; typing a size changes only the sheet.
 - **Crop** looks unlike resizing: the canvas outside the window dims with the cut-away picture faintly showing, brackets instead of squares, a Crop tag, and the floating bars step aside; a dot on the Crop and Adjust buttons says a picture has them. Bookmarks, Styles and Tags moved to a stack on the left.

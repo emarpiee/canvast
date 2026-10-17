@@ -1,3 +1,4 @@
+import { DOCK_PANEL_IDS } from "../settings/panels";
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
 import { openColourPopover } from "./colour-popover";
 import { swatchBackground } from "../render/ink";
@@ -66,7 +67,7 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Media", ["media", "screenshot"]],
-  ["Interface", ["appearance", "performance"]],
+  ["Interface", ["appearance", "panels", "performance"]],
   ["App", ["storage", "privacy", "collaboration", "develop"]],
 ];
 
@@ -153,6 +154,14 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "shot.tagCanvas", label: "Tag: the canvas's name", control: { kind: "toggle" } },
       { key: "shot.tagItems", label: "Tags of the items in it", help: "The in-canvas tags of the items in the screenshot (or in the selection).", control: { kind: "toggle" } },
       { key: "shot.tagsCustom", label: "Your own tags", help: "Tags you choose, put on every screenshot. Separate them with commas.", control: { kind: "text", max: 200, placeholder: "client, draft" } },
+    ],
+  },
+  {
+    id: "panels",
+    label: "Panels",
+    rows: [
+      { key: "panel.autoFold", label: "Minimize inactive panels", help: "The panels stacked on a side fold to their title bar when you use another one. Off: they stay as you left them. Only the active one: just the panel on top of each stack stays open. The latest few: the panels you used last stay open (set how many below). Floating panels are never folded.", control: { kind: "select", options: [["off", "Off"], ["all", "Keep only the active panel open"], ["latest", "Keep the latest few open"]] } },
+      { key: "panel.keep", label: "Panels kept open", help: `How many stacked panels stay open with "Keep the latest few open", counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
     ],
   },
   {

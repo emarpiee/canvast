@@ -90,6 +90,9 @@ function closeChild(): void {
   pop.remove();
 }
 
+/** Close the floating gradient editor of the Adjust panel (the panel was rebuilt or closed). */
+export const closeAdjustChild = (): void => closeChild();
+
 export function closeColourPopover(refocus = false): void {
   closeChild();
   if (!open) return;
@@ -584,14 +587,12 @@ export interface AdjustOptions {
 
 const DEFAULT_MAP: readonly GradientStop[] = [{ o: 0, c: "#1e1b4b" }, { o: 1, c: "#f59e0b" }];
 
-export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
-  if (open && open.anchor === anchor) return closeColourPopover(true);
-  closeColourPopover();
-  installCloseRules();
+/** Fill `host` (the body of the Adjust panel) with the adjustment controls for the picked pictures (ADR 0118; a dock panel, ADR 0123). Call again to show other pictures. */
+export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current(): Adjust } {
+  closeChild();
   const pop = document.createElement("div");
-  pop.className = "colour-pop adjust-pop";
-  pop.setAttribute("role", "dialog");
-  pop.setAttribute("aria-label", "Adjust the picture");
+  pop.className = "adjust-pop";
+  host.replaceChildren(pop);
   const rows = ADJUSTMENTS;
   let cur: Adjust = { ...o.adjust };
   const GROUPS: Array<[string, readonly AdjustKey[]]> = [
@@ -738,15 +739,5 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
       o.onChange(cur, "Reset adjustments");
     }
   });
-  document.body.appendChild(pop);
-  place(pop, anchor);
-  // (below the bars along the top of the page, whichever side of the picture it opened on)
-  const topEdge = 64;
-  if (parseFloat(pop.style.top) < topEdge) {
-    pop.style.top = `${topEdge}px`;
-    pop.style.maxHeight = `${window.innerHeight - topEdge - 8}px`;
-  }
-  anchor.setAttribute("aria-expanded", "true");
-  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
-  pop.querySelector<HTMLElement>("input[type=range]")?.focus();
+  return { current: () => cur };
 }

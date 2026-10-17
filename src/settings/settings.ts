@@ -13,6 +13,7 @@
  * Instance-specific state (a video's pause position, an image's adjustments)
  * is not a setting: it lives in the object itself.
  */
+import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 
 export type Scope = "device" | "workspace" | "board";
@@ -72,6 +73,9 @@ export const SETTINGS = {
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "panel.autoFold": { scope: "device", default: "off", validate: oneOf("off", "all", "latest"), effect: "immediate" } as Def<"off" | "all" | "latest">,
+  "panel.keep": { scope: "device", default: 2, validate: range(1, DOCK_PANEL_IDS.length), effect: "immediate" } as Def<number>,
+  "ui.dock": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && v.length <= 8000 ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.stylesOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.tagsOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.bookmarksOpen": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,

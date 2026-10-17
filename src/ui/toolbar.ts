@@ -9,7 +9,7 @@ import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
 import { moreButton, openMoreMenu } from "./more-menu";
 import type { GradientStop } from "../doc/paint";
-import { openAdjustPopover, openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
+import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { Adjust } from "../doc/adjust";
 import { setAdjustPreviewing } from "../render/adjust-image";
 import type { DocumentStore } from "../doc/document-store";
@@ -360,27 +360,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
   root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
   root.querySelector<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
-  root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", (e) => {
-    const anchor = e.currentTarget as HTMLElement;
-    const sel = actions.selectedAdjust();
-    if (!sel) return;
-    openAdjustPopover(anchor, {
-      ...sel,
-      styles: actions.adjustStyles(),
-      onStyles: () => {
-        editor.stylesOpen = true;
-        editor.changed();
-      },
-      onInput: (a) => actions.previewAdjust(a),
-      onChange: (a, label) => actions.commitAdjust(a, label),
-      onClose: () => {
-        setAdjustPreviewing(false);
-        if (editor.preview.kind === "replace") {
-          editor.preview = { kind: "none" }; // (an unfinished slider is not kept)
-          editor.changed();
-        }
-      },
-    });
+  root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
+    if (!actions.selectedAdjust() && !editor.adjustOpen) return;
+    editor.adjustOpen = !editor.adjustOpen; // the Adjust panel (ui/adjust-panel.ts, ADR 0123)
+    editor.changed();
   });
   root.querySelector<HTMLElement>("[data-attach]")!.addEventListener("click", () => {
     editor.attachMode = !editor.attachMode;
@@ -688,6 +671,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const adj = pick && still ? actions.selectedAdjust() : null;
     const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
     adjustBtn.hidden = !adj;
+    adjustBtn.setAttribute("aria-pressed", String(editor.adjustOpen));
     const adjusted = !!adj && Object.keys(adj.adjust).length > 0;
     adjustBtn.classList.toggle("is-applied", adjusted);
     adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");

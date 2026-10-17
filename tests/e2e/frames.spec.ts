@@ -1729,7 +1729,7 @@ test("phone layout (360 px wide): the bars stack in rows, the tools sit below th
   const dock = (await rect("#toolbar > .dock"))!;
   const options = (await rect("#toolbar > .toolbar"))!;
   const rail = (await rect("#toolbar > .rail"))!;
-  const panel = (await rect("#side-panels > *"))!;
+  const panel = (await rect("#side-panels > .dock-item:not([hidden])"))!;
   const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   expect(overlap(nav, crumb), "tabs and workspace menu share a row").toBe(false);
   expect(crumb.x + crumb.width).toBeLessThanOrEqual(360);

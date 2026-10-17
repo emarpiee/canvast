@@ -3,7 +3,7 @@ import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
 import { newObjectId, rasterKey } from "../doc/model";
 import type { CanvasObject, ImageObject } from "../doc/model";
-import type { Gradient } from "../doc/paint";
+import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
@@ -61,6 +61,8 @@ import { chooseDialog, confirmDialog } from "../ui/confirm";
 import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
+import { PanelDock } from "../ui/panel-dock";
+import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
@@ -528,8 +530,13 @@ async function start(): Promise<void> {
   const sideLeft = document.createElement("div");
   sideLeft.id = "side-panels-left";
   host.appendChild(sideLeft);
+  const narrow = window.matchMedia("(max-width: 640px)");
+  const dock = new PanelDock(sideLeft, side, { initial: settings.get("ui.dock"), persist: (json) => void settings.set("ui.dock", json), narrow: () => narrow.matches, autoFold: () => ({ mode: settings.get("panel.autoFold"), keep: settings.get("panel.keep") }) });
+  settings.subscribe((key) => {
+    if (key === "panel.autoFold" || key === "panel.keep") dock.apply();
+  });
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
-  mountBookmarksPanel(sideLeft, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
+  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -546,7 +553,7 @@ async function start(): Promise<void> {
     assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
     reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
   });
-  mountStylesPanel(sideLeft, editor, session.styles, {
+  mountStylesPanel(side, editor, session.styles, {
     adjustment: {
       can: () => !!selectedAdjust(doc, editor),
       apply: (s) => commitAdjust(doc, editor, s.data as Adjust, `Apply the adjustment “${s.name}”`),
@@ -595,7 +602,7 @@ async function start(): Promise<void> {
       editor.changed();
     },
   });
-  const tagsPanel = mountTagsPanel(sideLeft, editor, doc, {
+  const tagsPanel = mountTagsPanel(side, editor, doc, {
     tag: (ids, change) => void tagObjects(doc, editor, ids, change),
     renameTag: (from, to) => void session.changeCanvasTag(from, to),
     deleteTag: (tag) =>
@@ -605,12 +612,33 @@ async function start(): Promise<void> {
         confirmLabel: "Delete tag",
       }).then((ok) => (ok ? session.changeCanvasTag(tag, null) : 0)),
   });
-  const narrow = window.matchMedia("(max-width: 640px)");
-  const seatPanels = (): void => {
-    for (const el of [...sideLeft.children, ...side.querySelectorAll<HTMLElement>(".bookmarks-panel, .styles-panel, .tags-panel")]) (narrow.matches ? side : sideLeft).appendChild(el);
-  };
-  seatPanels();
-  narrow.addEventListener("change", seatPanels);
+  const adjustStylesApi = () => ({
+      gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
+      saveGradient: async (stops: readonly GradientStop[]) => {
+        await session.styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops });
+        editor.message = "Saved the gradient to the Styles.";
+        editor.changed();
+      },
+      save: async (name: string, a: Adjust) => {
+        if (!(await session.styles.add("adjustment", name, a))) {
+          editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
+          editor.changed();
+        }
+      },
+  });
+  // Every floating panel lives in the dock (ADR 0123): stacked on a side, or floating, folded by its title bar.
+  const panelEl = (testid: string): HTMLElement => side.querySelector<HTMLElement>(`[data-testid="${testid}"]`)!;
+  dock.add(panelEl("layers-panel"), { id: "layers", title: "Layers", side: "right" });
+  dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
+  dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
+  dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });
+  mountAdjustPanel(side, editor, {
+    selectedAdjust: () => selectedAdjust(doc, editor),
+    previewAdjust: (a) => previewAdjust(doc, editor, a),
+    commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
+    adjustStyles: adjustStylesApi,
+  });
+  dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
@@ -675,20 +703,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     cropped: () => isCropped(doc, editor),
     uncrop: () => uncropPicture(doc, editor),
     selectedAdjust: () => selectedAdjust(doc, editor),
-    adjustStyles: () => ({
-      gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
-      saveGradient: async (stops) => {
-        await session.styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops });
-        editor.message = "Saved the gradient to the Styles.";
-        editor.changed();
-      },
-      save: async (name, a) => {
-        if (!(await session.styles.add("adjustment", name, a))) {
-          editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
-          editor.changed();
-        }
-      },
-    }),
+    adjustStyles: adjustStylesApi,
     previewAdjust: (a) => previewAdjust(doc, editor, a),
     commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
     copyAdjust: () => void copyAdjustments(doc, editor),
@@ -1185,6 +1200,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
       { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
+      ...dock.commands().map((c): Command => ({ ...c, enabled: () => onCanvas && (c.enabled?.() ?? true) })),
       { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
       { group: "Go to", title: "Assets view", words: "library", run: () => setView("assets") },
       { group: "Go to", title: "Shortcuts", keys: "?", words: "keys keyboard help", run: () => { setView("settings"); settingsView.show("shortcuts"); } },

@@ -19,6 +19,12 @@ const centre = async (app: App, id: string): Promise<[number, number]> => {
 };
 const SUNSET = "GIMP Gradient\nName: Sunset\n1\n0.000000 0.500000 1.000000 1.000000 0.000000 0.000000 1.000000 0.000000 0.000000 1.000000 1.000000 0 0 0 0\n";
 
+/** The Adjust panel is a dock panel: the button shows it, and it stays (ADR 0123). */
+async function openAdjust(p: App["page"]): Promise<void> {
+  if (!(await p.getByTestId("adjust-panel").isVisible())) await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+}
+
 test("Styles: a gradient is saved from the fill picker, applied (the part asked when several are picked), exported and read back as .ggr", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");
@@ -31,7 +37,6 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.click('[data-paint="fill"]');
   await pop.locator('[data-mode="linear"]').click();
   await pop.locator("[data-save-gradient]").click();
-  await p.keyboard.press("Escape");
 
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
@@ -124,7 +129,7 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   const pic = (await objs(app))[0]!;
   await p.keyboard.press("v");
   await p.mouse.click(...(await centre(app, pic.id)));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   const pop = p.locator(".adjust-pop");
   await pop.locator("[data-adj-map]").selectOption({ label: "Sunset" });
   const map = (await objs(app))[0]!.adjust!.map!;
@@ -144,7 +149,7 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   await p.keyboard.press("Control+z");
   // a custom gradient made right there, in the floating picker panel beside the Adjust panel
   await p.mouse.click(...(await centre(app, pic.id)));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   await pop.locator("[data-adj-map]").selectOption({ label: "Make a custom gradient…" });
   await expect(p.locator(".colour-pop").filter({ hasText: "Save gradient" }).locator(".cg")).toBeVisible();
   await expect(pop.locator(".cg"), "not inside the Adjust panel").toHaveCount(0);

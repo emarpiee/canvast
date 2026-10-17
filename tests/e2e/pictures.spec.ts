@@ -20,6 +20,12 @@ async function place(app: App, name = "pic.png", buffer = PIC): Promise<Pic> {
   return (await objs(app)).at(-1)!;
 }
 
+/** The Adjust panel is a dock panel: the button shows it, and it stays (ADR 0123). */
+async function openAdjust(p: App["page"]): Promise<void> {
+  if (!(await p.getByTestId("adjust-panel").isVisible())) await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+}
+
 test("crop: the picture's handles move its window, what stays does not move, pulling back out restores it, one undo each", async ({ app }) => {
   const p = app.page;
   const pic = await place(app);
@@ -80,7 +86,7 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   await p.mouse.click(60, 650);
   const dark = await px(app, ...at);
   await p.mouse.click(Math.round((ba.minX + ba.maxX) / 2), Math.round((ba.minY + ba.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   const pop = p.locator(".adjust-pop");
   await pop.locator('[data-adj-num="exposure"]').fill("70");
   await pop.locator('[data-adj-num="exposure"]').blur();
@@ -108,7 +114,7 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   await p.keyboard.press("Escape");
   await p.mouse.click(60, 650);
   await p.mouse.click(...edge);
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   await pop.getByRole("button", { name: "Reset" }).click();
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
@@ -121,11 +127,10 @@ test("an adjusted picture too big to be decoded whole is still drawn whole when 
   await p.keyboard.press("v");
   const b = await boxOf(app, pic.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   const pop = p.locator(".adjust-pop");
   await pop.locator('[data-adj-num="contrast"]').fill("30");
   await pop.locator('[data-adj-num="contrast"]').blur();
-  await p.keyboard.press("Escape");
   await p.mouse.click(40, 700);
   await p.evaluate(() => window.__canvastDebug.jump(-3)); // far enough out that a reduced copy is used
   await app.frame();
@@ -143,10 +148,9 @@ test("Make a new picture files it as an edited picture: its own folder, name and
   await p.keyboard.press("v");
   const b = await boxOf(app, pic.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("40");
   await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
-  await p.keyboard.press("Escape");
   await p.getByTestId("context-bar").getByRole("button", { name: "Make a new picture of it as it looks now, beside it" }).click();
   await expect.poll(async () => (await objs(app)).length).toBe(2);
   const listing = await p.evaluate(() => window.__canvastDebug.assetListing());
@@ -170,10 +174,9 @@ test("Download: an edited still comes with its original, named as edited picture
   await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
   expect((await plain).suggestedFilename()).toBe("trip.png");
   // adjusted: the original and the edited picture, in one ZIP
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="contrast"]').fill("30");
   await p.locator('.adjust-pop [data-adj-num="contrast"]').blur();
-  await p.keyboard.press("Escape");
   const both = p.waitForEvent("download");
   await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
   const dl = await both;
@@ -192,10 +195,9 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
   const reset = p.getByRole("button", { name: "Reset the adjustments" });
   await expect(reset).toBeHidden();
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("25");
   await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
-  await p.keyboard.press("Escape");
   await expect(reset).toBeVisible();
   await reset.click();
   expect((await objs(app)).find((o) => o.id === pic.id)!.adjust).toBeUndefined();
@@ -215,7 +217,7 @@ test("a video has every adjustment: highlights, shadows, tint, sharpen and grain
   const b = await boxOf(app, v!.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
   await slow(p.getByTestId("media-bar")).toBeVisible();
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   const pop = p.locator(".adjust-pop");
   for (const key of ["exposure", "highlights", "shadows", "tint", "sharpen", "grain"]) {
     await expect(pop.locator(`[data-adj-num="${key}"]`), `${key} is offered for a video`).toBeVisible();
@@ -224,7 +226,6 @@ test("a video has every adjustment: highlights, shadows, tint, sharpen and grain
     await pop.locator(`[data-adj-num="${key}"]`).fill(val);
     await pop.locator(`[data-adj-num="${key}"]`).blur();
   }
-  await p.keyboard.press("Escape");
   expect((await objs(app)).find((o) => o.id === v!.id)!.adjust).toEqual({ shadows: 40, tint: -20, grain: 30 });
   // the player shows it through a filter that exists in the page and holds those steps
   await expect.poll(() => p.evaluate(() => document.querySelector<HTMLElement>("video.media-video")?.style.filter ?? "")).toMatch(/^url\("?#adj-/);
@@ -246,7 +247,7 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   await p.keyboard.press("v");
   const b = await boxOf(app, first.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await openAdjust(p);
   const pop = p.locator(".adjust-pop");
   await pop.locator('[data-adj-num="contrast"]').fill("30");
   await pop.locator('[data-adj-num="contrast"]').blur();
@@ -256,7 +257,6 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   // double-clicking a name takes that one number off
   await pop.locator('[data-adj-row="contrast"] label').dblclick();
   await expect(pop.locator('[data-adj-num="contrast"]')).toHaveValue("0");
-  await p.keyboard.press("Escape");
 
   // the Styles panel lists it, with what it does, and renames it
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();

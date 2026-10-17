@@ -115,6 +115,8 @@ export class EditorState {
   tagsOpen = false;
   /** The Styles panel is shown (ui/styles-panel.ts). */
   stylesOpen = false;
+  /** The Adjust panel is shown (ui/adjust-panel.ts). */
+  adjustOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */
