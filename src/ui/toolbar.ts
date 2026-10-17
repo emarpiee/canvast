@@ -1,4 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
+import type { TextLook, lookOf } from "../text/text-style";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
@@ -51,9 +52,9 @@ export interface ToolbarActions {
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
   /** How the first picked object on a sheet follows it (null: none is on one), and changing it; fitting a picked sheet to what is on it (ADR 0108). */
   selectedPin(): { h: string; v: string } | null;
-  /** The line height and letter spacing (em) of the first picked text, and changing them for every picked text. */
-  selectedTextStyle(): { lineHeight: number; tracking: number } | null;
-  setTextStyle(patch: { lineHeight?: number; tracking?: number }): void;
+  /** The look of the text being edited, else of the Text tool (when it is the tool), else of the first picked text (null: none), and changing it (ADR 0126). */
+  selectedTextStyle(): ReturnType<typeof lookOf> | null;
+  setTextStyle(look: TextLook, final?: boolean): void;
   setPin(patch: { h?: string; v?: string }): void;
   canFitSheet(): boolean;
   /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
@@ -148,6 +149,17 @@ export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label
   },
 ];
 
+const TEXT_ALIGNS = [
+  { id: "left", label: "Align left", icon: ICONS.textAlignLeft },
+  { id: "center", label: "Align centre", icon: ICONS.textAlignCenter },
+  { id: "right", label: "Align right", icon: ICONS.textAlignRight },
+  { id: "justify", label: "Justify", icon: ICONS.textAlignJustify },
+] as const;
+const TEXT_FITS = [
+  { id: "width", label: "Auto width", title: "Auto width: the box is as wide as the words (a click makes one)", icon: ICONS.textAutoWidth },
+  { id: "fixed", label: "Fixed width", title: "Fixed width: the words wrap at the box's width (drag a box to make one)", icon: ICONS.textFixedWidth },
+] as const;
+
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
     <div class="rail" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
@@ -172,9 +184,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
-      <div class="tb-group tb-options" data-for="pen text" data-label="Colour">
+      <div class="tb-group tb-options" data-for="pen" data-label="Colour">
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
-        <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen and text colour: open the colour picker"><span data-colour-chip></span></button>
+        <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="shape path" role="radiogroup" aria-label="Shape or path">
         ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
@@ -188,8 +200,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
-        <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
-        <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
         <label class="tb-count" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
           <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
@@ -205,6 +215,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select></span>
         <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
+      </div>
+      <div class="tb-group tb-options" data-for="text select node">
+        <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span><b class="swatch-name">Colour</b></button>
+        <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
+        <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
+        <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
+      </div>
+      <div class="tb-group tb-options" data-for="text select node" role="radiogroup" aria-label="Text alignment">
+        ${TEXT_ALIGNS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-align="${a.id}" aria-label="${a.label}" title="${a.label}">${a.icon}</button>`).join("")}
+      </div>
+      <div class="tb-group tb-options" data-for="text select node" role="radiogroup" aria-label="Text width">
+        ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="select node">
         <button type="button" class="initial-btn" data-initial hidden aria-haspopup="menu" aria-expanded="false" aria-label="Initial shape" title="Initial shape: save the shape as it is now, and come back to it later">${ICONS.pin}</button>
@@ -332,6 +354,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
     const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
     if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
+  });
+  root.querySelector<HTMLInputElement>("[data-text-size]")!.addEventListener("change", (e) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (Number.isFinite(v) && v > 0) actions.setTextStyle({ sizePx: v });
+  });
+  // (these buttons keep the focus where it is, so a text being edited stays open and takes the change)
+  for (const b of root.querySelectorAll<HTMLElement>("[data-text-align], [data-text-fit]")) b.addEventListener("mousedown", (e) => e.preventDefault());
+  for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => actions.setTextStyle({ align: b.dataset["textAlign"] as "left" }));
+  for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.addEventListener("click", () => actions.setTextStyle({ autoWidth: b.dataset["textFit"] === "width" }));
+  root.querySelector<HTMLElement>("[data-text-colour]")!.addEventListener("click", (e) => {
+    const anchor = e.currentTarget as HTMLElement;
+    openPaintPopover(anchor, {
+      name: "Text colour",
+      paint: actions.selectedTextStyle()?.color ?? null,
+      noneLabel: "No colour",
+      solidOnly: true,
+      onInput: (p) => typeof p === "string" && actions.setTextStyle({ color: p }, false),
+      onChange: (p) => typeof p === "string" && actions.setTextStyle({ color: p }),
+    });
   });
   root.querySelector<HTMLInputElement>("[data-text-line]")!.addEventListener("change", (e) => {
     const v = Number((e.target as HTMLInputElement).value);
@@ -646,9 +687,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
-    const txt = pick && still ? actions.selectedTextStyle() : null;
+    const txt = (pick && still) || editor.tool === "text" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
+      const size = root.querySelector<HTMLInputElement>("[data-text-size]")!;
+      if (document.activeElement !== size) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
+      for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));
+      for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.setAttribute("aria-checked", String((b.dataset["textFit"] === "width") === txt.autoWidth));
+      root.querySelector<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = swatchBackground(txt.color);
       const line = root.querySelector<HTMLInputElement>("[data-text-line]")!, track = root.querySelector<HTMLInputElement>("[data-text-track]")!;
       if (document.activeElement !== line) line.value = String(Math.round(txt.lineHeight * 100) / 100);
       if (document.activeElement !== track) track.value = String(Math.round(txt.tracking * 100));

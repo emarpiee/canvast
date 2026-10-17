@@ -12,7 +12,9 @@ import { radiansFromAngle } from "../core/angle";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
-import { layoutText } from "../text/layout";
+import { layoutOf } from "../text/layout";
+import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
+import type { TextLook } from "../text/text-style";
 import { TEXT_FONT_FAMILY } from "../render/draw-text";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
@@ -27,8 +29,6 @@ import { esc } from "./format";
  */
 
 /** Size of new text, in CSS px at the zoom where it is created. */
-export const NEW_TEXT_PX = 16;
-export const NEW_TEXT_WRAP_PX = 320;
 /** Editing happens at a readable size: outside this range the camera zooms to NEW_TEXT_PX first. */
 const MIN_EDIT_PX = 9;
 const MAX_EDIT_PX = 72;
@@ -70,9 +70,14 @@ const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
 ];
 
 export interface TextEditor {
-  open(target: TextObject | null, at: WorldPoint): void;
+  /** Edit `target`, or a new text: at the point `at` (the middle of its first line), as wide as its words, or (`widthPx`, dragged out) as wide as that, from its top-left corner. */
+  open(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   commit(): void;
   readonly isOpen: boolean;
+  /** The look of the text being edited at the zoom now (null: none is open). */
+  look(): ReturnType<typeof lookOf> | null;
+  /** Change the look of the text being edited (stored when the edit is finished). */
+  restyle(look: TextLook): void;
 }
 
 export function mountTextEditor(
@@ -100,6 +105,13 @@ export function mountTextEditor(
 
   let target: TextObject | null = null;
   let isNew = false;
+  /** The look was changed while editing: the edited object (not the stored one) carries it. */
+  let restyled = false;
+  const ppuNow = (): number => {
+    if (!target) return 0;
+    const cam = cameraIn(view.frameCamera, target.frame ?? doc.space.world) ?? view.camera;
+    return 2 ** (target.unit + cam.zi + cam.zf);
+  };
 
   const position = (): void => {
     if (!target) return;
@@ -110,7 +122,9 @@ export function mountTextEditor(
     const em = target.size * ppu;
     box.style.left = `${s.x}px`;
     box.style.top = `${s.y}px`;
-    box.style.width = `${target.w * ppu}px`;
+    box.style.width = target.autoWidth ? "max-content" : `${target.w * ppu}px`;
+    box.style.minWidth = target.autoWidth ? `${em * 0.5}px` : "";
+    box.style.textAlign = target.align ?? "left";
     box.style.fontSize = `${em}px`;
     box.style.setProperty("--em", `${em}px`);
     // A turned text is edited turned, about the same pivot it is drawn about.
@@ -139,7 +153,7 @@ export function mountTextEditor(
     const zi = Math.floor(level);
     const zf = level - zi;
     const vp = view.viewport;
-    const l = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
+    const l = layoutOf(o);
     const dx = Math.min((o.w / o.size) * NEW_TEXT_PX, vp.width - 64) / 2;
     const dy = Math.min(l.height * NEW_TEXT_PX, vp.height - 160) / 2;
     const off = (px: number): D.Dyadic => D.shift(D.fromNumber(px / 2 ** zf), -zi);
@@ -164,21 +178,23 @@ export function mountTextEditor(
     }
     const o = target;
     const wasNew = isNew;
+    const wasRestyled = restyled;
     close();
     const cur = doc.get(o.id);
     if (wasNew || !cur || cur.kind !== "text") {
-      if (md) doc.commit(doc.transaction("Add text", [homeObject(normalizeUnit({ ...o, md, z: doc.topZ() + 1 }), doc.space)]));
+      if (md) doc.commit(doc.transaction("Add text", [homeObject(normalizeUnit(fitWidth({ ...o, md, z: doc.topZ() + 1 })), doc.space)]));
     } else if (!md) {
       doc.commit(doc.transaction("Delete text", [], [o.id]));
       editor.selection.delete(o.id);
-    } else if (md !== cur.md) {
-      doc.commit(doc.transaction("Edit text", [{ ...cur, md }]));
+    } else if (md !== cur.md || wasRestyled) {
+      doc.commit(doc.transaction("Edit text", [fitWidth(wasRestyled ? { ...o, md } : { ...cur, md })]));
     }
   };
 
-  const open = (t: TextObject | null, at: WorldPoint): void => {
+  const open = (t: TextObject | null, at: WorldPoint, drawn?: { widthPx: number }): void => {
     commit();
     if (editor.blockEdit()) return;
+    restyled = false;
     const cam = view.camera;
     if (t) {
       zoomToEdit(t);
@@ -188,12 +204,14 @@ export function mountTextEditor(
     } else {
       const f = 2 ** cam.zf;
       const unit = -cam.zi;
-      const size = NEW_TEXT_PX / f;
-      // The click point is the middle of the first line.
-      const anchor = { x: at.x, y: D.sub(at.y, D.shift(D.fromNumber(size * 0.65), unit)) };
+      const look = editor.textLook;
+      const size = (look.sizePx ?? NEW_TEXT_PX) / f;
+      // A click: the point is the middle of the first line. A drag: the top-left corner of the box that was drawn.
+      const anchor = drawn ? at : { x: at.x, y: D.sub(at.y, D.shift(D.fromNumber(size * 0.65), unit)) };
       // `at` is in the camera frame's coordinates: the new text starts there.
       const frame = view.frame === doc.space.world ? {} : { frame: view.frame };
-      target = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: NEW_TEXT_WRAP_PX / f, size, color: editor.penColor };
+      const base: TextObject = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: drawn ? drawn.widthPx / f : size, size, color: look.color ?? editor.penColor };
+      target = withLook(base, { ...look, autoWidth: !drawn });
       isNew = true;
     }
     box.innerHTML = blocksToHtml(parse(target.md));
@@ -257,6 +275,13 @@ export function mountTextEditor(
     commit,
     get isOpen() {
       return target !== null;
+    },
+    look: () => (target ? lookOf(target, ppuNow()) : null),
+    restyle: (look) => {
+      if (!target) return;
+      target = withLook(target, look, ppuNow());
+      restyled = true;
+      position();
     },
   };
 }

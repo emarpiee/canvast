@@ -34,7 +34,7 @@ import type { DensityLayer } from "../render/density";
 import type { CatalogEntry, CatalogListing, GcReport, ThumbRecord } from "../assets/asset-catalog";
 import { done, req } from "../storage/idb";
 import { lastCopiedText } from "../ui/text-editor";
-import { layoutText, textFont } from "../text/layout";
+import { layoutOf, textFont } from "../text/layout";
 import type { PlacedGlyph, Line } from "../text/layout";
 import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
@@ -248,7 +248,7 @@ export function installDebugHook(
     const o = stored && worldForm(stored); // the hook speaks world coordinates
     if (!o || o.kind !== "text") throw new Error(`no text ${id}`);
     let i = 0;
-    for (const line of layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking).lines) {
+    for (const line of layoutOf(o).lines) {
       for (const g of line.glyphs) if (g.cp !== 32 && i++ === n) return { o, line, g };
     }
     throw new Error(`text ${id} has no character ${n}`);

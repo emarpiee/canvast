@@ -71,6 +71,7 @@ import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runExport, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
+import { toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
@@ -512,6 +513,11 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor);
+  /** Screen px per local unit of a text at this view (0 when it is not on screen). */
+  const textPpu = (id: string): number => {
+    const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === id);
+    return po && !po.cover ? po.proj.ppu : 0;
+  };
   const bookmarkList = new BookmarkList(session, view, doc);
   installMenuKeys();
   const focusCycle = createFocusCycle(doc, view, editor, () => true);
@@ -525,7 +531,7 @@ async function start(): Promise<void> {
     },
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
   });
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at) => textEditor.open(t, at), toolForKey: (k) => toolForKey(settings, k), navForKey: (k) => navForKey(settings, k),
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(settings, k), navForKey: (k) => navForKey(settings, k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
@@ -694,8 +700,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedPin: () => selectedPin(doc, editor),
-    selectedTextStyle: () => selectedTextStyle(doc, editor),
-    setTextStyle: (patch) => setTextStyle(doc, editor, patch),
+    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, editor.penColor) : selectedTextStyle(doc, editor, textPpu)),
+    setTextStyle: (look, final = true) => {
+      if (editor.tool === "text") editor.textLook = { ...editor.textLook, ...look };
+      if (textEditor.isOpen) textEditor.restyle(look);
+      else if (editor.tool !== "text") setTextStyle(doc, editor, look, textPpu, final);
+      else editor.changed();
+    },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
     canFitSheet: () => canFitSheet(doc, editor),
     fitSheet: () => fitSheet(doc, editor),

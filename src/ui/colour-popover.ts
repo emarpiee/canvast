@@ -389,6 +389,8 @@ export interface PaintPopoverOptions {
   /** Once, when a gesture ends or the kind changes. */
   onChange(paint: Paint | null): void;
   onClose?(): void;
+  /** Only a plain colour (with transparency) can be chosen: no None, Linear or Radial (a text's colour). */
+  solidOnly?: boolean;
 }
 
 type Mode = "none" | "solid" | "linear" | "radial";
@@ -433,7 +435,8 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.innerHTML = (["none", "solid", "linear", "radial"] as const).map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
   const body = document.createElement("div");
   body.className = "paint-body";
-  pop.append(modes, body);
+  if (o.solidOnly) pop.append(body);
+  else pop.append(modes, body);
 
   let current: { destroy(): void } | null = null;
   const mount = (): void => {

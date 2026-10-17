@@ -152,7 +152,7 @@ type Gesture =
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
-  | { kind: "text"; pointerId: number; start: ScreenPoint }
+  | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean }
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
@@ -197,9 +197,12 @@ type Gesture =
       rot0: number;
     };
 
+/** Narrowest box that counts as a drawn text box (screen px); a narrower drag is a click. */
+const MIN_TEXT_BOX_PX = 24;
+
 export interface ToolHooks {
-  /** Open the text editor on `target`, or on a new text object at `at`. */
-  editText(target: TextObject | null, at: WorldPoint): void;
+  /** Open the text editor on `target`, or on a new text object at `at` (a click: as wide as its words; a box dragged out: `box.widthPx` wide, `at` its top-left corner). */
+  editText(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
@@ -1181,7 +1184,7 @@ export function attachTools(
         startSelectPress(e, s);
         break;
       case "text":
-        g = { kind: "text", pointerId: e.pointerId, start: s };
+        g = { kind: "text", pointerId: e.pointerId, start: s, moved: false };
         break;
       case "shape":
       case "sheet":
@@ -1297,6 +1300,14 @@ export function attachTools(
         break;
       case "shape":
         updateShape(s, e);
+        break;
+      case "text":
+        // A box dragged out on empty canvas: a text of that width (a click makes one as wide as its words).
+        if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX && !editor.blockEdit() && !textAt(g.start)) {
+          g.moved = true;
+          editor.shapeDraft = { frame: view.frame, anchor: world(g.start), unit: -view.camera.zi, kind: "rect", bx: 0, by: 0, bw: 0, bh: 0, sides: 6, tips: 5, fill: null, stroke: "#2563eb", width: 1 / 2 ** view.camera.zf };
+        }
+        if (g.moved) updateShape(s, e);
         break;
       case "pathnode":
         if (!g.dragging && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) g.dragging = true;
@@ -1432,7 +1443,10 @@ export function attachTools(
         break;
       case "text":
         // Opened after the pointer is released, so the editor keeps the focus.
-        if (!cancelled && !editor.blockEdit()) hooks.editText(textAt(g.start), world(g.start));
+        editor.shapeDraft = null;
+        if (cancelled || editor.blockEdit()) break;
+        if (g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX) hooks.editText(null, world({ x: Math.min(s.x, g.start.x), y: Math.min(s.y, g.start.y) }), { widthPx: Math.abs(s.x - g.start.x) });
+        else hooks.editText(textAt(g.start), world(g.start));
         break;
     }
     g = { kind: "none" };

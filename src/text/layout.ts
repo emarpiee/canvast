@@ -1,3 +1,4 @@
+import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
 import { parse } from "./markdown";
@@ -39,6 +40,16 @@ export interface TextLayout {
   readonly height: number;
 }
 
+/** Horizontal alignment of the lines (absent on an object = left). Justify spreads the spaces of every line but the last of a paragraph. */
+export type TextAlign = "left" | "center" | "right" | "justify";
+
+/** What besides the words changes the layout. */
+export interface TextStyle {
+  readonly lineHeight?: number;
+  readonly tracking?: number;
+  readonly align?: TextAlign;
+}
+
 export const LINE_HEIGHT = 1.3;
 export const BLOCK_GAP = 0.6;
 export const ITEM_GAP = 0.2;
@@ -66,15 +77,21 @@ export function textFont(): Font {
   return font;
 }
 
-export function layoutText(md: string, wrapEm: number, lineHeight: number = LINE_HEIGHT, tracking = 0): TextLayout {
-  const key = `${wrapEm}|${lineHeight}|${tracking}|${md}`;
+export function layoutText(md: string, wrapEm: number, style: TextStyle = {}): TextLayout {
+  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left" } = style;
+  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm, lineHeight, tracking);
+    l = compute(md, wrapEm, lineHeight, tracking, align);
     cache.set(key, l);
   }
   return l;
+}
+
+/** The layout of a text object: the one place that knows how its fields (width, auto width, line height, letter spacing, alignment) shape it. */
+export function layoutOf(o: TextObject): TextLayout {
+  return layoutText(o.md, o.autoWidth ? Infinity : o.w / o.size, o);
 }
 
 interface Ch {
@@ -83,7 +100,7 @@ interface Ch {
   italic: boolean;
 }
 
-function compute(md: string, wrapEm: number, lineHeight: number, tracking: number): TextLayout {
+function compute(md: string, wrapEm: number, lineHeight: number, tracking: number, align: TextAlign): TextLayout {
   const f = textFont();
   const upm = f.unitsPerEm;
   const advance = (cp: number): { gid: number; adv: number } => {
@@ -91,7 +108,7 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
     return { gid, adv: (gid ? f.glyph(gid).advance / upm : fallbackAdvance(cp)) + tracking };
   };
   const lines: Line[] = [];
-  let width = wrapEm;
+  let width = Number.isFinite(wrapEm) ? wrapEm : 0;
   let y = 0;
   const blocks = parse(md);
   let n = 0;
@@ -105,7 +122,7 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
     for (const sp of b.spans) for (const c of sp.text) chars.push({ cp: c.codePointAt(0)!, bold: sp.bold, italic: sp.italic });
     let line: Array<Ch & { gid: number; adv: number }> = [];
     let first = true;
-    const emit = (glyphs: typeof line): void => {
+    const emit = (glyphs: typeof line, last = false): void => {
       const lh = lineHeight * s;
       const placed: PlacedGlyph[] = [];
       if (first && list) {
@@ -121,6 +138,7 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
         placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic });
         x += g.adv * s;
       }
+      if (align === "justify" && !last && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent, wrapEm);
       width = Math.max(width, x);
       const content = ((f.ascender - f.descender) / upm) * s;
       lines.push({ top: y, bottom: y + lh, baseline: y + (lh - content) / 2 + (f.ascender / upm) * s, scale: s, glyphs: placed });
@@ -144,9 +162,34 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
       line.push({ ...c, ...a });
       x += adv;
     }
-    emit(line);
+    emit(line, true);
     const next = blocks[bi + 1];
     if (next) y += list && next.type === b.type ? ITEM_GAP : BLOCK_GAP;
   });
+  if (align === "center" || align === "right") {
+    // The width the lines align in: the set width, or (no wrapping) the widest line.
+    const W = Number.isFinite(wrapEm) ? Math.max(wrapEm, width) : width;
+    lines.forEach((ln, i) => {
+      const end = ln.glyphs.reduce((m, g) => Math.max(m, g.x + g.adv), 0);
+      const d = align === "center" ? (W - end) / 2 : W - end;
+      if (d > 0) lines[i] = { ...ln, glyphs: ln.glyphs.map((g) => ({ ...g, x: g.x + d })) };
+    });
+  }
   return { lines, width, height: Math.max(y, lineHeight) };
+}
+
+/** Spread the spaces of a line so it ends at the wrap width; returns where it ends. `n` words' glyphs follow any list marker in `placed`. */
+function justify(placed: PlacedGlyph[], n: number, indent: number, wrapEm: number): number {
+  const from = placed.length - n;
+  const spaces = placed.slice(from).filter((g) => g.cp === 32).length;
+  const end = placed.length ? placed[placed.length - 1]!.x + placed[placed.length - 1]!.adv : indent;
+  if (!spaces || end >= wrapEm) return end;
+  const extra = (wrapEm - end) / spaces;
+  let shift = 0;
+  for (let i = from; i < placed.length; i++) {
+    const g = placed[i]!;
+    placed[i] = { ...g, x: g.x + shift };
+    if (g.cp === 32) shift += extra;
+  }
+  return wrapEm;
 }

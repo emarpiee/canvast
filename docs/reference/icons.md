@@ -4,6 +4,12 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `align-left` | Align text left |
+| `align-center` | Align text in the centre |
+| `align-right` | Align text right |
+| `align-justify` | Justify text |
+| `move-horizontal` | Text width follows its words (auto width) |
+| `wrap-text` | Text wraps at a set width (fixed width) |
 | `align-horizontal-distribute-center` | Horizontally |
 | `align-horizontal-justify-center` | Centre |
 | `align-horizontal-justify-end` | Right |

@@ -81,6 +81,12 @@ import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
 import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
+import textAlignLeftIcon from "lucide-static/icons/align-left.svg";
+import textAlignCenterIcon from "lucide-static/icons/align-center.svg";
+import textAlignRightIcon from "lucide-static/icons/align-right.svg";
+import textAlignJustifyIcon from "lucide-static/icons/align-justify.svg";
+import textAutoWidthIcon from "lucide-static/icons/move-horizontal.svg";
+import textFixedWidthIcon from "lucide-static/icons/wrap-text.svg";
 import splineIcon from "lucide-static/icons/spline.svg";
 import circleOffIcon from "lucide-static/icons/circle-off.svg";
 import circleHelpIcon from "lucide-static/icons/circle-help.svg";
@@ -233,6 +239,12 @@ export const ICONS = {
   panelBottomClose: clean(panelBottomCloseIcon),
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),
+  textAlignLeft: clean(textAlignLeftIcon),
+  textAlignCenter: clean(textAlignCenterIcon),
+  textAlignRight: clean(textAlignRightIcon),
+  textAlignJustify: clean(textAlignJustifyIcon),
+  textAutoWidth: clean(textAutoWidthIcon),
+  textFixedWidth: clean(textFixedWidthIcon),
   spline: clean(splineIcon),
   circleOff: clean(circleOffIcon),
   circleHelp: clean(circleHelpIcon),

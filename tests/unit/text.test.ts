@@ -3,7 +3,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
 import { parseFont } from "../../src/text/font";
 import type { Font } from "../../src/text/font";
-import { layoutText, setFont, LINE_HEIGHT } from "../../src/text/layout";
+import { layoutOf, layoutText, setFont, LINE_HEIGHT } from "../../src/text/layout";
+import { LOOK_LIMITS, lookOf, withLook } from "../../src/text/text-style";
 import { canonical, normalizeSpans, parse, serialize } from "../../src/text/markdown";
 import type { Block } from "../../src/text/markdown";
 import { deserializeObject, localBounds, serializeObject, validateObject } from "../../src/doc/model";
@@ -139,11 +140,46 @@ describe("layout", () => {
     expect(l.lines[1]!.glyphs[1]!.x).toBeGreaterThan(1);
   });
 
+  it("aligns lines, justifies all but the last line of a paragraph, and does not wrap without a width (ADR 0126)", () => {
+    const md = "aaa bbb ccc ddd eee fff";
+    const right = (l: ReturnType<typeof layoutText>, i: number): number => l.lines[i]!.glyphs.reduce((m, g) => Math.max(m, g.x + g.adv), 0);
+    const left = layoutText(md, 6);
+    expect(left.lines.length).toBeGreaterThan(1);
+    const centre = layoutText(md, 6, { align: "center" });
+    const end = layoutText(md, 6, { align: "right" });
+    for (let i = 0; i < left.lines.length; i++) {
+      expect(right(end, i)).toBeCloseTo(6, 6);
+      expect(right(centre, i)).toBeCloseTo((6 + right(left, i)) / 2, 6);
+    }
+    const just = layoutText(md, 6, { align: "justify" });
+    for (let i = 0; i < just.lines.length - 1; i++) expect(right(just, i)).toBeCloseTo(6, 6);
+    expect(right(just, just.lines.length - 1)).toBeCloseTo(right(left, left.lines.length - 1), 6);
+    const none = layoutText("one\n\ntwo words here", Infinity);
+    expect(none.lines).toHaveLength(2); // only the paragraph break
+    expect(none.width).toBeCloseTo(right(none, 1), 6);
+  });
+
   it("is independent of the absolute size (layout is in em)", () => {
     const md = "The quick brown fox jumps over the lazy dog. ".repeat(4);
     const a = layoutText(md, 12);
     expect(layoutText(md, 12)).toBe(a); // cached
     expect(a.lines.length).toBeGreaterThan(2);
+  });
+});
+
+describe("text look", () => {
+  const base = { id: "a", kind: "text", anchor: { x: { m: 0n, e: 0 }, y: { m: 0n, e: 0 } }, unit: 0, z: 0, opacity: 1, attachmentTargetId: null, md: "one two three", w: 4, size: 2, color: "#112233" } as unknown as import("../../src/doc/model").TextObject;
+  it("keeps defaults out of the stored form, refits an auto width, and turns a size in px into a local size", () => {
+    const auto = withLook(base, { autoWidth: true, align: "center" });
+    expect(auto).toMatchObject({ autoWidth: true, align: "center" });
+    expect(auto.w).toBeCloseTo(layoutOf(auto).width * auto.size, 9);
+    expect(auto.w).not.toBe(base.w);
+    const back = withLook(auto, { autoWidth: false, align: "left", lineHeight: 1.3, tracking: 0 });
+    expect("autoWidth" in back || "align" in back || "lineHeight" in back || "tracking" in back).toBe(false);
+    expect(back.w).toBe(auto.w); // turning auto width off keeps the width it had
+    expect(withLook(base, { sizePx: 32 }, 4).size).toBe(8); // 32 px at 4 px per unit
+    expect(withLook(base, { sizePx: 1e9 }, 1).size).toBe(LOOK_LIMITS.sizePx[1]);
+    expect(lookOf(base, 3).sizePx).toBe(6);
   });
 });
 

@@ -9,7 +9,7 @@ import type { FlatPath } from "../doc/path";
 import { distanceToOutline, flatten, insideFill } from "../doc/path";
 import { paintAt } from "./gradient";
 import { cosSin } from "../core/angle";
-import { layoutText, textFont } from "../text/layout";
+import { layoutOf, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
 
 /**
@@ -257,7 +257,7 @@ const textSampler: CoarseSampler<TextObject> = {
     } catch {
       return "exact"; // the font is not loaded yet
     }
-    const lay = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
+    const lay = layoutOf(o);
     const upm = font.unitsPerEm;
     let inside = false;
     for (const line of lay.lines) {

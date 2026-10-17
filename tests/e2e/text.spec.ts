@@ -136,6 +136,43 @@ async function openApp(context: BrowserContext): Promise<Page> {
   return page;
 }
 
+test("a click makes a text as wide as its words, a dragged box one of that width; size, alignment and width mode are in the options bar (ADR 0126)", async ({ app }) => {
+  const p = app.page;
+  const width = async (id: string): Promise<number> => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return b.maxX - b.minX;
+  };
+  await newText(p, 300, 300);
+  await p.keyboard.type("Hello wide world");
+  await finish(p);
+  await p.keyboard.press("t");
+  await app.drag({ x: 300, y: 400 }, { x: 560, y: 440 }, 4);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.type("Hello wide world again and again");
+  await finish(p);
+  const [a, b] = await textObjects(p);
+  expect(a!.autoWidth).toBe(true);
+  expect(b!.autoWidth).toBeUndefined();
+  expect(await width(a!.id)).toBeLessThan(200); // as wide as 16 words of 16 px, no wrapping
+  expect(Math.abs((await width(b!.id)) - 260 - 2 * 16 * 0.25)).toBeLessThan(8); // the dragged width (and the padding the box has)
+
+  // The options bar of a picked text: size, alignment, width mode.
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  const size = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+  await expect(size).toHaveValue("16");
+  const before = await width(a!.id);
+  await size.fill("32");
+  await size.press("Enter");
+  await expect.poll(async () => width(a!.id)).toBeGreaterThan(before * 1.8); // an auto width follows the size
+  await p.getByRole("radio", { name: "Align centre" }).click();
+  await p.getByRole("radio", { name: "Fixed width" }).click();
+  await expect.poll(async () => (await textObjects(p)).find((t) => t.id === a!.id)).toMatchObject({ align: "center" });
+  expect((await textObjects(p)).find((t) => t.id === a!.id)!.autoWidth).toBeUndefined();
+  await expect(p.getByRole("radio", { name: "Fixed width" })).toHaveAttribute("aria-checked", "true");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {
   const p1 = app.page;
   await newText(p1, 300, 300);

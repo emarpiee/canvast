@@ -90,6 +90,7 @@ export interface DraftStroke {
 import type { PenLock } from "../interaction/pen-width";
 import type { PenKind } from "../interaction/pens";
 import type { SelectionFrame } from "../render/selection-frame";
+import type { TextLook } from "../text/text-style";
 
 export const PEN_COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"] as const;
 /** Pen widths in CSS px at the zoom level where the stroke is drawn. */
@@ -102,6 +103,8 @@ export class EditorState {
   selection = new Set<ObjectId>();
   lassoFilter: LassoFilter = "strokes";
   penColor: string = PEN_COLORS[0];
+  /** What the Text tool makes (ADR 0126): the look of the next text; a colour left out is the pen colour. */
+  textLook: TextLook = {};
   penWidthPx: number = PEN_WIDTHS[1];
   /** Which pen draws (interaction/pens.ts). */
   penKind: PenKind = "fine";

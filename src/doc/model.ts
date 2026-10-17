@@ -4,7 +4,8 @@ import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
-import { layoutText } from "../text/layout";
+import { layoutOf } from "../text/layout";
+import type { TextAlign } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
 import type { Dash } from "./stroke-look";
@@ -136,9 +137,13 @@ export interface TextObject extends ObjectBase {
   readonly lineHeight?: number;
   /** Extra space after every letter, in em (ADR 0113); absent = none. */
   readonly tracking?: number;
+  /** Horizontal alignment of the lines; absent = left. */
+  readonly align?: Exclude<TextAlign, "left">;
+  /** The width follows the words: no wrapping but at a new paragraph, and `w` is kept equal to the widest line. Absent = a set width the words wrap at. */
+  readonly autoWidth?: true;
   /** Canonical Markdown (text/markdown.ts); the anchor is the top-left corner. */
   readonly md: string;
-  /** Wrap width in local units. */
+  /** Wrap width in local units (with `autoWidth`, the width of the widest line). */
   readonly w: number;
   /** Body font size (1 em) in local units. */
   readonly size: number;
@@ -296,7 +301,7 @@ export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "path") return paintBounds(o.base ?? o.sub, inkStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
-    const l = layoutText(o.md, o.w / o.size, o.lineHeight, o.tracking);
+    const l = layoutOf(o);
     const p = TEXT_PAD_EM * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
   }
@@ -373,6 +378,8 @@ export class InvalidObjectError extends Error {}
 const ID_RE = /^[0-9a-f]{32}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
+/** A text colour may carry alpha (#rrggbbaa). */
+const TEXT_COLOR_RE = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 /** Most sub-paths in a path, and most nodes in all of them (a guard against a hand-edited or hostile file). */
 export const MAX_SUBPATHS = 4096;
 export const MAX_PATH_NODES = 200_000;
@@ -478,7 +485,9 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.size, "size");
     if (o.lineHeight !== undefined && !(Number.isFinite(o.lineHeight) && o.lineHeight >= 0.5 && o.lineHeight <= 5)) throw new InvalidObjectError("bad line height");
     if (o.tracking !== undefined && !(Number.isFinite(o.tracking) && o.tracking >= -0.5 && o.tracking <= 2)) throw new InvalidObjectError("bad letter spacing");
-    if (!COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
+    if (o.align !== undefined && !(o.align === "center" || o.align === "right" || o.align === "justify")) throw new InvalidObjectError("bad alignment");
+    if (o.autoWidth !== undefined && o.autoWidth !== true) throw new InvalidObjectError("bad auto width");
+    if (!TEXT_COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }
@@ -576,7 +585,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

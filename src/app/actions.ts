@@ -11,6 +11,8 @@ import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, TextObject } from "../doc/model";
+import { withLook, lookOf, sameLook } from "../text/text-style";
+import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
@@ -797,7 +799,7 @@ function derivedPreview(doc: DocumentStore, next: readonly PathObject[]): PathOb
 }
 
 /** Show these objects as they would be (a number being dragged), without storing them. */
-function showReplaced(editor: EditorState, next: readonly PathObject[]): void {
+function showReplaced(editor: EditorState, next: readonly CanvasObject[]): void {
   editor.preview = next.length ? { kind: "replace", ids: next.map((o) => o.id), objs: new Map(next.map((o) => [o.id, o] as const)) } : { kind: "none" };
   editor.changed();
 }
@@ -1178,7 +1180,7 @@ export function convertTextToPath(doc: DocumentStore, editor: EditorState): void
     const { sub, missing: m } = textOutline(o);
     missing += m;
     if (!sub.length) continue;
-    const { kind: _k, md, w: _w, size, color, rot: _r, ...base } = o;
+    const { kind: _k, md, w: _w, size, color, rot: _r, lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, ...base } = o;
     const plain = md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
     const path: PathObject = { ...base, kind: "path", sub, fill: color, stroke: null, width: Math.max(size * 0.05, Number.MIN_VALUE), ...(!base.name && plain ? { name: plain } : {}) };
     made.push(homeObject(normalizeUnit(path), doc.space));
@@ -1446,25 +1448,21 @@ export function detachSelection(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
-/** The line height (a multiple of the size) and letter spacing (em) of the first picked text (null: no text is picked). */
-export function selectedTextStyle(doc: DocumentStore, editor: EditorState): { lineHeight: number; tracking: number } | null {
+/** The look (text/text-style.ts) of the first picked text, at the zoom `ppuOf` says (null: no text is picked). */
+export function selectedTextStyle(doc: DocumentStore, editor: EditorState, ppuOf: (id: string) => number): ReturnType<typeof lookOf> | null {
   const t = selected(doc, editor).find((o): o is TextObject => o.kind === "text");
-  return t ? { lineHeight: t.lineHeight ?? 1.3, tracking: t.tracking ?? 0 } : null;
+  return t ? lookOf(t, ppuOf(t.id)) : null;
 }
 
-/** Change the line height or letter spacing of the picked texts (ADR 0113): one undo step. */
-export function setTextStyle(doc: DocumentStore, editor: EditorState, patch: { lineHeight?: number; tracking?: number }, final = true): void {
+/** Change the look of the picked texts (ADR 0126: size, line height, letter spacing, alignment, width mode, colour): one undo step; `final` false only shows it. */
+export function setTextStyle(doc: DocumentStore, editor: EditorState, look: TextLook, ppuOf: (id: string) => number, final = true): void {
   const texts = selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && !o.locked);
   if (!texts.length || editor.blockEdit()) return;
-  const next = texts.map((t): TextObject => {
-    const { lineHeight: _l, tracking: _t, ...rest } = t;
-    const lineHeight = patch.lineHeight !== undefined ? Math.min(5, Math.max(0.5, patch.lineHeight)) : t.lineHeight;
-    const tracking = patch.tracking !== undefined ? Math.min(2, Math.max(-0.5, patch.tracking)) : t.tracking;
-    return { ...rest, ...(lineHeight !== undefined && lineHeight !== 1.3 ? { lineHeight } : {}), ...(tracking ? { tracking } : {}) };
-  });
-  if (next.every((n, i) => n.lineHeight === texts[i]!.lineHeight && n.tracking === texts[i]!.tracking)) return;
-  doc.commit(doc.transaction(texts.length === 1 ? "Change text spacing" : `Change text spacing of ${texts.length} texts`, next));
-  void final;
+  const next = texts.map((t) => withLook(t, look, ppuOf(t.id)));
+  const changed = next.filter((n, i) => !sameLook(n, texts[i]!));
+  if (!final) return showReplaced(editor, changed);
+  editor.preview = { kind: "none" };
+  if (changed.length) doc.commit(doc.transaction(changed.length === 1 ? "Change text" : `Change ${changed.length} texts`, changed));
   editor.changed();
 }
 
