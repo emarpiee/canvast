@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- **ZIP64** (ADR 0115): archives with more than 65,535 entries or 4 GiB or more are written and read; smaller ones are unchanged.
+
 - **Library filters** by size, ratio, orientation and colour (`width>1000`, `ratio:16x9`, `orientation:portrait`, `colour:red`), and a **Similar images** list that puts look-alikes side by side (ADR 0114).
 
 - **Erase parts of strokes** (ADR 0111, scissors button on the eraser); **play only a range** of audio or video (ADR 0112, in the player's settings); **pen tilt** turns the ink nib and broadens the pencil, and **line height and letter spacing** for text (ADR 0113).

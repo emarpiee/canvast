@@ -95,8 +95,8 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | `.canvast` archives: four export scopes, manifest, hashes, verified before a single-transaction import; plain ZIP by kind or folder | Done | ADR 0008, 0057. |
 | Notes as real `.md` entries; thumbnails in archives | Done | |
 | OPFS, SQLite WASM | Decided | IndexedDB only (ADR 0006). |
-| ZIP64, archives above 4 GiB or 65,535 entries | **Gap** | The format refuses them. |
-| Streaming export and import without the whole archive in memory | **Gap** | Built and verified from Blobs. |
+| ZIP64, archives above 4 GiB or 65,535 entries | Done (ADR 0115) | Written and read; the ceiling is the browser's Blob size. |
+| Streaming export and import without the whole archive in memory | Partial (ADR 0115) | Built from Blob slices and verified by streaming; not measured at multi-GB sizes. |
 | Hundreds of gigabytes, chunked or desktop-assisted fallback | **Gap** | Not offered. |
 | Incremental backup chain; last verified backup shown | Partial | The status is shown; there is no incremental backup. |
 | Update-safe origin for a replaced HTML file | **Gap** | Phase 8. The Storage tab explains it; there is no upgrade test. |
