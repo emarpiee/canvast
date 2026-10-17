@@ -2119,3 +2119,37 @@ test("a picture with a player: the selection bar and the player bar never sit on
   expect(above.hud.every((h) => h > above.pic)).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the library filters by size, shape and colour, and lists look-alikes together (ADR 0114)", async ({ app }) => {
+  const p = app.page;
+  const grad = (w: number, h: number, shift: number, tint: [number, number, number]): Buffer =>
+    makePng(w, h, (x, y) => [Math.min(255, Math.round((x / w) * 220 + shift) * tint[0]), Math.min(255, Math.round((y / h) * 220 + shift) * tint[1]), Math.min(255, 60 * tint[2]), 255]);
+  const red = makePng(80, 40, () => [210, 30, 30, 255]); // landscape, red
+  const blue = makePng(30, 90, () => [37, 99, 235, 255]); // portrait, blue
+  const photo = grad(64, 64, 0, [1, 1, 1]);
+  const photoLighter = grad(64, 64, 18, [1, 1, 1]); // the same picture a little brighter: not an exact copy
+  await toAssets(p);
+  const input = p.getByTestId("assets-import-input");
+  for (const [name, buffer] of [["red.png", red], ["blue.png", blue], ["photo.png", photo], ["photo-bright.png", photoLighter]] as const) {
+    await input.setInputFiles({ name, mimeType: "image/png", buffer });
+    await expect(p.getByTestId("asset-card").filter({ hasText: name })).toHaveCount(1);
+  }
+  const search = p.getByTestId("assets-search");
+  const names = async () => (await p.getByTestId("asset-card").locator(".asset-name").allTextContents()).sort();
+  await search.fill("width>70");
+  await expect.poll(names).toEqual(["red.png"]);
+  await search.fill("orientation:portrait");
+  await expect.poll(names).toEqual(["blue.png"]);
+  await search.fill("ratio:2x1");
+  await expect.poll(names).toEqual(["red.png"]);
+  await search.fill("colour:blue");
+  await expect.poll(names, { timeout: 8000 }).toEqual(["blue.png"]); // read from the thumbnails: arrives a moment later
+  await search.fill("colour:red OR orientation:portrait");
+  await expect.poll(names).toEqual(["blue.png", "red.png"]);
+  await search.fill("");
+
+  // look-alikes: the two photos, side by side; the red and blue ones are not among them
+  await p.getByRole("button", { name: /^Similar images/ }).click();
+  await expect.poll(names, { timeout: 8000 }).toEqual(["photo-bright.png", "photo.png"]);
+  expect(app.consoleErrors).toEqual([]);
+});

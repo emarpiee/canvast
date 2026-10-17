@@ -18,6 +18,7 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import copyCheckSvg from "lucide-static/icons/copy-check.svg";
 import scissorsSvg from "lucide-static/icons/scissors.svg";
 import arrowUpSvg from "lucide-static/icons/arrow-up.svg";
 import arrowDownSvg from "lucide-static/icons/arrow-down.svg";
@@ -329,6 +330,7 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  copyCheck: clean(copyCheckSvg),
   scissors: clean(scissorsSvg),
   arrowUp: clean(arrowUpSvg),
   arrowDown: clean(arrowDownSvg),

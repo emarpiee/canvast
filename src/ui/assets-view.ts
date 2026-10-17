@@ -7,10 +7,12 @@ import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
-import { searchHelpButton, wireSearchHelp } from "./search-help";
+import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
+import { parseFilter, type Filter } from "../assets/filters";
+import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetFolder, CatalogListing } from "../assets/asset-catalog";
@@ -112,7 +114,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Asset library">
       <div class="assets-searchbox">
-              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type" aria-label="Search assets">
+              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search assets">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${searchHelpButton()}
         <div class="assets-search-pop" data-testid="assets-search-pop">
@@ -196,7 +198,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const status = root.querySelector<HTMLElement>(".assets-status")!;
   const count = root.querySelector<HTMLElement>(".assets-count")!;
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
-  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, search);
+  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, search, "Type the operators in capitals.", LIBRARY_ROWS);
   const usageSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-usage"]')!;
   const sortSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-sort"]')!;
   const sortDirBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-sort-dir"]')!;
@@ -360,6 +362,43 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     return p;
   };
+  // ---- what pictures look like (ADR 0114): read from the thumbnails, a few at a time, kept in memory
+  const looks = new Map<string, Look | null>();
+  const looking = new Set<string>();
+  let lookTimer = 0;
+  const ensureLooks = (hashes: readonly string[]): void => {
+    const todo = hashes.filter((h) => !looks.has(h) && !looking.has(h));
+    for (const h of todo) looking.add(h);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < todo.length) {
+        const hash = todo[next++]!;
+        try {
+          const img = new Image();
+          img.src = await thumbFor(hash);
+          await img.decode();
+          const c = document.createElement("canvas");
+          c.width = c.height = LOOK_SIZE;
+          const g = c.getContext("2d", { willReadFrequently: true })!;
+          g.drawImage(img, 0, 0, LOOK_SIZE, LOOK_SIZE);
+          looks.set(hash, lookOf(g.getImageData(0, 0, LOOK_SIZE, LOOK_SIZE).data));
+        } catch {
+          looks.set(hash, null); // a file with no picture (a card, a missing original)
+        }
+        looking.delete(hash);
+        if (!lookTimer) lookTimer = window.setTimeout(() => ((lookTimer = 0), render()), 150);
+      }
+    };
+    for (let i = 0; i < Math.min(3, todo.length); i++) void worker();
+  };
+  const filterCache = new Map<string, Filter | null>();
+  const filterOf = (w: string): Filter | null => {
+    if (!filterCache.has(w)) filterCache.set(w, parseFilter(w));
+    return filterCache.get(w)!;
+  };
+  let wantsLooks = false;
+  /** The groups of look-alikes among the pictures read so far. */
+  const similar = (): string[][] => similarGroups([...looks].flatMap(([id, l]) => (l ? [{ id, dhash: l.dhash }] : [])));
   const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
     thumbFor(hash).then(
@@ -936,6 +975,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (w.startsWith("#")) return tags.some((t) => tagIsOrUnder(t, w.slice(1))); // a tag and the tags nested under it
       // `.png` is the file type: a word that starts with a dot matches files with that extension (a lone dot: files that have one).
       if (w.startsWith(".")) return w.length > 1 ? chipOf(e.name, e.type).toLowerCase() === w.slice(1) : extOf(e.name) !== "";
+      const f = filterOf(w);
+      if (f) {
+        const verdict = f.test(e, looks.get(e.hash));
+        if (verdict === "unknown") {
+          if (f.needsLook) wantsLooks = true;
+          return false;
+        }
+        return verdict;
+      }
       const inTags = tags.some((t) => t.includes(w));
       if (how === "tag") return inTags;
       if (how === "name") return name.includes(w);
@@ -947,10 +995,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!listing) return [];
     // shortcut: a linear filter over the in-memory listing; add a tag/name index if libraries reach tens of thousands.
     const words = searchWords(search.value);
+    wantsLooks = scope === "similar";
     const usage = usageSel.value as UsageFilter;
+    const group = new Map<string, number>();
+    if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
     const inScope = (e: CatalogListing["entries"][number]): boolean => {
       const m = meta(e);
+      if (scope === "similar") return group.has(e.hash);
       if (scope === "favorites") return m.favorite;
       if (scope === "unfiled") return m.folderIds.length === 0;
       if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
@@ -960,6 +1012,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return true;
     };
     const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
+    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e)).map((e) => e.hash));
+    // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
+    if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || a.name.localeCompare(b.name));
     const key = sortSel.value as SortKey;
     const folderOf = (e: (typeof rows)[number]): string => (meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "");
     const cmp: Record<SortKey, (a: (typeof rows)[number], b: (typeof rows)[number]) => number> = {
@@ -1129,6 +1184,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope === "all") return "All assets";
       if (scope === "favorites") return "Favourites";
       if (scope === "unfiled") return "Unfiled";
+      if (scope === "similar") return "Similar images";
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
       if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
       if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
@@ -1143,6 +1199,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("all", "All assets", entries.length, { icon: ICONS.images })}
           ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
+          ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
         ${section(
           "folders",

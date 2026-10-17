@@ -16,6 +16,13 @@ const ROWS: readonly { keys: string; does: string; example: string }[] = [
   { keys: ".ext", does: "a file type", example: ".png OR .jpg" },
 ];
 
+/** The words that only the library understands (ADR 0114). */
+export const LIBRARY_ROWS: readonly { keys: string; does: string; example: string }[] = [
+  { keys: "width> height< pixels> size<", does: "by size (px, mp, kb, mb)", example: "width>1000 size<5mb" },
+  { keys: "ratio:  orientation:", does: "shape of the picture", example: "ratio:16x9" },
+  { keys: "colour:", does: "the colour that fills most of it", example: "colour:blue" },
+];
+
 export function searchHelpButton(): string {
   return `<button type="button" class="search-help-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="How to combine search words" title="How to combine search words (AND, OR, XOR, NOT)">${ICONS.circleHelp}</button>`;
 }
@@ -30,7 +37,7 @@ export function closeSearchHelp(): void {
 }
 
 /** Wire the button: it opens the card; choosing an example puts it in `input` (before any `/ # @` the canvas search added) and searches. */
-export function wireSearchHelp(button: HTMLElement, input: HTMLInputElement, note = "Type the operators in capitals."): void {
+export function wireSearchHelp(button: HTMLElement, input: HTMLInputElement, note = "Type the operators in capitals.", extra: readonly { keys: string; does: string; example: string }[] = []): void {
   button.addEventListener("click", () => {
     if (current?.anchor === button) return closeSearchHelp();
     closeSearchHelp();
@@ -38,7 +45,7 @@ export function wireSearchHelp(button: HTMLElement, input: HTMLInputElement, not
     card.className = "search-help";
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-label", "Combining search words");
-    card.innerHTML = `<table><tbody>${ROWS.map((r) => `<tr><th scope="row">${esc(r.keys)}</th><td>${esc(r.does)}</td><td><button type="button" data-example="${esc(r.example)}">${esc(r.example)}</button></td></tr>`).join("")}</tbody></table><p>${esc(note)}</p>`;
+    card.innerHTML = `<table><tbody>${[...ROWS, ...extra].map((r) => `<tr><th scope="row">${esc(r.keys)}</th><td>${esc(r.does)}</td><td><button type="button" data-example="${esc(r.example)}">${esc(r.example)}</button></td></tr>`).join("")}</tbody></table><p>${esc(note)}</p>`;
     document.body.appendChild(card);
     placeMenu(card, button);
     button.setAttribute("aria-expanded", "true");

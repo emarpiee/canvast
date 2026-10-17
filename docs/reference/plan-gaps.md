@@ -81,8 +81,8 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Dynamic smart folders | Decided against | Built (ADR 0035), then replaced by file types (ADR 0082). The plan still lists them. |
 | Saved searches | Decided against | Left out (owner, 2026-10-17); recent searches that found something exist (ADR 0071). |
 | Ratings | Decided against | Left out (owner, 2026-10-17); favourite only. |
-| Filters by colour, dimensions, orientation, aspect ratio | **Gap** | Width, Height and Pixels are columns that sort; there is no filter. |
-| Duplicate review, perceptual similarity | **Gap** | Exact duplicates merge on import; nothing shows them. |
+| Filters by colour, dimensions, orientation, aspect ratio | Done (ADR 0114) | Filter words in the search; colour from the thumbnail. |
+| Duplicate review, perceptual similarity | Done (ADR 0114) | The Similar images list; exact copies still merge on import. |
 | Search covering objects, boards and named locations | Done | Canvas search `/ # @` (ADR 0060). |
 
 ## §7 Storage and portability
