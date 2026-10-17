@@ -8,9 +8,12 @@ import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
 import { homeObject, newObjectId, pathSubs } from "../doc/model";
+import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, shapeSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
-import { hitNodes, isSmoothNode, localOf } from "./path-edit";
+import { gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
+import type { GradHandle } from "./path-edit";
+import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
 import { penWidthNow } from "./pen-width";
@@ -27,7 +30,7 @@ import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { arrangeSelection, deleteSelection, duplicateSelection, groupSelection, redo, ungroupSelection, undo } from "../app/actions";
+import { arrangeSelection, commitPaint, deleteSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 
 /**
@@ -138,6 +141,8 @@ type Gesture =
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint }
+  /** Dragging a handle of a path's gradient (ADR 0100). */
+  | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -367,7 +372,7 @@ export function attachTools(
     const b = localIn(frame, anchor, unit, { x: s.x + 1, y: s.y });
     return Math.hypot(b.x - a.x, b.y - a.y);
   };
-  const paintOf = (c: string | null): string | null => c;
+  const paintOf = (c: Paint | null): Paint | null => c;
 
   /** The box of a shape dragged by (dx, dy) from its start: Shift keeps it square (a line: to 45 degree steps), Alt grows it from the start as its centre. */
   const shapeBox = (kind: ShapeKind, dx: number, dy: number, shift: boolean, alt: boolean): { bx: number; by: number; bw: number; bh: number } => {
@@ -533,6 +538,24 @@ export function attachTools(
     doc.commit(doc.transaction(label, [next]));
   };
 
+  /** A press on a handle of the selected path's gradient takes it. */
+  const startGradientPress = (e: PointerEvent, s: ScreenPoint): boolean => {
+    const tgt = nodeTarget();
+    if (!tgt || editor.blockEdit()) return false;
+    const h = gradientHandles(tgt.po);
+    const handle = h && hitGradient(h, s.x, s.y);
+    if (!h || !handle) return false;
+    g = { kind: "grad", pointerId: e.pointerId, id: tgt.o.id, which: h.which, handle, g: h.g };
+    return true;
+  };
+  const updateGradient = (s: ScreenPoint): void => {
+    if (g.kind !== "grad") return;
+    const tgt = nodeTarget();
+    if (!tgt) return;
+    const l = localOf(tgt.po, s.x, s.y);
+    previewPaint(doc, editor, { [g.which]: moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y) });
+  };
+
   const startNodePress = (e: PointerEvent, s: ScreenPoint): boolean => {
     const tgt = nodeTarget();
     if (!tgt || editor.blockEdit()) return false;
@@ -607,6 +630,7 @@ export function attachTools(
 
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
+    if (startGradientPress(e, s)) return;
     const vis = visible();
     // Rotate and resize handles take priority when a selection is visible.
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
@@ -909,7 +933,7 @@ export function attachTools(
         startPathNode(s, e);
         break;
       case "node": {
-        if (startNodePress(e, s)) break;
+        if (startNodePress(e, s) || startGradientPress(e, s)) break;
         // Not on a node: a click picks the path to edit (or clears), a drag from nothing is a box.
         const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null;
         g = { kind: "press", pointerId: e.pointerId, start: s, target: hit, additive: e.shiftKey };
@@ -1007,6 +1031,9 @@ export function attachTools(
         editor.changed();
         break;
       }
+      case "grad":
+        updateGradient(s);
+        break;
       case "shape":
         updateShape(s, e);
         break;
@@ -1098,6 +1125,12 @@ export function attachTools(
         if (cancelled) editor.preview = { kind: "none" };
         else commitPreview();
         break;
+      case "grad": {
+        const p = editor.preview;
+        if (cancelled || p.kind !== "paint") editor.preview = { kind: "none" };
+        else commitPaint(doc, editor, { [g.which]: p[g.which] as Gradient });
+        break;
+      }
       case "shape":
         commitShape(s, cancelled, e, g.start);
         break;

@@ -84,6 +84,18 @@ export const PICKER_CSS = `
 .cp-contrast { color: var(--cp-muted); font-size: var(--cp-text-sm); }
 .cp-contrast:empty { display: none; }
 
+.cg { gap: var(--cp-gap); }
+.cg-bar { position: relative; height: calc(var(--cp-bar) * 2); margin: calc(var(--cp-thumb) / 2) calc(var(--cp-thumb) / 2) var(--cp-gap-sm); touch-action: none; cursor: copy; }
+.cg-track { position: absolute; inset: 0; border-radius: var(--cp-radius-sm); box-shadow: inset 0 0 0 1px var(--cp-border); }
+.cg-stop { position: absolute; top: 100%; width: var(--cp-thumb); height: var(--cp-thumb); margin: 2px 0 0 calc(var(--cp-thumb) / -2); padding: 0; border: 2px solid var(--cp-accent-fg); border-radius: 50%; background: var(--cg-stop); box-shadow: 0 0 0 1px var(--cp-fg); cursor: grab; }
+.cg-stop::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 0; height: var(--cp-gap-sm); border-left: 1px solid var(--cp-fg); }
+.cg-stop.is-on { box-shadow: 0 0 0 2px var(--cp-accent); }
+.cg-row { display: flex; gap: var(--cp-gap-sm); align-items: center; flex-wrap: wrap; }
+.cg-field { display: flex; flex: 1; align-items: center; gap: var(--cp-gap-sm); color: var(--cp-muted); font-size: var(--cp-text-sm); white-space: nowrap; }
+.cg-field .cp-num { width: 3.8em; flex: none; }
+.cg-text { width: 28px; font-size: var(--cp-text); }
+.cg-text:disabled { opacity: 0.4; cursor: default; }
+.cg[data-type="linear"] .cg-radial, .cg[data-type="radial"] .cg-linear { display: none; }
 .cp-groups { display: flex; flex-direction: column; gap: var(--cp-gap-sm); }
 .cp-groups:empty { display: none; }
 .cp-group-h { color: var(--cp-muted); font-size: var(--cp-text-sm); margin-bottom: 3px; }

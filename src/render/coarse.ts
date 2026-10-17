@@ -6,6 +6,7 @@ import type { CanvasObject, ImageObject, PathObject, StrokeObject, TextObject } 
 import { localBounds, pathSubs, pivotOf, strokePoints } from "../doc/model";
 import type { FlatPath } from "../doc/path";
 import { distanceToOutline, flatten, insideFill } from "../doc/path";
+import { paintAt } from "./gradient";
 import { cosSin } from "../core/angle";
 import { layoutText, textFont } from "../text/layout";
 import { distToSegment } from "./geometry2d";
@@ -162,15 +163,15 @@ const pathSampler: CoarseSampler<PathObject> = {
     const d = distanceToOutline(f, lx, ly);
     if (o.stroke !== null) {
       const h = o.width / 2;
-      if (d <= h - m) return { color: o.stroke };
+      if (d <= h - m) return { color: paintAt(o, o.stroke, lx, ly) };
       if (d < h + m) return "exact"; // the edge of the outline is within the view
     } else if (d < m) return "exact"; // the edge of the fill is
-    return o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? { color: o.fill } : "miss";
+    return o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? { color: paintAt(o, o.fill, lx, ly) } : "miss";
   },
   approx(o, { lx, ly }) {
     const f = flatOf(o);
-    if (o.stroke !== null && distanceToOutline(f, lx, ly) <= o.width / 2) return { color: o.stroke };
-    return { color: o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? o.fill : "transparent" };
+    if (o.stroke !== null && distanceToOutline(f, lx, ly) <= o.width / 2) return { color: paintAt(o, o.stroke, lx, ly) };
+    return { color: o.fill !== null && insideFill(f, lx, ly, !!o.evenodd) ? paintAt(o, o.fill, lx, ly) : "transparent" };
   },
 };
 

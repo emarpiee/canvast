@@ -8,6 +8,7 @@ import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
 import type { ShapeKind, SubPath } from "../doc/path";
+import type { Paint } from "../doc/paint";
 
 export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser" | "shape" | "path" | "node";
 
@@ -30,7 +31,7 @@ export type Preview =
   /** Nodes of one path being dragged (ADR 0099): the path as it would be (a turned path is baked, so `rot` goes). */
   | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[] }
   /** The fill and/or outline of paths being changed in the colour picker (ADR 0099); committed once when the picker settles. */
-  | { kind: "paint"; ids: readonly ObjectId[]; fill?: string | null; stroke?: string | null };
+  | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null };
 
 /** A shape being dragged out (the Shape tool): its box in local units of its own anchor, like a stroke's draft. */
 export interface DraftShape {
@@ -45,8 +46,8 @@ export interface DraftShape {
   bh: number;
   sides: number;
   tips: number;
-  fill: string | null;
-  stroke: string | null;
+  fill: Paint | null;
+  stroke: Paint | null;
   /** Outline width in local units. */
   width: number;
 }
@@ -60,8 +61,8 @@ export interface DraftPath {
   n: number[];
   /** The pointer, local, for the line that follows it (null until it moves). */
   cursor: { x: number; y: number } | null;
-  fill: string | null;
-  stroke: string | null;
+  fill: Paint | null;
+  stroke: Paint | null;
   width: number;
 }
 
@@ -124,8 +125,8 @@ export class EditorState {
   ignoreFilling = false;
   /** The Shape and Path tools (ADR 0099): what they make. Fill and outline null: none. */
   shapeKind: ShapeKind = "rect";
-  shapeFill: string | null = "#2563eb";
-  shapeStroke: string | null = "#1f2329";
+  shapeFill: Paint | null = "#2563eb";
+  shapeStroke: Paint | null = "#1f2329";
   shapeWidthPx = 2;
   shapeSides = 6;
   shapeTips = 5;

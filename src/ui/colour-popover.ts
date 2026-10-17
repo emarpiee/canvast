@@ -1,4 +1,7 @@
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
+import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
+import type { Gradient, Paint } from "../doc/paint";
+import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { DEFAULT_INK, swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
@@ -66,7 +69,7 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
   }
 }
 
-let open: { pop: HTMLElement; anchor: HTMLElement; picker: ColourPicker; onClose: (() => void) | undefined } | null = null;
+let open: { pop: HTMLElement; anchor: HTMLElement; picker: { destroy(): void }; onClose: (() => void) | undefined } | null = null;
 
 export function closeColourPopover(refocus = false): void {
   if (!open) return;
@@ -165,4 +168,148 @@ function installCloseRules(): void {
     true,
   );
   window.addEventListener("resize", () => closeColourPopover());
+}
+
+
+// ---- Fill and outline: none, a colour, or a gradient (ADR 0100) --------------------------------------------------------------------
+
+/** The gradient as the editor of the package takes it: an angle, or a centre and radius. */
+export function gradientToValue(g: Gradient): GradientValue {
+  const stops = g.stops.map((s) => ({ offset: s.o, colour: s.c }));
+  return g.type === "linear" ? { type: "linear", angle: angleOf(g), cx: 0.5, cy: 0.5, r: 0.5, stops } : { type: "radial", angle: 0, cx: g.cx, cy: g.cy, r: g.r, stops };
+}
+
+/**
+ * The gradient for an edited value. The shape of the gradient the person placed on the canvas is kept (an end dragged off the middle, a
+ * radial centre) unless the editor changed it; the stops always follow the editor.
+ */
+export function gradientFromValue(prev: Gradient, v: GradientValue): Gradient {
+  const stops = v.stops.map((s) => ({ o: s.offset, c: s.colour }));
+  if (v.type === "linear") {
+    const kept = prev.type === "linear" && Math.abs(angleOf(prev) - v.angle) < 0.5 ? prev : null;
+    return kept ? { ...kept, stops } : linearAt(v.angle, stops);
+  }
+  const kept = prev.type === "radial" && Math.abs(prev.cx - v.cx) < 0.005 && Math.abs(prev.cy - v.cy) < 0.005 && Math.abs(prev.r - v.r) < 0.005 ? prev : null;
+  return kept ? { ...kept, stops } : { type: "radial", cx: v.cx, cy: v.cy, r: v.r, stops };
+}
+
+export interface PaintPopoverOptions {
+  /** Names the popover for a screen reader ("Fill"). */
+  name: string;
+  paint: Paint | null;
+  /** The label of the "none" choice ("No fill", "No outline"). */
+  noneLabel: string;
+  /** Every step while a colour or a stop is dragged, and when the kind of paint is changed. */
+  onInput(paint: Paint | null): void;
+  /** Once, when a gesture ends or the kind changes. */
+  onChange(paint: Paint | null): void;
+  onClose?(): void;
+}
+
+type Mode = "none" | "solid" | "linear" | "radial";
+
+/** Open the paint chooser under `anchor`: None, Solid, Linear or Radial, with the colour picker or the gradient editor below. */
+export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  let paint = o.paint;
+  let committed = JSON.stringify(paint);
+  const settle = (p: Paint | null): void => {
+    committed = JSON.stringify(p);
+    o.onChange(p);
+  };
+  let solid = typeof paint === "string" ? paint : isGradient(paint) ? paint.stops[0]!.c : "#2563eb";
+  const modeOf = (): Mode => (paint === null ? "none" : isGradient(paint) ? paint.type : "solid");
+  const groups = (): SwatchGroup[] => [
+    { label: "Recent", colours: recentColours() },
+    { label: "Presets", colours: presets() },
+  ];
+  const pickerOptions = {
+    model: store?.get("colour.model") ?? "okhsv",
+    view: store?.get("colour.view") ?? "wheel",
+    format: store?.get("colour.format") ?? "hex",
+    groups: groups(),
+    display: swatchBackground,
+    onModel: (m: "okhsl" | "okhsv" | "okhcl") => void store?.set("colour.model", m),
+    onFormat: (f: "hex" | "rgb" | "oklch") => void store?.set("colour.format", f),
+    onView: (v: "wheel" | "plane" | "sliders" | "mixer") => {
+      void store?.set("colour.view", v);
+      place(pop, anchor);
+    },
+  } as const;
+
+  const pop = document.createElement("div");
+  pop.className = "colour-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", o.name);
+  const modes = document.createElement("div");
+  modes.className = "paint-modes";
+  modes.setAttribute("role", "radiogroup");
+  modes.setAttribute("aria-label", `${o.name}: kind of paint`);
+  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial" };
+  modes.innerHTML = (["none", "solid", "linear", "radial"] as const).map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
+  const body = document.createElement("div");
+  body.className = "paint-body";
+  pop.append(modes, body);
+
+  let current: { destroy(): void } | null = null;
+  const mount = (): void => {
+    current?.destroy();
+    current = null;
+    body.replaceChildren();
+    for (const b of modes.querySelectorAll<HTMLElement>("[data-mode]")) b.setAttribute("aria-checked", String(b.dataset["mode"] === modeOf()));
+    if (paint === null) {
+      const note = document.createElement("div");
+      note.className = "paint-none";
+      note.textContent = o.noneLabel;
+      body.append(note);
+    } else if (isGradient(paint)) {
+      const g = paint;
+      const ed = createGradientEditor({
+        value: gradientToValue(g),
+        picker: pickerOptions,
+        onInput: (v) => o.onInput((paint = gradientFromValue(paint as Gradient, v))),
+        onChange: (v) => settle((paint = gradientFromValue(paint as Gradient, v))),
+      });
+      body.append(ed.el);
+      current = ed;
+    } else {
+      const picker = createColourPicker({
+        ...pickerOptions,
+        value: paint,
+        alpha: true,
+        onInput: (hex) => o.onInput((paint = solid = hex)),
+        onChange: (hex) => {
+          rememberColour(hex);
+          settle((paint = solid = hex));
+          picker.setGroups(groups());
+        },
+      });
+      body.append(picker.el);
+      current = picker;
+    }
+  };
+  modes.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-mode]");
+    if (!b || b.dataset["mode"] === modeOf()) return;
+    const m = b.dataset["mode"] as Mode;
+    if (isGradient(paint)) solid = paint.stops[0]!.c;
+    paint = m === "none" ? null : m === "solid" ? solid : isGradient(paint) ? asKind(paint, m) : gradientFrom(solid, m);
+    mount();
+    place(pop, anchor);
+    o.onInput(paint);
+    settle(paint);
+  });
+  mount();
+  document.body.appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  // Closing keeps what was last shown: a number typed in a field is only "changed" on Enter or leaving it.
+  const onClose = (): void => {
+    if (JSON.stringify(paint) !== committed) o.onChange(paint);
+    o.onClose?.();
+  };
+  open = { pop, anchor, picker: { destroy: () => current?.destroy() }, onClose };
+  modes.querySelector<HTMLElement>("[aria-checked=true]")?.focus();
 }

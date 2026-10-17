@@ -62,6 +62,7 @@ import { copyText, mountTextEditor } from "../ui/text-editor";
 import { installTextFont } from "../text/inter";
 import { SettingsStore } from "../settings/settings";
 import { setThemeInk } from "../render/ink";
+import { paintFromText, paintToText } from "../doc/paint";
 
 declare const __CANVAST_VERSION__: string;
 
@@ -161,8 +162,8 @@ async function start(): Promise<void> {
   editor.penWidthPx = settings.get("pen.widthPx");
   editor.penKind = settings.get("pen.kind");
   editor.shapeKind = settings.get("shape.kind");
-  editor.shapeFill = settings.get("shape.fill") === "none" ? null : settings.get("shape.fill");
-  editor.shapeStroke = settings.get("shape.stroke") === "none" ? null : settings.get("shape.stroke");
+  editor.shapeFill = paintFromText(settings.get("shape.fill")) ?? null;
+  editor.shapeStroke = paintFromText(settings.get("shape.stroke")) ?? null;
   editor.shapeWidthPx = settings.get("shape.widthPx");
   editor.shapeSides = settings.get("shape.sides");
   editor.shapeTips = settings.get("shape.tips");
@@ -182,8 +183,8 @@ async function start(): Promise<void> {
     settings.set("pen.widthPx", editor.penWidthPx);
     settings.set("pen.kind", editor.penKind);
     settings.set("shape.kind", editor.shapeKind);
-    settings.set("shape.fill", editor.shapeFill ?? "none");
-    settings.set("shape.stroke", editor.shapeStroke ?? "none");
+    settings.set("shape.fill", paintToText(editor.shapeFill));
+    settings.set("shape.stroke", paintToText(editor.shapeStroke));
     settings.set("shape.widthPx", editor.shapeWidthPx);
     settings.set("shape.sides", editor.shapeSides);
     settings.set("shape.tips", editor.shapeTips);

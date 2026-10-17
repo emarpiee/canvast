@@ -56,6 +56,20 @@ Makes a picker. Append `picker.el` where you want it. The picker is `size` px wi
 | Sliders | The native range keys: arrows, Page Up and Down, Home and End. |
 | Text field | Enter applies. A colour that parses is applied as you type. |
 
+## `createGradientEditor(options?) → GradientEditor`
+
+A bar showing the gradient with a handle per stop: drag a handle to move the stop, click the bar to add one (in the colour the gradient has there), Delete or the − button removes (never below `minStops`, default 2; at most `maxStops`, default 16), arrows move the focused stop by 1% (Shift 10%), Home and End to 0 and 100%. Below it: Linear or Radial, the position of the selected stop, a reverse button, the angle (linear) or the centre and radius (radial), and this package's picker, with transparency, for the selected stop.
+
+| Option | Meaning |
+| --- | --- |
+| `value` | `{ type: "linear" \| "radial", angle, cx, cy, r, stops: [{ offset, colour }] }`. `angle` in degrees (0 runs left to right, 90 top to bottom); `cx`, `cy`, `r` as fractions of the box the gradient is on; offsets 0 to 1; colours `#rrggbb` or `#rrggbbaa`. What angle and centre mean on a shape is the host's business. |
+| `picker` | Options for the stop's picker (`model`, `view`, `format`, `groups`, `labels`, `size`, `display`, `onModel`, …). Transparency is always on. |
+| `labels` | Every word of the editor (`GradientLabels`). |
+| `minStops`, `maxStops` | The limits on the number of stops. |
+| `onInput`, `onChange` | The value on every step, and once when a gesture ends or a field is committed. |
+
+Members: `el`, `value` (a copy), `setValue(value)` (fires nothing), `destroy()`. The editor is themed by the same `--cp-*` properties.
+
 ## `<colour-picker>`
 
 `defineColourPickerElement(name = "colour-picker")` once. Attributes: `value`, `model`, `view`, `format`, `alpha`, `contrast`, `size`, `eyedropper="false"`. Property `value`. Events `input` and `change`, with `event.detail.value`. The picker is in a shadow root; `--cp-*` properties pass through it.

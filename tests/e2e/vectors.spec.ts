@@ -466,3 +466,95 @@ test("exact edges: past what doubles can place (2^45 and 2^3000 times in), a fil
   expect(await px(630, 400)).toEqual(fill);
   expect(await px(650, 400)).not.toEqual(fill);
 });
+
+test("gradients: Linear and Radial in the paint chooser, stops, angle, handles on the canvas, one undo each, saved, and exact colour at any depth", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  type Grad = { type: string; x0: number; y0: number; x1: number; y1: number; cx: number; cy: number; r: number; stops: Array<{ o: number; c: string }> };
+  const fillOf = async () => (await last(app)).fill as unknown as Grad;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+
+  await key(app, "u");
+  await p.click('[data-paint="stroke"]');
+  await pop.locator(".colour-none").click(); // fill only
+  await key(app, "Escape");
+  await drag(app, [500, 300], [760, 400]);
+  await key(app, "v");
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(1);
+
+  // Linear: the colour fading to nothing, left to right
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  let g = await fillOf();
+  expect(g).toMatchObject({ type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5 });
+  expect(g.stops.map((s) => s.c)).toEqual(["#2563eb", "#2563eb00"]);
+  await app.frame();
+  const left = await px(512, 330); // near the start (off the axis, where the handles are): mostly the colour
+  expect(left[2]).toBeGreaterThan(200);
+  expect(left[0]).toBeLessThan(90);
+  const bg = await px(300, 600);
+  const right = await px(752, 330); // near the end: almost nothing, the background shows
+  expect(Math.abs(right[0]! - bg[0]!) + Math.abs(right[1]! - bg[1]!) + Math.abs(right[2]! - bg[2]!)).toBeLessThan(40);
+
+  // the stops: the first red, the last opaque blue, one more in the middle by a click on the bar
+  await pop.locator(".cg [data-hex]").fill("ff0000");
+  await pop.locator(".cg [data-hex]").press("Enter");
+  await pop.locator(".cg-stop").nth(1).click();
+  await pop.locator(".cg [data-hex]").fill("0000ffff");
+  await pop.locator(".cg [data-hex]").press("Enter");
+  g = await fillOf();
+  expect(g.stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+  const bar = (await pop.locator(".cg-bar").boundingBox())!;
+  await p.mouse.click(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  expect((await fillOf()).stops).toHaveLength(3);
+  await pop.locator(".cg [data-remove]").click();
+  expect((await fillOf()).stops).toHaveLength(2);
+
+  // the angle: 90 runs top to bottom (the stored ends turn)
+  await pop.locator(".cg [data-angle]").fill("90");
+  await pop.locator(".cg [data-angle]").press("Enter"); // a typed number is stored on Enter, or on leaving the field
+  g = await fillOf();
+  expect(g.x0).toBeCloseTo(g.x1, 6);
+  expect(g.y1).toBeGreaterThan(g.y0);
+  await key(app, "Escape");
+
+  // Radial, then back to Linear keeps the stops
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="radial"]').click();
+  g = await fillOf();
+  expect(g).toMatchObject({ type: "radial", cx: 0.5, cy: 0.5, r: 0.5 });
+  expect(g.stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+  await pop.locator('[data-mode="linear"]').click();
+  await key(app, "Escape");
+
+  // handles on the canvas: drag the end of a left-to-right gradient to the middle of the shape
+  await p.click('[data-paint="fill"]');
+  await pop.locator(".cg [data-angle]").fill("0");
+  await key(app, "Escape"); // (closing keeps what was shown)
+  g = await fillOf();
+  expect([g.x0, g.x1]).toEqual([0, 1]);
+  const box = await screenBox(app, (await last(app)).id);
+  const mid = (box.minY + box.maxY) / 2;
+  await drag(app, [box.maxX - 1, mid], [(box.minX + box.maxX) / 2, mid]);
+  g = await fillOf();
+  expect(g.x1).toBeGreaterThan(0.45);
+  expect(g.x1).toBeLessThan(0.55);
+  await p.keyboard.press("Control+z");
+  expect((await fillOf()).x1).toBe(1);
+  await p.keyboard.press("Control+Shift+z");
+  expect((await fillOf()).x1).toBeLessThan(0.55);
+
+  // saved
+  await reload(app);
+  expect((await fillOf()).stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+
+  // exact at any depth: a quarter of the way along (x1 is now half the width, so the shape's own 12.5% point), the colour is the blend there
+  await p.keyboard.press("Escape");
+  const here = await app.worldAt(500 + 260 * 0.125, 350); // t = 0.25 of the gradient (it ends half way)
+  for (const zi of [40, 3000]) {
+    await p.evaluate((w) => window.__canvastDebug.setCamera({ cx: w.x, cy: w.y, zi: w.zi, zf: 0, pz: w.zi }), { ...here, zi });
+    await app.frame();
+    const c = await px(640, 400);
+    expect(Math.abs(c[0]! - 191) + Math.abs(c[1]!) + Math.abs(c[2]! - 64), `at ${zi} levels: ${c}`).toBeLessThanOrEqual(8);
+  }
+});

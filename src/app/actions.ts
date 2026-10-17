@@ -6,6 +6,7 @@ import { relinkMention } from "../text/markdown";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject } from "../doc/model";
+import type { Paint } from "../doc/paint";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -644,14 +645,14 @@ export async function importImages(
 const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked);
 
 /** The fill and outline of the first selected path, or null when none is selected. */
-export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: string | null; stroke: string | null } | null {
+export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: Paint | null; stroke: Paint | null } | null {
   const o = editablePaths(doc, editor)[0];
   return o ? { fill: o.fill, stroke: o.stroke } : null;
 }
 
 export interface PaintPatch {
-  fill?: string | null;
-  stroke?: string | null;
+  fill?: Paint | null;
+  stroke?: Paint | null;
 }
 
 /** Show a new fill or outline on the selected paths without storing it (the picker is still being dragged). */

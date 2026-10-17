@@ -3,4 +3,6 @@ export type { ColourPicker, PickerOptions, Labels, SwatchGroup, View } from "./p
 export { HARMONIES, MODELS, TEXT_FORMATS, colourToHex, contrastRatio, convert, formatColour, fromRgb, harmonies, hexToTriple, oklchToRgb, paintPlane, parseColour, parseHex, prefersDarkText, rgbToHex, rgbToOklch, toRgb, tripleToHex } from "./colour";
 export type { Colour, Harmony, Model, Rgb, TextFormat, Triple } from "./colour";
 export { defineColourPickerElement } from "./element";
+export { createGradientEditor } from "./gradient";
+export type { GradientEditor, GradientEditorOptions, GradientLabels, GradientStopValue, GradientValue } from "./gradient";
 export { PICKER_CSS, ensureStyles } from "./style";

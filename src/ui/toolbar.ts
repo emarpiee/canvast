@@ -2,8 +2,10 @@ import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
 import type { PaintPatch } from "../app/actions";
 import { SHAPE_KINDS } from "../doc/path";
+import type { Paint } from "../doc/paint";
+import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
-import { openColourPopover, recentColours } from "./colour-popover";
+import { openColourPopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -26,7 +28,7 @@ export interface ToolbarActions {
   /** Set the thickness (screen px at this zoom) of the selected strokes and paths: one undo step. */
   setSelectedWidth(px: number): void;
   /** The fill and outline of the first selected path, or null when no path is selected. */
-  selectedPaint(): { fill: string | null; stroke: string | null } | null;
+  selectedPaint(): { fill: Paint | null; stroke: Paint | null } | null;
   /** Show (final false: while the picker is dragged) or store (final true) a new fill or outline on the selected paths. */
   paintSelected(patch: PaintPatch, final: boolean): void;
 }
@@ -213,11 +215,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
 
   // The fill and outline chips: the colours the next shape gets (Shape and Path tools), or those of the selected paths.
-  const lastPaint = { fill: "#2563eb", stroke: "#1f2329" };
   const editsSelection = (): boolean => editor.tool === "select" || editor.tool === "node";
-  const paintNow = (which: "fill" | "stroke"): string | null => (editsSelection() ? (actions.selectedPaint()?.[which] ?? null) : which === "fill" ? editor.shapeFill : editor.shapeStroke);
-  const setPaint = (which: "fill" | "stroke", value: string | null, final: boolean): void => {
-    if (value !== null) lastPaint[which] = value;
+  const paintNow = (which: "fill" | "stroke"): Paint | null => (editsSelection() ? (actions.selectedPaint()?.[which] ?? null) : which === "fill" ? editor.shapeFill : editor.shapeStroke);
+  const setPaint = (which: "fill" | "stroke", value: Paint | null, final: boolean): void => {
     if (editsSelection()) actions.paintSelected({ [which]: value }, final);
     else {
       if (which === "fill") editor.shapeFill = value;
@@ -226,15 +226,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
   };
   const openPaint = (anchor: HTMLElement, which: "fill" | "stroke"): void => {
-    const cur = paintNow(which);
-    if (cur !== null) lastPaint[which] = cur;
-    openColourPopover(anchor, {
+    openPaintPopover(anchor, {
       name: which === "fill" ? "Fill" : "Outline",
-      value: cur ?? lastPaint[which],
-      alpha: true,
-      none: { label: which === "fill" ? "No fill" : "No outline", active: cur === null, set: (on) => setPaint(which, on ? null : lastPaint[which], true) },
-      onInput: (hex) => setPaint(which, hex, false),
-      onChange: (hex) => setPaint(which, hex, true),
+      paint: paintNow(which),
+      noneLabel: which === "fill" ? "No fill" : "No outline",
+      onInput: (p) => setPaint(which, p, false),
+      onChange: (p) => setPaint(which, p, true),
       onClose: () => {
         if (editsSelection()) actions.paintSelected({}, true); // drop a preview that was never stored
       },
@@ -355,7 +352,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
       b.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
       b.classList.toggle("is-none", value === null);
-      (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "transparent" : swatchBackground(value));
+      (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${swatchBackground(value)}, ${swatchBackground(value)})` : paintCss(value));
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;

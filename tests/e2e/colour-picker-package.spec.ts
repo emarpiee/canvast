@@ -8,7 +8,7 @@ test("colour picker package: four layouts, plane, transparency, text formats, co
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(DEMO);
-  const cp = page.locator(".cp");
+  const cp = page.locator("#host .cp");
   const hex = cp.locator("[data-hex]");
   const visible = async (sel: string) => cp.locator(sel).isVisible();
 
@@ -98,4 +98,67 @@ test("colour picker package: four layouts, plane, transparency, text formats, co
   expect(seen.got.length).toBe(1);
   expect(seen.value).toBe("#ff0000");
   expect(errors).toEqual([]);
+});
+
+test("gradient editor in the package: stops by bar, handle, field and key; kinds; angle and centre; the stop's own colour picker", async ({ page }) => {
+  await page.goto(DEMO);
+  type G = { type: string; angle: number; cx: number; r: number; stops: Array<{ offset: number; colour: string }> };
+  const value = () => page.evaluate(() => (window as unknown as { gradient: { value: G } }).gradient.value);
+  const ed = page.locator(".cg");
+  const bar = ed.locator("[data-bar]");
+  const box = (await bar.boundingBox())!;
+  expect((await value()).stops).toHaveLength(2);
+
+  // a click on the bar adds a stop there, in the colour the gradient has at that offset, and selects it
+  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+  let v = await value();
+  expect(v.stops).toHaveLength(3);
+  expect(v.stops[1]!.offset).toBeCloseTo(0.5, 1);
+  expect(v.stops[1]!.colour).toMatch(/^#2563eb[0-9a-f]{2}$/); // half way to nothing
+  await expect(ed.locator(".cg-stop.is-on")).toHaveCount(1);
+
+  // drag its handle: the stops stay in order
+  const h = (await ed.locator(".cg-stop").nth(1).boundingBox())!;
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.8, h.y + h.height / 2, { steps: 6 });
+  await page.mouse.up();
+  v = await value();
+  expect(v.stops.map((s) => Math.round(s.offset * 10) / 10)).toEqual([0, 0.8, 1]);
+
+  // the position field, and a stop dragged past its neighbour
+  await ed.locator("[data-pos]").fill("30");
+  expect((await value()).stops[1]!.offset).toBeCloseTo(0.3, 6);
+
+  // the selected stop's colour: its own picker (typing an opaque 8-digit hex sets colour and opacity)
+  await ed.locator("[data-hex]").fill("ff0000ff");
+  await ed.locator("[data-hex]").press("Enter");
+  expect((await value()).stops[1]!.colour).toBe("#ff0000");
+
+  // reverse, angle, kind
+  await ed.locator("[data-reverse]").click();
+  v = await value();
+  expect(v.stops.at(-1)!.colour).toBe("#2563eb");
+  expect(v.stops[1]!.offset).toBeCloseTo(0.7, 6);
+  await ed.locator("[data-angle]").fill("45");
+  expect((await value()).angle).toBe(45);
+  await ed.locator('[data-gtype="radial"]').click();
+  expect((await value()).type).toBe("radial");
+  await expect(ed.locator(".cg-radial")).toBeVisible();
+  await expect(ed.locator(".cg-linear")).toBeHidden();
+  await ed.locator("[data-cx]").fill("25");
+  expect((await value()).cx).toBeCloseTo(0.25, 6);
+  await ed.locator("[data-r]").fill("80");
+  expect((await value()).r).toBeCloseTo(0.8, 6);
+
+  // keys: Delete removes the stop with the focus, never below two
+  await ed.locator(".cg-stop").nth(1).focus();
+  await page.keyboard.press("Delete");
+  expect((await value()).stops).toHaveLength(2);
+  await ed.locator(".cg-stop").nth(0).focus();
+  await page.keyboard.press("Delete");
+  expect((await value()).stops).toHaveLength(2);
+  await page.keyboard.press("ArrowRight");
+  expect((await value()).stops[0]!.offset).toBeCloseTo(0.01, 6);
+  expect(await page.evaluate(() => (window as unknown as { gradientEvents: number }).gradientEvents)).toBeGreaterThan(8);
 });

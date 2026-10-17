@@ -6,6 +6,7 @@ import * as D from "../core/dyadic";
 import type { Rect } from "./geometry2d";
 import { clipPolygon, clipSegment } from "./geometry2d";
 import { MITER_LIMIT } from "../doc/path";
+import { canvasPaint } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
 
@@ -196,17 +197,17 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   const o = po.obj as PathObject;
   const body = (c: CanvasRenderingContext2D): void => {
     if (o.fill !== null) {
-      c.fillStyle = paintColor(o.fill);
+      c.fillStyle = canvasPaint(c, o, o.fill, po.proj, vp);
       c.beginPath();
       addFillPath(c, po, vp);
       c.fill(o.evenodd ? "evenodd" : "nonzero");
     }
     if (o.stroke !== null && po.strokePolys) {
       // Too wide for the canvas to stroke: its exact coverage, as polygons.
-      c.fillStyle = paintColor(o.stroke);
+      c.fillStyle = canvasPaint(c, o, o.stroke, po.proj, vp);
       fillPolygons(c, po.strokePolys as number[][]);
     } else if (o.stroke !== null) {
-      c.strokeStyle = paintColor(o.stroke);
+      c.strokeStyle = canvasPaint(c, o, o.stroke, po.proj, vp);
       c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
       c.lineJoin = o.join ?? "round";
       c.lineCap = o.cap ?? "round";

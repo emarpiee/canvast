@@ -13,6 +13,8 @@
  * Instance-specific state (a video's pause position, an image's adjustments)
  * is not a setting: it lives in the object itself.
  */
+import { paintFromText } from "../doc/paint";
+
 export type Scope = "device" | "workspace" | "board";
 
 export interface Def<T> {
@@ -34,8 +36,8 @@ const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#
 /** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
 const colourList = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 8 * 10 && (v === "" || v.split(",").every((c) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(c))) ? v : undefined);
 
-/** A shape's fill or outline: "none", or "#rrggbb" / "#rrggbbaa". */
-const paint = (v: unknown): string | undefined => (typeof v === "string" && (v === "none" || /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) ? v : undefined);
+/** A shape's fill or outline as text: "none", "#rrggbb" / "#rrggbbaa", or a gradient as JSON (doc/paint.ts). */
+const paint = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 4000 && paintFromText(v) !== undefined ? v : undefined);
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,

@@ -7,6 +7,8 @@ import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
 import type { Cap, Join, ShapeKind, SubPath } from "./path";
+import type { Paint } from "./paint";
+import { inkOfPaint, isPaint } from "./paint";
 import { NODE, SHAPE_KINDS, paintBounds, rotateSubs } from "./path";
 
 /**
@@ -131,10 +133,10 @@ export interface TextObject extends ObjectBase {
 export interface PathObject extends ObjectBase {
   readonly kind: "path";
   readonly sub: readonly SubPath[];
-  /** "#rrggbb" or "#rrggbbaa"; null: not filled. */
-  readonly fill: string | null;
-  /** "#rrggbb" or "#rrggbbaa"; null: no outline. */
-  readonly stroke: string | null;
+  /** A colour ("#rrggbb" or "#rrggbbaa") or a gradient (doc/paint.ts); null: not filled. */
+  readonly fill: Paint | null;
+  /** A colour or a gradient; null: no outline. */
+  readonly stroke: Paint | null;
   /** Outline width in local units (kept positive even without an outline, so turning one on has a width to show). */
   readonly width: number;
   /** Absent: round. */
@@ -277,8 +279,7 @@ export function localBounds(o: CanvasObject): LocalBounds {
 /** The one colour that stands for an object where only one fits (the density preview, the layers list): "#rrggbb" and its opacity, 0 to 1. */
 export function inkOf(o: StrokeObject | TextObject | PathObject): { rgb: string; alpha: number } {
   if (o.kind !== "path") return { rgb: o.color, alpha: 1 };
-  const paint = o.fill ?? o.stroke ?? "#000000";
-  return { rgb: paint.slice(0, 7), alpha: paint.length === 9 ? parseInt(paint.slice(7), 16) / 255 : 1 };
+  return inkOfPaint(o.fill ?? o.stroke ?? "#000000");
 }
 
 export function newObjectId(): ObjectId {
@@ -295,7 +296,6 @@ export class InvalidObjectError extends Error {}
 const ID_RE = /^[0-9a-f]{32}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
-const PAINT_RE = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 /** Most sub-paths in a path, and most nodes in all of them (a guard against a hand-edited or hostile file). */
 export const MAX_SUBPATHS = 4096;
 export const MAX_PATH_NODES = 200_000;
@@ -350,7 +350,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
       s.n.forEach((v: number, i: number) => finite(v, `node[${i}]`));
     }
     if (nodes > MAX_PATH_NODES) throw new InvalidObjectError("too many nodes");
-    for (const [what, v] of [["fill", o.fill], ["stroke", o.stroke]] as const) if (v !== null && !(typeof v === "string" && PAINT_RE.test(v))) throw new InvalidObjectError(`bad ${what} ${String(v)}`);
+    for (const [what, v] of [["fill", o.fill], ["stroke", o.stroke]] as const) if (v !== null && !isPaint(v)) throw new InvalidObjectError(`bad ${what} ${JSON.stringify(v)}`);
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
@@ -437,8 +437,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...base,
       kind: "path",
       sub: (s["sub"] as Array<{ n: number[]; closed: boolean }>).map((p) => ({ n: p?.n as number[], closed: p?.closed as boolean })),
-      fill: (s["fill"] ?? null) as string | null,
-      stroke: (s["stroke"] ?? null) as string | null,
+      fill: (s["fill"] ?? null) as Paint | null,
+      stroke: (s["stroke"] ?? null) as Paint | null,
       width: s["width"] as number,
       ...(s["join"] !== undefined ? { join: s["join"] as Join } : {}),
       ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),

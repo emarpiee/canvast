@@ -33,7 +33,7 @@ One layout cannot be best at everything, so the picker offers four and remembers
 
 | # | Feature | Why |
 | --- | --- | --- |
-| 1 | **Gradient editor** (stops on a bar, add, drag and delete a stop, angle and type, each stop opening this picker) | Every vector editor needs it; canvast's vector fills are the first user. Reuses the picker for each stop. |
+| 1 | **Gradient interpolation in OKLab** (the editor is done; the stops are blended in sRGB like a canvas) | Avoids the muddy middle of a red to green; needs the stops resampled into many for a canvas. |
 | 2 | **Display P3 and wide gamut** (`color(display-p3 …)` output, a gamut toggle) | Screens are wider than sRGB; the models extend to a bigger gamut by changing the gamut function. |
 | 3 | **Colour-blindness preview** (protan, deutan, tritan swatches of the current colour) | Cheap with the matrices, and the contrast readout already points that way. |
 | 4 | **Pick from an image with a loupe** | The eyedropper fallback for Firefox and Safari, which have no `EyeDropper`. |

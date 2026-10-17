@@ -8,7 +8,7 @@ import { projectObject } from "./projection";
 import { batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, shapeSubs } from "../doc/path";
-import { nodesOnScreen } from "../interaction/path-edit";
+import { gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
@@ -264,6 +264,7 @@ export function drawOverlays(
 
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
+  if (editor.tool === "select" || editor.tool === "node") drawGradientHandles(ctx, selected, theme);
 
   if (editor.lasso && editor.lasso.length >= 4) {
     ctx.save();
@@ -320,6 +321,45 @@ function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedOb
     ctx.fillStyle = on ? theme.selection : theme.handleFill;
     ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
     ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
+  }
+  ctx.restore();
+}
+
+/** The axis or the rings of the gradient of the one selected path, with handles to drag (ADR 0100). */
+function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme): void {
+  if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
+  const h = gradientHandles(selected[0]!);
+  if (!h) return;
+  ctx.save();
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = theme.selection;
+  ctx.fillStyle = theme.handleFill;
+  if (h.ring) {
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(h.ring.x, h.ring.y, Math.min(h.ring.r, 1e5), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(h.pts[0]!.x, h.pts[0]!.y);
+    ctx.lineTo(h.pts[1]!.x, h.pts[1]!.y);
+    ctx.stroke();
+    for (const s of h.stops) {
+      // a stop on the axis, in its own colour
+      ctx.fillStyle = s.c;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, HANDLE_SIZE_PX / 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = theme.handleFill;
+  }
+  for (const q of h.pts) {
+    ctx.beginPath();
+    ctx.arc(q.x, q.y, HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }

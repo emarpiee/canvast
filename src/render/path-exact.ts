@@ -222,7 +222,7 @@ export function outlineStrokes(o: PathObject): StrokeObject[] {
     for (let k = 0; k < nodeCount(s); k++) pts.push(s.n[k * NODE]!, s.n[k * NODE + 1]!);
     if (s.closed) pts.push(s.n[0]!, s.n[1]!);
     return pts.length >= 2
-      ? [{ id: o.id, kind: "stroke" as const, anchor: o.anchor, unit: o.unit, z: o.z, opacity: o.opacity, attachmentTargetId: null, points: pts, width: o.width, color: o.stroke ?? "#000000" }]
+      ? [{ id: o.id, kind: "stroke" as const, anchor: o.anchor, unit: o.unit, z: o.z, opacity: o.opacity, attachmentTargetId: null, points: pts, width: o.width, color: "#000000" }]
       : [];
   });
 }

@@ -1,0 +1,27 @@
+# ADR 0100: Gradients on paths, and a gradient editor in the colour package
+
+## Status
+Accepted (v0.17.0).
+
+## Decision
+**A paint is a colour or a gradient** (`src/doc/paint.ts`). A path's `fill` and `stroke` are `"#rrggbb"`, `"#rrggbbaa"`, a gradient, or null. A gradient is `linear` (two points) or `radial` (a centre and a radius) with 2 to 32 stops (offset 0..1 in order, a colour with transparency each), stored as plain JSON: no format change, and the archive, the clipboard and IndexedDB carry it unchanged. Validation refuses unordered or out-of-range stops, bad colours, a linear gradient with no length, a radial one with no radius and anything not finite.
+
+**It is placed on the geometry box of the shape** (the bounds of its curves, without the outline), in units of that box: (0, 0) top-left, (1, 1) bottom-right; a radial radius is in units of the box's longer side. So a gradient follows the shape when it is moved, stretched or turned (its points are turned with the path as `pathSubs` turns the nodes), and keeps its place when nodes are edited. A new gradient from a colour is that colour fading to nothing (linear: across the box, left to right; radial: from the middle); changing the kind keeps the stops.
+
+**Drawing** (`render/gradient.ts`). The canvas is given only the part of the gradient the view can show. A gradient may be a million times bigger than the view or astronomically far from it, and a rasterizer keeps gradient coordinates in single precision, so the gradient is re-expressed over the view in the path's local units (exact placement, then doubles): a linear one runs along its axis across the view's own span (ends a half diagonal either side of the centre, the offset of the centre and the span from one dot product), a radial one is true rings while its centre is within 20 view-half-diagonals (radii in px of the distance, so bounded by the view whatever its size), and a linear gradient along the direction to the centre when it is farther (the rings are straight across the view to within a small part of the colour change they carry). Its stops are cut to the part of 0..1 that is visible, so the colours at the ends are exact (`sliceStops`, blended premultiplied as a browser does). Past what the view can resolve (deeper than the offsets' span in doubles) it is one colour: the gradient's colour at the centre. Tested at 2^40 and 2^3000 levels against the exact blend along the shape. A wide outline on a straight shape (exact capsules) and the dimmed far stand-ins use the same colour sampling.
+
+**Deep zoom.** The coarse sampler of a path returns the paint's colour *at the point* (`paintAt`), so a view far inside a gradient fill is the colour there, not the average. The density preview and the Layers swatch use the gradient's average colour weighted by the stretch each pair of stops covers (`inkOfPaint`).
+
+**The editor** is part of the colour package (`src/colour-picker/gradient.ts`, standalone, documented there): a bar with a handle per stop (drag, click the bar to add one in the colour the gradient has there, Delete removes, arrows move, Home and End), Linear or Radial, the position of the stop, the angle (linear) or the centre and radius (radial), reverse, remove, and the package's own picker with transparency for the selected stop. Its value is plain data (angle, centre, radius, stops); what they mean on a shape is the host's.
+
+**In the app** the Fill and Outline chips open a paint chooser (`ui/colour-popover.ts` `openPaintPopover`): None, Colour, Linear, Radial, and below it the picker or the editor. The chips show the paint (a gradient as a gradient over the chequer). Switching kind keeps what it can (a gradient to a colour takes its first stop; a colour to a gradient fades it). A gradient the person has shaped on the canvas keeps its shape unless the editor changes the angle, the centre or the radius. Every change is shown live (the `paint` preview) and stored as one undo step; closing the chooser keeps what it last showed (a number typed in a field is only "changed" on Enter or on leaving it, and closing used to drop it).
+
+**On the canvas**, with a path whose fill (or, failing that, outline) is a gradient selected under Select or Edit nodes: its axis with a dot per stop and a handle at each end, or its centre, a dashed ring and a radius handle. A press on a handle drags it; the same live preview, one undo step. Handles take priority over resizing and rotating, and nodes over gradient handles in Edit nodes.
+
+**Settings.** The Shape and Path tools' defaults persist as before (`shape.fill`, `shape.stroke`), now as text: `none`, a colour, or the gradient as JSON.
+
+## Tests
+`tests/unit/paint.test.ts` (validation, blending, slicing, angles, text and CSS, serialization with a path, box units turned and back, the exact arguments the canvas is given near, far and deep, the coarse colour), `tests/e2e/colour-picker-package.spec.ts` (the editor on the demo page: bar, handle, field, keys, kinds, angle, centre, the stop's picker), `tests/e2e/vectors.spec.ts` (the chooser, stops, angle, kinds, canvas handles, one undo each, saved, exact colour at 2^40 and 2^3000). Chromium and Firefox.
+
+## Next slices
+Booleans, SVG import and export, rounded rectangles and dashes. Gradients not yet: on text, on strokes (freehand), mesh and pattern fills, a stop's position snapped to others, and a gradient's colour space (interpolation is in sRGB like the canvas; OKLab interpolation would avoid muddy midpoints and needs the stops resampled).
