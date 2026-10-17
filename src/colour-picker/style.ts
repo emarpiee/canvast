@@ -64,6 +64,8 @@ export const PICKER_CSS = `
 .cp-num, .cp-hex { background: var(--cp-field); border: 1px solid transparent; border-radius: var(--cp-radius-sm); }
 .cp .cp-num { width: 100%; min-width: 0; padding: 3px var(--cp-gap-sm); text-align: right; font-family: var(--cp-mono); color: var(--cp-fg); appearance: textfield; -moz-appearance: textfield; }
 .cp-num::-webkit-outer-spin-button, .cp-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+label[data-scrubbable] { cursor: ew-resize; user-select: none; }
+label[data-scrubbable] input { cursor: text; user-select: text; }
 .cp-num:focus, .cp-hex:focus-within { border-color: var(--cp-focus); outline: none; }
 
 .cp-slider { -webkit-appearance: none; appearance: none; width: 100%; height: var(--cp-bar); margin: 0; border-radius: var(--cp-radius); background: var(--cp-track); box-shadow: inset 0 0 0 1px var(--cp-border); cursor: pointer; }

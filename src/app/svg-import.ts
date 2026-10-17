@@ -1,0 +1,296 @@
+/**
+ * Read an SVG as vector shapes (ADR 0107): paths, rectangles (with rounded corners), circles, ellipses, lines, polylines and polygons, in
+ * groups and with transforms (matrix, translate, scale, rotate, skew), each with its fill, outline, width, ends, corners, dashes, fill rule
+ * and opacity, and linear and radial gradients. Everything is turned into paths in SVG units; nothing is run (the text is parsed as an
+ * image document, never inserted in the page). Left out: text, images, filters, masks, clips, patterns, markers and `<use>`.
+ */
+import type { Dash } from "../doc/stroke-look";
+import type { Gradient, Paint } from "../doc/paint";
+import { NODE, geometryBounds, mapSubs } from "../doc/path";
+import type { Cap, Join, SubPath } from "../doc/path";
+import { parsePathData } from "../doc/svg-path";
+
+export interface SvgShape {
+  sub: SubPath[];
+  fill: Paint | null;
+  stroke: Paint | null;
+  /** Outline width in SVG units (already scaled by the transform). */
+  width: number;
+  join?: Join;
+  cap?: Cap;
+  dash?: Dash;
+  evenodd: boolean;
+  opacity: number;
+  name?: string;
+}
+
+export interface SvgImport {
+  shapes: SvgShape[];
+  /** The drawing's own box (its viewBox, else the box of the shapes). */
+  box: { x: number; y: number; w: number; h: number };
+}
+
+type Matrix = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
+const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
+const mul = (m: Matrix, n: Matrix): Matrix => [
+  m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
+  m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3],
+  m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5],
+];
+
+/** The matrix of a `transform` attribute (an unknown or malformed one is the identity). */
+export function parseTransform(t: string | null | undefined): Matrix {
+  let m = IDENTITY;
+  if (!t) return m;
+  for (const part of t.matchAll(/(\w+)\s*\(([^)]*)\)/g)) {
+    const a = (part[2] ?? "").split(/[\s,]+/).filter(Boolean).map(Number);
+    if (a.some((v) => !Number.isFinite(v))) return IDENTITY;
+    let n: Matrix | null = null;
+    switch (part[1]) {
+      case "matrix": if (a.length === 6) n = a as unknown as Matrix; break;
+      case "translate": n = [1, 0, 0, 1, a[0] ?? 0, a[1] ?? 0]; break;
+      case "scale": n = [a[0] ?? 1, 0, 0, a[1] ?? a[0] ?? 1, 0, 0]; break;
+      case "rotate": {
+        const r = ((a[0] ?? 0) * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
+        const rot: Matrix = [c, s, -s, c, 0, 0];
+        n = a.length === 3 ? mul(mul([1, 0, 0, 1, a[1]!, a[2]!], rot), [1, 0, 0, 1, -a[1]!, -a[2]!]) : rot;
+        break;
+      }
+      case "skewX": n = [1, 0, Math.tan(((a[0] ?? 0) * Math.PI) / 180), 1, 0, 0]; break;
+      case "skewY": n = [1, Math.tan(((a[0] ?? 0) * Math.PI) / 180), 0, 1, 0, 0]; break;
+    }
+    if (n) m = mul(m, n);
+  }
+  return m;
+}
+
+let swatch: CanvasRenderingContext2D | null = null;
+/** Any CSS colour as "#rrggbb" or "#rrggbbaa" (the browser reads it), or null when it is not one. */
+function cssColour(v: string): string | null {
+  swatch ??= document.createElement("canvas").getContext("2d");
+  if (!swatch) return null;
+  swatch.fillStyle = "#010203";
+  swatch.fillStyle = v;
+  const out = String(swatch.fillStyle);
+  if (out === "#010203" && v.trim().toLowerCase() !== "#010203") return null;
+  if (out.startsWith("#")) return out.toLowerCase();
+  const m = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(out);
+  if (!m) return null;
+  const h = (n: number): string => Math.round(n).toString(16).padStart(2, "0");
+  return `#${h(+m[1]!)}${h(+m[2]!)}${h(+m[3]!)}${h(+m[4]! * 255)}`;
+}
+
+/** The same colour with its alpha multiplied by `k`. */
+function fade(c: string, k: number): string {
+  if (k >= 1) return c;
+  const a = c.length === 9 ? parseInt(c.slice(7, 9), 16) / 255 : 1;
+  return c.slice(0, 7) + Math.round(a * Math.max(0, k) * 255).toString(16).padStart(2, "0");
+}
+
+interface Style {
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  cap?: Cap;
+  join?: Join;
+  dash: number[];
+  evenodd: boolean;
+  opacity: number;
+  fillOpacity: number;
+  strokeOpacity: number;
+}
+const BASE_STYLE: Style = { fill: "black", stroke: "none", strokeWidth: 1, dash: [], evenodd: false, opacity: 1, fillOpacity: 1, strokeOpacity: 1 };
+
+function readStyle(el: Element, parent: Style): Style {
+  const s: Style = { ...parent, opacity: 1 }; // (opacity is not inherited; it is multiplied on the way down by the caller)
+  const decl = new Map<string, string>();
+  for (const a of ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "fill-rule", "opacity", "fill-opacity", "stroke-opacity"]) {
+    const v = el.getAttribute(a);
+    if (v !== null) decl.set(a, v.trim());
+  }
+  for (const part of (el.getAttribute("style") ?? "").split(";")) {
+    const i = part.indexOf(":");
+    if (i > 0) decl.set(part.slice(0, i).trim().toLowerCase(), part.slice(i + 1).trim());
+  }
+  const n = (k: string): number | undefined => {
+    const v = parseFloat(decl.get(k) ?? "");
+    return Number.isFinite(v) ? v : undefined;
+  };
+  if (decl.has("fill")) s.fill = decl.get("fill")!;
+  if (decl.has("stroke")) s.stroke = decl.get("stroke")!;
+  s.strokeWidth = n("stroke-width") ?? s.strokeWidth;
+  const cap = decl.get("stroke-linecap");
+  if (cap === "butt" || cap === "square" || cap === "round") { if (cap === "round") delete s.cap; else s.cap = cap; }
+  const join = decl.get("stroke-linejoin");
+  if (join === "miter" || join === "bevel" || join === "round" || join === "miter-clip" || join === "arcs") { if (join === "round") delete s.join; else s.join = join === "bevel" ? "bevel" : "miter"; }
+  if (decl.has("stroke-dasharray")) {
+    const d = decl.get("stroke-dasharray")!;
+    s.dash = d === "none" ? [] : d.split(/[\s,]+/).filter(Boolean).map(Number).filter((v) => Number.isFinite(v) && v >= 0);
+  }
+  if (decl.has("fill-rule")) s.evenodd = decl.get("fill-rule") === "evenodd";
+  s.opacity = n("opacity") ?? 1;
+  s.fillOpacity = (n("fill-opacity") ?? parent.fillOpacity);
+  s.strokeOpacity = (n("stroke-opacity") ?? parent.strokeOpacity);
+  return s;
+}
+
+/** A length in user units (px and bare numbers; a percentage of `of`). */
+function len(v: string | null, of = 0): number {
+  if (v === null) return 0;
+  const x = parseFloat(v);
+  if (!Number.isFinite(x)) return 0;
+  return v.trim().endsWith("%") ? (x / 100) * of : x;
+}
+
+const K = 0.5522847498307936; // a quarter circle as one cubic
+function ellipseData(cx: number, cy: number, rx: number, ry: number): SubPath {
+  const n = [
+    cx + rx, cy, cx + rx, cy - ry * K, cx + rx, cy + ry * K,
+    cx, cy + ry, cx + rx * K, cy + ry, cx - rx * K, cy + ry,
+    cx - rx, cy, cx - rx, cy + ry * K, cx - rx, cy - ry * K,
+    cx, cy - ry, cx - rx * K, cy - ry, cx + rx * K, cy - ry,
+  ];
+  return { n, closed: true };
+}
+
+function roundedRect(x: number, y: number, w: number, h: number, rx: number, ry: number): SubPath[] {
+  if (!(rx > 0 || ry > 0)) return [{ n: [x, y, x, y, x, y, x + w, y, x + w, y, x + w, y, x + w, y + h, x + w, y + h, x + w, y + h, x, y + h, x, y + h, x, y + h], closed: true }];
+  rx = Math.min(rx || ry, w / 2);
+  ry = Math.min(ry || rx, h / 2);
+  const d = `M${x + rx} ${y}H${x + w - rx}A${rx} ${ry} 0 0 1 ${x + w} ${y + ry}V${y + h - ry}A${rx} ${ry} 0 0 1 ${x + w - rx} ${y + h}H${x + rx}A${rx} ${ry} 0 0 1 ${x} ${y + h - ry}V${y + ry}A${rx} ${ry} 0 0 1 ${x + rx} ${y}Z`;
+  return parsePathData(d);
+}
+
+const points = (v: string | null): number[] => (v ?? "").split(/[\s,]+/).filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
+
+/** The shapes of SVG text, or null when it is not an SVG document (or has nothing to draw). */
+export function parseSvg(text: string): SvgImport | null {
+  const docEl = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
+  if (!docEl || docEl.localName !== "svg" || docEl.querySelector("parsererror")) return null;
+  const gradients = new Map<string, Element>();
+  for (const g of docEl.querySelectorAll("linearGradient, radialGradient")) if (g.id) gradients.set(g.id, g);
+  const shapes: SvgShape[] = [];
+  const stopsOf = (g: Element): Array<{ o: number; c: string }> => {
+    let src: Element | undefined = g;
+    for (let hops = 0; src && !src.querySelector("stop") && hops < 5; hops++) {
+      const ref = (src.getAttribute("href") ?? src.getAttribute("xlink:href") ?? "").replace("#", "");
+      src = gradients.get(ref);
+    }
+    const out: Array<{ o: number; c: string }> = [];
+    let last = 0;
+    for (const s of src?.querySelectorAll("stop") ?? []) {
+      const st = readStyle(s, { ...BASE_STYLE });
+      const raw = (s.getAttribute("style")?.match(/stop-color:\s*([^;]+)/)?.[1] ?? s.getAttribute("stop-color") ?? "black").trim();
+      const op = parseFloat(s.getAttribute("style")?.match(/stop-opacity:\s*([^;]+)/)?.[1] ?? s.getAttribute("stop-opacity") ?? "1");
+      const c = cssColour(raw) ?? "#000000";
+      const off = s.getAttribute("offset") ?? "0";
+      const o = Math.min(1, Math.max(last, off.endsWith("%") ? parseFloat(off) / 100 : parseFloat(off) || 0));
+      last = o;
+      out.push({ o, c: fade(c, (Number.isFinite(op) ? op : 1) * st.opacity) });
+    }
+    return out;
+  };
+  // A paint value: a colour, none, or a url(#gradient) turned into the box units of the shape the gradient is on.
+  const paintOf = (value: string, factor: number, sub: readonly SubPath[], m: Matrix): Paint | null => {
+    const v = value.trim();
+    if (v === "none" || v === "transparent") return null;
+    const ref = /^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)/.exec(v);
+    if (ref) {
+      const g = gradients.get(ref[1]!);
+      const stops = g ? stopsOf(g) : [];
+      if (!g || stops.length === 0) return null;
+      const solid = (): Paint => fade(stops[0]!.c, factor);
+      if (stops.length < 2) return solid();
+      const b = geometryBounds(sub);
+      const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+      if (!(bw > 0 && bh > 0)) return solid();
+      const user = g.getAttribute("gradientUnits") === "userSpaceOnUse";
+      const gt = parseTransform(g.getAttribute("gradientTransform"));
+      const at = (x: number, y: number): [number, number] => {
+        // user space → the shape's own space (the transform of the element is already in `sub`) → box units
+        const gx = gt[0] * x + gt[2] * y + gt[4], gy = gt[1] * x + gt[3] * y + gt[5];
+        const [px, py] = user ? [gx * m[0] + gy * m[2] + m[4], gx * m[1] + gy * m[3] + m[5]] : [b.minX + gx * bw, b.minY + gy * bh];
+        return [(px - b.minX) / bw, (py - b.minY) / bh];
+      };
+      const attr = (k: string, d: number): number => {
+        const raw = g.getAttribute(k);
+        if (raw === null) return d;
+        const x = parseFloat(raw);
+        return raw.trim().endsWith("%") ? (user ? x : x / 100) : x;
+      };
+      const st = stops.map((s) => ({ o: s.o, c: fade(s.c, factor) }));
+      if (g.localName === "linearGradient") {
+        const [x0, y0] = at(attr("x1", 0), attr("y1", 0));
+        const [x1, y1] = at(attr("x2", user ? 100 : 1), attr("y2", 0));
+        if (x0 === x1 && y0 === y1) return solid();
+        return { type: "linear", x0, y0, x1, y1, stops: st } as Gradient;
+      }
+      const [cx, cy] = at(attr("cx", 0.5), attr("cy", 0.5));
+      const r = attr("r", 0.5) * (user ? Math.hypot(m[0], m[1]) / Math.max(bw, bh) : 1);
+      return r > 0 ? ({ type: "radial", cx, cy, r, stops: st } as Gradient) : solid();
+    }
+    const c = cssColour(v);
+    return c ? fade(c, factor) : null;
+  };
+  const add = (el: Element, subs: SubPath[], st: Style, m: Matrix, alpha: number): void => {
+    if (!subs.length) return;
+    const sub = mapSubs(subs, (x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+    const scale = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+    const fill = paintOf(st.fill, st.fillOpacity, sub, m);
+    const stroke = st.strokeWidth > 0 ? paintOf(st.stroke, st.strokeOpacity, sub, m) : null;
+    if (fill === null && stroke === null) return;
+    const width = Math.max(st.strokeWidth * scale, 1e-9);
+    // dashes are kept in widths of the outline: the first two lengths (a single one means dash and gap alike)
+    const pattern = st.dash.length ? (st.dash.length === 1 ? [st.dash[0]!, st.dash[0]!] : st.dash.slice(0, 2)) : [];
+    const dash: Dash | undefined = stroke !== null && pattern.length === 2 && pattern[0]! + pattern[1]! > 0 ? [(pattern[0]! * scale) / width, (pattern[1]! * scale) / width] : undefined;
+    const id = el.getAttribute("id");
+    shapes.push({
+      sub, fill, stroke, width, evenodd: st.evenodd, opacity: Math.min(1, Math.max(0.01, alpha)),
+      ...(st.join ? { join: st.join } : {}), ...(st.cap ? { cap: st.cap } : {}), ...(dash ? { dash } : {}), ...(id ? { name: id.slice(0, 80) } : {}),
+    });
+  };
+  const SKIP = new Set(["defs", "clipPath", "mask", "pattern", "marker", "symbol", "style", "script", "title", "desc", "metadata", "linearGradient", "radialGradient", "foreignObject", "text"]);
+  const walk = (el: Element, parent: Style, pm: Matrix, alpha: number, vw: number, vh: number): void => {
+    if (shapes.length > 20000) return;
+    const name = el.localName;
+    if (SKIP.has(name) || el.getAttribute("display") === "none" || /display:\s*none/.test(el.getAttribute("style") ?? "")) return;
+    const st = readStyle(el, parent);
+    const m = mul(pm, parseTransform(el.getAttribute("transform")));
+    const a = alpha * st.opacity;
+    const f = (k: string, of = 0): number => len(el.getAttribute(k), of);
+    switch (name) {
+      case "svg": case "g": case "a": case "switch":
+        for (const c of el.children) walk(c, st, m, a, vw, vh);
+        return;
+      case "path": add(el, parsePathData(el.getAttribute("d") ?? ""), st, m, a); return;
+      case "rect": {
+        const w = f("width", vw), h = f("height", vh);
+        if (w > 0 && h > 0) add(el, roundedRect(f("x", vw), f("y", vh), w, h, f("rx", vw), f("ry", vh)), st, m, a);
+        return;
+      }
+      case "circle": { const r = f("r", Math.hypot(vw, vh) / Math.SQRT2); if (r > 0) add(el, [ellipseData(f("cx", vw), f("cy", vh), r, r)], st, m, a); return; }
+      case "ellipse": { const rx = f("rx", vw), ry = f("ry", vh); if (rx > 0 && ry > 0) add(el, [ellipseData(f("cx", vw), f("cy", vh), rx, ry)], st, m, a); return; }
+      case "line": { const x1 = f("x1", vw), y1 = f("y1", vh), x2 = f("x2", vw), y2 = f("y2", vh); add(el, [{ n: [x1, y1, x1, y1, x1, y1, x2, y2, x2, y2, x2, y2], closed: false }], { ...st, fill: "none" }, m, a); return; }
+      case "polyline": case "polygon": {
+        const p = points(el.getAttribute("points"));
+        const n: number[] = [];
+        for (let i = 0; i + 1 < p.length; i += 2) n.push(p[i]!, p[i + 1]!, p[i]!, p[i + 1]!, p[i]!, p[i + 1]!);
+        if (n.length >= 2 * NODE) add(el, [{ n, closed: name === "polygon" }], name === "polyline" ? st : st, m, a);
+        return;
+      }
+    }
+  };
+  const vb = (docEl.getAttribute("viewBox") ?? "").split(/[\s,]+/).map(Number);
+  const vbOk = vb.length === 4 && vb.every((v) => Number.isFinite(v)) && vb[2]! > 0 && vb[3]! > 0;
+  const vw = vbOk ? vb[2]! : len(docEl.getAttribute("width")) || 100;
+  const vh = vbOk ? vb[3]! : len(docEl.getAttribute("height")) || 100;
+  walk(docEl, BASE_STYLE, IDENTITY, 1, vw, vh);
+  if (!shapes.length) return null;
+  let box = vbOk ? { x: vb[0]!, y: vb[1]!, w: vb[2]!, h: vb[3]! } : null;
+  if (!box) {
+    const b = geometryBounds(shapes.flatMap((s) => s.sub));
+    box = { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY };
+  }
+  return { shapes, box };
+}
+

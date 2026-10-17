@@ -32,14 +32,15 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Raster adjustments | **Gap** | See §5. |
 | Resolution-aware display, thumbnails, large images | Done | Tile cache, reduced copies, stored WebP thumbnails (ADR 0009, 0030, 0034). |
 | Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Partial | Reduced copies and tiles exist; no mipmap pyramid; EXIF and colour profiles are not read (the browser decides). |
-| SVG import | Partial | An SVG is kept as a picture (the browser draws it). It is not turned into editable vector objects. |
-| SVG export | **Gap** | Not present. |
+| SVG import | Done (ADR 0107) | Pasted SVG text, or Make vector copy of an SVG picture, becomes editable paths (gradients, dashes, transforms; not text, masks, clips, patterns, `<use>`). A dropped SVG file is still a picture. |
+| SVG export | Done (ADR 0107) | Save as SVG from the selection bar; an outline inside or outside the edge is written centred. |
 | Vector shapes, custom paths, Bézier points and handles, fills, strokes, node editing | Done (ADR 0099) | Shape, Path and Edit nodes tools; fill and outline with transparency; join, cap and fill rule are stored (the tools set round or miter). Edges are exact at any depth (fill and thin outline; wide outlines of straight shapes); only a curved shape's outline wider than 2^14 px at the view is a dimmed approximation. |
 | Gradients on paths (ADR 0100) | Done | Linear and radial, on fills and outlines, with a gradient editor in the colour package and handles on the canvas. |
 | Boolean operations (ADR 0101, 0103) | Done | Union, intersect, subtract, exclude on the selection bar as non-destructive boolean groups (members stay editable, result derived, flatten and release); curves stay curves. |
 | Stroke position (inside, centre, outside), outline corners and ends | Done | ADR 0104; Outline options on the options bar. |
 | Corner radius (every shape with corners, curves included, per corner, boolean groups), sides, points and ratio editable after drawing | Done | ADR 0105; per-corner radii on a boolean group's result are not. |
-| Clipping, dashes | **Gap** | Next slices of the vector plan (ADR 0099). |
+| Dashes | Done (ADR 0107) | Solid, Dashed, Dotted; custom lengths and offset are not offered. |
+| Clipping | **Gap** | Next slice of the vector plan (ADR 0099). |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | **Gap** | Pressure is read; tilt is not. |
 | Object eraser (swept, one undoable step, never deletes the original) | Done | ADR 0022. Whole-group option. |

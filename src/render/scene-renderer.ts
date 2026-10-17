@@ -244,7 +244,7 @@ export function drawOverlays(
       fill: sd.fill,
       stroke: sd.stroke,
       width: sd.width,
-      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, sd.kind === "rect" || sd.kind === "polygon" || sd.kind === "star" ? "miter" : undefined),
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, sd.kind === "rect" || sd.kind === "polygon" || sd.kind === "star" ? "miter" : undefined, editor.shapeDash),
     };
     const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
     if (po) drawPath(ctx, po, vp);
@@ -266,7 +266,7 @@ export function drawOverlays(
       fill: null,
       stroke: pd.stroke ?? "#1f2329",
       width: pd.width,
-      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, "centre"),
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, "centre", undefined, editor.shapeDash),
     };
     const po = cam && projectObject(draft, cam, vp, { keepTiny: true });
     if (po && !po.cover) {

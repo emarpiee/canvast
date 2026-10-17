@@ -13,6 +13,7 @@
  */
 import { createColourPicker, type ColourPicker, type Labels as PickerLabels, type PickerOptions } from "./picker";
 import { ensureStyles } from "./style";
+import { scrubNumbers } from "./scrub";
 
 export interface GradientStopValue {
   offset: number;
@@ -139,6 +140,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
       <label class="cg-field">${esc(L.radius)} <input type="number" class="cp-num" data-r min="1" max="400" step="1" inputmode="numeric" aria-label="${esc(L.radius)} %"></label>
     </div>
     <div data-picker></div>`;
+  scrubNumbers(root);
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const bar = q<HTMLElement>("[data-bar]");
   const track = q<HTMLElement>("[data-track]");

@@ -40,6 +40,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
+| `file-code` | Save the shapes as an SVG file |
 | `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |
@@ -80,6 +81,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `panel-right` | Details panel |
 | `pen-line` | Ink pen |
 | `pen-tool` | Fine pen |
+| `vector-polygon` | Make editable vector shapes from an SVG picture |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

@@ -188,6 +188,9 @@ function addOutlinePath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: 
   }
 }
 
+/** The dash pattern in screen px for an outline `w` px wide (the pattern is in widths, so it looks the same at any zoom). */
+const dashPattern = (d: readonly [number, number], w: number): number[] => [d[0] * w, d[1] * w];
+
 let layer: HTMLCanvasElement | null = null;
 
 /**
@@ -213,11 +216,13 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       c.strokeStyle = canvasPaint(c, o, o.stroke, po.proj, vp);
       c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
       c.lineJoin = o.join ?? "round";
-      c.lineCap = o.cap ?? "round";
+      c.lineCap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round"); // (a dot is a dash of no length: only round ends show it)
       c.miterLimit = MITER_LIMIT;
+      if (o.dash) c.setLineDash(dashPattern(o.dash, c.lineWidth));
       c.beginPath();
       addOutlinePath(c, po, vp);
       c.stroke();
+      if (o.dash) c.setLineDash([]);
     }
   };
   if (!(o.fill !== null && o.stroke !== null && (o.opacity < 1 || o.blend))) return paint(ctx, o, () => body(ctx));
@@ -263,9 +268,11 @@ function drawAlignedOutline(c: CanvasRenderingContext2D, po: ProjectedObject, vp
   a.lineWidth = 2 * Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
   a.lineJoin = o.join ?? "round";
   a.miterLimit = MITER_LIMIT;
+  if (o.dash) a.setLineDash(dashPattern(o.dash, a.lineWidth / 2));
   a.beginPath();
   addOutlinePath(a, po, vp);
   a.stroke();
+  a.setLineDash([]);
   a.globalCompositeOperation = side === "inside" ? "destination-in" : "destination-out";
   a.beginPath();
   addFillPath(a, po, vp);

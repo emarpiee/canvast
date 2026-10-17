@@ -34,6 +34,7 @@ import {
   type Triple,
 } from "./colour";
 import { ensureStyles } from "./style";
+import { scrubNumbers } from "./scrub";
 
 export type View = "wheel" | "plane" | "sliders" | "mixer";
 export const VIEWS: readonly View[] = ["wheel", "plane", "sliders", "mixer"];
@@ -224,6 +225,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     <div class="cp-groups" data-harmony></div>
     <div class="cp-groups" data-groups></div>`;
 
+  scrubNumbers(root);
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const wheel = q<HTMLElement>("[data-wheel]");
   const ring = q<HTMLElement>("[data-ring]");

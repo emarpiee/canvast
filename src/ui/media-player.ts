@@ -1,3 +1,4 @@
+import { scrubNumbers } from "../colour-picker/scrub";
 import type { ViewState } from "../app/view-state";
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
@@ -276,6 +277,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
       <label>GIF step (frames) <input type="number" min="1" max="1000" step="1" data-step="media.step.gif"></label>
     </div>`;
+  scrubNumbers(bar);
   host.append(bar);
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");

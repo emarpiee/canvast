@@ -10,7 +10,7 @@ import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-op
 import type { ShapeKind, SubPath } from "../doc/path";
 import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
-import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
+import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
 export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser" | "shape" | "path" | "node";
 
@@ -148,6 +148,7 @@ export class EditorState {
   shapeJoin: JoinChoice | null = null;
   shapeCap: CapChoice = "round";
   shapeAlign: AlignChoice = "centre";
+  shapeDash: DashChoice = "solid";
   shapeSides = 6;
   shapeTips = 5;
   shapeDraft: DraftShape | null = null;

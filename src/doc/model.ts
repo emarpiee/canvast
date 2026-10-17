@@ -7,6 +7,7 @@ import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
 import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
+import type { Dash } from "./stroke-look";
 import type { Paint } from "./paint";
 import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
@@ -146,6 +147,8 @@ export interface PathObject extends ObjectBase {
   readonly join?: Join;
   /** Absent: round. */
   readonly cap?: Cap;
+  /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
+  readonly dash?: Dash;
   /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
   readonly align?: Align;
   /** Fill rule: absent is non-zero. */
@@ -411,6 +414,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
+    if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
@@ -533,6 +537,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["join"] !== undefined ? { join: s["join"] as Join } : {}),
       ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
+      ...(s["dash"] !== undefined ? { dash: s["dash"] as Dash } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),

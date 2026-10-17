@@ -1,3 +1,4 @@
+import { scrubNumbers } from "../colour-picker/scrub";
 import { applyRule, ruleProblem, splitName } from "../doc/rename-rules";
 import type { RenameMode, RenameRule } from "../doc/rename-rules";
 import { esc } from "./format";
@@ -71,6 +72,7 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
       <button type="button" value="cancel" data-testid="rename-cancel">Cancel</button>
       <button type="button" class="is-primary" value="ok" data-testid="rename-ok">Rename</button>
     </div>`;
+  scrubNumbers(dlg);
   document.body.appendChild(dlg);
   const q = <T extends HTMLElement>(sel: string): T => dlg.querySelector<T>(sel)!;
   const field = (k: string): HTMLInputElement => q<HTMLInputElement>(`[data-rn="${k}"]`);

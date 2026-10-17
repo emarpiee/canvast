@@ -13,7 +13,7 @@ import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
-import { cornerHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
+import { cornerHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -22,7 +22,7 @@ import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
 import { expandStroke } from "./pens";
 import { normalizeUnit, worldBounds } from "../doc/edit-ops";
-import { bestSnap } from "./snap";
+import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { boxSelect, hitsObject, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
@@ -446,7 +446,7 @@ export function attachTools(
     fill: d.fill,
     stroke: d.stroke,
     width: d.width,
-    ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, d.kind === "rect" || d.kind === "polygon" || d.kind === "star" ? "miter" : undefined),
+    ...lookFromChoices(editor.shapeJoin, editor.shapeCap, editor.shapeAlign, d.kind === "rect" || d.kind === "polygon" || d.kind === "star" ? "miter" : undefined, editor.shapeDash),
     shape: d.kind,
   });
 
@@ -524,7 +524,7 @@ export function attachTools(
       fill: closed ? d.fill : null,
       stroke: closed ? d.stroke : (stroke ?? d.stroke),
       width: d.width,
-      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, closed ? editor.shapeAlign : "centre", closed ? "miter" : undefined),
+      ...lookFromChoices(editor.shapeJoin, editor.shapeCap, closed ? editor.shapeAlign : "centre", closed ? "miter" : undefined, editor.shapeDash),
     };
     const made = homeObject(normalizeUnit(obj), doc.space);
     doc.commit(doc.transaction(closed ? "Draw closed path" : "Draw path", [made]));
@@ -677,6 +677,28 @@ export function attachTools(
     const tgt = nodeTarget();
     if (!tgt) return;
     g.moved = true;
+    // Snapping a node (the Snap toggle): its x or y lines up with another node of this shape or of another shape in view, within SNAP_PX.
+    editor.guides = null;
+    if (g.what === "point" && editor.snap) {
+      const { s: gs, k: gk } = g;
+      const self = nodesOnScreen(tgt.po).find((n) => n.s === gs && n.k === gk);
+      if (self) {
+        const at = { x: self.p[0] + (s.x - g.start.x), y: self.p[1] + (s.y - g.start.y) };
+        const others = [
+          ...nodesOnScreen(tgt.po).filter((n) => n !== self),
+          ...visible().filter((po) => po.obj.kind === "path" && po.obj.id !== tgt.o.id && !po.cover).flatMap((po) => nodesOnScreen(po)),
+        ].slice(0, MAX_SNAP_TARGETS);
+        const near = (v: number, key: 0 | 1): number | null => {
+          let best: number | null = null;
+          for (const n of others) if (Math.abs(n.p[key] - v) <= SNAP_PX && (best === null || Math.abs(n.p[key] - v) < Math.abs(best - v))) best = n.p[key];
+          return best;
+        };
+        const sx = near(at.x, 0);
+        const sy = near(at.y, 1);
+        if (sx !== null) { s = { ...s, x: s.x + (sx - at.x) }; editor.guides = { x: sx }; }
+        if (sy !== null) { s = { ...s, y: s.y + (sy - at.y) }; editor.guides = { ...editor.guides, y: sy }; }
+      }
+    }
     const l = localOf(tgt.po, s.x, s.y);
     const dx = l.x - g.startLocal.x;
     const dy = l.y - g.startLocal.y;
@@ -695,6 +717,7 @@ export function attachTools(
     const gs = g;
     const p = editor.preview;
     editor.preview = { kind: "none" };
+    editor.guides = null;
     const o = doc.get(gs.id);
     if (cancelled || !o || o.kind !== "path") return;
     if (gs.moved && p.kind === "nodes") return commitSub(o, p.sub, gs.what === "point" ? "Move node" : "Move handle");
@@ -789,9 +812,9 @@ export function attachTools(
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
-    const draggable = t && (t.kind === "stroke" || t.kind === "path" || editor.selection.has(t.id)) && !editor.readOnly;
+    // Only what is already selected moves: a press-and-slide on anything else (a shape, a path, a stroke, like a picture) draws the selection box.
+    const draggable = t && editor.selection.has(t.id) && !editor.readOnly;
     if (t && draggable) {
-      if (!editor.selection.has(t.id)) pick([t.id], gp.additive);
       // Alt held as the drag starts: the drag carries a copy (placed exactly on the original) and the original stays.
       if (alt && !editor.blockEdit()) duplicateSelection(doc, editor, view, 0);
       const ids = [...editor.selection].filter((id) => doc.get(id));

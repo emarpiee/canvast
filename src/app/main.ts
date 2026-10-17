@@ -7,14 +7,14 @@ import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
 import { isCard } from "../assets/file-kind";
-import { downloadOriginal, fileActionsOf, openOriginalInTab } from "../ui/file-actions";
+import { downloadOriginal, fileActionsOf, openOriginalInTab, saveFile } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
 import type { FrameBreakdown } from "./frame-stats";
 import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -173,6 +173,7 @@ async function start(): Promise<void> {
   editor.shapeJoin = settings.get("shape.join") === "default" ? null : settings.get("shape.join") as JoinChoice;
   editor.shapeCap = settings.get("shape.cap");
   editor.shapeAlign = settings.get("shape.align");
+  editor.shapeDash = settings.get("shape.dash");
   editor.lockRadius = settings.get("shape.lockRadius");
   editor.shapeSides = settings.get("shape.sides");
   editor.shapeTips = settings.get("shape.tips");
@@ -198,6 +199,7 @@ async function start(): Promise<void> {
     settings.set("shape.join", editor.shapeJoin ?? "default");
     settings.set("shape.cap", editor.shapeCap);
     settings.set("shape.align", editor.shapeAlign);
+    settings.set("shape.dash", editor.shapeDash);
     settings.set("shape.lockRadius", editor.lockRadius);
     settings.set("shape.sides", editor.shapeSides);
     settings.set("shape.tips", editor.shapeTips);
@@ -714,7 +716,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
 
-  const fileKinds = new Map<string, { card: boolean; open: boolean }>();
+  const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
@@ -760,15 +762,44 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return null;
         if (!fileKinds.has(o.assetId)) {
-          fileKinds.set(o.assetId, { card: false, open: false });
+          fileKinds.set(o.assetId, { card: false, open: false, svg: false });
           void session.catalog?.entry(o.assetId).then((e) => {
             if (!e) return;
-            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen });
+            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml" });
             contextBar.update();
           });
         }
         const k = fileKinds.get(o.assetId)!;
         return k.card ? { hash: o.assetId, open: k.open } : null;
+      },
+      svgPicture: () => {
+        const ids = [...editor.selection];
+        const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
+        if (o?.kind !== "image") return false;
+        void session.catalog?.entry(o.assetId).then((e) => {
+          if (e && !fileKinds.get(o.assetId)?.svg && e.type === "image/svg+xml") {
+            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: true });
+            contextBar.update();
+          }
+        });
+        return fileKinds.get(o.assetId)?.svg === true;
+      },
+      vectorise: () => {
+        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
+        if (o?.kind !== "image") return;
+        void assets.record(o.assetId).then(async (rec) => {
+          if (rec) importSvg(doc, editor, view, await rec.blob.text()); // (the picture stays: this makes a vector copy)
+        });
+      },
+      canExportSvg: () => canExportSvg(doc, editor),
+      exportSvg: () => {
+        const text = svgOfSelection(doc, editor);
+        if (text === null) {
+          editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
+          editor.changed();
+          return;
+        }
+        saveFile("canvast-shapes.svg", new Blob([text], { type: "image/svg+xml" }));
       },
       downloadFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
@@ -994,7 +1025,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (files.length) {
       e.preventDefault();
       receive(files);
-    } else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
+    } else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(e.clipboardData?.getData("text/plain") ?? "") && importSvg(doc, editor, view, e.clipboardData!.getData("text/plain"))) e.preventDefault();
+    else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
   });
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {

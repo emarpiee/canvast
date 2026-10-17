@@ -18,6 +18,8 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import fileCodeSvg from "lucide-static/icons/file-code.svg";
+import vectorPolygonSvg from "lucide-static/icons/vector-polygon.svg";
 import squareRoundCornerSvg from "lucide-static/icons/square-round-corner.svg";
 import outlineOptionsSvg from "lucide-static/icons/sliders-horizontal.svg";
 import play from "lucide-static/icons/play.svg";
@@ -317,6 +319,8 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  fileCode: clean(fileCodeSvg),
+  vectorPolygon: clean(vectorPolygonSvg),
   squareRoundCorner: clean(squareRoundCornerSvg),
   outlineOptions: clean(outlineOptionsSvg),
 } as const;

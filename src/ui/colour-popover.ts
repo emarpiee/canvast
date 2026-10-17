@@ -1,9 +1,10 @@
-import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
+import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
 import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
 import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
+import { scrubNumbers } from "../colour-picker/scrub";
 import { DEFAULT_INK, swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
 import { placeMenu } from "./more-menu";
@@ -325,10 +326,11 @@ export interface OutlineOptions {
   join: JoinChoice;
   cap: CapChoice;
   align: AlignChoice;
+  dash: DashChoice;
   /** Every sub-path is closed: the outline can sit inside or outside the edge, and corners matter more than ends. */
   closed: boolean;
   onWidth(px: number): void;
-  onStyle(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
+  onStyle(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
   onClose?(): void;
 }
 
@@ -349,8 +351,10 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     `<div class="op-row"><label class="op-label" for="op-width">Width</label><input id="op-width" class="op-width" type="number" min="0" step="0.5" inputmode="decimal" value="${o.widthPx === null ? "" : String(Math.round(o.widthPx * 100) / 100)}"><span class="op-unit">px</span></div>` +
     choices("align", "Position", [["inside", "Inside", "Inside: the whole width is inside the edge"], ["centre", "Centre", "Centre: half on each side of the edge"], ["outside", "Outside", "Outside: the whole width is outside the edge"]] as const, o.align, !o.closed) +
     choices("join", "Corners", [["miter", "Sharp", "Sharp corners"], ["round", "Round", "Round corners"], ["bevel", "Cut", "Cut (bevelled) corners"]] as const, o.join) +
+    choices("dash", "Line", [["solid", "Solid", "A solid line"], ["dashed", "Dashed", "Dashes (three widths long, two apart)"], ["dotted", "Dotted", "Dots (round ends)"]] as const, o.dash) +
     choices("cap", "Ends", [["butt", "Flat", "Flat ends, cut at the last node"], ["round", "Round", "Round ends"], ["square", "Square", "Square ends, reaching half the width past the last node"]] as const, o.cap) +
     (o.closed ? "" : `<p class="op-note">An open line is always centred on its path.</p>`);
+  scrubNumbers(pop);
   const width = pop.querySelector<HTMLInputElement>(".op-width")!;
   width.addEventListener("change", () => {
     const v = Number(width.value);
@@ -365,6 +369,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     if (d["align"]) o.onStyle({ align: d["align"] as AlignChoice });
     else if (d["join"]) o.onStyle({ join: d["join"] as JoinChoice });
     else if (d["cap"]) o.onStyle({ cap: d["cap"] as CapChoice });
+    else if (d["dash"]) o.onStyle({ dash: d["dash"] as DashChoice });
   });
   document.body.appendChild(pop);
   place(pop, anchor);

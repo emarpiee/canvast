@@ -9,6 +9,19 @@ export interface FileActions {
 
 export const fileActionsOf = (name: string, type: string): FileActions => ({ canOpen: describeFile(name, type).openIn !== null });
 
+/** Save a blob under a name (the browser's download). */
+export function saveFile(name: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.hidden = true;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 /** Save a copy of the original, under its own name. Returns false when the original is not stored. */
 export async function downloadOriginal(assets: AssetLibrary, hash: string): Promise<boolean> {
   const rec = await assets.record(hash);

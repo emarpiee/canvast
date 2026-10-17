@@ -1650,9 +1650,9 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
 test("the colour picker and the outline options keep off the selected shape", async ({ app }) => {
   const p = app.page;
   await key(app, "u");
-  await drag(app, [380, 250], [820, 600]);
+  await drag(app, [380, 330], [820, 640]); // (the outline options grew a row, Line, so this shape sits lower to leave them room above it)
   await key(app, "v");
-  await click(app, 600, 420);
+  await click(app, 600, 480);
   const frame = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
   const xs = frame.corners.map((c) => c[0]), ys = frame.corners.map((c) => c[1]);
   const covers = async (sel: string) => {
@@ -1937,4 +1937,87 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   list = await all();
   expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(1); // a union with a shape inside it is the big one alone
   expect(await px(640, 400)).toEqual([37, 99, 235]);
+});
+
+test("only a picked shape moves (a press-and-slide on another draws the selection box); dashes from Outline options; a node snaps to another shape's node", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [400, 300], [500, 400]); // A
+  await drag(app, [700, 300], [800, 400]); // B
+  const [a, b] = (await objs(app)).slice(-2) as [Obj, Obj];
+  await key(app, "v");
+  await click(app, 300, 600); // nothing picked
+  const before = await screenBox(app, b.id);
+  await drag(app, [750, 350], [780, 450]); // slide on B, which is not picked
+  expect((await screenBox(app, b.id)).minX, "B did not move").toBe(before.minX);
+  await click(app, 300, 600); // (the selection box picked it: clear that)
+  await click(app, 750, 350);
+  await drag(app, [750, 350], [750, 450]);
+  expect((await screenBox(app, b.id)).minY, "picked, it moves").toBeGreaterThan(before.minY + 90);
+  await key(app, "Control+z");
+
+  // dashes: one undo each; dotted needs round ends, which are the default
+  await p.click("[data-outline-options]");
+  await p.click('.outline-pop [data-dash="dashed"]');
+  expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toEqual([3, 2]);
+  await p.click('.outline-pop [data-dash="dotted"]');
+  expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toEqual([0, 2]);
+  await key(app, "Escape");
+  await key(app, "Control+z");
+  await key(app, "Control+z");
+  expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toBeUndefined();
+
+  // node snapping: B's top-left node, dragged to 3 px beside A's right edge, lands exactly on it
+  await click(app, 750, 350);
+  await key(app, "n");
+  const boxA = await screenBox(app, a.id);
+  const x0 = (await screenBox(app, b.id)).minX;
+  await drag(app, [700, 300], [boxA.maxX - 1 + 3, 343]);
+  const x1 = (await screenBox(app, b.id)).minX;
+  expect(x1 - x0, "the node moved by the whole distance to A's edge, not 3 px short").toBeCloseTo(boxA.maxX - 1 - 700, 0);
+
+  // a name tied to its field with `for` (the Width of Outline options) can be dragged too
+  await key(app, "v");
+  await p.click("[data-outline-options]");
+  const w0 = Number(await p.locator(".outline-pop .op-width").inputValue());
+  const lb = (await p.locator(".outline-pop label.op-label").first().boundingBox())!;
+  await p.mouse.move(lb.x + 4, lb.y + lb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(lb.x + 4 + 20, lb.y + lb.height / 2, { steps: 5 });
+  await p.mouse.up();
+  expect(Number(await p.locator(".outline-pop .op-width").inputValue())).toBeCloseTo(w0 + 5, 5); // 2 px per 0.5
+});
+
+test("a number's name can be dragged to change it (Sides before drawing a polygon), and SVG text pasted on the canvas becomes shapes", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="polygon"]');
+  const sides = p.locator("[data-sides]");
+  const label = p.locator("[data-sides-wrap]");
+  await expect(sides).toHaveValue("6");
+  const r = (await label.boundingBox())!;
+  await p.mouse.move(r.x + 6, r.y + r.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(r.x + 6 + 40, r.y + r.height / 2, { steps: 6 });
+  await p.mouse.up();
+  await expect(sides).toHaveValue("11"); // 8 px a step
+  await key(app, "v");
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="40" height="40" fill="#ff0000"/><circle cx="70" cy="70" r="20" fill="none" stroke="#0000ff" stroke-width="4" stroke-dasharray="8 4"/><path d="M10 90 L40 60 L50 90 Z" fill="url(#g)"/><defs><linearGradient id="g"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient></defs></svg>';
+  const n0 = (await objs(app)).length;
+  await p.evaluate((text) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, svg);
+  await app.frame();
+  // (Firefox does not hand a constructed paste event its data: the pasted-text path is checked in Chromium)
+  if (test.info().project.name === "firefox") return;
+  const made = (await objs(app)).slice(n0) as unknown as Array<Obj & { dash?: number[] }>;
+  expect(made.length).toBe(3);
+  expect(made[0]!.fill).toBe("#ff0000");
+  expect(made[1]!.fill).toBeNull();
+  expect(made[1]!.stroke).toBe("#0000ff");
+  expect(made[1]!.dash![0]! / made[1]!.dash![1]!).toBeCloseTo(2, 5);
+  expect(typeof made[2]!.fill).toBe("object"); // a gradient
+  expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBe(3);
 });

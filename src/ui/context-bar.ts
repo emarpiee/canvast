@@ -27,6 +27,12 @@ export interface ContextActions {
   /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
   fileSelection(): { hash: string; open: boolean } | null;
+  /** A picked SVG picture: its shapes can be made into vectors (a copy beside it). */
+  svgPicture(): boolean;
+  vectorise(): void;
+  /** Picked paths can be saved as an SVG file. */
+  canExportSvg(): boolean;
+  exportSvg(): void;
   downloadFile(): void;
   openFile(): void;
   hasLibraryItems(): boolean;
@@ -79,6 +85,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("library", ICONS.library, "View in the library") +
     btn("download", ICONS.download, "Download the original file") +
     btn("open", ICONS.externalLink, "Open in a new tab") +
+    btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)") +
+    btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file") +
     `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
@@ -212,6 +220,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
       case "open": actions.openFile(); break;
+      case "vectorise": actions.vectorise(); break;
+      case "exportsvg": actions.exportSvg(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
@@ -249,6 +259,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const file = actions.fileSelection();
     q("download").hidden = !file;
     q("open").hidden = !file?.open;
+    q("vectorise").hidden = !actions.svgPicture();
+    q("exportsvg").hidden = !actions.canExportSvg();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
     if (sel.length < 2) closeMenu();

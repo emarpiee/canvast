@@ -2,7 +2,8 @@ import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } fr
 import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn } from "../doc/rounding";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
-import { alignChoice, capChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
+import { alignChoice, capChoice, dashChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
+import type { DashChoice } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
 import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { isCard } from "../assets/file-kind";
@@ -14,7 +15,9 @@ import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, Pa
 import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
-import { boolGroupsOf, isResult, operandOf, resultOf } from "../doc/boolean-group";
+import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
+import { exportSvg } from "./svg-export";
+import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -709,15 +712,16 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
 }
 
 /** The corners, ends and place on the edge of the first selected path's outline (null: no path is selected). `closed`: every sub-path is closed, so the outline can be inside or outside. */
-export function selectedOutline(doc: DocumentStore, editor: EditorState): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean } | null {
+export function selectedOutline(doc: DocumentStore, editor: EditorState): { join: JoinChoice; cap: CapChoice; align: AlignChoice; dash: DashChoice; closed: boolean } | null {
   const o = editablePaths(doc, editor)[0];
-  return o ? { join: joinChoice(o), cap: capChoice(o), align: alignChoice(o), closed: o.sub.length > 0 && o.sub.every((s) => s.closed) } : null;
+  return o ? { join: joinChoice(o), cap: capChoice(o), align: alignChoice(o), dash: dashChoice(o), closed: o.sub.length > 0 && o.sub.every((s) => s.closed) } : null;
 }
 
 export interface OutlinePatch {
   join?: JoinChoice;
   cap?: CapChoice;
   align?: AlignChoice;
+  dash?: DashChoice;
 }
 
 /** Change the corners, ends or place on the edge of the selected paths' outlines: one undo step. */
@@ -725,11 +729,12 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   const paths = editablePaths(doc, editor);
   if (!paths.length || editor.blockEdit()) return;
   const next = paths.map((o): PathObject => {
-    const { join: _j, cap: _c, align: _a, ...rest } = o;
-    const look = lookFromChoices(patch.join ?? joinChoice(o), patch.cap ?? capChoice(o), patch.align ?? alignChoice(o));
+    const { join: _j, cap: _c, align: _a, dash: _d, ...rest } = o;
+    const dash = patch.dash ?? dashChoice(o);
+    const look = lookFromChoices(patch.join ?? joinChoice(o), patch.dash === "dotted" ? "round" : patch.cap ?? capChoice(o), patch.align ?? alignChoice(o), undefined, dash);
     return { ...rest, ...look };
   });
-  const label = patch.align !== undefined ? "Outline position" : patch.join !== undefined ? "Outline corners" : "Outline ends";
+  const label = patch.align !== undefined ? "Outline position" : patch.dash !== undefined ? "Outline dashes" : patch.join !== undefined ? "Outline corners" : "Outline ends";
   doc.commit(doc.transaction(paths.length === 1 ? label : `${label} of ${paths.length} paths`, next));
   editor.changed();
 }
@@ -1173,4 +1178,56 @@ export function convertTextToPath(doc: DocumentStore, editor: EditorState): void
   doc.commit(doc.transaction(made.length === 1 ? "Convert text to path" : `Convert ${made.length} texts to paths`, made));
   editor.message = missing ? `${missing} character${missing === 1 ? "" : "s"} in a system font could not be turned into a path and ${missing === 1 ? "was" : "were"} left out.` : "";
   editor.changed();
+}
+
+/** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
+const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o));
+
+export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean => svgPaths(doc, editor).length > 0;
+
+/** The picked paths as SVG text (ADR 0107), or null when none is picked or they cannot be placed together. */
+export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space);
+
+/**
+ * Put the shapes of SVG text on the canvas (ADR 0107): centred in the view, the longer side half of the shorter side of the view, grouped
+ * when there are several, picked. False (with a message) when the text is not a drawing the app can read.
+ */
+export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewState, text: string): boolean {
+  if (editor.blockEdit()) return false;
+  const svg = parseSvg(text);
+  if (!svg) {
+    editor.message = "That is not an SVG drawing this app can read.";
+    editor.changed();
+    return false;
+  }
+  const cam = view.camera;
+  const vp = view.viewport;
+  const at = screenToWorld(cam, vp, { x: vp.width / 2, y: vp.height / 2 });
+  const k = (0.5 * Math.min(vp.width, vp.height)) / 2 ** cam.zf / Math.max(svg.box.w, svg.box.h);
+  const cx = svg.box.x + svg.box.w / 2, cy = svg.box.y + svg.box.h / 2;
+  const z0 = doc.topZ();
+  let objs: CanvasObject[] = svg.shapes.map((s, i): PathObject => homeObject(normalizeUnit({
+    id: newObjectId(),
+    kind: "path",
+    ...(view.frame === doc.space.world ? {} : { frame: view.frame }),
+    anchor: at,
+    unit: -cam.zi,
+    z: z0 + 1 + i,
+    opacity: s.opacity,
+    attachmentTargetId: null,
+    sub: s.sub.map((p) => ({ n: p.n.map((v, j) => (v - (j % 2 === 0 ? cx : cy)) * k), closed: p.closed })),
+    fill: s.fill,
+    stroke: s.stroke,
+    width: s.width * k,
+    ...(s.join ? { join: s.join } : {}),
+    ...(s.cap ? { cap: s.cap } : {}),
+    ...(s.dash ? { dash: s.dash } : {}),
+    ...(s.evenodd ? { evenodd: true as const } : {}),
+    ...(s.name ? { name: s.name } : {}),
+  } as PathObject), doc.space) as PathObject);
+  if (objs.length > 1) objs = groupObjects(objs, 0);
+  doc.commit(doc.transaction(`Import SVG (${objs.length} ${objs.length === 1 ? "shape" : "shapes"})`, objs));
+  editor.select(objs.map((o) => o.id));
+  editor.changed();
+  return true;
 }

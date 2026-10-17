@@ -26,7 +26,7 @@ The vector tools work; the owner's report is that they are *confusing*: where th
 | 8 | **Shape and Path are separate tools, and the rail has Pen next to them.** Three ways of drawing, with icons that read alike at 20 px (pencil, pentagon, spline-pointer). | Which one makes a thing I can edit later? | ✅ one rail button, **Shape and path**: the Path tool is the last choice beside the shapes (B still works), the rail button stays lit on it |
 | 9 | **Defaults for the next shape are invisible state.** Fill, outline, width and now corners and position stay from the last use, and are shown only in the options bar. | A new shape comes out in last week's colour. | ✅ the bar and Outline options show them, and corners, ends and position are remembered with the rest |
 | 10 | **Polygon sides, star points and corner radius could not be changed after drawing** (owner feedback). | You had to redraw the shape. | ✅ ADR 0105: Radius, Sides, Points and Ratio in the options bar for a picked shape |
-| 11 | **Dashes, node snapping, per-corner radii** are not there. | These are the next things a person looks for. | 🔜 later (plan-gaps) |
+| 11 | **Dashes, node snapping, per-corner radii** are not there. | These are the next things a person looks for. | ✅ dashes and node snapping (ADR 0107); per-corner radii on a boolean result are left out on purpose (ADR 0107) |
 
 ## What changed in the first pass
 

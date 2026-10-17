@@ -1,4 +1,5 @@
-import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
+import { scrubNumbers } from "../colour-picker/scrub";
+import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
 import type { PaintPatch } from "../app/actions";
@@ -34,7 +35,7 @@ export interface ToolbarActions {
   /** Show (final false: while the picker is dragged) or store (final true) a new fill or outline on the selected paths. */
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
-  selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean; widthPx: number | null } | null;
+  selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; dash: DashChoice; closed: boolean; widthPx: number | null } | null;
   /** The picked shapes that have a shape of their own to save, and how many of them have an initial shape saved (null: none can). */
   initialShapeState(): { count: number; saved: number } | null;
   /** Save the picked shapes' shape as their initial one (or replace it), and put them back to it. */
@@ -53,7 +54,7 @@ export interface ToolbarActions {
   /** Round the corners of the picked paths: one value, or one for every corner (four for a rectangle: top left, top right, bottom right, bottom left). */
   cornersSelected(px: number[], final?: boolean): void;
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
-  outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
+  outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
 }
 
 const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
@@ -225,6 +226,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx);
   });
 
+  scrubNumbers(root);
   root.querySelector<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
     editor.shapeWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
     editor.changed();
@@ -381,6 +383,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       join: sel ? sel.join : (editor.shapeJoin ?? "miter"),
       cap: sel ? sel.cap : editor.shapeCap,
       align: sel ? sel.align : editor.shapeAlign,
+      dash: sel ? sel.dash : editor.shapeDash,
       closed: sel ? sel.closed : editor.tool === "shape" && editor.shapeKind !== "line",
       onWidth: (px) => {
         if (sel) actions.setSelectedWidth(px);
@@ -400,6 +403,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           if (patch.join) editor.shapeJoin = patch.join;
           if (patch.cap) editor.shapeCap = patch.cap;
           if (patch.align) editor.shapeAlign = patch.align;
+          if (patch.dash) {
+            editor.shapeDash = patch.dash;
+            if (patch.dash === "dotted") editor.shapeCap = "round"; // (a dot needs round ends)
+          }
           editor.changed();
         }
       },
