@@ -17,6 +17,17 @@ Accepted (v0.17.0). The audit is `docs/reference/vector-ux-audit.md`.
 ## Second pass
 Corners, ends and position for the next shape are remembered (`shape.join`, `shape.cap`, `shape.align`). A **Flatten** button is on the selection bar for a boolean group. Shape and Path are one rail button, **Shape and path**; the Path tool is chosen beside the shape kinds and stays lit under the Shape button (U and B keep working).
 
+## Where things are (second pass)
+- **The hint moved off the options bar to plain floating text at the bottom of the canvas** (`ui/hint-line.ts`: on the row of the view controls, from the left edge to them, no background, click-through), so the room above the canvas is for the options. It says what the tool does and what to press next, and, while the pointer or the keyboard focus is on a button of a toolbar, what that button is. The options bar's groups are named (Colour, Size, Smooth, Keep size, Select), numbers share one value font token (`--font-value`), the pen's size presets and slider are one group, and the two locks sit together. **Settings > Appearance > Hints and tooltips**: All (the line and the browser's own tooltips), Line only (the browser's are set aside while the pointer is on a button), None.
+- **Seldom-used options of Select left the bar** for one menu (`Selection tool options`: show all hidden, unlock all, axis-aligned selection box, ignore the object that fills the view); snapping and the locks stay.
+- **The selection bar has dividers** between its groups (copy; group; tag, library, file; turn and proportions; vector actions; arrange and order; lock, hide, delete), shown only between two groups that both have a button, and delete goes red under the pointer.
+- **Selection colours** show the six most used, then "+n" with a list of the rest; the pointer on a colour lights up the shapes that use it on the canvas.
+- **Handles each look different**: the big filled ringed dot is the radius of every corner; a ring with a dot is one corner's own radius; a diamond is a star's ratio; a triangle (pointing round the middle) is how many corners, with a label beside whatever is being dragged ("Radius 12", "Ratio 40%", "Count 8"). Gradient handles stay plain circles.
+- **Count handle** for polygons and stars (`cornerHandles().count`): on the second outer corner; dragged round the middle, the angle from the first corner is a turn divided by how many there are (live, one undo step).
+
+- **A turned shape keeps its side handles.** Resizing is along the selection box's own axes (`scaleFactors`), and a turned path can be stretched along them (`stretchTurned`: its geometry is scaled in its own unturned coordinates and the anchor chosen to leave the fixed point where it is). Pictures, text and strokes still resize only proportionally when turned.
+- **Stepping with W A S D** reaches an item that is in the window however small the selected one is: the size (6x) and gap (3 sizes) rules that keep the step among neighbours are relaxed to 60x and a window between two items that are both in view.
+
 ## Width 0
 Typing 0 in Outline options' width (or setting it on several shapes) is no outline: the stroke is switched off and the width is kept for when it is turned on; a width typed on a shape without an outline turns one on in the default colour. For the next shape the same applies to the Shape tool's defaults.
 

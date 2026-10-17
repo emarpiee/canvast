@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
-import { deserializeObject, localBounds, newObjectId, serializeObject } from "../../src/doc/model";
+import { deserializeObject, homeObject, localBounds, newObjectId, pathSubs, serializeObject } from "../../src/doc/model";
+import { FrameSpace } from "../../src/core/frames";
 import type { PathObject } from "../../src/doc/model";
-import { drawnParams, drawnSubs, geometryBounds, nodeCount, polygonSubs, rectSubs, scaleParams } from "../../src/doc/path";
+import { FLAT_TOLERANCE_PX, drawnParams, drawnSubs, flatten, geometryBounds, insideFill, nodeCount, polygonSubs, rectSubs, scaleParams, type SubPath } from "../../src/doc/path";
 import { hasCorners, paramsOf, withRadius, withShapeParams } from "../../src/doc/shape-params";
 import { canRound, cornerAt, maxFor, maxUniform, roundCorners } from "../../src/doc/rounding";
-import { scaleAbout } from "../../src/doc/edit-ops";
+import { rotateAbout, scaleAbout } from "../../src/doc/edit-ops";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
 const base = { id: "", kind: "path" as const, anchor: ORIGIN, unit: 0, z: 1, opacity: 1, attachmentTargetId: null, fill: "#2563eb", stroke: "#1f2329", width: 2 };
@@ -99,6 +100,52 @@ describe("parametric shapes", () => {
     const turned = { ...rounded, rot: 123456789 };
     expect(box({ ...star, rot: 123456789 })).toBe(box(turned)); // and the same turned
   });
+  it("a corner takes its arc from the whole edge it ends, not only the segment next to it: a string of tiny segments does not hold it to a hair", () => {
+    // a 100 x 100 square whose top edge also has nodes 1 and 2 units from the corner (as a Boolean operation leaves them)
+    const corner = (x: number, y: number) => [x, y, x, y, x, y];
+    const sq = [{ n: [...corner(0, 0), ...corner(1, 0), ...corner(2, 0), ...corner(100, 0), ...corner(100, 100), ...corner(0, 100)], closed: true }];
+    const round = roundCorners(sq, 10);
+    const flat = (subs: readonly SubPath[]) => flatten(subs, subs.map((q) => Float64Array.from(q.n)), FLAT_TOLERANCE_PX / 10, { minX: -1e9, minY: -1e9, maxX: 1e9, maxY: 1e9 }, 0);
+    const flatten2 = (subs: readonly SubPath[]) => flat(subs);
+    expect(insideFill(flatten2(round), 1, 1, false)).toBe(false); // the corner is cut away to a radius of 10
+    expect(insideFill(flatten2(round), 8, 8, false)).toBe(true);
+    // the edge is one edge: the same as a square without the extra nodes
+    const plain = roundCorners(rectSubs(0, 0, 100, 100), 10);
+    const b1 = geometryBounds(round), b2 = geometryBounds(plain);
+    expect([b1.minX, b1.minY, b1.maxX, b1.maxY]).toEqual([b2.minX, b2.minY, b2.maxX, b2.maxY]);
+    expect(maxUniform(sq)).toBeCloseTo(maxUniform(rectSubs(0, 0, 100, 100)), 6);
+  });
+  it("a turned path stretches along its own axes with the fixed point staying put", () => {
+    const o0 = drawn("rect", 200, 100);
+    const turned = rotateAbout(o0, { x: D.fromNumber(110), y: D.fromNumber(70) }, Math.round(2 ** 32 / 8)) as PathObject; // 45 degrees
+    const world = (o: PathObject, x: number, y: number): [number, number] => {
+      const sub = pathSubs(o);
+      void sub;
+      return [D.toNumber(o.anchor.x) + x * 2 ** o.unit, D.toNumber(o.anchor.y) + y * 2 ** o.unit];
+    };
+    // the middle of the box's left side, where it is drawn (the turn is about the middle of the unturned box)
+    const p = (o: PathObject) => { const { rot: _t, ...flatO } = o;
+      const b = localBounds(flatO as PathObject); return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, b }; };
+    const at = (o: PathObject, lx: number, ly: number): [number, number] => {
+      const m = p(o);
+      const { c, s } = { c: Math.cos((o.rot! / 2 ** 32) * 2 * Math.PI), s: Math.sin((o.rot! / 2 ** 32) * 2 * Math.PI) };
+      const dx = lx - m.x, dy = ly - m.y;
+      return world(o, m.x + c * dx - s * dy, m.y + s * dx + c * dy);
+    };
+    // (the sides of the outline itself: the fixed side is the geometry's edge, the stroke grows round it)
+    const left = (o: PathObject) => at(o, geometryBounds(o.sub).minX, p(o).y);
+    const right = (o: PathObject) => at(o, geometryBounds(o.sub).maxX, p(o).y);
+    const fixed = { x: D.fromNumber(left(turned)[0]), y: D.fromNumber(left(turned)[1]) };
+    const wide = scaleAbout(turned, fixed, 2, 1) as PathObject;
+    expect(left(wide)[0]).toBeCloseTo(left(turned)[0], 6); // the fixed side did not move
+    expect(left(wide)[1]).toBeCloseTo(left(turned)[1], 6);
+    const w0 = Math.hypot(right(turned)[0] - left(turned)[0], right(turned)[1] - left(turned)[1]);
+    const w1 = Math.hypot(right(wide)[0] - left(wide)[0], right(wide)[1] - left(wide)[1]);
+    expect(w1 / w0).toBeCloseTo(2, 6); // twice as long, along its own axis
+    expect(wide.rot).toBe(turned.rot);
+    const g0 = geometryBounds(turned.sub), g1 = geometryBounds(wide.sub);
+    expect(g1.maxY - g1.minY).toBeCloseTo(g0.maxY - g0.minY, 6); // as high as it was
+  });
   it("a shape drawn before parameters were kept is found out from its nodes, and one edited by hand is not", () => {
     const legacy: PathObject = { ...base, id: newObjectId(), sub: polygonSubs(0, 0, 100, 100, 5), shape: "polygon" };
     const p = paramsOf(legacy)!;
@@ -123,6 +170,18 @@ describe("parametric shapes", () => {
     const g = 2 ** (o.unit - back.unit);
     expect(back.sub[0]!.n.every((v, i) => Math.abs(v * g - o.sub[0]!.n[i]!) < 1e-6)).toBe(true);
     expect(scaleParams(o.params!, 1, 4).box[3]).toBe(400);
+  });
+  it("an initial shape is saved with the object, read back, refused when malformed, and follows the object's units", () => {
+    const o = withRadius(drawn("star"), 4);
+    const withInitial: PathObject = { ...o, initial: { sub: o.sub, base: o.base!, radius: 4, params: o.params!, unit: o.unit } };
+    const back = deserializeObject(serializeObject(withInitial)) as PathObject;
+    expect(back.initial).toEqual(withInitial.initial);
+    expect(() => deserializeObject({ ...serializeObject(withInitial), initial: { sub: [], unit: 0 } })).toThrow();
+    expect(() => deserializeObject({ ...serializeObject(withInitial), initial: { ...withInitial.initial, unit: 0.5 } })).toThrow();
+    // moved to another frame (the unit changes, the numbers do not), the saved shape's unit changes with it
+    const frames = new FrameSpace();
+    const into = homeObject({ ...withInitial, anchor: { x: D.fromNumber(2 ** 60), y: D.ZERO } }, frames) as PathObject;
+    expect(into.initial!.unit - into.unit).toBe(withInitial.initial!.unit - withInitial.unit);
   });
   it("is saved and read back, and bad numbers are refused", () => {
     const o = withRadius(drawn("star"), 3);

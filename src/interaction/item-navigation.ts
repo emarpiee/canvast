@@ -123,6 +123,8 @@ export function pickNeighbour(doc: DocumentStore, view: ViewState, editor: Edito
 const CONE = 1.5;
 /** "Nearest in view" ignores items whose size on screen differs from the selected one's by more than this factor. */
 const SIZE_RATIO = 6;
+/** ...but between two items that are both in the window it is this much, so the step still goes to what can be seen. */
+const SIZE_RATIO_IN_VIEW = 60;
 /** ...and by a gap wider than this many of the selected item's own sizes (so the rule means the same at every zoom). */
 const REACH = 3;
 
@@ -132,6 +134,8 @@ const REACH = 3;
  *  2. its size on screen is within a factor of 6 of the selected item's (a much larger or smaller item is another depth, not a neighbour),
  *  3. the gap between it and the selected item is at most 3 sizes of the selected item (a far-off item is not a neighbour; measured in
  *     the item's own size, so stepping works the same after the view has zoomed to the item),
+ *  (rules 2 and 3 are relaxed, to a factor of 60 and a gap of a window, between two items that are both in the window: what is on the
+ *  screen can be stepped to, however small the selected item is),
  * and it lies ahead in the direction pressed, within about 56 degrees of that line, or overlapping the selected item across it.
  * Of those the nearest wins (distance ahead, and twice the sideways offset). Nothing qualifying: the selection stays.
  * With nothing selected the first step picks the visible item nearest the middle of the window.
@@ -171,9 +175,13 @@ function pickInView(
     const b = px(boxes.get(u)!);
     if (!legible(b)) return [];
     if (a) {
-      if (b.size > a.size * SIZE_RATIO || b.size < a.size / SIZE_RATIO) return [];
+      // Two items that are both in the window are both in view: a tiny one next to a big one, or a gap of a few of its own sizes, does not
+      // put the neighbour out of reach (it is right there on the screen); the size and gap rules are for what is not.
+      const both = inWindow(a) && inWindow(b);
+      const ratio = both ? SIZE_RATIO_IN_VIEW : SIZE_RATIO;
+      if (b.size > a.size * ratio || b.size < a.size / ratio) return [];
       const gap = Math.hypot(Math.max(0, a.minX - b.maxX, b.minX - a.maxX), Math.max(0, a.minY - b.maxY, b.minY - a.maxY));
-      if (gap > REACH * a.size) return [];
+      if (gap > (both ? Math.max(REACH * a.size, Math.max(vp.width, vp.height)) : REACH * a.size)) return [];
     } else if (!inWindow(b)) return [];
     return [{ u, b }];
   });

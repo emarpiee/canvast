@@ -15,6 +15,9 @@ import squaresSubtractSvg from "lucide-static/icons/squares-subtract.svg";
 import squaresExcludeSvg from "lucide-static/icons/squares-exclude.svg";
 import replaceIcon from "lucide-static/icons/replace.svg";
 import mergeIcon from "lucide-static/icons/merge.svg";
+import squarePlusSvg from "lucide-static/icons/square-plus.svg";
+import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
+import pinIcon from "lucide-static/icons/pin.svg";
 import squareRoundCornerSvg from "lucide-static/icons/square-round-corner.svg";
 import outlineOptionsSvg from "lucide-static/icons/sliders-horizontal.svg";
 import play from "lucide-static/icons/play.svg";
@@ -311,6 +314,9 @@ export const ICONS = {
   squaresExclude: clean(squaresExcludeSvg),
   replace: clean(replaceIcon),
   merge: clean(mergeIcon),
+  squarePlus: clean(squarePlusSvg),
+  squareOut: clean(squareOutSvg),
+  pin: clean(pinIcon),
   squareRoundCorner: clean(squareRoundCornerSvg),
   outlineOptions: clean(outlineOptionsSvg),
 } as const;

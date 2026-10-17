@@ -42,7 +42,8 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases" + handles;
       if (paths.length === 1 && sel.length === 1) {
         const shape = (paths[0] as PathObject).shape;
-        const dots = !hasCorners(paths[0] as PathObject) ? "" : shape === "star" ? " · Drag the big dot to round every corner (double-click it for one dot per corner) or the small one for the ratio" : " · Drag the big dot to round every corner (double-click it for one dot per corner)";
+        const radius = " · Big dot: the radius of every corner (double-click: one dot for each)";
+        const dots = !hasCorners(paths[0] as PathObject) ? (shape === "polygon" || shape === "star" ? " · Triangle: how many" : "") : radius + (shape === "star" ? " · Diamond: the ratio · Triangle: how many" : shape === "polygon" ? " · Triangle: how many" : "");
         return "Enter or double-click edits its nodes · Fill and Outline are in the bar above" + dots + handles;
       }
       return null;

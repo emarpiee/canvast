@@ -136,6 +136,10 @@ export class EditorState {
   lockRadius = false;
   /** Which paint's gradient the canvas handles belong to when both the fill and the outline have one (the last chip opened). */
   /** The shape whose corner radius dots are opened out to one per corner (a double-click or long press on the main dot); closes when another is picked. */
+  /** Shapes lit up on the canvas while the pointer is on a colour that they use (Selection colours). */
+  highlight: ReadonlySet<ObjectId> | null = null;
+  /** A few words beside a handle that is being dragged ("Radius 12", "Count 8"). */
+  handleLabel: { x: number; y: number; text: string } | null = null;
   cornersOpen: ObjectId | null = null;
   gradientFocus: "fill" | "stroke" | null = null;
   /** The outline's corners, ends and place on the edge for the next shape (null join: the tool's own, sharp for shapes with corners). */
@@ -230,7 +234,7 @@ export class EditorState {
     if (p.kind === "scale" && p.ids.includes(o.id)) {
       const f = o.frame ?? p.frame.space.world;
       const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
-      return scaleAbout(o, fixed, p.kx, o.kind === "image" || (o.kind === "path" && !o.rot) ? p.ky : p.kx, p.keepWidth, p.keepRadius);
+      return scaleAbout(o, fixed, p.kx, o.kind === "image" || o.kind === "path" ? p.ky : p.kx, p.keepWidth, p.keepRadius);
     }
     return o;
   }

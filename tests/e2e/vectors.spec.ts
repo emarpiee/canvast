@@ -1277,7 +1277,7 @@ test("selection colours: the colours of several picked shapes as chips; one chan
   await expect(chips).toHaveCount(3); // the red, the gradient the two share (one chip), the dark of the outlines
   const before = (await fills())[0] as G;
   expect(before.type).toBe("linear");
-  await chips.first().click(); // (in the order they first appear: the gradient of the first shape)
+  await chips.nth(1).click(); // (the most used first: the dark of the three outlines, then the gradient of two fills, then the red)
   await pop.locator(".cg [data-angle]").fill("90");
   await key(app, "Escape");
   const now = await fills();
@@ -1357,14 +1357,242 @@ test("a rounded star keeps its box when its radius, points or ratio change, and 
   expect(parseFloat(await p.locator("[data-sel-radius]").inputValue()) / radius0).toBeCloseTo(0.5, 1);
 });
 
+test("polygon and star: a triangle handle on the shape sets how many; a label says what is being changed; one undo step", async ({ app }) => {
+  const p = app.page;
+  type P = Obj & { params?: { sides?: number; tips?: number } };
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [500, 300], [740, 540]);
+  await key(app, "v");
+  await click(app, 620, 420);
+  const f = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!;
+  expect(f.count).not.toBeNull();
+  const [hx, hy] = f.count!;
+  const [cx, cy] = f.countCentre!;
+  // from the first tip (the top) to the second: turning further round makes fewer, nearer makes more
+  const at = (deg: number) => [cx + Math.sin((deg * Math.PI) / 180) * 120, cy - Math.cos((deg * Math.PI) / 180) * 120] as const;
+  await p.mouse.move(hx, hy);
+  await p.mouse.down();
+  await p.mouse.move(...at(60), { steps: 6 }); // 360 / 60 = 6 points
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.handleLabel())).toBe("Count 6");
+  await p.mouse.up();
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
+  expect(((await last(app)) as P).params!.tips).toBe(6);
+  await key(app, "Control+z");
+  expect(((await last(app)) as P).params!.tips).toBe(5);
+});
+
+test("the interface around the vector tools: the hint floats at the bottom (and can be turned off), buttons name themselves, seldom-used options are in a menu, dividers in the selection bar, many colours do not push any out of reach", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  const hint = p.getByTestId("tool-hint");
+  await p.mouse.move(300, 650);
+  await key(app, "u");
+  await expect(hint).toContainText("rectangle"); // floating at the bottom, not in the options bar
+  await expect(p.locator(".toolbar [data-testid=tool-hint]")).toHaveCount(0);
+  // seven shapes of seven colours
+  const hexes = ["e11d48", "f59e0b", "84cc16", "14b8a6", "3b82f6", "8b5cf6", "ec4899"];
+  for (const [n, hex] of hexes.entries()) {
+    await p.click('[data-paint="fill"]');
+    await pop.locator("[data-hex]").fill(hex);
+    await pop.locator("[data-hex]").press("Enter");
+    await key(app, "Escape");
+    await drag(app, [300 + n * 90, 300], [370 + n * 90, 360]);
+  }
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  // six chips and "+2": the seven fills and the dark outline are eight colours
+  await expect(p.locator("[data-sel-colour]")).toHaveCount(6);
+  const more = p.locator("[data-sel-colour-more]");
+  await expect(more).toHaveText("+2");
+  await more.click();
+  await expect(p.getByRole("menuitem")).toHaveCount(2);
+  await key(app, "Escape");
+  // dividers between the groups of the selection bar, a button names itself in the hint
+  expect(await p.locator(".ctx-sep:not([hidden])").count()).toBeGreaterThan(0);
+  await p.hover('[data-ctx="duplicate"]');
+  await expect(hint).toHaveText("Duplicate");
+  await p.mouse.move(300, 650);
+  // the seldom-used options of the Select tool are in one menu
+  await p.locator("[data-select-more]").click();
+  await expect(p.getByRole("menuitem", { name: "Show all hidden" })).toBeVisible();
+  await expect(p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ })).toBeVisible();
+  await key(app, "Escape");
+  await expect(p.locator('.toolbar [data-action="show-all"]')).toHaveCount(0);
+  // Settings > Hints and tooltips: none
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Appearance" }).click();
+  await p.locator('select[data-set="ui.hints"]').selectOption("off");
+  await p.getByRole("button", { name: /Back to canvas/ }).click();
+  await app.frame();
+  await key(app, "u");
+  await expect(hint).toBeHidden();
+});
+
+test("initial shape: set it, change the shape any way, reset to it (after a reload too); update it; one undo step each", async ({ app }) => {
+  const p = app.page;
+  type P = Obj & { params?: { inner?: number; tips?: number; box?: number[] }; initial?: unknown; radius?: number };
+  const lastP = async () => (await last(app)) as P;
+  const world = (o: P) => ({ w: o.params!.box![2]! * 2 ** o.unit, nodes: o.sub[0]!.n.length / 6 }); // (the box the shape fills: rounding does not change it)
+  const menu = async (name: RegExp) => {
+    await p.click("[data-initial]");
+    await p.getByRole("menuitem", { name }).click();
+    await app.frame();
+  };
+  await key(app, "u");
+  await p.click('[data-shape-kind="star"]');
+  await drag(app, [500, 300], [740, 540]);
+  await key(app, "v");
+  await click(app, 620, 420);
+  // nothing saved yet: the button is there, only "Set initial shape" can be chosen
+  await p.click("[data-initial]");
+  await expect(p.getByRole("menuitem", { name: /^Reset to initial shape/ })).toBeDisabled();
+  await expect(p.getByRole("menuitem", { name: /^Update initial shape/ })).toBeDisabled();
+  await key(app, "Escape");
+  await menu(/^Set initial shape/);
+  const first = world(await lastP());
+  expect((await lastP()).initial).toBeDefined();
+  // change it: ratio, points, radius, a move and a resize
+  const set = async (sel: string, v: string) => {
+    await p.locator(sel).fill(v);
+    await p.locator(sel).press("Enter");
+    await p.locator(sel).blur();
+    await app.frame();
+  };
+  await set("[data-sel-inner]", "15");
+  await set("[data-sel-tips]", "9");
+  await set("[data-sel-radius]", "20");
+  await drag(app, [620, 430], [700, 450]);
+  const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  await drag(app, [f.corners[2]![0], f.corners[2]![1]], [f.corners[2]![0] + 90, f.corners[2]![1] + 60]);
+  expect(world(await lastP()).w / first.w).toBeGreaterThan(1.2);
+  const edited = await lastP();
+  await reload(app);
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  // back to the initial shape: its size, its points, its ratio, no radius; where the middle was
+  const middle = async () => {
+    const b = await screenBox(app, (await lastP()).id);
+    return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+  };
+  const m0 = await middle();
+  await menu(/^Reset to initial shape/);
+  const back = await lastP();
+  expect(world(back).w / first.w).toBeCloseTo(1, 6);
+  expect(back.params!.tips).toBe(5);
+  expect(back.params!.inner).toBeCloseTo(0.45, 6);
+  expect(back.radius).toBeUndefined();
+  const m1 = await middle();
+  expect(Math.abs(m1[0]! - m0[0]!)).toBeLessThan(2);
+  expect(Math.abs(m1[1]! - m0[1]!)).toBeLessThan(2);
+  expect(back.fill).toBe(edited.fill); // only the shape goes back
+  await key(app, "Control+z"); // one step
+  expect(((await lastP()) as P).params!.tips).toBe(9);
+  await key(app, "Control+Shift+z");
+  // update it to something else, change again, reset: to the updated one
+  await set("[data-sel-tips]", "7");
+  await menu(/^Update initial shape/);
+  await set("[data-sel-tips]", "12");
+  await menu(/^Reset to initial shape/);
+  expect(((await lastP()) as P).params!.tips).toBe(7);
+});
+
+test("stepping with W A S D reaches an item that is in view even when it is much bigger than the selected one", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [520, 520], [540, 535]); // a small one
+  await drag(app, [440, 160], [700, 330]); // a big one above it, a few hundred px away
+  await key(app, "v");
+  const [small, big] = (await objs(app)).map((o) => o.id);
+  await click(app, 530, 527);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([small]);
+  await key(app, "w");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection())).toEqual([big]);
+});
+
+test("a boolean group takes more shapes and gives them back: Add to the group, Take out of the group", async ({ app }) => {
+  const p = app.page;
+  type G = Obj & { groups?: string[]; boolOps?: Record<string, string>; result?: string };
+  const all = async () => (await objs(app)) as unknown as G[];
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  await key(app, "u");
+  await drag(app, [300, 300], [440, 420]); // a third shape, apart from the group
+  await key(app, "v");
+  await click(app, 560, 330); // the group
+  await click(app, 370, 360, ["Shift"]); // and the shape beside it
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Add the shapes to the boolean group/ }).click();
+  await app.frame();
+  let list = await all();
+  const third = list.find((o) => o.result === undefined && size(o).w === 140)!;
+  expect(third.groups).toHaveLength(1);
+  expect(third.boolOps).toBeDefined();
+  expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(2); // the group's result is the union and the new shape apart
+  // out again: enter the group, pick that shape, take it out
+  await p.mouse.dblclick(560, 330);
+  await app.frame();
+  await click(app, 370, 360);
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Take the shapes out of the boolean group/ }).click();
+  await app.frame();
+  list = await all();
+  expect(list.find((o) => o.id === third.id)!.groups).toBeUndefined();
+  expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(1);
+  await key(app, "Control+z");
+  expect((await all()).find((o) => o.id === third.id)!.groups).toHaveLength(1);
+});
+
+test("a turned shape can be stretched along its own sides: the side handles stay when it is turned", async ({ app }) => {
+  const p = app.page;
+  type T = Obj & { rot?: number };
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await key(app, "v");
+  await click(app, 600, 360);
+  let f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const c0 = f.corners;
+  const cx = (c0[0]![0] + c0[2]![0]) / 2, cy = (c0[0]![1] + c0[2]![1]) / 2;
+  const top = [(c0[0]![0] + c0[1]![0]) / 2, (c0[0]![1] + c0[1]![1]) / 2 - 26];
+  await p.mouse.move(top[0]!, top[1]!);
+  await p.mouse.down();
+  await p.mouse.move(cx + 140, cy - 60, { steps: 6 }); // turned about 30 degrees
+  await p.mouse.up();
+  await app.frame();
+  f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  expect(Math.abs(f.angle)).toBeGreaterThan(0.2);
+  const before = (await last(app)) as T;
+  const w0 = size(before).w, h0 = size(before).h;
+  const c = f.corners;
+  const right = [(c[1]![0] + c[2]![0]) / 2, (c[1]![1] + c[2]![1]) / 2];
+  const ax = [c[1]![0] - c[0]![0], c[1]![1] - c[0]![1]];
+  const len = Math.hypot(ax[0]!, ax[1]!);
+  await drag(app, [right[0]!, right[1]!], [right[0]! + (ax[0]! / len) * 80, right[1]! + (ax[1]! / len) * 80]);
+  const after = (await last(app)) as T;
+  expect(after.rot).toBe(before.rot); // still turned the same
+  expect(size(after).w / w0).toBeGreaterThan(1.25); // longer along its own axis
+  expect(size(after).h / h0).toBeCloseTo(1, 2); // and no higher
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");
+  await p.mouse.move(300, 650); // (a hint also names the button the pointer is on: keep it on the canvas)
   await key(app, "u");
   await expect(hint).toContainText("rectangle");
   await p.click('[data-shape-kind="star"]');
   await expect(hint).toContainText("star");
   await p.locator('[role=radiogroup][aria-label="Shape or path"] [data-tool="path"]').click(); // the Path tool is chosen beside the shapes
+  await p.mouse.move(300, 650); // (the bar moves under a pointer that stays: keep it off the buttons, a hint also names the button it is on)
   expect(await tool(app)).toBe("path");
   await expect(hint).toContainText("Click to place a corner");
   await p.click('[data-shape-kind="rect"]');

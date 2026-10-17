@@ -30,7 +30,7 @@ import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
-import { TURN, angleFromRadians } from "../core/angle";
+import { TURN, angleFromRadians, radiansFromAngle } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
@@ -116,13 +116,13 @@ interface ResizeHandle {
   edge: Edge | null;
 }
 const mid = (a: readonly [number, number], b: readonly [number, number]): [number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-/** The resize handles of a selection box: its four corners, and (for an upright box that is long enough) the middle of each side. */
+/** The resize handles of a selection box: its four corners, and (for a box that is long enough, turned or not) the middle of each side. */
 function resizeHandles(frame: SelectionFrame): ResizeHandle[] {
   const c = frame.corners;
   const out: ResizeHandle[] = c.map((p, i) => ({ at: [p[0], p[1]] as [number, number], fixed: [c[(i + 2) % 4]![0], c[(i + 2) % 4]![1]] as [number, number], edge: null }));
-  if (frame.angle === 0) {
-    const w = Math.abs(c[1]![0] - c[0]![0]);
-    const h = Math.abs(c[3]![1] - c[0]![1]);
+  {
+    const w = Math.hypot(c[1]![0] - c[0]![0], c[1]![1] - c[0]![1]);
+    const h = Math.hypot(c[3]![0] - c[0]![0], c[3]![1] - c[0]![1]);
     // A side handle needs room: on a thin box it would sit on top of the item itself (and its middle), so the corners alone are used.
     const roomy = w >= 3 * HANDLE_SIZE_PX && h >= 3 * HANDLE_SIZE_PX;
     if (roomy) {
@@ -148,7 +148,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio"; index: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -170,6 +170,8 @@ type Gesture =
       edge: Edge | null;
       /** The selection may be stretched on one axis (only upright pictures); anything else keeps its proportions. */
       free: boolean;
+      /** The box's own axes on screen (its turn): the factors of a resize are along them. */
+      axes: { c: number; s: number };
       snap: SnapContext | null;
     }
   | {
@@ -612,7 +614,18 @@ export function attachTools(
     const ppu = tgt.po.proj.ppu;
     if (g.what === "ratio" && h.ratio) {
       const q = h.ratio;
-      commitShapeNumbers(doc, editor, { inner: Math.max(0.05, Math.min(0.95, Math.hypot(s.x - q.cx, s.y - q.cy) / Math.max(1e-6, q.outer))) }, final);
+      const inner = Math.max(0.05, Math.min(0.95, Math.hypot(s.x - q.cx, s.y - q.cy) / Math.max(1e-6, q.outer)));
+      commitShapeNumbers(doc, editor, { inner }, final);
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Ratio ${Math.round(inner * 100)}%` };
+      return;
+    }
+    if (g.what === "count" && h.count) {
+      // Round the middle, from the first corner: the angle to the second corner is a turn divided by how many there are.
+      const q = h.count;
+      const turn = (Math.atan2(s.y - q.cy, s.x - q.cx) - q.a0 + 4 * Math.PI) % (2 * Math.PI);
+      const n = turn < (2 * Math.PI) / 24 ? 24 : Math.max(3, Math.min(24, Math.round((2 * Math.PI) / turn)));
+      commitShapeNumbers(doc, editor, { sides: n, tips: n }, final);
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Count ${n}` };
       return;
     }
     const which = g.index;
@@ -623,6 +636,7 @@ export function attachTools(
     const px = Math.max(0, Math.min(g.what === "corner" ? dot.max : dot.maxAll, g.r0 + delta));
     if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
     else commitCorners(doc, editor, [px], () => ppu, final);
+    editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Radius ${Math.round(px * 10) / 10}` };
   };
   const updateGradient = (s: ScreenPoint): void => {
     if (g.kind !== "grad") return;
@@ -735,10 +749,13 @@ export function attachTools(
         const reach = h.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX;
         if (Math.abs(s.x - h.at[0]) > reach || Math.abs(s.y - h.at[1]) > reach) continue;
         const ids = [...editor.selection].filter((id) => doc.get(id));
-        // Free (one-axis, or both axes apart) only for upright pictures in an upright box: strokes and text keep their shape.
-        const free = sel.frame.angle === 0 && ids.length > 0 && ids.every((id) => {
+        // Free (one-axis, or both axes apart) for upright pictures and for paths, turned or not, whose turn is the box's: strokes and text keep their shape.
+        const turnOf = (rot: number | undefined): number => ((radiansFromAngle(rot ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const boxTurn = ((sel.frame.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        const same = (rot: number | undefined): boolean => Math.abs(turnOf(rot) - boxTurn) < 1e-6 || Math.abs(Math.abs(turnOf(rot) - boxTurn) - 2 * Math.PI) < 1e-6;
+        const free = ids.length > 0 && ids.every((id) => {
           const o = doc.get(id)!;
-          return (o.kind === "image" || o.kind === "path") && !o.rot;
+          return o.kind === "path" ? same(o.rot) : o.kind === "image" && !o.rot && sel.frame.angle === 0;
         });
         g = {
           kind: "scale",
@@ -752,6 +769,7 @@ export function attachTools(
           centre: { x: sel.frame.centre[0], y: sel.frame.centre[1] },
           edge: h.edge,
           free,
+          axes: { c: Math.cos(sel.frame.angle), s: Math.sin(sel.frame.angle) },
           snap: editor.snap ? snapContext(ids, view.frame) : null,
         };
         return;
@@ -853,8 +871,12 @@ export function attachTools(
    */
   const scaleFactors = (gs: Extract<Gesture, { kind: "scale" }>, s: ScreenPoint, mods: { shift: boolean; alt: boolean; noSnap: boolean }): { kx: number; ky: number; fixed: ScreenPoint } => {
     const fixed = mods.alt ? gs.centre : gs.fixed;
-    const sx = gs.start.x - fixed.x;
-    const sy = gs.start.y - fixed.y;
+    // Along the box's own axes (the same as the screen's for an upright box).
+    const { c: ac, s: as } = gs.axes;
+    const boxOf = (x: number, y: number): { u: number; v: number } => ({ u: (x - fixed.x) * ac + (y - fixed.y) * as, v: -(x - fixed.x) * as + (y - fixed.y) * ac });
+    const st = boxOf(gs.start.x, gs.start.y);
+    const sx = st.u;
+    const sy = st.v;
     const proportional = mods.shift || !gs.free;
     const moveX = gs.edge !== "n" && gs.edge !== "s";
     const moveY = gs.edge !== "e" && gs.edge !== "w";
@@ -863,13 +885,14 @@ export function attachTools(
     const px = s.x - gs.grab.x;
     const py = s.y - gs.grab.y;
     editor.guides = null;
-    const sn = gs.snap && !mods.noSnap ? gs.snap : null;
-    let kx = sx !== 0 ? (px - fixed.x) / sx : 1;
-    let ky = sy !== 0 ? (py - fixed.y) / sy : 1;
+    const sn = gs.snap && !mods.noSnap && as === 0 && ac === 1 ? gs.snap : null; // (the edges to line up with are on the screen's axes)
+    const pt = boxOf(px, py);
+    let kx = sx !== 0 ? pt.u / sx : 1;
+    let ky = sy !== 0 ? pt.v / sy : 1;
     if (proportional) {
       let k: number;
       if (gs.edge) k = gs.edge === "n" || gs.edge === "s" ? ky : kx;
-      else k = (sx * (px - fixed.x) + sy * (py - fixed.y)) / (sx * sx + sy * sy || 1); // along the diagonal, so the corner tracks the pointer
+      else k = (sx * pt.u + sy * pt.v) / (sx * sx + sy * sy || 1); // along the diagonal, so the corner tracks the pointer
       if (sn) {
         // Where the edges end up at this size, and the nearer of the two that is within reach holds: the size follows from it.
         const ex = fixed.x + k * sx;
@@ -1212,6 +1235,7 @@ export function attachTools(
       }
       case "round":
         window.clearTimeout(g.timer);
+        editor.handleLabel = null;
         if (cancelled || !g.moved) editor.preview = { kind: "none" };
         else updateCorner(s, true);
         break;

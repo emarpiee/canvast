@@ -1,4 +1,3 @@
-import { toolHint } from "./tool-hint";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
@@ -7,6 +6,7 @@ import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
+import { moreButton, openMoreMenu } from "./more-menu";
 import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
@@ -35,8 +35,13 @@ export interface ToolbarActions {
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
   selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean; widthPx: number | null } | null;
+  /** The picked shapes that have a shape of their own to save, and how many of them have an initial shape saved (null: none can). */
+  initialShapeState(): { count: number; saved: number } | null;
+  /** Save the picked shapes' shape as their initial one (or replace it), and put them back to it. */
+  setInitialShape(onlyMissing?: boolean): void;
+  resetToInitialShape(): void;
   /** The paints the picked shapes use (each once, gradients included) and how many shapes are picked. */
-  selectionPaints(): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number }> };
+  selectionPaints(): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number; ids: string[] }> };
   /** Change one paint to another everywhere the picked shapes use it. */
   recolourSelected(from: Paint, to: Paint | null, final: boolean): void;
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
@@ -133,7 +138,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
-      <div class="tb-group tb-options" data-for="pen text">
+      <div class="tb-group tb-options" data-for="pen text" data-label="Colour">
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen and text colour: open the colour picker"><span data-colour-chip></span></button>
       </div>
@@ -151,6 +156,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
+      <div class="tb-group tb-options" data-for="select node">
+        <button type="button" class="initial-btn" data-initial hidden aria-haspopup="menu" aria-expanded="false" aria-label="Initial shape" title="Initial shape: save the shape as it is now, and come back to it later">${ICONS.pin}</button>
+      </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours hidden></div>
       <div class="tb-group tb-options" data-for="shape path select node">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
@@ -164,45 +172,39 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="pen">
+      <div class="tb-group tb-options" data-for="pen select" data-label="Size">
         ${PEN_WIDTHS.map(
-          (w) => `<button type="button" class="width" data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
+          (w) => `<button type="button" class="width" data-pen-only data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
-      </div>
-      <div class="tb-group tb-options" data-for="pen select">
         <input type="range" class="size" data-size min="0" max="100" step="1" aria-label="Pen size" title="Pen size (screen px at this zoom); on Select it sets the thickness of the selected strokes">
         <span class="size-out" data-size-out></span>
       </div>
-      <div class="tb-group tb-options" data-for="pen">
+      <div class="tb-group tb-options" data-for="pen" data-label="Smooth">
         <button type="button" class="stab" data-stab aria-pressed="false" aria-label="Stabilizer" title="Stabilizer: smooths hand wobble; the brush follows the pointer on a rope">${ICONS.waves}</button>
         <input type="range" class="size" data-strength min="1" max="100" step="1" aria-label="Stabilizer strength" title="Stabilizer strength (rope length)" hidden>
-        <button type="button" class="follow" data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
       </div>
-      <div class="tb-group tb-options" data-for="pen select">
+      <div class="tb-group tb-options" data-for="pen select" data-label="Keep size">
+        <button type="button" class="follow" data-pen-only data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
+        <button type="button" class="lock" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
         <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
       <div class="tb-group tb-options" data-for="select">
-        <button type="button" class="lock" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
-        <button type="button" data-action="show-all" aria-label="Show all hidden" title="Show every hidden object">${ICONS.eye}</button>
-        <button type="button" data-action="unlock-all" aria-label="Unlock all" title="Unlock every locked object">${ICONS.lockKeyholeOpen}</button>
-        <button type="button" class="snap" data-align-box aria-pressed="false" aria-label="Axis-aligned selection box" title="Selection box: by default it turns with the selected objects when they share a rotation. On: it stays aligned to the canvas axes.">${ICONS.boxSelect}</button>
         <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
-        <button type="button" class="ignore-fill" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: clicking, lasso and box select skip an object you have zoomed far into, so it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
+        ${moreButton("Selection tool options", "data-select-more")}
       </div>
       <div class="tb-group tb-options" data-for="select text">
         <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.clipboardCopy}</button>
       </div>
-      <div class="tb-group tb-options" data-for="eraser">
+      <div class="tb-group tb-options" data-for="eraser" data-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
         <span class="size-out" data-eraser-out></span>
         <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.shapes}</button>
       </div>
-      <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
+      <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects" data-label="Select">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
         <button type="button" role="radio" data-filter="all" title="Lasso selects strokes and fully enclosed media">All</button>
       </div>
       </div>
-      <p class="tool-hint" data-testid="tool-hint" aria-live="polite" hidden></p>
     </div>
   `;
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
@@ -334,6 +336,43 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
   let colourEditing = false;
+  const SEL_CHIPS = 6;
+  const chipPaint = (p: Paint): string => (typeof p === "string" ? `linear-gradient(${swatchBackground(p)}, ${swatchBackground(p)})` : paintCss(p));
+  const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : "Gradient");
+  const usage = (it: { fills: number; strokes: number }): string =>
+    [it.fills ? `${it.fills} ${it.fills === 1 ? "fill" : "fills"}` : "", it.strokes ? `${it.strokes} ${it.strokes === 1 ? "outline" : "outlines"}` : ""].filter(Boolean).join(" and ");
+  // Change a colour everywhere the picked shapes use it: the paint chooser, shown on the colour's chip.
+  const editColour = (anchor: HTMLElement, index: number): void => {
+    const item = actions.selectionPaints().items[index];
+    if (!item) return;
+    let current: Paint = item.paint;
+    colourEditing = true;
+    openPaintPopover(anchor, {
+      name: "Selection colour",
+      paint: item.paint,
+      noneLabel: "No colour",
+      onInput: (p) => actions.recolourSelected(current, p, false),
+      onChange: (p) => {
+        actions.recolourSelected(current, p, true);
+        if (p !== null) current = p;
+      },
+      onClose: () => {
+        colourEditing = false;
+        editor.preview = { kind: "none" };
+        editor.changed();
+      },
+    });
+  };
+  // Pointing at a colour lights up the shapes that use it.
+  const light = (e: Event): void => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sel-colour]");
+    editor.highlight = b ? new Set(actions.selectionPaints().items[Number(b.dataset["selColour"])]?.ids ?? []) : null;
+    editor.changed();
+  };
+  root.addEventListener("pointerover", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
+  root.addEventListener("pointerout", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]") && editor.highlight) { editor.highlight = null; editor.changed(); } });
+  root.addEventListener("focusin", (e) => { if ((e.target as HTMLElement).closest("[data-sel-colour]")) light(e); });
+  root.addEventListener("focusout", () => { if (editor.highlight) { editor.highlight = null; editor.changed(); } });
   const openOutline = (anchor: HTMLElement): void => {
     const sel = editsSelection() ? actions.selectedOutline() : null;
     if (editsSelection() && !sel) return;
@@ -393,25 +432,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (editor.tool === "path") editor.setTool("shape");
       editor.changed();
     } else if (d["selColour"] !== undefined) {
-      const item = actions.selectionPaints().items[Number(d["selColour"])];
-      if (!item) return;
-      let current: Paint = item.paint;
-      colourEditing = true;
-      openPaintPopover(b, {
-        name: "Selection colour",
-        paint: item.paint,
-        noneLabel: "No colour",
-        onInput: (p) => actions.recolourSelected(current, p, false),
-        onChange: (p) => {
-          actions.recolourSelected(current, p, true);
-          if (p !== null) current = p;
-        },
-        onClose: () => {
-          colourEditing = false;
-          editor.preview = { kind: "none" };
-          editor.changed();
-        },
-      });
+      editColour(b, Number(d["selColour"]));
+    } else if (d["selColourMore"] !== undefined) {
+      // The colours that did not fit as chips, in a list: the colour and what uses it.
+      const rest = actions.selectionPaints().items.slice(SEL_CHIPS);
+      openMoreMenu(b, rest.map((it, k) => ({ label: `${paintName(it.paint)} · ${usage(it)}`, icon: `<span class="menu-swatch" style="--paint:${chipPaint(it.paint)}"></span>`, run: () => editColour(b, SEL_CHIPS + k) })), "Colours of the selection");
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
     } else if (d["paint"]) {
@@ -445,14 +470,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
-    } else if (d["alignBox"] !== undefined) {
-      editor.alignBox = !editor.alignBox;
-      editor.changed();
+    } else if (d["initial"] !== undefined) {
+      const st = actions.initialShapeState();
+      if (!st) return;
+      const some = st.saved > 0;
+      openMoreMenu(b, [
+        ...(st.saved < st.count ? [{ label: some ? "Set initial shape (where there is none)" : "Set initial shape", aria: "Set initial shape: save the shape as it is now", run: () => actions.setInitialShape(true) }] : []),
+        { label: "Update initial shape", aria: "Update initial shape: replace the saved shape with the shape as it is now", disabled: !some, run: () => actions.setInitialShape(false) },
+        { label: "Reset to initial shape", aria: "Reset to initial shape: put the shape back as it was saved", disabled: !some, run: () => actions.resetToInitialShape() },
+      ], "Initial shape");
+    } else if (d["selectMore"] !== undefined) {
+      // What is seldom wanted on Select, kept out of the bar: bringing things back, and two ways the selection behaves.
+      openMoreMenu(b, [
+        { label: "Show all hidden", icon: ICONS.eye, run: () => actions.clearFlag("hidden") },
+        { label: "Unlock all", icon: ICONS.lockKeyholeOpen, run: () => actions.clearFlag("locked") },
+        { label: "Axis-aligned selection box", aria: "Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation", icon: ICONS.boxSelect, checked: editor.alignBox, run: () => { editor.alignBox = !editor.alignBox; editor.changed(); } },
+        { label: "Ignore the object that fills the view", icon: ICONS.pointerBan, checked: editor.ignoreFilling, run: () => { editor.ignoreFilling = !editor.ignoreFilling; editor.changed(); } },
+      ], "Selection tool options");
     } else if (d["snap"] !== undefined) {
       editor.snap = !editor.snap;
-      editor.changed();
-    } else if (d["ignoreFill"] !== undefined) {
-      editor.ignoreFilling = !editor.ignoreFilling;
       editor.changed();
     } else if (d["follow"] !== undefined) {
       editor.followZoom = !editor.followZoom;
@@ -521,19 +557,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const colours = root.querySelector<HTMLElement>("[data-sel-colours]")!;
     if (pick && still && !colourEditing) {
       const used = actions.selectionPaints();
-      const items = used.count >= 2 ? used.items.slice(0, 8) : [];
-      const key = JSON.stringify(items);
+      const all = used.count >= 2 ? used.items : [];
+      const items = all.slice(0, SEL_CHIPS);
+      const key = JSON.stringify(all.map((it) => [it.paint, it.fills, it.strokes]));
       if (colours.dataset["list"] !== key) {
         colours.dataset["list"] = key;
-        colours.innerHTML = items
-          .map((it, i) => {
-            const n = it.fills + it.strokes;
-            const what = it.fills && it.strokes ? "fill and outline" : it.fills ? (it.fills === 1 ? "fill" : "fills") : it.strokes === 1 ? "outline" : "outlines";
-            return `<button type="button" class="swatch swatch-paint" data-sel-colour="${i}"${it.fills ? "" : " data-ring"} aria-haspopup="dialog" aria-expanded="false" aria-label="Colour used by ${n} ${what}" title="${typeof it.paint === "string" ? it.paint.toUpperCase() : "Gradient"}: used by ${n} ${what}; change it everywhere in the selection"><span data-paint-chip style="--paint:${typeof it.paint === "string" ? `linear-gradient(${swatchBackground(it.paint)}, ${swatchBackground(it.paint)})` : paintCss(it.paint)}"></span></button>`;
-          })
-          .join("");
+        colours.innerHTML =
+          items
+            .map((it, i) => {
+              return `<button type="button" class="swatch swatch-paint" data-sel-colour="${i}"${it.fills ? "" : " data-ring"} aria-haspopup="dialog" aria-expanded="false" aria-label="${paintName(it.paint)}, used by ${usage(it)}" title="${paintName(it.paint)}: used by ${usage(it)}; change it everywhere in the selection"><span data-paint-chip style="--paint:${chipPaint(it.paint)}"></span></button>`;
+            })
+            .join("") +
+          (all.length > SEL_CHIPS ? `<button type="button" class="swatch swatch-more" data-sel-colour-more aria-haspopup="menu" aria-expanded="false" aria-label="${all.length - SEL_CHIPS} more colours" title="${all.length - SEL_CHIPS} more colours of the selection">+${all.length - SEL_CHIPS}</button>` : "");
       }
-      if (items.length === 0) colours.dataset["list"] = key;
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
     if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));
@@ -541,6 +577,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
     const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;
+    const initialBtn = root.querySelector<HTMLElement>("[data-initial]")!;
+    if (editor.preview.kind === "none") {
+      const st = (editor.tool === "select" || editor.tool === "node") ? actions.initialShapeState() : null;
+      initialBtn.hidden = !st;
+      initialBtn.setAttribute("aria-pressed", String(!!st && st.saved > 0)); // (lit when a shape is saved)
+    }
     root.querySelector<HTMLElement>("[data-outline-options]")!.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
@@ -550,6 +592,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${swatchBackground(value)}, ${swatchBackground(value)})` : paintCss(value));
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
+    for (const b of root.querySelectorAll<HTMLElement>("[data-pen-only]")) b.hidden = editor.tool !== "pen"; // (the pen's own presets and zoom behaviour: not for strokes already drawn)
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;
     if (document.activeElement !== size) size.value = String(sliderFromPen(editor.penWidthPx));
     root.querySelector<HTMLElement>("[data-size-out]")!.textContent = `${editor.penWidthPx} px`;
@@ -564,9 +607,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
-    root.querySelector<HTMLElement>("[data-align-box]")!.setAttribute("aria-pressed", String(editor.alignBox));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
-    root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
     const lockR = root.querySelector<HTMLElement>("[data-lock-radius]")!;
@@ -584,11 +625,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // The options bar shows what the current tool offers and is gone when there is nothing to show.
     for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool) || ![...g.children].some((c) => !(c as HTMLElement).hidden);
-    const hint = root.querySelector<HTMLElement>("[data-testid=tool-hint]")!;
-    const said = toolHint(editor, doc);
-    hint.hidden = said === null;
-    if (said !== null && hint.textContent !== said) hint.textContent = said;
-    root.querySelector<HTMLElement>(".toolbar")!.hidden = !said && ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
+    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
   };
   editor.subscribe(update);
   doc.subscribe(update);

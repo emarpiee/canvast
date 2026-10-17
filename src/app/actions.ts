@@ -14,9 +14,9 @@ import type { BlendMode, CanvasObject, ImageObject, MediaState, PathObject, Text
 import { textOutline } from "../text/outline";
 import type { Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
-import { boolGroupsOf, isResult, resultOf } from "../doc/boolean-group";
+import { boolGroupsOf, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, homeObject, newObjectId } from "../doc/model";
+import { MAX_NAME_LENGTH, homeObject, localBounds, newObjectId } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
@@ -714,21 +714,23 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
 const paintKey = (p: Paint | null): string => JSON.stringify(p);
 
 /** The paints the picked shapes use, each once (a gradient counts as one paint, equal ones together), in the order they first appear, with how many fills and outlines use it; `count`: how many shapes. */
-export function selectionPaints(doc: DocumentStore, editor: EditorState): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number }> } {
+export function selectionPaints(doc: DocumentStore, editor: EditorState): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number; ids: string[] }> } {
   const paths = editablePaths(doc, editor);
-  const seen = new Map<string, { paint: Paint; fills: number; strokes: number }>();
+  const seen = new Map<string, { paint: Paint; fills: number; strokes: number; ids: string[] }>();
   for (const o of paths) {
     for (const which of ["fill", "stroke"] as const) {
       const v = o[which];
       if (v === null) continue;
       const k = paintKey(v);
-      const e = seen.get(k) ?? { paint: v, fills: 0, strokes: 0 };
+      const e = seen.get(k) ?? { paint: v, fills: 0, strokes: 0, ids: [] };
+      if (!e.ids.includes(o.id)) e.ids.push(o.id);
       if (which === "fill") e.fills++;
       else e.strokes++;
       seen.set(k, e);
     }
   }
-  return { count: paths.length, items: [...seen.values()] };
+  // The most used first, then in the order they first appear.
+  return { count: paths.length, items: [...seen.values()].map((e, i) => ({ e, i })).sort((a, b) => b.e.fills + b.e.strokes - (a.e.fills + a.e.strokes) || a.i - b.i).map((x) => x.e) };
 }
 
 /** Change one paint to another everywhere the picked shapes use it (fills and outlines): a colour, a gradient (each shape keeps its own box), or none. Shown while a picker is dragged, stored once. */
@@ -834,6 +836,46 @@ export function commitCorners(doc: DocumentStore, editor: EditorState, px: reado
   editor.changed();
 }
 
+// ---- The initial shape (ADR 0106) -----------------------------------------------------------------------------------
+
+/** The picked paths that have a shape of their own to save (not a boolean group's result, which is derived), and how many already have an initial one. */
+export function initialShapeState(doc: DocumentStore, editor: EditorState): { count: number; saved: number } | null {
+  const paths = editablePaths(doc, editor).filter((o) => o.result === undefined);
+  return paths.length ? { count: paths.length, saved: paths.filter((o) => o.initial).length } : null;
+}
+
+/** Save the picked shapes' shape as their initial one ("Set initial shape" where there is none, "Update initial shape" to replace it): kept with the object. One undo step. */
+export function setInitialShape(doc: DocumentStore, editor: EditorState, onlyMissing = false): void {
+  if (editor.blockEdit()) return;
+  const paths = editablePaths(doc, editor).filter((o) => o.result === undefined && !(onlyMissing && o.initial));
+  if (!paths.length) return;
+  const next = paths.map((o): PathObject => ({ ...o, initial: { sub: o.sub, ...(o.base ? { base: o.base } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.params ? { params: o.params } : {}), ...(o.rot ? { rot: o.rot } : {}), unit: o.unit } }));
+  const updating = paths.every((o) => o.initial);
+  doc.commit(doc.transaction(updating ? (paths.length === 1 ? "Update initial shape" : `Update initial shape of ${paths.length} shapes`) : paths.length === 1 ? "Set initial shape" : `Set initial shape of ${paths.length} shapes`, next));
+  editor.changed();
+}
+
+/** Put the picked shapes back to their initial shape, about where their middle is now (its paint, its place and its layer are as they are). One undo step. */
+export function resetToInitialShape(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const next: PathObject[] = [];
+  for (const o of editablePaths(doc, editor)) {
+    const init = o.initial;
+    if (!init || o.result !== undefined) continue;
+    const now = localBounds(o);
+    const cx = D.add(o.anchor.x, D.shift(D.fromNumber((now.minX + now.maxX) / 2), o.unit));
+    const cy = D.add(o.anchor.y, D.shift(D.fromNumber((now.minY + now.maxY) / 2), o.unit));
+    const { rot: _r, radius: _rad, base: _b, params: _p, ...rest } = o;
+    const back: PathObject = { ...rest, sub: init.sub, unit: init.unit, ...(init.base ? { base: init.base } : {}), ...(init.radius !== undefined ? { radius: init.radius } : {}), ...(init.params ? { params: init.params } : {}), ...(init.rot ? { rot: init.rot } : {}) };
+    const then = localBounds(back);
+    const placed: PathObject = { ...back, anchor: { x: D.sub(cx, D.shift(D.fromNumber((then.minX + then.maxX) / 2), init.unit)), y: D.sub(cy, D.shift(D.fromNumber((then.minY + then.maxY) / 2), init.unit)) } };
+    next.push(homeObject(normalizeUnit(placed), doc.space) as PathObject);
+  }
+  if (!next.length) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Reset to initial shape" : `Reset ${next.length} shapes to their initial shape`, next));
+  editor.changed();
+}
+
 // ---- Combining shapes (ADR 0101, 0103) ------------------------------------------------------------------------------
 
 const COMBINE_LABEL: Record<BoolOp, string> = { union: "Union", intersect: "Intersect", subtract: "Subtract", exclude: "Exclude" };
@@ -867,6 +909,58 @@ export const canCombine = (doc: DocumentStore, editor: EditorState): boolean => 
   const u = combineUnits(doc, editor);
   return ("units" in u && u.units >= 2) || booleanSelection(doc, editor) !== null;
 };
+/** (the Combine button is also there to take shapes out of the group being worked in: see `groupJoinMode`) */
+
+/**
+ * How the picked shapes can join or leave a boolean group: "add" when one boolean group is picked with plain shapes beside it (they can
+ * become shapes of it, as well as being combined with it as a whole); "out" when shapes of the group being worked in are picked (they can
+ * be taken out of it); null otherwise.
+ */
+export function groupJoinMode(doc: DocumentStore, editor: EditorState): "add" | "out" | null {
+  const level = editor.entered.length;
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  if (!objs.length) return null;
+  const inner = editor.entered[level - 1];
+  if (inner && objs.every((o) => o.boolOps?.[inner] && operandOf(o) === inner && !(isResult(o) && o.result === inner))) return "out";
+  const keys = new Map<string, CanvasObject[]>();
+  for (const o of objs) {
+    const k = o.groups?.[level] ?? o.id;
+    keys.set(k, [...(keys.get(k) ?? []), o]);
+  }
+  const groups = [...keys.entries()].filter(([k, list]) => list.some((o) => k !== o.id && o.boolOps?.[k]));
+  const plain = [...keys.entries()].filter(([k, list]) => list.length === 1 && list[0]!.id === k && list[0]!.kind === "path");
+  return groups.length === 1 && plain.length >= 1 && groups.length + plain.length === keys.size ? "add" : null;
+}
+
+/** Make the plain shapes picked beside a boolean group shapes of it (as the group's own operation). One undo step: the result follows. */
+export function addToBooleanGroup(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit() || groupJoinMode(doc, editor) !== "add") return;
+  const level = editor.entered.length;
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  const gid = objs.map((o) => o.groups?.[level]).find((k): k is string => !!k && objs.some((x) => x.boolOps?.[k] && x.groups?.[level] === k))!;
+  const op = objs.find((o) => o.boolOps?.[gid])!.boolOps![gid]!;
+  const plain = objs.filter((o) => o.groups?.[level] === undefined && o.kind === "path");
+  const next = plain.map((o) => ({ ...o, groups: [...(o.groups ?? []), gid], boolOps: { ...(o.boolOps ?? {}), [gid]: op } }) as CanvasObject);
+  doc.commit(doc.transaction(next.length === 1 ? "Add to the group" : `Add ${next.length} shapes to the group`, next));
+  editor.select(expandToUnits(doc.ordered(), [resultOf(doc.all(), gid)!], editor.entered));
+}
+
+/** Take the shapes picked inside a boolean group out of it (they stay where they are, as plain shapes of the level above). One undo step: the result follows. */
+export function takeOutOfBooleanGroup(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit() || groupJoinMode(doc, editor) !== "out") return;
+  const gid = editor.entered[editor.entered.length - 1]!;
+  const objs = selected(doc, editor).filter((o) => !o.locked);
+  const next = objs.map((o): CanvasObject => {
+    const { [gid]: _op, ...ops } = o.boolOps ?? {};
+    const { [gid]: _name, ...names } = o.groupNames ?? {};
+    const chain = (o.groups ?? []).filter((g) => g !== gid);
+    const { boolOps: _b, groups: _g, groupNames: _gn, ...rest } = o;
+    return { ...rest, ...(chain.length ? { groups: chain } : {}), ...(Object.keys(ops).length ? { boolOps: ops } : {}), ...(Object.keys(names).length ? { groupNames: names } : {}) } as CanvasObject;
+  });
+  doc.commit(doc.transaction(next.length === 1 ? "Take out of the group" : `Take ${next.length} shapes out of the group`, next));
+  editor.entered = editor.entered.slice(0, -1);
+  editor.select(next.map((o) => o.id));
+}
 
 /**
  * Combine the selected shapes with a Boolean operation (union, intersect, subtract the front ones from the back one, exclude where they

@@ -124,7 +124,9 @@ export interface DebugHook {
   /** The box of the selection on screen: its rotation (radians) and corners (top-left first, in the box's own axes). */
   selectionFrame(): { angle: number; corners: Array<[number, number]> } | null;
   /** Where the main corner radius dot and each corner's own dot are on screen for the one picked shape (null: none). */
-  cornerDots(): { main: [number, number]; corners: Array<[number, number]> } | null;
+  cornerDots(): { main: [number, number]; corners: Array<[number, number]>; count: [number, number] | null; countCentre: [number, number] | null } | null;
+  /** The words beside a handle being dragged, or null. */
+  handleLabel(): string | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;
@@ -395,8 +397,9 @@ export function installDebugHook(
     cornerDots: () => {
       const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
       const h = po && cornerHandles(po, editor.cornersOpen === po.obj.id);
-      return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]) } : null;
+      return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
     },
+    handleLabel: () => editor.handleLabel?.text ?? null,
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),

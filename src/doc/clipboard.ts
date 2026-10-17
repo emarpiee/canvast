@@ -76,6 +76,7 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
       ? {
           ...o,
           unit: o.unit + k,
+          ...(o.kind === "path" && o.initial ? { initial: { ...o.initial, unit: o.initial.unit + k } } : {}),
           anchor: { x: D.add(target!.at.x, D.shift(D.sub(o.anchor.x, centre.x), k)), y: D.add(target!.at.y, D.shift(D.sub(o.anchor.y, centre.y), k)) },
         }
       : o;

@@ -80,6 +80,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `panel-right` | Details panel |
 | `pen-line` | Ink pen |
 | `pen-tool` | Fine pen |
+| `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
 | `pentagon` | Shape tool |
@@ -99,6 +100,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `sliders-horizontal` | Outline options (width, position, corners, ends) |
 | `sparkle` | Star shape |
 | `spline-pointer` | Path tool (curves) |
+| `square-arrow-out-up-left` | Take the shapes out of the boolean group |
+| `square-plus` | Add the shapes to the boolean group |
 | `square-round-corner` | Lock corner radius (resizing keeps the radius) |
 | `squares-exclude` | Exclude overlap |
 | `squares-intersect` | Intersect |

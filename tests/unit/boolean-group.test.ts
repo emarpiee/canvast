@@ -10,7 +10,9 @@ import { instantiate } from "../../src/doc/clipboard";
 import { FLAT_TOLERANCE_PX, flatten, geometryBounds, insideFill, rectSubs, type SubPath } from "../../src/doc/path";
 import { rotateAbout, scaleAbout, translate } from "../../src/doc/edit-ops";
 import { pathSubs } from "../../src/doc/model";
-import { nodeCount, ellipseSubs } from "../../src/doc/path";
+import { nodeCount, ellipseSubs, drawnParams, drawnSubs } from "../../src/doc/path";
+import { withRadius } from "../../src/doc/shape-params";
+import { cornersOf } from "../../src/doc/rounding";
 import { TURN } from "../../src/core/angle";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -305,5 +307,19 @@ describe("corner radius of a boolean group", () => {
     expect(ro.sub.reduce((n, s) => n + nodeCount(s), 0)).toBe(16 + 4); // the rounded inner result and the plain rectangle
     doc.commit(doc.transaction("Radius", [{ ...ro, radius: 5 } as PathObject]));
     expect(resultOf(doc.all(), outer)!.sub.reduce((n, s) => n + nodeCount(s), 0)).toBeGreaterThan(20);
+  });
+});
+
+describe("rounding a boolean result that is full of short segments", () => {
+  it("leaves no corner sharp: a rounded star cut by a rectangle (curves meeting at sharp points) is rounded all round", () => {
+    const star: PathObject = { ...rect(0, 0, 1, 1, 1), sub: drawnSubs("star", 0, 0, 200, 200, 6, 11), shape: "star", params: drawnParams("star", 0, 0, 200, 200, 6, 11)! };
+    const waves = withRadius(star, 12); // many short arcs
+    const cutter = rect(60, -50, 200, 300, 2);
+    const { doc, gid } = combined([waves, cutter], "subtract");
+    const sharp = result(doc, gid);
+    expect(sharp.sub.flatMap((sp) => cornersOf(sp)).filter((c) => c !== null).length).toBeGreaterThan(0);
+    doc.commit(doc.transaction("Radius", [{ ...sharp, radius: 20 } as PathObject]));
+    const rounded = result(doc, gid);
+    for (const sp of rounded.sub) for (const c of cornersOf(sp)) expect(c, "a corner is left").toBeNull();
   });
 });

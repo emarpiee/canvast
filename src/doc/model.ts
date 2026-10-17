@@ -157,6 +157,8 @@ export interface PathObject extends ObjectBase {
    */
   readonly radius?: Radius;
   readonly base?: readonly SubPath[];
+  /** The shape as it was when "Set initial shape" was pressed (ADR 0106): kept with the object, so it survives whatever happens after, and can be come back to. */
+  readonly initial?: InitialShape;
   /** What the shape is made from (box, sides, points, ratio, corner radius), present while its nodes are still the shape's own (ADR 0105). */
   readonly params?: ShapeParams;
   /** The result of the boolean group with this id (ADR 0103): derived from the group's members, recomputed with every change to them. */
@@ -204,6 +206,16 @@ export function editSubs(o: PathObject): readonly SubPath[] {
     turnedBases.set(o, (r = rotateSubs(o.base, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
   }
   return r;
+}
+
+/** A path's geometry as saved by "Set initial shape": everything that makes its shape, in its own units (`unit`), without where it is or how it is painted. */
+export interface InitialShape {
+  readonly sub: readonly SubPath[];
+  readonly base?: readonly SubPath[];
+  readonly radius?: Radius;
+  readonly params?: ShapeParams;
+  readonly rot?: number;
+  readonly unit: number;
 }
 
 /** Margin around a text box (em) for italic overhang, bold and descenders past the line box. */
@@ -406,6 +418,17 @@ export function validateObject(o: CanvasObject): CanvasObject {
       for (const b of o.base) if (!Array.isArray(b?.n) || b.n.length % NODE !== 0 || b.n.length > MAX_PATH_NODES * NODE) throw new InvalidObjectError("bad base");
       o.base.forEach((b) => b.n.forEach((v: number, i: number) => finite(v, `base[${i}]`)));
     }
+    if (o.initial !== undefined) {
+      const q = o.initial;
+      if (!Array.isArray(q.sub) || q.sub.length < 1 || q.sub.length > MAX_SUBPATHS || !Number.isInteger(q.unit)) throw new InvalidObjectError("bad initial shape");
+      for (const list of [q.sub, q.base ?? []]) {
+        if (!Array.isArray(list)) throw new InvalidObjectError("bad initial shape");
+        for (const b of list) {
+          if (!Array.isArray(b?.n) || b.n.length % NODE !== 0 || b.n.length > MAX_PATH_NODES * NODE) throw new InvalidObjectError("bad initial shape");
+          b.n.forEach((v: number, i: number) => finite(v, `initial[${i}]`));
+        }
+      }
+    }
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
     if (o.params !== undefined) {
@@ -510,6 +533,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as Radius } : {}),
+      ...(s["initial"] !== undefined ? { initial: s["initial"] as InitialShape } : {}),
       ...(s["base"] !== undefined ? { base: (s["base"] as Array<{ n: number[]; closed: boolean }>).map((p) => ({ n: p?.n as number[], closed: p?.closed as boolean })) } : {}),
       ...(s["result"] !== undefined ? { result: s["result"] as string } : {}),
     };
@@ -533,7 +557,9 @@ function extentLog2(o: CanvasObject): number {
 
 function inFrame(o: CanvasObject, f: Frame, anchor: WorldPoint, unit: number): CanvasObject {
   const { frame: _frame, ...rest } = o;
-  return (f === f.space.world ? { ...rest, anchor, unit } : { ...rest, frame: f, anchor, unit }) as CanvasObject;
+  // (the shape saved as the initial one is in the same units as the object: it moves up or down with them)
+  const kept = o.kind === "path" && o.initial ? { initial: { ...o.initial, unit: o.initial.unit + (unit - o.unit) } } : {};
+  return (f === f.space.world ? { ...rest, ...kept, anchor, unit } : { ...rest, ...kept, frame: f, anchor, unit }) as CanvasObject;
 }
 
 /**

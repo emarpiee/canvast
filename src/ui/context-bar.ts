@@ -41,6 +41,10 @@ export interface ContextActions {
   canCombine(): boolean;
   /** The operation of the boolean group that is the selection, if it is one (ADR 0103), and taking it apart or making it one path. */
   booleanState(): BoolOp | null;
+  /** How the picked shapes can join or leave a boolean group: "add" (a group picked with shapes beside it), "out" (shapes of the group being worked in), or null. */
+  groupJoin(): "add" | "out" | null;
+  addToGroup(): void;
+  takeOutOfGroup(): void;
   releaseBoolean(): void;
   flattenBoolean(): void;
   /** Turn the selected text into paths (ADR 0102), and whether any is selected. */
@@ -70,18 +74,23 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("duplicate", ICONS.copy, "Duplicate") +
     btn("group", ICONS.group, "Group") +
     btn("ungroup", ICONS.ungroup, "Ungroup") +
+    `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("tag", ICONS.tag, "Tag the selection") +
     btn("library", ICONS.library, "View in the library") +
     btn("download", ICONS.download, "Download the original file") +
     btn("open", ICONS.externalLink, "Open in a new tab") +
+    `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
     btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
+    `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)") +
     btn("flatten", ICONS.merge, "Flatten the boolean group into one path (Ctrl+E)") +
     btn("combine", ICONS.combineIcon, "Combine shapes (union, intersect, subtract, exclude); on a boolean group: its operation, flatten, release") +
+    `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("layout", ICONS.blocks, "Arrange and align") +
     btn("front", ICONS.bringToFront, "Bring to front") +
     btn("back", ICONS.sendToBack, "Send to back") +
+    `<span class="ctx-sep" aria-hidden="true"></span>` +
     btn("lock", ICONS.lockKeyhole, "Lock selection") +
     btn("hide", ICONS.eyeOff, "Hide selection") +
     btn("delete", ICONS.trash, "Delete selection");
@@ -159,7 +168,11 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // current one ticked), and it can be flattened into one path or released into its shapes again.
         const cur = actions.booleanState();
         const pick = (op: BoolOp, label: string, icon: string, aria: string): MenuItem => ({ label, icon, aria, ...(cur ? { checked: cur === op } : {}), run: () => actions.combine(op) });
+        const join = actions.groupJoin();
         openMoreMenu(b, [
+          ...(join === "add" ? [{ label: "Add to the group", icon: ICONS.squarePlus, aria: "Add the shapes to the boolean group: they become shapes of it, with its operation", run: () => actions.addToGroup() }] : []),
+          ...(join === "out" ? [{ label: "Take out of the group", icon: ICONS.squareOut, aria: "Take the shapes out of the boolean group: they stay where they are", run: () => actions.takeOutOfGroup() }] : []),
+          ...(actions.canCombine() ? [
           pick("union", "Union", ICONS.squaresUnite, "Union: join the shapes into one"),
           pick("intersect", "Intersect", ICONS.squaresIntersect, "Intersect: keep only where the shapes overlap"),
           pick("subtract", "Subtract", ICONS.squaresSubtract, "Subtract: take the shapes in front away from the one at the back"),
@@ -167,8 +180,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(cur ? [
             { label: "Flatten", icon: ICONS.merge, aria: "Flatten: make it one path, without the shapes inside (Ctrl+E)", run: () => actions.flattenBoolean() },
             { label: "Release shapes", icon: ICONS.ungroup, aria: "Release the shapes: take the group apart, the shapes stay as they are", run: () => actions.releaseBoolean() },
-          ] : []),
-        ], cur ? "Boolean group" : "Combine shapes");
+          ] : [])
+        ] : []),
+], cur ? "Boolean group" : "Combine shapes");
         break;
       }
       case "flatten": actions.flattenBoolean(); break;
@@ -206,7 +220,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
     q("layout").hidden = sel.length < 2;
-    q("combine").hidden = !actions.canCombine();
+    q("combine").hidden = !(actions.canCombine() || actions.groupJoin() !== null);
     q("flatten").hidden = actions.booleanState() === null;
     q("outline").hidden = !actions.canOutline();
     const reset = actions.resettable();
@@ -219,6 +233,19 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     if (sel.length < 2) closeMenu();
     q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
     bar.hidden = false;
+    // A divider only between two groups that both have a button showing.
+    let seen = false;
+    let pending: HTMLElement | null = null;
+    for (const c of bar.children as Iterable<HTMLElement>) {
+      if (c.classList.contains("ctx-sep")) {
+        c.hidden = true;
+        pending = seen ? c : null;
+      } else if (!c.hidden) {
+        if (pending) pending.hidden = false;
+        pending = null;
+        seen = true;
+      }
+    }
     const xs = box.frame.corners.map((c) => c[0]);
     const ys = box.frame.corners.map((c) => c[1]);
     const w = bar.offsetWidth;

@@ -531,10 +531,10 @@ test("W A S D on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("W A S D, nearest in view: an item far from the selected one (many of its sizes away) or of a very different size is not a neighbour; 'anywhere' still reaches it (ADR 0058)", async ({ app }) => {
+test("W A S D, nearest in view: an item that is in the window is a neighbour however far (in its own sizes) or different in size; one off the screen is not (ADR 0058)", async ({ app }) => {
   const p = app.page;
   await key(app, "p");
-  // A small stroke; one far to the right (about 8 of its own sizes away); one close; one very large but near.
+  // A small stroke; one far to the right (about 8 of its own sizes away) but in the window.
   await app.drag({ x: 200, y: 400 }, { x: 260, y: 420 }, 4);
   await app.drag({ x: 900, y: 400 }, { x: 960, y: 420 }, 4);
   await key(app, "v");
@@ -546,10 +546,8 @@ test("W A S D, nearest in view: an item far from the selected one (many of its s
   await pick(a!.id);
   await key(app, "d");
   await app.frame();
-  expect(await selection(app), "too far to be a neighbour").toEqual([a!.id]);
-  expect(await p.evaluate(() => window.__canvastDebug.camera())).toBeTruthy();
+  expect(await selection(app), "in the window: it is what the step goes to").toEqual([far!.id]);
   expect(app.consoleErrors).toEqual([]);
-  void far;
 });
 
 test("resize with side handles: corners and sides follow the pointer; Shift keeps the proportions, Alt resizes about the middle, Ctrl turns snapping off; edges snap to other items (ADR 0063)", async ({ app }) => {

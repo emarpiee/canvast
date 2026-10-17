@@ -2,7 +2,7 @@ import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { SubPath } from "../doc/path";
 import { NODE, isLine, nodeCount, segmentsOf } from "../doc/path";
-import { cornerAt, maxFor, maxUniform } from "../doc/rounding";
+import { cornersOf, maxFor, maxUniform } from "../doc/rounding";
 import type { ProjectedObject } from "../render/projection";
 import { exactX, exactY, fromPx } from "../render/projection";
 import * as D from "../core/dyadic";
@@ -233,6 +233,8 @@ export interface CornerHandles {
   /** Where the main dot is when the corners are opened out: the middle of the shape. */
   centre: { x: number; y: number } | null;
   ratio: { x: number; y: number; cx: number; cy: number; outer: number } | null;
+  /** The count handle of a polygon or star: on its second outer corner; dragged round the middle it changes how many there are (`a0`: the angle of the first corner). */
+  count: { x: number; y: number; cx: number; cy: number; a0: number; n: number } | null;
 }
 
 const MIN_DOT_PX = 18;
@@ -263,9 +265,10 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
   const radiiPx = Array.from({ length: total }, (_, i) => (typeof o.radius === "number" ? o.radius : o.radius ? (o.radius[i] ?? 0) : 0) * p.ppu);
   let index = 0;
   for (const screen of screenSubs) {
+    const found = cornersOf(screen);
     for (let k = 0; k < nodeCount(screen); k++, index++) {
       if (dots.length >= MAX_CORNER_DOTS) continue;
-      const corner = cornerAt(screen, k);
+      const corner = found[k];
       if (!corner) continue;
       let ux = corner.e1[0] + corner.e2[0], uy = corner.e1[1] + corner.e2[1];
       const ul = Math.hypot(ux, uy);
@@ -297,15 +300,32 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
     const [ix, iy] = at(1);
     ratio = { x: ix, y: iy, cx: mx, cy: my, outer: Math.hypot(ox - mx, oy - my) };
   }
+  let count: CornerHandles["count"] = null;
+  if (sub && o.params && (o.shape === "polygon" || o.shape === "star") && nodeCount(sub) >= 3) {
+    const c = nodeCount(sub);
+    const step = o.shape === "star" ? 2 : 1;
+    const at = (k: number): [number, number] => [exactX(p, sub.n[k * NODE]!), exactY(p, sub.n[k * NODE + 1]!)];
+    let mx = 0, my = 0, m = 0;
+    for (let k = 0; k < c; k += step, m++) {
+      const [x, y] = at(k);
+      mx += x;
+      my += y;
+    }
+    mx /= m;
+    my /= m;
+    const [x0, y0] = at(0);
+    const [x1, y1] = at(step);
+    count = { x: x1, y: y1, cx: mx, cy: my, a0: Math.atan2(y0 - my, x0 - mx), n: m };
+  }
   const first = dots[0] ?? null;
-  if (!first && !ratio) return null;
+  if (!first && !ratio && !count) return null;
   const centre = sn ? { x: sx / sn, y: sy / sn } : null;
   const main = first && expanded && centre ? { ...first, x: centre.x, y: centre.y } : first;
-  const out: CornerHandles = { main, corners: o.result !== undefined ? [] : dots, centre, ratio };
+  const out: CornerHandles = { main, corners: o.result !== undefined ? [] : dots, centre, ratio, count };
   return !main || (Math.abs(main.x) < FAR && Math.abs(main.y) < FAR) ? out : null;
 }
 
-export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" };
+export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
 
 /** Which handle a press takes: a corner's own dot (when opened out), the ratio handle, or the main dot. */
 export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded: boolean): CornerPick | null {
@@ -321,5 +341,6 @@ export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded
   if (h.main) consider({ what: "main" }, near(h.main) - 2); // the main one wins a tie: it is the bigger
   if (expanded) for (const dot of h.corners) consider({ what: "corner", dot }, near(dot));
   if (h.ratio) consider({ what: "ratio" }, near(h.ratio));
+  if (h.count) consider({ what: "count" }, near(h.count));
   return best;
 }

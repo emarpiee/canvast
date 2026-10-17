@@ -647,8 +647,12 @@ test("option: ignore the object that fills the view, so zooming far into somethi
   await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
   const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
   await p.keyboard.press("v");
-  const ignore = p.getByRole("button", { name: "Ignore the object that fills the view" });
-  await expect(ignore).toHaveAttribute("aria-pressed", "false");
+  // (the option is in the Selection tool options menu now)
+  const item = () => p.getByRole("menuitemradio", { name: "Ignore the object that fills the view" });
+  const ignore = {
+    click: async () => { await p.locator("[data-select-more]").click(); await item().click(); },
+    checked: async () => { await p.locator("[data-select-more]").click(); const v = await item().getAttribute("aria-checked"); await p.keyboard.press("Escape"); return v; },
+  };
   const selected = () => p.evaluate(() => window.__canvastDebug.selection());
   // A band that does not fill the view (3 levels in: 64 px wide) stays selectable with the option on.
   await ignore.click();
@@ -666,13 +670,13 @@ test("option: ignore the object that fills the view, so zooming far into somethi
     expect(await selected(), `${depth}: off`).toEqual([id]);
     await p.keyboard.press("Escape");
     // On: it is ignored by a click, by Ctrl+A-free lasso and box select too.
-    if ((await ignore.getAttribute("aria-pressed")) === "false") await ignore.click();
+    if ((await ignore.checked()) === "false") await ignore.click();
     await p.mouse.click(700, 402);
     expect(await selected(), `${depth}: on`).toEqual([]);
     await app.drag({ x: 500, y: 300 }, { x: 800, y: 600 }, 6);
     expect(await selected(), `${depth}: box select`).toEqual([]);
     await ignore.click(); // off again
-    await expect(ignore).toHaveAttribute("aria-pressed", "false");
+    expect(await ignore.checked()).toBe("false");
     await p.evaluate((d) => window.__canvastDebug.jump(-d), depth);
   }
   // At home the stroke is a line: with the option on, it is still selectable (it does not fill the view).
@@ -972,7 +976,8 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await app.frame();
   await expect.poll(ink, { message: "still hidden after a reload (the canvas is painted again once the saved canvas has loaded)" }).toBe(none);
-  await p.getByRole("button", { name: "Show all hidden" }).click();
+  await p.locator("[data-select-more]").click();
+  await p.getByRole("menuitem", { name: "Show all hidden" }).click();
   await app.frame();
   expect(await ink()).toBe(drawn);
   // Locked: drawn, but a click, a box and select-all all miss it.
@@ -985,7 +990,8 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.keyboard.press("Control+a");
   expect(await sel(), "select all skips it").toEqual([]);
   expect(await ink(), "still drawn").toBe(drawn);
-  await p.getByRole("button", { name: "Unlock all" }).click();
+  await p.locator("[data-select-more]").click();
+  await p.getByRole("menuitem", { name: /^Unlock all/ }).click();
   await p.mouse.click(600, 300);
   expect((await sel()).length).toBe(1);
 });
@@ -1475,9 +1481,11 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   const turned = await rots();
   expect(turned.every((r) => r === turned[0] && r > 0), "all four turned by the same angle").toBe(true);
   // The box can be axis-aligned instead.
-  await p.getByRole("button", { name: "Axis-aligned selection box" }).click();
+  await p.locator("[data-select-more]").click();
+  await p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ }).click();
   expect((await frame())!.angle).toBe(0);
-  await p.getByRole("button", { name: "Axis-aligned selection box" }).click();
+  await p.locator("[data-select-more]").click();
+  await p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ }).click();
   // Turning from just outside a corner (the handle may be out of the view for a big selection).
   const before = (await rots())[0]!;
   const f2 = (await frame())!;

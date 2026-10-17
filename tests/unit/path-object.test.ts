@@ -69,9 +69,12 @@ describe("path objects: editing", () => {
     expect((scaleAbout(o, ORIGIN, 3, 3, true) as PathObject).width).toBe(8);
     expect((scaleAbout(o, ORIGIN, 3, 3) as PathObject).width).toBe(24);
   });
-  it("a turned path scales uniformly only", () => {
+  it("a turned path stretches along its own axes (and keeps its turn)", () => {
     const o = { ...path(rectSubs(0, 0, 10, 10)), rot: 1000 } as PathObject;
-    expect(() => scaleAbout(o, ORIGIN, 2, 1)).toThrow(RangeError);
+    const wide = scaleAbout(o, ORIGIN, 2, 1) as PathObject;
+    expect(wide.rot).toBe(1000);
+    expect(geometryBounds(wide.sub).maxX * 2 ** wide.unit).toBeCloseTo(20, 9);
+    expect(geometryBounds(wide.sub).maxY * 2 ** wide.unit).toBeCloseTo(10, 9);
     expect(() => scaleAbout(o, ORIGIN, 2, 2)).not.toThrow();
   });
   it("a path far outside the comfortable size is re-expressed in another unit, exactly", () => {

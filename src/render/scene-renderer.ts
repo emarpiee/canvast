@@ -361,12 +361,17 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
   ctx.lineWidth = 1.25;
   ctx.strokeStyle = theme.selection;
   if (open) {
-    ctx.fillStyle = theme.handleFill;
+    // One corner's own radius: a small ring with a dot in it.
     for (const d of h.corners) {
+      ctx.fillStyle = theme.handleFill;
       ctx.beginPath();
       ctx.arc(d.x, d.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      ctx.fillStyle = theme.selection;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   if (h.main) {
@@ -384,13 +389,52 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.arc(h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 6, 0, Math.PI * 2);
     ctx.stroke();
   }
+  const r = HANDLE_SIZE_PX / 2 + 1;
   if (h.ratio) {
+    // The ratio of a star: a diamond.
     ctx.fillStyle = theme.selection;
     ctx.lineWidth = 1.25;
     ctx.beginPath();
-    ctx.arc(h.ratio.x, h.ratio.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
+    ctx.moveTo(h.ratio.x, h.ratio.y - r);
+    ctx.lineTo(h.ratio.x + r, h.ratio.y);
+    ctx.lineTo(h.ratio.x, h.ratio.y + r);
+    ctx.lineTo(h.ratio.x - r, h.ratio.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = theme.handleFill;
+    ctx.stroke();
+  }
+  if (h.count) {
+    // How many corners: a triangle pointing the way round the middle that it is dragged.
+    const k = h.count;
+    const a = Math.atan2(k.y - k.cy, k.x - k.cx) + Math.PI / 2;
+    ctx.fillStyle = theme.handleFill;
+    ctx.strokeStyle = theme.selection;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const t = a + (i * 2 * Math.PI) / 3;
+      const px = k.x + Math.sin(t) * (r + 2);
+      const py = k.y - Math.cos(t) * (r + 2);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  }
+  if (editor.handleLabel) {
+    // What is being changed, and to what, beside the handle.
+    const { x, y, text } = editor.handleLabel;
+    ctx.font = "600 12px system-ui, sans-serif";
+    const w = ctx.measureText(text).width + 12;
+    ctx.fillStyle = theme.selection;
+    ctx.beginPath();
+    ctx.roundRect(x + 14, y - 26, w, 20, 5);
+    ctx.fill();
+    ctx.fillStyle = theme.handleFill;
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + 20, y - 16);
   }
   ctx.restore();
 }
@@ -490,6 +534,13 @@ function drawSelection(
     for (let i = 1; i < c.length; i++) ctx.lineTo(c[i]![0], c[i]![1]);
     ctx.closePath();
     ctx.stroke();
+    if (editor.highlight?.has(po.obj.id)) {
+      // Lit up: the shapes that use the colour the pointer is on.
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
   }
   // Editing nodes: the nodes are the handles; the selection's own handles would sit on top of them.
   const sel = editor.tool === "node" ? null : selectedFrame(visible, editor, vp);

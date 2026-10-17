@@ -51,6 +51,32 @@ function renamed(o: PathObject, s: number): Partial<PathObject> {
 }
 
 /**
+ * A turned path stretched along its own axes (kx along its width, ky along its height) with a world point fixed. The geometry is scaled in
+ * its own, unturned, coordinates; the turn is about the middle of the geometry's box, which moves with the stretch, so the anchor is chosen to
+ * leave the fixed point where it is: the fixed point as the unturned geometry sees it (`f`) goes to `f` scaled, and is then turned about the
+ * new middle.
+ */
+function stretchTurned(o: PathObject, fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean): PathObject {
+  const { c, s } = cosSin(o.rot!);
+  const p = pivotOf(o);
+  const rel = {
+    x: D.toNumber(D.shift(D.sub(fixed.x, o.anchor.x), -o.unit)),
+    y: D.toNumber(D.shift(D.sub(fixed.y, o.anchor.y), -o.unit)),
+  };
+  // the fixed point in the geometry's own unturned coordinates: undo the turn about the pivot
+  const vx = rel.x - p.x, vy = rel.y - p.y;
+  const f = { x: c * vx + s * vy + p.x, y: -s * vx + c * vy + p.y };
+  const grown: PathObject = { ...o, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) };
+  const q = pivotOf(grown);
+  const wx = kx * f.x - q.x, wy = ky * f.y - q.y;
+  const at = { x: c * wx - s * wy + q.x, y: s * wx + c * wy + q.y }; // where that point is now, turned about the new middle
+  return normalizeUnit({
+    ...grown,
+    anchor: { x: D.sub(fixed.x, D.shift(D.fromNumber(at.x), o.unit)), y: D.sub(fixed.y, D.shift(D.fromNumber(at.y), o.unit)) },
+  }) as PathObject;
+}
+
+/**
  * Scale about a fixed world point by (kx, ky). Strokes and text require
  * kx === ky (they scale uniformly, including stroke width and font size); a path
  * may be stretched (its outline width follows the geometric mean of the two).
@@ -58,6 +84,7 @@ function renamed(o: PathObject, s: number): Partial<PathObject> {
  */
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false, keepRadius = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
+  if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, keepWidth, keepRadius);
   const anchor = {
     x: scaleCoord(o.anchor.x, fixed.x, D.fromNumber(kx), o.unit),
     y: scaleCoord(o.anchor.y, fixed.y, D.fromNumber(ky), o.unit),

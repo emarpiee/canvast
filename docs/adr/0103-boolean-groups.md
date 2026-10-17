@@ -12,6 +12,8 @@ Accepted (v0.17.0). Supersedes the destructive behaviour of [ADR 0101](0101-bool
 
 **Members are hidden, not gone.** They are not drawn, not in the spatial index and not picked, as for hidden objects, unless their group has been **entered** (double-click the group, or choose a member in the Layers list). Inside, members can be picked, moved, stretched, turned, edited node by node, hidden (a hidden member is left out of the result) and deleted; the result follows live while dragging (`previewResults`: the same derivation on the preview objects, never stored). Select all skips hidden members and expands to whole units.
 
+**Adding and taking out.** With a boolean group picked together with plain shapes, the Combine menu offers *Add to the group* (the shapes become shapes of it, with its operation; the result follows) besides combining with it as a whole (nesting). Inside a group, *Take out of the group* on its picked shapes puts them back at the level above. Both are one undo step.
+
 **Nesting.** A boolean group can be combined with a shape or another boolean group; the inner result is an operand of the outer one.
 
 **Actions.** The Combine button on a boolean group shows the four operations with the current one ticked (choosing another changes the operation), **Flatten** (the result becomes one plain path and the shapes go; also Ctrl+E) and **Release shapes** (the shapes come back as they were; the result goes). Copy and paste remap `boolOps` keys and `result` to the new ids. The Layers list shows the group with its operation's icon and hides the result row.

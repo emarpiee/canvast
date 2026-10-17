@@ -14,7 +14,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -51,6 +51,7 @@ import { BookmarkList, captureThumb } from "./bookmarks";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountSettingsView } from "../ui/settings-view";
+import { mountHintLine } from "../ui/hint-line";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { confirmDialog } from "../ui/confirm";
@@ -521,6 +522,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     layoutSelection(doc, editor, full, names);
   };
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
+  const hintLine = { current: null as null | { refresh(): void } };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
@@ -549,6 +551,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return { ...o, widthPx: ppu > 0 && ppu < Infinity ? first!.width * ppu : null };
     },
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
+    initialShapeState: () => initialShapeState(doc, editor),
+    setInitialShape: (onlyMissing) => setInitialShape(doc, editor, onlyMissing),
+    resetToInitialShape: () => resetToInitialShape(doc, editor),
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedShape: () => {
@@ -710,6 +715,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
 
   const fileKinds = new Map<string, { card: boolean; open: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
+  hintLine.current = mountHintLine(editor, doc, () => settings.get("ui.hints"));
   const contextBar = mountContextBar(
     host,
     editor,
@@ -720,6 +726,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       canOutline: () => canOutline(doc, editor),
       combine: (op) => combineSelection(doc, editor, op),
       booleanState: () => booleanSelection(doc, editor)?.op ?? null,
+      groupJoin: () => groupJoinMode(doc, editor),
+      addToGroup: () => addToBooleanGroup(doc, editor),
+      takeOutOfGroup: () => takeOutOfBooleanGroup(doc, editor),
       releaseBoolean: () => {
         const b = booleanSelection(doc, editor);
         if (b) releaseBoolean(doc, editor, b.gid);
@@ -898,6 +907,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return;
       case "ui.zen":
         applyZen();
+        return;
+      case "ui.hints":
+        hintLine.current?.refresh();
         return;
       case "ui.pattern":
         invalidate();
