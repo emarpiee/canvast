@@ -749,6 +749,12 @@ export function recolour(doc: DocumentStore, editor: EditorState, from: Paint, t
   editor.changed();
 }
 
+/** The objects as a change would leave them, boolean results included (the transaction derives them without storing anything), for a live preview. */
+function derivedPreview(doc: DocumentStore, next: readonly PathObject[]): PathObject[] {
+  const tx = doc.transaction("preview", next);
+  return [...tx.after.values()].filter((o): o is PathObject => !!o && o.kind === "path");
+}
+
 /** Show these objects as they would be (a number being dragged), without storing them. */
 function showReplaced(editor: EditorState, next: readonly PathObject[]): void {
   editor.preview = next.length ? { kind: "replace", ids: next.map((o) => o.id), objs: new Map(next.map((o) => [o.id, o] as const)) } : { kind: "none" };
@@ -829,7 +835,7 @@ export function commitCorners(doc: DocumentStore, editor: EditorState, px: reado
     const each = o.result === undefined && px.length > 1 && px.length === nodesIn(o.base ?? o.sub); // one for every corner (a rectangle: four)
     next.push(withRadius(o, each ? px.map((v) => v / ppu) : px[0]! / ppu));
   }
-  if (!final) return showReplaced(editor, next);
+  if (!final) return showReplaced(editor, next.some((o) => o.result !== undefined) ? derivedPreview(doc, next) : next);
   editor.preview = { kind: "none" };
   if (!next.length) return editor.changed();
   doc.commit(doc.transaction(next.length === 1 ? "Corner radius" : `Corner radius of ${next.length} shapes`, next));

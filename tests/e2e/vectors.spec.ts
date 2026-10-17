@@ -1583,6 +1583,34 @@ test("a turned shape can be stretched along its own sides: the side handles stay
   expect(size(after).h / h0).toBeCloseTo(1, 2); // and no higher
 });
 
+test("a boolean group's corner radius updates live while it is dragged, like a plain shape's", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await p.click('[data-paint="stroke"]');
+  await p.locator(".colour-pop .colour-none").click();
+  await key(app, "Escape");
+  await drag(app, [500, 300], [700, 420]);
+  await drag(app, [640, 340], [840, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const corner = await px(507, 307); // (inside the sharp corner)
+  const lb = (await p.locator('[data-scrub="radius"]').boundingBox())!;
+  await p.mouse.move(lb.x + 8, lb.y + lb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(lb.x + 8 + 40, lb.y + lb.height / 2, { steps: 6 });
+  await app.frame();
+  expect(await px(507, 307), "rounded while the name is still held").not.toEqual(corner);
+  expect((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!.sub[0]!.n.length / 6).toBe(8); // not stored yet
+  await p.mouse.up();
+  await app.frame();
+  expect(await px(507, 307)).not.toEqual(corner);
+  expect((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!.sub[0]!.n.length / 6).toBeGreaterThan(8);
+});
+
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {
   const p = app.page;
   const hint = p.getByTestId("tool-hint");
