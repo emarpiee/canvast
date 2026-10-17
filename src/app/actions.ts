@@ -21,13 +21,15 @@ import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { cropEdges, uncrop } from "../doc/crop";
-import { renderedPicture } from "../render/adjust-image";
+import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import type { Constraint } from "../doc/constraints";
 import { drawnParams, drawnSubs } from "../doc/path";
 import { exportSvg } from "./svg-export";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId } from "../doc/model";
+import { worldBounds } from "../doc/edit-ops";
+import { planSheetScale } from "../doc/constraints";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
@@ -691,6 +693,16 @@ export async function importImages(
 const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] =>
   // (the shapes inside a boolean group take no paint from outside it: the group's result has the look; they are painted when it is entered)
   selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
+
+/** How many selected shapes a colour or gradient can be put on. */
+export const paintTargetCount = (doc: DocumentStore, editor: EditorState): number => editablePaths(doc, editor).length;
+
+/** The solid colours the selected shapes use, without transparency, each once, in the order they are met. */
+export function selectionColours(doc: DocumentStore, editor: EditorState): string[] {
+  const out: string[] = [];
+  for (const o of editablePaths(doc, editor)) for (const p of [o.fill, o.stroke]) if (typeof p === "string" && !out.includes(p.slice(0, 7).toLowerCase())) out.push(p.slice(0, 7).toLowerCase());
+  return out;
+}
 
 /** The fill and outline of the first selected path, or null when none is selected. */
 export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: Paint | null; stroke: Paint | null } | null {
@@ -1359,6 +1371,37 @@ export function setPin(doc: DocumentStore, editor: EditorState, patch: { h?: Con
 export const canFitSheet = (doc: DocumentStore, editor: EditorState): boolean =>
   selected(doc, editor).some((o) => isContainer(o) && !o.rot && o.radius === undefined && [...doc.all()].some((k) => k.parent === o.id));
 
+/** The one picked sheet (upright), when exactly one is picked. */
+const pickedSheet = (doc: DocumentStore, editor: EditorState) => {
+  const sheets = selected(doc, editor).filter(isContainer);
+  return sheets.length === 1 && !sheets[0]!.rot ? sheets[0]! : null;
+};
+
+/** Width and height in px of the one picked sheet (ADR 0121), or null. */
+export function sheetSize(doc: DocumentStore, editor: EditorState): { w: number; h: number } | null {
+  const s = pickedSheet(doc, editor);
+  if (!s) return null;
+  const b = worldBounds(s);
+  const w = D.toNumber(D.sub(b.max.x, b.min.x)), h = D.toNumber(D.sub(b.max.y, b.min.y));
+  return Number.isFinite(w + h) && w > 0 && h > 0 ? { w, h } : null;
+}
+
+/**
+ * Give the picked sheet a size in px (ADR 0121), its top-left corner fixed. Only the sheet changes size: what is on it follows its own
+ * pin (left/top by default, so it stays as it is; "Scale" makes it grow with the sheet). One undo step.
+ */
+export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, h: number): void {
+  const s = pickedSheet(doc, editor);
+  const now = sheetSize(doc, editor);
+  if (editor.blockEdit() || !s || !now || !(w > 0 && h > 0 && Number.isFinite(w + h))) return;
+  const kx = w / now.w, ky = h / now.h;
+  if (Math.abs(kx - 1) < 1e-9 && Math.abs(ky - 1) < 1e-9) return;
+  const group = [s, ...descendantsOf(doc.all(), new Set([s.id])).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o)];
+  const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
+  doc.commit(doc.transaction("Resize sheet", [...plan.values()]));
+  editor.changed();
+}
+
 /** Make each picked sheet exactly as large as what is directly on it (ADR 0108): one undo step. */
 export function fitSheet(doc: DocumentStore, editor: EditorState): void {
   if (editor.blockEdit()) return;
@@ -1470,6 +1513,7 @@ export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: A
   const ps = pictures(doc, editor);
   if (!ps.length || editor.blockEdit()) return;
   const clean = cleanAdjust(adjust);
+  setAdjustPreviewing(true);
   const next = new Map(ps.map((p): [string, ImageObject] => {
     const { adjust: _a, ...rest } = p;
     return [p.id, clean ? { ...rest, adjust: clean } : rest];
@@ -1482,6 +1526,7 @@ export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: A
 export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust | undefined, label = "Adjust picture"): void {
   const ps = pictures(doc, editor);
   editor.preview = { kind: "none" };
+  setAdjustPreviewing(false);
   if (!ps.length || editor.blockEdit()) return editor.changed();
   const clean = adjust ? cleanAdjust(adjust) : undefined;
   const next = ps

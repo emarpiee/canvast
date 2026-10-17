@@ -6,6 +6,7 @@
  */
 import type { Adjust } from "../doc/adjust";
 import { adjustKey, isNeutral } from "../doc/adjust";
+import { stopsAt } from "../doc/paint";
 
 const NS = "http://www.w3.org/2000/svg";
 const MAX_FILTERS = 40;
@@ -37,6 +38,18 @@ function build(a: Adjust, id: string): string {
   }
   if (c) f.push(`<feComponentTransfer>${transfer(() => `type="linear" slope="${n(1 + c)}" intercept="${n(0.5 - 0.5 * (1 + c))}"`)}</feComponentTransfer>`);
   if (a.saturation || a.vibrance) f.push(`<feColorMatrix type="saturate" values="${n(Math.max(0, 1 + (a.saturation ?? 0) / 100 + ((a.vibrance ?? 0) / 100) * 0.5))}"/>`);
+  if (a.map) {
+    // the gradient map: brightness, looked up in a table of the gradient, mixed back with the picture by the amount
+    const k = a.map.amount / 100;
+    const at = (t: number): readonly number[] => stopsAt(a.map!.stops, t);
+    const table = (ch: 0 | 1 | 2): string => Array.from({ length: 33 }, (_, i) => n(at(i / 32)[ch]! / 255)).join(" ");
+    f.push(
+      `<feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="pre-${id}"/>` +
+        `<feColorMatrix in="pre-${id}" type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0"/>` +
+        `<feComponentTransfer result="map-${id}"><feFuncR type="table" tableValues="${table(0)}"/><feFuncG type="table" tableValues="${table(1)}"/><feFuncB type="table" tableValues="${table(2)}"/></feComponentTransfer>` +
+        `<feComposite in="map-${id}" in2="pre-${id}" operator="arithmetic" k1="0" k2="${n(k)}" k3="${n(1 - k)}" k4="0"/>`,
+    );
+  }
   if (a.sharpen) {
     const k = (a.sharpen / 100) * 1.5 * 0.25 * 4; // the unsharp mask of the stills: the pixel plus `amount` times its difference from its four neighbours
     const m = k / 4;
@@ -58,7 +71,7 @@ export function playingFilter(a: Adjust | undefined): string {
   if (isNeutral(a) || !a) return "";
   const key = adjustKey(a);
   let id = made.get(key);
-  const needsSvg = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance || a.sharpen || a.grain);
+  const needsSvg = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance || a.sharpen || a.grain || a.map);
   if (needsSvg && !id) {
     if (!host) {
       const svg = document.createElementNS(NS, "svg");

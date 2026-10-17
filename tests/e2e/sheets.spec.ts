@@ -183,3 +183,33 @@ test("Attach: the picked objects follow the object clicked next when it moves; D
   await click(app, 640, 340);
   expect(await selection(app)).toEqual([b.id]);
 });
+
+test("a picked sheet shows its size in px, in, mm and cm; typing another size changes only the sheet (what is on it keeps its size), in one undo step (ADR 0121)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 600, 450); // the sheet (not the rectangle)
+  const w = p.locator("[data-sheet-w]"), h = p.locator("[data-sheet-h]"), unit = p.locator("[data-sheet-unit]");
+  await expect(w).toBeVisible();
+  const w0 = Number(await w.inputValue());
+  expect(w0).toBeGreaterThan(0);
+  await unit.selectOption({ label: "in" });
+  expect(Number(await w.inputValue())).toBeCloseTo(w0 / 96, 2);
+  await unit.selectOption({ label: "px" });
+  await w.fill(String(w0 * 2));
+  await w.blur();
+  await app.frame();
+  expect(Number(await w.inputValue())).toBeCloseTo(w0 * 2, 0);
+  const boxes = await p.evaluate(() => window.__canvastDebug.objects()) as unknown as Array<{ id: string; kind: string }>;
+  expect(boxes.length, "nothing was added or lost").toBe(2);
+  const kept = (await objs(app)).find((o) => o.id === rect.id)!;
+  expect(JSON.stringify(kept), "what is on the sheet keeps its place and size").toBe(JSON.stringify(rect));
+  await key(app, "Control+z");
+  await app.frame();
+  expect(Number(await w.inputValue())).toBeCloseTo(w0, 0);
+  expect(app.consoleErrors).toEqual([]);
+});

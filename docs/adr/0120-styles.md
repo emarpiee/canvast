@@ -17,3 +17,9 @@ Colour palettes (the next kind), saved styles travelling in `.canvast` archives,
 
 ## Tests
 `tests/unit/styles.test.ts` (the registry, saving, naming, renaming, removing, a failed write, reading back); `tests/e2e/pictures.spec.ts` (save from the Adjust panel, the card, rename, reload, apply to another picture, delete; save a colour), both browsers.
+
+## Update: the Styles panel
+
+Applying is done from a floating Styles panel (`ui/styles-panel.ts`), not a row under the selection bar: it holds one folding section per kind that has an apply handler, a name search, and rows disabled until the selection can take that kind. Adding a kind = one `STYLE_KINDS` entry plus one handler in `main.ts`.
+
+The Assets view no longer has a Styles card: the panel on the canvas does everything it did (list, rename, delete) and applies.

@@ -2,7 +2,13 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
-- **Styles** (ADR 0120): a card in the Assets view's sidebar for the looks you save, made to take more kinds (colour palettes next). **Save adjustment** in the Adjust panel, with the saved ones as chips to apply; **Save colour** in the colour picker, with a Saved row of swatches.
+- **Styles grow** (ADR 0122): **gradients** (Save gradient in the fill and outline picker), **colours** and **palettes** (made from the selection, a picture or a colour with a harmony; open one to use or edit its colours: change, name, add, remove, sort, copy as CSS), all applied from the Styles panel (asking fill, outline or both when several shapes are picked); **GIMP `.ggr` gradients and `.gpl` palettes** import (several at once) and export (a ZIP for several); a **gradient map** adjustment for pictures and video.
+- **Sheets in real units** (ADR 0121): a picked sheet shows its size in px, in, mm or cm; typing a size changes only the sheet.
+- **Crop** looks unlike resizing: the canvas outside the window dims with the cut-away picture faintly showing, brackets instead of squares, a Crop tag, and the floating bars step aside; a dot on the Crop and Adjust buttons says a picture has them. Bookmarks, Styles and Tags moved to a stack on the left.
+
+- **Styles panel** (toolbar, top right): the saved adjustments in a floating panel with a search box and a folding section per kind; select pictures and press one to apply it (one undo step). **/** now opens the command palette (it used to search; Ctrl+F searches). The Adjust panel is wider with no clipped number fields, and sliders no longer lag (a reduced picture is adjusted while dragging).
+
+- **Styles** (ADR 0120): the looks you save, kept in one list made to take more kinds (colour palettes next) and shown in the Styles panel of the canvas (no card in the Assets view). **Save adjustment** in the Adjust panel, with the saved ones as chips to apply; **Save colour** in the colour picker, with a Saved row of swatches.
 
 - **Download** on the selection bar for every file of the canvas (several in one ZIP; an edited still comes with its original, named as edited pictures are), **Reset** beside Adjust, and **every adjustment on video and GIF** (highlights, shadows, tint, sharpen and grain were missing) through an SVG filter (ADR 0119).
 

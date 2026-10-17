@@ -1,0 +1,132 @@
+import { expect, test } from "./harness";
+import type { App } from "./harness";
+import { makePng } from "./png";
+
+/**
+ * Styles of the canvas (ADR 0122): gradients and palettes saved, applied (asking when several shapes are picked), edited, and read and
+ * written as GIMP .ggr and .gpl files; a gradient map on a picture. Real input; assertions read the stored objects.
+ */
+type Grad = { type: string; stops: Array<{ o: number; c: string }> };
+type Obj = { id: string; kind: string; fill: string | Grad | null; stroke: string | Grad | null; adjust?: { map?: { stops: Array<{ o: number; c: string }>; amount: number } } };
+const objs = async (app: App): Promise<Obj[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Obj[];
+const drag = async (app: App, a: [number, number], b: [number, number]) => {
+  await app.drag({ x: a[0], y: a[1] }, { x: b[0], y: b[1] }, 8);
+  await app.frame();
+};
+const centre = async (app: App, id: string): Promise<[number, number]> => {
+  const b = (await app.page.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  return [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)];
+};
+const SUNSET = "GIMP Gradient\nName: Sunset\n1\n0.000000 0.500000 1.000000 1.000000 0.000000 0.000000 1.000000 0.000000 0.000000 1.000000 1.000000 0 0 0 0\n";
+
+test("Styles: a gradient is saved from the fill picker, applied (the part asked when several are picked), exported and read back as .ggr", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await p.keyboard.press("u");
+  await drag(app, [500, 300], [620, 380]);
+  await drag(app, [700, 300], [820, 380]);
+  const [a, b] = (await objs(app)).slice(-2) as [Obj, Obj];
+  await p.keyboard.press("v");
+  await p.mouse.click(...(await centre(app, a.id)));
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await pop.locator("[data-save-gradient]").click();
+  await p.keyboard.press("Escape");
+
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  const panel = p.getByTestId("styles-panel");
+  const card = (name: string) => panel.locator(".style-card", { hasText: name });
+  await expect(card("Gradient 1")).toContainText("Linear · 2 stops");
+  // one shape picked: it goes on the fill, no question
+  await p.mouse.click(...(await centre(app, b.id)));
+  await card("Gradient 1").click();
+  await expect.poll(async () => ((await objs(app)).find((o) => o.id === b.id)!.fill as Grad).type).toBe("linear");
+  // two picked: the person is asked which part
+  await p.mouse.click(...(await centre(app, a.id)));
+  await p.keyboard.down("Shift");
+  await p.mouse.click(...(await centre(app, b.id)));
+  await p.keyboard.up("Shift");
+  await card("Gradient 1").click();
+  await p.getByTestId("choose-dialog").locator('input[value="stroke"]').check();
+  await p.getByTestId("choose-ok").click();
+  for (const id of [a.id, b.id]) await expect.poll(async () => ((await objs(app)).find((o) => o.id === id)!.stroke as Grad).type).toBe("linear");
+
+  // written as a GIMP gradient, and a file of that kind read back
+  const [file] = await Promise.all([p.waitForEvent("download"), (async () => {
+    await panel.getByRole("button", { name: /^More actions for style Gradient 1/ }).click();
+    await p.getByRole("menuitem", { name: /Export Gradient 1 as a GIMP gradient/ }).click();
+  })()]);
+  expect(file.suggestedFilename()).toBe("gradient_1.ggr");
+  await p.getByTestId("styles-import").setInputFiles([{ name: "sunset.ggr", mimeType: "text/plain", buffer: Buffer.from(SUNSET) }, { name: "junk.ggr", mimeType: "text/plain", buffer: Buffer.from("nope") }]);
+  await expect(card("Sunset")).toContainText("Linear · 2 stops");
+  await expect(p.getByTestId("toast").getByText(/not a GIMP/)).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Styles: a palette from the selection's colours is opened, a colour of it applied, edited (named, changed, added, removed), exported and read back as .gpl", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await drag(app, [500, 300], [620, 380]);
+  const shape = (await objs(app)).at(-1)!;
+  await p.keyboard.press("v");
+  await p.mouse.click(...(await centre(app, shape.id)));
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  const panel = p.getByTestId("styles-panel");
+  await panel.getByRole("button", { name: "New style" }).click();
+  await p.getByRole("menuitem", { name: "New palette from the selection" }).click();
+  const card = panel.locator(".style-palette").first();
+  await expect(card).toContainText("Palette 1");
+  await expect(card.locator(".palette-chip")).toHaveCount(2); // the fill and the outline colour
+  // applied: the chip's colour goes on the fill
+  await card.locator(".palette-chip").nth(1).click();
+  const picked = (await objs(app)).at(-1)!;
+  expect(picked.fill).toMatch(/^#[0-9a-f]{6}$/);
+  // edited: named, one more added, one removed
+  await card.getByRole("button", { name: /^More actions for style Palette 1/ }).click();
+  await p.getByRole("menuitem", { name: /Edit the colours of Palette 1/ }).click();
+  await card.locator('[data-colour-name="0"]').fill("Ink");
+  await card.locator('[data-colour-name="0"]').blur();
+  await card.getByRole("button", { name: "Add colour" }).click();
+  await expect(card.locator(".pal-row")).toHaveCount(3);
+  await p.keyboard.press("Escape"); // the picker that opens on the new colour
+  await card.getByRole("button", { name: /^Remove/ }).last().click();
+  await expect(card.locator(".pal-row")).toHaveCount(2);
+  await card.getByRole("button", { name: "Done" }).click();
+  await expect(card.locator(".palette-chip").first()).toHaveAttribute("title", /^Ink /);
+  // written as a GIMP palette, and read back
+  const [file] = await Promise.all([p.waitForEvent("download"), (async () => {
+    await card.getByRole("button", { name: /^More actions for style Palette 1/ }).click();
+    await p.getByRole("menuitem", { name: /Export Palette 1 as a GIMP palette/ }).click();
+  })()]);
+  expect(file.suggestedFilename()).toBe("palette_1.gpl");
+  await p.getByTestId("styles-import").setInputFiles({ name: "brand.gpl", mimeType: "text/plain", buffer: Buffer.from("GIMP Palette\nName: Brand\nColumns: 2\n#\n255 136   0\tOrange\n 16  32  48\n") });
+  await expect(panel.locator(".style-card", { hasText: "Brand" })).toContainText("2 colours");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Styles: a gradient map on a picture maps its brightness onto a saved gradient, by an amount, in one undo step", async ({ app }) => {
+  const p = app.page;
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  await p.getByTestId("styles-import").setInputFiles({ name: "sunset.ggr", mimeType: "text/plain", buffer: Buffer.from(SUNSET) });
+  await expect(p.getByTestId("styles-panel").locator(".style-card", { hasText: "Sunset" })).toBeVisible();
+  await p.getByTestId("import-input").setInputFiles({ name: "grey.png", mimeType: "image/png", buffer: makePng(80, 80, () => [128, 128, 128, 255]) });
+  await expect.poll(async () => (await objs(app)).length).toBe(1);
+  await app.frame();
+  const pic = (await objs(app))[0]!;
+  await p.keyboard.press("v");
+  await p.mouse.click(...(await centre(app, pic.id)));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  const pop = p.locator(".adjust-pop");
+  await pop.locator("[data-adj-map]").selectOption({ label: "Sunset" });
+  const map = (await objs(app))[0]!.adjust!.map!;
+  expect(map.amount).toBe(100);
+  expect(map.stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(1100, 700); // nothing picked: a selection paints over the pixels
+  const [x, y] = await centre(app, pic.id);
+  const shown = await p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  expect(shown[0]! > 100 && shown[2]! > 100 && shown[1]! < 40, "mid grey on a red-to-blue map is purple").toBe(true);
+  await p.keyboard.press("Control+z");
+  expect((await objs(app))[0]!.adjust).toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});

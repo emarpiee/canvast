@@ -12,7 +12,6 @@ import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import { parseFilter, type Filter } from "../assets/filters";
-import { STYLE_KINDS } from "../assets/styles";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -336,7 +335,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | { kind: "rename-style"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
   const fileTile = (e: { name: string; type: string }, note = true): string =>
@@ -1270,26 +1269,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             }
           </ul>`,
         )}
-        ${section(
-          "styles",
-          "Styles",
-          "",
-          `<div class="styles-card" data-testid="styles-card">${STYLE_KINDS.map((k) => {
-            const rows = session.styles.of(k.id);
-            return `<h3 class="styles-kind">${esc(k.plural)}<span class="side-n">${rows.length}</span></h3><ul class="side-list" data-testid="styles-${k.id}">${
-              rows
-                .map((s) =>
-                  naming?.kind === "rename-style" && naming.id === s.id
-                    ? nameInput(s.name, `New name for ${k.label.toLowerCase()} ${s.name}`)
-                    : `<li class="side-row style-row" data-style="${esc(s.id)}" title="${esc(k.summary(s.data))}">${k.dot?.(s.data) ? `<span class="style-dot" style="--dot:${esc(k.dot(s.data)!)}"></span>` : ""}<span class="side-label">${esc(s.name)}</span><span class="style-sum">${esc(k.summary(s.data))}</span>${more("style", s.id, s.name, [
-                        { attr: 'data-style-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename ${k.label.toLowerCase()} ${s.name}` },
-                        { attr: 'data-style-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete ${k.label.toLowerCase()} ${s.name}`, danger: true },
-                      ])}</li>`,
-                )
-                .join("") || `<li class="side-empty">${esc(k.empty)}</li>`
-            }</ul>`;
-          }).join("")}</div>`,
-        )}
       </div>`;
     // The menu floats over the page (the sidebar scrolls and would clip it), kept inside the window.
     const pop = side.querySelector<HTMLElement>(".side-menu");
@@ -1990,20 +1969,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       return;
     }
-    if (b.dataset["styleAction"]) {
-      const id = b.dataset["key"]!;
-      const s = session.styles.items.find((x) => x.id === id);
-      if (!s) return;
-      if (b.dataset["styleAction"] === "rename") {
-        naming = { kind: "rename-style", id };
-        renderSide();
-      } else {
-        void confirmDialog({ title: `Delete “${s.name}”?`, lines: ["It is taken out of the saved styles. What it was used on keeps its look."], confirmLabel: "Delete" }).then((ok) => {
-          if (ok) void session.styles.remove(id);
-        });
-      }
-      return;
-    }
     if (b.dataset["ctagAction"]) {
       const key = b.dataset["key"]!;
       const label = canvasTags.get(key)?.label ?? key;
@@ -2091,8 +2056,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if (ok && scope === `tag:${n.key}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
           renderSide();
         });
-      } else if (n.kind === "rename-style") {
-        void session.styles.rename(n.id, name).then(() => renderSide());
       } else if (n.kind === "rename-ctag") {
         const was = n.label;
         void session.changeCanvasTag(was, name).then((changed) => {
@@ -2419,7 +2382,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (visible) status.textContent = text;
   });
   session.subscribeAssets(() => void refresh());
-  session.styles.subscribe(() => renderSide()); // a style saved from the canvas, renamed or deleted
   session.subscribe(() => void refresh()); // tree renamed, role changed
 
   const view: AssetsView = {

@@ -339,10 +339,10 @@ test("a tour plays the bookmarks in order: Right and Left step, the bars fade, E
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("the command palette: Ctrl+K finds a command by its words, shows its key, offers only what can be done now, runs it with Enter and closes with Escape (ADR 0117)", async ({ app }) => {
+test("the command palette: / or Ctrl+K opens it and it finds a command by its words, shows its key, offers only what can be done now, runs it with Enter and closes with Escape (ADR 0117)", async ({ app }) => {
   const p = app.page;
   const palette = p.getByTestId("command-palette");
-  await p.keyboard.press("Control+k");
+  await p.keyboard.press("/");
   await expect(palette).toBeVisible();
   await expect(p.locator(".palette-input")).toBeFocused();
   // nothing is selected: commands that need a selection are not offered

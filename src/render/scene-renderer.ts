@@ -6,6 +6,7 @@ import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
+import type { RasterSource } from "./draw-objects";
 import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
@@ -603,11 +604,14 @@ function drawSelection(
       }
     }
     editor.drawnHandles = handles;
-    for (const [x, y] of handles) {
-      const h = HANDLE_SIZE_PX;
-      ctx.fillRect(x - h / 2, y - h / 2, h, h);
-      ctx.strokeRect(x - h / 2, y - h / 2, h, h);
-    }
+    const cropping = editor.cropId !== null && editor.selection.size === 1 && editor.selection.has(editor.cropId);
+    if (cropping) drawCropBrackets(ctx, frame.corners, theme);
+    else
+      for (const [x, y] of handles) {
+        const h = HANDLE_SIZE_PX;
+        ctx.fillRect(x - h / 2, y - h / 2, h, h);
+        ctx.strokeRect(x - h / 2, y - h / 2, h, h);
+      }
     if (canRotate(visible, editor)) {
       const top: Pt = [(frame.corners[0][0] + frame.corners[1][0]) / 2, (frame.corners[0][1] + frame.corners[1][1]) / 2];
       ctx.beginPath();
@@ -619,6 +623,83 @@ function drawSelection(
       ctx.fill();
       ctx.stroke();
     }
+  }
+  ctx.restore();
+}
+
+/**
+ * Crop mode looks unlike resizing (ADR 0118): the corners are thick L brackets and the sides short bars (not squares), the part of the picture
+ * that is cut away shows faintly around the window (`drawCropGhost`), and a "Crop" tag sits above it.
+ */
+function drawCropBrackets(ctx: CanvasRenderingContext2D, corners: readonly (readonly number[])[], theme: SceneTheme): void {
+  const [a, b, c, d] = corners as [number[], number[], number[], number[]];
+  const left = Math.min(a[0]!, c[0]!), right = Math.max(a[0]!, c[0]!), top = Math.min(a[1]!, c[1]!), bottom = Math.max(a[1]!, c[1]!);
+  const arm = Math.min(CROP_ARM_PX, (right - left) / 3, (bottom - top) / 3);
+  if (!(arm > 2)) return;
+  const mx = (left + right) / 2, my = (top + bottom) / 2;
+  const path = (): void => {
+    ctx.beginPath();
+    for (const [x, y, dx, dy] of [[left, top, 1, 1], [right, top, -1, 1], [right, bottom, -1, -1], [left, bottom, 1, -1]] as const) {
+      ctx.moveTo(x + dx * arm, y);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y + dy * arm);
+    }
+    const half = arm / 2;
+    ctx.moveTo(mx - half, top); ctx.lineTo(mx + half, top);
+    ctx.moveTo(mx - half, bottom); ctx.lineTo(mx + half, bottom);
+    ctx.moveTo(left, my - half); ctx.lineTo(left, my + half);
+    ctx.moveTo(right, my - half); ctx.lineTo(right, my + half);
+  };
+  ctx.save();
+  ctx.lineCap = "square";
+  ctx.lineJoin = "miter";
+  path();
+  ctx.strokeStyle = theme.handleFill;
+  ctx.lineWidth = CROP_BRACKET_PX + 2;
+  ctx.stroke();
+  path();
+  ctx.strokeStyle = theme.selection;
+  ctx.lineWidth = CROP_BRACKET_PX;
+  ctx.stroke();
+  // The tag.
+  ctx.font = LABEL_FONT;
+  ctx.textBaseline = "middle";
+  const text = "Crop";
+  const w = ctx.measureText(text).width + 14;
+  const x = left, y = top - 26; // (the turn handle is above the middle)
+  ctx.fillStyle = theme.selection;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, 18, 9);
+  ctx.fill();
+  ctx.fillStyle = theme.handleFill;
+  ctx.fillText(text, x + 7, y + 9);
+  ctx.restore();
+  void b; void d;
+}
+
+const CROP_ARM_PX = 16;
+const CROP_BRACKET_PX = 3;
+
+/** Around the crop window: the canvas is dimmed and what the crop cuts away of the picture shows faintly (ADR 0118); drag outward to bring it back. */
+export function drawCropGhost(ctx: CanvasRenderingContext2D, po: ProjectedObject, src: RasterSource | null, vp: Viewport): void {
+  const o = po.obj;
+  if (o.kind !== "image" || !src || o.rot) return;
+  const [l, t, r, b] = po.q as unknown as [number, number, number, number];
+  const crop = cropOf(o);
+  const sx = (r - l) / crop.w, sy = (b - t) / crop.h;
+  const x = l - crop.x * sx, y = t - crop.y * sy, w = o.pixelW * sx, h = o.pixelH * sy;
+  if (![l, t, r, b].every(Number.isFinite)) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, vp.width, vp.height);
+  ctx.rect(l, t, r - l, b - t);
+  ctx.clip("evenodd");
+  // Everything outside the window is dimmed, so the window stands out; the cut-away part of the picture shows through that dimness.
+  ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+  ctx.fillRect(0, 0, vp.width, vp.height);
+  if ([x, y, w, h].every(Number.isFinite) && w < 1e5 && h < 1e5) {
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(src.source, x, y, w, h);
   }
   ctx.restore();
 }

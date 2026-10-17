@@ -4,7 +4,17 @@
  * are 0 to 100. `adjustPixel` is the whole of the colour part, one pixel at a time, so a picture seen magnified (each source pixel a big
  * rectangle), seen from so far in that it is one colour, and drawn at ordinary size all agree.
  */
+import type { GradientStop } from "./paint";
+import { MAX_STOPS, isColour, stopsAt } from "./paint";
+
+/** A gradient map (ADR 0122): the brightness of each pixel is looked up in a gradient, and `amount` (1 to 100) says how far the picture goes towards it. Transparency in the gradient is not used. */
+export interface GradientMap {
+  readonly stops: readonly GradientStop[];
+  readonly amount: number;
+}
+
 export interface Adjust {
+  readonly map?: GradientMap;
   readonly exposure?: number;
   readonly contrast?: number;
   readonly highlights?: number;
@@ -18,7 +28,7 @@ export interface Adjust {
   readonly grain?: number;
 }
 
-export type AdjustKey = keyof Adjust;
+export type AdjustKey = Exclude<keyof Adjust, "map">;
 
 export interface AdjustSpec {
   readonly key: AdjustKey;
@@ -44,14 +54,28 @@ export const ADJUSTMENTS: readonly AdjustSpec[] = [
 ];
 
 /** Whether anything is changed (an adjustment of 0 is none). */
-export const isNeutral = (a: Adjust | undefined): boolean => !a || ADJUSTMENTS.every((s) => !a[s.key]);
+export const isNeutral = (a: Adjust | undefined): boolean => !a || (!a.map && ADJUSTMENTS.every((s) => !a[s.key]));
+
+/** Whether `m` is a gradient map the document accepts (2 to 32 ordered stops, an amount of 1 to 100). */
+export function validMap(m: unknown): m is GradientMap {
+  const g = m as { stops?: unknown; amount?: unknown } | null;
+  if (!g || typeof g !== "object" || !Array.isArray(g.stops) || g.stops.length < 2 || g.stops.length > MAX_STOPS) return false;
+  if (typeof g.amount !== "number" || !Number.isInteger(g.amount) || g.amount < 1 || g.amount > 100) return false;
+  let last = 0;
+  for (const s of g.stops as Array<Record<string, unknown>>) {
+    if (!s || typeof s["o"] !== "number" || s["o"] < last || s["o"] > 1 || !isColour(s["c"])) return false;
+    last = s["o"];
+  }
+  return true;
+}
 
 /** Whether the pictures around a pixel matter (blur, sharpen, grain): such an adjustment is drawn at the size seen, never at depth. */
 export const needsNeighbours = (a: Adjust | undefined): boolean => !!a && (!!a.blur || !!a.sharpen || !!a.grain);
 
 /** The adjustments with only the nonzero numbers, in range; undefined when nothing is left. */
 export function cleanAdjust(a: Adjust): Adjust | undefined {
-  const out: Record<string, number> = {};
+  const out: Record<string, unknown> = {};
+  if (a.map && validMap({ ...a.map, amount: Math.round(a.map.amount) })) out["map"] = { stops: a.map.stops.map((s) => ({ o: s.o, c: s.c.toLowerCase() })), amount: Math.round(a.map.amount) };
   for (const s of ADJUSTMENTS) {
     const v = a[s.key];
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
@@ -62,54 +86,110 @@ export function cleanAdjust(a: Adjust): Adjust | undefined {
 }
 
 /** A short text that differs whenever the adjustments do (to cache what was drawn with them). */
-export const adjustKey = (a: Adjust | undefined): string => (a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") : "");
+export const adjustKey = (a: Adjust | undefined): string => (a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") : "");
 
 const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
-const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const linearToSrgb = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+/** sRGB byte to linear light, and back (a table of 4096 steps): exposure works in linear light, and a table is far quicker than a power. */
+const S2L = new Float32Array(256);
+const L2S = new Uint8ClampedArray(4097);
+for (let i = 0; i < 256; i++) {
+  const c = i / 255;
+  S2L[i] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+for (let i = 0; i <= 4096; i++) {
+  const c = i / 4096;
+  L2S[i] = Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
+}
+
+/**
+ * The colour part of the adjustments made ready once, as a function that changes the first three bytes of the pixel at `i` of `d` in place
+ * (RGBA bytes). It allocates nothing, so it can run over every pixel of a picture while a slider is dragged.
+ */
+export function prepare(a: Adjust): (d: { [i: number]: number }, i: number) => void {
+  const expK = a.exposure ? 2 ** ((a.exposure / 100) * 2) : 0;
+  const t = (a.temperature ?? 0) / 100, n = (a.tint ?? 0) / 100;
+  const warm = !!(t || n);
+  const rMul = 1 + 0.25 * t + 0.06 * n, gMul = 1 - 0.18 * n, bMul = 1 - 0.25 * t + 0.06 * n;
+  const sh = ((a.shadows ?? 0) / 100) * 0.5, hi = ((a.highlights ?? 0) / 100) * 0.5;
+  const tone = !!(sh || hi);
+  const ck = 1 + (a.contrast ?? 0) / 100;
+  const contrast = !!a.contrast;
+  const sat = (a.saturation ?? 0) / 100, vib = (a.vibrance ?? 0) / 100;
+  const colourful = !!(a.saturation || a.vibrance);
+  // The gradient map: a table of 256 colours, one per brightness.
+  const lut = a.map ? new Uint8ClampedArray(256 * 3) : null;
+  const mapK = a.map ? a.map.amount / 100 : 0;
+  if (lut && a.map) for (let v = 0; v < 256; v++) {
+    const [r, g, b] = stopsAt(a.map.stops, v / 255);
+    lut[v * 3] = r;
+    lut[v * 3 + 1] = g;
+    lut[v * 3 + 2] = b;
+  }
+  return (d, i) => {
+    let R: number, G: number, B: number;
+    if (expK) {
+      R = L2S[Math.min(4096, Math.round(S2L[d[i]!]! * expK * 4096))]! / 255;
+      G = L2S[Math.min(4096, Math.round(S2L[d[i + 1]!]! * expK * 4096))]! / 255;
+      B = L2S[Math.min(4096, Math.round(S2L[d[i + 2]!]! * expK * 4096))]! / 255;
+    } else {
+      R = d[i]! / 255;
+      G = d[i + 1]! / 255;
+      B = d[i + 2]! / 255;
+    }
+    if (warm) {
+      R *= rMul;
+      G *= gMul;
+      B *= bMul;
+    }
+    if (tone) {
+      const y = 0.299 * R + 0.587 * G + 0.114 * B;
+      const lift = sh * (1 - y) ** 2 - hi * y * y;
+      R += lift;
+      G += lift;
+      B += lift;
+    }
+    if (contrast) {
+      R = (R - 0.5) * ck + 0.5;
+      G = (G - 0.5) * ck + 0.5;
+      B = (B - 0.5) * ck + 0.5;
+    }
+    if (colourful) {
+      const y = 0.299 * R + 0.587 * G + 0.114 * B;
+      const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+      // vibrance lifts the dull colours more than the vivid ones
+      const k = 1 + sat + vib * (1 - (mx <= 0 ? 0 : (mx - mn) / mx));
+      R = y + (R - y) * k;
+      G = y + (G - y) * k;
+      B = y + (B - y) * k;
+    }
+    if (lut) {
+      const y = Math.max(0, Math.min(255, Math.round((0.299 * R + 0.587 * G + 0.114 * B) * 255)));
+      R += (lut[y * 3]! / 255 - R) * mapK;
+      G += (lut[y * 3 + 1]! / 255 - G) * mapK;
+      B += (lut[y * 3 + 2]! / 255 - B) * mapK;
+    }
+    d[i] = clamp(R * 255);
+    d[i + 1] = clamp(G * 255);
+    d[i + 2] = clamp(B * 255);
+  };
+}
+
+let lastKey = "";
+let last: ((d: { [i: number]: number }, i: number) => void) | null = null;
+const one = [0, 0, 0];
 
 /** The colour of one pixel (0..255) after the adjustments that need no neighbours. */
 export function adjustPixel(r: number, g: number, b: number, a: Adjust): [number, number, number] {
-  let R = r / 255, G = g / 255, B = b / 255;
-  if (a.exposure) {
-    // in linear light, a stop doubles it
-    const k = 2 ** ((a.exposure / 100) * 2);
-    R = linearToSrgb(Math.min(1, srgbToLinear(R) * k));
-    G = linearToSrgb(Math.min(1, srgbToLinear(G) * k));
-    B = linearToSrgb(Math.min(1, srgbToLinear(B) * k));
+  const key = adjustKey(a);
+  if (key !== lastKey || !last) {
+    last = prepare(a);
+    lastKey = key;
   }
-  if (a.temperature || a.tint) {
-    const t = (a.temperature ?? 0) / 100, n = (a.tint ?? 0) / 100;
-    R *= 1 + 0.25 * t;
-    B *= 1 - 0.25 * t;
-    G *= 1 - 0.18 * n; // towards green when negative, towards magenta when positive
-    R *= 1 + 0.06 * n;
-    B *= 1 + 0.06 * n;
-  }
-  if (a.highlights || a.shadows) {
-    const y = 0.299 * R + 0.587 * G + 0.114 * B;
-    const lift = ((a.shadows ?? 0) / 100) * 0.5 * (1 - y) ** 2 - ((a.highlights ?? 0) / 100) * 0.5 * y ** 2;
-    R += lift;
-    G += lift;
-    B += lift;
-  }
-  if (a.contrast) {
-    const k = 1 + a.contrast / 100;
-    R = (R - 0.5) * k + 0.5;
-    G = (G - 0.5) * k + 0.5;
-    B = (B - 0.5) * k + 0.5;
-  }
-  if (a.saturation || a.vibrance) {
-    const y = 0.299 * R + 0.587 * G + 0.114 * B;
-    const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
-    const sat = mx <= 0 ? 0 : (mx - mn) / mx;
-    // vibrance lifts the dull colours more than the vivid ones
-    const k = 1 + (a.saturation ?? 0) / 100 + ((a.vibrance ?? 0) / 100) * (1 - sat);
-    R = y + (R - y) * k;
-    G = y + (G - y) * k;
-    B = y + (B - y) * k;
-  }
-  return [clamp(R * 255), clamp(G * 255), clamp(B * 255)];
+  one[0] = r;
+  one[1] = g;
+  one[2] = b;
+  last(one, 0);
+  return [one[0]!, one[1]!, one[2]!];
 }
 
 /**

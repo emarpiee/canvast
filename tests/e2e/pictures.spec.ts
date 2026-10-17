@@ -37,6 +37,11 @@ test("crop: the picture's handles move its window, what stays does not move, pul
   const b1 = await boxOf(app, pic.id);
   expect(b1.minX, "what is left has not moved").toBeCloseTo(b0.minX, 0);
   expect(b0.maxX - b1.maxX, "and the box follows the cut").toBeGreaterThan(70);
+  // crop mode looks unlike resizing: what is cut away shows faintly beside the window, and is gone when cropping ends
+  const ghostAt = [Math.round(b1.maxX) + 30, Math.round(b1.minY) + 15] as const;
+  const bg = await px(app, 60, 650);
+  expect(await px(app, ghostAt[0], ghostAt[1]), "the cut-away part shows").not.toEqual(bg);
+  await expect(p.locator(".rail"), "the floating bars step aside while cropping").toBeHidden();
   // from the left too: the picture's own left edge stays where the cut leaves it
   const leftNow = Math.round(b1.minX);
   await app.drag({ x: leftNow, y: midY }, { x: leftNow + 40, y: midY }, 6);
@@ -47,7 +52,9 @@ test("crop: the picture's handles move its window, what stays does not move, pul
   // the pixel at the middle of what is left is the one it was before the cut
   await p.keyboard.press("Enter");
   await expect(p.getByRole("button", { name: "Crop the picture" })).toHaveAttribute("aria-pressed", "false");
+  await expect(p.locator(".rail")).toBeVisible();
   await p.mouse.click(60, 650);
+  expect(await px(app, ghostAt[0], ghostAt[1]), "and is gone when cropping ends").toEqual(await px(app, 60, 650));
   // undo the two crops one by one, then crop and show the whole picture with the button
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === pic.id)!.crop!.x).toBe(0);
@@ -244,58 +251,64 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   await pop.locator('[data-adj-num="contrast"]').fill("30");
   await pop.locator('[data-adj-num="contrast"]').blur();
   await pop.locator("[data-adj-name]").fill("Punchy");
-  await pop.getByRole("button", { name: "Save adjustment" }).click();
-  await expect(pop.locator(".adj-chip")).toHaveText(["Punchy"]);
+  await pop.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(pop.locator("[data-adj-name]")).toHaveAttribute("placeholder", /Saved/);
+  // double-clicking a name takes that one number off
+  await pop.locator('[data-adj-row="contrast"] label').dblclick();
+  await expect(pop.locator('[data-adj-num="contrast"]')).toHaveValue("0");
   await p.keyboard.press("Escape");
 
-  // the Styles card of the library lists it, with what it does
-  await p.getByTestId("view-assets").click();
-  const card = p.getByTestId("styles-card");
-  await expect(card.getByTestId("styles-adjustment")).toContainText("Punchy");
-  await expect(card.getByTestId("styles-adjustment")).toContainText("Contrast +30");
-  await expect(card.getByTestId("styles-colour")).toContainText("None yet");
-  // rename it
-  await card.getByRole("button", { name: /^More actions for style Punchy/ }).click();
-  await p.getByRole("menuitem", { name: /^Rename adjustment Punchy/ }).click();
-  await p.locator(".side-name").fill("Punchy 2");
+  // the Styles panel lists it, with what it does, and renames it
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  const panel = p.getByTestId("styles-panel");
+  const card = (name: string) => panel.locator(".style-card", { hasText: name });
+  await expect(card("Punchy")).toContainText("Contrast +30");
+  await panel.getByRole("button", { name: /^More actions for style Punchy/ }).click();
+  await p.getByRole("menuitem", { name: /^Rename style Punchy/ }).click();
+  await p.locator(".style-rename").fill("Punchy 2");
   await p.keyboard.press("Enter");
-  await expect(card.getByTestId("styles-adjustment")).toContainText("Punchy 2");
+  await expect(card("Punchy 2")).toBeVisible();
   // kept over a reload
   expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  await p.getByTestId("view-assets").click();
-  await expect(p.getByTestId("styles-card").getByTestId("styles-adjustment")).toContainText("Punchy 2");
-  await p.getByTestId("view-canvas").click();
+  if (!(await panel.isVisible())) await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  await expect(card("Punchy 2")).toBeVisible();
 
-  // applied to another picture from the Adjust panel
   const second = await place(app, "two.png", makePng(60, 60, () => [30, 80, 160, 255]));
   await p.keyboard.press("v");
   const sb = await boxOf(app, second.id);
   await p.mouse.click(Math.round((sb.minX + sb.maxX) / 2), Math.round((sb.minY + sb.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
-  await p.locator(".adjust-pop .adj-chip", { hasText: "Punchy 2" }).click();
-  expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
-  await p.keyboard.press("Escape");
 
-  // deleted from the card
-  await p.getByTestId("view-assets").click();
-  await p.getByTestId("styles-card").getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
-  await p.getByRole("menuitem", { name: /^Delete adjustment Punchy 2/ }).click();
+  // ... and from the Styles panel: disabled with nothing selected, searchable, one undo step
+  await p.mouse.click(1100, 700); // empty canvas: nothing selected
+  await expect(card("Punchy 2")).toBeDisabled();
+  await panel.getByRole("searchbox").fill("zzz");
+  await expect(panel.getByText("No style matches.")).toBeVisible();
+  await panel.getByRole("searchbox").fill("punchy");
+  await p.mouse.click(Math.round((sb.minX + sb.maxX) / 2), Math.round((sb.minY + sb.maxY) / 2));
+  await card("Punchy 2").click();
+  expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
+  await p.keyboard.press("Control+z");
+  expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toBeUndefined();
+  await panel.getByRole("button", { name: "Adjustments" }).click(); // folds
+  await expect(card("Punchy 2")).toHaveCount(0);
+
+  // deleted from the panel
+  await panel.getByRole("button", { name: "Adjustments" }).click(); // unfolds
+  await panel.getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
+  await p.getByRole("menuitem", { name: /^Delete style Punchy 2/ }).click();
   await p.getByTestId("confirm-ok").click();
-  await expect(p.getByTestId("styles-card").getByTestId("styles-adjustment")).toContainText("None yet");
+  await expect(panel).toContainText("None yet");
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Styles: a colour is saved from the colour picker, listed in the Styles card and offered as Saved in the picker", async ({ app }) => {
+test("Styles: a colour is saved from the colour picker, offered as Saved in the picker", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
   await p.locator("[data-colour-open]").click();
   await p.getByRole("button", { name: "Save colour" }).click();
   await p.keyboard.press("Escape");
-  await p.getByTestId("view-assets").click();
-  await expect(p.getByTestId("styles-card").getByTestId("styles-colour")).toContainText("#1F2329");
-  await p.getByTestId("view-canvas").click();
   await p.locator("[data-colour-open]").click();
   await expect(p.locator(".colour-pop").getByText("Saved", { exact: true })).toBeVisible();
   expect(app.consoleErrors).toEqual([]);

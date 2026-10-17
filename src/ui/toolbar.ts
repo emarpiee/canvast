@@ -8,8 +8,10 @@ import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
 import { moreButton, openMoreMenu } from "./more-menu";
+import type { GradientStop } from "../doc/paint";
 import { openAdjustPopover, openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { Adjust } from "../doc/adjust";
+import { setAdjustPreviewing } from "../render/adjust-image";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -54,6 +56,9 @@ export interface ToolbarActions {
   setTextStyle(patch: { lineHeight?: number; tracking?: number }): void;
   setPin(patch: { h?: string; v?: string }): void;
   canFitSheet(): boolean;
+  /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
+  sheetSize(): { w: number; h: number } | null;
+  resizeSheet(w: number, h: number): void;
   sheetSelection(): void;
   canDetach(): boolean;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
@@ -62,7 +67,7 @@ export interface ToolbarActions {
   uncrop(): void;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
   /** The saved adjustments, and saving the numbers as one (ADR 0120). */
-  adjustStyles(): { items(): Array<{ id: string; name: string; adjust: Adjust; summary: string }>; save(name: string, a: Adjust): Promise<void> };
+  adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
   previewAdjust(a: Adjust): void;
   commitAdjust(a: Adjust, label: string): void;
   copyAdjust(): void;
@@ -156,9 +161,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
       </div>
       <div class="tb-group">
-        <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (/ name, # tag, @ bookmark)">${ICONS.search}</button>
+        <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
+        <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
         <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
       </div>
@@ -194,6 +200,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
         <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
+        <span class="tb-count" data-sheet-size hidden title="Size of the sheet; only the sheet changes, what is on it follows its pin">Size
+          <input type="number" data-sheet-w min="0" step="any" inputmode="decimal" aria-label="Sheet width"> × <input type="number" data-sheet-h min="0" step="any" inputmode="decimal" aria-label="Sheet height">
+          <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select></span>
         <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
@@ -335,6 +344,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLElement>("[data-fit-sheet]")!.addEventListener("click", () => actions.fitSheet());
+  const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
+  const sheetUnit = (): number => Number(sheetField("[data-sheet-unit]").value) || 1;
+  const sheetCommit = (): void => {
+    const w = Number(sheetField("[data-sheet-w]").value) * sheetUnit(), h = Number(sheetField("[data-sheet-h]").value) * sheetUnit();
+    if (w > 0 && h > 0) actions.resizeSheet(w, h);
+  };
+  for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) sheetField(f).addEventListener("change", sheetCommit);
+  sheetField("[data-sheet-unit]").addEventListener("change", () => editor.changed()); // (the same size, said in another unit)
   root.querySelector<HTMLElement>("[data-put-on-sheet]")!.addEventListener("click", () => actions.sheetSelection());
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
@@ -350,9 +367,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     openAdjustPopover(anchor, {
       ...sel,
       styles: actions.adjustStyles(),
+      onStyles: () => {
+        editor.stylesOpen = true;
+        editor.changed();
+      },
       onInput: (a) => actions.previewAdjust(a),
       onChange: (a, label) => actions.commitAdjust(a, label),
       onClose: () => {
+        setAdjustPreviewing(false);
         if (editor.preview.kind === "replace") {
           editor.preview = { kind: "none" }; // (an unfinished slider is not kept)
           editor.changed();
@@ -550,6 +572,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["bookmarks"] !== undefined) {
       editor.bookmarksOpen = !editor.bookmarksOpen;
       editor.changed();
+    } else if (d["styles"] !== undefined) {
+      editor.stylesOpen = !editor.stylesOpen;
+      editor.changed();
     } else if (d["tags"] !== undefined) {
       editor.tagsOpen = !editor.tagsOpen;
       editor.changed();
@@ -655,15 +680,33 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const crop = root.querySelector<HTMLElement>("[data-crop]")!;
     crop.hidden = !(pick && still && actions.croppable());
     crop.setAttribute("aria-pressed", String(editor.cropId !== null));
+    // A dot on the button says the picture already has it (and the label says so for a screen reader).
+    const cropped = pick && still && actions.cropped();
+    crop.classList.toggle("is-applied", cropped);
+    crop.setAttribute("aria-label", cropped ? "Crop the picture (cropped)" : "Crop the picture");
     root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
     const adj = pick && still ? actions.selectedAdjust() : null;
-    root.querySelector<HTMLElement>("[data-adjust]")!.hidden = !adj;
+    const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
+    adjustBtn.hidden = !adj;
+    const adjusted = !!adj && Object.keys(adj.adjust).length > 0;
+    adjustBtn.classList.toggle("is-applied", adjusted);
+    adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
     root.querySelector<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
     root.querySelector<HTMLElement>("[data-attach]")!.hidden = !(pick && still && editor.selection.size > 0);
     root.querySelector<HTMLElement>("[data-attach]")!.setAttribute("aria-pressed", String(editor.attachMode));
     root.querySelector<HTMLElement>("[data-detach]")!.hidden = !(pick && still && actions.canDetach());
     root.querySelector<HTMLElement>("[data-put-on-sheet]")!.hidden = !(pick && still && editor.selection.size > 0);
     root.querySelector<HTMLElement>("[data-fit-sheet]")!.hidden = !(pick && still && actions.canFitSheet());
+    const sz = pick && still ? actions.sheetSize() : null;
+    root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = !sz;
+    if (sz) {
+      const u = Number(root.querySelector<HTMLSelectElement>("[data-sheet-unit]")!.value) || 1;
+      const round = (v: number): string => String(Math.round((v / u) * 1000) / 1000);
+      for (const [f, v] of [["[data-sheet-w]", sz.w], ["[data-sheet-h]", sz.h]] as const) {
+        const el = root.querySelector<HTMLInputElement>(f)!;
+        if (document.activeElement !== el) el.value = round(v);
+      }
+    }
     for (const [key, shown, value] of fields) {
       if (!still && pick) continue;
       root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
@@ -726,6 +769,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
+    root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));

@@ -1405,9 +1405,10 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   const results = p.getByTestId("canvas-search");
   const selection = () => p.evaluate(() => window.__canvastDebug.selection());
   // "/": by file name; Enter selects it and brings it into view.
-  await p.keyboard.press("/");
+  await p.keyboard.press("Control+f");
   await expect(box).toBeFocused();
   await expect(box).toHaveValue(""); // the key chose the way; it is not part of the search
+  await results.getByRole("tab", { name: /Name/ }).click(); // Ctrl+F opens with the last way; "/" is the palette now
   await expect(results.getByRole("tab", { name: /Name/ })).toHaveAttribute("aria-selected", "true");
   await box.pressSequentially("blocks");
   await expect(results.getByRole("option")).toHaveCount(1);
@@ -1436,7 +1437,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect((await selection()).length).toBe(2);
   await p.mouse.click(1100, 700);
   expect((await selection()).length).toBe(0);
-  await p.keyboard.press("/");
+  await p.keyboard.press("Control+f");
   await box.fill("/.png");
   await p.keyboard.press("Shift+Enter");
   expect((await selection()).length).toBe(2);

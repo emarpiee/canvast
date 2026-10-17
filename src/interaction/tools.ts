@@ -207,7 +207,7 @@ export interface ToolHooks {
   navigate(dir: NavDir): void;
   /** Alt: bring the selection into view. */
   focusSelection(): void;
-  /** "/", "#" or "@": search the canvas by name, tag or bookmark (ADR 0060). */
+  /** "#" or "@": search the canvas by name, tag or bookmark (ADR 0060). */
   openSearch(prefix: string): void;
 }
 
@@ -1515,7 +1515,7 @@ export function attachTools(
       arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
     } else if (mod || e.altKey) {
       return;
-    } else if (e.key === "/" || e.key === "#" || e.key === "@") {
+    } else if (e.key === "#" || e.key === "@") {
       hooks.openSearch(e.key);
     } else if (e.key === " ") {
       if (!spaceDown) {

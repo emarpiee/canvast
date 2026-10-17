@@ -5,9 +5,12 @@ import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { esc } from "./format";
+import { gradientCss } from "../assets/styles";
+import { ICONS } from "./icons";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { ADJUSTMENTS } from "../doc/adjust";
 import type { Adjust, AdjustKey } from "../doc/adjust";
+import type { GradientStop } from "../doc/paint";
 import { DEFAULT_INK, swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
 import { placeMenu } from "./more-menu";
@@ -88,8 +91,14 @@ export function closeColourPopover(refocus = false): void {
 }
 
 /** The saved colours of the library's Styles (ADR 0120): the colours now, and saving one. Set by the app. */
-let styleHooks: { colours(): string[]; save(hex: string): void } | null = null;
-export function setColourStyles(h: { colours(): string[]; save(hex: string): void } | null): void {
+export interface ColourStyleHooks {
+  colours(): string[];
+  save(hex: string): void;
+  gradients(): Array<{ name: string; gradient: Gradient }>;
+  saveGradient(g: Gradient): void;
+}
+let styleHooks: ColourStyleHooks | null = null;
+export function setColourStyles(h: ColourStyleHooks | null): void {
   styleHooks = h;
 }
 
@@ -112,6 +121,26 @@ function saveColourButton(hex: () => string, after: () => void): HTMLButtonEleme
     after();
   });
   return b;
+}
+
+/** Under a gradient editor: the saved gradients as bars to pick one, and a button to save this one (Styles, ADR 0122). */
+function gradientStyles(now: () => Gradient, use: (g: Gradient) => void): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "gradient-styles";
+  const saved = styleHooks?.gradients() ?? [];
+  box.innerHTML = `${saved.length ? `<div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background:${gradientCss(s.gradient)}"></button>`).join("")}</div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
+  box.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    const chip = t.closest<HTMLElement>("[data-saved]");
+    if (chip) {
+      const g = saved[Number(chip.dataset["saved"])]?.gradient;
+      if (g) use(g);
+    } else if (t.closest("[data-save-gradient]")) {
+      styleHooks?.saveGradient(now());
+      t.closest<HTMLElement>("[data-save-gradient]")!.textContent = "Saved";
+    }
+  });
+  return box;
 }
 
 /** Open the picker under `anchor`; a second press on the same button closes it. */
@@ -304,6 +333,12 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
         onChange: (v) => settle((paint = gradientFromValue(paint as Gradient, v))),
       });
       body.append(ed.el);
+      body.append(gradientStyles(() => paint as Gradient, (g) => {
+        o.onInput((paint = g));
+        settle(paint);
+        mount();
+        place(pop, anchor);
+      }));
       current = ed;
     } else {
       const picker = createColourPicker({
@@ -419,7 +454,9 @@ export interface AdjustOptions {
   /** Every step of a slider: the adjustments to show now (not stored). */
   onInput(a: Adjust): void;
   /** The saved adjustments (Styles in the library, ADR 0120): the list now, and saving the numbers as a new one. */
-  styles: { items(): Array<{ id: string; name: string; adjust: Adjust; summary: string }>; save(name: string, a: Adjust): Promise<void> };
+  styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
+  /** Open the Styles panel, where saved adjustments are applied. */
+  onStyles(): void;
   /** A slider is let go, a number typed, or Reset pressed: store them. */
   onChange(a: Adjust, label: string): void;
   onClose?(): void;
@@ -435,65 +472,125 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   pop.setAttribute("aria-label", "Adjust the picture");
   const rows = ADJUSTMENTS;
   let cur: Adjust = { ...o.adjust };
+  const GROUPS: Array<[string, readonly AdjustKey[]]> = [
+    ["Light", ["exposure", "contrast", "highlights", "shadows"]],
+    ["Colour", ["temperature", "tint", "saturation", "vibrance"]],
+    ["Detail", ["blur", "sharpen", "grain"]],
+  ];
+  const row = (s: (typeof rows)[number]): string =>
+    `<div class="adj-row${cur[s.key] ? " is-changed" : ""}" data-adj-row="${s.key}"><label class="adj-label" for="adj-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
+  const saved = o.styles.gradients();
+  const sameStops = (a: readonly GradientStop[], b: readonly GradientStop[]): boolean => JSON.stringify(a) === JSON.stringify(b);
+  const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
+  const mapSection = (): string =>
+    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option>${cur.map && mapIndex() === "keep" ? `<option value="keep">The one it has</option>` : ""}${saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("")}</select><span class="adj-map-bar" data-map-bar></span></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
   pop.innerHTML =
-    `<p class="op-note">${o.count > 1 ? `The first of ${o.count} pictures is shown; what you set goes to all of them.` : "Nothing is changed in the original: these numbers are kept with the picture."}${o.stills ? "" : " Sharpen and grain can slow the playback of a big video."}</p>` +
-    rows
-      .map(
-        (s) => `<div class="adj-row"><label class="adj-label" for="adj-${s.key}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`,
-      )
-      .join("") +
-    `<div class="adj-styles"><span class="adj-label">Saved</span><span class="adj-chips" data-adj-chips></span></div>
-    <div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save adjustment</button></div>
-    <div class="adj-actions"><button type="button" data-adj-reset>Reset</button></div>`;
+    `<header class="adj-head"><h3>Adjust</h3><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span><button type="button" class="adj-reset" data-adj-reset>Reset</button></header>` +
+    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}</section>`).join("") +
+    mapSection() +
+    (o.stills ? "" : `<p class="op-note">Sharpen and grain can slow the playback of a big video.</p>`) +
+    `<footer class="adj-foot"><div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save</button></div><button type="button" class="adj-open" data-adj-open>${ICONS.swatchBook}<span>Saved adjustments</span></button></footer>`;
   scrubNumbers(pop);
-  const chips = pop.querySelector<HTMLElement>("[data-adj-chips]")!;
-  const drawChips = (): void => {
-    const list = o.styles.items();
-    chips.innerHTML = list.length
-      ? list.map((s) => `<button type="button" class="adj-chip" data-adj-style="${esc(s.id)}" title="${esc(s.summary)}">${esc(s.name)}</button>`).join("")
-      : `<span class="adj-none">None yet</span>`;
+  const mapSelect = pop.querySelector<HTMLSelectElement>("[data-adj-map]")!;
+  const mapBar = pop.querySelector<HTMLElement>("[data-map-bar]")!;
+  const mapRow = pop.querySelector<HTMLElement>("[data-map-amount-row]")!;
+  const syncMap = (): void => {
+    mapSelect.value = mapIndex();
+    mapBar.style.background = cur.map ? gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: cur.map.stops }) : "";
+    mapBar.hidden = !cur.map;
+    mapRow.hidden = !cur.map;
   };
-  drawChips();
+  syncMap();
+  let frame = 0;
   const set = (key: AdjustKey, v: number): void => {
     cur = { ...cur, [key]: v };
     const r = pop.querySelector<HTMLInputElement>(`[data-adj="${key}"]`)!, n = pop.querySelector<HTMLInputElement>(`[data-adj-num="${key}"]`)!;
     r.value = String(v);
     n.value = String(v);
+    r.closest(".adj-row")!.classList.toggle("is-changed", v !== 0);
   };
   pop.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     const key = (t.dataset["adj"] ?? t.dataset["adjNum"]) as AdjustKey | undefined;
     if (!key || t.value === "" || !Number.isFinite(Number(t.value))) return;
     set(key, Number(t.value));
-    o.onInput(cur);
+    // one preview a frame, the latest numbers (a fast drag makes many more input events than a screen can show)
+    if (!frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      o.onInput(cur);
+    });
+  });
+  const setMap = (m: Adjust["map"]): void => {
+    const { map: _m, ...rest } = cur;
+    cur = m ? { ...rest, map: m } : rest;
+    syncMap();
+  };
+  mapSelect.addEventListener("change", () => {
+    const v = mapSelect.value;
+    if (v === "keep") return;
+    const g = v === "" ? undefined : saved[Number(v)];
+    setMap(g ? { stops: g.stops, amount: cur.map?.amount ?? 100 } : undefined);
+    mapOut.textContent = String(cur.map?.amount ?? 100);
+    o.onChange(cur, "Adjust picture");
+  });
+  const mapAmount = pop.querySelector<HTMLInputElement>("[data-map-amount]")!;
+  const mapOut = pop.querySelector<HTMLElement>("[data-map-out]")!;
+  mapAmount.addEventListener("input", () => {
+    if (!cur.map) return;
+    setMap({ stops: cur.map.stops, amount: Number(mapAmount.value) });
+    mapOut.textContent = mapAmount.value;
+    if (!frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      o.onInput(cur);
+    });
+  });
+  mapAmount.addEventListener("change", () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    o.onChange(cur, "Adjust picture");
+  });
+  pop.addEventListener("dblclick", (e) => {
+    const key = (e.target as HTMLElement).closest<HTMLElement>("[data-adj-row]")?.dataset["adjRow"] as AdjustKey | undefined;
+    if (!key || !cur[key]) return;
+    set(key, 0);
+    const { [key]: _gone, ...rest } = cur;
+    cur = rest;
+    o.onChange(cur, "Adjust picture");
   });
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.dataset["adj"] || t.dataset["adjNum"]) o.onChange(cur, "Adjust picture");
+    if (t.dataset["adj"] || t.dataset["adjNum"]) {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      o.onChange(cur, "Adjust picture");
+    }
   });
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
-    if (b.dataset["adjStyle"]) {
-      const saved = o.styles.items().find((s) => s.id === b.dataset["adjStyle"]);
-      if (!saved) return;
-      for (const s of rows) set(s.key, saved.adjust[s.key] ?? 0);
-      cur = { ...saved.adjust };
-      o.onChange(cur, `Apply the adjustment “${saved.name}”`);
+    if (b.hasAttribute("data-adj-open")) {
+      o.onStyles();
     } else if (b.hasAttribute("data-adj-save")) {
       const name = pop.querySelector<HTMLInputElement>("[data-adj-name]")!;
       void o.styles.save(name.value, cur).then(() => {
         name.value = "";
-        drawChips();
+        name.placeholder = "Saved. See it in Styles";
       });
     } else if (b.hasAttribute("data-adj-reset")) {
       for (const s of rows) set(s.key, 0);
       cur = {};
+      syncMap();
       o.onChange(cur, "Reset adjustments");
     }
   });
   document.body.appendChild(pop);
   place(pop, anchor);
+  // (below the bars along the top of the page, whichever side of the picture it opened on)
+  const topEdge = 64;
+  if (parseFloat(pop.style.top) < topEdge) {
+    pop.style.top = `${topEdge}px`;
+    pop.style.maxHeight = `${window.innerHeight - topEdge - 8}px`;
+  }
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
   pop.querySelector<HTMLElement>("input[type=range]")?.focus();

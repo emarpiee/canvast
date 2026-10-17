@@ -382,7 +382,9 @@ export function drawImageObject(
       // A video or a GIF is adjusted as its player on the canvas is (an SVG filter, every adjustment); a still, pixel by pixel.
       const filter = o.media ? playingFilter(o.adjust) : "";
       if (filter) ctx.filter = filter;
-      ctx.drawImage(isNeutral(o.adjust) || o.media ? src.source : adjustedSource(src, o.adjust!), sx0, sy0, sx1 - sx0, sy1 - sy0, cl, ct, cr - cl, cb - ct);
+      const adj = isNeutral(o.adjust) || o.media ? null : adjustedSource(src, o.adjust!);
+      const f = adj?.f ?? 1; // (the adjusted copy may be smaller than the source while a slider is dragged)
+      ctx.drawImage(adj?.img ?? src.source, sx0 * f, sy0 * f, (sx1 - sx0) * f, (sy1 - sy0) * f, cl, ct, cr - cl, cb - ct);
       if (filter) ctx.filter = "none";
       return;
     }

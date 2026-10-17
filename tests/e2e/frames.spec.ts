@@ -1797,7 +1797,7 @@ test("panels stack without squeezing each other; many layers get a filter, the l
   const lb = (await layers.boundingBox())!;
   expect(bb.height, "the bookmarks panel keeps its card").toBeGreaterThan(90);
   expect(lb.height, "the layers panel keeps a usable list").toBeGreaterThan(180);
-  expect(lb.y, "stacked, not overlapping").toBeGreaterThanOrEqual(bb.y + bb.height - 1);
+  expect(bb.x + bb.width, "Bookmarks, Styles and Tags stack on the left, Layers on the right").toBeLessThanOrEqual(lb.x);
   const vh = p.viewportSize()!.height;
   expect(lb.y + lb.height, "clear of the bottom controls").toBeLessThan(vh - 60);
   await expect(layers.locator("[data-opacity]")).toHaveCount(0);
@@ -1815,13 +1815,14 @@ test("panels stack without squeezing each other; many layers get a filter, the l
   await expect(layers.locator("[data-opacity]")).toBeVisible();
   // (the list is rebuilt as the panel settles: measure it until it stays)
   await expect.poll(async () => (await layers.locator('ul[role="tree"]').boundingBox())?.height ?? 0).toBeGreaterThan(100);
-  // The Tags panel joins the stack: below the others, inside the screen, and the Layers list still has room (ADR 0076).
+  // The Tags panel joins the left stack: below the Bookmarks, inside the screen, and the Layers list still has room (ADR 0076).
   await p.getByRole("button", { name: "Tags panel", exact: true }).click();
   const tags = p.getByTestId("tags-panel");
   await expect(tags).toBeVisible();
   const tb = (await tags.boundingBox())!;
   const lb2 = (await layers.boundingBox())!;
-  expect(tb.y, "stacked, not overlapping").toBeGreaterThanOrEqual(lb2.y + lb2.height - 1);
+  const bb2 = (await bookmarks.boundingBox())!;
+  expect(tb.y, "stacked, not overlapping").toBeGreaterThanOrEqual(bb2.y + bb2.height - 1);
   expect(tb.y + tb.height, "clear of the bottom controls").toBeLessThan(vh - 60);
   expect(lb2.height, "Layers keeps a usable list").toBeGreaterThan(150);
   expect(app.consoleErrors).toEqual([]);

@@ -8,7 +8,7 @@ import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
 import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
 import type { Dash } from "./stroke-look";
-import { ADJUSTMENTS } from "./adjust";
+import { ADJUSTMENTS, validMap } from "./adjust";
 import type { Adjust, Crop } from "./adjust";
 import type { Paint } from "./paint";
 import type { BoolOp } from "./boolean";
@@ -421,7 +421,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
-    if (o.adjust !== undefined && !(typeof o.adjust === "object" && o.adjust !== null && Object.entries(o.adjust).every(([k, v]) => { const s = ADJUSTMENTS.find((x) => x.key === k); return !!s && typeof v === "number" && Number.isFinite(v) && v >= s.min && v <= 100; }))) throw new InvalidObjectError("bad adjustments");
+    if (o.adjust !== undefined && !(typeof o.adjust === "object" && o.adjust !== null && Object.entries(o.adjust).every(([k, v]) => { if (k === "map") return validMap(v); const s = ADJUSTMENTS.find((x) => x.key === k); return !!s && typeof v === "number" && Number.isFinite(v) && v >= s.min && v <= 100; }))) throw new InvalidObjectError("bad adjustments");
     if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean" && (o.media.range === undefined || (Array.isArray(o.media.range) && o.media.range.length === 2 && Number.isFinite(o.media.range[0]) && Number.isFinite(o.media.range[1]) && o.media.range[0] >= 0 && o.media.range[1] > o.media.range[0])))) throw new InvalidObjectError("bad media state");
   } else if (o.kind === "path") {
     if (!Array.isArray(o.sub) || o.sub.length < 1 || o.sub.length > MAX_SUBPATHS) throw new InvalidObjectError("a path needs 1 to 4096 sub-paths");

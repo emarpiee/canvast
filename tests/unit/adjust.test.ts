@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adjustKey, adjustPixel, cleanAdjust, cropOf, cssFilter, isNeutral, needsNeighbours } from "../../src/doc/adjust";
+import { adjustKey, adjustPixel, cleanAdjust, cropOf, cssFilter, isNeutral, needsNeighbours, validMap } from "../../src/doc/adjust";
 
 describe("adjustments of a picture (ADR 0118)", () => {
   it("none is none: no change to any pixel", () => {
@@ -45,5 +45,20 @@ describe("adjustments of a picture (ADR 0118)", () => {
   it("a crop is the window of the source it shows, all of it when there is none", () => {
     expect(cropOf({ pixelW: 40, pixelH: 30 })).toEqual({ x: 0, y: 0, w: 40, h: 30 });
     expect(cropOf({ pixelW: 40, pixelH: 30, crop: { x: 5, y: 6, w: 7, h: 8 } })).toEqual({ x: 5, y: 6, w: 7, h: 8 });
+  });
+
+  it("a gradient map looks the brightness of each pixel up in the gradient, by its amount (ADR 0122)", () => {
+    const map = { stops: [{ o: 0, c: "#ff0000" }, { o: 1, c: "#0000ff" }], amount: 100 };
+    expect(validMap(map)).toBe(true);
+    expect(validMap({ ...map, amount: 0 })).toBe(false);
+    expect(validMap({ ...map, stops: [map.stops[0]] })).toBe(false);
+    expect(isNeutral({ map })).toBe(false);
+    expect(cleanAdjust({ map: { ...map, amount: 40.4 } })!.map!.amount).toBe(40);
+    expect(adjustKey({ map })).not.toBe(adjustKey({ map: { ...map, amount: 50 } }));
+    expect(adjustPixel(0, 0, 0, { map })).toEqual([255, 0, 0]);
+    expect(adjustPixel(255, 255, 255, { map })).toEqual([0, 0, 255]);
+    const half = adjustPixel(0, 0, 0, { map: { ...map, amount: 50 } });
+    expect(half[0]).toBeGreaterThan(120);
+    expect(half[0]).toBeLessThan(135); // half way from black to red
   });
 });

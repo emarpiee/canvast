@@ -14,7 +14,7 @@ import { ICONS } from "./icons";
 import { labelOf } from "./layers-panel";
 
 /**
- * Search on the open canvas (ADR 0060). Press "/" to look for an item by its file name, layer name or text, "#" to look for pictures by
+ * Search on the open canvas (ADR 0060). Press Ctrl+F to look for an item by its file name, layer name or text, "#" to look for pictures by
  * the tags of their original, "@" to look for a bookmark; the first character of the box chooses the way, so it can be changed while
  * typing. Enter goes to the highlighted result (select it and bring it into view), Shift+Enter selects every match, Escape closes.
  */

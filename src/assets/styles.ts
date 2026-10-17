@@ -6,7 +6,10 @@
  */
 import type { Adjust } from "../doc/adjust";
 import { ADJUSTMENTS, cleanAdjust } from "../doc/adjust";
-import { isColour } from "../doc/paint";
+import type { Gradient } from "../doc/paint";
+import { isColour, isGradient, isPaint } from "../doc/paint";
+import type { PaletteColour } from "./gpl";
+import { MAX_PALETTE } from "./gpl";
 
 export interface StyleItem {
   readonly id: string;
@@ -31,8 +34,13 @@ export interface StyleKind {
   validate(data: unknown): unknown | null;
   /** One short line about the data. */
   summary(data: unknown): string;
-  /** A colour for a dot beside the name (any CSS colour), when the kind has one. */
-  dot?(data: unknown): string | null;
+  /** How to show it on its card: a bar of CSS background (a gradient) or a row of colours (a colour, a palette). */
+  look?(data: unknown): StyleLook;
+}
+
+export interface StyleLook {
+  readonly bar?: string;
+  readonly swatches?: readonly string[];
 }
 
 const signed = (v: number): string => (v > 0 ? `+${v}` : `${v}`.replace("-", "−"));
@@ -41,11 +49,11 @@ export const ADJUSTMENT_KIND: StyleKind = {
   id: "adjustment",
   label: "Adjustment",
   plural: "Adjustments",
-  empty: "None yet. Save one from the Adjust panel of a picture.",
+  empty: "None yet. Save one from the Adjust panel.",
   validate: (d) => (d && typeof d === "object" ? (cleanAdjust(d as Adjust) ?? null) : null),
   summary: (d) => {
     const a = d as Adjust;
-    const parts = ADJUSTMENTS.filter((s) => a[s.key]).map((s) => `${s.label} ${signed(a[s.key]!)}`);
+    const parts = [...(a.map ? [`Gradient map ${a.map.amount}%`] : []), ...ADJUSTMENTS.filter((s) => a[s.key]).map((s) => `${s.label} ${signed(a[s.key]!)}`)];
     return parts.length > 3 ? `${parts.slice(0, 3).join(", ")} and ${parts.length - 3} more` : parts.join(", ");
   },
 };
@@ -57,11 +65,54 @@ export const COLOUR_KIND: StyleKind = {
   empty: "None yet. Save one from the colour picker.",
   validate: (d) => (isColour(d) ? d.toLowerCase() : null),
   summary: (d) => String(d).toUpperCase(),
-  dot: (d) => String(d),
+  look: (d) => ({ swatches: [String(d)] }),
 };
 
-// Colour palettes, stroke and text styles come here as more kinds (ADR 0120).
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, COLOUR_KIND];
+/** A gradient as a CSS `linear-gradient` along its stops (for a card or a button). */
+export const gradientCss = (g: Gradient): string => `linear-gradient(90deg, ${g.stops.map((s) => `${s.c} ${Math.round(s.o * 1000) / 10}%`).join(", ")})`;
+
+export const GRADIENT_KIND: StyleKind = {
+  id: "gradient",
+  label: "Gradient",
+  plural: "Gradients",
+  empty: "None yet. Save one from the fill or outline picker, or import a .ggr file.",
+  validate: (d) => (isPaint(d) && isGradient(d) ? d : null),
+  summary: (d) => {
+    const g = d as Gradient;
+    return `${g.type === "linear" ? "Linear" : "Radial"} · ${g.stops.length} stops`;
+  },
+  look: (d) => ({ bar: gradientCss(d as Gradient) }),
+};
+
+export interface PaletteData {
+  readonly colours: readonly PaletteColour[];
+}
+
+export const PALETTE_KIND: StyleKind = {
+  id: "palette",
+  label: "Palette",
+  plural: "Palettes",
+  empty: "None yet. Make one from the selection or a picture, or import a .gpl file.",
+  validate: (d) => {
+    const list = (d as { colours?: unknown } | null)?.colours;
+    if (!Array.isArray(list) || list.length < 1 || list.length > MAX_PALETTE) return null;
+    const colours: PaletteColour[] = [];
+    for (const c of list as Array<Record<string, unknown>>) {
+      if (!c || !isColour(c["c"])) return null;
+      const name = typeof c["name"] === "string" ? c["name"].trim().slice(0, 40) : "";
+      colours.push({ c: (c["c"] as string).toLowerCase(), ...(name ? { name } : {}) });
+    }
+    return { colours } satisfies PaletteData;
+  },
+  summary: (d) => {
+    const n = (d as PaletteData).colours.length;
+    return `${n} colour${n === 1 ? "" : "s"}`;
+  },
+  look: (d) => ({ swatches: (d as PaletteData).colours.map((c) => c.c) }),
+};
+
+// Stroke and text styles come here as more kinds (ADR 0120).
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 
@@ -146,6 +197,25 @@ export class StyleLibrary {
     const item: StyleItem = { id: this.newId(), kind, name: name.trim().slice(0, MAX_STYLE_NAME) || this.nextName(kind), at: Date.now(), data: clean };
     await this.set([...this.list, item]);
     return item;
+  }
+
+  /** Replace the data of a style (a palette edited, a colour changed); not data of its kind: nothing happens. */
+  async update(id: string, data: unknown): Promise<boolean> {
+    const item = this.list.find((s) => s.id === id);
+    const clean = item && kindById(item.kind)?.validate(data);
+    if (!item || clean === null || clean === undefined) return false;
+    await this.set(this.list.map((s) => (s.id === id ? { ...s, data: clean } : s)));
+    return true;
+  }
+
+  /** A copy of a style right after it, named "… copy". */
+  async duplicate(id: string): Promise<StyleItem | null> {
+    const i = this.list.findIndex((s) => s.id === id);
+    if (i < 0 || this.list.length >= MAX_STYLES) return null;
+    const s = this.list[i]!;
+    const copy: StyleItem = { ...s, id: this.newId(), name: `${s.name} copy`.slice(0, MAX_STYLE_NAME), at: Date.now() };
+    await this.set([...this.list.slice(0, i + 1), copy, ...this.list.slice(i + 1)]);
+    return copy;
   }
 
   async rename(id: string, name: string): Promise<void> {

@@ -126,6 +126,10 @@ import bringToFront from "lucide-static/icons/bring-to-front.svg";
 import activity from "lucide-static/icons/activity.svg";
 import boxSelect from "lucide-static/icons/box-select.svg";
 import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
+import paletteSvg from "lucide-static/icons/palette.svg";
+import fileUpSvg from "lucide-static/icons/file-up.svg";
+import pipetteSvg from "lucide-static/icons/pipette.svg";
+import swatchBookSvg from "lucide-static/icons/swatch-book.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
@@ -276,6 +280,10 @@ export const ICONS = {
   eraser: clean(eraser),
   activity: clean(activity),
   boxSelect: clean(boxSelect),
+  swatchBook: clean(swatchBookSvg),
+  palette: clean(paletteSvg),
+  fileUp: clean(fileUpSvg),
+  pipette: clean(pipetteSvg),
   bookmark: clean(bookmark),
   bookmarkPlus: clean(bookmarkPlus),
   chevronDown: clean(chevronDown),

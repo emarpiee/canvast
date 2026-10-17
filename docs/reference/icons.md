@@ -17,6 +17,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-up-down` | Sorted: Newest first. Reverse the order |
 | `bell` | Show a sample notice (developer tools) |
 | `blocks` | Arrange and align |
+| `swatchBook` | Styles panel |
+| `palette` | Styles panel: New style |
+| `fileUp` | Styles panel: Import .ggr or .gpl files |
+| `pipette` | Styles panel: Edit a colour (menu item) |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |
 | `box-select` | Axis-aligned selection box |

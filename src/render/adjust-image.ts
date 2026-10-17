@@ -4,7 +4,7 @@
  * is a 3 x 3 unsharp mask; grain is the same noise on every draw (it is fixed to the pixel, not to the time).
  */
 import type { Adjust } from "../doc/adjust";
-import { adjustKey, adjustPixel } from "../doc/adjust";
+import { adjustKey, prepare } from "../doc/adjust";
 import type { RasterSource } from "./draw-objects";
 
 /** Beyond this many pixels a source is drawn as it is: adjusting it would stall a frame (it is only so large when zoomed far in, where pixels are drawn one by one and adjusted one by one). */
@@ -29,15 +29,10 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   g.filter = "none";
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
-  const colour = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance);
+  const colour = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance || a.map);
   if (colour) {
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] === 0) continue;
-      const [r, gg, b] = adjustPixel(d[i]!, d[i + 1]!, d[i + 2]!, a);
-      d[i] = r;
-      d[i + 1] = gg;
-      d[i + 2] = b;
-    }
+    const px = prepare(a);
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] !== 0) px(d, i);
   }
   if (a.sharpen) {
     // unsharp mask: the pixel plus `amount` times its difference from the average of its four neighbours
@@ -70,22 +65,32 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   return true;
 }
 
-export function adjustedSource(src: RasterSource, a: Adjust): CanvasImageSource {
-  const key = adjustKey(a);
+/** While a slider is being dragged, pictures are adjusted at a smaller size (this many pixels at most), so the picture follows the hand; the full size is made when it is let go. */
+const PREVIEW_PIXELS = 500_000;
+let previewing = false;
+export function setAdjustPreviewing(on: boolean): void {
+  previewing = on;
+}
+
+/** The adjusted picture and how much smaller than the source it is (1: the same size; less while a slider is being dragged). */
+export function adjustedSource(src: RasterSource, a: Adjust): { img: CanvasImageSource; f: number } {
+  const quick = previewing && src.pixelW * src.pixelH > PREVIEW_PIXELS;
+  const key = adjustKey(a) + (quick ? "|p" : "");
   let per = cache.get(src.source as object);
   if (!per) cache.set(src.source as object, (per = new Map()));
   const hit = per.get(key);
-  if (hit) return hit;
+  if (hit) return { img: hit, f: hit.width / src.pixelW };
   // (`pixelW` and `pixelH` are the pixels this source really has: a reduced copy is already smaller than the picture)
-  const w = Math.max(1, src.pixelW), h = Math.max(1, src.pixelH);
-  if (w * h > MAX_PIXELS) return src.source;
+  const f = quick ? Math.sqrt(PREVIEW_PIXELS / (src.pixelW * src.pixelH)) : 1;
+  const w = Math.max(1, Math.round(src.pixelW * f)), h = Math.max(1, Math.round(src.pixelH * f));
+  if (w * h > MAX_PIXELS) return { img: src.source, f: 1 };
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  if (!adjustInto(c, (g) => g.drawImage(src.source, 0, 0, w, h), a)) return src.source;
+  if (!adjustInto(c, (g) => g.drawImage(src.source, 0, 0, w, h), a)) return { img: src.source, f: 1 };
   per.set(key, c);
   if (per.size > KEEP) per.delete(per.keys().next().value as string); // (the oldest numbers go: a slider being dragged makes many)
-  return c;
+  return { img: c, f: w / src.pixelW };
 }
 
 /** A picture as a PNG with its crop and adjustments baked in, at the size of its source pixels (null: it could not be made). */

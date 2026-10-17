@@ -1,8 +1,9 @@
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
-import { newObjectId } from "../doc/model";
-import type { CanvasObject } from "../doc/model";
+import { newObjectId, rasterKey } from "../doc/model";
+import type { CanvasObject, ImageObject } from "../doc/model";
+import type { Gradient } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
@@ -14,13 +15,13 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
-import { batchRuns, drawObjects, drawOverlays } from "../render/scene-renderer";
+import { batchRuns, drawObjects, drawOverlays, drawCropGhost } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
 import { coverObject, projectObject } from "../render/projection";
@@ -56,8 +57,10 @@ import { mountHintLine } from "../ui/hint-line";
 import { setMenuAvoid } from "../ui/more-menu";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
-import { confirmDialog } from "../ui/confirm";
+import { chooseDialog, confirmDialog } from "../ui/confirm";
+import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
+import { mountStylesPanel } from "../ui/styles-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
@@ -211,6 +214,7 @@ async function start(): Promise<void> {
   editor.layersOpen = settings.get("ui.layersOpen");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
   editor.tagsOpen = settings.get("ui.tagsOpen");
+  editor.stylesOpen = settings.get("ui.stylesOpen");
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
   editor.eraseParts = settings.get("eraser.parts");
@@ -239,6 +243,7 @@ async function start(): Promise<void> {
     settings.set("ui.layersOpen", editor.layersOpen);
     settings.set("ui.bookmarksOpen", editor.bookmarksOpen);
     settings.set("ui.tagsOpen", editor.tagsOpen);
+    settings.set("ui.stylesOpen", editor.stylesOpen);
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
     settings.set("eraser.parts", editor.eraseParts);
@@ -403,6 +408,8 @@ async function start(): Promise<void> {
     const selected = editor.selection.size
       ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
       : [];
+    const cropping = editor.cropId ? selected.find((po) => po.obj.id === editor.cropId && po.obj.kind === "image") : undefined;
+    if (cropping && (!shot || shot.overlays)) drawCropGhost(ctx, cropping, assets.get(rasterKey(cropping.obj as ImageObject)), vp);
     if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
     const t3 = performance.now();
     const b: FrameBreakdown = {
@@ -516,8 +523,13 @@ async function start(): Promise<void> {
   const side = document.createElement("div");
   side.id = "side-panels";
   host.appendChild(side);
+  // The panels that are not the Layers go to a second stack on the left (beside the tools), so the right side is not crowded;
+  // on a narrow screen they all share the one stack.
+  const sideLeft = document.createElement("div");
+  sideLeft.id = "side-panels-left";
+  host.appendChild(sideLeft);
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
-  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
+  mountBookmarksPanel(sideLeft, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start());
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -534,7 +546,54 @@ async function start(): Promise<void> {
     assetName: async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "",
     reveal: (canvasId, ids) => void session.reveal(canvasId ?? session.current!.canvasId, ids),
   });
-  const tagsPanel = mountTagsPanel(side, editor, doc, {
+  mountStylesPanel(sideLeft, editor, session.styles, {
+    adjustment: {
+      can: () => !!selectedAdjust(doc, editor),
+      apply: (s) => commitAdjust(doc, editor, s.data as Adjust, `Apply the adjustment “${s.name}”`),
+    },
+    paint: {
+      count: () => paintTargetCount(doc, editor),
+      apply: (paint, label, target) =>
+        void (async () => {
+          let where: "fill" | "stroke" | "both" = target ?? "fill";
+          const n = paintTargetCount(doc, editor);
+          if (!target && n > 1) {
+            const choice = await chooseDialog({
+              title: `Apply “${label}” to ${n} shapes`,
+              lines: ["Which part of the picked shapes should take it?"],
+              choices: [
+                { value: "fill", label: "Fill", help: "The inside of each shape" },
+                { value: "stroke", label: "Outline", help: "The line round each shape" },
+                { value: "both", label: "Fill and outline", help: "Both parts" },
+              ],
+              confirmLabel: "Apply",
+            });
+            if (!choice) return;
+            where = choice as typeof where;
+          }
+          commitPaint(doc, editor, (where as string) === "both" ? { fill: paint, stroke: paint } : where === "stroke" ? { stroke: paint } : { fill: paint });
+        })(),
+    },
+    selectionColours: () => selectionColours(doc, editor),
+    picturePalette: async () => {
+      const pics = pickedFiles(doc, editor);
+      const src = pics.length === 1 ? assets.get(rasterKey(pics[0]!)) : null;
+      if (!src) return null;
+      const c = document.createElement("canvas");
+      const k = Math.min(1, 96 / Math.max(src.pixelW, src.pixelH));
+      c.width = Math.max(1, Math.round(src.pixelW * k));
+      c.height = Math.max(1, Math.round(src.pixelH * k));
+      const x = c.getContext("2d");
+      if (!x) return null;
+      x.drawImage(src.source, 0, 0, c.width, c.height);
+      return extractPalette(x.getImageData(0, 0, c.width, c.height).data, 6);
+    },
+    notify: (text) => {
+      editor.message = text;
+      editor.changed();
+    },
+  });
+  const tagsPanel = mountTagsPanel(sideLeft, editor, doc, {
     tag: (ids, change) => void tagObjects(doc, editor, ids, change),
     renameTag: (from, to) => void session.changeCanvasTag(from, to),
     deleteTag: (tag) =>
@@ -544,6 +603,12 @@ async function start(): Promise<void> {
         confirmLabel: "Delete tag",
       }).then((ok) => (ok ? session.changeCanvasTag(tag, null) : 0)),
   });
+  const narrow = window.matchMedia("(max-width: 640px)");
+  const seatPanels = (): void => {
+    for (const el of [...sideLeft.children, ...side.querySelectorAll<HTMLElement>(".bookmarks-panel, .styles-panel, .tags-panel")]) (narrow.matches ? side : sideLeft).appendChild(el);
+  };
+  seatPanels();
+  narrow.addEventListener("change", seatPanels);
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
@@ -600,6 +665,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
     canFitSheet: () => canFitSheet(doc, editor),
     fitSheet: () => fitSheet(doc, editor),
+    sheetSize: () => sheetSize(doc, editor),
+    resizeSheet: (w, h) => resizeSheet(doc, editor, w, h),
     sheetSelection: () => sheetSelection(doc, editor),
     canDetach: () => canDetach(doc, editor),
     croppable: () => croppablePicture(doc, editor) !== null,
@@ -607,7 +674,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     uncrop: () => uncropPicture(doc, editor),
     selectedAdjust: () => selectedAdjust(doc, editor),
     adjustStyles: () => ({
-      items: () => session.styles.of("adjustment").map((s) => ({ id: s.id, name: s.name, adjust: s.data as Adjust, summary: ADJUSTMENT_KIND.summary(s.data) })),
+      gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
       save: async (name, a) => {
         if (!(await session.styles.add("adjustment", name, a))) {
           editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
@@ -746,12 +813,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
 
   setColourStyles({
+    gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, gradient: s.data as Gradient })),
+    saveGradient: (g) => void session.styles.add("gradient", "", g).then((made) => made && ((editor.message = "Saved the gradient to the Styles."), editor.changed())),
     colours: () => session.styles.of("colour").map((s) => String(s.data)),
     save: (hex) => void session.styles.add("colour", "", hex).then((made) => made && ((editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`), editor.changed())),
   });
   const history = new CameraHistory(view);
   editor.subscribe(() => {
     if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
+    document.body.classList.toggle("is-cropping", editor.cropId !== null); // (the floating bars and panels step aside, ADR 0118)
   });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     fit: (kind) => focusCycle.fit(kind),
@@ -1106,6 +1176,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
+      { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
       { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
       { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
       { group: "Go to", title: "Assets view", words: "library", run: () => setView("assets") },
@@ -1126,6 +1197,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     e.preventDefault();
     palette.open();
   }, true);
+
+  // "/" opens the command palette (not while typing).
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "/" || appView !== "canvas" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    e.preventDefault();
+    palette.open();
+  });
 
   // "?" opens the shortcut list (not while typing).
   window.addEventListener("keydown", (e) => {
