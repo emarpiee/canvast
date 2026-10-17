@@ -1,5 +1,5 @@
-import { paramsOf, withShapeParams, type ShapePatch } from "../doc/shape-params";
-import { DEFAULT_INNER } from "../doc/path";
+import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
+import { DEFAULT_INNER, canRound, type Radius } from "../doc/path";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import { alignChoice, capChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
@@ -710,11 +710,11 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   editor.changed();
 }
 
-/** What the first selected shape that can still be changed (a rectangle, polygon or star made from its numbers) is made of; radius in local units. */
-export function selectedShape(doc: DocumentStore, editor: EditorState): { id: string; shape: "rect" | "polygon" | "star"; sides: number; tips: number; inner: number; radius: number } | null {
+/** What the first selected shape whose numbers can still be changed (a polygon or star made from them) is made of. */
+export function selectedShape(doc: DocumentStore, editor: EditorState): { id: string; shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null {
   for (const o of editablePaths(doc, editor)) {
-    const p = o.shape === "rect" || o.shape === "polygon" || o.shape === "star" ? paramsOf(o) : null;
-    if (p && (o.shape === "rect" || o.shape === "polygon" || o.shape === "star")) return { id: o.id, shape: o.shape, sides: p.sides ?? 6, tips: p.tips ?? 5, inner: p.inner ?? DEFAULT_INNER, radius: p.radius ?? 0 };
+    const p = o.shape === "polygon" || o.shape === "star" ? paramsOf(o) : null;
+    if (p && (o.shape === "polygon" || o.shape === "star")) return { id: o.id, shape: o.shape, sides: p.sides ?? 6, tips: p.tips ?? 5, inner: p.inner ?? DEFAULT_INNER };
   }
   return null;
 }
@@ -723,12 +723,10 @@ export interface ShapeChange {
   sides?: number;
   tips?: number;
   inner?: number;
-  /** Screen px at this zoom; `ppuOf` turns it into the object's own units. */
-  radiusPx?: number;
 }
 
-/** Change the sides, points, ratio or corner radius of the selected shapes that have them: one undo step. */
-export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange, ppuOf: (id: string) => number): void {
+/** Change the sides, points or ratio of the selected polygons and stars: one undo step. */
+export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange): void {
   if (editor.blockEdit()) return;
   const next: PathObject[] = [];
   for (const o of editablePaths(doc, editor)) {
@@ -736,17 +734,38 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
     if (change.sides !== undefined && o.shape === "polygon") patch.sides = change.sides;
     if (change.tips !== undefined && o.shape === "star") patch.tips = change.tips;
     if (change.inner !== undefined && o.shape === "star") patch.inner = change.inner;
-    if (change.radiusPx !== undefined && (o.shape === "rect" || o.shape === "polygon" || o.shape === "star")) {
-      const ppu = ppuOf(o.id);
-      if (ppu > 0 && ppu < Infinity) patch.radius = change.radiusPx / ppu;
-    }
     if (!Object.keys(patch).length) continue;
     const made = withShapeParams(o, patch);
     if (made) next.push(made);
   }
   if (!next.length) return;
-  const what = change.radiusPx !== undefined ? "Corner radius" : change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
+  const what = change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
   doc.commit(doc.transaction(next.length === 1 ? what : `${what} of ${next.length} shapes`, next));
+  editor.changed();
+}
+
+/**
+ * The corner radius of the first selected path that has corners to round (a rectangle, polygon, star, any path with sharp nodes between
+ * straight lines, a boolean group's result): in local units, with whether it takes one radius per corner (a rectangle made as one).
+ */
+export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: string; radius: Radius; perCorner: boolean } | null {
+  for (const o of editablePaths(doc, editor)) if (hasCorners(o) || (o.result !== undefined && canRound(o.sub))) return { id: o.id, radius: o.radius ?? 0, perCorner: o.shape === "rect" && paramsOf(o) !== null };
+  return null;
+}
+
+/** Round the corners of the selected paths (px at this zoom: one value, or four for a rectangle: top left, top right, bottom right, bottom left): one undo step. */
+export function commitCorners(doc: DocumentStore, editor: EditorState, px: readonly number[], ppuOf: (id: string) => number): void {
+  if (editor.blockEdit() || !px.length) return;
+  const next: PathObject[] = [];
+  for (const o of editablePaths(doc, editor)) {
+    if (!(hasCorners(o) || (o.result !== undefined && canRound(o.sub)))) continue;
+    const ppu = ppuOf(o.id);
+    if (!(ppu > 0 && ppu < Infinity)) continue;
+    const four = px.length === 4 && o.shape === "rect" && paramsOf(o) !== null;
+    next.push(withRadius(o, four ? px.map((v) => v / ppu) : px[0]! / ppu));
+  }
+  if (!next.length) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Corner radius" : `Corner radius of ${next.length} shapes`, next));
   editor.changed();
 }
 
@@ -840,7 +859,7 @@ export function flattenBoolean(doc: DocumentStore, editor: EditorState, gid: str
   const all = [...doc.all()].filter((o) => o.groups?.includes(gid));
   const result = all.find((o) => isResult(o) && o.result === gid) as PathObject | undefined;
   if (!result) return;
-  const { boolOps, groupNames, groups, result: _r, ...rest } = result;
+  const { boolOps, groupNames, groups, result: _r, radius: _rad, ...rest } = result;
   const { [gid]: _op, ...ops } = boolOps ?? {};
   const { [gid]: _name, ...names } = groupNames ?? {};
   const chain = (groups ?? []).filter((g) => g !== gid);

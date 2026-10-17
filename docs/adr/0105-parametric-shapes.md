@@ -4,16 +4,29 @@
 Accepted (v0.17.0).
 
 ## Decision
-A rectangle, polygon or star keeps the numbers it was made from, in `PathObject.params` (`ShapeParams`: `box`, and `sides`, `tips`, `inner`, `radius` as the kind takes them, lengths in the object's local units). The nodes are made again from them whenever one changes (`withShapeParams`, `src/doc/shape-params.ts`), in one undo step, so after drawing a polygon you can still change its sides, a star its points and ratio, and any of the three its **corner radius**.
+**Shape numbers.** A polygon or star keeps the numbers it was made from, in `PathObject.params` (`ShapeParams`: `box`, `sides`, `tips`, `inner`), and a rectangle its box. The nodes are made again from them when one changes (`withShapeParams`, `src/doc/shape-params.ts`): a polygon's **Sides**, a star's **Points** and **Ratio**, in one undo step. `fittedShape` stretches the generated shape so that its *bounds* are the box (polygons and stars used to sit inside their box's ellipse; a drawn shape now fills the box it was dragged). Moving a node by hand ends the numbers (`params` goes); shapes drawn before are recognised from their nodes when those are still exactly the kind's own (`paramsOf`).
 
-**Geometry** (`src/doc/path.ts`). `fittedShape` generates the shape in a unit box and stretches it so that its *bounds* are `box` (a polygon or star used to be inscribed in its box's ellipse, so it did not fill it; now a drawn shape fills the box it was dragged, and changing the sides keeps the same box). `roundCorners` turns every corner node between two straight lines into two nodes joined by a circular arc (a cubic with the standard handle length); the radius is cut down so each corner uses at most half of each line, so a large radius gives a pill on a rectangle and neighbours never overlap. Nodes with handles, and the ends of open sub-paths, are left as they are. The stored `sub` is the rounded result, so everything that draws, picks, bounds or combines paths needs no change.
+**Corner radius is a property of the path, not of the shape kind** (reworked after review against a design tool whose radius works on every shape). It applies to any path that has a corner to round: a *sharp node between two straight lines* (a node with handles, or next to a curved edge, is left alone; the ends of an open path are never rounded):
 
-**When it applies.** Stretching scales `params` with the shape (`scaleParams`; the radius follows the mean of the two scales, at the two places that scale a path's coordinates). Moving a node, a handle or deleting a node by hand ends it: the object loses `params` and is an ordinary path, as the nodes are then the person's own. Shapes drawn before this keep working: their numbers are worked out from the nodes when those are still exactly the kind's own (`paramsOf`), and not otherwise.
+| What | Behaviour |
+|---|---|
+| Rectangle | One radius, or four (top left, top right, bottom right, bottom left) typed in the same field. Cut to half the shorter side (a pill). |
+| Polygon, star | Every corner, outer and inner. |
+| Any path (Path tool, converted text, a flattened group) | Every sharp corner; on an open path the inner ones. |
+| Ellipse, line | No field (no corner). |
+| Boolean group | The group has its own radius, stored on its *result* and applied as the result is derived: the result is rounded, the shapes inside keep their own corners (and the result honours a shape's rounding). Flatten bakes it. |
+| Picked together | The field shows the first; a value goes to every picked path that has corners. |
 
-**Controls.** With a shape picked on Select or Edit nodes, the options bar shows **Radius** (px at this zoom), and **Sides** for a polygon, **Points** and **Ratio** (percent) for a star, applied on Enter or blur. With several picked, each number goes to the shapes it concerns. The Shape tool's own Sides and Points still set the next shape.
+**Storage.** `radius` (a number, or an array of one per node for a rectangle) with `sub` as the rounded geometry and `base` as the sharp geometry it was made from. Everything that draws, picks, bounds or combines uses `sub`, so none of it changed. **Edit nodes shows and edits `base`** (the sharp corners, turned like the drawing; `editSubs`), and the rounding is made again on commit, so rounding survives node editing. The result of a boolean group stores only the number (it is derived from its shapes, never edited).
+
+**Stretching** keeps the radius (a bigger rectangle keeps its corner, as the reference app does) and makes the rounding again from the stretched base; only a change of local units (normalisation, the same size in the world) scales it.
+
+**Rounding** (`roundCorners`): a circular arc as a cubic of the standard handle length; the tangent length is cut so each corner uses at most half of each adjacent line.
+
+**One field, no new buttons.** *Radius* sits in the options bar of Select and Edit nodes, shown only when a picked path has corners; it takes one value or four. Sides, Points and Ratio appear only for a picked polygon or star. Nothing is added to the selection bar, the rail or the Shape tool.
 
 ## Not done
-Per-corner radii, smoothing (a corner rounded with a curve other than a circle), an ellipse's arc and inner radius, and rounding corners of a path that was not made as a shape.
+Corners next to curved edges, a radius handle on the canvas, smoothing other than circular arcs (continuous curvature), per-node radii on a general path (the model allows an array; only rectangles get the field), an ellipse's arc and inner radius.
 
 ## Tests
 `tests/unit/shape-params.test.ts` (a drawn shape fills its box; sides, points, ratio remake it in the same box; the radius rounds, keeps a rectangle's bounds, is cut down to a pill; open paths untouched; legacy shapes found out, hand-edited ones refused; stretching scales box and radius; saved and bad numbers refused), `tests/e2e/vectors.spec.ts` ("shapes stay editable": sides with undo and redo, radius, saved over a reload; a star's points and ratio; a rectangle's corner cut away; a node moved by hand ends it).

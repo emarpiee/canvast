@@ -1,5 +1,5 @@
 import type { PathObject } from "../doc/model";
-import { pathSubs } from "../doc/model";
+import { editSubs } from "../doc/model";
 import type { SubPath } from "../doc/path";
 import { NODE, isLine, nodeCount, segmentsOf } from "../doc/path";
 import type { ProjectedObject } from "../render/projection";
@@ -32,7 +32,7 @@ export function nodesOnScreen(po: ProjectedObject): NodeScreen[] {
   const p = po.proj;
   const at = (x: number, y: number): [number, number] => [exactX(p, x), exactY(p, y)];
   const out: NodeScreen[] = [];
-  pathSubs(o).forEach((sp, s) => {
+  editSubs(o).forEach((sp, s) => {
     for (let k = 0; k < nodeCount(sp); k++) {
       const n = sp.n;
       const b = k * NODE;
@@ -80,7 +80,7 @@ export function hitNodes(po: ProjectedObject, x: number, y: number, sel: { s: nu
   const byKey = new Map(nodes.map((n) => [`${n.s}:${n.k}`, n] as const));
   let hit: NodeHit | null = null;
   let bestD = SEG_REACH_PX;
-  pathSubs(po.obj as PathObject).forEach((sp: SubPath, s) => {
+  editSubs(po.obj as PathObject).forEach((sp: SubPath, s) => {
     for (const [a, b] of segmentsOf(sp)) {
       const na = byKey.get(`${s}:${a}`)!;
       const nb = byKey.get(`${s}:${b}`)!;

@@ -6,7 +6,7 @@ import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutText } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical, mentionIds } from "../text/markdown";
-import type { Align, Cap, Join, ShapeKind, ShapeParams, SubPath } from "./path";
+import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
 import type { Paint } from "./paint";
 import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
@@ -151,6 +151,12 @@ export interface PathObject extends ObjectBase {
   /** Fill rule: absent is non-zero. */
   readonly evenodd?: true;
   readonly shape?: ShapeKind;
+  /**
+   * Rounded corners (ADR 0105): the radius in local units, or for a rectangle one per node. `sub` is then the rounded geometry and `base` the
+   * sharp one it was made from (what Edit nodes shows and edits), except on the result of a boolean group, which is rounded as it is derived.
+   */
+  readonly radius?: Radius;
+  readonly base?: readonly SubPath[];
   /** What the shape is made from (box, sides, points, ratio, corner radius), present while its nodes are still the shape's own (ADR 0105). */
   readonly params?: ShapeParams;
   /** The result of the boolean group with this id (ADR 0103): derived from the group's members, recomputed with every change to them. */
@@ -181,6 +187,21 @@ export function pathSubs(o: PathObject): readonly SubPath[] {
     const b = paintBounds(o.sub, pathStyle(o));
     const { c, s } = cosSin(o.rot);
     turnedPaths.set(o, (r = rotateSubs(o.sub, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
+  }
+  return r;
+}
+
+const turnedBases = new WeakMap<PathObject, readonly SubPath[]>();
+
+/** The sub-paths Edit nodes shows and changes: the sharp base of a rounded path (turned like `pathSubs`), else what is drawn. */
+export function editSubs(o: PathObject): readonly SubPath[] {
+  if (!o.base) return pathSubs(o);
+  if (!o.rot) return o.base;
+  let r = turnedBases.get(o);
+  if (!r) {
+    const b = paintBounds(o.sub, pathStyle(o));
+    const { c, s } = cosSin(o.rot);
+    turnedBases.set(o, (r = rotateSubs(o.base, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
   }
   return r;
 }
@@ -374,15 +395,25 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
+    if (o.radius !== undefined) {
+      const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
+      if (!Array.isArray(rs) && typeof o.radius !== "number") throw new InvalidObjectError("bad radius");
+      if (rs.length > MAX_PATH_NODES || !rs.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
+    }
+    if (o.base !== undefined) {
+      if (o.radius === undefined || !Array.isArray(o.base) || o.base.length !== o.sub.length) throw new InvalidObjectError("bad base");
+      for (const b of o.base) if (!Array.isArray(b?.n) || b.n.length % NODE !== 0 || b.n.length > MAX_PATH_NODES * NODE) throw new InvalidObjectError("bad base");
+      o.base.forEach((b) => b.n.forEach((v: number, i: number) => finite(v, `base[${i}]`)));
+    }
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
     if (o.params !== undefined) {
       const q = o.params;
       if (o.shape === undefined || !Array.isArray(q.box) || q.box.length !== 4) throw new InvalidObjectError("bad shape parameters");
       q.box.forEach((v, i) => finite(v, `params.box[${i}]`));
-      for (const [k, lo, hi] of [["sides", 3, 24], ["tips", 3, 24], ["inner", 0.01, 0.99], ["radius", 0, Infinity]] as const) {
+      for (const [k, lo, hi] of [["sides", 3, 24], ["tips", 3, 24], ["inner", 0.01, 0.99]] as const) {
         const v = q[k];
-        if (v !== undefined && !(typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (k === "inner" || k === "radius" || Number.isInteger(v)))) throw new InvalidObjectError(`bad ${k}`);
+        if (v !== undefined && !(typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (k === "inner" || Number.isInteger(v)))) throw new InvalidObjectError(`bad ${k}`);
       }
     }
     if (o.result !== undefined && !(typeof o.result === "string" && (o.groups ?? []).includes(o.result) && o.boolOps?.[o.result] !== undefined)) throw new InvalidObjectError("bad boolean result");
@@ -410,7 +441,7 @@ export function serializeObject(o: CanvasObject): SerializedObject {
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
   // `refs` is derived from the Markdown for the storage index of backlinks (ADR 0040); never read back.
   const refs = o.kind === "text" ? mentionIds(o.md) : [];
-  const s = { ...rest, ...(refs.length ? { refs } : {}), unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, sub: o.kind === "path" ? o.sub.map((p) => ({ n: [...p.n], closed: p.closed })) : undefined, ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
+  const s = { ...rest, ...(refs.length ? { refs } : {}), unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, sub: o.kind === "path" ? o.sub.map((p) => ({ n: [...p.n], closed: p.closed })) : undefined, ...(o.kind === "path" && o.base ? { base: o.base.map((p) => ({ n: [...p.n], closed: p.closed })) } : {}), ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
   if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
   return s;
 }
@@ -477,6 +508,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),
+      ...(s["radius"] !== undefined ? { radius: s["radius"] as Radius } : {}),
+      ...(s["base"] !== undefined ? { base: (s["base"] as Array<{ n: number[]; closed: boolean }>).map((p) => ({ n: p?.n as number[], closed: p?.closed as boolean })) } : {}),
       ...(s["result"] !== undefined ? { result: s["result"] as string } : {}),
     };
   } else if (s.kind === "text") {

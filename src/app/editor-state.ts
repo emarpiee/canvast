@@ -7,7 +7,7 @@ import type { CanvasObject, ObjectId } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
-import type { ShapeKind, SubPath } from "../doc/path";
+import { roundCorners, type ShapeKind, type SubPath } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 
@@ -206,7 +206,7 @@ export class EditorState {
     }
     if (p.kind === "nodes" && p.ids.includes(o.id) && o.kind === "path") {
       const { rot: _turned, ...flat } = o;
-      return { ...flat, sub: p.sub };
+      return o.base && o.radius !== undefined ? { ...flat, base: p.sub, sub: roundCorners(p.sub, o.radius) } : { ...flat, sub: p.sub };
     }
     if (p.kind === "move" && p.ids.includes(o.id)) {
       // A displacement only scales between frames: exact shift.

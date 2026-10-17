@@ -19,7 +19,7 @@ import type { FrameSpace } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { CanvasObject, ObjectId, PathObject } from "./model";
 import { expressObjectIn, homeObject, newObjectId, pathSubs } from "./model";
-import { mapSubs } from "./path";
+import { mapSubs, roundCorners } from "./path";
 
 /** The boolean groups an object is in, outermost first, each with whether the object is that group's own result. */
 export function boolGroupsOf(o: CanvasObject): Array<{ gid: string; op: BoolOp; own: boolean }> {
@@ -95,14 +95,17 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
     if (!r) return null;
     regions.push(r);
   }
-  const loops = ops.length === 1 ? regions[0]!.subs : booleanOp(op, regions);
-  if (!loops) return null;
+  const raw = ops.length === 1 ? regions[0]!.subs : booleanOp(op, regions);
+  if (!raw) return null;
+  // The group's own corner radius rounds the corners of the result (the shapes keep their own); it is in the result's units, which may differ from the back shape's.
+  const radius = typeof existing?.radius === "number" ? existing.radius * 2 ** ((existing.unit ?? 0) - base.unit) : 0;
+  const loops = radius > 0 ? roundCorners(raw, radius) : raw;
   if (!loops.length) return { upsert: [], remove: existing ? [existing.id] : [] };
   const chain = (base.groups ?? []).slice(0, (base.groups ?? []).indexOf(gid) + 1);
   const bools = Object.fromEntries(Object.entries(base.boolOps ?? {}).filter(([k]) => chain.includes(k)));
   // The result's own look is kept (it is the group's fill and outline); a new one starts as the back shape's.
   const look = existing ?? { fill: base.fill, stroke: base.stroke, width: base.width, ...(base.join ? { join: base.join } : {}), ...(base.cap ? { cap: base.cap } : {}), ...(base.align ? { align: base.align } : {}), opacity: base.opacity, ...(base.blend ? { blend: base.blend } : {}) };
-  const { sub: _s, rot: _r, shape: _sh, evenodd: _e, anchor: _a, unit: _u, frame: _f, groups: _g, boolOps: _b, ...keep } = look as PathObject;
+  const { sub: _s, rot: _r, shape: _sh, evenodd: _e, anchor: _a, unit: _u, frame: _f, groups: _g, boolOps: _b, radius: _rad, base: _bs, params: _pm, ...keep } = look as PathObject;
   const result: PathObject = {
     ...keep,
     id: existing?.id ?? newObjectId(),
@@ -113,6 +116,7 @@ export function deriveResult(all: readonly CanvasObject[], gid: string, space: F
     z: existing?.z ?? base.z,
     attachmentTargetId: null,
     sub: loops,
+    ...(radius > 0 ? { radius } : {}),
     groups: chain,
     boolOps: bools,
     result: gid,

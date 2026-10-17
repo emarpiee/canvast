@@ -1,9 +1,9 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
-import type { CanvasObject } from "./model";
+import type { CanvasObject, PathObject } from "./model";
 import { localBounds, pivotOf } from "./model";
-import { scaleParams, scaleSubs } from "./path";
+import { roundCorners, scaleParams, scaleRadius, scaleSubs } from "./path";
 
 /**
  * Pure geometric edits. Each returns a new object; the document applies them
@@ -22,6 +22,26 @@ const ANCHOR_GUARD_BITS = 96;
 function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyadic {
   // a' = f + (a - f) * k, rounded far below one local unit.
   return D.roundTo(D.add(f, D.mul(D.sub(a, f), k)), unit - ANCHOR_GUARD_BITS);
+}
+
+/** A path stretched: its geometry and shape numbers scale; a corner radius does not (a bigger rectangle keeps its corner), the rounding is made again. */
+function stretched(o: PathObject, kx: number, ky: number): Partial<PathObject> {
+  const params = o.params ? { params: scaleParams(o.params, kx, ky) } : {};
+  if (o.base) {
+    const base = scaleSubs(o.base, kx, ky);
+    return { ...params, base, sub: roundCorners(base, o.radius!) };
+  }
+  return { ...params, sub: scaleSubs(o.sub, kx, ky) };
+}
+
+/** A path with its local units renamed (s times as many units for the same size): everything in local units follows. */
+function renamed(o: PathObject, s: number): Partial<PathObject> {
+  return {
+    sub: scaleSubs(o.sub, s, s),
+    ...(o.params ? { params: scaleParams(o.params, s, s) } : {}),
+    ...(o.base ? { base: scaleSubs(o.base, s, s) } : {}),
+    ...(o.radius !== undefined ? { radius: scaleRadius(o.radius, s) } : {}),
+  };
 }
 
 /**
@@ -46,7 +66,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   }
   if (o.kind === "path") {
     if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
-    return normalizeUnit({ ...o, anchor, sub: scaleSubs(o.sub, kx, ky), ...(o.params ? { params: scaleParams(o.params, kx, ky) } : {}), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
+    return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
 }
@@ -132,7 +152,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   const unit = o.unit + n;
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
   if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s };
-  if (o.kind === "path") return { ...o, unit, sub: scaleSubs(o.sub, s, s), ...(o.params ? { params: scaleParams(o.params, s, s) } : {}), width: o.width * s };
+  if (o.kind === "path") return { ...o, unit, ...renamed(o, s), width: o.width * s };
   return { ...o, unit, w: o.w * s, h: o.h * s };
 }
 

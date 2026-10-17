@@ -35,10 +35,14 @@ export interface ToolbarActions {
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
   selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; closed: boolean; widthPx: number | null } | null;
-  /** The first picked shape whose numbers can still be changed (null: none): its kind, sides, points, star ratio (0-1) and corner radius in px at this zoom. */
-  selectedShape(): { shape: "rect" | "polygon" | "star"; sides: number; tips: number; inner: number; radiusPx: number } | null;
-  /** Change the sides, points, ratio or corner radius (px) of the picked shapes: one undo step. */
-  shapeSelected(change: { sides?: number; tips?: number; inner?: number; radiusPx?: number }): void;
+  /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
+  selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
+  /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
+  shapeSelected(change: { sides?: number; tips?: number; inner?: number }): void;
+  /** The corner radius (px at this zoom) of the first picked path that has corners to round; `perCorner`: a rectangle, which takes one per corner. */
+  selectedCorners(): { radiusPx: number[]; perCorner: boolean } | null;
+  /** Round the corners of the picked paths: one value, or four for a rectangle (top left, top right, bottom right, bottom left). */
+  cornersSelected(px: number[]): void;
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice }): void;
 }
@@ -138,7 +142,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <label class="tb-count" data-sel-radius-wrap hidden>Radius <input type="number" data-sel-radius min="0" step="1" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom"></label>
+        <label class="tb-count" data-sel-radius-wrap hidden>Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. A rectangle also takes four values: top left, top right, bottom right, bottom left."></label>
         <label class="tb-count" data-sel-sides-wrap hidden>Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-sel-tips-wrap hidden>Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
         <label class="tb-count" data-sel-inner-wrap hidden>Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -265,7 +269,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (change) actions.shapeSelected(change);
     });
   };
-  shapeInput("[data-sel-radius]", (v) => (v >= 0 ? { radiusPx: v } : null));
+  root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
+    const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
+    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === 4)) actions.cornersSelected(parts);
+  });
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
@@ -407,11 +414,22 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-tips-wrap]")!.hidden = editor.shapeKind !== "star";
     if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
-    const shp = editor.tool === "select" || editor.tool === "node" ? actions.selectedShape() : null;
-    for (const [key, shown, value] of [["radius", !!shp, shp ? Math.round(shp.radiusPx * 100) / 100 : 0], ["sides", shp?.shape === "polygon", shp?.sides ?? 0], ["tips", shp?.shape === "star", shp?.tips ?? 0], ["inner", shp?.shape === "star", shp ? Math.round(shp.inner * 100) : 0]] as const) {
+    const pick = editor.tool === "select" || editor.tool === "node";
+    const still = editor.preview.kind === "none"; // (not while something is being dragged: the numbers wait for it to end)
+    const shp = pick && still ? actions.selectedShape() : null;
+    const crn = pick && still ? actions.selectedCorners() : null;
+    const round2 = (v: number): string => String(Math.round(v * 100) / 100);
+    const fields: Array<[string, boolean, string]> = [
+      ["radius", !!crn, crn ? (crn.perCorner && crn.radiusPx.length === 4 ? crn.radiusPx.map(round2).join(" ") : round2(crn.radiusPx[0] ?? 0)) : ""],
+      ["sides", shp?.shape === "polygon", String(shp?.sides ?? 0)],
+      ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
+      ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
+    ];
+    for (const [key, shown, value] of fields) {
+      if (!still && pick) continue;
       root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
       const input = root.querySelector<HTMLInputElement>(`[data-sel-${key}]`)!;
-      if (shown && document.activeElement !== input) input.value = String(value);
+      if (shown && document.activeElement !== input) input.value = value;
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
     if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));

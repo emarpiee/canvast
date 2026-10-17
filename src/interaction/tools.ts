@@ -8,10 +8,10 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { homeObject, newObjectId, pathSubs } from "../doc/model";
+import { editSubs, homeObject, newObjectId } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
-import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, roundCorners, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
@@ -547,11 +547,14 @@ export function attachTools(
   /** The geometry as it is drawn (a turn baked in), and the object without its turn. */
   const baked = (o: PathObject): { sub: readonly SubPath[]; flat: PathObject } => {
     const { rot: _turn, ...flat } = o;
-    return { sub: pathSubs(o), flat: { ...flat, sub: pathSubs(o) } };
+    // (a rounded path is edited at its sharp corners: its base, turned)
+    const sub = editSubs(o);
+    return { sub, flat: { ...flat, sub } };
   };
   const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
     const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
-    const next = homeObject(normalizeUnit({ ...flat, sub }), doc.space);
+    // a rounded path keeps its radius: the nodes are the sharp ones, and the rounding is made again
+    const next = homeObject(normalizeUnit(o.base && o.radius !== undefined ? { ...flat, base: sub, sub: roundCorners(sub, o.radius) } : { ...flat, sub }), doc.space);
     doc.commit(doc.transaction(label, [next]));
   };
 

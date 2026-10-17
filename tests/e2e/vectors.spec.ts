@@ -922,14 +922,79 @@ test("shapes stay editable after drawing: a polygon's sides, a star's points and
   expect(await px(304, 524)).not.toEqual([37, 99, 235]); // the corner is gone
   expect(await px(330, 550)).toEqual([37, 99, 235]); // the middle is not
 
-  // moving a node by hand makes it an ordinary path: the numbers go
+  // moving a node by hand makes it an ordinary path: the sides and points go, the radius stays (the nodes shown are its sharp ones)
   await click(app, 400, 580);
   await key(app, "Enter"); // Edit nodes
   const box = await screenBox(app, (await last(app)).id);
   await drag(app, [box.minX + 70, box.minY + 0.5], [box.minX + 70, box.minY - 20]);
   await key(app, "Escape");
   await click(app, 400, 600);
+  await expect(p.locator("[data-sel-radius]")).toBeVisible();
+  await expect(p.locator("[data-sel-radius]")).toHaveValue("30");
+});
+
+test("corner radius on every kind of shape: one value or four on a rectangle, any path with sharp corners, a boolean group's result (the shapes keep theirs)", async ({ app }) => {
+  const p = app.page;
+  const nodes = async (o?: Obj) => ((o ?? (await last(app))).sub.reduce((a, s) => a + s.n.length / 6, 0));
+  const set = async (v: string) => {
+    await p.locator("[data-sel-radius]").fill(v);
+    await p.locator("[data-sel-radius]").press("Enter");
+    await p.locator("[data-sel-radius]").blur();
+    await app.frame();
+  };
+  // a rectangle: four values, one per corner
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 420]);
+  await key(app, "v");
+  await click(app, 600, 360);
+  await set("40 0 40 0");
+  expect(await nodes()).toBe(6);
+  await set("0");
+  expect(await nodes()).toBe(4);
+  // an ellipse has no corners: no field
+  await key(app, "u");
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [800, 300], [960, 420]);
+  await key(app, "v");
+  await click(app, 880, 360);
   await expect(p.locator("[data-sel-radius]")).toBeHidden();
+  // a triangle drawn with the Path tool: any path with sharp corners
+  await key(app, "b");
+  await click(app, 300, 520);
+  await click(app, 460, 520);
+  await click(app, 380, 640);
+  await click(app, 300, 520);
+  await key(app, "v");
+  await click(app, 380, 560);
+  await set("12");
+  expect(await nodes()).toBe(6);
+  // Edit nodes shows its three sharp corners, not the six rounded ones, and keeps the rounding when one is moved
+  await key(app, "Enter");
+  const tri = await last(app);
+  const box = await screenBox(app, tri.id);
+  await drag(app, [box.maxX - 3, box.maxY - 3], [box.maxX + 30, box.maxY + 20]);
+  await key(app, "Escape");
+  expect(await nodes()).toBe(6);
+  // a boolean group: its own radius rounds the result, the shapes inside keep their sharp corners
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [700, 520], [860, 620]);
+  await drag(app, [780, 560], [940, 660]);
+  await key(app, "v");
+  await click(app, 720, 540);
+  await click(app, 920, 640, ["Shift"]);
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const before = (await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!;
+  expect(await nodes(before)).toBe(8);
+  await set("14");
+  const after = (await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!;
+  expect(await nodes(after)).toBe(16);
+  const members = (await objs(app)).filter((o) => (o as Obj & { result?: string }).result === undefined && (o as Obj & { groups?: string[] }).groups);
+  expect(members.every((m) => m.sub[0]!.n.length / 6 === 4)).toBe(true); // the shapes are as they were
+  await p.keyboard.press("Control+z");
+  expect(await nodes((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!)).toBe(8);
 });
 
 test("the line under the tool options says what to do: per tool, with a shape picked, with a group entered; Enter edits nodes and finishes", async ({ app }) => {

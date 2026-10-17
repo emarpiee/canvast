@@ -4,7 +4,7 @@
  * (the nodes are then the person's own): the object loses `params` and stays an ordinary path.
  */
 import type { PathObject } from "./model";
-import { CORNERED, DEFAULT_INNER, fittedShape, geometryBounds, nodeCount, shapeFromParams, type ShapeParams } from "./path";
+import { CORNERED, DEFAULT_INNER, canRound, fittedShape, geometryBounds, nodeCount, roundCorners, type Radius, type ShapeParams, type SubPath } from "./path";
 
 /** The parameters of a shape that has them, or can be worked out: a shape drawn before they were kept, whose nodes are still exactly its kind's own. */
 export function paramsOf(o: PathObject): ShapeParams | null {
@@ -20,13 +20,36 @@ export function paramsOf(o: PathObject): ShapeParams | null {
   return same ? p : null;
 }
 
-export type ShapePatch = { sides?: number; tips?: number; inner?: number; radius?: number };
+export type ShapePatch = { sides?: number; tips?: number; inner?: number };
 
-/** The shape made again with some of its numbers changed (null: it cannot be, its nodes are no longer the shape's own). */
+/** The sharp geometry of a path: what its rounded corners are made from. */
+const sharpOf = (o: PathObject): readonly SubPath[] => o.base ?? (o.params && o.shape ? fittedShape(o.shape, o.params) : o.sub);
+
+/** The shape made again with some of its numbers changed, keeping its rounded corners (null: it cannot be, its nodes are no longer the shape's own). */
 export function withShapeParams(o: PathObject, patch: ShapePatch): PathObject | null {
   const p = paramsOf(o);
   if (!p || !o.shape) return null;
-  const next: ShapeParams = { ...p, ...patch };
-  const params: ShapeParams = next.radius ? next : (({ radius: _r, ...rest }) => rest)(next);
-  return { ...o, sub: shapeFromParams(o.shape, params), params };
+  const params: ShapeParams = { ...p, ...patch };
+  const base = fittedShape(o.shape, params);
+  return o.radius !== undefined ? { ...o, params, base, sub: roundCorners(base, o.radius) } : { ...o, params, sub: base };
+}
+
+/**
+ * The path with its corners rounded by `radius` (0: sharp again). The sharp geometry is kept in `base`, so the radius can be changed and the
+ * nodes edited later. The result of a boolean group keeps only the number: it is rounded as it is derived from its shapes.
+ */
+export function withRadius(o: PathObject, radius: Radius): PathObject {
+  const zero = typeof radius === "number" ? !(radius > 0) : radius.every((v) => !(v > 0));
+  const { radius: _r, base: _b, ...rest } = o;
+  if (o.result !== undefined) return zero ? (rest as PathObject) : { ...rest, radius: radius };
+  const base = sharpOf(o);
+  return zero ? { ...rest, sub: base } : { ...rest, radius, base, sub: roundCorners(base, radius) };
+}
+
+/** Whether the path has corners that a radius would round (or is rounded now); a boolean group's result is judged by its own outline. */
+const cornered = new WeakMap<PathObject, boolean>();
+export function hasCorners(o: PathObject): boolean {
+  let r = cornered.get(o);
+  if (r === undefined) cornered.set(o, (r = o.radius !== undefined || canRound(sharpOf(o))));
+  return r;
 }

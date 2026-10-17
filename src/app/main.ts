@@ -13,7 +13,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -545,14 +545,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
+      return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
+    },
+    shapeSelected: (change) => commitShape(doc, editor, change),
+    selectedCorners: () => {
+      const o = selectedCorners(doc, editor);
       if (!o) return null;
       const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === o.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
-      return { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner, radiusPx: ppu > 0 && ppu < Infinity ? o.radius * ppu : 0 };
+      if (!(ppu > 0 && ppu < Infinity)) return { radiusPx: [0], perCorner: o.perCorner };
+      return { radiusPx: typeof o.radius === "number" ? [o.radius * ppu] : o.radius.map((v) => v * ppu), perCorner: o.perCorner };
     },
-    shapeSelected: (change) => {
+    cornersSelected: (px) => {
       const visible = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
-      commitShape(doc, editor, change, (id) => {
+      commitCorners(doc, editor, px, (id) => {
         const po = visible.find((p) => p.obj.id === id);
         return po && !po.cover ? po.proj.ppu : 0;
       });

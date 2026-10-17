@@ -454,8 +454,6 @@ export interface ShapeParams {
   readonly tips?: number;
   /** A star's inner radius as a fraction of the outer one. */
   readonly inner?: number;
-  /** Corner radius; 0 or absent: sharp corners. */
-  readonly radius?: number;
 }
 
 export const DEFAULT_INNER = 0.45;
@@ -472,34 +470,43 @@ export function fittedShape(kind: ShapeKind, p: ShapeParams): SubPath[] {
   return mapSubs(g, (px, py) => [x + (px - b.minX) * sx, y + (py - b.minY) * sy]);
 }
 
-/** The geometry of a shape from its parameters: the fitted shape with its corners rounded. */
-export const shapeFromParams = (kind: ShapeKind, p: ShapeParams): SubPath[] => (p.radius && CORNERED.includes(kind) ? roundCorners(fittedShape(kind, p), p.radius) : fittedShape(kind, p));
+/** The parameters after the object's local coordinates are scaled. */
+export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams => ({ ...p, box: [p.box[0] * kx, p.box[1] * ky, p.box[2] * kx, p.box[3] * ky] });
 
-/** The parameters after the object's local coordinates are scaled (a corner radius follows the mean of the two scales). */
-export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams => ({
-  ...p,
-  box: [p.box[0] * kx, p.box[1] * ky, p.box[2] * kx, p.box[3] * ky],
-  ...(p.radius ? { radius: p.radius * Math.sqrt(kx * ky) } : {}),
-});
+/** A corner radius: one for every corner, or (a rectangle) one per node of its first sub-path. */
+export type Radius = number | readonly number[];
+
+const isSharp = (q: readonly number[]): boolean => q[2] === q[0] && q[3] === q[1] && q[4] === q[0] && q[5] === q[1];
+
+/** Whether any corner could be rounded: a sharp node between two straight lines (the ends of an open sub-path have none). */
+export function canRound(subs: readonly SubPath[]): boolean {
+  return subs.some((s) => {
+    const c = nodeCount(s);
+    for (let k = s.closed ? 0 : 1; k < (s.closed ? c : c - 1); k++) {
+      const at = (i: number): number[] => s.n.slice(((i + c) % c) * NODE, ((i + c) % c) * NODE + NODE);
+      if (isSharp(at(k)) && isSharp(at(k - 1)) && isSharp(at(k + 1))) return true;
+    }
+    return false;
+  });
+}
 
 /**
- * The corners of closed sub-paths rounded with a circular arc (as a cubic) of radius `r`: a corner node between two straight lines becomes two
- * nodes. The radius is cut down where a line is too short to hold it (each corner may use half of each line), so neighbours never overlap.
- * Nodes with handles, and the ends of open sub-paths, are left alone.
+ * The corners of sub-paths rounded with a circular arc (as a cubic) of radius `r`: a sharp node between two straight lines becomes two
+ * nodes. The radius is cut down where a line is too short to hold it (each corner may use half of each line), so neighbours never overlap
+ * and a large radius on a rectangle makes a pill. The ends of an open sub-path, and nodes with handles, are left as they are.
  */
-export function roundCorners(subs: readonly SubPath[], r: number): SubPath[] {
-  if (!(r > 0)) return [...subs];
-  return subs.map((s) => {
+export function roundCorners(subs: readonly SubPath[], r: Radius): SubPath[] {
+  return subs.map((s, si) => {
     const c = nodeCount(s);
-    if (!s.closed || c < 3) return s;
-    const at = (k: number): number[] => s.n.slice(k * NODE, k * NODE + NODE);
-    const sharp = (q: number[]): boolean => q[2] === q[0] && q[3] === q[1] && q[4] === q[0] && q[5] === q[1];
+    if (c < 3) return s;
+    const at = (k: number): number[] => s.n.slice(((k + c) % c) * NODE, ((k + c) % c) * NODE + NODE);
     const out: number[] = [];
     for (let k = 0; k < c; k++) {
       const P = at(k);
-      const A = at((k + c - 1) % c);
-      const B = at((k + 1) % c);
-      if (!(sharp(P) && sharp(A) && sharp(B))) {
+      const rad = typeof r === "number" ? r : si === 0 && r.length === c ? r[k]! : 0;
+      const A = at(k - 1);
+      const B = at(k + 1);
+      if (!(rad > 0) || (!s.closed && (k === 0 || k === c - 1)) || !(isSharp(P) && isSharp(A) && isSharp(B))) {
         out.push(...P);
         continue;
       }
@@ -515,16 +522,19 @@ export function roundCorners(subs: readonly SubPath[], r: number): SubPath[] {
         out.push(...P);
         continue;
       }
-      const t = Math.min(r / Math.tan(theta / 2), Math.min(l1, l2) / 2);
+      const t = Math.min(rad / Math.tan(theta / 2), Math.min(l1, l2) / 2);
       const rr = t * Math.tan(theta / 2);
       const hh = (4 / 3) * Math.tan((Math.PI - theta) / 4) * rr;
       const p1x = P[0]! + e1x * t, p1y = P[1]! + e1y * t, p2x = P[0]! + e2x * t, p2y = P[1]! + e2y * t;
       out.push(p1x, p1y, p1x, p1y, p1x - e1x * hh, p1y - e1y * hh);
       out.push(p2x, p2y, p2x - e2x * hh, p2y - e2y * hh, p2x, p2y);
     }
-    return { n: out, closed: true };
+    return { n: out, closed: s.closed };
   });
 }
+
+/** The radius after the object's local units are renamed by a factor (the same world size). */
+export const scaleRadius = (r: Radius, k: number): Radius => (typeof r === "number" ? r * k : r.map((v) => v * k));
 
 /** The parameters of a shape just drawn into a box (null for kinds that have none). */
 export const drawnParams = (kind: ShapeKind, x: number, y: number, w: number, h: number, sides: number, tips: number): ShapeParams | null =>
