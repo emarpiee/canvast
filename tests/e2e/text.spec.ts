@@ -218,6 +218,10 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.evaluate(() => window.__canvastDebug.nextFrame());
   await expect.poll(async () => width(t!.id)).toBeCloseTo(after, 0); // the font came back from the library
+  // Picked after a reload, the menu names the font (it reads the library before it is opened).
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  await expect(p.getByRole("combobox", { name: "Font" }).locator("option:checked")).toHaveText("Inter-Black");
 });
 
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {

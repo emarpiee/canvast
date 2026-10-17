@@ -377,10 +377,20 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (html !== fontHtml) fontSelect.innerHTML = fontHtml = html;
     fontSelect.value = now;
   };
+  const askedFor = new Set<string>();
   const askFonts = (): void => void actions.fonts().then((l) => {
     fontList = l;
+    askedFor.add("");
     if (document.activeElement !== fontSelect) paintFonts();
   });
+  // The list is read before the menu opens (a menu already open is not rebuilt under the pointer): the first time a text is shown, when the
+  // font it is set in is not in the list yet, and when the pointer comes near.
+  const wantFonts = (now: string): void => {
+    if (askedFor.has("") && (!now || fontList.some((f) => f.hash === now) || askedFor.has(now))) return;
+    askedFor.add(now);
+    askFonts();
+  };
+  fontSelect.addEventListener("pointerenter", askFonts);
   fontSelect.addEventListener("pointerdown", askFonts);
   fontSelect.addEventListener("focus", askFonts);
   fontSelect.addEventListener("change", () => {
@@ -732,6 +742,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const txt = (pick && still) || editor.tool === "text" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
+      wantFonts(txt.assetId ?? "");
       if (document.activeElement !== fontSelect) paintFonts();
       const size = root.querySelector<HTMLInputElement>("[data-text-size]")!;
       if (document.activeElement !== size) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
