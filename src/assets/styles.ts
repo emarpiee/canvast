@@ -10,6 +10,8 @@ import type { Gradient } from "../doc/paint";
 import { isColour, isGradient, isPaint } from "../doc/paint";
 import type { PaletteColour } from "./gpl";
 import { MAX_PALETTE } from "./gpl";
+import { cleanLook } from "../text/text-style";
+import type { TextLook } from "../text/text-style";
 
 export interface StyleItem {
   readonly id: string;
@@ -111,8 +113,21 @@ export const PALETTE_KIND: StyleKind = {
   look: (d) => ({ swatches: (d as PaletteData).colours.map((c) => c.c) }),
 };
 
-// Stroke and text styles come here as more kinds (ADR 0120).
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND];
+export const TEXT_KIND: StyleKind = {
+  id: "text",
+  label: "Text style",
+  plural: "Text styles",
+  empty: "None yet. Save one from a text.",
+  validate: (d) => cleanLook(d),
+  summary: (d) => {
+    const l = d as TextLook;
+    return [l.sizePx !== undefined ? `${Math.round(l.sizePx * 10) / 10} px` : "", l.align && l.align !== "left" ? l.align : "", l.lineHeight !== undefined ? `line ${l.lineHeight}` : "", l.tracking ? `letters ${Math.round(l.tracking * 100)}%` : ""].filter(Boolean).join(" · ") || "Default";
+  },
+  look: (d) => ({ swatches: (d as TextLook).color ? [(d as TextLook).color!] : [] }),
+};
+
+// Stroke styles come here as one more kind (ADR 0120).
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

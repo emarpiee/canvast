@@ -4,6 +4,7 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `a-large-small` | The Text styles tab of the Styles panel |
 | `align-left` | Align text left |
 | `align-center` | Align text in the centre |
 | `align-right` | Align text right |

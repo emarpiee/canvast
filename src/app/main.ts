@@ -71,7 +71,7 @@ import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runExport, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
-import { toolLook } from "../text/text-style";
+import { styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
@@ -564,6 +564,18 @@ async function start(): Promise<void> {
     names: assetNames,
   });
   mountStylesPanel(side, editor, session.styles, {
+    text: {
+      count: () => [...editor.selection].filter((id) => doc.get(id)?.kind === "text").length,
+      current: () => {
+        const l = selectedTextStyle(doc, editor, textPpu);
+        return l ? styleOf(l) : null;
+      },
+      apply: (look, label) => {
+        setTextStyle(doc, editor, look, textPpu);
+        editor.message = `Applied the text style “${label}”.`;
+        editor.changed();
+      },
+    },
     adjustment: {
       can: () => !!selectedAdjust(doc, editor),
       apply: (s) => commitAdjust(doc, editor, s.data as Adjust, `Apply the adjustment “${s.name}”`),

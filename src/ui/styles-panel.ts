@@ -1,6 +1,7 @@
 import type { EditorState } from "../app/editor-state";
 import type { StyleItem, StyleLibrary, PaletteData } from "../assets/styles";
 import { STYLE_KINDS, gradientCss } from "../assets/styles";
+import type { TextLook } from "../text/text-style";
 import { parseGgr, serializeGgr } from "../assets/ggr";
 import { MAX_PALETTE, parseGpl, serializeGpl } from "../assets/gpl";
 import type { PaletteColour } from "../assets/gpl";
@@ -35,6 +36,8 @@ export interface StylesDeps {
   };
   /** Pictures take a gradient as a gradient map: how many are picked, and putting one on them. */
   map: { count(): number; apply(stops: Gradient["stops"], label: string): void };
+  /** Text styles: how many texts are picked (or are being edited), the look of the first one, and putting a saved look on them. */
+  text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
   picturePalette(): Promise<string[] | null>;
@@ -76,7 +79,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "adjustment" ? deps.adjustment.can() : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   const card = (item: StyleItem, can: boolean): string => {
@@ -109,12 +112,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
+    text: "A text style is a size, spacing, alignment and colour. Pick a text, save its style here, then press it to give other texts the same look.",
   };
 
   const render = (): void => {
@@ -130,7 +134,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const all = styles.of(k.id);
     const items = all.filter((s) => !q || s.name.toLowerCase().includes(q));
     const can = canApply(k.id);
-    const paints = k.id !== "adjustment";
+    const paints = k.id === "gradient" || k.id === "colour" || k.id === "palette";
     const tabs = kindsShown
       .map((t) => {
         const n = styles.of(t.id).filter((s) => !q || s.name.toLowerCase().includes(q)).length;
@@ -145,7 +149,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
           ? `<button type="button" class="styles-make" data-add-style-colour>${ICONS.droplet}<span>Add a colour</span></button>`
           : k.id === "gradient"
             ? `<button type="button" class="styles-make" data-new-gradient>${ICONS.blend}<span>New gradient</span></button><button type="button" class="styles-make" data-import>${ICONS.fileUp}<span>Import .ggr</span></button>`
-            : "";
+            : k.id === "text"
+              ? `<button type="button" class="styles-make" data-save-text${deps.text.current() ? "" : " disabled"}>${ICONS.textStyle}<span>Save from the text</span></button>`
+              : "";
     const empty =
       all.length === 0
         ? k.id === "palette"
@@ -160,7 +166,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       <div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the picked shapes")}${seg("stroke", "Outline", "Colours go on the outline of the picked shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
-        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
@@ -356,6 +362,11 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         deps.notify(`Saved ${h.toUpperCase()}.`);
       });
     }
+    if (t.closest("[data-save-text]")) {
+      const look = deps.text.current();
+      if (look) void styles.add("text", "", look).then((made) => made && deps.notify(`Saved the text style “${made.name}”.`));
+      return;
+    }
     const newGradient = t.closest<HTMLElement>("[data-new-gradient]");
     if (newGradient) {
       void styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: [{ o: 0, c: "#2563eb" }, { o: 1, c: "#f59e0b" }] }).then((made) => {
@@ -466,6 +477,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const item = find(row?.dataset["style"]);
     if (!item || !canApply(item.kind)) return;
     if (item.kind === "adjustment") deps.adjustment.apply(item);
+    else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
     else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {

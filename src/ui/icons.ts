@@ -81,6 +81,7 @@ import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
 import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
+import textStyleIcon from "lucide-static/icons/a-large-small.svg";
 import textAlignLeftIcon from "lucide-static/icons/align-left.svg";
 import textAlignCenterIcon from "lucide-static/icons/align-center.svg";
 import textAlignRightIcon from "lucide-static/icons/align-right.svg";
@@ -239,6 +240,7 @@ export const ICONS = {
   panelBottomClose: clean(panelBottomCloseIcon),
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),
+  textStyle: clean(textStyleIcon),
   textAlignLeft: clean(textAlignLeftIcon),
   textAlignCenter: clean(textAlignCenterIcon),
   textAlignRight: clean(textAlignRightIcon),

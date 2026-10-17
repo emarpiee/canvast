@@ -117,6 +117,39 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Styles: a text style is saved from a picked text and put on another one (size, alignment, spacing, colour; the width mode stays)", async ({ app }) => {
+  const p = app.page;
+  const texts = async () => (await objs(app)).filter((o) => o.kind === "text") as unknown as Array<Record<string, unknown> & { id: string }>;
+  for (const [x, y, words] of [[300, 300, "first words"], [300, 450, "second words"]] as const) {
+    await p.keyboard.press("t");
+    await p.mouse.click(x, y);
+    await p.keyboard.type(words);
+    await p.keyboard.press("Escape");
+    await app.frame();
+  }
+  const [a, b] = await texts();
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  await p.getByRole("radio", { name: "Align right" }).click();
+  await p.getByRole("spinbutton", { name: "Text size (px at this zoom)" }).fill("30");
+  await p.getByRole("spinbutton", { name: "Text size (px at this zoom)" }).press("Enter");
+  await p.getByRole("button", { name: "Styles panel" }).click();
+  await p.getByRole("tab", { name: /^Text styles/ }).click();
+  await p.getByRole("button", { name: "Save from the text" }).click();
+  await expect(p.getByTestId("styles-panel").locator(".style-card")).toHaveCount(1);
+  await expect(p.getByTestId("styles-panel").locator(".style-card")).toContainText("30 px");
+  // Another text takes it, and keeps being as wide as its words.
+  await p.keyboard.press("Escape");
+  await p.mouse.click(310, 458);
+  await p.getByTestId("styles-panel").locator(".style-card").click();
+  await expect.poll(async () => (await texts()).find((t) => t.id === b!.id)).toMatchObject({ align: "right", autoWidth: true });
+  const after = (await texts()).find((t) => t.id === b!.id)!;
+  expect(after.size as number).toBeGreaterThan((b!.size as number) * 1.5);
+  expect(after.w as number).toBeGreaterThan((b!.w as number) * 1.5); // refitted to the bigger size
+  expect(((await texts()).find((t) => t.id === a!.id) as Record<string, unknown>)["align"]).toBe("right");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("Styles: a gradient map on a picture maps its brightness onto a saved gradient, by an amount, in one undo step", async ({ app }) => {
   const p = app.page;
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
