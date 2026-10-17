@@ -1,6 +1,7 @@
 import { expect, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
+import { makeWebm } from "./video";
 
 /**
  * Pictures on the canvas (ADR 0118): crop, and non-destructive adjustments. Real input; assertions read the stored objects and pixels.
@@ -194,4 +195,40 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
   await expect(reset).toBeHidden();
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === pic.id)!.adjust).toEqual({ exposure: 25 });
+});
+
+test("a video has every adjustment: highlights, shadows, tint, sharpen and grain too, through a filter the player and the canvas share", async ({ app }) => {
+  const slow = expect.configure({ timeout: 20_000 });
+  const p = app.page;
+  const webm = await makeWebm(p, 2);
+  await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: webm });
+  await slow.poll(async () => (await objs(app)).length).toBe(1);
+  const [v] = await objs(app);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, v!.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await slow(p.getByTestId("media-bar")).toBeVisible();
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  const pop = p.locator(".adjust-pop");
+  for (const key of ["exposure", "highlights", "shadows", "tint", "sharpen", "grain"]) {
+    await expect(pop.locator(`[data-adj-num="${key}"]`), `${key} is offered for a video`).toBeVisible();
+  }
+  for (const [key, val] of [["shadows", "40"], ["tint", "-20"], ["grain", "30"]] as const) {
+    await pop.locator(`[data-adj-num="${key}"]`).fill(val);
+    await pop.locator(`[data-adj-num="${key}"]`).blur();
+  }
+  await p.keyboard.press("Escape");
+  expect((await objs(app)).find((o) => o.id === v!.id)!.adjust).toEqual({ shadows: 40, tint: -20, grain: 30 });
+  // the player shows it through a filter that exists in the page and holds those steps
+  await expect.poll(() => p.evaluate(() => document.querySelector<HTMLElement>("video.media-video")?.style.filter ?? "")).toMatch(/^url\("?#adj-/);
+  const parts = await p.evaluate(() => {
+    const url = document.querySelector<HTMLElement>("video.media-video")!.style.filter;
+    const id = /#([^")]+)/.exec(url)![1]!;
+    const f = document.getElementById(id)!;
+    return [...f.children].map((c) => c.localName);
+  });
+  expect(parts).toContain("feComponentTransfer"); // shadows
+  expect(parts).toContain("feColorMatrix"); // tint (and the grain's)
+  expect(parts).toContain("feTurbulence"); // grain
+  expect(app.consoleErrors).toEqual([]);
 });

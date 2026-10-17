@@ -10,7 +10,8 @@ import { MITER_LIMIT } from "../doc/path";
 import { canvasPaint } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
-import { adjustPixel, cropOf, cssFilter, isNeutral } from "../doc/adjust";
+import { adjustPixel, cropOf, isNeutral } from "../doc/adjust";
+import { playingFilter } from "./adjust-filter";
 import { adjustedSource } from "./adjust-image";
 
 /**
@@ -378,8 +379,8 @@ export function drawImageObject(
       const sy0 = k * (crop.y + (localY(ct) * crop.h) / o.h);
       const sx1 = k * (crop.x + (localX(cr) * crop.w) / o.w);
       const sy1 = k * (crop.y + (localY(cb) * crop.h) / o.h);
-      // A video or a GIF is adjusted as its player on the canvas is (a CSS filter: exposure, contrast, colour, blur); a still, pixel by pixel.
-      const filter = o.media ? cssFilter(o.adjust) : "";
+      // A video or a GIF is adjusted as its player on the canvas is (an SVG filter, every adjustment); a still, pixel by pixel.
+      const filter = o.media ? playingFilter(o.adjust) : "";
       if (filter) ctx.filter = filter;
       ctx.drawImage(isNeutral(o.adjust) || o.media ? src.source : adjustedSource(src, o.adjust!), sx0, sy0, sx1 - sx0, sy1 - sy0, cl, ct, cr - cl, cb - ct);
       if (filter) ctx.filter = "none";

@@ -2,6 +2,8 @@
 
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
+- **Download** on the selection bar for every file of the canvas (several in one ZIP; an edited still comes with its original, named as edited pictures are), **Reset** beside Adjust, and **every adjustment on video and GIF** (highlights, shadows, tint, sharpen and grain were missing) through an SVG filter (ADR 0119).
+
 - **Crop** a picture (its handles move its window of the source; pull back out to restore) and **adjust** it without changing the original: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, blur, sharpen, grain; copy and paste adjustments, copy or make a new picture as it looks (ADR 0118).
 
 - **Command palette** (Ctrl+K, ADR 0117); **previous and next view** (Alt+Shift+Left and Alt+Shift+Right and two buttons), **gliding** between views, and a **tour of the bookmarks** (ADR 0116).

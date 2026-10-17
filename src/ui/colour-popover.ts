@@ -385,7 +385,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
 export interface AdjustOptions {
   /** The numbers now (those of the first picked picture). */
   adjust: Adjust;
-  /** Only stills have every adjustment; video and GIF show the ones a playing picture can (exposure, contrast, saturation, vibrance, temperature, blur). */
+  /** Stills are adjusted pixel by pixel; video and GIF through a filter (every adjustment too, but sharpen and grain can slow playback of a big video). */
   stills: boolean;
   count: number;
   /** Every step of a slider: the adjustments to show now (not stored). */
@@ -395,8 +395,6 @@ export interface AdjustOptions {
   onClose?(): void;
 }
 
-const MOVING_KEYS: readonly AdjustKey[] = ["exposure", "contrast", "saturation", "vibrance", "temperature", "blur"];
-
 export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   if (open && open.anchor === anchor) return closeColourPopover(true);
   closeColourPopover();
@@ -405,10 +403,10 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   pop.className = "colour-pop adjust-pop";
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", "Adjust the picture");
-  const rows = ADJUSTMENTS.filter((s) => o.stills || MOVING_KEYS.includes(s.key));
+  const rows = ADJUSTMENTS;
   let cur: Adjust = { ...o.adjust };
   pop.innerHTML =
-    `<p class="op-note">${o.count > 1 ? `The first of ${o.count} pictures is shown; what you set goes to all of them.` : "Nothing is changed in the original: these numbers are kept with the picture."}</p>` +
+    `<p class="op-note">${o.count > 1 ? `The first of ${o.count} pictures is shown; what you set goes to all of them.` : "Nothing is changed in the original: these numbers are kept with the picture."}${o.stills ? "" : " Sharpen and grain can slow the playback of a big video."}</p>` +
     rows
       .map(
         (s) => `<div class="adj-row"><label class="adj-label" for="adj-${s.key}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`,
