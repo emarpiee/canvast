@@ -30,6 +30,12 @@ export interface ContextActions {
   /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
   releaseSheet(): void;
   canReleaseSheet(): boolean;
+  /** Pictures (ADR 0118): what can be done with the picked ones now (null: none is a picture). */
+  pictureTools(): { still: boolean; canPaste: boolean } | null;
+  copyAdjust(): void;
+  pasteAdjust(): void;
+  copyRendered(): void;
+  bake(): void;
   /** A picked SVG picture: its shapes can be made into vectors (a copy beside it). */
   svgPicture(): boolean;
   vectorise(): void;
@@ -88,6 +94,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     btn("library", ICONS.library, "View in the library") +
     btn("download", ICONS.download, "Download the original file") +
     btn("open", ICONS.externalLink, "Open in a new tab") +
+    btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture") +
+    btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures") +
+    btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)") +
+    btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it") +
     btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)") +
     btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file") +
     `<span class="ctx-sep" aria-hidden="true"></span>` +
@@ -226,6 +236,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "open": actions.openFile(); break;
       case "unsheet": actions.releaseSheet(); break;
       case "vectorise": actions.vectorise(); break;
+      case "copyadj": actions.copyAdjust(); break;
+      case "pasteadj": actions.pasteAdjust(); break;
+      case "copypng": actions.copyRendered(); break;
+      case "bake": actions.bake(); break;
       case "exportsvg": actions.exportSvg(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
@@ -266,6 +280,12 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("open").hidden = !file?.open;
     q("unsheet").hidden = !actions.canReleaseSheet();
     q("vectorise").hidden = !actions.svgPicture();
+    const pic = actions.pictureTools();
+    q("copyadj").hidden = !pic;
+    q("pasteadj").hidden = !pic;
+    (q("pasteadj") as HTMLButtonElement).disabled = !pic?.canPaste;
+    q("copypng").hidden = !pic?.still;
+    q("bake").hidden = !pic?.still;
     q("exportsvg").hidden = !actions.canExportSvg();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;

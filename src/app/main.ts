@@ -842,6 +842,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const k = fileKinds.get(o.assetId)!;
         return k.card ? { hash: o.assetId, open: k.open } : null;
       },
+      pictureTools: () => {
+        const sa = selectedAdjust(doc, editor);
+        return sa ? { still: sa.stills, canPaste: canPasteAdjustments() } : null;
+      },
+      copyAdjust: () => void copyAdjustments(doc, editor),
+      pasteAdjust: () => pasteAdjustments(doc, editor),
+      copyRendered: () => void copyRenderedPicture(doc, editor, assets),
+      bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
       svgPicture: () => {
         const ids = [...editor.selection];
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;

@@ -1511,7 +1511,7 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   // Turning from just outside a corner (the handle may be out of the view for a big selection).
   const before = (await rots())[0]!;
   const f2 = (await frame())!;
-  const c2 = f2.corners[2]!;
+  const c2 = f2.corners[0]!; // (the top-left corner: the selection bar, longer for a picture, sits under the box)
   const cc: [number, number] = [(f2.corners[0]![0] + f2.corners[2]![0]) / 2, (f2.corners[0]![1] + f2.corners[2]![1]) / 2];
   const out = Math.hypot(c2[0] - cc[0], c2[1] - cc[1]);
   const ux = (c2[0] - cc[0]) / out;

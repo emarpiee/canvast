@@ -90,12 +90,9 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   expect(edge[0] < bb.minX || edge[0] > bb.maxX || edge[1] < bb.minY || edge[1] > bb.maxY).toBe(true);
   await p.mouse.click(60, 650);
   await p.mouse.click(...edge);
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
-  await pop.getByRole("button", { name: "Copy adjustments" }).click();
-  await p.keyboard.press("Escape");
+  await p.getByTestId("context-bar").getByRole("button", { name: "Copy the adjustments of the picture" }).click(); // (on the bar under the picture)
   await p.mouse.click(Math.round((bb.minX + bb.maxX) / 2), Math.round((bb.minY + bb.maxY) / 2));
-  await p.getByRole("button", { name: "Adjust the picture" }).click();
-  await pop.getByRole("button", { name: "Paste adjustments" }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Paste the copied adjustments on the picked pictures" }).click();
   expect((await objs(app)).find((o) => o.id === b.id)!.adjust).toEqual({ exposure: 70 });
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === b.id)!.adjust, "one undo step").toBeUndefined();
@@ -129,5 +126,27 @@ test("an adjusted picture too big to be decoded whole is still drawn whole when 
   // the far corner of the picture is the picture, not the empty page
   const corner = await px(app, Math.round(s.maxX - 3), Math.round(s.maxY - 3));
   expect(corner).not.toEqual(bg);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Make a new picture files it as an edited picture: its own folder, name and tag, not those of extracted frames (ADR 0118)", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app, "holiday.png");
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("40");
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
+  await p.keyboard.press("Escape");
+  await p.getByTestId("context-bar").getByRole("button", { name: "Make a new picture of it as it looks now, beside it" }).click();
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
+  const listing = await p.evaluate(() => window.__canvastDebug.assetListing());
+  const made = listing.entries.find((e) => e.name.startsWith("holiday-edited"));
+  expect(made, "named from the original and the edited name").toBeTruthy();
+  expect(made!.tags).toContain("edited-picture");
+  expect(made!.tags).not.toContain("extracted-frame");
+  expect(listing.folders.map((f) => f.name)).toContain("Edited pictures");
+  expect(listing.folders.map((f) => f.name)).not.toContain("Extracted frames");
   expect(app.consoleErrors).toEqual([]);
 });

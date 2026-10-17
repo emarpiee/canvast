@@ -347,11 +347,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ...sel,
       onInput: (a) => actions.previewAdjust(a),
       onChange: (a, label) => actions.commitAdjust(a, label),
-      onCopy: () => actions.copyAdjust(),
-      onPaste: () => actions.pasteAdjust(),
-      canPaste: () => actions.canPasteAdjust(),
-      onCopyRendered: () => actions.copyRendered(),
-      onBake: () => actions.bake(),
       onClose: () => {
         if (editor.preview.kind === "replace") {
           editor.preview = { kind: "none" }; // (an unfinished slider is not kept)

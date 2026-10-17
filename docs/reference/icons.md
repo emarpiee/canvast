@@ -99,6 +99,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `projector` | Play the bookmarks as a tour |
+| `clipboard-list` | Copy the adjustments of a picture |
+| `clipboard-paste` | Paste adjustments |
+| `clipboard` | Copy a picture to the clipboard as it looks |
+| `copy-plus` | Make a new picture of it as it looks |
 | `pin` | Initial shape (set, update, reset) |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |

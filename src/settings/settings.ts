@@ -121,6 +121,16 @@ export const SETTINGS = {
   "shot.name": { scope: "device", default: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "shot.nameStyle": { scope: "device", default: "snake", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
   "shot.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  // Edited pictures (ADR 0118): "Make a new picture" of a picture as it looks with its crop and adjustments.
+  "edit.format": { scope: "device", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
+  "edit.quality": { scope: "device", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
+  "edit.folder": { scope: "device", default: "Edited pictures", validate: text(60), effect: "immediate" } as Def<string>,
+  "edit.name": { scope: "device", default: "{name}-edited", validate: text(120), effect: "immediate" } as Def<string>,
+  "edit.nameStyle": { scope: "device", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
+  "edit.tagEdited": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagSource": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagInherit": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // Extracted frames (ADR 0081).
   "frame.format": { scope: "device", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
   "frame.quality": { scope: "device", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,

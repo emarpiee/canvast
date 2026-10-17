@@ -753,10 +753,10 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   await key(app, "Control+z");
   // Turn it: drag just outside a corner.
   c = await frame();
-  const corner = c[2] as [number, number];
-  await p.mouse.move(corner[0] + 16, corner[1] + 16);
+  const corner = c[0] as [number, number]; // (the top-left one: the selection bar, longer for a picture, sits under the box)
+  await p.mouse.move(corner[0] - 16, corner[1] - 16);
   await p.mouse.down();
-  await p.mouse.move(corner[0] + 60, corner[1] - 10, { steps: 6 });
+  await p.mouse.move(corner[0] - 60, corner[1] + 10, { steps: 6 });
   await p.mouse.up();
   await app.frame();
   const turned = ((await objects(app)).find((o) => o.id === img.id) as Obj & { rot?: number }).rot;

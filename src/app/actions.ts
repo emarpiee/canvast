@@ -1529,7 +1529,7 @@ export async function bakePicture(
   doc: DocumentStore,
   editor: EditorState,
   assets: AssetLibrary,
-  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string }) => Promise<AssetRecord>,
+  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string; kind?: "edit" }) => Promise<AssetRecord>,
 ): Promise<void> {
   const o = pictures(doc, editor).find((p) => !p.media);
   if (!o || editor.blockEdit()) return;
@@ -1540,7 +1540,7 @@ export async function bakePicture(
     editor.message = "Could not make the picture.";
     return editor.changed();
   }
-  const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId });
+  const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
   const { crop: _c, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
   const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
   const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;

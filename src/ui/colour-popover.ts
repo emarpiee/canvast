@@ -392,12 +392,6 @@ export interface AdjustOptions {
   onInput(a: Adjust): void;
   /** A slider is let go, a number typed, or Reset pressed: store them. */
   onChange(a: Adjust, label: string): void;
-  onCopy(): void;
-  onPaste(): void;
-  canPaste(): boolean;
-  /** Stills only: copy the picture as a PNG as it looks, and make a new picture of it. */
-  onCopyRendered(): void;
-  onBake(): void;
   onClose?(): void;
 }
 
@@ -420,9 +414,7 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
         (s) => `<div class="adj-row"><label class="adj-label" for="adj-${s.key}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`,
       )
       .join("") +
-    `<div class="adj-actions"><button type="button" data-adj-reset>Reset</button><button type="button" data-adj-copy>Copy adjustments</button><button type="button" data-adj-paste${o.canPaste() ? "" : " disabled"}>Paste adjustments</button>${
-      o.stills ? `<button type="button" data-adj-png title="Copy the picture to the clipboard as it looks now">Copy as picture</button><button type="button" data-adj-bake title="Make a new picture of it as it looks now, beside it">Make a new picture</button>` : ""
-    }</div>`;
+    `<div class="adj-actions"><button type="button" data-adj-reset>Reset</button></div>`;
   scrubNumbers(pop);
   const set = (key: AdjustKey, v: number): void => {
     cur = { ...cur, [key]: v };
@@ -448,14 +440,6 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
       for (const s of rows) set(s.key, 0);
       cur = {};
       o.onChange(cur, "Reset adjustments");
-    } else if (b.hasAttribute("data-adj-copy")) o.onCopy();
-    else if (b.hasAttribute("data-adj-paste")) {
-      o.onPaste();
-      closeColourPopover(true);
-    } else if (b.hasAttribute("data-adj-png")) o.onCopyRendered();
-    else if (b.hasAttribute("data-adj-bake")) {
-      o.onBake();
-      closeColourPopover(true);
     }
   });
   document.body.appendChild(pop);
