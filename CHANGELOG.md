@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.0 — The text tool revamp (2026-10-18)
+
+- **Mentions removed** (ADR 0125): the `@` picker, mention spans, the Layers panel's Mentions and Mentioned in lists, relink, and the database indexes behind them are gone (database version 9 drops them). A separate note item is planned for them.
+- **Names above pictures and file cards** (ADR 0125), like a sheet's: a picture shows its file name, any other item its layer name while it is picked; the same list is drawn and pressed to pick; one shared file-name cache.
+- **Text look in the options bar** (ADR 0126): Colour (with transparency, in the shape colour chooser), Size (px at this zoom), Line, Letters, alignment (left, centre, right, justify) and Auto width / Fixed width, for the Text tool, the text being edited and picked texts. A click with the Text tool makes an auto-width text, a dragged box a text of that width.
+- **Text styles** (ADR 0126): a Styles kind; save the look of a text and press it to apply it to other texts.
+- **Fonts from the library** (ADR 0127): import a TrueType `.ttf` or a `.woff` from the Font menu, set a text in it; the font is a library asset that follows the canvas into archives and is never cleaned up while a text uses it.
+
 ## 0.17.0 — Assets, canvas tools and small screens (2026-10-16)
 
 - **Panel dock** (ADR 0123): the floating panels (Layers, Bookmarks, Styles, Tags, and Adjust, now a panel instead of a popover) stack on the left or right of the view in the order they were last used (the last used on top), fold to their title bar when it is pressed, float anywhere when it is dragged, dock again at a side edge, and take any width from 240 to 480 px; the layout is remembered and the same moves are in the command palette. Settings > Panels can minimize the inactive panels (all of them, or all but the latest few). A new panel is one `dock.add` call.

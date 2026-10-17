@@ -6,7 +6,7 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: v0.17.0, UI polish after Phase 7 (professional UX).** Done:
+> **Status: v0.18.0, the text tool revamp after UI polish (v0.17.0).** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
 > Canvases model with safe incremental saving, a shared Assets library with
 > tags, folders and file types, `.canvast` archives and plain ZIP export,
@@ -18,6 +18,12 @@ or network connection.
 > [Roadmap and status](docs/status.md) and
 > [gaps against the plan](docs/reference/plan-gaps.md). This README describes
 > only what exists.
+>
+> **v0.18.0 in short:** the text tool has its look in the options bar (colour with
+> transparency, size, line height, letter spacing, alignment, auto or fixed width),
+> saved text styles, and fonts imported from the library (`.ttf`, `.woff`); a click
+> makes a text as wide as its words, a dragged box one of that width; pictures and
+> file cards show their name above them like sheets; @mentions were removed.
 >
 > **v0.17.0 in short:** a redesigned Assets view (gallery, viewer with the canvas
 > player's controls, multi-select, one folder per asset, renamable tags, a
