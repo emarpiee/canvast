@@ -6,7 +6,9 @@
 import type { DocumentStore } from "../doc/document-store";
 import { boolGroupsOf } from "../doc/boolean-group";
 import type { EditorState } from "../app/editor-state";
+import type { PathObject } from "../doc/model";
 import type { ShapeKind } from "../doc/path";
+import { isGradient } from "../doc/paint";
 
 const SHAPE_HINT: Record<ShapeKind, string> = {
   rect: "Drag to draw a rectangle · Shift: square · Alt: from the centre",
@@ -33,8 +35,11 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       // (a group entered with nothing picked is found among all the objects: a rare moment, so the scan is fine)
       const boolEntered = inside !== null && (sel.length ? sel.some((o) => o!.boolOps?.[inside]) : [...doc.all()].some((o) => o.boolOps?.[inside]));
       if (boolEntered) return "Inside a boolean group: edit its shapes and the result follows · Esc goes back out";
-      if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases";
-      if (paths.length === 1 && sel.length === 1) return "Enter or double-click edits its nodes · Fill and Outline are in the bar above";
+      // (a gradient's handles are on the shape: the group's own paint is what a picked boolean group shows)
+      const gradient = paths.some((o) => !boolGroupsOf(o!).some((g) => !g.own && !editor.entered.includes(g.gid)) && (isGradient((o as PathObject).fill) || isGradient((o as PathObject).stroke)));
+      const handles = gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline picks which one)" : "";
+      if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases" + handles;
+      if (paths.length === 1 && sel.length === 1) return "Enter or double-click edits its nodes · Fill and Outline are in the bar above" + handles;
       return null;
     }
     default:

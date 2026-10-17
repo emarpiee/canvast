@@ -129,6 +129,8 @@ export class EditorState {
   shapeFill: Paint | null = "#2563eb";
   shapeStroke: Paint | null = "#1f2329";
   shapeWidthPx = 2;
+  /** Which paint's gradient the canvas handles belong to when both the fill and the outline have one (the last chip opened). */
+  gradientFocus: "fill" | "stroke" | null = null;
   /** The outline's corners, ends and place on the edge for the next shape (null join: the tool's own, sharp for shapes with corners). */
   shapeJoin: JoinChoice | null = null;
   shapeCap: CapChoice = "round";

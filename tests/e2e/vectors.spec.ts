@@ -829,6 +829,39 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   await expect(pop.locator("#op-width")).toHaveValue("20");
 });
 
+test("a boolean group's gradient is moved with its handles on the canvas, picked whole, as a single shape's is", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  type Grad = { x0: number; x1: number; stops: Array<{ c: string }> };
+  const result = async () => (await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!;
+  await key(app, "u");
+  await p.click('[data-paint="stroke"]');
+  await pop.locator(".colour-none").click();
+  await key(app, "Escape");
+  await drag(app, [500, 300], [760, 400]);
+  await key(app, "v");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await pop.locator(".cg [data-angle]").fill("0");
+  await key(app, "Escape");
+  await key(app, "u");
+  await drag(app, [640, 340], [900, 460]);
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await p.locator('[data-ctx="combine"]').click();
+  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await app.frame();
+  const r = await result();
+  expect((r.fill as unknown as Grad).x1).toBe(1);
+  await expect(p.getByTestId("tool-hint")).toContainText("round handles");
+  const box = await screenBox(app, r.id);
+  const mid = (box.minY + box.maxY) / 2;
+  await drag(app, [box.maxX - 1, mid], [(box.minX + box.maxX) / 2, mid]); // the group is picked whole: its gradient end is dragged
+  const g = (await result()).fill as unknown as Grad;
+  expect(g.x1).toBeGreaterThan(0.4);
+  expect(g.x1).toBeLessThan(0.6);
+});
+
 test("shapes stay editable after drawing: a polygon's sides, a star's points and ratio, a corner radius; one undo each; saved; nodes edited by hand end it", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);

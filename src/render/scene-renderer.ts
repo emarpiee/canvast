@@ -287,7 +287,7 @@ export function drawOverlays(
 
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
-  if (editor.tool === "select" || editor.tool === "node") drawGradientHandles(ctx, selected, theme);
+  if (editor.tool === "select" || editor.tool === "node") drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
 
   if (editor.lasso && editor.lasso.length >= 4) {
     ctx.save();
@@ -349,9 +349,9 @@ function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedOb
 }
 
 /** The axis or the rings of the gradient of the one selected path, with handles to drag (ADR 0100). */
-function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme): void {
+function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme, focus: "fill" | "stroke" | null): void {
   if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
-  const h = gradientHandles(selected[0]!);
+  const h = gradientHandles(selected[0]!, focus);
   if (!h) return;
   ctx.save();
   ctx.lineWidth = 1.25;

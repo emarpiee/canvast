@@ -33,7 +33,7 @@ import { TURN, angleFromRadians } from "../core/angle";
 import { PanGesture } from "./navigation";
 import { arrangeSelection, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
-import { boolGroupsOf } from "../doc/boolean-group";
+import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
 /**
  * Pointer routing and tool behaviour.
@@ -532,6 +532,18 @@ export function attachTools(
     const po = visible().find((p) => editor.selection.has(p.obj.id));
     return po && po.obj.kind === "path" && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
   };
+  /** What a gradient is edited on: the one picked path, or the result of a boolean group picked whole (whose paint is the group's own). */
+  const gradientTarget = (): { po: ProjectedObject; o: PathObject } | null => {
+    const one = nodeTarget();
+    if (one) return one;
+    const level = editor.entered.length;
+    const objs = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
+    const gid = objs[0]?.groups?.[level];
+    if (!gid || !objs.every((o) => o!.groups?.[level] === gid && o!.boolOps?.[gid])) return null;
+    const res = objs.find((o) => isResult(o!) && (o as PathObject).result === gid);
+    const po = res && visible().find((p) => p.obj.id === res.id);
+    return po && po.obj.kind === "path" && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
+  };
   /** The geometry as it is drawn (a turn baked in), and the object without its turn. */
   const baked = (o: PathObject): { sub: readonly SubPath[]; flat: PathObject } => {
     const { rot: _turn, ...flat } = o;
@@ -545,9 +557,9 @@ export function attachTools(
 
   /** A press on a handle of the selected path's gradient takes it. */
   const startGradientPress = (e: PointerEvent, s: ScreenPoint): boolean => {
-    const tgt = nodeTarget();
+    const tgt = gradientTarget();
     if (!tgt || editor.blockEdit()) return false;
-    const h = gradientHandles(tgt.po);
+    const h = gradientHandles(tgt.po, editor.gradientFocus);
     const handle = h && hitGradient(h, s.x, s.y);
     if (!h || !handle) return false;
     g = { kind: "grad", pointerId: e.pointerId, id: tgt.o.id, which: h.which, handle, g: h.g };
@@ -555,7 +567,7 @@ export function attachTools(
   };
   const updateGradient = (s: ScreenPoint): void => {
     if (g.kind !== "grad") return;
-    const tgt = nodeTarget();
+    const tgt = gradientTarget();
     if (!tgt) return;
     const l = localOf(tgt.po, s.x, s.y);
     previewPaint(doc, editor, { [g.which]: moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y) });

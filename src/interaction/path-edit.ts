@@ -150,10 +150,10 @@ export interface GradientHandles {
 const FAR = 1e5;
 
 /** The handles of the gradient of a path, where they are on screen (null: no gradient, or too far out of view to hold). */
-export function gradientHandles(po: ProjectedObject): GradientHandles | null {
+export function gradientHandles(po: ProjectedObject, focus: "fill" | "stroke" | null = null): GradientHandles | null {
   const o = po.obj as PathObject;
   if (po.cover) return null;
-  const which = isGradient(o.fill) ? "fill" : isGradient(o.stroke) ? "stroke" : null;
+  const which = focus && isGradient(o[focus]) ? focus : isGradient(o.fill) ? "fill" : isGradient(o.stroke) ? "stroke" : null;
   if (!which) return null;
   const g = o[which] as Gradient;
   const p = po.proj;

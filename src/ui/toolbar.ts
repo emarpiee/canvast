@@ -244,6 +244,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
   };
   const openPaint = (anchor: HTMLElement, which: "fill" | "stroke"): void => {
+    editor.gradientFocus = which; // the handles on the canvas are this paint's
     openPaintPopover(anchor, {
       name: which === "fill" ? "Fill" : "Outline",
       paint: paintNow(which),
