@@ -738,7 +738,9 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .adj-map { display: grid; gap: var(--sp-3); }
 .adj-map select { width: 100%; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .adj-map-bar { display: block; height: var(--sp-8); border-radius: var(--r-sm); border: 1px solid var(--hud-border); }
-.adj-map-bar[hidden], .adj-row[hidden] { display: none; }
+.adj-map-bar[hidden], .adj-row[hidden], .adj-map-edit[hidden] { display: none; }
+.adj-map-edit { height: var(--sp-11); padding: 0 var(--sp-5); background: none; color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
+.adj-map-edit:hover { background: var(--hud-hover); }
 .adj-map-out { text-align: right; font: var(--font-value); color: var(--hud-fg); }
 .adj-foot { display: grid; gap: var(--sp-3); padding-top: var(--sp-4); border-top: 1px solid var(--hud-border); }
 .adj-save { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-3); }

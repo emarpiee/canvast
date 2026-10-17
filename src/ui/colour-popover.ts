@@ -79,7 +79,19 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
 
 let open: { pop: HTMLElement; anchor: HTMLElement; picker: { destroy(): void }; onClose: (() => void) | undefined } | null = null;
 
+/** A second picker panel that floats beside the open one (the gradient editor of the Adjust panel's gradient map): it closes with it. */
+let child: { pop: HTMLElement; destroy(): void } | null = null;
+
+function closeChild(): void {
+  if (!child) return;
+  const { pop, destroy } = child;
+  child = null;
+  destroy();
+  pop.remove();
+}
+
 export function closeColourPopover(refocus = false): void {
+  closeChild();
   if (!open) return;
   const { pop, anchor, picker, onClose } = open;
   open = null;
@@ -221,7 +233,11 @@ function installCloseRules(): void {
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.key === "Escape" && open) {
+      if (e.key === "Escape" && child) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeChild();
+      } else if (e.key === "Escape" && open) {
         e.preventDefault();
         e.stopPropagation();
         closeColourPopover(true);
@@ -302,6 +318,61 @@ export function openGradientPopover(anchor: HTMLElement, o: GradientPopoverOptio
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: ed, onClose: o.onClose };
+}
+
+export interface ChildGradientOptions {
+  name: string;
+  stops: readonly GradientStop[];
+  onInput(stops: readonly GradientStop[]): void;
+  onChange(stops: readonly GradientStop[]): void;
+  /** Keep this gradient in the Styles. */
+  onSave(stops: readonly GradientStop[]): void;
+}
+
+/** The floating gradient editor beside the open popover `parent`: the same picker panel as everywhere, not a copy inside another panel. */
+function openChildGradient(parent: HTMLElement, o: ChildGradientOptions): void {
+  closeChild();
+  let g: Gradient = { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: o.stops };
+  const pop = document.createElement("div");
+  pop.className = "colour-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", o.name);
+  const ed = createGradientEditor({
+    value: gradientToValue(g),
+    picker: editorPicker(() => put()),
+    typeSwitch: false,
+    onInput: (v) => {
+      g = gradientFromValue(g, v);
+      o.onInput(g.stops);
+    },
+    onChange: (v) => {
+      g = gradientFromValue(g, v);
+      o.onChange(g.stops);
+    },
+  });
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "colour-save";
+  save.textContent = "Save gradient";
+  save.title = "Keep this gradient in the Styles";
+  save.addEventListener("click", () => {
+    o.onSave(g.stops);
+    save.textContent = "Saved";
+  });
+  pop.append(ed.el, save);
+  document.body.appendChild(pop);
+  const put = (): void => {
+    const p = parent.getBoundingClientRect();
+    const w = pop.offsetWidth, h = pop.offsetHeight;
+    const right = p.right + 8;
+    const left = right + w <= window.innerWidth - 8 ? right : Math.max(8, p.left - 8 - w);
+    pop.style.position = "fixed";
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(Math.max(8, Math.min(p.top, window.innerHeight - h - 8)))}px`;
+    pop.style.maxHeight = `${window.innerHeight - 16}px`;
+  };
+  put();
+  child = { pop, destroy: () => ed.destroy() };
 }
 
 export interface PaintPopoverOptions {
@@ -534,7 +605,7 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   const sameStops = (a: readonly GradientStop[], b: readonly GradientStop[]): boolean => JSON.stringify(a) === JSON.stringify(b);
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
   const mapSection = (): string =>
-    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("")}</select><span class="adj-map-bar" data-map-bar></span><div class="adj-map-editor" data-map-editor hidden></div></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
+    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("")}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
   pop.innerHTML =
     `<header class="adj-head"><h3>Adjust</h3><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span><button type="button" class="adj-reset" data-adj-reset>Reset</button></header>` +
     GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}</section>`).join("") +
@@ -545,60 +616,41 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   const mapSelect = pop.querySelector<HTMLSelectElement>("[data-adj-map]")!;
   const mapBar = pop.querySelector<HTMLElement>("[data-map-bar]")!;
   const mapRow = pop.querySelector<HTMLElement>("[data-map-amount-row]")!;
-  const mapEditor = pop.querySelector<HTMLElement>("[data-map-editor]")!;
-  let editorHandle: { destroy(): void } | null = null;
-  const closeEditor = (): void => {
-    editorHandle?.destroy();
-    editorHandle = null;
-    mapEditor.replaceChildren();
-    mapEditor.hidden = true;
-  };
+  const closeEditor = (): void => closeChild();
   const openEditor = (): void => {
-    if (!cur.map || editorHandle) return;
-    const stops = cur.map.stops;
-    const grad: Gradient = { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops };
-    let live: Gradient = grad;
-    const ed = createGradientEditor({
-      value: gradientToValue(grad),
-      picker: editorPicker(() => place(pop, anchor)),
-      typeSwitch: false,
-      onInput: (v) => {
-        live = gradientFromValue(live, v);
-        cur = { ...cur, map: { stops: live.stops, amount: cur.map?.amount ?? 100 } };
-        mapBar.style.background = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: live.stops });
+    if (!cur.map) return;
+    openChildGradient(pop, {
+      name: "Gradient map: gradient",
+      stops: cur.map.stops,
+      onInput: (stops) => {
+        cur = { ...cur, map: { stops, amount: cur.map?.amount ?? 100 } };
+        mapBar.style.background = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops });
         if (!frame) frame = requestAnimationFrame(() => {
           frame = 0;
           o.onInput(cur);
         });
       },
-      onChange: (v) => {
-        live = gradientFromValue(live, v);
-        cur = { ...cur, map: { stops: live.stops, amount: cur.map?.amount ?? 100 } };
+      onChange: (stops) => {
+        cur = { ...cur, map: { stops, amount: cur.map?.amount ?? 100 } };
+        mapSelect.value = mapIndex();
         if (frame) cancelAnimationFrame(frame);
         frame = 0;
         o.onChange(cur, "Adjust picture");
       },
+      onSave: (stops) => void o.styles.saveGradient(stops),
     });
-    const save = document.createElement("button");
-    save.type = "button";
-    save.className = "colour-save";
-    save.textContent = "Save gradient";
-    save.title = "Keep this gradient in the Styles";
-    save.addEventListener("click", () => void o.styles.saveGradient(cur.map!.stops).then(() => (save.textContent = "Saved")));
-    mapEditor.append(ed.el, save);
-    mapEditor.hidden = false;
-    editorHandle = ed;
-    place(pop, anchor);
   };
   const syncMap = (): void => {
     mapSelect.value = mapIndex();
     mapBar.style.background = cur.map ? gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: cur.map.stops }) : "";
     mapBar.hidden = !cur.map;
     mapRow.hidden = !cur.map;
+    mapEdit.hidden = !cur.map;
     if (!cur.map) closeEditor();
   };
+  const mapEdit = pop.querySelector<HTMLElement>("[data-map-edit]")!;
+  mapEdit.addEventListener("click", openEditor);
   syncMap();
-  if (cur.map && mapIndex() === "keep") openEditor();
   let frame = 0;
   const set = (key: AdjustKey, v: number): void => {
     cur = { ...cur, [key]: v };
@@ -626,12 +678,12 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
   mapSelect.addEventListener("change", () => {
     const v = mapSelect.value;
     if (v === "keep") return;
-    if (v !== "custom") closeEditor();
+    closeEditor();
     const g = v === "" ? undefined : v === "custom" ? { stops: cur.map?.stops ?? DEFAULT_MAP } : saved[Number(v)];
     setMap(g ? { stops: g.stops, amount: cur.map?.amount ?? 100 } : undefined);
     if (v === "custom") {
       mapSelect.value = "keep";
-      openEditor();
+      requestAnimationFrame(openEditor); // (after the panel has taken its place, so the editor floats beside it)
     }
     mapOut.textContent = String(cur.map?.amount ?? 100);
     o.onChange(cur, "Adjust picture");
@@ -695,6 +747,6 @@ export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
     pop.style.maxHeight = `${window.innerHeight - topEdge - 8}px`;
   }
   anchor.setAttribute("aria-expanded", "true");
-  open = { pop, anchor, picker: { destroy: closeEditor }, onClose: o.onClose };
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
   pop.querySelector<HTMLElement>("input[type=range]")?.focus();
 }

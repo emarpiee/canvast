@@ -33,6 +33,8 @@ export interface StylesDeps {
     /** Put a colour or gradient on them: on `target` (the person's choice in the panel); with `ask`, and several shapes picked, the app asks which part first. */
     apply(paint: Paint, label: string, target: "fill" | "stroke" | "both", ask: boolean): void;
   };
+  /** Pictures take a gradient as a gradient map: how many are picked, and putting one on them. */
+  map: { count(): number; apply(stops: Gradient["stops"], label: string): void };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
   picturePalette(): Promise<string[] | null>;
@@ -74,7 +76,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "adjustment" ? deps.adjustment.can() : deps.paint.count() > 0);
+  const canApply = (kind: string): boolean => (kind === "adjustment" ? deps.adjustment.can() : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   const card = (item: StyleItem, can: boolean): string => {
@@ -158,7 +160,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       <div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the picked shapes")}${seg("stroke", "Outline", "Colours go on the outline of the picked shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
-        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? "Select shapes on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
@@ -256,8 +258,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const del: MenuItem = { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
     if (item.kind === "gradient")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
         { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
         ...common(item),
         { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
@@ -265,8 +267,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       ];
     if (item.kind === "colour")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
         { label: "Change colour", icon: ICONS.pipette, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
         { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyText(String(item.data).toUpperCase(), String(item.data).toUpperCase()) },
         ...common(item),
@@ -317,6 +319,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         void addPalette(`${kind[0]!.toUpperCase()}${kind.slice(1)} ${base.slice(0, 7).toUpperCase()}`, [base.slice(0, 7), ...harmonies(rgb as [number, number, number], kind as Harmony).map(hex)]);
       },
     });
+  };
+
+  /** A colour or gradient goes on the picked shapes; a gradient also goes on the picked pictures, as a gradient map. */
+  const applyPaint = (item: StyleItem): void => {
+    if (item.kind === "gradient" && deps.map.count() > 0) deps.map.apply((item.data as Gradient).stops, item.name);
+    if (deps.paint.count() > 0) deps.paint.apply(item.data as Paint, item.name, target, true);
   };
 
   panel.addEventListener("click", (e) => {
@@ -458,7 +466,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const item = find(row?.dataset["style"]);
     if (!item || !canApply(item.kind)) return;
     if (item.kind === "adjustment") deps.adjustment.apply(item);
-    else deps.paint.apply(item.data as Paint, item.name, target, true);
+    else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;

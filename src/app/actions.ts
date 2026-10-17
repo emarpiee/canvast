@@ -13,7 +13,7 @@ import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, TextObject } from "../doc/model";
 import { textOutline } from "../text/outline";
-import type { Paint } from "../doc/paint";
+import type { GradientStop, Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
@@ -1536,6 +1536,22 @@ export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Ad
       return clean ? { ...rest, adjust: clean } : rest;
     });
   if (next.length) doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
+  editor.changed();
+}
+
+/** How many pictures (still, video, GIF) are picked: a gradient from the Styles goes on them as a gradient map (ADR 0122). */
+export const pictureCount = (doc: DocumentStore, editor: EditorState): number => pictures(doc, editor).length;
+
+/** Put a gradient map made of `stops` on the picked pictures, keeping their other adjustments (and the amount, when they had a map): one undo step. */
+export function applyGradientMap(doc: DocumentStore, editor: EditorState, stops: readonly GradientStop[], label: string): void {
+  const ps = pictures(doc, editor);
+  if (!ps.length || editor.blockEdit()) return;
+  const next = ps.map((p): ImageObject => {
+    const { adjust: _a, ...rest } = p;
+    const clean = cleanAdjust({ ...p.adjust, map: { stops, amount: p.adjust?.map?.amount ?? 100 } });
+    return clean ? { ...rest, adjust: clean } : rest;
+  });
+  doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
   editor.changed();
 }
 

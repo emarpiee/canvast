@@ -137,11 +137,17 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   expect(shown[0]! > 100 && shown[2]! > 100 && shown[1]! < 40, "mid grey on a red-to-blue map is purple").toBe(true);
   await p.keyboard.press("Control+z");
   expect((await objs(app))[0]!.adjust).toBeUndefined();
-  // a custom gradient made right there
+  // a gradient style goes on a picked picture from the Styles panel, as a gradient map
+  await p.mouse.click(...(await centre(app, pic.id)));
+  await p.getByTestId("styles-panel").locator(".style-card", { hasText: "Sunset" }).click();
+  await expect.poll(async () => (await objs(app))[0]!.adjust?.map?.stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+  await p.keyboard.press("Control+z");
+  // a custom gradient made right there, in the floating picker panel beside the Adjust panel
   await p.mouse.click(...(await centre(app, pic.id)));
   await p.getByRole("button", { name: "Adjust the picture" }).click();
   await pop.locator("[data-adj-map]").selectOption({ label: "Make a custom gradient…" });
-  await expect(pop.locator("[data-map-editor] .cg")).toBeVisible();
+  await expect(p.locator(".colour-pop").filter({ hasText: "Save gradient" }).locator(".cg")).toBeVisible();
+  await expect(pop.locator(".cg"), "not inside the Adjust panel").toHaveCount(0);
   await expect.poll(async () => (await objs(app))[0]!.adjust?.map?.stops.map((s) => s.c)).toEqual(["#1e1b4b", "#f59e0b"]);
   expect(app.consoleErrors).toEqual([]);
 });
