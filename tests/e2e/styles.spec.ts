@@ -36,11 +36,18 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
   const card = (name: string) => panel.locator(".style-card", { hasText: name });
+  await panel.getByRole("tab", { name: /^Gradients/ }).click();
   await expect(card("Gradient 1")).toContainText("Linear · 2 stops");
   // one shape picked: it goes on the fill, no question
   await p.mouse.click(...(await centre(app, b.id)));
   await card("Gradient 1").click();
   await expect.poll(async () => ((await objs(app)).find((o) => o.id === b.id)!.fill as Grad).type).toBe("linear");
+  // "Apply to" Outline: the same card now goes on the outline of one picked shape
+  await panel.getByRole("radio", { name: "Outline" }).click();
+  await p.mouse.click(...(await centre(app, a.id)));
+  await card("Gradient 1").click();
+  await expect.poll(async () => ((await objs(app)).find((o) => o.id === a.id)!.stroke as Grad).type).toBe("linear");
+  await panel.getByRole("radio", { name: "Fill", exact: true }).click();
   // two picked: the person is asked which part
   await p.mouse.click(...(await centre(app, a.id)));
   await p.keyboard.down("Shift");
@@ -72,8 +79,9 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   await p.mouse.click(...(await centre(app, shape.id)));
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
-  await panel.getByRole("button", { name: "New style" }).click();
-  await p.getByRole("menuitem", { name: "New palette from the selection" }).click();
+  await panel.getByRole("tab", { name: /^Palettes/ }).click();
+  await expect(panel.getByTestId("palette-empty")).toContainText("A palette is a set of colours"); // a first-time person is told what to do
+  await panel.locator('[data-new-from="selection"]').click();
   const card = panel.locator(".style-palette").first();
   await expect(card).toContainText("Palette 1");
   await expect(card.locator(".palette-chip")).toHaveCount(2); // the fill and the outline colour
@@ -108,6 +116,7 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   const p = app.page;
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   await p.getByTestId("styles-import").setInputFiles({ name: "sunset.ggr", mimeType: "text/plain", buffer: Buffer.from(SUNSET) });
+  await p.getByTestId("styles-panel").getByRole("tab", { name: /^Gradients/ }).click();
   await expect(p.getByTestId("styles-panel").locator(".style-card", { hasText: "Sunset" })).toBeVisible();
   await p.getByTestId("import-input").setInputFiles({ name: "grey.png", mimeType: "image/png", buffer: makePng(80, 80, () => [128, 128, 128, 255]) });
   await expect.poll(async () => (await objs(app)).length).toBe(1);
@@ -128,5 +137,11 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   expect(shown[0]! > 100 && shown[2]! > 100 && shown[1]! < 40, "mid grey on a red-to-blue map is purple").toBe(true);
   await p.keyboard.press("Control+z");
   expect((await objs(app))[0]!.adjust).toBeUndefined();
+  // a custom gradient made right there
+  await p.mouse.click(...(await centre(app, pic.id)));
+  await p.getByRole("button", { name: "Adjust the picture" }).click();
+  await pop.locator("[data-adj-map]").selectOption({ label: "Make a custom gradient…" });
+  await expect(pop.locator("[data-map-editor] .cg")).toBeVisible();
+  await expect.poll(async () => (await objs(app))[0]!.adjust?.map?.stops.map((s) => s.c)).toEqual(["#1e1b4b", "#f59e0b"]);
   expect(app.consoleErrors).toEqual([]);
 });

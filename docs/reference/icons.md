@@ -18,7 +18,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `bell` | Show a sample notice (developer tools) |
 | `blocks` | Arrange and align |
 | `swatchBook` | Styles panel |
-| `palette` | Styles panel: New style |
+| `slidersHorizontal` | Styles panel: Adjustments tab |
+| `blend` | Styles panel: Gradients tab |
+| `droplet` | Styles panel: Colours tab |
+| `palette` | Styles panel: Palettes tab |
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `pipette` | Styles panel: Edit a colour (menu item) |
 | `bookmark` | Bookmarks panel |

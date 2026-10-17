@@ -284,22 +284,22 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   await p.mouse.click(1100, 700); // empty canvas: nothing selected
   await expect(card("Punchy 2")).toBeDisabled();
   await panel.getByRole("searchbox").fill("zzz");
-  await expect(panel.getByText("No style matches.")).toBeVisible();
+  await expect(panel.getByText("No adjustments match.")).toBeVisible();
   await panel.getByRole("searchbox").fill("punchy");
   await p.mouse.click(Math.round((sb.minX + sb.maxX) / 2), Math.round((sb.minY + sb.maxY) / 2));
   await card("Punchy 2").click();
   expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toBeUndefined();
-  await panel.getByRole("button", { name: "Adjustments" }).click(); // folds
+  await panel.getByRole("tab", { name: /^Gradients/ }).click(); // another tab shows other styles
   await expect(card("Punchy 2")).toHaveCount(0);
 
   // deleted from the panel
-  await panel.getByRole("button", { name: "Adjustments" }).click(); // unfolds
+  await panel.getByRole("tab", { name: /^Adjustments/ }).click();
   await panel.getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
   await p.getByRole("menuitem", { name: /^Delete style Punchy 2/ }).click();
   await p.getByTestId("confirm-ok").click();
-  await expect(panel).toContainText("None yet");
+  await expect(panel).toContainText("Save an adjustment from the Adjust panel");
   expect(app.consoleErrors).toEqual([]);
 });
 

@@ -129,6 +129,9 @@ import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
 import pipetteSvg from "lucide-static/icons/pipette.svg";
+import slidersHorizontalSvg from "lucide-static/icons/sliders-horizontal.svg";
+import blendSvg from "lucide-static/icons/blend.svg";
+import dropletSvg from "lucide-static/icons/droplet.svg";
 import swatchBookSvg from "lucide-static/icons/swatch-book.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
@@ -281,6 +284,9 @@ export const ICONS = {
   activity: clean(activity),
   boxSelect: clean(boxSelect),
   swatchBook: clean(swatchBookSvg),
+  slidersHorizontal: clean(slidersHorizontalSvg),
+  blend: clean(blendSvg),
+  droplet: clean(dropletSvg),
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
   pipette: clean(pipetteSvg),

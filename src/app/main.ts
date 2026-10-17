@@ -553,25 +553,26 @@ async function start(): Promise<void> {
     },
     paint: {
       count: () => paintTargetCount(doc, editor),
-      apply: (paint, label, target) =>
+      apply: (paint, label, target, ask) =>
         void (async () => {
-          let where: "fill" | "stroke" | "both" = target ?? "fill";
+          let where: "fill" | "stroke" | "both" = target;
           const n = paintTargetCount(doc, editor);
-          if (!target && n > 1) {
+          if (ask && n > 1) {
+            const all = [
+              { value: "fill", label: "Fill", help: "The inside of each shape" },
+              { value: "stroke", label: "Outline", help: "The line round each shape" },
+              { value: "both", label: "Fill and outline", help: "Both parts" },
+            ];
             const choice = await chooseDialog({
               title: `Apply “${label}” to ${n} shapes`,
               lines: ["Which part of the picked shapes should take it?"],
-              choices: [
-                { value: "fill", label: "Fill", help: "The inside of each shape" },
-                { value: "stroke", label: "Outline", help: "The line round each shape" },
-                { value: "both", label: "Fill and outline", help: "Both parts" },
-              ],
+              choices: [...all.filter((c) => c.value === target), ...all.filter((c) => c.value !== target)],
               confirmLabel: "Apply",
             });
             if (!choice) return;
             where = choice as typeof where;
           }
-          commitPaint(doc, editor, (where as string) === "both" ? { fill: paint, stroke: paint } : where === "stroke" ? { stroke: paint } : { fill: paint });
+          commitPaint(doc, editor, where === "both" ? { fill: paint, stroke: paint } : where === "stroke" ? { stroke: paint } : { fill: paint });
         })(),
     },
     selectionColours: () => selectionColours(doc, editor),
@@ -675,6 +676,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectedAdjust: () => selectedAdjust(doc, editor),
     adjustStyles: () => ({
       gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
+      saveGradient: async (stops) => {
+        await session.styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops });
+        editor.message = "Saved the gradient to the Styles.";
+        editor.changed();
+      },
       save: async (name, a) => {
         if (!(await session.styles.add("adjustment", name, a))) {
           editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";

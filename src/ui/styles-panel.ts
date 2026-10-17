@@ -8,7 +8,7 @@ import { harmonies, parseHex, rgbToHex } from "../colour-picker/index";
 import type { Harmony } from "../colour-picker/colour";
 import type { Gradient, Paint } from "../doc/paint";
 import { writeZip } from "../storage/zip";
-import { openColourPopover } from "./colour-popover";
+import { openColourPopover, openGradientPopover } from "./colour-popover";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { saveFile } from "./file-actions";
 import { esc } from "./format";
@@ -30,8 +30,8 @@ export interface StylesDeps {
   paint: {
     /** How many shapes are picked that a colour or gradient can go on. */
     count(): number;
-    /** Put a colour or gradient on them. Without a target the app asks (when several are picked). */
-    apply(paint: Paint, label: string, target?: "fill" | "stroke"): void;
+    /** Put a colour or gradient on them: on `target` (the person's choice in the panel); with `ask`, and several shapes picked, the app asks which part first. */
+    apply(paint: Paint, label: string, target: "fill" | "stroke" | "both", ask: boolean): void;
   };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
@@ -57,6 +57,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   host.appendChild(panel);
   let filter = "";
   let scheduled = false;
+  /** The tab shown (a kind), and which part of a shape a colour or gradient goes on. */
+  let tab = "adjustment";
+  let target: "fill" | "stroke" | "both" = "fill";
   const folded = new Set<string>();
   /** The style being renamed. */
   let renaming: string | null = null;
@@ -104,6 +107,14 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette };
+  const GUIDE: Record<string, string> = {
+    adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
+    gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
+    colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
+    palette: "A palette is a set of colours you reuse together, like a brand's.",
+  };
+
   const render = (): void => {
     scheduled = false;
     panel.hidden = !editor.stylesOpen;
@@ -113,25 +124,44 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const typing = !!active && panel.contains(active) && active.matches("[data-styles-filter]");
     const q = filter.trim().toLowerCase();
     const total = styles.items.filter((s) => kindsShown.some((k) => k.id === s.kind)).length;
-    const sections = kindsShown.map((k) => {
-      const all = styles.of(k.id);
-      const items = all.filter((s) => !q || s.name.toLowerCase().includes(q));
-      const can = canApply(k.id);
-      const open = !folded.has(k.id);
-      const sectionMore = k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : "";
-      return `<section class="styles-kind" data-testid="styles-kind-${k.id}">
-        <div class="styles-head"><button type="button" class="styles-fold" data-fold="${k.id}" aria-expanded="${open}">${open ? ICONS.chevronDown : ICONS.chevronRight}<span>${esc(k.plural)}</span><span class="layers-count">${q ? `${items.length} of ${all.length}` : all.length}</span></button>${sectionMore}</div>
-        ${open ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((s) => card(s, can)).join("") || `<li class="layers-empty">${all.length ? "No style matches." : esc(k.empty)}</li>`}</ul>` : ""}
-      </section>`;
-    });
-    const anyCan = kindsShown.some((k) => canApply(k.id));
+    const k = kindsShown.find((x) => x.id === tab) ?? kindsShown[0]!;
+    const all = styles.of(k.id);
+    const items = all.filter((s) => !q || s.name.toLowerCase().includes(q));
+    const can = canApply(k.id);
+    const paints = k.id !== "adjustment";
+    const tabs = kindsShown
+      .map((t) => {
+        const n = styles.of(t.id).filter((s) => !q || s.name.toLowerCase().includes(q)).length;
+        return `<button type="button" role="tab" class="styles-tab" data-tab="${t.id}" aria-selected="${t.id === k.id}" tabindex="${t.id === k.id ? 0 : -1}" aria-label="${esc(t.plural)} (${n})" title="${esc(t.plural)}">${TAB_ICON[t.id] ?? ""}<span class="styles-tab-n">${n}</span></button>`;
+      })
+      .join("");
+    const seg = (v: "fill" | "stroke" | "both", text: string, tip: string): string => `<button type="button" role="radio" data-target="${v}" aria-checked="${target === v}" title="${tip}">${text}</button>`;
+    const actions =
+      k.id === "palette"
+        ? `<button type="button" class="styles-make" data-new aria-haspopup="menu">${ICONS.palette}<span>New palette</span></button>`
+        : k.id === "colour"
+          ? `<button type="button" class="styles-make" data-add-style-colour>${ICONS.droplet}<span>Add a colour</span></button>`
+          : k.id === "gradient"
+            ? `<button type="button" class="styles-make" data-new-gradient>${ICONS.blend}<span>New gradient</span></button><button type="button" class="styles-make" data-import>${ICONS.fileUp}<span>Import .ggr</span></button>`
+            : "";
+    const empty =
+      all.length === 0
+        ? k.id === "palette"
+          ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a picked picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a .gpl file</button></div></div>`
+          : `<p class="styles-guide">${esc(GUIDE[k.id] ?? k.empty)}</p>`
+        : "";
     panel.innerHTML = `
       <header><h2>Styles <span class="layers-count">${total}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-new aria-haspopup="menu" aria-label="New style" title="New style: a palette from the selection or a picture, or from a colour">${ICONS.palette}</button><button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr) and palettes (.gpl)">${ICONS.fileUp}</button><button type="button" class="layer-btn" data-close aria-label="Hide the Styles panel" title="Hide the Styles panel">${ICONS.x}</button></span></header>
-      <div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${total} styles" aria-label="Search the styles by name" autocomplete="off" value="${esc(filter)}"></div>
-      <div class="styles-body">
-        ${anyCan ? "" : `<p class="styles-hint">${ICONS.pointer}<span>Select items on the canvas, then press a style to apply it.</span></p>`}
-        ${sections.join("")}
+        <span class="layers-tools"><button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr) and palettes (.gpl)">${ICONS.fileUp}</button><button type="button" class="layer-btn" data-close aria-label="Hide the Styles panel" title="Hide the Styles panel">${ICONS.x}</button></span></header>
+      <div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div>
+      <div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>
+      <div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
+        <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
+        ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the picked shapes")}${seg("stroke", "Outline", "Colours go on the outline of the picked shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? "Select shapes on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
+        ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
+        ${empty}
+        ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
       </div>`;
     panel.appendChild(fileInput);
     if (typing) {
@@ -226,14 +256,17 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const del: MenuItem = { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
     if (item.kind === "gradient")
       return [
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke") },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
+        { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
         ...common(item),
         { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
         del,
       ];
     if (item.kind === "colour")
       return [
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke") },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: !can, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
         { label: "Change colour", icon: ICONS.pipette, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
         { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyText(String(item.data).toUpperCase(), String(item.data).toUpperCase()) },
         ...common(item),
@@ -294,6 +327,46 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       return;
     }
     if (t.closest("[data-import]")) return fileInput.click();
+    const tabBtn = t.closest<HTMLElement>("[data-tab]");
+    if (tabBtn) {
+      tab = tabBtn.dataset["tab"]!;
+      render();
+      return;
+    }
+    const seg = t.closest<HTMLElement>("[data-target]");
+    if (seg) {
+      target = seg.dataset["target"] as typeof target;
+      render();
+      return;
+    }
+    const addColour1 = t.closest<HTMLElement>("[data-add-style-colour]");
+    if (addColour1) {
+      let hex = "#2563eb";
+      return editColour(addColour1, "A colour to keep", hex, (h) => {
+        hex = h;
+        void styles.add("colour", "", h);
+        deps.notify(`Saved ${h.toUpperCase()}.`);
+      });
+    }
+    const newGradient = t.closest<HTMLElement>("[data-new-gradient]");
+    if (newGradient) {
+      void styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: [{ o: 0, c: "#2563eb" }, { o: 1, c: "#f59e0b" }] }).then((made) => {
+        if (!made) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => panel.querySelector<HTMLElement>(`[data-more="${made.id}"]`)?.click()));
+        deps.notify(`Made “${made.name}”: open its ⋯ menu and choose Edit the gradient to change it.`);
+      });
+      return;
+    }
+    const from = t.closest<HTMLElement>("[data-new-from]");
+    if (from) {
+      const how = from.dataset["newFrom"]!;
+      const sel = deps.selectionColours();
+      if (how === "selection") void (sel.length ? addPalette(styles.nextName("palette"), sel) : Promise.resolve(deps.notify("Select shapes with colours first.")));
+      else if (how === "picture") void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Pick one picture first.")));
+      else if (how === "colour") void harmonyPalette(from);
+      else void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); });
+      return;
+    }
     const add = t.closest<HTMLElement>("[data-new]");
     if (add) {
       const sel = deps.selectionColours();
@@ -348,7 +421,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (chip) {
       const owner = find(chip.closest<HTMLElement>(".style-palette")?.querySelector<HTMLElement>("[data-toggle]")?.dataset["toggle"]);
       const c = owner ? paletteOf(owner)[Number(chip.dataset["chip"])] : undefined;
-      if (c && deps.paint.count()) deps.paint.apply(c.c, c.name || c.c.toUpperCase());
+      if (c && deps.paint.count()) deps.paint.apply(c.c, c.name || c.c.toUpperCase(), target, true);
       return;
     }
     // palette editing
@@ -385,7 +458,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const item = find(row?.dataset["style"]);
     if (!item || !canApply(item.kind)) return;
     if (item.kind === "adjustment") deps.adjustment.apply(item);
-    else deps.paint.apply(item.data as Paint, item.name);
+    else deps.paint.apply(item.data as Paint, item.name, target, true);
   });
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
@@ -405,6 +478,16 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     void setPalette(owner, list);
   });
   panel.addEventListener("keydown", (e) => {
+    const tb = (e.target as HTMLElement).closest<HTMLElement>("[data-tab]");
+    if (tb && (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Home" || e.key === "End")) {
+      const ids = kindsShown.map((x) => x.id);
+      const at = ids.indexOf(tb.dataset["tab"]!);
+      tab = ids[e.key === "Home" ? 0 : e.key === "End" ? ids.length - 1 : (at + (e.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length]!;
+      e.preventDefault();
+      render();
+      panel.querySelector<HTMLElement>(`[data-tab="${tab}"]`)?.focus();
+      return;
+    }
     const t = e.target as HTMLInputElement;
     if (!t.matches?.("input")) return;
     e.stopPropagation(); // typing here never reaches the canvas shortcuts
