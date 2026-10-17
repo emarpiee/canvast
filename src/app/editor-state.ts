@@ -158,6 +158,8 @@ export class EditorState {
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;
+  /** The picture whose crop is being changed (ADR 0118): its box handles move its window instead of its size. */
+  cropId: ObjectId | null = null;
   shapeDraft: DraftShape | null = null;
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */

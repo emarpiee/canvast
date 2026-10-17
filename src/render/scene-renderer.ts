@@ -16,6 +16,7 @@ import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
 import { LABEL_FONT } from "./sheet-label";
 import type { SheetLabel } from "./sheet-label";
+import { cropOf } from "../doc/adjust";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
@@ -72,7 +73,12 @@ export function batchRuns(list: readonly ProjectedObject[]): Map<ProjectedObject
  * original is still loading (or missing).
  */
 /** How many CSS px the longer side of a projected image takes on screen. */
-const shownEdge = (po: ProjectedObject): number => (po.obj.kind === "image" ? po.proj.ppu * Math.max(po.obj.w, po.obj.h) : Infinity);
+const shownEdge = (po: ProjectedObject): number => {
+  if (po.obj.kind !== "image") return Infinity;
+  // (what the whole source would take on screen: a crop shows only a window of it)
+  const c = cropOf(po.obj);
+  return po.proj.ppu * Math.max((po.obj.w * po.obj.pixelW) / c.w, (po.obj.h * po.obj.pixelH) / c.h);
+};
 
 export function drawObjects(
   ctx: CanvasRenderingContext2D,

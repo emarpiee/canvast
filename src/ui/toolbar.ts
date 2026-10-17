@@ -8,7 +8,8 @@ import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
 import { moreButton, openMoreMenu } from "./more-menu";
-import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
+import { openAdjustPopover, openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
+import type { Adjust } from "../doc/adjust";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -55,6 +56,18 @@ export interface ToolbarActions {
   canFitSheet(): boolean;
   sheetSelection(): void;
   canDetach(): boolean;
+  /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
+  croppable(): boolean;
+  cropped(): boolean;
+  uncrop(): void;
+  selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
+  previewAdjust(a: Adjust): void;
+  commitAdjust(a: Adjust, label: string): void;
+  copyAdjust(): void;
+  pasteAdjust(): void;
+  canPasteAdjust(): boolean;
+  copyRendered(): void;
+  bake(): void;
   detachSelection(): void;
   fitSheet(): void;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
@@ -174,6 +187,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
         <button type="button" data-attach hidden aria-label="Attach the picked objects to another object" title="Attach: the picked objects follow the object you click next when it moves">${ICONS.link}</button>
         <button type="button" data-detach hidden aria-label="Detach the picked objects" title="Detach: the picked objects stop following another object">${ICONS.unlink}</button>
+        <button type="button" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
+        <button type="button" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
+        <button type="button" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
         <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
         <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -317,6 +333,33 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLElement>("[data-fit-sheet]")!.addEventListener("click", () => actions.fitSheet());
   root.querySelector<HTMLElement>("[data-put-on-sheet]")!.addEventListener("click", () => actions.sheetSelection());
+  root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
+    const id = [...editor.selection][0];
+    editor.cropId = editor.cropId ? null : (id ?? null);
+    editor.changed();
+  });
+  root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
+  root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", (e) => {
+    const anchor = e.currentTarget as HTMLElement;
+    const sel = actions.selectedAdjust();
+    if (!sel) return;
+    openAdjustPopover(anchor, {
+      ...sel,
+      onInput: (a) => actions.previewAdjust(a),
+      onChange: (a, label) => actions.commitAdjust(a, label),
+      onCopy: () => actions.copyAdjust(),
+      onPaste: () => actions.pasteAdjust(),
+      canPaste: () => actions.canPasteAdjust(),
+      onCopyRendered: () => actions.copyRendered(),
+      onBake: () => actions.bake(),
+      onClose: () => {
+        if (editor.preview.kind === "replace") {
+          editor.preview = { kind: "none" }; // (an unfinished slider is not kept)
+          editor.changed();
+        }
+      },
+    });
+  });
   root.querySelector<HTMLElement>("[data-attach]")!.addEventListener("click", () => {
     editor.attachMode = !editor.attachMode;
     editor.changed();
@@ -609,6 +652,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (document.activeElement !== h) h.value = pin.h;
       if (document.activeElement !== v) v.value = pin.v;
     }
+    const crop = root.querySelector<HTMLElement>("[data-crop]")!;
+    crop.hidden = !(pick && still && actions.croppable());
+    crop.setAttribute("aria-pressed", String(editor.cropId !== null));
+    root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
+    root.querySelector<HTMLElement>("[data-adjust]")!.hidden = !(pick && still && actions.selectedAdjust());
     root.querySelector<HTMLElement>("[data-attach]")!.hidden = !(pick && still && editor.selection.size > 0);
     root.querySelector<HTMLElement>("[data-attach]")!.setAttribute("aria-pressed", String(editor.attachMode));
     root.querySelector<HTMLElement>("[data-detach]")!.hidden = !(pick && still && actions.canDetach());

@@ -18,6 +18,9 @@ import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import scissorsLineDashedSvg from "lucide-static/icons/scissors-line-dashed.svg";
+import fullscreenSvg from "lucide-static/icons/fullscreen.svg";
+import slidersVerticalSvg from "lucide-static/icons/sliders-vertical.svg";
 import projectorSvg from "lucide-static/icons/projector.svg";
 import cornerUpLeftSvg from "lucide-static/icons/corner-up-left.svg";
 import cornerUpRightSvg from "lucide-static/icons/corner-up-right.svg";
@@ -333,6 +336,9 @@ export const ICONS = {
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
   pin: clean(pinIcon),
+  scissorsLineDashed: clean(scissorsLineDashedSvg),
+  fullscreen: clean(fullscreenSvg),
+  slidersVertical: clean(slidersVerticalSvg),
   projector: clean(projectorSvg),
   cornerUpLeft: clean(cornerUpLeftSvg),
   cornerUpRight: clean(cornerUpRightSvg),

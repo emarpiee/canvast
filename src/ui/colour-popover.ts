@@ -5,6 +5,8 @@ import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { scrubNumbers } from "../colour-picker/scrub";
+import { ADJUSTMENTS } from "../doc/adjust";
+import type { Adjust, AdjustKey } from "../doc/adjust";
 import { DEFAULT_INK, swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
 import { placeMenu } from "./more-menu";
@@ -376,4 +378,89 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
   (pop.querySelector<HTMLElement>("[role=radio][aria-checked=true]:not(:disabled)") ?? width).focus();
+}
+
+// ---- Adjust: the non-destructive adjustments of a picture (ADR 0118) -------------------------------------------------------------
+
+export interface AdjustOptions {
+  /** The numbers now (those of the first picked picture). */
+  adjust: Adjust;
+  /** Only stills have every adjustment; video and GIF show the ones a playing picture can (exposure, contrast, saturation, vibrance, temperature, blur). */
+  stills: boolean;
+  count: number;
+  /** Every step of a slider: the adjustments to show now (not stored). */
+  onInput(a: Adjust): void;
+  /** A slider is let go, a number typed, or Reset pressed: store them. */
+  onChange(a: Adjust, label: string): void;
+  onCopy(): void;
+  onPaste(): void;
+  canPaste(): boolean;
+  /** Stills only: copy the picture as a PNG as it looks, and make a new picture of it. */
+  onCopyRendered(): void;
+  onBake(): void;
+  onClose?(): void;
+}
+
+const MOVING_KEYS: readonly AdjustKey[] = ["exposure", "contrast", "saturation", "vibrance", "temperature", "blur"];
+
+export function openAdjustPopover(anchor: HTMLElement, o: AdjustOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  const pop = document.createElement("div");
+  pop.className = "colour-pop adjust-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Adjust the picture");
+  const rows = ADJUSTMENTS.filter((s) => o.stills || MOVING_KEYS.includes(s.key));
+  let cur: Adjust = { ...o.adjust };
+  pop.innerHTML =
+    `<p class="op-note">${o.count > 1 ? `The first of ${o.count} pictures is shown; what you set goes to all of them.` : "Nothing is changed in the original: these numbers are kept with the picture."}</p>` +
+    rows
+      .map(
+        (s) => `<div class="adj-row"><label class="adj-label" for="adj-${s.key}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`,
+      )
+      .join("") +
+    `<div class="adj-actions"><button type="button" data-adj-reset>Reset</button><button type="button" data-adj-copy>Copy adjustments</button><button type="button" data-adj-paste${o.canPaste() ? "" : " disabled"}>Paste adjustments</button>${
+      o.stills ? `<button type="button" data-adj-png title="Copy the picture to the clipboard as it looks now">Copy as picture</button><button type="button" data-adj-bake title="Make a new picture of it as it looks now, beside it">Make a new picture</button>` : ""
+    }</div>`;
+  scrubNumbers(pop);
+  const set = (key: AdjustKey, v: number): void => {
+    cur = { ...cur, [key]: v };
+    const r = pop.querySelector<HTMLInputElement>(`[data-adj="${key}"]`)!, n = pop.querySelector<HTMLInputElement>(`[data-adj-num="${key}"]`)!;
+    r.value = String(v);
+    n.value = String(v);
+  };
+  pop.addEventListener("input", (e) => {
+    const t = e.target as HTMLInputElement;
+    const key = (t.dataset["adj"] ?? t.dataset["adjNum"]) as AdjustKey | undefined;
+    if (!key || t.value === "" || !Number.isFinite(Number(t.value))) return;
+    set(key, Number(t.value));
+    o.onInput(cur);
+  });
+  pop.addEventListener("change", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.dataset["adj"] || t.dataset["adjNum"]) o.onChange(cur, "Adjust picture");
+  });
+  pop.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+    if (!b) return;
+    if (b.hasAttribute("data-adj-reset")) {
+      for (const s of rows) set(s.key, 0);
+      cur = {};
+      o.onChange(cur, "Reset adjustments");
+    } else if (b.hasAttribute("data-adj-copy")) o.onCopy();
+    else if (b.hasAttribute("data-adj-paste")) {
+      o.onPaste();
+      closeColourPopover(true);
+    } else if (b.hasAttribute("data-adj-png")) o.onCopyRendered();
+    else if (b.hasAttribute("data-adj-bake")) {
+      o.onBake();
+      closeColourPopover(true);
+    }
+  });
+  document.body.appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
+  pop.querySelector<HTMLElement>("input[type=range]")?.focus();
 }

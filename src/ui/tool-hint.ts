@@ -34,6 +34,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
     case "node":
       return paths.length === 1 ? "Drag a node or a handle · click a line to add a node · Alt-click a node: smooth or corner · Delete removes it · Enter or Esc to finish" : "Click a shape to edit its nodes";
     case "select": {
+      if (editor.cropId) return "Crop: drag a side or a corner of the picture; drag outward to bring back what was cut · Enter or Esc finishes";
       if (editor.attachMode) return "Click the object to attach the picked ones to · they will follow it when it moves · Esc cancels";
       const inside = editor.entered.length ? editor.entered[editor.entered.length - 1]! : null;
       // (a group entered with nothing picked is found among all the objects: a rare moment, so the scan is fine)

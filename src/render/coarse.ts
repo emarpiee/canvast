@@ -1,4 +1,5 @@
 import * as D from "../core/dyadic";
+import { cropOf } from "../doc/adjust";
 import type { WorldPoint } from "../core/camera";
 import type { TermSum } from "../core/frames";
 import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
@@ -201,14 +202,15 @@ function axisRuns(t: TermSum, count: number, size: number, ctr: number, unit: nu
 
 const imageSampler: CoarseSampler<ImageObject> = {
   classify(o, { lx, ly, m, vp, info, terms }) {
-    const u = (lx * o.pixelW) / o.w;
-    const v = (ly * o.pixelH) / o.h;
-    const mu = (m * o.pixelW) / o.w + u * ROUND;
-    const mv = (m * o.pixelH) / o.h + v * ROUND;
+    const cr = cropOf(o); // (a crop shows a window of the source pixels)
+    const u = (lx * cr.w) / o.w;
+    const v = (ly * cr.h) / o.h;
+    const mu = (m * cr.w) / o.w + u * ROUND;
+    const mv = (m * cr.h) / o.h + v * ROUND;
     const i = Math.floor(u);
     const j = Math.floor(v);
     const away = lx >= m && lx <= o.w - m && ly >= m && ly <= o.h - m && u - i >= mu && i + 1 - u >= mu && v - j >= mv && j + 1 - v >= mv;
-    if (away) return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i, j }] };
+    if (away) return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i: i + cr.x, j: j + cr.y }] };
     // A pixel boundary (or the image's own edge) is within the view: place it from exact term sums of the centre.
     const t = terms();
     if (!t) return "exact";
@@ -216,8 +218,8 @@ const imageSampler: CoarseSampler<ImageObject> = {
     const local = (s: TermSum, anchor: D.Dyadic): TermSum => termsAdd(termsShift(s, -unit), D.neg(D.shift(anchor, -unit)));
     const hx = vp.width / 2 + 2;
     const hy = vp.height / 2 + 2;
-    const xs = axisRuns(local(t.x, o.anchor.x), o.pixelW, o.w, lx, unit, info.zTrue, hx);
-    const ys = axisRuns(local(t.y, o.anchor.y), o.pixelH, o.h, ly, unit, info.zTrue, hy);
+    const xs = axisRuns(local(t.x, o.anchor.x), cr.w, o.w, lx, unit, info.zTrue, hx);
+    const ys = axisRuns(local(t.y, o.anchor.y), cr.h, o.h, ly, unit, info.zTrue, hy);
     const rects: PixelRect[] = [];
     for (const yr of ys) {
       for (const xr of xs) {
@@ -226,17 +228,18 @@ const imageSampler: CoarseSampler<ImageObject> = {
           x1: vp.width / 2 + Math.min(xr.hi, hx),
           y0: vp.height / 2 + Math.max(yr.lo, -hy),
           y1: vp.height / 2 + Math.min(yr.hi, hy),
-          i: xr.index,
-          j: yr.index,
+          i: xr.index + cr.x,
+          j: yr.index + cr.y,
         });
       }
     }
     return rects.length ? { rects } : "miss";
   },
   approx(o, { lx, ly, vp }) {
-    const i = Math.min(o.pixelW - 1, Math.max(0, Math.floor((lx * o.pixelW) / o.w)));
-    const j = Math.min(o.pixelH - 1, Math.max(0, Math.floor((ly * o.pixelH) / o.h)));
-    return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i, j }] };
+    const cr = cropOf(o);
+    const i = Math.min(cr.w - 1, Math.max(0, Math.floor((lx * cr.w) / o.w)));
+    const j = Math.min(cr.h - 1, Math.max(0, Math.floor((ly * cr.h) / o.h)));
+    return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i: i + cr.x, j: j + cr.y }] };
   },
 };
 

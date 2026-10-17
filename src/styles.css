@@ -723,6 +723,14 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .media-settings[hidden] { display: none; }
 .media-settings input { width: 72px; }
 .media-settings .media-range { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.adjust-pop { display: grid; gap: var(--sp-3); min-width: 18rem; }
+.adj-row { display: grid; grid-template-columns: 6.5rem 1fr 3.5rem; align-items: center; gap: var(--sp-4); font: var(--font-meta); color: var(--hud-muted); }
+.adj-row input[type="range"] { width: 100%; min-width: 0; }
+.adj-num { width: 100%; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.adj-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-3); }
+.adj-actions button { height: var(--sp-11); padding: 0 var(--sp-4); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.adj-actions button:hover:not(:disabled) { background: var(--hud-hover); }
+.adj-actions button:disabled { opacity: 0.4; cursor: default; }
 .palette { position: fixed; top: 14vh; left: 50%; transform: translateX(-50%); z-index: var(--z-pop); width: min(34rem, calc(100vw - var(--sp-8))); display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); overflow: hidden; }
 .palette[hidden] { display: none; }
 .palette-input { padding: var(--sp-6) var(--sp-7); font: var(--font-value); color: var(--hud-fg); background: transparent; border: 0; border-bottom: 1px solid var(--hud-border); outline: none; }

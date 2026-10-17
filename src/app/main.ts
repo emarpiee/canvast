@@ -14,7 +14,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle } from "./actions";
+import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, relinkMentionOn, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -598,6 +598,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     fitSheet: () => fitSheet(doc, editor),
     sheetSelection: () => sheetSelection(doc, editor),
     canDetach: () => canDetach(doc, editor),
+    croppable: () => croppablePicture(doc, editor) !== null,
+    cropped: () => isCropped(doc, editor),
+    uncrop: () => uncropPicture(doc, editor),
+    selectedAdjust: () => selectedAdjust(doc, editor),
+    previewAdjust: (a) => previewAdjust(doc, editor, a),
+    commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
+    copyAdjust: () => void copyAdjustments(doc, editor),
+    pasteAdjust: () => pasteAdjustments(doc, editor),
+    canPasteAdjust: () => canPasteAdjustments(),
+    copyRendered: () => void copyRenderedPicture(doc, editor, assets),
+    bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
     detachSelection: () => detachSelection(doc, editor),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
@@ -722,6 +733,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
 
   const history = new CameraHistory(view);
+  editor.subscribe(() => {
+    if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
+  });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
     fit: (kind) => focusCycle.fit(kind),
     canCameraBack: () => history.canBack(),

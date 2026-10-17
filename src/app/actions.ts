@@ -18,6 +18,10 @@ import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
+import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
+import type { Adjust } from "../doc/adjust";
+import { cropEdges, uncrop } from "../doc/crop";
+import { renderedPicture } from "../render/adjust-image";
 import type { Constraint } from "../doc/constraints";
 import { drawnParams, drawnSubs } from "../doc/path";
 import { exportSvg } from "./svg-export";
@@ -1428,5 +1432,118 @@ export function setTextStyle(doc: DocumentStore, editor: EditorState, patch: { l
   if (next.every((n, i) => n.lineHeight === texts[i]!.lineHeight && n.tracking === texts[i]!.tracking)) return;
   doc.commit(doc.transaction(texts.length === 1 ? "Change text spacing" : `Change text spacing of ${texts.length} texts`, next));
   void final;
+  editor.changed();
+}
+
+// ---- pictures: crop and adjustments (ADR 0118) ----------------------------------------------------------------------------------------
+
+/** The picked pictures (stills, video and GIF; audio has no picture). */
+const pictures = (doc: DocumentStore, editor: EditorState): ImageObject[] => selected(doc, editor).filter((o): o is ImageObject => o.kind === "image" && o.media?.kind !== "audio" && !o.locked);
+
+/** The one picked picture that can be cropped: a still, upright (null otherwise). */
+export function croppablePicture(doc: DocumentStore, editor: EditorState): ImageObject | null {
+  const sel = selected(doc, editor);
+  const o = sel.length === 1 ? sel[0]! : null;
+  return o && o.kind === "image" && !o.media && !o.rot && !o.locked ? o : null;
+}
+
+/** Whether the picked picture is cropped (so it can be shown whole again). */
+export const isCropped = (doc: DocumentStore, editor: EditorState): boolean => !!croppablePicture(doc, editor)?.crop;
+
+/** Show the whole source of the picked picture again, at the same scale and place: one undo step. */
+export function uncropPicture(doc: DocumentStore, editor: EditorState): void {
+  const o = croppablePicture(doc, editor);
+  if (!o?.crop || editor.blockEdit()) return;
+  doc.commit(doc.transaction("Show the whole picture", [uncrop(o)]));
+  editor.changed();
+}
+
+/** The adjustments of the first picked picture, and whether every picked picture is a still (video and GIF show only some of them). */
+export function selectedAdjust(doc: DocumentStore, editor: EditorState): { adjust: Adjust; stills: boolean; count: number } | null {
+  const ps = pictures(doc, editor);
+  return ps.length ? { adjust: ps[0]!.adjust ?? {}, stills: ps.every((p) => !p.media), count: ps.length } : null;
+}
+
+/** Show the adjustments on the picked pictures without storing them (a slider being dragged). */
+export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust): void {
+  const ps = pictures(doc, editor);
+  if (!ps.length || editor.blockEdit()) return;
+  const clean = cleanAdjust(adjust);
+  const next = new Map(ps.map((p): [string, ImageObject] => {
+    const { adjust: _a, ...rest } = p;
+    return [p.id, clean ? { ...rest, adjust: clean } : rest];
+  }));
+  editor.preview = { kind: "replace", ids: [...next.keys()], objs: next };
+  editor.changed();
+}
+
+/** Store the adjustments on the picked pictures: one undo step. */
+export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust | undefined, label = "Adjust picture"): void {
+  const ps = pictures(doc, editor);
+  editor.preview = { kind: "none" };
+  if (!ps.length || editor.blockEdit()) return editor.changed();
+  const clean = adjust ? cleanAdjust(adjust) : undefined;
+  const next = ps
+    .filter((p) => JSON.stringify(p.adjust ?? null) !== JSON.stringify(clean ?? null))
+    .map((p): ImageObject => {
+      const { adjust: _a, ...rest } = p;
+      return clean ? { ...rest, adjust: clean } : rest;
+    });
+  if (next.length) doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
+  editor.changed();
+}
+
+let copiedAdjust: Adjust | null = null;
+/** Remember the adjustments of the first picked picture, to paste on others. */
+export function copyAdjustments(doc: DocumentStore, editor: EditorState): boolean {
+  const ps = pictures(doc, editor);
+  if (!ps.length) return false;
+  copiedAdjust = ps[0]!.adjust ?? {};
+  editor.message = isNeutral(ps[0]!.adjust) ? "That picture has no adjustments to copy." : "Adjustments copied: paste them on other pictures, video or GIFs.";
+  editor.changed();
+  return true;
+}
+export const canPasteAdjustments = (): boolean => copiedAdjust !== null;
+export function pasteAdjustments(doc: DocumentStore, editor: EditorState): void {
+  if (copiedAdjust) commitAdjust(doc, editor, copiedAdjust, "Paste adjustments");
+}
+
+/** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
+export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<void> {
+  const o = croppablePicture(doc, editor) ?? pictures(doc, editor).find((p) => !p.media);
+  const rec = o && (await assets.record(o.assetId).catch(() => undefined));
+  const png = o && rec ? await renderedPicture(rec.blob, cropOf(o), o.adjust) : null;
+  try {
+    if (!png) throw new Error("no picture");
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    editor.message = "Copied the picture as it looks now (crop and adjustments baked in).";
+  } catch {
+    editor.message = "Could not copy the picture to the clipboard.";
+  }
+  editor.changed();
+}
+
+/** Make a new picture of the picked still as it looks now (crop and adjustments baked in), beside it, in the library too. */
+export async function bakePicture(
+  doc: DocumentStore,
+  editor: EditorState,
+  assets: AssetLibrary,
+  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string }) => Promise<AssetRecord>,
+): Promise<void> {
+  const o = pictures(doc, editor).find((p) => !p.media);
+  if (!o || editor.blockEdit()) return;
+  const rec = await assets.record(o.assetId).catch(() => undefined);
+  const c = cropOf(o);
+  const png = rec ? await renderedPicture(rec.blob, c, o.adjust) : null;
+  if (!rec || !png) {
+    editor.message = "Could not make the picture.";
+    return editor.changed();
+  }
+  const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId });
+  const { crop: _c, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
+  const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
+  const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
+  doc.commit(doc.transaction("Make a new picture of it as it looks", [placed]));
+  editor.select([placed.id]);
   editor.changed();
 }

@@ -159,6 +159,7 @@ test("edits refresh exactly the affected tiles: draw, move, undo, delete, opacit
   const id = (await p.evaluate(() => window.__canvastDebug.objects())).at(-1)!.id;
   // Move it with the select tool (preview frames render directly; the commit refreshes tiles).
   await p.keyboard.press("v");
+  await p.mouse.click(360, 330); // (only a picked object moves)
   await app.drag({ x: 360, y: 330 }, { x: 760, y: 530 });
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
   expectSamePicture(await compare(p), "after move");

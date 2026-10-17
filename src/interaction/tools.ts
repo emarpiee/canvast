@@ -7,7 +7,7 @@ import { screenToWorld } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
+import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
 import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
@@ -29,6 +29,7 @@ import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } fr
 import { isContainer } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
+import { cropEdges } from "../doc/crop";
 import { sheetLabelAt, sheetLabels } from "../render/sheet-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
@@ -145,6 +146,8 @@ type Gesture =
   | { kind: "pen"; pointerId: number; last: ScreenPoint; tip: ScreenPoint; depth: { levels: bigint; frac: number }; px: number; at: number }
   | { kind: "lasso"; pointerId: number }
   | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId>; trail: ScreenPoint[] }
+  /** Cropping the picked picture (ADR 0118): a side or corner of its box moves its window of the source. */
+  | { kind: "crop"; pointerId: number; base: ImageObject; sides: { l: boolean; r: boolean; t: boolean; b: boolean }; start: ScreenPoint; ppu: number }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
@@ -845,6 +848,15 @@ export function attachTools(
         const reach = h.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX;
         if (Math.abs(s.x - h.at[0]) > reach || Math.abs(s.y - h.at[1]) > reach) continue;
         const ids = [...editor.selection].filter((id) => doc.get(id));
+        // Crop mode: the handles move the window of the picture, not its size.
+        const pic = ids.length === 1 && editor.cropId === ids[0] ? doc.get(ids[0]!) : undefined;
+        const po = pic && vis.find((q) => q.obj.id === pic.id);
+        if (pic?.kind === "image" && po && po.proj.ppu > 0 && Number.isFinite(po.proj.ppu)) {
+          const [cx, cy] = sel.frame.centre;
+          const sides = h.edge ? { l: h.edge === "w", r: h.edge === "e", t: h.edge === "n", b: h.edge === "s" } : { l: h.at[0] < cx, r: h.at[0] > cx, t: h.at[1] < cy, b: h.at[1] > cy };
+          g = { kind: "crop", pointerId: e.pointerId, base: pic, sides, start: s, ppu: po.proj.ppu };
+          return;
+        }
         // Free (one-axis, or both axes apart) for upright pictures and for paths, turned or not, whose turn is the box's: strokes and text keep their shape.
         const turnOf = (rot: number | undefined): number => ((radiansFromAngle(rot ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
         const boxTurn = ((sel.frame.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -860,7 +872,7 @@ export function attachTools(
           kind: "scale",
           pointerId: e.pointerId,
           ids,
-          sheets: (sheetResize = false, sheets),
+          sheets: (replaceCommit = "", sheets),
           fixed: { x: h.fixed[0], y: h.fixed[1] },
           frame: view.frame,
           fixedWorld: world({ x: h.fixed[0], y: h.fixed[1] }),
@@ -1072,16 +1084,17 @@ export function attachTools(
     return reparented.map((o) => ({ ...o, z: z.get(o.id) ?? o.z }) as CanvasObject);
   };
 
-  /** The preview now on screen is the resize of a sheet and what is on it (a `replace` of every object it changes). */
-  let sheetResize = false;
+  /** The preview now on screen is a `replace` of every object a gesture changes (a sheet resize, a crop): what it is called in the undo list. */
+  let replaceCommit = "";
   const commitPreviewNow = (): void => {
     const p = editor.preview;
-    if (sheetResize) {
-      sheetResize = false;
+    if (replaceCommit) {
+      const label = replaceCommit;
+      replaceCommit = "";
       if (p.kind === "replace") {
         const n = [...p.objs.values()].map((o) => homeObject(o, doc.space));
         editor.preview = { kind: "none" };
-        doc.commit(doc.transaction("Resize", n));
+        doc.commit(doc.transaction(label, n));
         return;
       }
     }
@@ -1289,12 +1302,20 @@ export function attachTools(
       case "node":
         updateNode(s, e.altKey);
         break;
+      case "crop": {
+        const dx = (s.x - g.start.x) / g.ppu, dy = (s.y - g.start.y) / g.ppu; // (local units: an upright picture's box is aligned with the screen)
+        const next = cropEdges(g.base, g.sides.l ? dx : 0, g.sides.t ? dy : 0, g.sides.r ? -dx : 0, g.sides.b ? -dy : 0);
+        editor.preview = { kind: "replace", ids: [next.id], objs: new Map([[next.id, next]]) };
+        replaceCommit = "Crop picture";
+        editor.changed();
+        break;
+      }
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
         if (g.sheets) {
           const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
           editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
-          sheetResize = true;
+          replaceCommit = "Resize";
         } else editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };
         editor.changed();
         break;
@@ -1383,6 +1404,12 @@ export function attachTools(
         const p = editor.preview;
         if (cancelled || p.kind !== "paint") editor.preview = { kind: "none" };
         else commitPaint(doc, editor, { [g.which]: p[g.which] as Gradient });
+        break;
+      }
+      case "crop": {
+        const p = editor.preview;
+        if (cancelled || p.kind !== "replace" || !replaceCommit) editor.preview = { kind: "none" };
+        else commitPreview();
         break;
       }
       case "round":
@@ -1501,11 +1528,15 @@ export function attachTools(
       commitPath(false);
     } else if (e.key === "Enter" && editor.tool === "node") {
       editor.setTool("select"); // Enter finishes editing nodes, like Esc
+    } else if (e.key === "Enter" && editor.tool === "select" && g.kind === "none" && (editor.cropId || (editor.selection.size === 1 && (() => { const q = doc.get([...editor.selection][0]!); return q?.kind === "image" && !q.media && !q.rot && !q.locked; })()))) {
+      editor.cropId = editor.cropId ? null : [...editor.selection][0]!; // Enter on a still picture starts cropping it, and finishes
+      editor.changed();
     } else if (e.key === "Enter" && editor.tool === "select" && g.kind === "none" && editor.selection.size === 1 && doc.get([...editor.selection][0]!)?.kind === "path" && !doc.get([...editor.selection][0]!)?.locked) {
       editor.setTool("node"); // Enter on a shape edits its nodes
     } else if (e.key === "Escape") {
-      if (editor.attachMode) {
-        editor.attachMode = false; // Esc leaves Attach first
+      if (editor.attachMode || editor.cropId) {
+        editor.attachMode = false; // Esc leaves Attach, or Crop, first
+        editor.cropId = null;
         editor.changed();
       } else if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
       else if (g.kind !== "none" && g.kind !== "pan") cancelGesture();

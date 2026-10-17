@@ -1,4 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
+import { cssFilter } from "../doc/adjust";
 import type { ViewState } from "../app/view-state";
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
@@ -362,6 +363,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const el = p.eng.el;
     el.style.display = visible ? "" : "none";
     el.style.opacity = p.loading ? "0" : "";
+    el.style.filter = cssFilter(o.adjust); // (the adjustments a playing picture can show: the same filter the canvas draws it with)
     if (visible) {
       el.style.left = `${s.x}px`;
       el.style.top = `${s.y}px`;

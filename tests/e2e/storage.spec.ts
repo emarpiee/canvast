@@ -59,6 +59,7 @@ test("a fresh start creates a workspace, and saves write only the changed object
   // counts commits, not edits.)
   const r0 = (await sess(p)).revision;
   await p.keyboard.press("v");
+  await p.mouse.click(340, 330); // (only a picked object moves)
   await app.drag({ x: 340, y: 330 }, { x: 360, y: 450 });
   await saved(p);
   let s = await sess(p);

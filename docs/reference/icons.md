@@ -85,7 +85,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `scan` | Sheet tool |
 | `square-dashed` | Put the picked objects on a sheet |
 | `square-dashed-x` | Release the sheet (keep what is inside) |
-| `crop` | Clip content of a sheet (Layers) |
+| `scissors-line-dashed` | Clip content of a sheet (Layers) |
+| `crop` | Crop the picture |
+| `fullscreen` | Show the whole picture (remove the crop) |
+| `sliders-vertical` | Adjust the picture |
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |
 | `unlink` | Detach the picked objects |

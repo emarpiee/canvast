@@ -10,6 +10,8 @@ import { MITER_LIMIT } from "../doc/path";
 import { canvasPaint } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
+import { adjustPixel, cropOf, cssFilter, isNeutral } from "../doc/adjust";
+import { adjustedSource } from "./adjust-image";
 
 /**
  * Canvas 2D drawing of projected objects.
@@ -317,9 +319,11 @@ export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp
         if (x1 <= x0 || y1 <= y0) continue;
         if (!src) ctx.fillStyle = placeholder;
         else {
-          const [cr, cg, cb, ca] = src.readPixels(r.i, r.j, 1, 1) as unknown as [number, number, number, number];
+          const [cr0, cg0, cb0, ca] = src.readPixels(r.i, r.j, 1, 1) as unknown as [number, number, number, number];
           if (ca === 0) continue;
-          ctx.fillStyle = `rgba(${cr},${cg},${cb},${ca / 255})`;
+          const im = po.obj as ImageObject;
+          const [cr, cg, cb] = isNeutral(im.adjust) || im.media ? [cr0, cg0, cb0] : adjustPixel(cr0, cg0, cb0, im.adjust!);
+          ctx.fillStyle = `rgba(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)},${ca / 255})`;
         }
         ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       }
@@ -362,17 +366,23 @@ export function drawImageObject(
     const p = po.proj;
     const localX = (sx: number): number => p.lxHi + ((sx - p.cx) / p.ppu + p.lxLo);
     const localY = (sy: number): number => p.lyHi + ((sy - p.cy) / p.ppu + p.lyLo);
-    const pxPerSrc = (p.ppu * o.w) / o.pixelW;
+    // What the picture shows of its source (a crop is a window of whole source pixels): `cw` x `ch` source pixels over `w` x `h` local units.
+    const crop = cropOf(o);
+    const pxPerSrc = (p.ppu * o.w) / crop.w;
     if (pxPerSrc <= PIXEL_RECT_THRESHOLD) {
       // Magnified pixels stay crisp (no invented detail); minified images smooth.
       const k = src.scale ?? 1; // a reduced copy has fewer pixels: scale the source window to it
       ctx.imageSmoothingEnabled = pxPerSrc < 2;
       ctx.imageSmoothingQuality = "high";
-      const sx0 = k * (localX(cl) * o.pixelW) / o.w;
-      const sy0 = k * (localY(ct) * o.pixelH) / o.h;
-      const sx1 = k * (localX(cr) * o.pixelW) / o.w;
-      const sy1 = k * (localY(cb) * o.pixelH) / o.h;
-      ctx.drawImage(src.source, sx0, sy0, sx1 - sx0, sy1 - sy0, cl, ct, cr - cl, cb - ct);
+      const sx0 = k * (crop.x + (localX(cl) * crop.w) / o.w);
+      const sy0 = k * (crop.y + (localY(ct) * crop.h) / o.h);
+      const sx1 = k * (crop.x + (localX(cr) * crop.w) / o.w);
+      const sy1 = k * (crop.y + (localY(cb) * crop.h) / o.h);
+      // A video or a GIF is adjusted as its player on the canvas is (a CSS filter: exposure, contrast, colour, blur); a still, pixel by pixel.
+      const filter = o.media ? cssFilter(o.adjust) : "";
+      if (filter) ctx.filter = filter;
+      ctx.drawImage(isNeutral(o.adjust) || o.media ? src.source : adjustedSource(src, o.adjust!), sx0, sy0, sx1 - sx0, sy1 - sy0, cl, ct, cr - cl, cb - ct);
+      if (filter) ctx.filter = "none";
       return;
     }
     // Each source pixel covers many screen pixels: draw the few visible ones as
@@ -382,26 +392,27 @@ export function drawImageObject(
     const exactLocalX = (sx: number): number => D.toNumber(D.add(p.lx, fromPx(p, sx - p.cx)));
     const exactLocalY = (sy: number): number => D.toNumber(D.add(p.ly, fromPx(p, sy - p.cy)));
     // ±1 pixel of slack: the window only bounds the loop; edges are clamped below.
-    const x0 = Math.max(0, Math.floor((exactLocalX(cl) * o.pixelW) / o.w) - 1);
-    const y0 = Math.max(0, Math.floor((exactLocalY(ct) * o.pixelH) / o.h) - 1);
-    const x1 = Math.min(o.pixelW, Math.ceil((exactLocalX(cr) * o.pixelW) / o.w) + 1);
-    const y1 = Math.min(o.pixelH, Math.ceil((exactLocalY(cb) * o.pixelH) / o.h) + 1);
+    const x0 = Math.max(0, Math.floor((exactLocalX(cl) * crop.w) / o.w) - 1);
+    const y0 = Math.max(0, Math.floor((exactLocalY(ct) * crop.h) / o.h) - 1);
+    const x1 = Math.min(crop.w, Math.ceil((exactLocalX(cr) * crop.w) / o.w) + 1);
+    const y1 = Math.min(crop.h, Math.ceil((exactLocalY(cb) * crop.h) / o.h) + 1);
     const w = x1 - x0;
     const h = y1 - y0;
     if (w <= 0 || h <= 0) return;
-    const data = src.readPixels(x0, y0, w, h);
+    const data = src.readPixels(crop.x + x0, crop.y + y0, w, h);
+    const adj = isNeutral(o.adjust) || o.media ? null : o.adjust!;
     const snap = (v: number): number => Math.round(v * dpr) / dpr;
     // Pixel edge i lies at the rational local x = i·w/pixelW. Project it as
     // (i·w − L·pixelW)·2^e·f / pixelW: the numerator is exact, so interior
     // edges stay exact at any magnification.
     const W = D.fromNumber(o.w);
     const H = D.fromNumber(o.h);
-    const PW = D.fromNumber(o.pixelW);
-    const PH = D.fromNumber(o.pixelH);
+    const PW = D.fromNumber(crop.w);
+    const PH = D.fromNumber(crop.h);
     const edgeX = (i: number): number =>
-      snap(Math.min(cr, Math.max(cl, p.cx + toPx(p, D.sub(D.mul(D.fromNumber(i), W), D.mul(p.lx, PW))) / o.pixelW)));
+      snap(Math.min(cr, Math.max(cl, p.cx + toPx(p, D.sub(D.mul(D.fromNumber(i), W), D.mul(p.lx, PW))) / crop.w)));
     const edgeY = (j: number): number =>
-      snap(Math.min(cb, Math.max(ct, p.cy + toPx(p, D.sub(D.mul(D.fromNumber(j), H), D.mul(p.ly, PH))) / o.pixelH)));
+      snap(Math.min(cb, Math.max(ct, p.cy + toPx(p, D.sub(D.mul(D.fromNumber(j), H), D.mul(p.ly, PH))) / crop.h)));
     for (let j = 0; j < h; j++) {
       const top = edgeY(y0 + j);
       const bottom = edgeY(y0 + j + 1);
@@ -413,7 +424,10 @@ export function drawImageObject(
         const k = (j * w + i) * 4;
         const a = data[k + 3]!;
         if (a === 0) continue;
-        ctx.fillStyle = `rgba(${data[k]},${data[k + 1]},${data[k + 2]},${a / 255})`;
+        if (adj) {
+          const [ar, ag, ab] = adjustPixel(data[k]!, data[k + 1]!, data[k + 2]!, adj);
+          ctx.fillStyle = `rgba(${Math.round(ar)},${Math.round(ag)},${Math.round(ab)},${a / 255})`;
+        } else ctx.fillStyle = `rgba(${data[k]},${data[k + 1]},${data[k + 2]},${a / 255})`;
         ctx.fillRect(left, top, right - left + bleed, bottom - top + bleed);
       }
     }

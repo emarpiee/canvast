@@ -27,9 +27,9 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Plan item | State | Note |
 | --- | --- | --- |
 | Raster import, place, resize, rotate, flip, group, hide, lock | Done | Images, GIF, WebP, JPEG, PNG; item rotation about a pivot (ADR 0018). |
-| Raster crop | **Gap** | No crop on any item. |
+| Raster crop | Done for stills (ADR 0118) | Video and GIF are not cropped. |
 | Raster masks | Decided against | Left out (owner, 2026-10-17). |
-| Raster adjustments | **Gap** | See §5. |
+| Raster adjustments | Done (ADR 0118) | See §5. |
 | Resolution-aware display, thumbnails, large images | Done | Tile cache, reduced copies, stored WebP thumbnails (ADR 0009, 0030, 0034). |
 | Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Partial | Reduced copies and tiles exist; no mipmap pyramid; EXIF and colour profiles are not read (the browser decides). |
 | SVG import | Done (ADR 0107) | Pasted SVG text, or Make vector copy of an SVG picture, becomes editable paths (gradients, dashes, transforms; not text, masks, clips, patterns, `<use>`). A dropped SVG file is still a picture. |
@@ -49,7 +49,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Text: font selection, line height, letter spacing, text boxes with several fonts | Partial | Line height and letter spacing done (ADR 0113). Font choice needs a decision: each font is bundled outlines (size of the single file). |
 | Text: bidirectional text, IME, text-to-path export | Unverified | Not tested in this check. |
 | Video: on-canvas player, repeat, seek step (3 s), Extract Frame, paused frame persisted, decoder budget, unsupported codecs | Done | ADR 0041 to 0046. |
-| Video: crop, adjustments, playback speed | **Gap** | No crop or adjustments. Speed control not found. |
+| Video: crop, adjustments, playback speed | Partial | Adjustments done (ADR 0118); no crop; no speed control. |
 | Animated GIF: real frame parser, 1-frame step, Extract Frame | Done | ADR 0042. |
 | Audio: player, waveform, volume, repeat, 1 s step | Done | |
 | Audio: trimming or range selection | Done (ADR 0112) | Start here, End here, Whole file; video has it too. |
@@ -60,11 +60,11 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Plan item | State | Note |
 | --- | --- | --- |
 | Per-object opacity and blend modes | Partial | The only part that exists (ADR 0047). |
-| Crop | **Gap** | |
+| Crop | Done for stills (ADR 0118) | |
 | Mask | Decided against | Left out (owner, 2026-10-17). |
-| Exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, RGB, curves, levels, blur, sharpen, grain | **Gap** | No adjustment stack, no filters. |
-| Editable, reorderable stacks; Copy and Paste Adjustments across image, video and GIF | **Gap** | |
-| Copy Rendered Media (adjustments baked in) | **Gap** | Depends on the above. |
+| Exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, RGB, curves, levels, blur, sharpen, grain | Partial (ADR 0118) | All but RGB, curves and levels. |
+| Editable, reorderable stacks; Copy and Paste Adjustments across image, video and GIF | Partial (ADR 0118) | One set of numbers, not a stack; copy and paste across image, video and GIF are done. |
+| Copy Rendered Media (adjustments baked in) | Done for stills (ADR 0118) | Copy as picture, and Make a new picture. |
 
 ## §6 Assets and search
 
@@ -149,7 +149,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Create, rename, delete canvases and boards | Done | |
 | Duplicate, move and reorder canvases and boards | Done (ADR 0110) | In the More menu of the navigator. |
 | Copy Object, duplicate, paste; Copy Markdown | Done | ADR 0038. |
-| Copy Original Asset, Copy Rendered Media, Copy Adjustments | **Gap** | |
+| Copy Original Asset, Copy Rendered Media, Copy Adjustments | Partial (ADR 0118) | Rendered and adjustments done; the original is "Download the original". |
 | System-clipboard image paste, directory import, remote URL import (optional) | Unverified | Drop and file import work; paste from the system clipboard and folders were not confirmed. |
 | Single file, `file://`, no network (checked by tests), reproducible build | Partial | The build prints a hash and the offline check passes; a clean-machine test is Phase 9. |
 | U1, U2, U4, U5, U7, U8 | Done | `editing.spec.ts`. |
