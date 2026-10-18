@@ -75,6 +75,9 @@ or network connection.
 
 ### Editing (Phase 0B)
 
+
+**Shapes, sheets and masks** are one family: a *sheet* is a shape that holds other things and cuts them at its edge (it has a ratio, not a size; the size is chosen on Export), and a *clipping mask* is a sheet of any shape. What each is for and how they relate: [docs/reference/shapes-sheets-masks.md](docs/reference/shapes-sheets-masks.md).
+
 - **Vectors:** shapes and paths with fills, gradients (linear, radial, angular), outlines (position, corners, ends, dashes, arrow heads), outline stroke, taper, corner smoothing, boolean groups, divide and the shape builder, vector networks, masks, node editing on several paths with a lasso and with snapping, SVG in (paste SVG text, or Make vector copy of an SVG picture) and out (Save as SVG). Only what is picked moves; drag a number's name to change it.
 - **Pen:** freehand vector strokes in 4 colours, a size slider (0.5–128 px) with 3 presets, a thickness lock (new strokes keep the same width on the canvas at any zoom; on the Select tool it keeps line width when resizing), a stabilizer with adjustable strength, and "pen size follows zoom" while drawing; on the Select tool the size slider sets the thickness of the selected strokes (nested-frames branch; see ADR 0015, 0016). A stroke is
   authored at the current scale, so a 3 px line drawn 1,000 levels deep is a

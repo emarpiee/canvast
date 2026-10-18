@@ -27,3 +27,5 @@ Not done: a text or picture used as a mask works (any object does) but the Pen i
 ## A clipping mask is one unit (v0.19.1)
 
 A clipping mask is a sheet marked `container.mask` (older ones are found by their name, "Mask n"). It is picked like a group: a click on its output picks the mask with what it cuts (so dragging moves the output, not only the picture), and the box and handles are the mask's own, not the union with what it cuts (which reaches beyond it). A **double click** on the output goes in (`editor.openMask`): what the mask cuts is then picked one by one; Escape, picking elsewhere or picking nothing comes out. Ordinary sheets are not like this: a click on what is on a sheet picks that thing.
+
+See also the plain-words overview: [Shapes, sheets and masks](../reference/shapes-sheets-masks.md).

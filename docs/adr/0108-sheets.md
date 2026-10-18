@@ -31,3 +31,5 @@ Accepted for the first slice (v0.17.0). Real-unit sizes, constraints and auto la
 ## Sheets and frames (v0.19.1; the resize by handles and Scale contents are in ADR 0133)
 
 Deep in a zoom, near objects can be filed in different frames (the frame suits the size and position of each object). A sheet and what is on it are therefore not always in one frame, and every sheet function must not assume it. The rule: **express in the sheet's frame (`expressObjectIn`, exact) to measure or scale, leave each object filed where it is, and home it again if it was moved** (`planSheetScale`, `boxOnSheet`, `fitSheet`, putting objects on a sheet, brush masks). Before this, a resize left such objects behind, the On sheet fields were missing, and "needs objects that are in one space" refused. The fields are in px of the home zoom, shown in six significant digits (a sheet 0.0035 px wide is not "0"), and dragging a name moves a value by one screen pixel's worth (`data-scrub-step`), so a drag never sends an object tens of thousands of screen pixels away.
+
+See also the plain-words overview: [Shapes, sheets and masks](../reference/shapes-sheets-masks.md).
