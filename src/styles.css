@@ -23,7 +23,7 @@
   --canvas-guide: oklch(0.62 calc(0.2 * var(--vivid)) calc(var(--hue) + 157));
   --hud-bg: oklch(0.99 calc(0.006 * var(--vivid)) var(--hue) / 0.92);
   --hud-fg: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue));
-  --hud-muted: oklch(0.5 calc(0.02 * var(--vivid)) var(--hue));
+  --hud-muted: oklch(0.46 calc(0.02 * var(--vivid)) var(--hue));
   --hud-border: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.14);
   --hud-hover: oklch(0.5 calc(0.03 * var(--vivid)) var(--hue) / 0.14);
   --hud-accent: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
@@ -421,7 +421,6 @@ html, body {
 .hud-save {
   all: unset;
   cursor: pointer;
-  opacity: 0.75;
   border-radius: var(--r-xs);
 }
 .hud-save:hover { opacity: 1; text-decoration: underline; }
@@ -682,7 +681,7 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .layer-twist:disabled { cursor: default; }
 .layer-btn[aria-pressed="false"] { opacity: 0.45; }
 .layer:hover .layer-btn[aria-pressed="false"] { opacity: 0.9; }
-.layers-empty, .layers-note { padding: var(--sp-5); opacity: 0.6; margin: 0; }
+.layers-empty, .layers-note { padding: var(--sp-5); color: var(--hud-muted); margin: 0; }
 @media (max-width: 640px) { #side-panels { top: 110px; width: min(268px, calc(100vw - 24px)); } }
 
 /* Arrange / align / distribute menu (ui/toolbar.ts). */

@@ -95,3 +95,82 @@ test("notices: a message appears as a visible notice, progress updates in place 
   expect(box.y + box.height, "inside the window, near the bottom").toBeGreaterThan(500);
   expect(app.consoleErrors).toEqual([]);
 });
+
+/** WCAG contrast ratio of every visible text against what it sits on (translucent panels are composited over the canvas colour). */
+async function lowContrast(p: Page): Promise<string[]> {
+  return p.evaluate(() => {
+    type RGBA = [number, number, number, number];
+    const parse = (c: string): RGBA => {
+      const m = /rgba?\(([^)]+)\)/.exec(c);
+      if (!m) {
+        const o = c && c !== "transparent" ? document.createElement("canvas").getContext("2d", { willReadFrequently: true })! : null;
+        if (o) {
+          o.fillStyle = c;
+          o.clearRect(0, 0, 1, 1);
+          o.fillRect(0, 0, 1, 1);
+          const d = o.getImageData(0, 0, 1, 1).data;
+          return [d[0]!, d[1]!, d[2]!, d[3]! / 255];
+        }
+        return [0, 0, 0, 0];
+      }
+      const v = m[1]!.split(/[,/ ]+/).filter(Boolean).map(Number);
+      return [v[0]!, v[1]!, v[2]!, v[3] ?? 1];
+    };
+    const over = (top: RGBA, bottom: RGBA): RGBA => {
+      const a = top[3] + bottom[3] * (1 - top[3]);
+      return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map((i) => (top[i]! * top[3] + bottom[i]! * bottom[3] * (1 - top[3])) / a).concat(a) as RGBA;
+    };
+    const lum = (c: RGBA): number => {
+      const f = (v: number): number => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+    };
+    // what is under everything: the page's own background (the canvas is drawn in it)
+    const base = over(parse(getComputedStyle(document.body).backgroundColor), [255, 255, 255, 1]);
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const el of document.querySelectorAll<HTMLElement>("body *")) {
+      const own = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? "").trim().length > 1);
+      if (!own) continue;
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      if (!(r.width > 0 && r.height > 0) || cs.visibility === "hidden" || parseFloat(cs.opacity) === 0 || el.closest("[hidden], [inert], [disabled], [aria-disabled='true'], canvas, svg")) continue;
+      let bg: RGBA = [0, 0, 0, 0];
+      for (let n: HTMLElement | null = el, layers: RGBA[] = []; n; n = n.parentElement) {
+        layers.push(parse(getComputedStyle(n).backgroundColor));
+        bg = layers.reduceRight((under, l) => over(l, under), base);
+      }
+      let opacity = 1;
+      for (let n: HTMLElement | null = el; n; n = n.parentElement) opacity *= parseFloat(getComputedStyle(n).opacity);
+      const fg0 = parse(cs.color);
+      const fg = over([fg0[0], fg0[1], fg0[2], fg0[3] * opacity], bg);
+      const [hi, lo] = [Math.max(lum(fg), lum(bg)), Math.min(lum(fg), lum(bg))];
+      const ratio = (hi + 0.05) / (lo + 0.05);
+      const large = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
+      const text = (el.textContent ?? "").trim().slice(0, 30);
+      if (ratio < (large ? 3 : 4.5) && !seen.has(`${el.className}|${text}`)) {
+        seen.add(`${el.className}|${text}`);
+        out.push(`${ratio.toFixed(2)} ${el.tagName.toLowerCase()}.${el.className} "${text}" fg=${cs.color} bg=${bg.map((v) => Math.round(v * 100) / 100)} parentbg=${getComputedStyle(el.parentElement!).backgroundColor}`);
+      }
+    }
+    return out;
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`contrast: text is readable (4.5:1, 3:1 for large text) in the ${scheme} theme, in each view`, async ({ app }) => {
+    const p = app.page;
+    await p.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" }); // (no fade in progress when the colours are read)
+    await p.getByRole("button", { name: "Layers panel" }).click();
+    await p.getByRole("button", { name: "Bookmarks panel" }).click();
+    await p.keyboard.press("p");
+    await app.drag({ x: 400, y: 300 }, { x: 600, y: 360 }, 4);
+    expect(await lowContrast(p), "canvas view").toEqual([]);
+    await p.getByTestId("view-assets").click();
+    expect(await lowContrast(p), "assets view").toEqual([]);
+    await p.getByTestId("view-settings").click();
+    for (const tab of ["Drawing and selection", "Appearance", "Shortcuts", "Storage"]) {
+      await p.locator("#settings-view").getByRole("tab", { name: tab }).click();
+      expect(await lowContrast(p), `settings: ${tab}`).toEqual([]);
+    }
+  });
+}
