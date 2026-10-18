@@ -461,6 +461,32 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.fill();
     ctx.stroke();
   }
+  if (editor.handleLabel?.guide) {
+    // The line the handle slides along, with an arrowhead at each end: the way it moves is shown before and while it is dragged.
+    const { x0, y0, x1, y1 } = editor.handleLabel.guide;
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len > 4) {
+      const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+      ctx.strokeStyle = theme.selection;
+      ctx.fillStyle = theme.selection;
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const [x, y, d] of [[x0, y0, -1], [x1, y1, 1]] as const) {
+        const tx = x + ux * 5 * d, ty = y + uy * 5 * d;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(x - uy * 4, y + ux * 4);
+        ctx.lineTo(x + uy * 4, y - ux * 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
   if (editor.handleLabel) {
     // What is being changed, and to what, beside the handle.
     const { x, y, text } = editor.handleLabel;

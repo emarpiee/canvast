@@ -357,6 +357,25 @@ export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { g
   return cornerHandles(po, expanded, [...(gradientHandles(po, editor.gradientFocus)?.pts ?? []), ...editor.drawnHandles.map(([x, y]) => ({ x, y }))]);
 }
 
+/**
+ * The line a radius or ratio handle slides along, in screen px: the handle moves only along it, so it is drawn for the person to see
+ * (ends included): a corner's dot along the bisector of its corner from the smallest to the biggest radius, the main dot of opened-out
+ * corners sideways (a px of radius for a px moved), a star's ratio handle along the line from the middle through it.
+ */
+export function handleGuide(h: CornerHandles, pick: CornerPick, open: boolean): { x0: number; y0: number; x1: number; y1: number } | null {
+  if (pick.what === "ratio" && h.ratio) {
+    const q = h.ratio;
+    const len = Math.max(1e-6, Math.hypot(q.x - q.cx, q.y - q.cy));
+    const ux = (q.x - q.cx) / len, uy = (q.y - q.cy) / len;
+    return { x0: q.cx + ux * 0.05 * q.outer, y0: q.cy + uy * 0.05 * q.outer, x1: q.cx + ux * 0.95 * q.outer, y1: q.cy + uy * 0.95 * q.outer };
+  }
+  const dot = pick.what === "corner" ? pick.dot : pick.what === "main" ? h.main : null;
+  if (!dot) return null;
+  if (pick.what === "main" && open) return { x0: dot.x - dot.px, y0: dot.y, x1: dot.x + (dot.maxAll - dot.px), y1: dot.y };
+  const max = pick.what === "corner" ? dot.max : dot.maxAll;
+  return { x0: dot.cx + dot.ux * MIN_DOT_PX, y0: dot.cy + dot.uy * MIN_DOT_PX, x1: dot.cx + (dot.ux * max) / dot.sinHalf, y1: dot.cy + (dot.uy * max) / dot.sinHalf };
+}
+
 export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
 
 /** Which handle a press takes: a corner's own dot (when opened out), the ratio handle, or the main dot. */

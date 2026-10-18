@@ -1099,6 +1099,8 @@ test("corner radius dots: a radius pushed to its limit comes back; one dot per c
   // the handle names its value while the pointer is over it, not only while it is dragged
   await p.mouse.move(main0[0], main0[1]);
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toMatch(/^Radius /);
+  const guide = (await p.evaluate(() => window.__canvastDebug.handleGuide()))!; // the way it slides is drawn: a line with ends, through the dot
+  expect(Math.hypot(guide.x1 - guide.x0, guide.y1 - guide.y0)).toBeGreaterThan(20);
   await p.mouse.move(main0[0] + 150, main0[1] + 60);
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
   await p.mouse.dblclick(main0[0], main0[1]);

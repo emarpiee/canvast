@@ -15,7 +15,7 @@ import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnPara
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
-import { shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
+import { handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -158,7 +158,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -672,7 +672,7 @@ export function attachTools(
         toggleCorners(id);
       }
     }, LONG_PRESS_MS) : 0;
-    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, index: pick.what === "corner" ? pick.dot.index : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
+    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
     return true;
   };
   const updateCorner = (s: ScreenPoint, final: boolean): void => {
@@ -689,9 +689,10 @@ export function attachTools(
     const ppu = tgt.po.proj.ppu;
     if (g.what === "ratio" && h.ratio) {
       const q = h.ratio;
-      const inner = Math.max(0.05, Math.min(0.95, Math.hypot(s.x - q.cx, s.y - q.cy) / Math.max(1e-6, q.outer)));
+      // Only along its line (from the middle through the handle), wherever the pointer strays to.
+      const inner = Math.max(0.05, Math.min(0.95, ((s.x - q.cx) * g.ax + (s.y - q.cy) * g.ay) / Math.max(1e-6, q.outer)));
       commitShapeNumbers(doc, editor, { inner }, final);
-      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Ratio ${Math.round(inner * 100)}%` };
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Ratio ${Math.round(inner * 100)}%`, guide: handleGuide(h, { what: "ratio" }, open) };
       return;
     }
     if (g.what === "count" && h.count) {
@@ -711,7 +712,7 @@ export function attachTools(
     const px = Math.max(0, Math.min(g.what === "corner" ? dot.max : dot.maxAll, g.r0 + delta));
     if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
     else commitCorners(doc, editor, [px], () => ppu, final);
-    editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Radius ${Math.round(px * 10) / 10}` };
+    editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Radius ${Math.round(px * 10) / 10}`, guide: handleGuide(h, g.what === "corner" ? { what: "corner", dot } : { what: "main" }, open) };
   };
   const updateGradient = (s: ScreenPoint): void => {
     if (g.kind !== "grad") return;
@@ -725,12 +726,14 @@ export function attachTools(
   const hoverHandleLabel = (s: ScreenPoint): void => {
     const tgt = gradientTarget();
     let text: string | null = null;
+    let guide: ReturnType<typeof handleGuide> = null;
     if (tgt) {
       const open = editor.cornersOpen === tgt.o.id;
       const h = shapeHandles(tgt.po, open, editor);
       const pick = h && hitCornerHandle(h, s.x, s.y, open);
       if (pick && h) {
         const prm = paramsOf(tgt.o);
+        guide = handleGuide(h, pick, open);
         text = pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
       } else {
         const gh = gradientHandles(tgt.po, editor.gradientFocus);
@@ -738,7 +741,7 @@ export function attachTools(
         if (hit) text = hit === "p0" ? "Gradient start" : hit === "p1" ? "Gradient end" : hit === "c" ? "Gradient centre" : "Gradient radius";
       }
     }
-    if (text) editor.handleLabel = { x: s.x, y: s.y, text };
+    if (text) editor.handleLabel = { x: s.x, y: s.y, text, guide };
     else if (editor.handleLabel) editor.handleLabel = null;
     else return;
     editor.changed();
