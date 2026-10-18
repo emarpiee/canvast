@@ -6,6 +6,9 @@ import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
 import { esc } from "./format";
+declare const __CANVAST_VERSION__: string;
+import NOTICES from "../../THIRD_PARTY_NOTICES.md";
+import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } from "../app/diagnostics";
 import { ICONS } from "./icons";
 
 /**
@@ -68,7 +71,7 @@ const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Media", ["media", "screenshot"]],
   ["Interface", ["appearance", "panels", "performance"]],
-  ["App", ["storage", "privacy", "collaboration", "develop"]],
+  ["App", ["storage", "privacy", "collaboration", "about", "develop"]],
 ];
 
 const SCOPE_LABEL = { device: "This device", workspace: "This workspace", board: "This board" } as const;
@@ -169,6 +172,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Performance",
     rows: [
       { key: "quality.auto", label: "Adaptive quality", help: "Lower the canvas resolution when frames are slow.", control: { kind: "toggle" } },
+      { key: "quality.level", label: "Quality when adaptive quality is off", help: "The quality the canvas is held at. Full: every device pixel, nothing simplified. Balanced: at most 1.5 pixels per screen pixel and a zoom preview for busy scenes. Fast: 1 pixel per screen pixel and the preview more often. A big canvas on a slow or very sharp screen draws faster at Balanced or Fast.", control: { kind: "select", options: [["full", "Full"], ["balanced", "Balanced"], ["fast", "Fast"]] } },
+      { key: "cache.decodedMb", label: "Memory for pictures", help: "How much memory the pictures that are on screen may take once decoded. Over it, the ones nothing has asked for lately are let go and decoded again when needed (the originals stay stored). More keeps more pictures ready; less is kinder to a small machine.", control: { kind: "select", options: [["128", "128 MB"], ["256", "256 MB"], ["384", "384 MB"], ["768", "768 MB"], ["1536", "1.5 GB"]] } },
       { key: "ui.motion", label: "Animation", help: "How the interface moves: panels and menus fade and rise in, the floating bars fade in Zen mode, buttons change colour smoothly. System follows your operating system's reduce-motion setting (the choice that most often makes everything instant). Subtle fades only, and shorter. None changes everything at once.", control: { kind: "select", options: [["system", "System"], ["full", "Full"], ["subtle", "Subtle"], ["reduce", "None"]] } },
       { key: "ui.animSpeed", label: "Animation speed", help: "How long each animation takes. It has no effect when Animation is None.", control: { kind: "select", options: [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]] } },
     ],
@@ -194,6 +199,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
   { id: "collaboration", label: "Collaboration" },
+  { id: "about", label: "About and diagnostics" },
   {
     id: "develop",
     label: "Develop",
@@ -265,6 +271,13 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
                <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
              </div>
              <p class="set-help">A backup is one file you can keep anywhere. After a full one, an incremental backup holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>`
+        : t.id === "about"
+          ? `<div class="set-info set-card"><h3>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
+             <div class="set-info set-card"><h3>This browser</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
+             <div class="set-info set-card"><h3>Errors this session</h3><ul class="set-errors" data-testid="about-errors"></ul>
+               <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>
+               <p class="set-help">The report is a text file with the version, this browser, the numbers above and the errors. It holds no canvas content. canvast sends nothing: you send the file if you choose to.</p></div>
+             <div class="set-info set-card"><h3>Licences</h3><details><summary>Software this app is built from</summary><pre class="set-licences" data-testid="about-licences">${esc(NOTICES)}</pre></details></div>`
         : t.id === "collaboration"
           ? `<div class="set-info set-card"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
            <p>When it is added it will be opt-in for each workspace, with named roles, and everything will keep working offline. Until then, share work with an export from the workspace menu.</p></div>`
@@ -295,7 +308,27 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     for (const p of panels) p.hidden = p.dataset["panel"] !== id;
     cancelCapture();
     if (id === "storage") void storage();
+    if (id === "about") showErrors();
   };
+  const showErrors = (): void => {
+    const ul = root.querySelector<HTMLElement>("[data-testid=about-errors]");
+    if (!ul) return;
+    ul.innerHTML = errorLog().length ? errorLog().map((e) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`).join("") : "<li>none</li>";
+  };
+  onErrorLog(showErrors);
+  root.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-about]");
+    if (!b) return;
+    if (b.dataset["about"] === "clear") clearErrorLog();
+    else {
+      const blob = new Blob([diagnosticReport(backup ? { "Settings changed from the defaults": settings.changedKeys() } : {})], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `canvast-diagnostics-${new Date().toISOString().slice(0, 10)}.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+    }
+  });
 
   /**
    * Search: every word must be somewhere in a row (its name, its help, the key, the card and tab it is on). While a search is on, all the

@@ -22,7 +22,7 @@ const result = await build({
   define: {
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
   },
-  loader: { ".svg": "text", ".ttf": "binary" },
+  loader: { ".svg": "text", ".ttf": "binary", ".md": "text" },
   logLevel: "warning",
 });
 

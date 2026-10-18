@@ -48,6 +48,8 @@ import { mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
 import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
+import type { QualityLevel } from "./quality";
+import { startErrorLog } from "./diagnostics";
 import { BookmarkList, captureThumb } from "./bookmarks";
 import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
@@ -312,6 +314,10 @@ async function start(): Promise<void> {
   });
   // In debug mode (the tests) the level changes only when asked to, so a slow machine cannot change what a test measures.
   quality.pinned = !settings.get("quality.auto") || debug;
+  const heldLevel = (): QualityLevel => ({ full: 0, balanced: 1, fast: 2 })[settings.get("quality.level")] as QualityLevel;
+  const applyHeldQuality = (): void => {
+    if (!debug && !settings.get("quality.auto")) quality.force(heldLevel()); // (off: held at the level asked for)
+  };
   const effectiveDpr = (): number => Math.min(window.devicePixelRatio || 1, DPR_CAP[quality.level]);
   let scheduled = false;
   let frameWaiters: Array<() => void> = [];
@@ -348,6 +354,8 @@ async function start(): Promise<void> {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
+  assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
+  applyHeldQuality();
   // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
   const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
   const wantFonts = (objs: Iterable<CanvasObject | undefined>): void => {
@@ -1246,7 +1254,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "eraser.diameterPx": editor.eraserPx = settings.get(key); break;
       case "eraser.wholeGroups": editor.eraseWholeGroups = settings.get(key); break;
       case "eraser.parts": editor.eraseParts = settings.get(key); break;
-      case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; break;
+      case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; if (settings.get("quality.auto")) quality.force(0); else applyHeldQuality(); break;
+      case "quality.level": applyHeldQuality(); break;
+      case "cache.decodedMb": assets?.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20); break;
       case "ui.textScale":
       case "ui.density":
       case "ui.contrast":
@@ -1458,4 +1468,5 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   if (settings.get("ui.view") === "assets") setView("assets");
 }
 
+startErrorLog();
 void start();

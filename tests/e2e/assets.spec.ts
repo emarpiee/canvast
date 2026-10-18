@@ -2168,11 +2168,11 @@ test("a folder is imported with every file in it, and the files are put in libra
   writeFileSync(resolve(root, "pics/.hidden/c.png"), c); // hidden: left out
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-folder-input").setInputFiles(resolve(root, "pics"));
-  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.filter((e) => e.folderIds.length).length).toBe(2); // (imported, then filed)
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.filter((e) => (e.folderIds ?? []).length).length).toBe(2); // (imported, then filed)
   const listing = await p.evaluate(() => window.__canvastDebug.assetListing());
   const folders = listing.folders.map((f) => [f.name, listing.folders.find((q) => q.id === f.parentId)?.name ?? null]).sort();
   expect(folders).toEqual([["pics", null], ["sub", "pics"]]);
-  const inFolder = (hash: string) => listing.entries.find((e) => e.hash === hash)!.folderIds.map((id) => listing.folders.find((f) => f.id === id)!.name);
+  const inFolder = (hash: string) => (listing.entries.find((e) => e.hash === hash)!.folderIds ?? []).map((id) => listing.folders.find((f) => f.id === id)!.name);
   expect(inFolder(createHash("sha256").update(a).digest("hex"))).toEqual(["pics"]);
   expect(inFolder(createHash("sha256").update(b).digest("hex"))).toEqual(["sub"]);
   expect(app.consoleErrors).toEqual([]);

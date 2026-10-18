@@ -73,6 +73,8 @@ export const SETTINGS = {
   "select.ignoreFilling": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "quality.level": { scope: "device", default: "full", validate: oneOf("full", "balanced", "fast"), effect: "immediate" } as Def<"full" | "balanced" | "fast">,
+  "cache.decodedMb": { scope: "device", default: "384", validate: oneOf("128", "256", "384", "768", "1536"), effect: "immediate" } as Def<"128" | "256" | "384" | "768" | "1536">,
   "panel.autoFold": { scope: "device", default: "off", validate: oneOf("off", "all", "latest"), effect: "immediate" } as Def<"off" | "all" | "latest">,
   "panel.keep": { scope: "device", default: 2, validate: range(1, DOCK_PANEL_IDS.length), effect: "immediate" } as Def<number>,
   "ui.dock": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && v.length <= 8000 ? v : undefined), effect: "immediate" } as Def<string>,
@@ -186,6 +188,11 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate(raw[key]);
       if (v !== undefined) this.values.set(key, v);
     }
+  }
+
+  /** The settings whose value is not the default, as "key = value" (the diagnostic report lists them). */
+  changedKeys(): string[] {
+    return [...this.values].filter(([k, v]) => v !== (SETTINGS[k as SettingKey] as Def<unknown>).default).map(([k, v]) => `${k} = ${typeof v === "string" && k.startsWith("ui.dock") ? "(layout)" : JSON.stringify(v)}`);
   }
 
   /** Whether a value is stored (not the default): lets a build choose its own default. */

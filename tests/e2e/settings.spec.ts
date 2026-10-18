@@ -346,3 +346,33 @@ test("settings search: every word must match, all tabs show with only their matc
   await expect(panel.locator('[data-row="pen.kind"]')).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Settings > Performance holds the quality held when adaptive quality is off and the memory for pictures; About lists what the browser can do, the errors of the session, the licences and saves a report (ADR 0135)", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Performance" }).click();
+  const level = () => p.evaluate(() => window.__canvastDebug.qualityLevel());
+  expect(await level()).toBe(0);
+  // (the test build pins the level; asking for another one while adaptive quality is on changes nothing)
+  await p.getByRole("combobox", { name: "Memory for pictures" }).selectOption("128");
+  expect((await p.evaluate(() => window.__canvastDebug.decodedStats())).budget).toBe(128 * 2 ** 20);
+  await p.getByRole("combobox", { name: "Memory for pictures" }).selectOption("384");
+  await p.getByRole("tab", { name: "About and diagnostics" }).click();
+  await expect(p.getByTestId("about-version")).not.toHaveText("");
+  await expect(p.getByTestId("about-capabilities")).toContainText("IndexedDB");
+  await expect(p.getByTestId("about-errors")).toContainText("none");
+  await p.evaluate(() => window.dispatchEvent(new ErrorEvent("error", { message: "Test failure", filename: "x.js", lineno: 7 })));
+  await expect(p.getByTestId("about-errors")).toContainText("Test failure (x.js:7)");
+  await p.getByText("Software this app is built from").click();
+  await expect(p.getByTestId("about-licences")).toContainText("Lucide");
+  const [file] = await Promise.all([p.waitForEvent("download"), p.getByTestId("about-report").click()]);
+  expect(file.suggestedFilename()).toMatch(/^canvast-diagnostics-\d{4}-\d{2}-\d{2}\.txt$/);
+  const text = await (await import("node:fs/promises")).readFile((await file.path())!, "utf8");
+  expect(text).toContain("canvast diagnostic report");
+  expect(text).toContain("Test failure");
+  expect(text).toContain("holds no canvas content");
+  await p.getByTestId("about-clear").click();
+  await expect(p.getByTestId("about-errors")).toContainText("none");
+  app.consoleErrors.length = 0; // (the error above was made on purpose)
+  expect(app.consoleErrors).toEqual([]);
+});
