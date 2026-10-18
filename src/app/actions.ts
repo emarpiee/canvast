@@ -364,16 +364,17 @@ export function renameLayer(doc: DocumentStore, editor: EditorState, key: string
 }
 
 /** Change a media instance's paused position or repeat mode (one undo step); a no-op when nothing changes. */
-export function setMedia(doc: DocumentStore, editor: EditorState, id: string, patch: Partial<Pick<MediaState, "t" | "repeat">> & { range?: readonly [number, number] | null }, label = "Media"): void {
+export function setMedia(doc: DocumentStore, editor: EditorState, id: string, patch: Partial<Pick<MediaState, "t" | "repeat">> & { range?: readonly [number, number] | null; speed?: number }, label = "Media"): void {
   if (editor.blockEdit()) return;
   const o = doc.get(id);
   if (!o || o.kind !== "image" || !o.media) return;
-  const { range, ...rest } = patch;
-  const { range: oldRange, ...kept } = o.media;
+  const { range, speed, ...rest } = patch;
+  const { range: oldRange, speed: oldSpeed, ...kept } = o.media;
   const next = range === undefined ? oldRange : (range ?? undefined);
-  const media: MediaState = { ...kept, ...rest, ...(next ? { range: next } : {}) };
+  const rate = speed === undefined ? oldSpeed : speed === 1 ? undefined : Math.max(0.25, Math.min(4, speed));
+  const media: MediaState = { ...kept, ...rest, ...(next ? { range: next } : {}), ...(rate ? { speed: rate } : {}) };
   const same = (a?: readonly [number, number], b?: readonly [number, number]): boolean => a?.[0] === b?.[0] && a?.[1] === b?.[1];
-  if (media.t === o.media.t && media.repeat === o.media.repeat && same(next, oldRange)) return;
+  if (media.t === o.media.t && media.repeat === o.media.repeat && same(next, oldRange) && media.speed === o.media.speed) return;
   doc.commit(doc.transaction(label, [{ ...o, media }]));
 }
 
@@ -1533,7 +1534,7 @@ const pictures = (doc: DocumentStore, editor: EditorState): ImageObject[] => sel
 export function croppablePicture(doc: DocumentStore, editor: EditorState): ImageObject | null {
   const sel = selected(doc, editor);
   const o = sel.length === 1 ? sel[0]! : null;
-  return o && o.kind === "image" && !o.media && !o.rot && !o.locked ? o : null;
+  return o && o.kind === "image" && o.media?.kind !== "audio" && !o.rot && !o.locked ? o : null; // (a video and a GIF too: the window of each frame)
 }
 
 /** Whether the picked picture is cropped (so it can be shown whole again). */

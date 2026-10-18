@@ -376,3 +376,42 @@ test("adjustments: red, green and blue, levels, a curve and a stack of layers ar
   expect((await adjust())!["red"]).toBe(100);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a video plays at the speed set for it and can be cropped: the player shows only the window of every frame (ADR 0137)", async ({ app }) => {
+  const slow = expect.configure({ timeout: 20_000 });
+  const p = app.page;
+  const webm = await makeWebm(p, 2);
+  await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: webm });
+  await slow.poll(async () => (await objs(app)).length).toBe(1);
+  const [v] = await objs(app);
+  await p.keyboard.press("v");
+  const b0 = await boxOf(app, v!.id);
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
+  await slow(p.getByTestId("media-bar")).toBeVisible();
+  // speed: kept on the instance and given to the player
+  await p.getByTestId("media-bar").getByRole("button", { name: "Media & Playback settings" }).click();
+  await p.getByRole("combobox", { name: "Playing speed" }).selectOption("2");
+  const media = async () => ((await objs(app)).find((o) => o.id === v!.id) as unknown as { media: { speed?: number } }).media;
+  expect((await media()).speed).toBe(2);
+  await expect.poll(() => p.evaluate(() => document.querySelector<HTMLVideoElement>("video.media-video")?.playbackRate)).toBe(2);
+  await p.getByRole("combobox", { name: "Playing speed" }).selectOption("1");
+  expect((await media()).speed).toBeUndefined(); // (1 is the default: not stored)
+  // crop: cut in from the right; the window is smaller, the player is clipped to it
+  await p.getByTestId("media-bar").getByRole("button", { name: "Media & Playback settings" }).click(); // (the settings are over the picture: closed)
+  await p.getByRole("button", { name: "Crop the picture" }).click();
+  const midY = Math.round((b0.minY + b0.maxY) / 2);
+  await app.drag({ x: Math.round(b0.maxX), y: midY }, { x: Math.round(b0.maxX) - 60, y: midY }, 6);
+  const c = (await objs(app)).find((o) => o.id === v!.id)!;
+  expect(c.crop, "cut in from the right").toBeTruthy();
+  await p.keyboard.press("Enter");
+  await expect.poll(() => p.evaluate(() => document.querySelector<HTMLElement>("video.media-video")?.style.clipPath ?? "")).toMatch(/^inset\(/);
+  const el = await p.evaluate(() => {
+    const e = document.querySelector<HTMLElement>("video.media-video")!;
+    const r = e.getBoundingClientRect();
+    return { w: r.width, clip: e.style.clipPath };
+  });
+  const b1 = await boxOf(app, v!.id);
+  expect(b1.maxX - b1.minX).toBeLessThan(b0.maxX - b0.minX - 40); // the object is narrower
+  expect(el.w).toBeGreaterThan(b1.maxX - b1.minX); // the player is the whole picture, clipped
+  expect(app.consoleErrors).toEqual([]);
+});

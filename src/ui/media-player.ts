@@ -26,7 +26,7 @@ import { ICONS } from "./icons";
  * deleted or leaves the view.
  */
 export interface MediaPlayerActions {
-  setMedia(id: string, patch: { t?: number; repeat?: boolean; range?: readonly [number, number] | null }, label: string): void;
+  setMedia(id: string, patch: { t?: number; repeat?: boolean; range?: readonly [number, number] | null; speed?: number }, label: string): void;
   /** The picture shown now, as a PNG, to become a new image next to the instance. */
   extract(id: string, png: Blob, label: string): void;
   /** Draw the instance again (its picture was replaced). */
@@ -53,6 +53,10 @@ export interface Engine {
   play(): void;
   pause(): void;
   setLoop(on: boolean): void;
+  /** How fast it plays (1: as made). */
+  setSpeed(rate: number): void;
+  /** How fast it plays (1: as made). */
+  setSpeed(rate: number): void;
   step(dir: 1 | -1, amount: number, repeat: boolean): void;
   label(): string;
   /** The picture shown now as a PNG (null when there is none to take). */
@@ -100,6 +104,7 @@ export function avEngine(v: HTMLVideoElement): Engine {
       await presented(v, 200); // the sought picture on screen before the layer shows
       target = at;
       v.loop = o.media!.repeat;
+      v.playbackRate = o.media!.speed ?? 1;
     },
     unload() {
       played = false;
@@ -131,6 +136,7 @@ export function avEngine(v: HTMLVideoElement): Engine {
       if (was) e.seek(v.currentTime);
     },
     setLoop: (on) => void (v.loop = on),
+    setSpeed: (rate) => void (v.playbackRate = rate),
     step: (dir, amount, repeat) => e.seek(stepTime(e.pos(), dir * amount, duration, repeat)),
     label: () => `${formatTime(e.pos())} / ${formatTime(duration)}`,
     async frame() {
@@ -193,6 +199,7 @@ export function gifEngine(c: HTMLCanvasElement): Engine {
     on = false;
     clearTimeout(timer);
   };
+  let speed = 1;
   const schedule = (): void => {
     timer = window.setTimeout(() => {
       let next = idx + 1;
@@ -208,7 +215,7 @@ export function gifEngine(c: HTMLCanvasElement): Engine {
       show(next);
       e.onTick();
       schedule();
-    }, g!.frames[idx]!.delay * 1000);
+    }, (g!.frames[idx]!.delay * 1000) / speed);
   };
   const e: Engine = {
     el: c,
@@ -218,6 +225,7 @@ export function gifEngine(c: HTMLCanvasElement): Engine {
       c.width = g.width;
       c.height = g.height;
       loop = o.media!.repeat;
+      speed = o.media!.speed ?? 1;
       show(Math.min(o.media!.t, g.count - 1));
     },
     unload() {
@@ -240,6 +248,7 @@ export function gifEngine(c: HTMLCanvasElement): Engine {
       e.onTick();
     },
     setLoop: (v) => void (loop = v),
+    setSpeed: (rate) => void (speed = rate),
     step: (dir, amount, repeat) => g && show(stepFrame(idx, dir * amount, g.count, repeat)),
     label: () => `Frame ${idx + 1} / ${g?.count ?? 0}`,
     frame: () => new Promise((res) => c.toBlob(res, "image/png")),
@@ -278,10 +287,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       <label>Audio step (s) <input type="number" min="0.1" max="600" step="any" data-step="media.step.audio"></label>
       <div class="media-range" data-range-row><span>Play only</span><output data-range-text></output>
         <button type="button" data-cmd="rin" title="Start playing from the position now">Start here</button><button type="button" data-cmd="rout" title="Stop playing at the position now">End here</button><button type="button" data-cmd="rclear" title="Play the whole file">Whole file</button></div>
+      <label>Speed <select data-speed aria-label="Playing speed">${[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].map((v) => `<option value="${v}">${v}×</option>`).join("")}</select></label>
       <label>GIF step (frames) <input type="number" min="1" max="1000" step="1" data-step="media.step.gif"></label>
     </div>`;
   scrubNumbers(bar);
   host.append(bar);
+  bar.querySelector<HTMLSelectElement>("[data-speed]")!.addEventListener("change", (e) => {
+    if (sel) actions.setMedia(sel.o.id, { speed: Number((e.target as HTMLSelectElement).value) }, "Playing speed");
+  });
   const $ = <T extends HTMLElement>(sel: string): T => bar.querySelector<T>(sel)!;
   const scrub = $<HTMLInputElement>(".media-scrub");
   const time = $<HTMLOutputElement>(".media-time");
@@ -317,6 +330,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     playBtn.setAttribute("aria-label", playing ? "Pause" : "Play");
     playBtn.title = playing ? "Pause" : "Play";
     repeatBtn.setAttribute("aria-pressed", String(!!o.media?.repeat));
+    const speedSel = bar.querySelector<HTMLSelectElement>("[data-speed]")!;
+    if (document.activeElement !== speedSel) speedSel.value = String(o.media?.speed ?? 1);
     muteBtn.hidden = volume.hidden = o.media?.kind === "gif";
     extractBtn.hidden = o.media?.kind === "audio";
     const muted = videoOf(sel)?.muted ?? false;
@@ -365,13 +380,20 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     el.style.opacity = p.loading ? "0" : "";
     el.style.filter = playingFilter(o.adjust); // (every adjustment, as a filter: the same one the canvas draws the paused picture with)
     if (visible) {
-      el.style.left = `${s.x}px`;
-      el.style.top = `${s.y}px`;
-      el.style.width = `${w}px`;
-      el.style.height = `${h}px`;
+      // A cropped video or GIF: the element is the whole picture, as big as the window would make it, put so the window is where the
+      // object is, and everything outside the window is clipped away.
+      const c = o.crop;
+      const kx = c ? w / c.w : 0, ky = c ? h / c.h : 0;
+      const offX = c ? c.x * kx : 0, offY = c ? c.y * ky : 0;
+      const fullW = c ? kx * o.pixelW : w, fullH = c ? ky * o.pixelH : h;
+      el.style.left = `${s.x - offX}px`;
+      el.style.top = `${s.y - offY}px`;
+      el.style.width = `${fullW}px`;
+      el.style.height = `${fullH}px`;
+      el.style.clipPath = c ? `inset(${offY}px ${fullW - offX - w}px ${fullH - offY - h}px ${offX}px)` : "";
       if (o.rot) {
         const pv = pivotOf(o);
-        el.style.transformOrigin = `${pv.x * ppu}px ${pv.y * ppu}px`;
+        el.style.transformOrigin = `${pv.x * ppu + offX}px ${pv.y * ppu + offY}px`;
         el.style.transform = `rotate(${radiansFromAngle(o.rot)}rad)`;
       } else el.style.transform = "";
     }
@@ -485,6 +507,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
         p.eng.play();
       }
       p.eng.setLoop(cur.media.repeat);
+      p.eng.setSpeed(cur.media.speed ?? 1);
       // An undo or redo changed the paused position: follow it (never while playing).
       if (!p.eng.playing() && !p.loading && Math.abs(p.eng.pos() - cur.media.t) > 0.01 && cur.media.t !== prev.media!.t) p.eng.seek(cur.media.t);
     }
