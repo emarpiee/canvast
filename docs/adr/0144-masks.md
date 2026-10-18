@@ -23,3 +23,7 @@ Command "Brush mask: show everything, paint black to hide" (or the other way rou
 Added later (v0.19.1): picking respects a mask by its shape (an object is picked only where a mask shape is, or is not when inverted; the mask's own softness or brightness is not read) and SVG export writes masks as `<mask>` (inverted ones through a filter).
 
 Not done: a text or picture used as a mask works (any object does) but the Pen is the only way to paint one.
+
+## A clipping mask is one unit (v0.19.1)
+
+A clipping mask is a sheet marked `container.mask` (older ones are found by their name, "Mask n"). It is picked like a group: a click on its output picks the mask with what it cuts (so dragging moves the output, not only the picture), and the box and handles are the mask's own, not the union with what it cuts (which reaches beyond it). A **double click** on the output goes in (`editor.openMask`): what the mask cuts is then picked one by one; Escape, picking elsewhere or picking nothing comes out. Ordinary sheets are not like this: a click on what is on a sheet picks that thing.

@@ -2477,3 +2477,49 @@ test("Brush mask: started from the palette over a picked shape, the Pen paints b
   await expect(p.locator('[data-mask-ink="done"]')).toBeHidden();
   expect((await objs(app)).filter((o) => o.kind === "stroke").length).toBeGreaterThan(6);
 });
+
+test("Clipping mask as one unit: a click on its output picks the whole mask (and the box is the mask's), dragging it moves the output, a double click goes in to pick what it cuts, Escape comes out", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 340], [600, 460]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  const all = (await objs(app)) as unknown as Array<Obj & { container?: { mask?: boolean }; parent?: string }>;
+  const sheet = all.find((o) => o.container)!;
+  const rect = all.find((o) => o.parent === sheet.id && !o.container)!;
+  expect(sheet.container!.mask, "marked as a mask").toBe(true);
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection());
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  // a click on the output (the ellipse's middle, where the rectangle shows) picks the mask whole
+  await click(app, 550, 400);
+  expect([...(await sel())].sort()).toEqual([sheet.id, rect.id].sort());
+  // its outline is the mask's, not the rectangle's (which reaches far beyond the ellipse): only the mask's box has handles
+  const handles = await p.evaluate(() => window.__canvastDebug.drawnHandles());
+  const sb = await box(sheet.id);
+  const xs = handles.map((h) => h[0]);
+  expect(Math.min(...xs)).toBeGreaterThan(sb.minX - 6);
+  expect(Math.max(...xs)).toBeLessThan(sb.maxX + 6);
+  // dragging the output moves the mask and what it cuts together
+  const r0 = await box(rect.id);
+  await drag(app, [550, 400], [650, 400]);
+  expect((await box(rect.id)).minX - r0.minX).toBeCloseTo(100, 0);
+  expect((await box(sheet.id)).minX - sb.minX).toBeCloseTo(100, 0);
+  // a double click goes in: the rectangle alone is picked, and stays pickable one by one
+  await p.mouse.dblclick(650, 400);
+  await app.frame();
+  expect(await sel()).toEqual([rect.id]);
+  await click(app, 120, 650);
+  expect(await sel()).toEqual([]);
+  await click(app, 650, 400);
+  expect([...(await sel())].sort(), "outside again, the mask is one unit again").toEqual([sheet.id, rect.id].sort());
+  await p.mouse.dblclick(650, 400);
+  await app.frame();
+  await key(app, "Escape");
+  expect([...(await sel())].sort(), "Escape comes out: the mask whole").toEqual([sheet.id, rect.id].sort());
+  expect(app.consoleErrors).toEqual([]);
+});

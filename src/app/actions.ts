@@ -1912,7 +1912,7 @@ export function makeClippingMask(doc: DocumentStore, editor: EditorState): void 
   let n = 0;
   for (const o of all) n = Math.max(n, Number(/^Mask (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
   const { parent: _p, ...bare } = maskShape;
-  const body: PathObject = { ...bare, fill: null, stroke: null, container: { clip: true }, name: `Mask ${n + 1}`, ...(parent !== undefined ? { parent } : {}) };
+  const body: PathObject = { ...bare, fill: null, stroke: null, container: { clip: true, mask: true }, name: `Mask ${n + 1}`, ...(parent !== undefined ? { parent } : {}) };
   const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : { ...body, z: lowest - 1 };
   const inside = content.map((o) => ({ ...o, parent: body.id }) as CanvasObject);
   doc.commit(doc.transaction("Clipping mask", [placed, ...inside]));

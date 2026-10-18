@@ -16,6 +16,7 @@
 - **Sheets, made solid** (ADR 0133): resizing, the On sheet fields, Fit to contents, Put on a sheet and brush masks work when the objects are filed in different frames (deep in a zoom); sheet sizes and places are shown in six significant digits (not 0), and dragging a name changes a value by a screen pixel at a time.
 - **Shapes, not sizes** (ADR 0147). A sheet has a **ratio** (type `16:9`, `A4 portrait`, `1.5`, pick a shape, or Turn it on its side; the area is kept) and no size in px. On sheet X, Y, W and H are per cent of the sheet. **Scale contents is kept with each sheet** (saved, undoable, shown for the picked sheet).
 - **Export…** (Actions bar, sheet bar, command palette) for a sheet, a picture or shapes: the size comes from the shape. Type a width or a height (the other follows the ratio) in px, in, cm or mm at 72 to 600 ppi, or take a size the shape is made for (A4, Full HD, a story, the picture's own pixels …); PNG, WebP, JPEG or SVG; download, copy or keep in the library.
+- **Clipping masks are one unit**: a click on the output picks the whole mask (drag moves the output; the box is the mask's, not the picture's); a double click goes in to pick what it cuts, Escape comes out.
 - **Paste lands under the pointer** (Ctrl+V, the menu, pasted SVG): the middle of the view only when the pointer is not on the canvas.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)

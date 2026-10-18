@@ -31,7 +31,7 @@ import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
-import { isContainer } from "../doc/containers";
+import { isContainer, isMaskSheet } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { cropEdges } from "../doc/crop";
@@ -292,8 +292,25 @@ export function attachTools(
    * Select what the user picked, widened to whole groups (at the level they are working at).
    * Picking something outside the group they entered leaves that group.
    */
+  /** The outermost clipping mask above `o` that has not been gone into: what is on a mask is one unit with it. */
+  const maskAbove = (o: CanvasObject): CanvasObject | null => {
+    let top: CanvasObject | null = null;
+    for (let p = o; p.parent !== undefined; ) {
+      const s = doc.get(p.parent);
+      if (!s) break;
+      if (isMaskSheet(s) && editor.openMask !== s.id) top = s;
+      p = s;
+    }
+    return top;
+  };
+  const inside = (o: CanvasObject, sheetId: string): boolean => {
+    for (let p: CanvasObject | undefined = o; p; p = p.parent !== undefined ? doc.get(p.parent) : undefined) if (p.id === sheetId) return true;
+    return false;
+  };
   const pick = (ids: readonly ObjectId[], additive = false): void => {
-    const picked = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+    let picked = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o);
+    if (editor.openMask && !picked.every((o) => inside(o, editor.openMask!))) editor.openMask = null; // (picking away from the mask leaves it)
+    picked = [...new Map(picked.map((o) => { const m = maskAbove(o) ?? o; return [m.id, m] as const; })).values()];
     if (editor.entered.length && !picked.every((o) => isInside(o, editor.entered))) editor.entered = [];
     editor.select(expandToUnits(doc.ordered(), picked, editor.entered), additive);
   };
@@ -1743,8 +1760,16 @@ export function attachTools(
         return;
       }
     }
-    // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
+    // A double-click on what a clipping mask cuts goes into the mask: from then on its things are picked one by one.
     const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj;
+    const mask = hit ? maskAbove(hit) : null;
+    if (hit && mask) {
+      editor.openMask = mask.id;
+      editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
+      editor.changed();
+      return;
+    }
+    // A double-click on a grouped object goes one group deeper; once inside, it edits (text) as before.
     if (hit?.groups && hit.groups.length > editor.entered.length && isInside(hit, editor.entered)) {
       editor.entered = hit.groups.slice(0, editor.entered.length + 1);
       const gid = editor.entered[editor.entered.length - 1]!;
@@ -1832,7 +1857,12 @@ export function attachTools(
       } else if (editor.pathDraft) commitPath(false); // Esc ends the path being drawn, open
       else if (g.kind !== "none" && g.kind !== "pan") cancelGesture();
       else if (editor.tool !== "select") editor.setTool("select"); // Esc: back to the Select tool
-      else if (editor.entered.length) {
+      else if (editor.openMask) {
+        // Leave the clipping mask that was gone into: the mask is picked again, whole.
+        const m = doc.get(editor.openMask);
+        editor.openMask = null;
+        editor.select(m ? expandToUnits(doc.ordered(), [m], editor.entered) : []);
+      } else if (editor.entered.length) {
         // Leave the group entered last; what was picked inside it stays selected.
         editor.entered = editor.entered.slice(0, -1);
         editor.changed();

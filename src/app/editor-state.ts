@@ -208,6 +208,8 @@ export class EditorState {
   marquee: { x0: number; y0: number; x1: number; y1: number } | null = null;
   /** A short message for the user; the notice stack (ui/notices.ts) takes it and shows it. */
   message = "";
+  /** A clipping mask (a sheet) that has been gone into by a double click: what is on it is picked one by one, as in an entered group. */
+  openMask: string | null = null;
   /** Where the pointer is on the canvas (CSS px from its corner), or null when it is elsewhere: pasted things land there. Not a change: nothing redraws for it. */
   pointerAt: { x: number; y: number } | null = null;
   /** A button for the notice that takes `message` (its label and what it does); the notice stack takes it with the message. */
@@ -248,6 +250,7 @@ export class EditorState {
     this.nodeSel = null;
     this.nodeMulti.clear();
     for (const id of ids) this.selection.add(id);
+    if (!this.selection.size) this.openMask = null; // (nothing picked: no mask is gone into)
     this.changed();
   }
 

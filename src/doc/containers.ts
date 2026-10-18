@@ -9,6 +9,9 @@ export const MAX_SHEET_DEPTH = 32;
 export const isContainer = (o: CanvasObject | undefined | null): o is PathObject & { container: { clip: boolean } } => !!o && o.kind === "path" && !!o.container;
 
 /** The sheets around `o`, innermost first. A sheet that is gone, or a loop in a hand-edited file, ends the chain. */
+/** A sheet that is a clipping mask (ADR 0144): the picked shape cutting what is on it. It is one unit with what it cuts: a click on the output picks all of it, a double click goes in. */
+export const isMaskSheet = (o: CanvasObject | undefined | null): o is PathObject & { container: { clip: boolean } } => isContainer(o) && (o.container.mask === true || /^Mask \d+$/.test(o.name ?? ""));
+
 export function ancestorsOf(get: (id: ObjectId) => CanvasObject | undefined, o: CanvasObject): Array<PathObject & { container: { clip: boolean } }> {
   const out: Array<PathObject & { container: { clip: boolean } }> = [];
   let p = o.parent;

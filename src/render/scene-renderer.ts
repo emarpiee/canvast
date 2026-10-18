@@ -1,3 +1,4 @@
+import { isMaskSheet } from "../doc/containers";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { Viewport } from "../core/camera";
 import type { FrameCamera } from "../core/frames";
@@ -586,9 +587,12 @@ function clampBox(b: ScreenBox, vp: Viewport): ScreenBox {
   };
 }
 
+/** What a picked clipping mask cuts is part of the mask: the box of the mask is the box of the output, so the cut things get none of their own. */
+const underPickedMask = (po: ProjectedObject, editor: EditorState): boolean => !!po.clip?.some((c) => isMaskSheet(c.obj) && editor.selection.has(c.obj.id));
+
 /** The box of the visible selected objects (turned with them when they share a rotation, see selection-frame.ts). */
 export function selectedFrame(visible: readonly ProjectedObject[], editor: EditorState, vp: Viewport): { frame: SelectionFrame; handle: Pt } | null {
-  const frame = selectionFrame(visible.filter((po) => editor.selection.has(po.obj.id)), editor.alignBox);
+  const frame = selectionFrame(visible.filter((po) => editor.selection.has(po.obj.id) && !underPickedMask(po, editor)), editor.alignBox);
   return frame ? { frame, handle: rotateHandleAt(frame, vp) } : null;
 }
 
@@ -621,7 +625,7 @@ function drawSelection(
   ctx.lineWidth = 1;
   // Each selected object is outlined by the rectangle it occupies, turned with it.
   for (const po of visible) {
-    if (!editor.selection.has(po.obj.id)) continue;
+    if (!editor.selection.has(po.obj.id) || underPickedMask(po, editor)) continue;
     const c = itemCorners(po);
     if (!c.every(finite)) continue;
     ctx.beginPath();

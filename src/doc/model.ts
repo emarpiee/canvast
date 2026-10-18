@@ -223,7 +223,7 @@ export interface PathObject extends ObjectBase {
   readonly cap?: Cap;
   /** Present: this path is a sheet (ADR 0108): a rectangle that holds objects (they name it as their `parent`) and, with `clip`, hides what lies outside it. */
   /** A sheet (ADR 0108). `scale`: when the sheet is resized, everything on it grows with it, whatever its pins say (ADR 0133). */
-  readonly container?: { readonly clip: boolean; readonly scale?: true };
+  readonly container?: { readonly clip: boolean; readonly scale?: true; readonly mask?: true };
   /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
   readonly dash?: Dash;
   /** Corners sharper than this many degrees (1 to 90) are cut to a bevel instead of a point; absent = the default (29°). */
@@ -511,7 +511,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
-    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true))) throw new InvalidObjectError("bad container");
+    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true))) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
     if (o.net !== undefined && o.net !== true) throw new InvalidObjectError("net is true or absent");
     if (o.smoothing !== undefined && !(Number.isFinite(o.smoothing) && o.smoothing > 0 && o.smoothing <= 1)) throw new InvalidObjectError("bad corner smoothing");
@@ -669,7 +669,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["miterAngle"] !== undefined ? { miterAngle: s["miterAngle"] as number } : {}),
       ...(s["arrowStart"] !== undefined ? { arrowStart: s["arrowStart"] as Arrow } : {}),
       ...(s["arrowEnd"] !== undefined ? { arrowEnd: s["arrowEnd"] as Arrow } : {}),
-      ...(s["container"] !== undefined ? { container: s["container"] as { clip: boolean; scale?: true } } : {}),
+      ...(s["container"] !== undefined ? { container: s["container"] as { clip: boolean; scale?: true; mask?: true } } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),
