@@ -5,7 +5,7 @@ import { booleanOp } from "../doc/boolean";
 import type { SubPath } from "../doc/path";
 import { rotateSubs } from "../doc/path";
 import { BOLD_SHIFT_EM, SKEW } from "../render/draw-text";
-import { layoutOf } from "./layout";
+import { DECO, glyphScale, layoutOf } from "./layout";
 import { fontFor } from "./fonts";
 
 /**
@@ -27,10 +27,12 @@ export function textOutline(o: TextObject): TextOutline {
   const subs: SubPath[] = [];
   let missing = 0;
   for (const line of lay.lines) {
-    const c = (o.size * line.scale) / f.unitsPerEm;
     const oy = line.baseline * o.size;
+    const lineStart = subs.length;
     for (const g of line.glyphs) {
       if (g.cp === 32) continue;
+      const gs = glyphScale(line, g);
+      const c = (o.size * gs) / f.unitsPerEm;
       if (!g.gid) {
         missing++;
         continue;
@@ -71,8 +73,24 @@ export function textOutline(o: TextObject): TextOutline {
         continue;
       }
       // bold: the outline and a copy shifted right, as one outline
-      const joined = booleanOp("union", [{ subs: copy(0), evenodd: false }, { subs: copy(BOLD_SHIFT_EM * line.scale), evenodd: false }]);
-      subs.push(...(joined && joined.length ? joined : [...copy(0), ...copy(BOLD_SHIFT_EM * line.scale)]));
+      const joined = booleanOp("union", [{ subs: copy(0), evenodd: false }, { subs: copy(BOLD_SHIFT_EM * gs), evenodd: false }]);
+      subs.push(...(joined && joined.length ? joined : [...copy(0), ...copy(BOLD_SHIFT_EM * gs)]));
+    }
+    if (line.decos.length) {
+      // The lines under and through the letters, joined with them into one outline (no edges inside it).
+      const rects: SubPath[] = line.decos.map((d) => {
+        const gs = line.scale * d.k;
+        const thick = DECO.thick * gs;
+        const y0 = (line.baseline + (d.kind === "under" ? DECO.underOffset * gs : -DECO.strikeOffset * gs - thick / 2)) * o.size;
+        const y1 = y0 + thick * o.size;
+        const x0 = d.x0 * o.size, x1 = d.x1 * o.size;
+        const n: number[] = [];
+        for (const [px, py] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as const) n.push(px, py, px, py, px, py);
+        return { n, closed: true };
+      });
+      const mine = subs.splice(lineStart);
+      const joined = booleanOp("union", [{ subs: mine, evenodd: false }, ...rects.map((r) => ({ subs: [r], evenodd: false }))]);
+      subs.push(...(joined && joined.length ? joined : [...mine, ...rects]));
     }
   }
   if (!o.rot) return { sub: subs, missing };

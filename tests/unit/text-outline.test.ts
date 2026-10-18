@@ -20,6 +20,15 @@ const text = (md: string, extra: Partial<TextObject> = {}): TextObject => ({ id:
 const flat = (subs: readonly SubPath[]) => flatten(subs, subs.map((s) => Float64Array.from(s.n)), FLAT_TOLERANCE_PX / 10, { minX: -1e9, minY: -1e9, maxX: 1e9, maxY: 1e9 }, 0);
 
 describe("text as outlines", () => {
+  it("an underline is one outline with the letters it touches, and a text without one has the same outline as before (v0.18.1)", () => {
+    const plain = textOutline(text("Ig")).sub;
+    const under = textOutline(text("<u>Ig</u>")).sub;
+    const bp = geometryBounds(plain), bu = geometryBounds(under);
+    expect(bu.maxY).toBeGreaterThan(bp.minY);
+    expect(bu.minX).toBeLessThanOrEqual(bp.minX + 1e-6); // the line starts at the first letter's advance, not inside the bearing
+    expect(textOutline(text("Ig")).sub).toEqual(plain);
+  });
+
   it("a letter is its glyph's outline, where the layout puts it, in the object's units", () => {
     const o = text("I");
     const { sub, missing } = textOutline(o);

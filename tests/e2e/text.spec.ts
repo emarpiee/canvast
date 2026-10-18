@@ -504,3 +504,62 @@ test("line height and letter spacing: set for the picked text, drawn and measure
   expect(((await textObjects(p))[0] as unknown as { lineHeight?: number }).lineHeight).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("words of a text can be underlined, struck through, given a colour and a size of their own; they are saved as Markdown, drawn and kept after a reload", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 300, 300);
+  await p.keyboard.type("one two three four");
+  const select = async (from: number, count: number) => {
+    await p.keyboard.press("Home");
+    for (let i = 0; i < from; i++) await p.keyboard.press("ArrowRight");
+    for (let i = 0; i < count; i++) await p.keyboard.press("Shift+ArrowRight");
+  };
+  await select(0, 3);
+  await p.keyboard.press(`${mod}+u`);
+  await select(4, 3);
+  await p.getByRole("button", { name: "Strikethrough (Ctrl+Shift+X)" }).click();
+  await select(8, 5);
+  await p.getByRole("button", { name: "Colour of the selected words" }).click();
+  await p.locator(".colour-pop [data-hex]").fill("ff0000");
+  await p.locator(".colour-pop [data-hex]").press("Enter");
+  await p.keyboard.press("Escape"); // closes the picker, then the edit
+  if (await p.getByTestId("text-editor").isVisible()) await finish(p);
+  await expect(p.getByTestId("text-editor")).toBeHidden();
+  let [t] = await textObjects(p);
+  expect(t!.md).toBe('<u>one</u> ~~two~~ <span style="color:#ff0000">three</span> four');
+
+  // A size of its own: bigger, and the line grows with it; smaller again goes back to the same words.
+  const height = async () => {
+    const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), t!.id))!.box;
+    return b.maxY - b.minY;
+  };
+  const h0 = await height();
+  await p.keyboard.press("v");
+  await p.mouse.dblclick(310, 308);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await select(14, 4);
+  await p.getByRole("button", { name: "Make the selected words bigger" }).click();
+  await p.getByRole("button", { name: "Make the selected words bigger" }).click();
+  await finish(p);
+  [t] = await textObjects(p);
+  expect(t!.md).toContain('<span style="font-size:156.25%">four</span>');
+  expect(await height()).toBeGreaterThan(h0 * 1.3);
+
+  // Drawn: the underline, the strikethrough and the red word leave ink (the default ink is dark, so red is told apart by its channels).
+  const red = await p.evaluate(() => {
+    let n = 0;
+    for (let y = 200; y < 420; y += 2) for (let x = 250; x < 700; x += 2) {
+      const [r, g, b] = window.__canvastDebug.pixelAt(x, y);
+      if (r > 180 && g < 90 && b < 90) n++;
+    }
+    return n;
+  });
+  expect(red).toBeGreaterThan(20);
+
+  // Saved and read back the same; one undo takes the size away.
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect((await textObjects(p))[0]!.md).toBe(t!.md);
+  expect(app.consoleErrors).toEqual([]);
+});

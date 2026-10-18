@@ -19,6 +19,7 @@ import { FALLBACK_FAMILY, familyFor } from "../text/fonts";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
+import { openColourPopover } from "./colour-popover";
 
 /**
  * WYSIWYG text editing with a native contenteditable overlay placed exactly
@@ -59,6 +60,11 @@ export async function copyText(s: string): Promise<void> {
 const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
   { cmd: "bold", icon: ICONS.bold, label: "Bold (Ctrl+B)" },
   { cmd: "italic", icon: ICONS.italic, label: "Italic (Ctrl+I)" },
+  { cmd: "underline", icon: ICONS.underline, label: "Underline (Ctrl+U)" },
+  { cmd: "strike", icon: ICONS.strikethrough, label: "Strikethrough (Ctrl+Shift+X)" },
+  { cmd: "colour", icon: ICONS.textColour, label: "Colour of the selected words" },
+  { cmd: "bigger", icon: ICONS.textBigger, label: "Make the selected words bigger" },
+  { cmd: "smaller", icon: ICONS.textSmaller, label: "Make the selected words smaller" },
   { cmd: "h1", icon: ICONS.heading1, label: "Heading 1" },
   { cmd: "h2", icon: ICONS.heading2, label: "Heading 2" },
   { cmd: "h3", icon: ICONS.heading3, label: "Heading 3" },
@@ -229,6 +235,69 @@ export function mountTextEditor(
     editor.changed();
   };
 
+  /** The words selected in the box (null: none, or the caret only). */
+  const selectedRange = (): Range | null => {
+    const sel = getSelection();
+    const r = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+    return r && !r.collapsed && box.contains(r.commonAncestorContainer) ? r : null;
+  };
+  const needWords = (): void => {
+    editor.message = "Select the words first.";
+    editor.changed();
+  };
+  /**
+   * Make the selected words `factor` times their size: each run of selected text is put in a span with a size relative to what it sits in,
+   * so a second press makes it bigger still, and a run that was already sized keeps the size it had.
+   */
+  const resizeSelection = (factor: number): void => {
+    const r = selectedRange();
+    if (!r) return needWords();
+    const root = r.commonAncestorContainer.nodeType === Node.TEXT_NODE ? r.commonAncestorContainer.parentNode! : r.commonAncestorContainer;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const runs: Text[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (r.intersectsNode(n) && (n as Text).data.length) runs.push(n as Text);
+    if (!runs.length) return needWords();
+    const { startContainer, startOffset, endContainer, endOffset } = r;
+    // Cut the first and last run where the selection begins and ends (the end first, so the start offset still holds).
+    const last = runs[runs.length - 1]!;
+    if (last === endContainer && endOffset < last.data.length) last.splitText(endOffset);
+    if (runs[0] === startContainer && startOffset > 0) runs[0] = runs[0]!.splitText(startOffset);
+    const spans = runs.filter((t) => t.data.length).map((t) => {
+      const span = document.createElement("span");
+      span.style.fontSize = `${factor * 100}%`;
+      t.replaceWith(span);
+      span.append(t);
+      return span;
+    });
+    // Keep the words selected, so that bigger and smaller can be pressed again.
+    const sel = document.createRange();
+    sel.setStartBefore(spans[0]!);
+    sel.setEndAfter(spans[spans.length - 1]!);
+    getSelection()?.removeAllRanges();
+    getSelection()?.addRange(sel);
+  };
+  /** The colour of the selected words, chosen in the colour picker (the selection is kept while the picker has the focus). */
+  const pickSelectionColour = (anchor: HTMLElement): void => {
+    const r = selectedRange();
+    if (!r) return needWords();
+    const saved = r.cloneRange();
+    const first = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : (r.startContainer as HTMLElement);
+    const now = first ? hexOfCss(getComputedStyle(first).color) : "#000000";
+    openColourPopover(anchor.closest("button") ?? anchor, {
+      name: "Colour of the selected words",
+      value: now,
+      alpha: true,
+      onInput: (hex) => {
+        const sel = getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(saved);
+        document.execCommand("styleWithCSS", false, "true");
+        document.execCommand("foreColor", false, cssOfHex(hex));
+        if (sel && sel.rangeCount) saved.setStart(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset), saved.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+      },
+    });
+  };
+
   view.subscribe(position);
   bar.addEventListener("mousedown", (e) => e.preventDefault()); // keep the text selection
   bar.addEventListener("click", (e) => {
@@ -242,15 +311,23 @@ export function mountTextEditor(
       });
     } else if (cmd === "ul") document.execCommand("insertUnorderedList");
     else if (cmd === "ol") document.execCommand("insertOrderedList");
-    else if (cmd === "bold" || cmd === "italic") document.execCommand(cmd);
+    else if (cmd === "bold" || cmd === "italic" || cmd === "underline") document.execCommand(cmd);
+    else if (cmd === "strike") document.execCommand("strikeThrough");
+    else if (cmd === "bigger" || cmd === "smaller") resizeSelection(cmd === "bigger" ? 1.25 : 0.8);
+    else if (cmd === "colour") pickSelectionColour(e.target as HTMLElement);
     else document.execCommand("formatBlock", false, `<${cmd === "p" ? "div" : cmd}>`);
   });
   box.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
-    // Handled here: not every browser binds these in editable content (and U has no Markdown form).
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === "b" || k === "i" || k === "u")) {
+    // Handled here: not every browser binds these in editable content.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (k === "b" || k === "i" || k === "u")) {
       e.preventDefault();
-      if (k !== "u") document.execCommand(k === "b" ? "bold" : "italic");
+      document.execCommand(k === "b" ? "bold" : k === "i" ? "italic" : "underline");
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.shiftKey && k === "x") {
+      e.preventDefault();
+      document.execCommand("strikeThrough");
       return;
     }
     if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
@@ -305,7 +382,10 @@ function blocksToHtml(blocks: readonly Block[]): string {
       let h = esc(s.text);
       if (s.italic) h = `<i>${h}</i>`;
       if (s.bold) h = `<b>${h}</b>`;
-      return h;
+      if (s.strike) h = `<s>${h}</s>`;
+      if (s.underline) h = `<u>${h}</u>`;
+      const css = [s.color ? `color:${cssOfHex(s.color)}` : "", s.scale && s.scale !== 1 ? `font-size:${s.scale * 100}%` : ""].filter(Boolean).join(";");
+      return css ? `<span style="${css}">${h}</span>` : h;
     }).join("");
   for (const b of blocks) {
     const l = b.type === "ul" || b.type === "ol" ? b.type : null;
@@ -335,13 +415,30 @@ export function domToBlocks(root: HTMLElement): Block[] {
     end();
     cur = { type, spans: [] };
   };
-  const walk = (n: Node, type: BlockType): void => {
+  const rootColor = getComputedStyle(root).color;
+  const rootPx = parseFloat(getComputedStyle(root).fontSize);
+  /** Whether an element, or one it sits in (up to the box), is decorated with `line` (underline, line-through). */
+  const decorated = (el: HTMLElement | null, line: string): boolean => {
+    for (; el && el !== root; el = el.parentElement) if (getComputedStyle(el).textDecorationLine.includes(line)) return true;
+    return false;
+  };
+  const walk = (n: Node, type: BlockType, blockPx = rootPx): void => {
     if (n.nodeType === Node.TEXT_NODE) {
-      const text = (n as Text).data.replace(/[ \r\n\t]/g, " ");
+      const text = (n as Text).data.replace(/[ \r\n\t]/g, " ");
       if (!text) return;
       if (!cur) start(type);
-      const cs = getComputedStyle(n.parentElement!);
-      cur!.spans.push({ text, bold: Number(cs.fontWeight) >= 600, italic: cs.fontStyle !== "normal" });
+      const el = n.parentElement!;
+      const cs = getComputedStyle(el);
+      const scale = Math.round((parseFloat(cs.fontSize) / blockPx) * 10000) / 10000;
+      cur!.spans.push({
+        text,
+        bold: Number(cs.fontWeight) >= 600,
+        italic: cs.fontStyle !== "normal",
+        ...(decorated(el, "underline") ? { underline: true } : {}),
+        ...(decorated(el, "line-through") ? { strike: true } : {}),
+        ...(cs.color !== rootColor ? { color: hexOfCss(cs.color) } : {}),
+        ...(Math.abs(scale - 1) > 0.004 ? { scale } : {}),
+      });
       return;
     }
     if (!(n instanceof HTMLElement)) return;
@@ -349,18 +446,35 @@ export function domToBlocks(root: HTMLElement): Block[] {
     if (tag === "BR") return end();
     if (tag === "UL" || tag === "OL") {
       end();
-      for (const c of n.childNodes) walk(c, tag === "UL" ? "ul" : "ol");
+      for (const c of n.childNodes) walk(c, tag === "UL" ? "ul" : "ol", blockPx);
       return end();
     }
     const block = HEADING[tag] ?? (tag === "LI" || tag === "DIV" || tag === "P" ? type : null);
     if (block) {
       start(block);
-      for (const c of n.childNodes) walk(c, block);
+      const px = parseFloat(getComputedStyle(n).fontSize) || blockPx;
+      for (const c of n.childNodes) walk(c, block, px);
       return end();
     }
-    for (const c of n.childNodes) walk(c, type);
+    for (const c of n.childNodes) walk(c, type, blockPx);
   };
   for (const c of root.childNodes) walk(c, "p");
   end();
   return blocks;
+}
+
+/** "#rrggbb" or "#rrggbbaa" from a computed `rgb()` or `rgba()` colour. */
+export function hexOfCss(css: string): string {
+  const m = /rgba?\(([^)]+)\)/.exec(css);
+  if (!m) return "#000000";
+  const [r = 0, g = 0, b = 0, a = 1] = m[1]!.split(/[,/\s]+/).filter(Boolean).map(Number);
+  const h = (v: number): string => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}${a < 1 ? h(a * 255) : ""}`;
+}
+
+/** A CSS colour from "#rrggbb" or "#rrggbbaa". */
+export function cssOfHex(hex: string): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const a = hex.length === 9 ? Math.round((parseInt(hex.slice(7), 16) / 255) * 1000) / 1000 : 1;
+  return a < 1 ? `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})` : `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }

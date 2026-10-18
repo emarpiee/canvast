@@ -123,6 +123,11 @@ import pencilLine from "lucide-static/icons/pencil-line.svg";
 import penLine from "lucide-static/icons/pen-line.svg";
 import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
+import underlineSvg from "lucide-static/icons/underline.svg";
+import strikethroughSvg from "lucide-static/icons/strikethrough.svg";
+import baselineSvg from "lucide-static/icons/baseline.svg";
+import aArrowUpSvg from "lucide-static/icons/a-arrow-up.svg";
+import aArrowDownSvg from "lucide-static/icons/a-arrow-down.svg";
 import italic from "lucide-static/icons/italic.svg";
 import heading1 from "lucide-static/icons/heading-1.svg";
 import heading2 from "lucide-static/icons/heading-2.svg";
@@ -288,6 +293,11 @@ export const ICONS = {
   penLine: clean(penLine),
   highlighter: clean(highlighter),
   bold: clean(bold),
+  underline: clean(underlineSvg),
+  strikethrough: clean(strikethroughSvg),
+  textColour: clean(baselineSvg),
+  textBigger: clean(aArrowUpSvg),
+  textSmaller: clean(aArrowDownSvg),
   italic: clean(italic),
   heading1: clean(heading1),
   heading2: clean(heading2),

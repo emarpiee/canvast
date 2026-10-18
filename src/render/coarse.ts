@@ -9,7 +9,10 @@ import type { FlatPath } from "../doc/path";
 import { distanceToOutline, flatten, insideFill } from "../doc/path";
 import { paintAt } from "./gradient";
 import { cosSin } from "../core/angle";
-import { layoutOf } from "../text/layout";
+import { glyphScale, layoutOf } from "../text/layout";
+import type { Line } from "../text/layout";
+
+const lineBigOf = (line: Line): number => line.glyphs.reduce((m, g) => Math.max(m, g.k ?? 1), 1);
 import { fontFor } from "../text/fonts";
 import { distToSegment } from "./geometry2d";
 
@@ -262,14 +265,15 @@ const textSampler: CoarseSampler<TextObject> = {
     const upm = font.unitsPerEm;
     let inside = false;
     for (const line of lay.lines) {
-      const c = (o.size * line.scale) / upm;
-      const mg = m + 0.004 * o.size * line.scale; // flattening error of the curves
+      const mg = m + 0.004 * o.size * line.scale * lineBigOf(line); // flattening error of the curves
       if (ly < (line.top - 0.3) * o.size - mg || ly > (line.bottom + 0.3) * o.size + mg) continue;
       for (const g of line.glyphs) {
         if (g.cp === 32) continue;
         if (lx < (g.x - 0.3) * o.size - mg || lx > (g.x + g.adv * line.scale + 0.3) * o.size + mg) continue;
         if (!g.gid) return "exact"; // a character the bundled font lacks (drawn by the system font): no outline to test
-        const shifts = g.bold ? [0, BOLD_SHIFT_EM * line.scale] : [0];
+        const gs = glyphScale(line, g);
+        const c = (o.size * gs) / upm;
+        const shifts = g.bold ? [0, BOLD_SHIFT_EM * gs] : [0];
         for (const sh of shifts) {
           const ox = (g.x + sh) * o.size;
           const oy = line.baseline * o.size;

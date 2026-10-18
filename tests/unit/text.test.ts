@@ -91,6 +91,17 @@ describe("markdown", () => {
     expect(canonical("****")).toBe("\\*\\*\\*\\*");
   });
 
+  it("reads and writes underline, strikethrough, a colour and a size of a range as the forms other readers know", () => {
+    const md = 'a ~~b~~ <u>c</u> <span style="color:#ff0000;font-size:150%">**d**</span> e \\<u> ~~';
+    const spans = parse(md)[0]!.spans;
+    expect(spans.find((x) => x.text === "b")).toMatchObject({ strike: true });
+    expect(spans.find((x) => x.text === "c")).toMatchObject({ underline: true });
+    expect(spans.find((x) => x.text === "d")).toMatchObject({ color: "#ff0000", scale: 1.5, bold: true });
+    expect(spans.find((x) => x.text.startsWith(" e"))?.color).toBeUndefined();
+    expect(canonical(md)).toBe(canonical(canonical(md)));
+    expect(canonical('<span style="color:#00f;font-size:5%">x</span>')).toBe('<span style="font-size:10%">x</span>'); // a colour of 3 digits is dropped; a size under 10% is raised
+  });
+
   it("round-trips arbitrary text exactly (canonical form is a fixed point)", () => {
     let seed = 7;
     const rnd = (n: number): number => ((seed = (seed * 1103515245 + 12345) % 2 ** 31), seed % n);
@@ -103,7 +114,15 @@ describe("markdown", () => {
         for (let s = rnd(4) + 1; s > 0; s--) {
           let text = "";
           for (let c = rnd(6) + 1; c > 0; c--) text += alphabet[rnd(alphabet.length)];
-          spans.push({ text, bold: rnd(2) === 1, italic: rnd(2) === 1 });
+          spans.push({
+            text,
+            bold: rnd(2) === 1,
+            italic: rnd(2) === 1,
+            ...(rnd(3) === 0 ? { underline: true } : {}),
+            ...(rnd(3) === 0 ? { strike: true } : {}),
+            ...(rnd(3) === 0 ? { color: ["#ff0000", "#00ff0080"][rnd(2)]! } : {}),
+            ...(rnd(3) === 0 ? { scale: [0.5, 1.5, 2][rnd(3)]! } : {}),
+          });
         }
         bs.push({ type: types[rnd(types.length)]!, spans });
       }
@@ -130,6 +149,25 @@ describe("layout", () => {
     }
     const long = layoutText("x".repeat(50), 3);
     expect(long.lines.length).toBeGreaterThan(5);
+  });
+
+  it("a range with its own size is wider and makes its line taller; underline and strikethrough are runs under the glyphs (v0.18.1)", () => {
+    const plain = layoutText("ab cd", Infinity);
+    const big = layoutText('ab <span style="font-size:200%">cd</span>', Infinity);
+    expect(big.width).toBeGreaterThan(plain.width);
+    expect(big.lines[0]!.bottom - big.lines[0]!.top).toBeCloseTo(2 * LINE_HEIGHT); // as tall as its biggest range
+    expect(big.lines[0]!.glyphs.map((g) => g.k ?? 1)).toEqual([1, 1, 1, 2, 2]);
+    const small = layoutText('<span style="font-size:50%">cd</span>', 50);
+    expect(small.lines[0]!.bottom - small.lines[0]!.top).toBeCloseTo(0.5 * LINE_HEIGHT); // a line of small text is small
+    const u = layoutText("ab <u>cd ef</u> gh", 50).lines[0]!;
+    expect(u.decos).toHaveLength(1);
+    expect(u.decos[0]!.kind).toBe("under");
+    const g = u.glyphs;
+    expect(u.decos[0]!.x0).toBeCloseTo(g[3]!.x); // from the first underlined letter...
+    expect(u.decos[0]!.x1).toBeCloseTo(g[7]!.x + g[7]!.adv); // ...to the end of the last, spaces between included
+    expect(layoutText("~~ab~~ ~~cd~~", 50).lines[0]!.decos).toHaveLength(1); // the space between is struck too: one run
+    expect(layoutText("~~ab~~ cd", 50).lines[0]!.decos).toHaveLength(1);
+    expect(layoutText("ab", 50).lines[0]!.decos).toEqual([]);
   });
 
   it("sizes headings and indents list items", () => {

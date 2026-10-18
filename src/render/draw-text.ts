@@ -3,8 +3,8 @@ import * as D from "../core/dyadic";
 import type { Viewport } from "../core/camera";
 import type { ImageObject, TextObject } from "../doc/model";
 import { TEXT_PAD_EM } from "../doc/model";
-import type { Line, PlacedGlyph } from "../text/layout";
-import { LINE_HEIGHT, layoutOf } from "../text/layout";
+import type { Deco, Line, PlacedGlyph } from "../text/layout";
+import { DECO, LINE_HEIGHT, glyphScale, layoutOf } from "../text/layout";
 import { FALLBACK_FAMILY, faceReady, familyFor, fontFor } from "../text/fonts";
 import type { ProjectedObject, Projection } from "./projection";
 import { exactX, exactY, projX, projY, toPx } from "./projection";
@@ -74,47 +74,86 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   };
   ctx.save();
   paint(ctx, o, () => {
-    ctx.fillStyle = paintColor(o.color);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.beginPath();
-    const path = new ExactPath(ctx, p, vp);
-    let filled = false;
+    // One pass per colour (nearly always one): a range with a colour of its own is filled apart from the rest.
+    const colours = new Set<string>();
     for (const line of lay.lines) {
-      if (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY) continue;
-      const linePx = emPx * line.scale;
-      const deep = po.exact || !(linePx <= DEEP_EM_PX);
-      const pad = TEXT_PAD_EM * line.scale;
-      for (const g of line.glyphs) {
-        if (g.cp === 32 || sx(g.x + g.adv + pad) < minX || sx(g.x - pad) > maxX) continue;
-        const shifts = g.bold ? [0, BOLD_SHIFT_EM * line.scale] : [0];
-        if (!g.gid) {
-          if (deep) drawFallbackRaster(ctx, p, vp, dpr, o, line, g);
-          else {
-            setFont(`${g.bold ? "bold " : ""}${linePx}px ${FALLBACK_FAMILY}`);
-            glyphText(String.fromCodePoint(g.cp), sx(g.x), sy(line.baseline), g.italic);
+      for (const g of line.glyphs) colours.add(g.color ?? o.color);
+      for (const d of line.decos) colours.add(d.color ?? o.color);
+    }
+    for (const colour of colours) {
+      ctx.fillStyle = paintColor(colour);
+      ctx.beginPath();
+      const path = new ExactPath(ctx, p, vp);
+      let filled = false;
+      for (const line of lay.lines) {
+        if (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY) continue;
+        const deep = po.exact || !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX);
+        const pad = TEXT_PAD_EM * line.scale;
+        for (const g of line.glyphs) {
+          if (g.cp === 32 || (g.color ?? o.color) !== colour || sx(g.x + g.adv + pad) < minX || sx(g.x - pad) > maxX) continue;
+          const gs = glyphScale(line, g);
+          const linePx = emPx * gs;
+          const shifts = g.bold ? [0, BOLD_SHIFT_EM * gs] : [0];
+          if (!g.gid) {
+            if (deep) drawFallbackRaster(ctx, p, vp, dpr, o, line, g, colour);
+            else {
+              setFont(`${g.bold ? "bold " : ""}${linePx}px ${FALLBACK_FAMILY}`);
+              glyphText(String.fromCodePoint(g.cp), sx(g.x), sy(line.baseline), g.italic);
+            }
+          } else if (deep) {
+            for (const d of shifts) addGlyphExact(path, o, line, g, d);
+            filled = true;
+          } else if (opaque && faceReady(o.assetId)) {
+            setFont(`${linePx}px ${familyFor(o.assetId)}`);
+            for (const d of shifts) glyphText(String.fromCodePoint(g.cp), sx(g.x + d), sy(line.baseline), g.italic);
+          } else {
+            for (const d of shifts) addGlyphFast(ctx, p, o, line, g, d);
+            filled = true;
           }
-        } else if (deep) {
-          for (const d of shifts) addGlyphExact(path, o, line, g, d);
-          filled = true;
-        } else if (opaque && faceReady(o.assetId)) {
-          setFont(`${linePx}px ${familyFor(o.assetId)}`);
-          for (const d of shifts) glyphText(String.fromCodePoint(g.cp), sx(g.x + d), sy(line.baseline), g.italic);
-        } else {
-          for (const d of shifts) addGlyphFast(ctx, p, o, line, g, d);
+        }
+        for (const d of line.decos) {
+          if ((d.color ?? o.color) !== colour || sx(d.x1) < minX || sx(d.x0) > maxX) continue;
+          addDeco(ctx, path, po, o, line, d, deep, sx, sy);
           filled = true;
         }
       }
+      if (filled) ctx.fill("nonzero");
     }
-    if (filled) ctx.fill("nonzero");
   });
   ctx.restore();
+}
+
+/** The biggest size of a glyph on a line, as a multiple of the line's. */
+const lineBig = (line: Line): number => line.glyphs.reduce((m, g) => Math.max(m, g.k ?? 1), 1);
+
+/** The rectangle of an underline or a strikethrough: in doubles, or (at deep zoom) as exact lines in the same path as the glyphs. */
+function addDeco(ctx: CanvasRenderingContext2D, path: ExactPath, po: ProjectedObject, o: TextObject, line: Line, d: Deco, deep: boolean, sx: (em: number) => number, sy: (em: number) => number): void {
+  const gs = line.scale * d.k;
+  const thick = DECO.thick * gs;
+  const y0 = line.baseline + (d.kind === "under" ? DECO.underOffset * gs : -DECO.strikeOffset * gs - thick / 2);
+  const y1 = y0 + thick;
+  if (!deep) {
+    ctx.moveTo(sx(d.x0), sy(y0));
+    ctx.lineTo(sx(d.x1), sy(y0));
+    ctx.lineTo(sx(d.x1), sy(y1));
+    ctx.lineTo(sx(d.x0), sy(y1));
+    ctx.closePath();
+    return;
+  }
+  const SIZE = D.fromNumber(o.size);
+  const pt = (xe: number, ye: number): Pt => ({ x: D.mul(D.fromNumber(xe), SIZE), y: D.mul(D.fromNumber(ye), SIZE) });
+  const c = [pt(d.x0, y0), pt(d.x1, y0), pt(d.x1, y1), pt(d.x0, y1)];
+  for (let i = 0; i < 4; i++) path.segment([c[i]!, c[(i + 1) % 4]!]);
+  path.close();
+  void po;
 }
 
 /** Glyph outline in doubles (bounded sizes only). */
 function addGlyphFast(ctx: CanvasRenderingContext2D, p: Projection, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
   const f = fontFor(o.assetId);
-  const c = (o.size * line.scale) / f.unitsPerEm;
+  const c = (o.size * glyphScale(line, g)) / f.unitsPerEm;
   const ox = (g.x + shiftEm) * o.size;
   const oy = line.baseline * o.size;
   const X = (fx: number, fy: number): number => projX(p, ox + (g.italic ? fx + fy * SKEW : fx) * c);
@@ -137,7 +176,7 @@ interface Pt {
 function addGlyphExact(path: ExactPath, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
   const f = fontFor(o.assetId);
   const SIZE = D.fromNumber(o.size);
-  const C = D.mul(SIZE, D.fromNumber(line.scale / f.unitsPerEm));
+  const C = D.mul(SIZE, D.fromNumber(glyphScale(line, g) / f.unitsPerEm));
   const ox = D.mul(D.fromNumber(g.x + shiftEm), SIZE);
   const oy = D.mul(D.fromNumber(line.baseline), SIZE);
   const pt = (fx: number, fy: number): Pt => ({
@@ -263,12 +302,13 @@ const rasters = new Map<string, RasterSource>();
  * drawn like an image (exact pixel edges at any magnification), so it
  * pixelates instead of disappearing.
  */
-function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewport, dpr: number, o: TextObject, line: Line, g: PlacedGlyph): void {
+function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewport, dpr: number, o: TextObject, line: Line, g: PlacedGlyph, colour: string): void {
   const pad = TEXT_PAD_EM;
   const R = RASTER_EM_PX;
-  const pixelW = Math.ceil((g.adv / line.scale + 2 * pad) * R);
-  const pixelH = Math.ceil((o.lineHeight ?? LINE_HEIGHT) * R);
-  const key = `${g.cp}|${g.bold}|${g.italic}|${paintColor(o.color)}|${pixelW}`;
+  const gs = glyphScale(line, g);
+  const pixelW = Math.ceil((g.adv / gs + 2 * pad) * R);
+  const pixelH = Math.ceil(Math.max(o.lineHeight ?? LINE_HEIGHT, (line.bottom - line.top) / gs) * R);
+  const key = `${g.cp}|${g.bold}|${g.italic}|${paintColor(colour)}|${pixelW}|${pixelH}|${((line.baseline - line.top) / gs).toFixed(4)}`;
   let src = rasters.get(key);
   if (!src) {
     if (rasters.size > 256) rasters.clear();
@@ -276,19 +316,19 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
     c.width = pixelW;
     c.height = pixelH;
     const r = c.getContext("2d", { willReadFrequently: true })!;
-    r.fillStyle = paintColor(o.color);
+    r.fillStyle = paintColor(colour);
     r.font = `${g.bold ? "bold " : ""}${R}px ${FALLBACK_FAMILY}`;
-    r.translate(pad * R, ((line.baseline - line.top) / line.scale) * R);
+    r.translate(pad * R, ((line.baseline - line.top) / gs) * R);
     if (g.italic) r.transform(1, 0, -SKEW, 1, 0, 0);
     r.fillText(String.fromCodePoint(g.cp), 0, 0);
     src = { source: c, pixelW, pixelH, readPixels: (x, y, w, h) => r.getImageData(x, y, w, h).data };
     rasters.set(key, src);
   }
   const SIZE = D.fromNumber(o.size);
-  const offX = D.mul(D.fromNumber(g.x - pad * line.scale), SIZE);
+  const offX = D.mul(D.fromNumber(g.x - pad * gs), SIZE);
   const offY = D.mul(D.fromNumber(line.top), SIZE);
-  const w = (pixelW / R) * line.scale * o.size;
-  const h = (pixelH / R) * line.scale * o.size;
+  const w = (pixelW / R) * gs * o.size;
+  const h = (pixelH / R) * gs * o.size;
   const img: ImageObject = { ...o, kind: "image", assetId: "", w, h, pixelW, pixelH, opacity: 1 };
   // The raster's projection: the text's, with the origin moved to the raster's corner.
   const lx = D.sub(p.lx, offX);

@@ -11,7 +11,7 @@ import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "
 import type { Dash } from "./stroke-look";
 import { ADJUSTMENTS, validMap } from "./adjust";
 import type { Adjust, Crop } from "./adjust";
-import type { Paint } from "./paint";
+import type { Gradient, Paint } from "./paint";
 import type { BoolOp } from "./boolean";
 import { inkOfPaint, isPaint } from "./paint";
 import { NODE, SHAPE_KINDS, paintBounds, rotateSubs } from "./path";
@@ -156,6 +156,22 @@ export interface TextObject extends ObjectBase {
   /** Body font size (1 em) in local units. */
   readonly size: number;
   readonly color: string;
+  /** A gradient the letters are filled with instead of `color`, placed on the text's box (doc/paint.ts); a range with a colour of its own keeps it. */
+  readonly gradient?: Gradient;
+  /** A line round the letters: its colour and its width in em, drawn outside them (behind the fill). */
+  readonly outline?: { readonly c: string; readonly w: number };
+  /** A set height in local units: the box is this tall whatever the words need (they may run past it), and `valign` places them in it. Absent = as tall as the words. */
+  readonly h?: number;
+  /** Where the words sit in a set height; absent = at the top. */
+  readonly valign?: "middle" | "bottom";
+  /** The space between paragraphs in em; absent = the standard 0.6. */
+  readonly paraGap?: number;
+  /** The first line of every paragraph starts this far in, in em; absent = none. */
+  readonly indent?: number;
+  /** A change of case applied to the letters when they are set (the words stay as they were typed); absent = none. */
+  readonly caps?: "upper" | "lower" | "title" | "small";
+  /** At most this many lines; the last shows "…" when words were cut. Absent = all of them. */
+  readonly maxLines?: number;
 }
 
 /**
@@ -497,6 +513,14 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.align !== undefined && !(o.align === "center" || o.align === "right" || o.align === "justify")) throw new InvalidObjectError("bad alignment");
     if (o.autoWidth !== undefined && o.autoWidth !== true) throw new InvalidObjectError("bad auto width");
     if (!TEXT_COLOR_RE.test(o.color)) throw new InvalidObjectError(`bad color ${o.color}`);
+    if (o.gradient !== undefined && !(typeof o.gradient === "object" && isPaint(o.gradient))) throw new InvalidObjectError("bad text gradient");
+    if (o.outline !== undefined && !(TEXT_COLOR_RE.test(o.outline.c) && Number.isFinite(o.outline.w) && o.outline.w > 0 && o.outline.w <= 1)) throw new InvalidObjectError("bad text outline");
+    if (o.h !== undefined) positive(o.h, "h");
+    if (o.valign !== undefined && !(o.valign === "middle" || o.valign === "bottom")) throw new InvalidObjectError("bad vertical alignment");
+    if (o.paraGap !== undefined && !(Number.isFinite(o.paraGap) && o.paraGap >= 0 && o.paraGap <= 5)) throw new InvalidObjectError("bad paragraph space");
+    if (o.indent !== undefined && !(Number.isFinite(o.indent) && o.indent >= 0 && o.indent <= 20)) throw new InvalidObjectError("bad indent");
+    if (o.caps !== undefined && !(o.caps === "upper" || o.caps === "lower" || o.caps === "title" || o.caps === "small")) throw new InvalidObjectError("bad case");
+    if (o.maxLines !== undefined && !(Number.isInteger(o.maxLines) && o.maxLines >= 1 && o.maxLines <= 10000)) throw new InvalidObjectError("bad line limit");
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }
@@ -594,7 +618,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["assetId"] !== undefined ? { assetId: String(s["assetId"]) } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["assetId"] !== undefined ? { assetId: String(s["assetId"]) } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}), ...(s["gradient"] !== undefined ? { gradient: s["gradient"] as Gradient } : {}), ...(s["outline"] !== undefined ? { outline: s["outline"] as { c: string; w: number } } : {}), ...(s["h"] !== undefined ? { h: s["h"] as number } : {}), ...(s["valign"] !== undefined ? { valign: s["valign"] as "middle" } : {}), ...(s["paraGap"] !== undefined ? { paraGap: s["paraGap"] as number } : {}), ...(s["indent"] !== undefined ? { indent: s["indent"] as number } : {}), ...(s["caps"] !== undefined ? { caps: s["caps"] as "upper" } : {}), ...(s["maxLines"] !== undefined ? { maxLines: s["maxLines"] as number } : {}) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

@@ -11,6 +11,10 @@
  * `_` is read like `*`). The serializer emits one delimiter run per style
  * change and keeps whitespace outside delimiters, which ordinary Markdown
  * readers parse the same way.
+ *
+ * Three more looks are kept as the forms other Markdown readers know: `~~strikethrough~~`, `<u>underline</u>` and
+ * `<span style="color:#rrggbb;font-size:150%">a colour and a size of its own</span>` (a size is a share of the block's size, 10% to 1000%).
+ * They are read as states like the emphasis marks, so `<span>` does not nest.
  */
 
 export type BlockType = "p" | "h1" | "h2" | "h3" | "ul" | "ol";
@@ -19,7 +23,21 @@ export interface Span {
   readonly text: string;
   readonly bold: boolean;
   readonly italic: boolean;
+  /** Underlined; absent = not. */
+  readonly underline?: boolean;
+  /** Struck through; absent = not. */
+  readonly strike?: boolean;
+  /** A colour of its own ("#rrggbb" or "#rrggbbaa"); absent = the text's. */
+  readonly color?: string;
+  /** Size as a multiple of the block's size, 0.1 to 10; absent = 1. */
+  readonly scale?: number;
 }
+
+export const SCALE_RANGE = [0.1, 10] as const;
+const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
+const clampScale = (v: number): number => Math.min(SCALE_RANGE[1], Math.max(SCALE_RANGE[0], v));
+/** The look of a span apart from its emphasis, as one comparable key (spans with the same key merge). */
+const looks = (s: Span): string => `${s.bold ? 1 : 0}${s.italic ? 1 : 0}${s.underline ? 1 : 0}${s.strike ? 1 : 0}|${s.color ?? ""}|${s.scale && s.scale !== 1 ? s.scale : ""}`;
 
 export interface Block {
   readonly type: BlockType;
@@ -67,13 +85,32 @@ export function parse(md: string): Block[] {
   return blocks;
 }
 
+const SPAN_OPEN = /^<span style="([^"<>]*)">/;
+
+/** The colour and size a `<span style="...">` says (anything else in it is ignored). */
+function spanStyle(css: string): { color?: string; scale?: number } {
+  const out: { color?: string; scale?: number } = {};
+  for (const decl of css.split(";")) {
+    const m = /^\s*([a-z-]+)\s*:\s*(.*?)\s*$/i.exec(decl);
+    if (!m) continue;
+    if (m[1]!.toLowerCase() === "color" && HEX.test(m[2]!)) out.color = m[2]!.toLowerCase();
+    const pct = m[1]!.toLowerCase() === "font-size" ? /^(\d+(?:\.\d+)?)%$/.exec(m[2]!) : null;
+    if (pct) out.scale = clampScale(Number(pct[1]) / 100);
+  }
+  return out;
+}
+
 function parseInline(s: string): Span[] {
   const out: Span[] = [];
   let bold = false;
   let italic = false;
+  let underline = false;
+  let strike = false;
+  let color: string | undefined;
+  let scale: number | undefined;
   let text = "";
   const flush = (): void => {
-    if (text) out.push({ text, bold, italic });
+    if (text) out.push({ text, bold, italic, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale } : {}) });
     text = "";
   };
   for (let i = 0; i < s.length; i++) {
@@ -91,6 +128,30 @@ function parseInline(s: string): Span[] {
         if (n !== 1) bold = !bold;
       }
       i += n - 1;
+    } else if (ch === "~" && s[i + 1] === "~") {
+      flush();
+      strike = !strike;
+      i += 1;
+    } else if (ch === "<") {
+      const rest = s.slice(i, i + 200);
+      const open = SPAN_OPEN.exec(rest);
+      if (rest.startsWith("<u>")) {
+        flush();
+        underline = true;
+        i += 2;
+      } else if (rest.startsWith("</u>")) {
+        flush();
+        underline = false;
+        i += 3;
+      } else if (open) {
+        flush();
+        ({ color, scale } = spanStyle(open[1]!));
+        i += open[0].length - 1;
+      } else if (rest.startsWith("</span>")) {
+        flush();
+        color = scale = undefined;
+        i += 6;
+      } else text += ch;
     } else {
       text += ch;
     }
@@ -106,24 +167,35 @@ function parseInline(s: string): Span[] {
  * of equal style merge.
  */
 export function normalizeSpans(spans: readonly Span[]): Span[] {
-  const chars: Array<{ c: string; bold: boolean; italic: boolean }> = [];
-  for (const s of spans) for (const c of s.text.replace(/\s+/g, " ")) chars.push({ c, bold: s.bold, italic: s.italic });
+  type Ch = { c: string } & Omit<Span, "text">;
+  const chars: Ch[] = [];
+  for (const s of spans) {
+    const { text, ...look } = s;
+    for (const c of text.replace(/\s+/g, " ")) chars.push({ c, ...look });
+  }
   let a = 0;
   let b = chars.length;
   while (a < b && chars[a]!.c === " ") a++;
   while (b > a && chars[b - 1]!.c === " ") b--;
   const t = chars.slice(a, b).filter((ch, i, arr) => !(ch.c === " " && arr[i - 1]?.c === " "));
+  const tidy = (c: Ch): Ch => {
+    const { underline, strike, color, scale, ...rest } = c;
+    return { ...rest, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale: clampScale(scale) } : {}) };
+  };
   for (let i = 0; i < t.length; i++) {
     if (t[i]!.c !== " ") continue;
     const prev = t[i - 1]!;
     const next = t[i + 1]!;
-    t[i] = { c: " ", bold: prev.bold && next.bold, italic: prev.italic && next.italic };
+    // a space takes the looks its neighbours share (it is invisible, and this keeps it outside the marks)
+    t[i] = { c: " ", bold: prev.bold && next.bold, italic: prev.italic && next.italic, ...(prev.underline && next.underline ? { underline: true } : {}), ...(prev.strike && next.strike ? { strike: true } : {}), ...(prev.color && prev.color === next.color ? { color: prev.color } : {}), ...(prev.scale && prev.scale === next.scale ? { scale: prev.scale } : {}) };
   }
   const out: Span[] = [];
-  for (const ch of t) {
+  for (const raw of t) {
+    const ch = tidy(raw);
+    const { c, ...look } = ch;
     const last = out[out.length - 1];
-    if (last && last.bold === ch.bold && last.italic === ch.italic) out[out.length - 1] = { ...last, text: last.text + ch.c };
-    else out.push({ text: ch.c, bold: ch.bold, italic: ch.italic });
+    if (last && looks(last) === looks(look as Span)) out[out.length - 1] = { ...last, text: last.text + c };
+    else out.push({ text: c, ...look } as Span);
   }
   return out;
 }
@@ -152,13 +224,25 @@ export function serialize(blocks: readonly Block[]): string {
     let s = prefix;
     let bold = false;
     let italic = false;
-    const delim = (nb: boolean, ni: boolean): string => (bold !== nb ? "**" : "") + (italic !== ni ? "*" : "");
+    let under = false;
+    let strike = false;
+    let spanKey = "";
+    const spanTag = (c: string | undefined, k: number | undefined): string => `<span style="${[c ? `color:${c}` : "", k && k !== 1 ? `font-size:${Math.round(k * 10000) / 100}%` : ""].filter(Boolean).join(";")}">`;
+    const delim = (sp: Span | null): string => {
+      const nb = sp?.bold ?? false, ni = sp?.italic ?? false, nu = sp?.underline ?? false, ns = sp?.strike ?? false;
+      const key = sp && (sp.color || (sp.scale && sp.scale !== 1)) ? spanTag(sp.color, sp.scale) : "";
+      const d = (bold !== nb ? "**" : "") + (italic !== ni ? "*" : "") + (strike !== ns ? "~~" : "") + (under !== nu ? (nu ? "<u>" : "</u>") : "") + (key !== spanKey ? (spanKey ? "</span>" : "") + key : "");
+      bold = nb;
+      italic = ni;
+      strike = ns;
+      under = nu;
+      spanKey = key;
+      return d;
+    };
     spans.forEach((sp, j) => {
-      s += delim(sp.bold, sp.italic) + escapeText(sp.text, j === 0);
-      bold = sp.bold;
-      italic = sp.italic;
+      s += delim(sp) + escapeText(sp.text, j === 0);
     });
-    s += delim(false, false);
+    s += delim(null);
     if (b.type[0] === "h") s = s.replace(/(\s)(#+)$/, (_, w: string, h: string) => w + h.replace(/#/g, "\\#")); // a closing run of # would be dropped on reading
     const list = b.type === "ul" || b.type === "ol";
     const sameList = list && out.length && blocks[i - 1]?.type === b.type;

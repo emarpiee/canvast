@@ -4,6 +4,11 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `underline` | Underline the selected words (text editor bar) |
+| `strikethrough` | Strike through the selected words (text editor bar) |
+| `baseline` | Colour of the selected words (text editor bar) |
+| `a-arrow-up` | Make the selected words bigger (text editor bar) |
+| `a-arrow-down` | Make the selected words smaller (text editor bar) |
 | `a-large-small` | The Text styles tab of the Styles panel |
 | `captions` | Item names: always shown |
 | `scan-text` | Item names: shown for the picked items |
