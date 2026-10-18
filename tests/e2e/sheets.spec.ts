@@ -502,3 +502,39 @@ test("Export… of picked shapes uses their box (with the outline) as the shape,
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Alt+drag of a picked thing on a sheet drags a copy (the sheet under it is not picked instead); a click with Alt goes on to what is under it", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  const sheet = (await objs(app)).at(-1)!;
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 460, 350);
+  expect(await selection(app)).toEqual([rect.id]);
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const r0 = await box(rect.id);
+  await p.keyboard.down("Alt");
+  await p.mouse.move(460, 350);
+  await p.mouse.down();
+  await p.mouse.move(560, 440, { steps: 8 });
+  await p.mouse.up();
+  await p.keyboard.up("Alt");
+  await app.frame();
+  const all = await objs(app);
+  expect(all, "a copy was made").toHaveLength(3);
+  const copy = all.find((o) => o.id !== sheet.id && o.id !== rect.id)!;
+  expect((await box(rect.id)).minX, "the original stays").toBeCloseTo(r0.minX, 0);
+  expect((await box(copy.id)).minX - r0.minX, "the copy moved with the drag").toBeCloseTo(100, 0);
+  expect(await selection(app)).toEqual([copy.id]);
+  // a click with Alt that does not move picks what is under the pointer
+  await click(app, 600, 450);
+  await p.keyboard.down("Alt");
+  await p.mouse.click(540, 400);
+  await p.keyboard.up("Alt");
+  await app.frame();
+  expect(await selection(app), "the copy was picked; Alt+click goes down to the sheet under it").not.toEqual([rect.id]);
+  expect(app.consoleErrors).toEqual([]);
+});

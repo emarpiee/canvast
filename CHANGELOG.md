@@ -18,6 +18,7 @@
 - **Export…** (Actions bar, sheet bar, command palette) for a sheet, a picture or shapes: the size comes from the shape. Type a width or a height (the other follows the ratio) in px, in, cm or mm at 72 to 600 ppi, or take a size the shape is made for (A4, Full HD, a story, the picture's own pixels …); PNG, WebP, JPEG or SVG; download, copy or keep in the library.
 - **Docs**: [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md) says what each is, how they relate and when to use which.
 - **Clipping masks are one unit**: a click on the output picks the whole mask (drag moves the output; the box is the mask's, not the picture's); a double click goes in to pick what it cuts, Escape comes out.
+- **Alt+drag copies a thing even when something lies under it** (a picture on a sheet, a shape over another): Alt on a picked thing starts a drag of a copy; only an Alt click that does not move goes on to the thing underneath.
 - **Paste lands under the pointer** (Ctrl+V, the menu, pasted SVG): the middle of the view only when the pointer is not on the canvas.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)

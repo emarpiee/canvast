@@ -155,7 +155,7 @@ type Gesture =
   | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId>; trail: ScreenPoint[] }
   /** Cropping the picked picture (ADR 0118): a side or corner of its box moves its window of the source. */
   | { kind: "crop"; pointerId: number; base: ImageObject; sides: { l: boolean; r: boolean; t: boolean; b: boolean }; start: ScreenPoint; ppu: number }
-  | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean }
+  | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean }
@@ -1089,13 +1089,21 @@ export function attachTools(
     }
     const hits = pickAll(unlocked(vis), s.x, s.y);
     let target: CanvasObject | null = hits[0]?.obj ?? null;
+    let click: CanvasObject | undefined;
     if (e.altKey && hits.length > 1) {
       cycleIndex = (cycleIndex + 1) % hits.length;
-      target = hits[cycleIndex]!.obj;
+      const next = hits[cycleIndex]!.obj;
+      // Alt on something already picked is a drag that carries a copy (a thing on a sheet has the sheet under it, so more than one thing is always
+      // under the pointer): the drag is of the picked one, and only a click that does not move goes on to the next thing down.
+      const held = hits.find((h) => editor.selection.has(h.obj.id))?.obj;
+      if (held) {
+        target = held;
+        click = next;
+      } else target = next;
     } else {
       cycleIndex = 0;
     }
-    g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey };
+    g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey, ...(click ? { click } : {}) };
   };
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
@@ -1618,7 +1626,7 @@ export function attachTools(
       }
       case "press": {
         // A click: select what is under the pointer (media included), or clear.
-        const t = g.target;
+        const t = g.click ?? g.target;
         if (t) {
           if (g.additive && editor.selection.has(t.id)) {
             editor.selection.delete(t.id);
