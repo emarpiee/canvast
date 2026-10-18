@@ -18,6 +18,12 @@ const click = async (app: App, x: number, y: number) => {
   await app.frame();
 };
 const px = (app: App, x: number, y: number) => app.page.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+/** The sheet at (400, 300) is picked by its name above its corner: the empty body of a sheet with things on it is ground, not the sheet. */
+const pickSheet = async (app: App) => {
+  await expect.poll(() => app.page.evaluate(() => window.__canvastDebug.itemLabels().length)).toBeGreaterThan(0);
+  await click(app, 150, 650); // (nothing picked first)
+  await click(app, 410, 291);
+};
 const selection = (app: App) => app.page.evaluate(() => window.__canvastDebug.selection());
 
 test("a sheet holds what is drawn on it and cuts it at its edge; the Layers clip button shows what is outside", async ({ app }) => {
@@ -125,7 +131,7 @@ test("resizing a sheet moves and stretches what is on it by its pin; Fit to cont
   await click(app, 150, 650);
 
   const [a0, b0] = [await box(a.id), await box(b.id)];
-  await click(app, 410, 291); // the sheet's name picks the sheet with what is on it
+  await pickSheet(app); // the sheet's name picks the sheet with what is on it
   await drag(app, [700, 400], [800, 400]); // its right side handle, 100 px out
   const sh = await box(sheet.id);
   expect(sh.maxX - sh.minX).toBeCloseTo(400, 0);
@@ -138,13 +144,13 @@ test("resizing a sheet moves and stretches what is on it by its pin; Fit to cont
   // both: A stretches with the sheet
   await click(app, 640, 400);
   await p.locator("[data-pin-h]").selectOption("both");
-  await click(app, 410, 291);
+  await pickSheet(app);
   await drag(app, [700, 400], [800, 400]);
   const stretched = (await box(a.id)).maxX - (await box(a.id)).minX;
   expect(Math.abs(stretched - (a0.maxX - a0.minX + 100)), "A stretched by about 100 (its outline is not stretched)").toBeLessThan(4);
 
   // fit: the sheet shrinks to what is on it
-  await click(app, 410, 291);
+  await pickSheet(app);
   await p.locator('[data-ctx=\"fitsheet\"]').click();
   await app.frame();
   const fit = await box(sheet.id);
@@ -193,7 +199,7 @@ test("a sheet has a shape, not a size: the Ratio field shows it (3 : 2), typing 
   await drag(app, [420, 320], [500, 380]);
   const [sheet, rect] = (await objs(app)).slice(-2) as [Obj, Obj];
   await key(app, "v");
-  await click(app, 600, 450); // the sheet (not the rectangle)
+  await pickSheet(app); // the sheet (not the rectangle)
   const ratio = p.locator("[data-sheet-ratio]");
   await expect(ratio).toBeVisible();
   await expect(ratio).toHaveValue("3 : 2");
@@ -242,7 +248,7 @@ test("Scale contents makes what is on a sheet grow with it, whatever its pins sa
   await drag(app, [420, 320], [500, 380]);
   const rect = (await objs(app)).at(-1)!;
   await key(app, "v");
-  await click(app, 600, 450);
+  await pickSheet(app);
   const ratio = p.locator("[data-sheet-ratio]");
   await expect(ratio).toBeVisible();
   const width = async () => {
@@ -291,7 +297,7 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   await drag(app, [420, 320], [500, 380]);
   const rect = (await objs(app)).at(-1)!;
   await key(app, "v");
-  await click(app, 600, 450);
+  await pickSheet(app);
   await p.locator("[data-sheet-scale]").click();
   const width = async () => {
     const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), rect.id))!.box;
@@ -403,7 +409,7 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await key(app, "u");
   await drag(app, [420, 320], [500, 380]);
   await key(app, "v");
-  await click(app, 600, 450);
+  await pickSheet(app);
   await p.locator("[data-sheet-export]").click();
   const dlg = p.getByTestId("export-dialog");
   await expect(dlg).toBeVisible();
@@ -482,7 +488,7 @@ test("Export… of picked shapes uses their box (with the outline) as the shape,
   await key(app, "u");
   await drag(app, [420, 320], [500, 380]);
   await key(app, "v");
-  await click(app, 600, 450);
+  await pickSheet(app);
   await p.locator("[data-sheet-export]").click();
   await expect(p.getByTestId("export-shape")).toContainText("3 : 2");
   await dlg.locator('[data-ex="w"]').fill("1200");
@@ -530,7 +536,7 @@ test("Alt+drag of a picked thing on a sheet drags a copy (the sheet under it is 
   expect((await box(copy.id)).minX - r0.minX, "the copy moved with the drag").toBeCloseTo(100, 0);
   expect(await selection(app)).toEqual([copy.id]);
   // a click with Alt that does not move picks what is under the pointer
-  await click(app, 600, 450);
+  await pickSheet(app);
   await p.keyboard.down("Alt");
   await p.mouse.click(540, 400);
   await p.keyboard.up("Alt");

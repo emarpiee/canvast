@@ -292,6 +292,30 @@ export function attachTools(
    * Select what the user picked, widened to whole groups (at the level they are working at).
    * Picking something outside the group they entered leaves that group.
    */
+  const hasThingsOn = (sheet: CanvasObject): boolean => {
+    for (const k of doc.all()) if (k.parent === sheet.id && !k.hidden) return true;
+    return false;
+  };
+  /** Enter: from a sheet to what is on it (a mask is gone into). Shift+Enter: from what is on a sheet back to the sheet. */
+  const intoSheet = (): boolean => {
+    const sheets = [...editor.selection].map((id) => doc.get(id)).filter((o): o is CanvasObject => isContainer(o));
+    if (sheets.length !== 1) return false;
+    const c = sheets[0]!;
+    const kids = [...doc.all()].filter((k) => k.parent === c.id && !k.hidden && !k.locked);
+    if (!kids.length) return false;
+    if (isMaskSheet(c)) editor.openMask = c.id;
+    editor.select(kids.map((k) => k.id));
+    return true;
+  };
+  const outOfSheet = (): boolean => {
+    const parents = new Set([...editor.selection].map((id) => doc.get(id)?.parent));
+    const only = parents.size === 1 ? [...parents][0] : undefined;
+    const sheet = only !== undefined ? doc.get(only) : undefined;
+    if (!sheet || !isContainer(sheet) || editor.selection.has(sheet.id)) return false;
+    editor.openMask = null;
+    editor.select(expandToUnits(doc.ordered(), [sheet], editor.entered));
+    return true;
+  };
   /** The outermost clipping mask above `o` that has not been gone into: what is on a mask is one unit with it. */
   const maskAbove = (o: CanvasObject): CanvasObject | null => {
     let top: CanvasObject | null = null;
@@ -1089,6 +1113,10 @@ export function attachTools(
     }
     const hits = pickAll(unlocked(vis), s.x, s.y);
     let target: CanvasObject | null = hits[0]?.obj ?? null;
+    // The empty body of a sheet that has things on it is ground, not the sheet: a click there clears, a drag draws the selection box, so
+    // the sheet is not moved or picked by accident. It is picked by its name, its Layers row, or a box over it; a sheet with nothing on it
+    // is picked by a click, as there is nothing else to pick there.
+    if (target && isContainer(target) && !isMaskSheet(target) && hasThingsOn(target)) target = null;
     let click: CanvasObject | undefined;
     if (e.altKey && hits.length > 1) {
       cycleIndex = (cycleIndex + 1) % hits.length;
@@ -1790,6 +1818,8 @@ export function attachTools(
       editor.select(expandToUnits(doc.ordered(), [hit], editor.entered));
       return;
     }
+    // A double click on the empty body of a sheet with things on it does nothing (it is ground, as for a click).
+    if (hit && isContainer(hit) && !isMaskSheet(hit) && hasThingsOn(hit)) return;
     // A double-click on a path edits its nodes.
     if (hit?.kind === "path") {
       editor.select([hit.id]);
@@ -1850,6 +1880,10 @@ export function attachTools(
     else if (hooks.toolForKey(key)) editor.setTool(hooks.toolForKey(key)!);
     else if (e.key === "Enter" && editor.pathDraft) {
       commitPath(false);
+    } else if (e.key === "Enter" && e.shiftKey && editor.tool === "select" && g.kind === "none" && outOfSheet()) {
+      // (Shift+Enter: the sheet that holds what is picked)
+    } else if (e.key === "Enter" && !e.shiftKey && editor.tool === "select" && g.kind === "none" && intoSheet()) {
+      // (Enter: what is on the picked sheet)
     } else if (e.key === "Enter" && editor.tool === "node") {
       editor.setTool("select"); // Enter finishes editing nodes, like Esc
     } else if (e.key === "Enter" && editor.tool === "select" && g.kind === "none" && (editor.cropId || (editor.selection.size === 1 && (() => { const q = doc.get([...editor.selection][0]!); return q?.kind === "image" && !q.media && !q.rot && !q.locked; })()))) {

@@ -164,7 +164,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("release", ICONS.releaseBoolean, "Release the shapes: take the boolean group apart, the shapes stay as they are")) +
     group("Sheet and attach",
       btn("puton", ICONS.sheetSelection, "Put the picked objects on a sheet (Ctrl+Alt+G)"),
-      btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away"),
+      btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away (a clipping mask goes back to being its shape)"),
       btn("fitsheet", ICONS.shrink, "Fit the sheet to what is on it"),
       btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +

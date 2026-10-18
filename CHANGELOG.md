@@ -19,6 +19,7 @@
 - **Docs**: [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md) says what each is, how they relate and when to use which.
 - **Clipping masks are one unit**: a click on the output picks the whole mask (drag moves the output; the box is the mask's, not the picture's); a double click goes in to pick what it cuts, Escape comes out.
 - **Alt+drag copies a thing even when something lies under it** (a picture on a sheet, a shape over another): Alt on a picked thing starts a drag of a copy; only an Alt click that does not move goes on to the thing underneath.
+- **The empty body of a sheet with things on it is ground**: a click clears and a drag draws the selection box, so the sheet is not moved by accident; pick it by its name, its Layers row, a box, or Shift+Enter from what is on it (Enter goes in). **Release the mask** gives the shape back with the fill and outline it had.
 - **Paste lands under the pointer** (Ctrl+V, the menu, pasted SVG): the middle of the view only when the pointer is not on the canvas.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)

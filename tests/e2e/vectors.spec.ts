@@ -2523,3 +2523,30 @@ test("Clipping mask as one unit: a click on its output picks the whole mask (and
   expect([...(await sel())].sort(), "Escape comes out: the mask whole").toEqual([sheet.id, rect.id].sort());
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Releasing a clipping mask gives the shape back as an ordinary shape, with the fill and outline it had, and what it cut stays", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 340], [600, 460]);
+  const ellipse = (await objs(app)).at(-1)! as Obj & { fill: unknown; stroke: unknown };
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  const made = (await objs(app)) as unknown as Array<Obj & { container?: unknown; fill: unknown; stroke: unknown }>;
+  expect(made.find((o) => o.container)!.fill, "the mask has no fill of its own").toBeNull();
+  await click(app, 550, 400);
+  await p.click('[data-ctx="releasemask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  const back = (await objs(app)) as unknown as Array<Obj & { container?: unknown; parent?: string; fill: unknown; stroke: unknown }>;
+  expect(back, "nothing was lost").toHaveLength(2);
+  expect(back.some((o) => o.container), "no sheet is left").toBe(false);
+  expect(back.every((o) => o.parent === undefined)).toBe(true);
+  const shape = back.find((o) => o.id === ellipse.id)!;
+  expect(shape.fill, "the fill it had").toEqual(ellipse.fill);
+  expect(shape.stroke).toEqual(ellipse.stroke);
+  expect(app.consoleErrors).toEqual([]);
+});

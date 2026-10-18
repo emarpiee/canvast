@@ -17,7 +17,7 @@ import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
-import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
+import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
@@ -1779,7 +1779,7 @@ function pickedMasks(doc: DocumentStore, editor: EditorState): Set<string> {
   return real;
 }
 
-export const canReleaseMask = (doc: DocumentStore, editor: EditorState): boolean => pickedMasks(doc, editor).size > 0;
+export const canReleaseMask = (doc: DocumentStore, editor: EditorState): boolean => pickedMasks(doc, editor).size > 0 || selected(doc, editor).some((o) => isMaskSheet(o));
 
 /** What the picked masks are now: how they cut and whether they are inverted (the first one); null when none is picked. */
 export function selectedMask(doc: DocumentStore, editor: EditorState): { mode: "alpha" | "luminance"; invert: boolean } | null {
@@ -1792,7 +1792,10 @@ export function selectedMask(doc: DocumentStore, editor: EditorState): { mode: "
 export function changeMask(doc: DocumentStore, editor: EditorState, change: { mode?: "alpha" | "luminance"; invert?: boolean; release?: true }): void {
   if (editor.blockEdit()) return;
   const bys = pickedMasks(doc, editor);
-  if (!bys.size) return;
+  if (!bys.size) {
+    if (change.release && selected(doc, editor).some((o) => isMaskSheet(o))) releaseSheets(doc, editor); // a clipping mask: its shape stays
+    return;
+  }
   const out: CanvasObject[] = [];
   for (const o of doc.all()) {
     if (o.mask && bys.has(o.mask.by)) {
@@ -1912,7 +1915,7 @@ export function makeClippingMask(doc: DocumentStore, editor: EditorState): void 
   let n = 0;
   for (const o of all) n = Math.max(n, Number(/^Mask (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
   const { parent: _p, ...bare } = maskShape;
-  const body: PathObject = { ...bare, fill: null, stroke: null, container: { clip: true, mask: true }, name: `Mask ${n + 1}`, ...(parent !== undefined ? { parent } : {}) };
+  const body: PathObject = { ...bare, fill: null, stroke: null, container: { clip: true, mask: true, was: { fill: maskShape.fill, stroke: maskShape.stroke } }, name: `Mask ${n + 1}`, ...(parent !== undefined ? { parent } : {}) };
   const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : { ...body, z: lowest - 1 };
   const inside = content.map((o) => ({ ...o, parent: body.id }) as CanvasObject);
   doc.commit(doc.transaction("Clipping mask", [placed, ...inside]));
@@ -1927,6 +1930,14 @@ export function releaseSheets(doc: DocumentStore, editor: EditorState): void {
   if (!frames.length) return;
   const gone = new Map(frames.map((f) => [f.id, f]));
   const next: CanvasObject[] = [];
+  // A clipping mask goes back to being the shape it was made from (with the fill and outline it had); only plain sheets go.
+  const shapes = frames.filter((f) => isMaskSheet(f)).map((f): CanvasObject => {
+    const { container, name: _n, ...rest } = f;
+    const was = container.was;
+    const fill = was ? was.fill : f.fill;
+    const stroke = was ? was.stroke : f.stroke === null && f.fill === null ? "#1f2329" : f.stroke; // (an old mask that kept nothing: given an outline, or it would be invisible)
+    return { ...rest, fill, stroke } as CanvasObject;
+  });
   for (const o of doc.all()) {
     if (gone.has(o.id) || o.parent === undefined || !gone.has(o.parent)) continue;
     let up = gone.get(o.parent)!.parent;
@@ -1934,8 +1945,9 @@ export function releaseSheets(doc: DocumentStore, editor: EditorState): void {
     const { parent: _p, ...rest } = o;
     next.push((up !== undefined ? { ...rest, parent: up } : rest) as CanvasObject);
   }
-  doc.commit(doc.transaction(frames.length === 1 ? "Release sheet" : `Release ${frames.length} sheets`, next, [...gone.keys()]));
-  editor.select(next.map((o) => o.id));
+  const kept = new Set(shapes.map((s) => s.id));
+  doc.commit(doc.transaction(frames.length === 1 ? "Release sheet" : `Release ${frames.length} sheets`, [...next, ...shapes], [...gone.keys()].filter((id) => !kept.has(id))));
+  editor.select([...next, ...shapes].map((o) => o.id));
   editor.changed();
 }
 
