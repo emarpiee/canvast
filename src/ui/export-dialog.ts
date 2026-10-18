@@ -67,7 +67,7 @@ const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u
 const PREVIEW_PX = 320;
 
 export function openExportDialog(deps: ExportDeps): void {
-  const ts = deps.targets;
+  let ts = [...deps.targets]; // (in the order the pictures leave: the pages of a PDF, the files of a ZIP; the person can change it)
   const t = ts[0]!;
   const multi = ts.length > 1;
   const allVectors = ts.every((x) => x.vectors);
@@ -94,9 +94,7 @@ export function openExportDialog(deps: ExportDeps): void {
     </header>
     <div class="ex-body">
       <div class="ex-stage">
-        ${multi
-          ? `<div class="ex-minis" data-ex-minis>${ts.slice(0, 6).map((x, i) => `<figure class="ex-mini"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas></div><figcaption>${esc(x.name)} · ${esc(formatRatio(x.ratio))}</figcaption></figure>`).join("")}</div>`
-          : `<div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(t.ratio, 0.2), 5)}">
+        ${multi ? `<div class="ex-minis" data-ex-minis></div>` : `<div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(t.ratio, 0.2), 5)}">
           <canvas class="ex-thumb" data-ex-thumb aria-label="Preview"></canvas>
           <span class="ex-dim ex-dim-w" data-ex-dim-w></span>
           <span class="ex-dim ex-dim-h" data-ex-dim-h></span>
@@ -142,12 +140,23 @@ export function openExportDialog(deps: ExportDeps): void {
   const wIn = q<HTMLInputElement>('[data-ex="w"]'), hIn = q<HTMLInputElement>('[data-ex="h"]');
   const dpiSel = q<HTMLSelectElement>('[data-ex="dpi"]'), qIn = q<HTMLInputElement>('[data-ex="q"]'), nameIn = q<HTMLInputElement>('[data-ex="name"]');
   const note = q<HTMLElement>("[data-ex-note]"), readout = q<HTMLElement>("[data-ex-readout]"), chips = q<HTMLElement>("[data-ex-chips]");
-  const thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
+  let thumbs: HTMLCanvasElement[] = [];
+  /** The small pictures of several sheets, numbered as they will leave, each with buttons to move it earlier or later. */
+  const drawMinis = (): void => {
+    const box = dlg.querySelector<HTMLElement>("[data-ex-minis]");
+    if (!box) {
+      thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
+      return;
+    }
+    box.innerHTML = ts.slice(0, 12).map((x, i) => `<figure class="ex-mini" data-mini="${i}"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
+  };
+  drawMinis();
   const radios = (sel: string): HTMLElement[] => [...dlg.querySelectorAll<HTMLElement>(sel)];
 
   const px = (): { w: number; h: number; capped: boolean } => (whole && whole.w === widthPx ? { ...whole, capped: false } : clampSize(widthPx, widthPx / t.ratio));
   /** The pixel size of target `i` at the width chosen: its own height from its own shape (the first one's is `px()`). */
-  const sizeOf = (i: number): { w: number; h: number } => (i === 0 ? px() : clampSize(widthPx, widthPx / ts[i]!.ratio));
+  const sizeOf = (i: number): { w: number; h: number } => (i === 0 && !multi ? px() : clampSize(widthPx, widthPx / ts[i]!.ratio));
   const ext = (): string => (prefs.format === "svg" ? "svg" : prefs.format === "pdf" ? "pdf" : SHOT_FORMATS[prefs.format].ext);
 
   const refreshName = (): void => {
@@ -197,6 +206,19 @@ export function openExportDialog(deps: ExportDeps): void {
     }
     refresh();
     void refreshThumb();
+  });
+
+  dlg.querySelector("[data-ex-minis]")?.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-move]");
+    const at = Number(b?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
+    if (!b || b.disabled || !Number.isInteger(at)) return;
+    const to = at + Number(b.dataset["move"]);
+    if (to < 0 || to >= ts.length) return;
+    ts = ts.map((x, i, all) => (i === at ? all[to]! : i === to ? all[at]! : x)); // (the two change places)
+    drawMinis();
+    refresh();
+    void refreshThumb();
+    dlg.querySelector<HTMLButtonElement>(`[data-mini="${to}"] [data-move="${b.dataset["move"]}"]`)?.focus();
   });
 
   /** Everything that follows from the width and the choices: the fields, the readout, the chips, the file name. */

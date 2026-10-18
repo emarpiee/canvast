@@ -21,7 +21,7 @@ import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
 import { renderFrame } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
-import { batchRuns, drawObjects, drawOverlays, drawCropGhost, drawReveal } from "../render/scene-renderer";
+import { batchRuns, drawObjects, drawOverlays, drawCropGhost } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
 import { coverObject, projectObject } from "../render/projection";
@@ -29,7 +29,8 @@ import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
-import { pickAll, pickAllByShape } from "../render/hit-test";
+import { pickAll } from "../render/hit-test";
+import { revealHits } from "../interaction/reveal";
 import { mountContextMenu } from "../ui/context-menu";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -99,6 +100,7 @@ import { settingCommands } from "../commands/settings-commands";
 import type { Command } from "../ui/command-palette";
 import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels, itemName } from "../render/item-label";
+import { drawReveal, drawRevealOutlines } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
 import { SettingsStore } from "../settings/settings";
 import { setThemeInk } from "../render/ink";
@@ -456,9 +458,13 @@ async function start(): Promise<void> {
     const cropping = editor.cropId ? selected.find((po) => po.obj.id === editor.cropId && po.obj.kind === "image") : undefined;
     if (cropping && (!shot || shot.overlays)) drawCropGhost(ctx, cropping, assets.get(rasterKey(cropping.obj as ImageObject)), vp);
     if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
+    if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
+      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
+      if (editor.revealIds) drawRevealOutlines(ctx, all.filter((po) => editor.revealIds!.has(po.obj.id)), theme, true);
+    }
     if (editor.revealAt && (!shot || shot.overlays)) {
-      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp)).filter((po) => !po.obj.hidden && !po.obj.locked);
-      drawReveal(ctx, pickAllByShape(all, editor.revealAt.x, editor.revealAt.y), editor.revealAt, theme, (po) => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item"));
+      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
+      drawReveal(ctx, revealHits(all, editor.revealAt.x, editor.revealAt.y), editor.revealAt, theme, (po) => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item"));
     }
     const t3 = performance.now();
     const b: FrameBreakdown = {

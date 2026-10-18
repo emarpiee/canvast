@@ -1093,7 +1093,11 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   await expect(rows.nth(2)).toHaveAttribute("data-key", ids[0]!);
   // Click selects; the eye hides (and unselects), the lock locks.
   // One pixel in the middle of the second stroke (a count of all inked pixels moves with tile and direct drawing).
-  const ink = () => p.evaluate(() => window.__canvastDebug.pixelAt(500, 350).join(","));
+  const ink = async () => {
+    await p.mouse.move(60, 650); // (a row the pointer is on shows its outline over the canvas: read with the pointer away)
+    await app.frame();
+    return p.evaluate(() => window.__canvastDebug.pixelAt(500, 350).join(","));
+  };
   const withAll = await ink();
   await rows.nth(1).click();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([ids[1]]);
@@ -1978,5 +1982,49 @@ test("Ctrl+hover and Ctrl+click find a shape that has no fill and no outline (re
   await p.mouse.click(550, 400);
   await p.keyboard.up("Control");
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "Ctrl+click picks it").toEqual([ghost.id]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 500 }, 8); // the big one, below
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 480, y: 360 }, { x: 560, y: 420 }, 8); // a small one on it
+  const [big, small] = ((await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ id: string }>).slice(-2) as [{ id: string }, { id: string }];
+  await p.keyboard.press("v");
+  await p.mouse.click(120, 650);
+  const sel = async () => [...(await p.evaluate(() => window.__canvastDebug.selection()))].sort();
+  const ctrlClick = async (x: number, y: number, extra: "Shift" | "Alt" | null) => {
+    await p.keyboard.down("Control");
+    if (extra) await p.keyboard.down(extra);
+    await p.mouse.click(x, y);
+    if (extra) await p.keyboard.up(extra);
+    await p.keyboard.up("Control");
+    await app.frame();
+  };
+  await ctrlClick(520, 390, null); // the small one is the top thing there
+  expect(await sel()).toEqual([small.id]);
+  await ctrlClick(430, 400, "Shift"); // only the big one is there: added
+  expect(await sel()).toEqual([big.id, small.id].sort());
+  await ctrlClick(520, 390, "Shift"); // the top one again: taken away
+  expect(await sel()).toEqual([big.id]);
+  await p.mouse.click(120, 650);
+  await ctrlClick(520, 390, null);
+  await ctrlClick(520, 390, "Alt"); // down the stack: the one below the one picked
+  expect(await sel(), "Ctrl+Alt+click goes down").toEqual([big.id]);
+  // a Layers row reveals its thing: take the paint off the big one so nothing of it shows, then point at its row
+  await p.mouse.click(120, 650);
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const edge = async () => p.evaluate(() => window.__canvastDebug.pixelAt(550, 300)); // the big ellipse's top
+  const before = await edge();
+  const rows = p.locator(".layers-panel li.layer");
+  await rows.last().hover(); // (the first layer drawn: the big ellipse)
+  await app.frame();
+  expect(await edge(), "its outline is drawn while the row is pointed at").not.toEqual(before);
+  await p.mouse.move(120, 650);
+  await app.frame();
+  expect(await edge(), "and gone when the pointer leaves").toEqual(before);
   expect(app.consoleErrors).toEqual([]);
 });

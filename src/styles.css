@@ -2473,3 +2473,11 @@ dialog.export-dlg.is-busy .ex-btn { opacity: 0.6; pointer-events: none; }
 .ex-mini { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); margin: 0; }
 .ex-mini .ex-frame { width: calc(var(--sp-15) * 2 * min(1, var(--shape))); }
 .ex-mini figcaption { max-width: calc(var(--sp-15) * 2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); font: var(--font-meta); }
+.ex-page { position: absolute; top: calc(-1 * var(--sp-3)); left: calc(-1 * var(--sp-3)); display: inline-flex; align-items: center; justify-content: center; min-width: var(--sp-9); height: var(--sp-9); padding: 0 var(--sp-2); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); font: var(--font-meta); }
+.ex-mini figcaption { display: flex; align-items: center; gap: var(--sp-1); max-width: calc(var(--sp-15) * 2.4); }
+.ex-mini figcaption span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ex-move { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--sp-9); height: var(--sp-9); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); cursor: pointer; }
+.ex-move svg { width: var(--icon-sm); height: var(--icon-sm); }
+.ex-move:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+.ex-move:disabled { opacity: 0.3; cursor: default; }
+.ex-move:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

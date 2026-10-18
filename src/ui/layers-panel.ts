@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { revealRow } from "../interaction/reveal";
 import { plural } from "../doc/plural";
 import type { DocumentStore } from "../doc/document-store";
 import type { AssetNames } from "../app/asset-names";
@@ -228,7 +229,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const locked = n.members.every((m) => m.locked);
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
-      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
+      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-ids="${n.members.map((m) => m.id).join(",")}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
         ${guides(depth, last, conts)}${n.group ? `<button type="button" class="layer-twist" data-twist aria-label="${expanded ? "Collapse" : "Expand"}">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</button>` : ""}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
         ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group && !n.sheet ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
@@ -392,6 +393,15 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     if (t.matches("[data-blend]")) actions.setBlend([...editor.selection], (t.value || null) as BlendMode | null);
   });
 
+  // Pointing at a row (or tabbing to it) shows the outline of what it stands for on the canvas, whatever its paint (interaction/reveal.ts).
+  const revealOf = (e: Event): void => {
+    const row = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
+    revealRow(editor, row?.dataset["ids"] ? new Set(row.dataset["ids"].split(",")) : null);
+  };
+  panel.addEventListener("pointerover", revealOf);
+  panel.addEventListener("focusin", revealOf);
+  panel.addEventListener("pointerleave", () => revealRow(editor, null));
+  panel.addEventListener("focusout", () => revealRow(editor, null));
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const doBtn = t.closest<HTMLButtonElement>("[data-do]");

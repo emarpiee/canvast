@@ -601,6 +601,9 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   // the same sheets as one PDF: a page each, at the physical size (600 px at 300 ppi is 2 in = 144 pt)
   await dlg.locator('[data-format="pdf"]').click();
   await expect(dlg.locator('[data-ex="copy"]')).toBeDisabled();
+  // the pages follow the order shown: the first sheet moved later goes second
+  await dlg.locator('[data-mini="0"] [data-move="1"]').click();
+  await expect(dlg.locator('[data-mini="1"] .ex-page')).toHaveText("2");
   const [pdf] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
   const text = fs.readFileSync(await pdf.path()).toString("latin1");
@@ -608,6 +611,7 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   expect(text).toContain("/Count 2");
   expect(text).toContain("/MediaBox [0 0 144 96]");
   expect(text).toContain("/MediaBox [0 0 144 288]");
+  expect(text.indexOf("/MediaBox [0 0 144 288]"), "the tall sheet is now the first page").toBeLessThan(text.indexOf("/MediaBox [0 0 144 96]"));
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });

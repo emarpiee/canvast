@@ -30,7 +30,8 @@ import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
-import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, pickAllByShape, sweepHits } from "../render/hit-test";
+import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
+import { createReveal, deepPick, isDeepPress, revealHits } from "./reveal";
 import { descendantsOf, isContainer, isMaskSheet } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
@@ -292,19 +293,8 @@ export function attachTools(
    * Select what the user picked, widened to whole groups (at the level they are working at).
    * Picking something outside the group they entered leaves that group.
    */
-  // Ctrl (or Cmd) held while the pointer moves over the canvas on Select: everything under the pointer shows its outline (the shape, not its box),
-  // the top one strongest, so what lies below what is picked can be seen before it is picked (and Ctrl+click picks the very thing, see startSelectPress).
-  let hoverAt: ScreenPoint | null = null;
-  let ctrlDown = false;
-  const updateReveal = (): void => {
-    const on = ctrlDown && hoverAt !== null && g.kind === "none" && effectiveTool() === "select";
-    const next = on ? { x: hoverAt!.x, y: hoverAt!.y } : null;
-    const was = editor.revealAt;
-    if (!next && !was) return;
-    if (next && was && Math.abs(next.x - was.x) < 1 && Math.abs(next.y - was.y) < 1) return;
-    editor.revealAt = next;
-    editor.changed();
-  };
+  // Reveal (interaction/reveal.ts, ADR 0149): Ctrl held over the canvas on Select shows the outline of everything under the pointer.
+  const reveal = createReveal(editor, () => g.kind === "none" && effectiveTool() === "select");
   const hasThingsOn = (sheet: CanvasObject): boolean => {
     for (const k of doc.all()) if (k.parent === sheet.id && !k.hidden) return true;
     return false;
@@ -1131,7 +1121,8 @@ export function attachTools(
     // is picked by a click, as there is nothing else to pick there.
     if (target && isContainer(target) && !isMaskSheet(target) && hasThingsOn(target)) target = null;
     // Ctrl (or Cmd) and a click picks the very thing under the pointer, however deep it is in a group or a mask, ground or not (what the outlines show).
-    const deep = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey ? pickAllByShape(unlocked(vis), s.x, s.y)[0] : undefined;
+    // (Shift adds the thing to what is picked or takes it away; Alt goes on to the one below the one already picked)
+    const deep = isDeepPress({ ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey }) ? deepPick(revealHits(vis, s.x, s.y), editor.selection, e.altKey) : null;
     if (deep) {
       target = deep.obj;
       editor.entered = [...(target.groups ?? [])];
@@ -1474,9 +1465,7 @@ export function attachTools(
       pan.move(e.pointerId, local(e));
       return;
     }
-    hoverAt = local(e);
-    ctrlDown = e.ctrlKey || e.metaKey;
-    updateReveal();
+    reveal.move(local(e), e.ctrlKey || e.metaKey);
     if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) {
       // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
       const b = editor.selectionBoxOnScreen;
@@ -1864,10 +1853,7 @@ export function attachTools(
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!canvasShortcutsActive(e)) return;
     altAlone = e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey;
-    if (e.key === "Control" || e.key === "Meta") {
-      ctrlDown = true;
-      updateReveal();
-    }
+    if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     if (editor.builder && g.kind === "none" && (e.key === "Enter" || e.key === "Escape")) {
@@ -1956,10 +1942,7 @@ export function attachTools(
   };
 
   const onKeyUp = (e: KeyboardEvent): void => {
-    if (e.key === "Control" || e.key === "Meta") {
-      ctrlDown = false;
-      updateReveal();
-    }
+    if (e.key === "Control" || e.key === "Meta") reveal.key(false);
     if (e.key === "Alt" && altAlone) {
       altAlone = false;
       if (canvasShortcutsActive(e)) {
@@ -1986,8 +1969,7 @@ export function attachTools(
   el.addEventListener("dblclick", onDoubleClick);
   // Moving onto a bar or panel over the canvas ends the hover (the resize cursor must not stay on the canvas).
   const onLeave = (): void => {
-    hoverAt = null;
-    updateReveal();
+    reveal.move(null, false);
     delete el.dataset["hover"];
     if (g.kind === "none" && editor.handleLabel) {
       editor.handleLabel = null;
