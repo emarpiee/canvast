@@ -15,7 +15,7 @@ import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../
 import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
-import { FALLBACK_FAMILY, faceStyleOf, familyFor } from "../text/fonts";
+import { FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
@@ -93,6 +93,7 @@ export function mountTextEditor(
   view: ViewState,
   doc: DocumentStore,
   editor: EditorState,
+  fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => [],
 ): TextEditor {
   const box = document.createElement("div");
   box.className = "text-editor";
@@ -109,6 +110,11 @@ export function mountTextEditor(
   bar.setAttribute("aria-label", "Text format");
   bar.hidden = true;
   bar.innerHTML = FORMATS.map((f) => `<button type="button" data-cmd="${f.cmd}" aria-label="${f.label}" title="${f.label}">${f.icon}</button>`).join("");
+  const fontSelect = document.createElement("select");
+  fontSelect.dataset["fontOfWords"] = "";
+  fontSelect.setAttribute("aria-label", "Font of the selected words");
+  fontSelect.title = "Font of the selected words";
+  bar.append(fontSelect);
   host.append(box, bar);
 
   let target: TextObject | null = null;
@@ -216,6 +222,7 @@ export function mountTextEditor(
   };
 
   const open = (t: TextObject | null, at: WorldPoint, drawn?: { widthPx: number }): void => {
+    fillFonts();
     commit();
     if (editor.blockEdit()) return;
     restyled = false;
@@ -338,8 +345,35 @@ export function mountTextEditor(
     });
   };
 
+  /** The fonts of the library for the words selected, filled when an edit starts (a font added meanwhile shows at the next one). */
+  const fillFonts = (): void => {
+    void fonts().then((list) => {
+      fontSelect.innerHTML = `<option value="">Font of the text</option>` + list.filter((f) => !f.unusable).map((f) => `<option value="${esc(f.hash)}">${esc(f.name)}</option>`).join("");
+      fontSelect.hidden = list.every((f) => f.unusable);
+    });
+  };
+  let wordsRange: Range | null = null;
+  document.addEventListener("selectionchange", () => {
+    const r = selectedRange();
+    if (r) wordsRange = r.cloneRange(); // (the list takes the focus: the words are found again from here)
+    else if (box.contains(getSelection()?.anchorNode ?? null)) wordsRange = null; // a caret in the box: no words are selected
+  });
+  fontSelect.addEventListener("change", () => {
+    const hash = fontSelect.value;
+    const r = wordsRange;
+    fontSelect.value = "";
+    if (!r) return needWords();
+    box.focus({ preventScroll: true });
+    const sel = getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand("fontName", false, hash ? familyFor(hash) : (getComputedStyle(box).fontFamily.split(",")[0] ?? "").trim().replace(/^["']|["']$/g, ""));
+  });
   view.subscribe(position);
-  bar.addEventListener("mousedown", (e) => e.preventDefault()); // keep the text selection
+  bar.addEventListener("mousedown", (e) => {
+    if (!(e.target as HTMLElement).closest("select")) e.preventDefault(); // keep the text selection
+  });
   bar.addEventListener("click", (e) => {
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
     if (!cmd) return;
@@ -438,7 +472,7 @@ function blocksToHtml(blocks: readonly Block[]): string {
       if (s.link) h = `<a href="${esc(s.link)}">${h}</a>`;
       if (s.strike) h = `<s>${h}</s>`;
       if (s.underline) h = `<u>${h}</u>`;
-      const css = [s.color ? `color:${cssOfHex(s.color)}` : "", s.scale && s.scale !== 1 ? `font-size:${s.scale * 100}%` : ""].filter(Boolean).join(";");
+      const css = [s.color ? `color:${cssOfHex(s.color)}` : "", s.scale && s.scale !== 1 ? `font-size:${s.scale * 100}%` : "", s.font ? `font-family:${familyFor(s.font)}` : ""].filter(Boolean).join(";");
       return css ? `<span style="${css}">${h}</span>` : h;
     }).join("");
   // Lists nest: a stack of the open lists; an item stays open until the next one (it may hold a deeper list).
@@ -496,6 +530,10 @@ export function domToBlocks(root: HTMLElement): Block[] {
   const rootColor = getComputedStyle(root).color;
   const rootWeight = Number(getComputedStyle(root).fontWeight);
   const rootStyle = getComputedStyle(root).fontStyle;
+  const firstFamily = (css: string): string => (css.split(",")[0] ?? "").trim().replace(/^["']|["']$/g, "");
+  const rootFamily = firstFamily(getComputedStyle(root).fontFamily);
+  /** The library font the words are set in when it is not the text's own (the editor draws it by its CSS family). */
+  const fontOf = (css: string): string | undefined => (firstFamily(css) === rootFamily ? undefined : hashOfFamily(firstFamily(css)));
   const rootPx = parseFloat(getComputedStyle(root).fontSize);
   /** Whether an element, or one it sits in (up to the box), is decorated with `line` (underline, line-through). */
   const decorated = (el: HTMLElement | null, line: string): boolean => {
@@ -520,6 +558,7 @@ export function domToBlocks(root: HTMLElement): Block[] {
         ...(decorated(el, "line-through") ? { strike: true } : {}),
         ...(cs.color !== rootColor ? { color: hexOfCss(cs.color) } : {}),
         ...(Math.abs(scale - 1) > 0.004 ? { scale } : {}),
+        ...(fontOf(cs.fontFamily) ? { font: fontOf(cs.fontFamily)! } : {}),
         ...(link ? { link } : {}),
       });
       return;

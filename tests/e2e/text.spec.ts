@@ -890,3 +890,46 @@ test("an input method (Japanese, say) composes into the text: the composition is
   expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2))).toBeGreaterThan(100);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("words of their own font: chosen in the text's format bar, stored as a span, wider than in the text's font, and kept after a reload", async ({ app }) => {
+  test.skip(![SYSTEM_FONTS.woff2, SYSTEM_FONTS.cff].every((f) => existsSync(f)), "needs the system fonts the test imports");
+  const p = app.page;
+  const width = async (id: string): Promise<number> => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return b.maxX - b.minX;
+  };
+  await newText(p, 300, 300);
+  await p.keyboard.type("Hamburg AVA 123");
+  await finish(p);
+  const [t] = await textObjects(p);
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  const set = async (file: string, name: string): Promise<void> => {
+    await p.getByTestId("font-input").setInputFiles({ name, mimeType: "font/ttf", buffer: readFileSync(file) });
+    await expect(p.getByRole("combobox", { name: "Font" }).locator("option:checked")).toHaveText(name.replace(/\.[a-z0-9]+$/, ""));
+  };
+  await set(SYSTEM_FONTS.woff2, "RedHatDisplay-Medium.woff2");
+  const redHat = String((await textObjects(p))[0]!["assetId"]);
+  await set(SYSTEM_FONTS.cff, "Comfortaa-Regular.otf");
+  const own = await width(t!.id);
+  await p.keyboard.press("Escape");
+  await p.mouse.dblclick(310, 308);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.press("Control+a");
+  await p.locator("[data-font-of-words]").selectOption({ label: "RedHatDisplay-Medium" });
+  await finish(p);
+  expect((await textObjects(p))[0]!.md).toContain(`font-family:${redHat}`);
+  await expect.poll(async () => Math.abs((await width(t!.id)) - own)).toBeGreaterThan(2);
+  const mixed = await width(t!.id);
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  await expect.poll(async () => width(t!.id)).toBeCloseTo(mixed, 0);
+  // back to the text's font: the span goes away
+  await p.mouse.dblclick(310, 308);
+  await p.keyboard.press("Control+a");
+  await p.locator("[data-font-of-words]").selectOption({ label: "Font of the text" });
+  await finish(p);
+  expect((await textObjects(p))[0]!.md).toBe("Hamburg AVA 123");
+});

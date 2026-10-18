@@ -106,5 +106,16 @@ export function familyFor(ref?: string): string {
   return e?.face ? e.family : BUNDLED_FAMILY;
 }
 
+/** The font a CSS family name stands for: the regular file of that family (the editor reads the families of the words back as fonts). */
+export function hashOfFamily(css: string): string | undefined {
+  let best: { hash: string; score: number } | undefined;
+  for (const [hash, e] of loaded) {
+    if (e.family !== css) continue;
+    const score = Math.abs(e.font.names.weight - 400) + (e.font.names.italic ? 1000 : 0);
+    if (!best || score < best.score) best = { hash, score };
+  }
+  return best?.hash;
+}
+
 /** Whether a canvas can draw a text set in this font with `fillText` (else from the outlines). */
 export const faceReady = (ref?: string): boolean => !ref || loaded.get(ref)?.face === true;

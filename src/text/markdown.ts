@@ -31,6 +31,8 @@ export interface Span {
   readonly color?: string;
   /** Size as a multiple of the block's size, 0.1 to 10; absent = 1. */
   readonly scale?: number;
+  /** A font of its own, as a library hash; absent = the text's. Written `<span style="font-family:HASH">`. */
+  readonly font?: string;
   /** Where the words link to (`[words](https://…)`, only http, https and mailto); they are drawn underlined. */
   readonly link?: string;
 }
@@ -44,9 +46,10 @@ export const linkUrlOf = (url: string): string => url.replace(/[()\s<>"\\]/g, (c
 
 export const SCALE_RANGE = [0.1, 10] as const;
 const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
+const FONT_HASH = /^[0-9a-f]{64}$/i;
 const clampScale = (v: number): number => Math.min(SCALE_RANGE[1], Math.max(SCALE_RANGE[0], v));
 /** The look of a span apart from its emphasis, as one comparable key (spans with the same key merge). */
-const looks = (s: Span): string => `${s.bold ? 1 : 0}${s.italic ? 1 : 0}${s.underline ? 1 : 0}${s.strike ? 1 : 0}|${s.color ?? ""}|${s.scale && s.scale !== 1 ? s.scale : ""}|${s.link ?? ""}`;
+const looks = (s: Span): string => `${s.bold ? 1 : 0}${s.italic ? 1 : 0}${s.underline ? 1 : 0}${s.strike ? 1 : 0}|${s.color ?? ""}|${s.scale && s.scale !== 1 ? s.scale : ""}|${s.link ?? ""}|${s.font ?? ""}`;
 
 export interface Block {
   readonly type: BlockType;
@@ -125,14 +128,15 @@ export function parse(md: string): Block[] {
 const SPAN_OPEN = /^<span style="([^"<>]*)">/;
 
 /** The colour and size a `<span style="...">` says (anything else in it is ignored). */
-function spanStyle(css: string): { color?: string; scale?: number } {
-  const out: { color?: string; scale?: number } = {};
+function spanStyle(css: string): { color?: string; scale?: number; font?: string } {
+  const out: { color?: string; scale?: number; font?: string } = {};
   for (const decl of css.split(";")) {
     const m = /^\s*([a-z-]+)\s*:\s*(.*?)\s*$/i.exec(decl);
     if (!m) continue;
     if (m[1]!.toLowerCase() === "color" && HEX.test(m[2]!)) out.color = m[2]!.toLowerCase();
     const pct = m[1]!.toLowerCase() === "font-size" ? /^(\d+(?:\.\d+)?)%$/.exec(m[2]!) : null;
     if (pct) out.scale = clampScale(Number(pct[1]) / 100);
+    if (m[1]!.toLowerCase() === "font-family" && FONT_HASH.test(m[2]!)) out.font = m[2]!.toLowerCase();
   }
   return out;
 }
@@ -148,10 +152,11 @@ function parseRuns(s: string, init: Look = { bold: false, italic: false }): Span
   let strike = init.strike === true;
   let color: string | undefined = init.color;
   let scale: number | undefined = init.scale;
+  let font: string | undefined = init.font;
   const link = init.link;
   let text = "";
   const flush = (): void => {
-    if (text) out.push({ text, bold, italic, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale } : {}), ...(link ? { link } : {}) });
+    if (text) out.push({ text, bold, italic, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale } : {}), ...(font ? { font } : {}), ...(link ? { link } : {}) });
     text = "";
   };
   for (let i = 0; i < s.length; i++) {
@@ -184,7 +189,7 @@ function parseRuns(s: string, init: Look = { bold: false, italic: false }): Span
       }
       if (m && isLinkUrl(m[2]!)) {
         flush();
-        out.push(...parseRuns(m[1]!, { bold, italic, underline, strike, ...(color ? { color } : {}), ...(scale ? { scale } : {}), link: linkUrlOf(url) }));
+        out.push(...parseRuns(m[1]!, { bold, italic, underline, strike, ...(color ? { color } : {}), ...(scale ? { scale } : {}), ...(font ? { font } : {}), link: linkUrlOf(url) }));
         i += m[0].length - 1;
       } else text += ch;
     } else if (ch === "<") {
@@ -200,11 +205,11 @@ function parseRuns(s: string, init: Look = { bold: false, italic: false }): Span
         i += 3;
       } else if (open) {
         flush();
-        ({ color, scale } = spanStyle(open[1]!));
+        ({ color, scale, font } = spanStyle(open[1]!));
         i += open[0].length - 1;
       } else if (rest.startsWith("</span>")) {
         flush();
-        color = scale = undefined;
+        color = scale = font = undefined;
         i += 6;
       } else text += ch;
     } else {
@@ -236,15 +241,15 @@ export function normalizeSpans(spans: readonly Span[]): Span[] {
   while (b > a && chars[b - 1]!.c === " ") b--;
   const t = chars.slice(a, b).filter((ch, i, arr) => !(ch.c === " " && arr[i - 1]?.c === " "));
   const tidy = (c: Ch): Ch => {
-    const { underline, strike, color, scale, link, ...rest } = c;
-    return { ...rest, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale: clampScale(scale) } : {}), ...(link ? { link } : {}) };
+    const { underline, strike, color, scale, font, link, ...rest } = c;
+    return { ...rest, ...(underline ? { underline } : {}), ...(strike ? { strike } : {}), ...(color ? { color } : {}), ...(scale && scale !== 1 ? { scale: clampScale(scale) } : {}), ...(font && FONT_HASH.test(font) ? { font } : {}), ...(link ? { link } : {}) };
   };
   for (let i = 0; i < t.length; i++) {
     if (t[i]!.c !== " ") continue;
     const prev = t[i - 1]!;
     const next = t[i + 1]!;
     // a space takes the looks its neighbours share (it is invisible, and this keeps it outside the marks)
-    t[i] = { c: " ", bold: prev.bold && next.bold, italic: prev.italic && next.italic, ...(prev.underline && next.underline ? { underline: true } : {}), ...(prev.strike && next.strike ? { strike: true } : {}), ...(prev.color && prev.color === next.color ? { color: prev.color } : {}), ...(prev.scale && prev.scale === next.scale ? { scale: prev.scale } : {}), ...(prev.link && prev.link === next.link ? { link: prev.link } : {}) };
+    t[i] = { c: " ", bold: prev.bold && next.bold, italic: prev.italic && next.italic, ...(prev.underline && next.underline ? { underline: true } : {}), ...(prev.strike && next.strike ? { strike: true } : {}), ...(prev.color && prev.color === next.color ? { color: prev.color } : {}), ...(prev.scale && prev.scale === next.scale ? { scale: prev.scale } : {}), ...(prev.font && prev.font === next.font ? { font: prev.font } : {}), ...(prev.link && prev.link === next.link ? { link: prev.link } : {}) };
   }
   const out: Span[] = [];
   for (const raw of t) {
@@ -285,10 +290,10 @@ export function serialize(blocks: readonly Block[]): string {
     let strike = false;
     let spanKey = "";
     let linkNow: string | undefined;
-    const spanTag = (c: string | undefined, k: number | undefined): string => `<span style="${[c ? `color:${c}` : "", k && k !== 1 ? `font-size:${Math.round(k * 10000) / 100}%` : ""].filter(Boolean).join(";")}">`;
+    const spanTag = (c: string | undefined, k: number | undefined, f: string | undefined): string => `<span style="${[c ? `color:${c}` : "", k && k !== 1 ? `font-size:${Math.round(k * 10000) / 100}%` : "", f ? `font-family:${f}` : ""].filter(Boolean).join(";")}">`;
     const delim = (sp: Span | null): string => {
       const nb = sp?.bold ?? false, ni = sp?.italic ?? false, nu = sp?.underline ?? false, ns = sp?.strike ?? false;
-      const key = sp && (sp.color || (sp.scale && sp.scale !== 1)) ? spanTag(sp.color, sp.scale) : "";
+      const key = sp && (sp.color || sp.font || (sp.scale && sp.scale !== 1)) ? spanTag(sp.color, sp.scale, sp.font) : "";
       // (tags close in the opposite order to the one they opened in: the span first, then the underline)
       const d = (bold !== nb ? "**" : "") + (italic !== ni ? "*" : "") + (strike !== ns ? "~~" : "") + (key !== spanKey && spanKey ? "</span>" : "") + (under !== nu ? (nu ? "<u>" : "</u>") : "") + (key !== spanKey ? key : "");
       bold = nb;

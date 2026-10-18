@@ -359,11 +359,15 @@ async function start(): Promise<void> {
   // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
   const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
   const wantFonts = (objs: Iterable<CanvasObject | undefined>): void => {
-    for (const o of objs) if (o?.kind === "text" && o.assetId && fontLoader.state(o.assetId) === undefined) void fontLoader.ensure(o.assetId);
+    for (const o of objs) {
+      if (o?.kind !== "text") continue;
+      if (o.assetId && fontLoader.state(o.assetId) === undefined) void fontLoader.ensure(o.assetId);
+      for (const m of o.md.matchAll(/font-family:([0-9a-f]{64})/gi)) if (fontLoader.state(m[1]!.toLowerCase()) === undefined) void fontLoader.ensure(m[1]!.toLowerCase());
+    }
   };
   doc.subscribe((_source, changed) => wantFonts(changed ? [...changed].map((id) => doc.get(id)) : doc.all()));
   onFontsChange(() => {
-    doc.refresh(new Set([...doc.all()].filter((o) => o.kind === "text" && o.assetId).map((o) => o.id)));
+    doc.refresh(new Set([...doc.all()].filter((o) => o.kind === "text" && (o.assetId || o.md.includes("font-family:"))).map((o) => o.id)));
     tiles.clear();
     invalidate();
   });
@@ -539,7 +543,14 @@ async function start(): Promise<void> {
 
   const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
-  const textEditor = mountTextEditor(host, view, doc, editor);
+  /** The fonts in the library, loaded: for the font choices of the toolbar and of the words selected in a text. */
+  const libraryFonts = async (): Promise<Array<{ hash: string; name: string; unusable: string }>> => {
+    const list = (await session.catalog?.list())?.entries ?? [];
+    const fonts = list.filter((e) => e.present && describeFile(e.name, e.type).category === "Font").sort((a, b) => a.name.localeCompare(b.name));
+    await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
+    return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
+  };
+  const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts);
   const copySelectedMarkdown = (): void => {
     const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
     if (!md.length) return;
@@ -752,12 +763,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
     selectedPin: () => selectedPin(doc, editor),
-    fonts: async () => {
-      const list = (await session.catalog?.list())?.entries ?? [];
-      const fonts = list.filter((e) => e.present && describeFile(e.name, e.type).category === "Font").sort((a, b) => a.name.localeCompare(b.name));
-      await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
-      return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
-    },
+    fonts: libraryFonts,
     importFont: async (file) => {
       const why = await whyNotFont(new Uint8Array(await file.arrayBuffer()));
       if (why) {

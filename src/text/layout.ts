@@ -267,7 +267,7 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
         wordStart = c === " ";
         for (const cp of cps) {
           // bold and italic words: the family's own bold or italic file when the library has one, else made from the outline
-          const v = variantOf(assetId, sp.bold, sp.italic);
+          const v = variantOf(sp.font ?? assetId, sp.bold, sp.italic);
           chars.push({ cp, bold: v.fakeBold, italic: v.fakeItalic, k: (sp.scale ?? 1) * k, color: sp.color, under: sp.underline === true || sp.link !== undefined, strike: sp.strike === true, link: sp.link, face: v.ref !== assetId ? v.ref : undefined });
         }
       }
