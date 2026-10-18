@@ -144,7 +144,7 @@ function gradientStyles(now: () => Gradient, use: (g: Gradient) => void): HTMLEl
   const box = document.createElement("div");
   box.className = "gradient-styles";
   const saved = styleHooks?.gradients() ?? [];
-  box.innerHTML = `${saved.length ? `<div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background:${gradientCss(s.gradient)}"></button>`).join("")}</div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
+  box.innerHTML = `${saved.length ? `<div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");
@@ -627,7 +627,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
       stops: cur.map.stops,
       onInput: (stops) => {
         cur = { ...cur, map: { stops, amount: cur.map?.amount ?? 100 } };
-        mapBar.style.background = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops });
+        mapBar.style.backgroundImage = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops });
         if (!frame) frame = requestAnimationFrame(() => {
           frame = 0;
           o.onInput(cur);
@@ -645,7 +645,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
   };
   const syncMap = (): void => {
     mapSelect.value = mapIndex();
-    mapBar.style.background = cur.map ? gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: cur.map.stops }) : "";
+    mapBar.style.backgroundImage = cur.map ? gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: cur.map.stops }) : "";
     mapBar.hidden = !cur.map;
     mapRow.hidden = !cur.map;
     mapEdit.hidden = !cur.map;

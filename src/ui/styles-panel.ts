@@ -88,7 +88,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const title = can ? `Apply ${item.name} to the selection` : "Select items it applies to first";
     const body =
       item.kind === "gradient"
-        ? `<span class="style-card-name">${esc(item.name)}</span><span class="style-bar" style="background:${esc(look?.bar ?? "")}"></span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
+        ? `<span class="style-card-name">${esc(item.name)}</span><span class="style-bar" style="background-image:${esc(look?.bar ?? "")}"></span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
         : item.kind === "colour"
           ? `<span class="style-card-line"><span class="style-swatch" style="background:${esc(String(item.data))}"></span><span class="style-card-name">${esc(item.name)}</span></span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
           : item.kind === "palette"
