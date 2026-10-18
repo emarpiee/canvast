@@ -430,7 +430,32 @@ export function drawImageObject(
   const cr = Math.min(r, view.maxX);
   const cb = Math.min(b, view.maxY);
   if (cr <= cl || cb <= ct) return;
+  // Rounded corners (ADR 0148): the picture is cut to the rounded rectangle of its own box (not of what is visible of it), and its border runs round that.
+  const rpx = o.radius ? Math.min(o.radius * po.proj.ppu, (r - l) / 2, (b - t) / 2) : 0;
+  const rounded = rpx > 0.01 && typeof ctx.roundRect === "function";
+  const wpx = o.border ? o.border.width * po.proj.ppu : 0;
   paint(ctx, o, () => {
+    if (rounded) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(l, t, r - l, b - t, rpx);
+      ctx.clip();
+    }
+    drawPictureBody();
+    if (rounded) ctx.restore();
+    if (o.border && wpx > 0.01) {
+      ctx.save();
+      ctx.strokeStyle = o.border.color;
+      ctx.lineWidth = wpx;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      if (rounded) ctx.roundRect(l, t, r - l, b - t, rpx);
+      else ctx.rect(l, t, r - l, b - t);
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+  function drawPictureBody(): void {
     if (!src) {
       ctx.fillStyle = placeholder;
       ctx.fillRect(cl, ct, cr - cl, cb - ct);
@@ -508,5 +533,5 @@ export function drawImageObject(
         ctx.fillRect(left, top, right - left + bleed, bottom - top + bleed);
       }
     }
-  });
+  }
 }

@@ -142,6 +142,10 @@ export interface ImageObject extends ObjectBase {
   readonly crop?: Crop;
   /** Non-destructive adjustments (ADR 0118); absent = none. */
   readonly adjust?: Adjust;
+  /** Rounded corners (ADR 0148): the radius in local units, the same at all four corners; absent = square. Never more than half the shorter side. */
+  readonly radius?: number;
+  /** A line round the picture (its border), centred on its edge (ADR 0148): its colour (#rrggbb or #rrggbbaa) and width in local units. */
+  readonly border?: { readonly color: string; readonly width: number };
 }
 
 /** The library asset an object uses: a picture's file, or the font file a text is set in (undefined: none). */
@@ -497,6 +501,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
     if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
+    if (o.radius !== undefined && !(Number.isFinite(o.radius) && o.radius >= 0)) throw new InvalidObjectError("bad radius");
+    if (o.border !== undefined && !(typeof o.border === "object" && o.border !== null && COLOR_RE.test(o.border.color) && Number.isFinite(o.border.width) && o.border.width > 0)) throw new InvalidObjectError("bad border");
     if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean" && (o.media.speed === undefined || (Number.isFinite(o.media.speed) && o.media.speed >= 0.25 && o.media.speed <= 4)) && (o.media.range === undefined || (Array.isArray(o.media.range) && o.media.range.length === 2 && Number.isFinite(o.media.range[0]) && Number.isFinite(o.media.range[1]) && o.media.range[0] >= 0 && o.media.range[1] > o.media.range[0])))) throw new InvalidObjectError("bad media state");
   } else if (o.kind === "path") {
     if (!Array.isArray(o.sub) || o.sub.length < 1 || o.sub.length > MAX_SUBPATHS) throw new InvalidObjectError("a path needs 1 to 4096 sub-paths");
@@ -649,6 +655,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
       ...(s["adjust"] !== undefined ? { adjust: s["adjust"] as Adjust } : {}),
+      ...(s["radius"] !== undefined ? { radius: s["radius"] as number } : {}),
+      ...(s["border"] !== undefined ? { border: s["border"] as { color: string; width: number } } : {}),
     };
   } else if (s.kind === "path") {
     if (!Array.isArray(s["sub"])) throw new InvalidObjectError("sub-paths missing");

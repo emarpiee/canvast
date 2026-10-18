@@ -2120,6 +2120,37 @@ export function setTextStyle(doc: DocumentStore, editor: EditorState, look: Text
 /** The picked pictures (stills, video and GIF; audio has no picture). */
 const pictures = (doc: DocumentStore, editor: EditorState): ImageObject[] => selected(doc, editor).filter((o): o is ImageObject => o.kind === "image" && o.media?.kind !== "audio" && !o.locked);
 
+/** The corner radius and border of the first picked picture (in its own units), and how many are picked; null when none is. */
+export function selectedPictureLook(doc: DocumentStore, editor: EditorState): { radius: number; border: { color: string; width: number } | null; count: number } | null {
+  const ps = pictures(doc, editor);
+  return ps.length ? { radius: ps[0]!.radius ?? 0, border: ps[0]!.border ?? null, count: ps.length } : null;
+}
+
+/**
+ * Round the corners of the picked pictures and give them a border (ADR 0148). `radius` in each picture's own units (never more than half its
+ * shorter side); `border`: a colour and/or a width (0 takes it away; a first one is white and a fiftieth of the shorter side). One undo step
+ * (shown only while `final` is false, for a number being scrubbed).
+ */
+export function setPictureLook(doc: DocumentStore, editor: EditorState, patch: { radius?: number; border?: { color?: string; width?: number } }, final = true): void {
+  const ps = pictures(doc, editor);
+  if (!ps.length || editor.blockEdit()) return;
+  const next = ps.map((o): CanvasObject => {
+    const { radius: _r, border: _b, ...rest } = o;
+    const half = Math.min(o.w, o.h) / 2;
+    const radius = patch.radius !== undefined ? Math.min(Math.max(0, patch.radius), half) : o.radius;
+    let border = o.border;
+    if (patch.border) {
+      const width = patch.border.width !== undefined ? patch.border.width : (border?.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE));
+      border = width > 0 && Number.isFinite(width) ? { color: patch.border.color ?? border?.color ?? "#ffffff", width } : undefined;
+    }
+    return { ...rest, ...(radius ? { radius } : {}), ...(border ? { border } : {}) } as CanvasObject;
+  });
+  if (!final) return showReplaced(editor, next);
+  editor.preview = { kind: "none" };
+  doc.commit(doc.transaction(patch.radius !== undefined ? "Round the corners" : "Border", next));
+  editor.changed();
+}
+
 /** The one picked picture that can be cropped: a still, upright (null otherwise). */
 export function croppablePicture(doc: DocumentStore, editor: EditorState): ImageObject | null {
   const sel = selected(doc, editor);

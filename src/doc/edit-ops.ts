@@ -101,7 +101,8 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
     if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
     return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
-  return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky });
+  const k = Math.sqrt(kx * ky); // (a picture's corners and border scale as the whole does)
+  return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.radius !== undefined ? { radius: o.radius * k } : {}), ...(o.kind === "image" && o.border ? { border: { ...o.border, width: o.border.width * k } } : {}) });
 }
 
 /**
@@ -186,7 +187,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
   if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s, ...(o.h !== undefined ? { h: o.h * s } : {}) };
   if (o.kind === "path") return { ...o, unit, ...renamed(o, s), width: o.width * s };
-  return { ...o, unit, w: o.w * s, h: o.h * s };
+  return { ...o, unit, w: o.w * s, h: o.h * s, ...(o.kind === "image" && o.radius !== undefined ? { radius: o.radius * s } : {}), ...(o.kind === "image" && o.border ? { border: { ...o.border, width: o.border.width * s } } : {}) };
 }
 
 /** World position of a local point (exact). */
