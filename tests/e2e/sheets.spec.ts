@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { expect, test } from "./harness";
 import type { App } from "./harness";
 
@@ -184,37 +185,56 @@ test("Attach: the picked objects follow the object clicked next when it moves; D
   expect(await selection(app)).toEqual([b.id]);
 });
 
-test("a picked sheet shows its size in px, in, mm and cm; typing another size changes only the sheet (what is on it keeps its size), in one undo step (ADR 0121)", async ({ app }) => {
+test("a sheet has a shape, not a size: the Ratio field shows it (3 : 2), typing 16:9 or A4 portrait, a preset or Turn changes only the sheet, keeping its area, in one undo step (ADR 0147)", async ({ app }) => {
   const p = app.page;
   await key(app, "c");
   await drag(app, [400, 300], [700, 500]);
   await key(app, "u");
   await drag(app, [420, 320], [500, 380]);
-  const rect = (await objs(app)).at(-1)!;
+  const [sheet, rect] = (await objs(app)).slice(-2) as [Obj, Obj];
   await key(app, "v");
   await click(app, 600, 450); // the sheet (not the rectangle)
-  const w = p.locator("[data-sheet-w]"), h = p.locator("[data-sheet-h]"), unit = p.locator("[data-sheet-unit]");
-  await expect(w).toBeVisible();
-  const w0 = Number(await w.inputValue());
-  expect(w0).toBeGreaterThan(0);
-  await unit.selectOption({ label: "in" });
-  expect(Number(await w.inputValue())).toBeCloseTo(w0 / 96, 2);
-  await unit.selectOption({ label: "px" });
-  await w.fill(String(w0 * 2));
-  await w.blur();
+  const ratio = p.locator("[data-sheet-ratio]");
+  await expect(ratio).toBeVisible();
+  await expect(ratio).toHaveValue("3 : 2");
+  const sb = async () => (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), sheet.id))!.box;
+  const shape = async () => { const b = await sb(); return { r: (b.maxX - b.minX) / (b.maxY - b.minY), area: (b.maxX - b.minX) * (b.maxY - b.minY) }; };
+  const a0 = (await shape()).area;
+  await ratio.fill("16:9");
+  await ratio.press("Enter");
   await app.frame();
-  expect(Number(await w.inputValue())).toBeCloseTo(w0 * 2, 0);
-  const boxes = await p.evaluate(() => window.__canvastDebug.objects()) as unknown as Array<{ id: string; kind: string }>;
-  expect(boxes.length, "nothing was added or lost").toBe(2);
-  const kept = (await objs(app)).find((o) => o.id === rect.id)!;
-  expect(JSON.stringify(kept), "what is on the sheet keeps its place and size").toBe(JSON.stringify(rect));
+  await expect(ratio).toHaveValue("16 : 9");
+  const s1 = await shape();
+  expect(s1.r).toBeCloseTo(16 / 9, 1);
+  expect(Math.abs(s1.area / a0 - 1), "the area is kept").toBeLessThan(0.02);
+  expect((await objs(app)).length, "nothing was added or lost").toBe(2);
+  expect(JSON.stringify((await objs(app)).find((o) => o.id === rect.id)), "what is on the sheet keeps its place and size").toBe(JSON.stringify(rect));
   await key(app, "Control+z");
   await app.frame();
-  expect(Number(await w.inputValue())).toBeCloseTo(w0, 0);
+  await expect(ratio).toHaveValue("3 : 2");
+  // words work too, with the way up
+  await ratio.fill("A4 portrait");
+  await ratio.press("Enter");
+  await app.frame();
+  await expect(ratio).toHaveValue("1 : 1.414");
+  // Turn: the same area on its side; a preset on a sheet that is upright stays upright
+  await p.locator("[data-sheet-turn]").click();
+  await app.frame();
+  await expect(ratio).toHaveValue("1.414 : 1");
+  await p.locator("[data-sheet-turn]").click();
+  await p.locator("[data-sheet-preset]").selectOption({ label: "Video 16 : 9" });
+  await app.frame();
+  await expect(ratio).toHaveValue("9 : 16");
+  expect(await p.locator("[data-sheet-preset]").inputValue()).toBe(""); // (ready for the next pick)
+  // not a shape: the field goes back and says so
+  await ratio.fill("nonsense");
+  await ratio.press("Enter");
+  await expect(p.getByTestId("toast")).toContainText("is not a shape");
+  await expect(ratio).toHaveValue("9 : 16");
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a sheet takes a paper or screen size from the presets, and Scale contents makes what is on it grow with it, whatever its pins say (ADR 0133)", async ({ app }) => {
+test("Scale contents makes what is on a sheet grow with it, whatever its pins say, by the ratio and by the handles, and belongs to its sheet (ADR 0133)", async ({ app }) => {
   const p = app.page;
   await key(app, "c");
   await drag(app, [400, 300], [700, 500]);
@@ -223,31 +243,28 @@ test("a sheet takes a paper or screen size from the presets, and Scale contents 
   const rect = (await objs(app)).at(-1)!;
   await key(app, "v");
   await click(app, 600, 450);
-  const w = p.locator("[data-sheet-w]"), h = p.locator("[data-sheet-h]");
-  await expect(w).toBeVisible();
+  const ratio = p.locator("[data-sheet-ratio]");
+  await expect(ratio).toBeVisible();
   const width = async () => {
     const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), rect.id))!.box;
     return b.maxX - b.minX;
   };
   const w0 = await width();
-  // a preset: the sheet takes the size (its own units are px), what is on it keeps its size
-  await p.locator("[data-sheet-preset]").selectOption({ label: "A4 (794 × 1123)" });
+  // without it, a new shape leaves what is on the sheet as it is
+  await ratio.fill("3:1");
+  await ratio.press("Enter");
   await app.frame();
-  expect(Number(await w.inputValue())).toBeCloseTo(794, 0);
-  expect(Number(await h.inputValue())).toBeCloseTo(1123, 0);
-  expect(await p.locator("[data-sheet-preset]").inputValue()).toBe(""); // (ready for the next pick)
   expect(await width()).toBeCloseTo(w0, 1);
   await key(app, "Control+z");
   await app.frame();
-  // Scale contents: the same change to the size grows what is on the sheet in the same proportion
-  const sheetW = Number(await w.inputValue());
+  // Scale contents: the same change grows what is on the sheet in the same proportion (3 : 1 at the same area: 1.414 times as wide)
   await p.locator("[data-sheet-scale]").click();
   await expect(p.locator("[data-sheet-scale]")).toHaveAttribute("aria-pressed", "true");
   expect((await objs(app)).find((o) => o.container)!.container, "kept with the sheet").toEqual({ clip: true, scale: true });
-  await w.fill(String(sheetW * 2));
-  await w.blur();
+  await ratio.fill("3:1");
+  await ratio.press("Enter");
   await app.frame();
-  expect(Math.abs((await width()) - w0 * 2)).toBeLessThan(3); // (the outline of the shape keeps its own width)
+  expect(Math.abs((await width()) - w0 * Math.SQRT2)).toBeLessThan(3); // (the outline of the shape keeps its own width)
   await key(app, "Control+z");
   await app.frame();
   expect(await width()).toBeCloseTo(w0, 1);
@@ -286,14 +303,14 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   await key(app, "Control+z");
   await app.frame();
   expect(await width()).toBeCloseTo(w0, 1);
-  // the fields are in px as drawn at this zoom, so what they say is what is on the screen, whatever the zoom;
-  // and dragging a name moves things by a screen px for each dragged px
+  // the shape and the place on the sheet are the same at any depth: a ratio, and per cent of the sheet
   const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
   const sheet = (await objs(app)).at(-2)!;
-  expect(Number(await p.locator("[data-sheet-w]").inputValue())).toBeCloseTo(300, 0);
+  await expect(p.locator("[data-sheet-ratio]")).toHaveValue("3 : 2");
   await click(app, 450, 350);
   const x = p.locator("[data-on-x]");
-  expect(Number(await x.inputValue()), "the place from the corner, in screen px").toBeCloseTo((await box(rect.id)).minX - (await box(sheet.id)).minX, -1);
+  const sbox = await box(sheet.id);
+  expect(Number(await x.inputValue()), "where it is, per cent of the sheet's width").toBeCloseTo((((await box(rect.id)).minX - sbox.minX) / (sbox.maxX - sbox.minX)) * 100, 0);
   const x0 = (await box(rect.id)).minX;
   const label = (await x.locator("xpath=..").boundingBox())!;
   await p.mouse.move(label.x + 4, label.y + label.height / 2);
@@ -301,8 +318,8 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   await p.mouse.move(label.x + 44, label.y + label.height / 2, { steps: 8 });
   await p.mouse.up();
   await app.frame();
-  expect((await box(rect.id)).minX - x0, "40 dragged px move it about 40 screen px").toBeGreaterThan(30);
-  expect((await box(rect.id)).minX - x0).toBeLessThan(50);
+  expect((await box(rect.id)).minX - x0, "40 dragged px move it 4 per cent of the sheet's 300 px").toBeGreaterThan(9);
+  expect((await box(rect.id)).minX - x0).toBeLessThan(15);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -324,7 +341,7 @@ test("objects filed in different frames (one drawn deep in a zoom, one at home) 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("an object on a sheet shows where it is from the sheet's corner, and X, Y, W and H change it in px (ADR 0133)", async ({ app }) => {
+test("an object on a sheet shows where it is from the sheet's corner, and X, Y, W and H change it, in per cent of the sheet (ADR 0147)", async ({ app }) => {
   const p = app.page;
   await key(app, "c");
   await drag(app, [400, 300], [800, 560]);
@@ -339,22 +356,24 @@ test("an object on a sheet shows where it is from the sheet's corner, and X, Y, 
   const [sb, rb] = [await box(sheet.id), await box(rect.id)];
   const x = p.locator("[data-on-x]"), y = p.locator("[data-on-y]"), w = p.locator("[data-on-w]"), h = p.locator("[data-on-h]");
   await expect(x).toBeVisible();
-  expect(Number(await x.inputValue())).toBeCloseTo(rb.minX - sb.minX, 0);
-  expect(Number(await y.inputValue())).toBeCloseTo(rb.minY - sb.minY, 0);
-  expect(Number(await w.inputValue())).toBeCloseTo(rb.maxX - rb.minX, 0);
-  // X moves it (one undo step), W and H resize it about its corner
-  await x.fill("100");
+  const [sw, sh] = [sb.maxX - sb.minX, sb.maxY - sb.minY];
+  // the fields are per cent of the sheet: where it is from the corner, and how big
+  expect(Number(await x.inputValue())).toBeCloseTo(((rb.minX - sb.minX) / sw) * 100, 0);
+  expect(Number(await y.inputValue())).toBeCloseTo(((rb.minY - sb.minY) / sh) * 100, 0);
+  expect(Number(await w.inputValue())).toBeCloseTo(((rb.maxX - rb.minX) / sw) * 100, 0);
+  // X moves it (one undo step), W resizes it about its corner
+  await x.fill("25");
   await x.press("Enter");
   await app.frame();
-  expect((await box(rect.id)).minX - sb.minX).toBeCloseTo(100, 0);
+  expect(((await box(rect.id)).minX - sb.minX) / sw).toBeCloseTo(0.25, 2);
   expect((await box(rect.id)).minY).toBeCloseTo(rb.minY, 0);
-  await w.fill("160");
+  await w.fill("40");
   await w.press("Enter");
   await w.blur();
   await app.frame();
   const after = await box(rect.id);
-  expect(Math.abs(after.maxX - after.minX - 160)).toBeLessThan(2); // (the box includes the outline)
-  expect(after.minX - sb.minX).toBeCloseTo(100, 0);
+  expect(Math.abs((after.maxX - after.minX) / sw - 0.4)).toBeLessThan(0.01); // (the box includes the outline)
+  expect((after.minX - sb.minX) / sw).toBeCloseTo(0.25, 2);
   await key(app, "Control+z");
   await key(app, "Control+z");
   await app.frame();
@@ -367,12 +386,119 @@ test("an object on a sheet shows where it is from the sheet's corner, and X, Y, 
   await p.mouse.move(label.x + 44, label.y + label.height / 2, { steps: 8 });
   await p.mouse.up();
   await app.frame();
-  expect(Number(await x.inputValue())).toBeGreaterThan(x0 + 5);
-  expect((await box(rect.id)).minX - sb.minX).toBeCloseTo(Number(await x.inputValue()), 0);
+  expect(Number(await x.inputValue())).toBeGreaterThan(x0 + 2);
+  expect(((await box(rect.id)).minX - sb.minX) / sw * 100).toBeCloseTo(Number(await x.inputValue()), 0);
   await key(app, "Control+z");
   await app.frame();
   // a sheet itself, or an object that is on none, has no such fields
   await click(app, 700, 520);
   await expect(x).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolution), the sides follow the ratio, and the file is exactly that size (ADR 0147)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  await key(app, "v");
+  await click(app, 600, 450);
+  await p.locator("[data-sheet-export]").click();
+  const dlg = p.getByTestId("export-dialog");
+  await expect(dlg).toBeVisible();
+  await expect(p.getByTestId("export-shape")).toContainText("3 : 2");
+  const w = dlg.locator('[data-ex="w"]'), h = dlg.locator('[data-ex="h"]');
+  // it begins at the first size the shape is made for; typing one side makes the other follow the ratio
+  await expect(w).toHaveValue("1800"); // (3 : 2 is the shape of a 4 × 6 in photo: that size is first)
+  await expect(h).toHaveValue("1200");
+  await w.fill("900");
+  await expect(h).toHaveValue("600");
+  await h.fill("400");
+  await expect(w).toHaveValue("600");
+  // inches at 300 ppi: 600 px is 2 in; typing 5 in gives 1500 px, and the other side follows
+  await dlg.locator('[data-unit="in"]').click();
+  await expect(w).toHaveValue("2");
+  await w.fill("5");
+  await expect(h).toHaveValue("3.33");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("1500 × 1000 px");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("12.7 × 8.5 cm");
+  // a resolution change keeps 5 in and changes the pixels
+  await dlg.locator('[data-ex="dpi"]').selectOption("150");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("750 × 500 px");
+  // a size chip takes its pixels (and its resolution)
+  await dlg.locator("[data-chip]", { hasText: "1080 px wide" }).click();
+  await dlg.locator('[data-unit="px"]').click();
+  await expect(w).toHaveValue("1080");
+  await expect(h).toHaveValue("720");
+  // the file is exactly that size
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  expect(download.suggestedFilename()).toMatch(/^sheet_\d+-1080x720\.png$/);
+  const bytes = fs.readFileSync(await download.path());
+  expect(bytes.readUInt32BE(16), "the width in the PNG header").toBe(1080);
+  expect(bytes.readUInt32BE(20)).toBe(720);
+  // and it is the sheet: the rectangle where it is on it (a fifth across, a quarter down), the rest of the sheet white
+  const at = await p.evaluate(async (b64) => {
+    const bmp = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: "image/png" })); // (no fetch: the page may not make requests)
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const x = c.getContext("2d")!;
+    x.drawImage(bmp, 0, 0);
+    return { rect: [...x.getImageData(216, 180, 1, 1).data], blank: [...x.getImageData(900, 600, 1, 1).data] };
+  }, bytes.toString("base64"));
+  expect(at.rect[2]!, "blue where the rectangle is").toBeGreaterThan(at.rect[0]! + 60);
+  expect(at.blank.slice(0, 3), "white elsewhere on the sheet").toEqual([255, 255, 255]);
+  await expect(dlg.locator("[data-ex-note]")).toContainText("1080 × 720 px");
+  // SVG is there when everything is vector, sized in the unit chosen
+  await dlg.locator('[data-format="svg"]').click();
+  await dlg.locator('[data-unit="in"]').click();
+  const [svgDownload] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = fs.readFileSync(await svgDownload.path(), "utf8");
+  expect(svg, "1080 × 720 px at 150 ppi is 7.2 × 4.8 in").toContain('width="7.2in" height="4.8in"');
+  await key(app, "Escape");
+  await expect(dlg).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Export… of picked shapes uses their box (with the outline) as the shape, and of a sheet deep in a zoom is as sharp and as right as at home", async ({ app }) => {
+  const p = app.page;
+  const dlg = p.getByTestId("export-dialog");
+  const px = async (x: number, y: number, bytes: Buffer) =>
+    p.evaluate(async ([b64, a, b]) => {
+      const bmp = await createImageBitmap(new Blob([Uint8Array.from(atob(b64 as string), (c) => c.charCodeAt(0))], { type: "image/png" }));
+      const c = new OffscreenCanvas(bmp.width, bmp.height);
+      const g = c.getContext("2d")!;
+      g.drawImage(bmp, 0, 0);
+      return [...g.getImageData(a as number, b as number, 1, 1).data];
+    }, [bytes.toString("base64"), x, y] as const);
+  const exportPng = async (): Promise<Buffer> => {
+    const [d] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+    return fs.readFileSync(await d.path());
+  };
+  // shapes: a 200 × 100 rectangle (2 : 1 and a bit for its outline) offers SVG, and the file has no sheet or canvas around it
+  await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: 20, zf: 0, pz: 20 }));
+  await app.frame();
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  await key(app, "v");
+  await click(app, 600, 450);
+  await p.locator("[data-sheet-export]").click();
+  await expect(p.getByTestId("export-shape")).toContainText("3 : 2");
+  await dlg.locator('[data-ex="w"]').fill("1200");
+  const deep = await exportPng();
+  expect(deep.readUInt32BE(16)).toBe(1200);
+  expect(deep.readUInt32BE(20)).toBe(800);
+  expect((await px(240, 200, deep)).slice(0, 3), "the rectangle, a fifth across and a quarter down").not.toEqual([255, 255, 255]);
+  expect((await px(1000, 700, deep)).slice(0, 3)).toEqual([255, 255, 255]);
+  await key(app, "Escape");
+  // the rectangle alone: its own box, SVG offered
+  await click(app, 450, 350);
+  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  await expect(dlg).toBeVisible();
+  await expect(dlg.locator('[data-format="svg"]')).toBeVisible();
+  const shape = await p.getByTestId("export-shape").innerText();
+  expect(shape).toMatch(/Shape \d/);
+  await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });

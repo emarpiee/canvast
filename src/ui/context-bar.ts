@@ -50,6 +50,9 @@ export interface ContextActions {
   /** Picked paths can be saved as an SVG file. */
   canExportSvg(): boolean;
   exportSvg(): void;
+  /** Export…: choose a size (from the shape) and save a sheet, a picture or shapes as a picture file (ADR 0147). */
+  canExport(): boolean;
+  exportPicture(): void;
   downloadFile(): void;
   openFile(): void;
   hasLibraryItems(): boolean;
@@ -144,6 +147,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
       btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)"),
+      btn("exportpic", ICONS.imageUp, "Export…: choose a size and save it as a picture (PNG, WebP, JPEG or SVG)"),
       btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
       btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
     group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
@@ -222,6 +226,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "copypng": actions.copyRendered(); break;
       case "bake": actions.bake(); break;
       case "exportsvg": actions.exportSvg(); break;
+      case "exportpic": actions.exportPicture(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
@@ -300,6 +305,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("copypng").hidden = !pic?.still;
     q("bake").hidden = !pic?.still;
     q("exportsvg").hidden = !actions.canExportSvg();
+    q("exportpic").hidden = !actions.canExport();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
     bar.hidden = false;

@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, sheetScalesContents, setSheetScale, resizeSheet, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, svgOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -72,6 +72,8 @@ import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
 import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
+import { renderExport } from "./export-render";
+import { openExportDialog } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
@@ -727,8 +729,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   const hintLine = { current: null as null | { refresh(): void } };
-  /** How many screen px a px of the home zoom is at this zoom (a power of two, with the fraction of the level). */
-  const screenPerPx = (): number => { const d = depthOf(view.frameCamera); return 2 ** (Number(d.levels) + d.frac); };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
@@ -793,12 +793,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       else editor.changed();
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
-    // The sheet fields are in px as drawn at this zoom (screen px), whatever the zoom: the stored sizes are in px of the home zoom.
-    sheetSize: () => { const s = sheetSize(doc, editor), k = screenPerPx(); return s && { w: s.w * k, h: s.h * k }; },
-    resizeSheet: (w, h, final) => { const k = screenPerPx(); resizeSheet(doc, editor, w / k, h / k, final); },
-    boxOnSheet: () => { const b = boxOnSheet(doc, editor), k = screenPerPx(); return b && { ...b, x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }; },
-    moveOnSheet: (x, y, final) => { const k = screenPerPx(); moveOnSheet(doc, editor, x / k, y / k, final); },
-    resizeOnSheet: (w, h, final) => { const k = screenPerPx(); resizeOnSheet(doc, editor, w / k, h / k, final); },
+    sheetRatio: () => sheetRatio(doc, editor),
+    setSheetRatio: (r, final) => setSheetRatio(doc, editor, r, final),
+    boxOnSheet: () => boxOnSheet(doc, editor),
+    moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
+    resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
+    exportSelection: () => openExport(),
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),
     croppable: () => croppablePicture(doc, editor) !== null,
@@ -837,6 +837,29 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
   });
+  // Export… (ui/export-dialog.ts, ADR 0147): the picked sheet, picture or shapes as a picture file whose size is chosen there, from its shape.
+  const openExport = (): void => {
+    const t = exportTarget(doc, editor);
+    if (!t || appView !== "canvas") {
+      editor.message = "Pick a sheet, a picture or some shapes to export.";
+      editor.changed();
+      return;
+    }
+    openExportDialog({
+      target: t,
+      render: (w, h, bg) => renderExport({ doc, index, assets, theme }, t, w, h, bg),
+      svg: (size) => svgOfTarget(doc, t, size),
+      say: (text) => { editor.message = text; editor.changed(); },
+      toLibrary: async (file) => {
+        if (!session.catalog) throw new Error("the library is not available in this tab");
+        const { record } = await assets.importFileDetailed(file, false);
+        const where = await fileInLibrary(session, record.hash, "Exports", ["export"]);
+        editor.message = `Exported “${file.name}” in ${where}.`;
+        editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+        editor.changed();
+      },
+    });
+  };
   // The dice (interaction/random-view.ts): the camera goes to a random place and zoom with nothing of the canvas near.
   const goRandomView = (): void => {
     const fc = randomEmptyView(doc.space, viewIsEmpty(index, view.viewport));
@@ -1143,6 +1166,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       canExportSvg: () => canExportSvg(doc, editor),
       exportSvg: () => saveSelectionSvg(),
+      canExport: () => exportTarget(doc, editor) !== null,
+      exportPicture: () => openExport(),
       canDownload: () => pickedFiles(doc, editor).length > 0,
       downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
       openFile: () => {
@@ -1394,6 +1419,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
       ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor, profile) })),
       { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
+      { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
       { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },

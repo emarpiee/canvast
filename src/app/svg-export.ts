@@ -55,7 +55,7 @@ interface Placed {
 }
 
 /** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
-export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => []): string | null {
+export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => [], size?: { w: string; h: string }): string | null {
   const objs = paths.filter((o) => !o.hidden && o.sub.length > 0);
   if (!objs.length) return null;
   const base = objs[0]!;
@@ -214,5 +214,5 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     const out = render(p);
     return m ? `  <g mask="url(#${m})">\n${out}\n  </g>` : out;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${num(w)}" height="${num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${size ? esc(size.w) : num(w)}" height="${size ? esc(size.h) : num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

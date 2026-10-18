@@ -1,4 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
+import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { createBar, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
@@ -62,15 +63,17 @@ export interface ToolbarActions {
   fonts(): Promise<Array<{ hash: string; name: string; unusable: string }>>;
   importFont(file: File): Promise<string | null>;
   setPin(patch: { h?: string; v?: string }): void;
-  /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
-  sheetSize(): { w: number; h: number } | null;
-  resizeSheet(w: number, h: number, final?: boolean): void;
-  /** Where the one picked object on a sheet is and how big, in px from the sheet's corner (null: none is), and moving or resizing it. */
+  /** The shape (width ÷ height) of the one picked sheet, and giving it another, keeping its area (ADR 0147). */
+  sheetRatio(): number | null;
+  setSheetRatio(ratio: number, final?: boolean): void;
+  /** Where the one picked object on a sheet is and how big, in per cent of the sheet (null: none is), and moving or resizing it. */
   boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
   moveOnSheet(x: number, y: number, final?: boolean): void;
   /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
   sheetScale(): boolean;
   setSheetScale(on: boolean): void;
+  /** Export…: the size is chosen there (ADR 0147). */
+  exportSelection(): void;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
@@ -187,18 +190,8 @@ const KIND_LABEL: Record<string, string> = { sheet: "Sheet", shape: "Shape", tex
 /** The kind of picked item the Properties bar sorts its controls by. */
 const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
 
-/** Paper and screen sizes for a sheet, in px at 96 to the inch (ADR 0121 left them out; ADR 0133). */
-const SHEET_PRESETS: ReadonlyArray<{ group: string; items: ReadonlyArray<{ name: string; w: number; h: number }> }> = [
-  { group: "Paper", items: [{ name: "A5", w: 559, h: 794 }, { name: "A4", w: 794, h: 1123 }, { name: "A4 landscape", w: 1123, h: 794 }, { name: "A3", w: 1123, h: 1587 }, { name: "A3 landscape", w: 1587, h: 1123 }, { name: "A2", w: 1587, h: 2245 }, { name: "Letter", w: 816, h: 1056 }, { name: "Letter landscape", w: 1056, h: 816 }, { name: "Legal", w: 816, h: 1344 }, { name: "Tabloid", w: 1056, h: 1632 }] },
-  { group: "Screen", items: [{ name: "HD 720p", w: 1280, h: 720 }, { name: "Full HD", w: 1920, h: 1080 }, { name: "4K", w: 3840, h: 2160 }, { name: "Phone portrait", w: 390, h: 844 }, { name: "Tablet", w: 1024, h: 768 }, { name: "Desktop", w: 1440, h: 900 }] },
-  { group: "Social", items: [{ name: "Square post", w: 1080, h: 1080 }, { name: "Story", w: 1080, h: 1920 }, { name: "Link preview", w: 1200, h: 630 }, { name: "Banner", w: 1500, h: 500 }, { name: "Icon", w: 512, h: 512 }] },
-];
-
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
-
-/** A length for a field: six significant digits, so a size deep in a zoom (0.0035 px) is not shown as 0. */
-const shown6 = (v: number): string => String(Number(v.toPrecision(6)));
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
@@ -257,13 +250,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-kind="picture" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
-        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in px as drawn at this zoom, from the sheet's top-left corner">On sheet
-          <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (px)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (px)"></label>
-          <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (px)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (px)"></label></span></span>
-        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="Size of the sheet, as drawn at this zoom (px of the screen); only the sheet changes, what is on it follows its pin"><label>Size
-          <input type="number" data-sheet-w min="0" step="any" inputmode="decimal" aria-label="Sheet width"></label> × <label><input type="number" data-sheet-h min="0" step="any" inputmode="decimal" aria-label="Sheet height"></label>
-          <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select>
-          <select data-sheet-preset aria-label="Sheet size preset" title="A paper or screen size: the sheet takes it (its top-left corner stays)"><option value="">Preset…</option>${SHEET_PRESETS.map((g) => `<optgroup label="${g.group}">${g.items.map((i) => `<option value="${i.w},${i.h}">${i.name} (${i.w} × ${i.h})</option>`).join("")}</optgroup>`).join("")}</select>
+        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
+          <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
+          <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
+        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="The shape of the sheet: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
+          <span class="tb-shape" data-sheet-shape aria-hidden="true"></span>
+          <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Sheet shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square), then Enter. Add portrait or landscape to turn it."></label>
+          <select data-sheet-preset aria-label="Sheet shape preset" title="A common shape: the sheet takes it, keeping its area and its top-left corner"><option value="">Shapes…</option>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
+          <button type="button" data-sheet-turn aria-label="Turn the sheet on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
+          <button type="button" data-sheet-export aria-label="Export…: choose a size and save the sheet as a picture" title="Export…: the shape becomes a size here: px, inches, cm or mm at a resolution, as PNG, WebP, JPEG or SVG">${ICONS.imageUp}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
@@ -535,22 +530,49 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
-  const sheetUnit = (): number => Number(sheetField("[data-sheet-unit]").value) || 1;
-  const sheetApply = (final: boolean): void => {
-    const w = Number(sheetField("[data-sheet-w]").value) * sheetUnit(), h = Number(sheetField("[data-sheet-h]").value) * sheetUnit();
-    if (w > 0 && h > 0) actions.resizeSheet(w, h, final);
-  };
-  for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) liveNumber(sheetField(f), (_v, final) => sheetApply(final));
   const onSheet = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
   for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => actions.moveOnSheet(Number(onSheet("[data-on-x]").value), Number(onSheet("[data-on-y]").value), final));
   for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => actions.resizeOnSheet(Number(onSheet("[data-on-w]").value), Number(onSheet("[data-on-h]").value), final));
-  sheetField("[data-sheet-unit]").addEventListener("change", () => editor.changed()); // (the same size, said in another unit)
+  // The shape of a sheet: typed (16:9, A4 portrait …), picked from the shapes, or turned on its side. Anything else keeps what it was.
+  const ratioField = sheetField("[data-sheet-ratio]");
+  const showRatio = (): void => {
+    const r = actions.sheetRatio();
+    if (r !== null && document.activeElement !== ratioField) ratioField.value = formatRatio(r);
+  };
+  const commitRatio = (): void => {
+    const r = parseRatio(ratioField.value);
+    ratioField.toggleAttribute("aria-invalid", r === null);
+    if (r === null) {
+      editor.message = `“${ratioField.value}” is not a shape. Try 16:9, 3/2, 1.5, A4 or square.`;
+      editor.changed();
+      ratioField.value = formatRatio(actions.sheetRatio() ?? 1);
+      ratioField.removeAttribute("aria-invalid");
+      return;
+    }
+    actions.setSheetRatio(r, true);
+    ratioField.value = formatRatio(actions.sheetRatio() ?? r);
+  };
+  ratioField.addEventListener("change", commitRatio);
+  ratioField.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") ratioField.blur();
+    else if (e.key === "Escape") {
+      ratioField.value = formatRatio(actions.sheetRatio() ?? 1);
+      ratioField.blur();
+      e.stopPropagation();
+    }
+  });
   sheetField("[data-sheet-preset]").addEventListener("change", (e) => {
     const sel = e.target as HTMLSelectElement;
-    const [w, h] = sel.value.split(",").map(Number);
+    const r = Number(sel.value);
     sel.value = "";
-    if (w && h) actions.resizeSheet(w, h, true);
+    const now = actions.sheetRatio();
+    if (r > 0 && now !== null) actions.setSheetRatio(now < 1 ? 1 / r : r, true); // (a sheet on its side stays on its side)
   });
+  root.querySelector<HTMLElement>("[data-sheet-turn]")!.addEventListener("click", () => {
+    const now = actions.sheetRatio();
+    if (now !== null) actions.setSheetRatio(1 / now, true);
+  });
+  root.querySelector<HTMLElement>("[data-sheet-export]")!.addEventListener("click", () => actions.exportSelection());
   root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
     actions.setSheetScale(!actions.sheetScale());
   });
@@ -897,23 +919,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-on-sheet]")!.hidden = !on;
     if (on) {
       root.querySelector<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
-      for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = "1"; // (a dragged pixel is a pixel of the screen)
+      for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = "0.1"; // (a dragged pixel is a tenth of a per cent)
       for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
         const el = onSheet(f);
-        if (document.activeElement !== el) el.value = shown6(v);
+        if (document.activeElement !== el) el.value = String(Math.round(v * 100) / 100);
       }
     }
-    const sz = pick && still ? actions.sheetSize() : null;
-    root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = !sz;
-    if (sz) {
-      const u = Number(root.querySelector<HTMLSelectElement>("[data-sheet-unit]")!.value) || 1;
-      const round = (v: number): string => shown6(v / u);
-      for (const [f, v] of [["[data-sheet-w]", sz.w], ["[data-sheet-h]", sz.h]] as const) {
-        const el = root.querySelector<HTMLInputElement>(f)!;
-        el.dataset["scrubStep"] = String(1 / u);
-        root.querySelector<HTMLElement>("[data-sheet-scale]")!.setAttribute("aria-pressed", String(actions.sheetScale()));
-        if (document.activeElement !== el) el.value = round(v);
-      }
+    const ratio = pick && still ? actions.sheetRatio() : null;
+    root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;
+    if (ratio !== null) {
+      showRatio();
+      const shape = root.querySelector<HTMLElement>("[data-sheet-shape]")!;
+      shape.style.setProperty("--shape", String(Math.min(Math.max(ratio, 0.2), 5)));
+      root.querySelector<HTMLElement>("[data-sheet-scale]")!.setAttribute("aria-pressed", String(actions.sheetScale()));
     }
     for (const [key, shown, value] of fields) {
       if (!still && pick) continue;

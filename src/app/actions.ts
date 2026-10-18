@@ -32,6 +32,8 @@ import { buildNetwork } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
 import { exportSvg } from "./svg-export";
+import type { ExportTarget } from "./export-render";
+import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
@@ -1436,6 +1438,47 @@ export function strokeToPath(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
+/**
+ * What Export… would send out (ADR 0147), or null when nothing is picked: a sheet (its own box, with what is on it) when one sheet is
+ * picked, otherwise the picked things (their box, with half the widest outline added). Only these are drawn, not what lies behind them.
+ */
+export function exportTarget(doc: DocumentStore, editor: EditorState): ExportTarget | null {
+  const sel = selected(doc, editor).filter((o) => !o.hidden && !isMaskObject(o));
+  if (!sel.length) return null;
+  const ids = new Set<ObjectId>([...sel.map((o) => o.id)]);
+  for (const id of descendantsOf(doc.all(), new Set(ids))) ids.add(id);
+  const all = [...ids].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.hidden && !isMaskObject(o));
+  const sheets = sel.filter((o) => isContainer(o) && !o.rot);
+  const sheet = sheets.length === 1 && sel.every((o) => o.id === sheets[0]!.id || ids.has(o.id) && descendantsOf(doc.all(), new Set([sheets[0]!.id])).includes(o.id)) ? sheets[0]! : null;
+  const first = sheet ?? sel[0]!;
+  const frame = first.frame ?? doc.space.world;
+  const bounds = sheet ? worldBounds(sheet) : unionBounds(sel.map((o) => expressObjectIn(o, frame)));
+  if (!bounds) return null;
+  let { min, max } = bounds;
+  if (!sheet) {
+    // the outlines are part of what is seen: add half the widest to every side
+    const half = Math.max(0, ...sel.map((o) => (o.kind === "path" && o.stroke !== null ? o.width / 2 : o.kind === "stroke" ? o.width / 2 : 0) * 2 ** (o.unit - first.unit)));
+    if (half > 0) {
+      const pad = D.shift(D.fromNumber(half), first.unit);
+      min = { x: D.sub(min.x, pad), y: D.sub(min.y, pad) };
+      max = { x: D.add(max.x, pad), y: D.add(max.y, pad) };
+    }
+  }
+  const lw = D.toNumber(D.shift(D.sub(max.x, min.x), -first.unit)), lh = D.toNumber(D.shift(D.sub(max.y, min.y), -first.unit));
+  if (!(lw > 0 && lh > 0) || !Number.isFinite(lw + lh)) return null;
+  const paths = all.filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o));
+  const vectors = all.every((o) => o.kind === "path") && paths.length ? paths : null;
+  const only = sel.length === 1 ? sel[0]! : null;
+  const original = only && only.kind === "image" && !only.crop ? { w: only.pixelW, h: only.pixelH } : null;
+  const name = sheet?.name ?? only?.name ?? (only ? (only.kind === "image" ? "picture" : only.kind === "path" ? "shape" : only.kind) : "selection");
+  return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original };
+}
+
+/** The picked vectors as SVG text with the width and height the export asks for (any unit SVG knows), or null when it cannot. */
+export function svgOfTarget(doc: DocumentStore, t: ExportTarget, size: { w: string; h: string }): string | null {
+  return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size) : null;
+}
+
 /** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
 const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && !isMaskObject(o));
 
@@ -1939,25 +1982,15 @@ export function setSheetScale(doc: DocumentStore, editor: EditorState, on: boole
   editor.changed();
 }
 
-/** Width and height in px of the one picked sheet (ADR 0121), or null. */
-export function sheetSize(doc: DocumentStore, editor: EditorState): { w: number; h: number } | null {
+/** The shape of the one picked sheet: its width ÷ height (ADR 0147: a sheet has a shape, and gets a size only when it is exported), or null. */
+export function sheetRatio(doc: DocumentStore, editor: EditorState): number | null {
   const s = pickedSheet(doc, editor);
-  if (!s) return null;
-  const b = worldBounds(s);
-  const w = D.toNumber(D.sub(b.max.x, b.min.x)), h = D.toNumber(D.sub(b.max.y, b.min.y));
-  return Number.isFinite(w + h) && w > 0 && h > 0 ? { w, h } : null;
+  const sz = s && sheetLocalSize(s);
+  return sz ? sz.w / sz.h : null;
 }
 
-/**
- * Give the picked sheet a size in px (ADR 0121), its top-left corner fixed. Only the sheet changes size: what is on it follows its own
- * pin (left/top by default, so it stays as it is; "Scale" makes it grow with the sheet), unless the editor is set to scale the contents,
- * which makes all of it grow with the sheet. One undo step.
- */
-export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, h: number, final = true): void {
-  const s = pickedSheet(doc, editor);
-  const now = sheetSize(doc, editor);
-  if (editor.blockEdit() || !s || !now || !(w > 0 && h > 0 && Number.isFinite(w + h))) return;
-  const kx = w / now.w, ky = h / now.h;
+/** Scale the picked sheet by (kx, ky) about its top-left corner: what is on it follows its pin, or all of it scales (`container.scale`). One undo step. */
+function scaleSheet(doc: DocumentStore, editor: EditorState, s: CanvasObject, kx: number, ky: number, final: boolean, label: string): void {
   if (Math.abs(kx - 1) < 1e-9 && Math.abs(ky - 1) < 1e-9) {
     if (final && editor.preview.kind !== "none") {
       editor.preview = { kind: "none" };
@@ -1969,8 +2002,21 @@ export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, 
   const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
   if (!final) return showReplaced(editor, [...plan.values()]);
   editor.preview = { kind: "none" };
-  doc.commit(doc.transaction("Resize sheet", [...plan.values()]));
+  doc.commit(doc.transaction(label, [...plan.values()]));
   editor.changed();
+}
+
+/**
+ * Give the picked sheet another shape (width ÷ height), keeping its area and its top-left corner: dragging a ratio, picking a preset or
+ * turning it on its side. Only the sheet changes: what is on it follows its own pin (left/top by default, so it stays as it is; "Scale"
+ * makes it grow with the sheet), unless the sheet has Scale contents. One undo step (shown only while `final` is false).
+ */
+export function setSheetRatio(doc: DocumentStore, editor: EditorState, ratio: number, final = true): void {
+  const s = pickedSheet(doc, editor);
+  const sz = s && sheetLocalSize(s);
+  if (editor.blockEdit() || !s || !sz || !(ratio > 0.01 && ratio < 100) || !Number.isFinite(ratio)) return;
+  const area = sz.w * sz.h;
+  scaleSheet(doc, editor, s, Math.sqrt(area * ratio) / sz.w, Math.sqrt(area / ratio) / sz.h, final, "Sheet shape");
 }
 
 /** Make each picked sheet exactly as large as what is directly on it (ADR 0108): one undo step. */
@@ -2236,25 +2282,36 @@ function pickedOnSheet(doc: DocumentStore, editor: EditorState): { o: CanvasObje
   return sheet && isContainer(sheet) && !o.locked ? { o, sheet } : null;
 }
 
+/** The size of a sheet in its own units (so it is a plain number at any depth), or null. */
+function sheetLocalSize(sheet: CanvasObject): { w: number; h: number } | null {
+  const b = worldBounds(sheet);
+  const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -sheet.unit)), h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -sheet.unit));
+  return Number.isFinite(w + h) && w > 0 && h > 0 ? { w, h } : null;
+}
+
 /**
- * Where the one picked object on a sheet is, in px from the sheet's top-left corner, and how big it is; `resizable`: it may be given
- * another width and height of its own (strokes and text only scale as a whole).
+ * Where the one picked object on a sheet is and how big it is, as percentages of the sheet (X and Y from its top-left corner, W and H of
+ * its width and height; ADR 0147: a sheet has a shape, not a size); `resizable`: it may be given another width and height of its own
+ * (strokes and text only scale as a whole).
  */
 export function boxOnSheet(doc: DocumentStore, editor: EditorState): { x: number; y: number; w: number; h: number; resizable: boolean } | null {
   const t = pickedOnSheet(doc, editor);
-  if (!t) return null;
+  const sz = t && sheetLocalSize(t.sheet);
+  if (!t || !sz) return null;
   const b = worldBounds(expressObjectIn(t.o, t.sheet.frame ?? doc.space.world)), sb = worldBounds(t.sheet); // (the object may be filed in another frame than its sheet)
-  const x = D.toNumber(D.sub(b.min.x, sb.min.x)), y = D.toNumber(D.sub(b.min.y, sb.min.y));
-  const w = D.toNumber(D.sub(b.max.x, b.min.x)), h = D.toNumber(D.sub(b.max.y, b.min.y));
+  const loc = (d: D.Dyadic): number => D.toNumber(D.shift(d, -t.sheet.unit));
+  const x = (loc(D.sub(b.min.x, sb.min.x)) / sz.w) * 100, y = (loc(D.sub(b.min.y, sb.min.y)) / sz.h) * 100;
+  const w = (loc(D.sub(b.max.x, b.min.x)) / sz.w) * 100, h = (loc(D.sub(b.max.y, b.min.y)) / sz.h) * 100;
   return Number.isFinite(x + y + w + h) ? { x, y, w, h, resizable: !t.o.rot && (t.o.kind === "path" || t.o.kind === "image") } : null;
 }
 
-/** Put the picked object on a sheet at (x, y) px from the sheet's corner: one undo step (shown only while `final` is false). */
+/** Put the picked object on a sheet at (x, y) per cent of the sheet from its corner: one undo step (shown only while `final` is false). */
 export function moveOnSheet(doc: DocumentStore, editor: EditorState, x: number, y: number, final = true): void {
   const now = boxOnSheet(doc, editor);
   const t = pickedOnSheet(doc, editor);
-  if (!now || !t || editor.blockEdit() || !Number.isFinite(x + y)) return;
-  const dx = D.fromNumber(x - now.x), dy = D.fromNumber(y - now.y);
+  const sz = t && sheetLocalSize(t.sheet);
+  if (!now || !t || !sz || editor.blockEdit() || !Number.isFinite(x + y)) return;
+  const dx = D.shift(D.fromNumber(((x - now.x) / 100) * sz.w), t.sheet.unit), dy = D.shift(D.fromNumber(((y - now.y) / 100) * sz.h), t.sheet.unit);
   if (dx.m === 0n && dy.m === 0n) {
     if (final) {
       editor.preview = { kind: "none" };
@@ -2270,7 +2327,7 @@ export function moveOnSheet(doc: DocumentStore, editor: EditorState, x: number, 
   editor.changed();
 }
 
-/** Give the picked object on a sheet this width and height in px (its top-left corner stays): one undo step (shown only while `final` is false). */
+/** Give the picked object on a sheet this width and height in per cent of the sheet (its top-left corner stays): one undo step (shown only while `final` is false). */
 export function resizeOnSheet(doc: DocumentStore, editor: EditorState, w: number, h: number, final = true): void {
   const now = boxOnSheet(doc, editor);
   const t = pickedOnSheet(doc, editor);
