@@ -1,4 +1,4 @@
-# Gaps against the engineering plan (checked 2026-10-17, updated 2026-10-18, v0.17.0, `main`)
+# Gaps against the engineering plan (checked 2026-10-17, updated 2026-10-18, v0.18.1, `main`)
 
 Owner decisions of 2026-10-17: **masks, ratings and saved searches are out of scope**; they are listed as Decided against, not as gaps.
 
@@ -12,58 +12,62 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 
 | Area | Done | Partial | Gap | Decided | Unverified | Not started |
 | --- | --- | --- | --- | --- | --- | --- |
-| §4 Content types | 21 | 4 | 1 | 1 | 1 | 0 |
-| §5 Non-destructive editing | 2 | 3 | 0 | 1 | 0 | 0 |
-| §6 Assets and search | 8 | 2 | 0 | 4 | 0 | 0 |
-| §7 Storage and portability | 6 | 2 | 2 | 1 | 0 | 0 |
+| §4 Content types | 28 | 1 | 1 | 2 | 0 | 0 |
+| §5 Non-destructive editing | 5 | 0 | 0 | 1 | 0 | 0 |
+| §6 Assets and search | 9 | 1 | 0 | 4 | 0 | 0 |
+| §7 Storage and portability | 7 | 1 | 2 | 1 | 0 | 0 |
 | §8 Performance | 3 | 1 | 1 | 2 | 1 | 0 |
-| §9 UI, Settings and accessibility | 10 | 5 | 0 | 0 | 2 | 0 |
-| §14 Hierarchy, selection, clipboard and tests | 9 | 4 | 0 | 1 | 2 | 0 |
+| §9 UI, Settings and accessibility | 15 | 2 | 0 | 0 | 0 | 0 |
+| §14 Hierarchy, selection, clipboard and tests | 11 | 4 | 0 | 1 | 0 | 0 |
 | §14.41 and roadmap | 0 | 1 | 1 | 0 | 0 | 2 |
-| **Rows counted** | **59** | **22** | **5** | **10** | **6** | **2** |
+| **Rows counted** | **78** | **11** | **5** | **11** | **1** | **2** |
 
 ## §4 Content types
 
 | Plan item | State | Note |
 | --- | --- | --- |
 | Raster import, place, resize, rotate, flip, group, hide, lock | Done | Images, GIF, WebP, JPEG, PNG; item rotation about a pivot (ADR 0018). |
-| Raster crop | Done for stills (ADR 0118) | Video and GIF are not cropped. |
+| Raster crop | Done (ADR 0118, 0137) | Stills, video and GIF. |
 | Raster masks | Decided against | Left out (owner, 2026-10-17). |
 | Raster adjustments | Done (ADR 0118) | See §5. |
 | Resolution-aware display, thumbnails, large images | Done | Tile cache, reduced copies, stored WebP thumbnails (ADR 0009, 0030, 0034). |
-| Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Partial | Reduced copies and tiles exist; no mipmap pyramid; EXIF and colour profiles are not read (the browser decides). |
-| SVG import | Done (ADR 0107) | Pasted SVG text, or Make vector copy of an SVG picture, becomes editable paths (gradients, dashes, transforms; not text, masks, clips, patterns, `<use>`). A dropped SVG file is still a picture. |
+| Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Done (ADR 0138) | Reduced copies and tiles stand in for a stored pyramid (decided: no per-level storage); EXIF and colour profiles are read and shown, and the orientation is applied. |
+| SVG import | Done (ADR 0107) | Pasted SVG text, or Make vector copy of an SVG picture, becomes editable paths (gradients, dashes, transforms, `<use>` and symbols; not text, masks, clips, patterns). A dropped SVG file is still a picture. |
 | SVG export | Done (ADR 0107) | Save as SVG from the selection bar; an outline inside or outside the edge is written centred. |
 | Vector shapes, custom paths, Bézier points and handles, fills, strokes, node editing | Done (ADR 0099) | Shape, Path and Edit nodes tools; fill and outline with transparency; join, cap and fill rule are stored (the tools set round or miter). Edges are exact at any depth (fill and thin outline; wide outlines of straight shapes); only a curved shape's outline wider than 2^14 px at the view is a dimmed approximation. |
 | Gradients on paths (ADR 0100) | Done | Linear and radial, on fills and outlines, with a gradient editor in the colour package and handles on the canvas. |
 | Boolean operations (ADR 0101, 0103) | Done | Union, intersect, subtract, exclude on the selection bar as non-destructive boolean groups (members stay editable, result derived, flatten and release); curves stay curves. |
 | Stroke position (inside, centre, outside), outline corners and ends | Done | ADR 0104; Outline options on the options bar. |
 | Corner radius (every shape with corners, curves included, per corner, boolean groups), sides, points and ratio editable after drawing | Done | ADR 0105; per-corner radii on a boolean group's result are not. |
-| Dashes | Done (ADR 0107) | Solid, Dashed, Dotted; custom lengths and offset are not offered. |
-| Clipping | **Gap** | Next slice of the vector plan (ADR 0099). |
+| Dashes, arrow heads, sharp-corner limit | Done (ADR 0107, 0139, 0142) | Solid, dashed, dotted, and a custom length, gap and start; an arrow head (solid, open, dot) at each end of an open line; the angle below which a sharp corner is cut. |
+| Clipping | Decided against | Clipping masks of arbitrary shapes are out with masks (owner, 2026-10-17); a sheet clips to its rectangle (ADR 0108). |
+| Simplify a path, pen stroke to path | Done (ADR 0139) | Curve fitting; one undo step each. |
+| Variable-width paths, corner smoothing, angular gradient, outline stroke, shape builder, lasso of nodes and editing nodes of several paths | **Gap** | Vectors II (see `docs/status.md`): each needs geometry or a node-selection model that is not in the code. |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | Done (ADR 0113) | Ink nib angle and pencil breadth follow the lean; mouse and touch unchanged. |
 | Object eraser (swept, one undoable step, never deletes the original) | Done | ADR 0022. Whole-group option. |
 | Stroke / path eraser (distinct from the object eraser) | Done for strokes (ADR 0111) | Scissors mode on the eraser; vector paths are not trimmed. |
 | Rich text: WYSIWYG with a Markdown source, mentions, backlinks, Copy Markdown | Done | ADR 0013, 0039, 0040. |
-| Text: font selection, line height, letter spacing, text boxes with several fonts | Partial | Line height and letter spacing done (ADR 0113). Font choice needs a decision: each font is bundled outlines (size of the single file). |
-| Text: bidirectional text, IME, text-to-path export | Unverified | Not tested in this check. |
+| Text: font selection, line height, letter spacing, text boxes with several fonts | Done (ADR 0113, 0127, 0132, 0139) | Fonts from the library (TrueType, OpenType with CFF, WOFF, WOFF2, variable fonts), real bold and italic files, kerning, OpenType features and axes, several fonts in one text. No font is bundled beyond the one for the interface (the owner chooses if one should be). |
+| Text: underline, strikethrough, colour and size of a range, links, nested lists, gradient, outline, case, line limit, set height, text on a path | Done (ADR 0130, 0131) | Markdown with `<u>`, `~~`, `<span style>`. |
+| Note tool (a text on a card) | Done (ADR 0140) | Key M. |
+| Text: bidirectional text, IME, text-to-path export | Done (ADR 0102, 0132) | UAX 9 order and Arabic joining; an input method tested in Chromium (a synthetic composition; Firefox has none to drive). |
 | Video: on-canvas player, repeat, seek step (3 s), Extract Frame, paused frame persisted, decoder budget, unsupported codecs | Done | ADR 0041 to 0046. |
-| Video: crop, adjustments, playback speed | Partial | Adjustments done (ADR 0118); no crop; no speed control. |
+| Video: crop, adjustments, playback speed | Done (ADR 0118, 0137) | |
 | Animated GIF: real frame parser, 1-frame step, Extract Frame | Done | ADR 0042. |
 | Audio: player, waveform, volume, repeat, 1 s step | Done | |
 | Audio: trimming or range selection | Done (ADR 0112) | Start here, End here, Whole file; video has it too. |
-| Content-type adapter architecture, future types (PDF, 3D) | Partial | Any file is kept and shown as a card with its kind (ADR 0078); nothing renders a PDF page or a 3D model. |
+| Content-type adapter architecture, future types (PDF, 3D) | Partial (ADR 0078, 0139) | Any file is kept and shown as a card with its kind; STL and OBJ cards show the model, a PDF card its page count. No PDF page is rendered and no other 3D format is read. |
 
 ## §5 Non-destructive editing
 
 | Plan item | State | Note |
 | --- | --- | --- |
-| Per-object opacity and blend modes | Partial | The only part that exists (ADR 0047). |
+| Per-object opacity and blend modes | Done (ADR 0047) | |
 | Crop | Done for stills (ADR 0118) | |
 | Mask | Decided against | Left out (owner, 2026-10-17). |
-| Exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, RGB, curves, levels, blur, sharpen, grain | Partial (ADR 0118) | All but RGB, curves and levels. |
-| Editable, reorderable stacks; Copy and Paste Adjustments across image, video and GIF | Partial (ADR 0118) | One set of numbers, not a stack; copy and paste across image, video and GIF are done. |
+| Exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, RGB, curves, levels, blur, sharpen, grain | Done (ADR 0118, 0136) | |
+| Editable, reorderable stacks; Copy and Paste Adjustments across image, video and GIF | Done (ADR 0118, 0136) | Layers of adjustments that can be added, reordered, hidden and removed. |
 | Copy Rendered Media (adjustments baked in) | Done for stills (ADR 0118) | Copy as picture, and Make a new picture. |
 
 ## §6 Assets and search
@@ -75,7 +79,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Tags (several per asset, Obsidian rules, nested), favourites, nested folders (one folder per asset) | Done | ADR 0011, 0057, 0084. |
 | Sorting, file-type filters, usage filter, Boolean search, suggestions | Done | ADR 0069, 0071, 0082, 0083, 0091. |
 | Bulk tagging, folders, favourites, rename; direct placement; usage to instance navigation | Done | ADR 0058, 0077, 0085. |
-| Metadata inspector | Partial | Name, size, pixels, type, usage, tags, folder; no EXIF, codec or colour data. |
+| Metadata inspector | Done (ADR 0138) | Name, size, pixels, type, usage, tags, folder, and what the file says: EXIF, colour profile, PNG text, codec. |
 | Search at large scale | Partial | A linear filter over the in-memory list; to be measured in Phase 8. |
 | Independent collections | Decided against | One folder per asset plus tags (ADR 0057). |
 | Dynamic smart folders | Decided against | Built (ADR 0035), then replaced by file types (ADR 0082). The plan still lists them. |
@@ -98,7 +102,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | ZIP64, archives above 4 GiB or 65,535 entries | Done (ADR 0115) | Written and read; the ceiling is the browser's Blob size. |
 | Streaming export and import without the whole archive in memory | Partial (ADR 0115) | Built from Blob slices and verified by streaming; not measured at multi-GB sizes. |
 | Hundreds of gigabytes, chunked or desktop-assisted fallback | **Gap** | Not offered. |
-| Incremental backup chain; last verified backup shown | Partial | The status is shown; there is no incremental backup. |
+| Incremental backup chain; last verified backup shown | Done (ADR 0133) | A chain of files restores as one; the status is shown. |
 | Update-safe origin for a replaced HTML file | **Gap** | Phase 8. The Storage tab explains it; there is no upgrade test. |
 
 ## §8 Performance
@@ -126,15 +130,15 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Lucide icons, bundled, labelled | Done | `src/ui/icons.ts`, `docs/reference/icons.md`. |
 | Layers panel, bookmarks, tags panel, canvas search, selection action bar, contextual toolbars | Done | ADR 0024, 0025, 0051, 0060, 0076. |
 | Phone and medium layouts, touch | Done | ADR 0061, 0097. |
-| Storage and Backups tab | Partial | Usage, quota and persistence are shown; backup, export and import live in the workspace menu, not here. |
-| Performance tab | Partial | Adaptive quality, Animation and speed; no backend choice, quality tier or cache limits. |
-| About and Diagnostics tab | Partial | The Develop tab shows the version (fixed in this check; it was blank), developer tools; no error log, capability results, licences list or diagnostic export. |
+| Storage and Backups tab | Done (ADR 0133) | Usage, quota, persistence, and backup, export and import. |
+| Performance tab | Done (ADR 0135) | Adaptive quality, the quality held when it is off, memory for pictures, animation and speed. Canvas 2D is the only backend (ADR 0002). |
+| About and Diagnostics tab | Done (ADR 0135) | Version, what the browser can do, the errors of the session, licences and a report to save. |
 | Privacy tab, Collaboration tab | Partial | Explanations only. Nothing to set while there is no network and no collaboration. |
 | Command palette; Settings reachable from it | Done (ADR 0117) | Ctrl+K. |
 | Minimap or overview, tours or presentation paths, camera transitions | Partial (ADR 0116) | Tour of the bookmarks and gliding done; a minimap is decided against (no bounds, objects at every depth). |
 | Navigation history (previous view) | Done (ADR 0116) | Alt+Shift+Left and Alt+Shift+Right. |
-| Context menus, drag between panels, detachable surfaces | Unverified | Not confirmed in this check. |
-| Contrast validated against actual ratios | Unverified | ADR 0050 audited by hand; no automated contrast test found. |
+| Context menus, drag between panels, detachable surfaces | Done (ADR 0123, 0141) | A right click on the canvas; panels drag, stack, float and fold, by keyboard too. |
+| Contrast validated against actual ratios | Done (ADR 0141) | `a11y.spec.ts` computes the ratio of every visible text in both themes and three views. |
 
 ## §14 Hierarchy, selection, clipboard and tests
 
@@ -150,12 +154,12 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Duplicate, move and reorder canvases and boards | Done (ADR 0110) | In the More menu of the navigator. |
 | Copy Object, duplicate, paste; Copy Markdown | Done | ADR 0038. |
 | Copy Original Asset, Copy Rendered Media, Copy Adjustments | Partial (ADR 0118) | Rendered and adjustments done; the original is "Download the original". |
-| System-clipboard image paste, directory import, remote URL import (optional) | Unverified | Drop and file import work; paste from the system clipboard and folders were not confirmed. |
+| System-clipboard image paste, directory import, remote URL import (optional) | Partial (ADR 0134) | A picture on the clipboard and a dropped or chosen folder are imported (the folder's files filed in library folders); a remote URL is not (no network by design). |
 | Single file, `file://`, no network (checked by tests), reproducible build | Partial | The build prints a hash and the offline check passes; a clean-machine test is Phase 9. |
 | U1, U2, U4, U5, U7, U8 | Done | `editing.spec.ts`. |
-| U3, U6, U9, U10 | Unverified | Named in `phase-0b.md` and ADR 0003; this check did not confirm a test for each. |
+| U3, U6, U9, U10 | Done (ADR 0141) | `scenarios.spec.ts`. |
 | U11 (CPU-only), U12 (crop or adjustment under an overlay) | Partial | U11 runs in the `chromium-cpu` project; U12 cannot exist until there is crop or an adjustment. |
-| Scenarios I (dual views) and J (hierarchy) | Partial | Views switch with state kept; the 1,000-switch leak test and the duplicate, move and reorder steps are not there. |
+| Scenarios I (dual views) and J (hierarchy) | Done (ADR 0110, 0141) | I: `scenarios.spec.ts` (1,000 switches, nodes, listeners and heap); J: `organize.spec.ts`. |
 
 ## §14.41 and roadmap
 
@@ -164,14 +168,14 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Local and online collaboration, roles, E2EE | **Gap (optional)** | Phase 10; Settings says it is off. |
 | Phase 8 Scale and compatibility | Not started | Large projects, qualification matrix, file-origin upgrade. |
 | Phase 9 Standalone release | Not started | A single file, README and `THIRD_PARTY_NOTICES.md` exist; no clean-machine test and no reproducible-build check. |
-| Phase 5 Creative editing | Partial | Pens, eraser, Markdown notes, arrange done; images and vectors editing and adjustments are not. |
+| Phase 5 Creative editing | Partial | Pens, eraser, text, notes, arrange, picture crop and adjustments, vectors done; the long tail of Vectors II (above) is not. |
 
 ## What to look at first
 
 | Order | Gap | Why |
 | --- | --- | --- |
-| 1 | Text fonts: which fonts to bundle (each is outlines in the single file) | Needs the owner's choice; line height and letter spacing are done |
-| 2 | Incremental backup chain; save straight to a chosen file for very large archives | ZIP64 removed the format limit; the rest needs archives matched to what they came from |
-| 3 | Video and GIF crop and speed; RGB, curves and levels; an adjustment stack | The first slice of pictures (crop, adjust) is done for stills |
-| 4 | Vector: clipping masks of arbitrary shapes (dropped by decision), dashes custom, miter angle, arrow ends, outline stroke, shape builder | See the vector research report |
-| 5 | Phase 8 and 9 checks, the full suite and a Firefox pass of the whole | The full suite has not run since v0.16.0 |
+| 1 | Vectors II: variable-width paths, corner smoothing, angular gradient, outline stroke, shape builder, lasso of nodes and nodes of several paths | Each needs stroke offsetting, region finding or a multi-node selection model that is not in the code |
+| 2 | PDF page rendering and other 3D formats | A renderer to ship offline (its size in the single file is the cost) |
+| 3 | Phase 8 (large projects, search at scale, qualification matrix, update-safe origin) and Phase 9 (clean-machine test, reproducible build) | Each is a phase of its own in `docs/status.md` |
+| 4 | Hundreds of gigabytes; streaming archives measured at multi-GB sizes | Not offered; the browser's Blob size is the ceiling |
+| 5 | 60 and 120 FPS on reference devices; cold and warm startup benchmarks; a low-memory tier | Need devices and a recorded method |

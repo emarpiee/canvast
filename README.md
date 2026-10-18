@@ -6,18 +6,34 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: v0.18.0, the text tool revamp after UI polish (v0.17.0).** Done:
+> **Status: v0.18.1, the backlog run after the text tool revamp (v0.18.0).** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
 > Canvases model with safe incremental saving, a shared Assets library with
 > tags, folders and file types, `.canvast` archives and plain ZIP export,
 > text, groups, hide and lock, snapping, rotation, four pens, videos, audio
 > and GIFs with an on-canvas player, a Settings view, accessibility options and
-> search with AND, OR, XOR and NOT. **Not done:** non-destructive editing
-> (crop, adjustments), ratings, similar-image review, Phase 8 (scale and
-> compatibility), Phase 9 (standalone release) and collaboration. See
+> search with AND, OR, XOR and NOT, crop and adjustments of pictures, video and
+> GIF, vectors, fonts from the library, and incremental backups. **Not done:**
+> the long tail of the vector tools (Vectors II), PDF page rendering, Phase 8
+> (scale and compatibility), Phase 9 (standalone release) and collaboration. Ratings,
+> saved searches and masks are left out on purpose. See
 > [Roadmap and status](docs/status.md) and
 > [gaps against the plan](docs/reference/plan-gaps.md). This README describes
 > only what exists.
+>
+> **v0.18.1 in short:** the font engine reads TrueType, OpenType with CFF, WOFF,
+> WOFF2 and variable fonts (real bold and italic files, kerning, features, axes,
+> bidirectional text) and a text can use several fonts; text ranges (underline,
+> strikethrough, colour, size, links, nested lists, gradient, outline, case, a
+> set height, text on a path); the **Note tool** (`M`); a right-click menu and a
+> command palette that records macros and takes values; red, green, blue, levels,
+> curves and stacks of adjustments; crop and speed for video and GIF; what a file
+> says about itself (EXIF, colour profile, codec); 3D models (STL, OBJ) and PDFs
+> with a preview card; folder and clipboard import; incremental backups, saved
+> styles in archives, `.ase` and `.aco` palettes; sheet size presets; dash numbers,
+> arrow heads, a sharp-corner limit, Simplify, pen stroke to path, SVG `<use>`; an
+> About and diagnostics tab; panel title bars by keyboard; an automated contrast
+> audit. Details in the [changelog](CHANGELOG.md).
 >
 > **v0.18.0 in short:** the text tool has its look in the options bar (colour with
 > transparency, size, line height, letter spacing, alignment, auto or fixed width),
@@ -195,8 +211,15 @@ or network connection.
   **double-click** a text to edit it. Esc, **Done** or clicking away
   finishes; emptying a text deletes it.
 - **Format bar** while editing: Bold, Italic (`Ctrl/⌘+B`, `Ctrl/⌘+I`),
-  Heading 1–3, Body, bulleted and numbered lists. Pasted text arrives as
-  plain text.
+  Underline, Strikethrough, Link, Colour, Bigger and Smaller for the selected
+  words, a Font for them, Heading 1–3, Body, bulleted and numbered lists
+  (`Tab` nests an item). Pasted text arrives as plain text.
+- **Look in the Properties bar:** colour (or a gradient) and an outline, size,
+  line height, letter spacing, alignment, auto or fixed width, paragraph space,
+  first-line indent, case, most lines, a set height with where the words sit,
+  kerning, OpenType features and the axes of a variable font; fonts come from
+  the library (`.ttf`, `.otf`, `.woff`, `.woff2`); texts can be set along a path,
+  and the **Note tool** (`M`) makes a text on a coloured card.
 - **What you edit is what you get:** the editor sits exactly over the text,
   in the same font, size and line breaks.
 - **Markdown inside.** Each text is stored as a Markdown entry.
@@ -231,8 +254,6 @@ or network connection.
   standalone module in `src/colour-picker/` (`npm run build:picker` builds it alone).
 - **Media:** videos, audio and GIFs play on the canvas with a player; a frame
   can be extracted as a picture.
-- **Text:** `@` mentions an object by stable id, with backlinks across a
-  board's canvases.
 - **Settings and accessibility:** a Settings view (device and canvas scopes,
   reset, theme), rebindable tool keys, interface size, contrast and motion
   options, and layouts for medium and phone screens.
@@ -245,10 +266,11 @@ or network connection.
 | Pan | Middle-drag · hold **Space** and drag · Hand tool drag · two-finger drag · shift+wheel · arrow keys (shift = larger steps) |
 | Zoom at centre | `+` / `=` and `-` (shift = 4× step) · on-screen `+` / `−` |
 | Return to origin | `0` · `Home` key · on-screen house button |
-| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text |
+| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text · `M` note · `U` shape · `B` path · `N` nodes · `C` sheet · `E` eraser |
 | Copy · cut · paste · duplicate the selection | `Ctrl/⌘+C` · `X` · `V` · `D` (pasted centred in the view, at its on-screen size) |
 | Edit text | Text tool click · double-click with Select · `Esc` or `Ctrl/⌘+Enter` to finish |
 | Undo / redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
+| Any command | `Ctrl/⌘+K` opens the command palette (`@kind` narrows it; a command can take a value; macros record and replay) · a right click on the canvas opens a menu of what fits |
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
 | Step to the next item | `W` `A` `S` `D` (rebind in Settings > Shortcuts; Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
@@ -521,28 +543,28 @@ docs/status.md              roadmap and current status (single source of truth)
     show as neutral grey.
   - Marks cannot be selected; zoom in to edit.
 - **Not implemented:**
-  - non-destructive editing of pictures: crop, masks, adjustments and filters
-    (only opacity and blend modes exist);
-  - picking that respects image transparency (images are picked by their
-    bounds);
-  - PDF;
-  - in text: other fonts and weights, alignment, links, code, right-to-left
-    and complex scripts (Arabic, Indic), and changing the wrap width on its
-    own;
-  - ratings, filters by colour or size, duplicate review and similar-image
-    search in the library; dragging an asset onto the canvas (use Place);
-  - renaming or deleting an in-canvas tag across canvases;
-  - collaboration.
+  - the long tail of the vector tools (Vectors II in
+    [the roadmap](docs/status.md)): variable-width paths, corner smoothing,
+    an angular gradient, outline stroke, a shape builder, and selecting nodes
+    with a lasso or editing the nodes of several paths at once;
+  - PDF pages as pictures (a PDF is kept and shown as a card with its page
+    count), and 3D formats other than STL and OBJ (and those only as a
+    preview card);
+  - complex scripts other than Arabic and Hebrew (Indic shaping), and
+    OpenType positioning beyond kerning;
+  - Phase 8 (large projects, search at scale) and Phase 9 (a clean-machine
+    test, a reproducible build), and collaboration;
+  - left out on purpose: masks, ratings, saved searches, a minimap, vector
+    networks.
 - **Text and system fonts.** Characters the bundled font lacks use the
   system font: their width comes from the browser, so such text can wrap
   differently on another computer, and in the editor its line can sit a
   few px lower than on the canvas.
-- **Large backups.** One archive holds at most 4 GiB and 65,535 files, and it
-  is built in the browser before download. Export and import speed for large
-  workspaces has not been measured.
-- **Large asset libraries.** Thumbnails are generated in memory each
-  session, and the grid draws every card. Very large libraries (many
-  thousands of assets) have not been measured.
+- **Large backups.** Archives use ZIP64 past 4 GiB or 65,535 files, built in
+  the browser from slices of the stored files; their speed at multi-GB sizes
+  has not been measured.
+- **Large asset libraries.** Thumbnails are stored; the grid draws every card.
+  Very large libraries (many thousands of assets) have not been measured.
 - Tested in Chromium and Firefox on one Linux machine. Touch is emulated in tests.
 
 ## Security

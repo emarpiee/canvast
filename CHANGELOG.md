@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.18.1 — The backlog run (2026-10-18)
+
+**Text** (ADR 0130 to 0132, 0139, 0140)
+- **Ranges:** underline (`<u>`), strikethrough (`~~`), a colour, a size (bigger and smaller), a link (safe addresses only; Ctrl+click opens it) and a **font of its own** for the selected words, in the format bar and stored as Markdown with `<span style>`.
+- **Look:** a gradient fill and an outline, paragraph space, first-line indent, case (upper, lower, title, small caps), most lines (with "…"), a set height with where the words sit, nested lists (`Tab`), and **text on a path** (a copy of a path's curve; take it off again). Colour styles apply to text and pen strokes.
+- **Font engine** (ADR 0132): TrueType, OpenType with **CFF and CFF2**, **WOFF2** (an own Brotli decoder, no network), **variable fonts** (axes in Font options), kerning, OpenType features, the bold and italic files of a family used for bold and italic words, bidirectional text (UAX 9) with Arabic joining, and an input method (IME) that composes in the editor.
+- **Note tool** (`M`, ADR 0140): a text on a coloured card (colour, space, rounding), one click to make; the card is part of the text's box and of the editor.
+
+**Vectors** (ADR 0139, 0142)
+- Dash **length, gap and start** as numbers; **arrow heads** (solid, open, dot) at the ends of open lines; the **angle below which a sharp corner is cut**; **Simplify** a path (curve fitting); **pen stroke to path**; SVG import follows `<use>` and symbols; **Copy the selection as SVG**.
+- Not done: variable-width paths, corner smoothing, an angular gradient, outline stroke, a shape builder, and node selection across paths (Vectors II in `docs/status.md`).
+
+**Pictures and media** (ADR 0136 to 0138)
+- Red, green, blue, **levels and curves**, and **stacks of adjustment layers** (add, reorder, hide, remove); the gradient map honours transparency.
+- **Crop** and **playback speed** for video and GIF.
+- **What a file says about itself** in the details panel (EXIF with the place a photo was taken, colour profile, PNG text, codec); an EXIF orientation is applied.
+- **3D models** (STL, OBJ) and **PDFs** get a preview card (the model, shaded; the page count).
+
+**Library, backups and settings** (ADR 0133 to 0135)
+- **Incremental backups** that restore as one chain, saved styles in archives, backup in Settings > Storage; **Adobe `.ase` and `.aco`** palettes import and export.
+- **Folder import** (the files filed in library folders of the same names) and picture paste from the clipboard.
+- Settings: **Performance** (the quality held when adaptive quality is off, memory for pictures) and **About and diagnostics** (what the browser can do, the errors of the session, licences, a report to save).
+- Sheets: **size presets** (A4, Letter, screens) and **Scale contents** with the sheet.
+
+**Commands and interface** (ADR 0129, 0141)
+- The command palette lists **recents first**, takes **values** (`Rename this canvas`), lists canvases and the shortcuts, and **records macros** that replay. A **right click** on the canvas opens a menu of what fits (Copy, Cut, Paste added as commands). Panel title bars are reachable and fold by **keyboard**. Handles name themselves on hover; on a phone the hint line and the rail fit.
+- Muted text and the save readout are darker in the light theme: an **automated contrast audit** (4.5:1) now covers both themes.
+
+**Tests**
+- Unit tests for the font engine, Brotli, curve fitting, adapters, metadata, archives and ASE/ACO; E2E for each feature above in Chromium and Firefox (the logic specs in Chromium); the spec's U3, U6, U9, U10 and scenario I (1,000 view switches leave nothing behind) in `scenarios.spec.ts`.
+
 ## 0.18.0 — The text tool revamp (2026-10-18)
 
 - **Bars revamped** (ADR 0128): the **Properties bar** (top, one row: what a tool or the selection looks like) and the **Actions bar** (bottom centre, one row, at a fixed place: what you can do to the selection) replace the options bar that wrapped into rows and the floating bar under the picked item. Nothing is in a "⋯" menu any more: align, distribute, grid and its spacing, the four shape operations, initial shape, the selection tool options and every colour of a selection are buttons. When the picked items are of different kinds, chips (Sheet, Text, Shape…) choose which kind's properties the row shows. A row wider than its room scrolls sideways with faded ends (phones too). One separator rule for every bar (no leading line), one meaning for "on" (a filled button), one drop-down look.
