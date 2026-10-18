@@ -146,11 +146,11 @@ export interface ImageObject extends ObjectBase {
   readonly adjust?: Adjust;
   /**
    * Rounded corners and an outline, as a shape has them (ADR 0148): the same fields, the same controls. `radius`: local units, one value or one
-   * for each corner (top left, top right, bottom right, bottom left); absent = square. `stroke` is a solid colour (a picture's outline has no
-   * gradient), `width` in local units, and `join`, `cap`, `align`, `dash`, `dashOffset`, `miterAngle` mean what they mean for a path.
+   * for each corner (top left, top right, bottom right, bottom left); absent = square. `stroke` is a colour or a gradient (placed on the picture's
+   * box like a shape's), `width` in local units, and `join`, `cap`, `align`, `dash`, `dashOffset`, `miterAngle` mean what they mean for a path.
    */
   readonly radius?: number | readonly number[];
-  readonly stroke?: string;
+  readonly stroke?: Paint;
   readonly width?: number;
   readonly join?: Join;
   readonly cap?: Cap;
@@ -521,7 +521,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
     }
-    if (o.stroke !== undefined && !(typeof o.stroke === "string" && COLOR_RE.test(o.stroke) && o.width !== undefined && Number.isFinite(o.width) && o.width > 0)) throw new InvalidObjectError("bad outline");
+    if (o.stroke !== undefined && !(isPaint(o.stroke) && o.width !== undefined && Number.isFinite(o.width) && o.width > 0)) throw new InvalidObjectError("bad outline");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");

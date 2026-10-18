@@ -9,4 +9,4 @@ A picture stays its own kind of object (the Assets pipeline, crop, adjustments, 
 
 The code paths are the shapes': `lined()` in `actions.ts` is "the picked paths and pictures", and the outline and corner functions (`selectedOutline`, `commitOutline`, the dash and miter numbers, `selectedCorners`, `commitCorners`, `commitPaint` for the outline colour) take both. One undo step per change; the numbers being dragged are shown without being stored. Scaling a picture scales both, a unit change keeps them, and Export draws them (it is the canvas's own drawing).
 
-Not done: an outline with a gradient, arrow heads (a picture's outline is closed), the radius handles on the canvas (the field only), picking by the rounded outline (a click in a cut corner still picks the picture), the copy-as-picture command, and a shape other than a rounded rectangle for a picture (a clipping mask does that).
+Not done (the rest is closed by [ADR 0153](0153-picture-and-reveal-gaps-vector-pdf.md)): the copy-as-picture command, and a shape other than a rounded rectangle for a picture (a clipping mask does that).

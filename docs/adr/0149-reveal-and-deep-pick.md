@@ -29,4 +29,4 @@ Moving a sheet always carries what is on it, even when only the sheet is picked.
 
 Covered: hidden and locked things stay out; the reveal is not in screenshots and exports; it does not run during a gesture or on other tools; Ctrl+click on a link in text still opens the link (that check comes first); Ctrl while dragging still means "no snapping".
 
-Not done: touch and pen have no Ctrl (a long press could reveal); mask members are not in the index, so they cannot be revealed or picked except by entering the mask; hidden and locked things cannot be revealed (showing them dimmed would help finding them); the names are not read out by a screen reader; Node and Lasso tools do not reveal; a marquee does not reveal what it would take.
+Not done: a marquee does not reveal what it would take. The touch and pen reveal is the long-press list (ADR 0151); mask members, hidden and locked things, screen reader words and the Node and Lasso tools are in [ADR 0153](0153-picture-and-reveal-gaps-vector-pdf.md).

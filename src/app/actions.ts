@@ -32,6 +32,8 @@ import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
 import { exportSvg } from "./svg-export";
+import { pdfVectorOf } from "./pdf-vector";
+import type { PdfVector } from "./pdf-vector";
 import type { ExportTarget } from "./export-render";
 import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
@@ -740,10 +742,10 @@ const firstColour = (p: Paint): string => (typeof p === "string" ? p : p.stops[0
 /** `o` with a fill and outline patch applied the way its kind takes it: a shape has both; a text fills its letters and outlines them; a stroke has one colour. */
 function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch): PathObject | TextObject | StrokeObject | ImageObject {
   if (o.kind === "image") {
-    // a picture has an outline only, one colour: a gradient gives its start; none takes the outline away (its width is kept for when it is turned on)
+    // a picture has an outline only, a colour or a gradient; none takes the outline away (its width is kept for when it is turned on)
     if (patch.stroke === undefined) return o;
     const { stroke: _s, ...rest } = o;
-    return patch.stroke === null ? rest : { ...rest, stroke: firstColour(patch.stroke), width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
+    return patch.stroke === null ? rest : { ...rest, stroke: patch.stroke, width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
   }
   if (o.kind === "path") return { ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) };
   if (o.kind === "stroke") {
@@ -1028,7 +1030,19 @@ export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: 
 /** Set the radius of one corner (its place among the nodes of the sharp outline) of one path, the others as they are: one undo step. */
 export function commitCornerAt(doc: DocumentStore, editor: EditorState, id: string, index: number, px: number, ppu: number, final = true): void {
   const o = doc.get(id);
-  if (editor.blockEdit() || !o || o.kind !== "path" || o.locked || !(ppu > 0 && ppu < Infinity)) return;
+  if (editor.blockEdit() || !o || (o.kind !== "path" && o.kind !== "image") || o.locked || !(ppu > 0 && ppu < Infinity)) return;
+  if (o.kind === "image") {
+    // a picture has four corners (top left, top right, bottom right, bottom left), none rounder than half its shorter side
+    const now = o.radius === undefined ? [0, 0, 0, 0] : typeof o.radius === "number" ? [o.radius, o.radius, o.radius, o.radius] : [...o.radius];
+    now[index] = Math.min(Math.max(0, px / ppu), Math.min(o.w, o.h) / 2);
+    const { radius: _r, ...rest } = o;
+    const made: ImageObject = now.every((v) => v === 0) ? rest : { ...rest, radius: now };
+    if (!final) return showReplaced(editor, [made]);
+    editor.preview = { kind: "none" };
+    doc.commit(doc.transaction("Corner radius", [made]));
+    editor.changed();
+    return;
+  }
   const nodes = nodesIn(o.base ?? o.sub);
   const now = o.radius === undefined ? new Array<number>(nodes).fill(0) : typeof o.radius === "number" ? new Array<number>(nodes).fill(o.radius) : [...o.radius];
   now[index] = Math.max(0, px / ppu);
@@ -1576,6 +1590,9 @@ function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sheet: Ca
 export function svgOfTarget(doc: DocumentStore, t: ExportTarget, size: { w: string; h: string }): string | null {
   return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size) : null;
 }
+
+/** The picked vectors as a PDF page of this size in points (ADR 0153), or null when the target is not all plain vectors or needs a picture. */
+export const pdfVectorOfTarget = (doc: DocumentStore, t: ExportTarget, wPt: number, hPt: number): PdfVector | null => (t.vectors ? pdfVectorOf(t.vectors, doc.space, wPt, hPt) : null);
 
 /** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
 const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && !isMaskObject(o));

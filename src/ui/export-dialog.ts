@@ -7,7 +7,8 @@
 import type { Background, ExportTarget } from "../app/export-render";
 import { DPIS, MAX_AREA, MAX_SIDE, UNITS, clampSize, formatRatio, fromPx, presetOf, sizeSuggestions, toPx } from "../app/export-size";
 import type { Unit } from "../app/export-size";
-import { jpegWithDpi, pdfOf, pdfPageOf, pngWithDpi } from "../app/export-files";
+import { jpegWithDpi, pdfOf, pdfPageOf, pdfVectorPage, pngWithDpi, webpWithDpi } from "../app/export-files";
+import type { PdfVector } from "../app/pdf-vector";
 import { SHOT_FORMATS, encodeShot } from "../app/screenshot";
 import { writeZip } from "../storage/zip";
 import type { ShotFormat } from "../app/screenshot";
@@ -21,6 +22,8 @@ export interface ExportDeps {
   render(t: ExportTarget, w: number, h: number, bg: Background): Promise<HTMLCanvasElement>;
   /** The vectors of a target as SVG text of this size (width and height as SVG writes them), or null when it cannot be. */
   svg(t: ExportTarget, size: { w: string; h: string }): string | null;
+  /** The vectors of a target as a PDF page of this size in points (ADR 0153), or null when the page needs a picture. */
+  pdfVector(t: ExportTarget, wPt: number, hPt: number): PdfVector | null;
   /** Put the file in the library (and tell the person, with a way to see it). */
   toLibrary(file: File): Promise<void>;
   /** A message for the person (the notice stack). */
@@ -117,7 +120,7 @@ export function openExportDialog(deps: ExportDeps): void {
         </section>
         <section class="ex-sec" aria-label="File">
           <div class="ex-row">
-            <div class="ex-seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${allVectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}<button type="button" role="radio" data-format="pdf" aria-checked="${prefs.format === "pdf"}" title="One page for each picture, at the physical size">PDF</button></div>
+            <div class="ex-seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${allVectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}<button type="button" role="radio" data-format="pdf" aria-checked="${prefs.format === "pdf"}" title="One page for each picture, at the physical size; plain shapes stay vectors">PDF</button></div>
             <label class="ex-field ex-quality" data-ex-quality>Quality <input type="range" data-ex="q" min="10" max="100" step="1" value="${prefs.quality}" aria-label="Quality"> <output data-ex-qout>${prefs.quality}%</output></label>
           </div>
           <div class="ex-row" data-ex-bgrow>
@@ -410,10 +413,16 @@ export function openExportDialog(deps: ExportDeps): void {
       const pages = [];
       for (let i = 0; i < ts.length; i++) {
         const z = sizeOf(i);
+        const wPt = (z.w / prefs.dpi) * 72, hPt = (z.h / prefs.dpi) * 72;
+        const vec = deps.pdfVector(ts[i]!, wPt, hPt);
+        if (vec) {
+          pages.push(pdfVectorPage(wPt, hPt, vec));
+          continue;
+        }
         const bg = prefs.bg;
         const canvas = await deps.render(ts[i]!, z.w, z.h, bg);
         const jpeg = bg === "transparent" ? null : new Uint8Array(await (await encodeShot(canvas, "jpeg", prefs.quality)).blob.arrayBuffer());
-        pages.push(pdfPageOf(canvas, (z.w / prefs.dpi) * 72, (z.h / prefs.dpi) * 72, jpeg));
+        pages.push(pdfPageOf(canvas, wPt, hPt, jpeg));
       }
       return [{ name: `${base()}.pdf`, blob: await pdfOf(pages), mime: "application/pdf" }];
     }
@@ -429,7 +438,7 @@ export function openExportDialog(deps: ExportDeps): void {
       const canvas = await deps.render(ts[i]!, z.w, z.h, bgFor(as));
       const enc = await encodeShot(canvas, as, prefs.quality);
       // (the print resolution goes into the file: a 5 in picture says 5 in)
-      const blob = enc.format === "png" ? await pngWithDpi(enc.blob, prefs.dpi) : enc.format === "jpeg" ? await jpegWithDpi(enc.blob, prefs.dpi) : enc.blob;
+      const blob = enc.format === "png" ? await pngWithDpi(enc.blob, prefs.dpi) : enc.format === "jpeg" ? await jpegWithDpi(enc.blob, prefs.dpi) : enc.format === "webp" ? await webpWithDpi(enc.blob, prefs.dpi) : enc.blob;
       out.push({ name: stem(i, SHOT_FORMATS[enc.format].ext, true), blob, mime: SHOT_FORMATS[enc.format].mime });
     }
     return out;

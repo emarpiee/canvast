@@ -1,11 +1,11 @@
 import * as D from "../core/dyadic";
 import { cosSin, radiansFromAngle } from "../core/angle";
 import type { Viewport } from "../core/camera";
-import type { PathObject } from "../doc/model";
+import type { ImageObject, PathObject } from "../doc/model";
 import { pathStyle } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { hexOf, isGradient, sliceStops, stopsAt } from "../doc/paint";
-import { geometryBounds, paintBounds } from "../doc/path";
+import { geometryBounds, paintBounds, rectSubs } from "../doc/path";
 import { paintColor } from "./ink";
 import type { Projection } from "./projection";
 
@@ -37,6 +37,12 @@ export function turner(o: PathObject): { turn(x: number, y: number): [number, nu
     turn: (x, y) => [px + c * (x - px) - s * (y - py), py + s * (x - px) + c * (y - py)],
     unturn: (x, y) => [px + c * (x - px) + s * (y - py), py - s * (x - px) + c * (y - py)],
   };
+}
+
+/** A picture as the rectangle path its outline gradient is placed on (ADR 0153): its box, unturned (a picture is drawn turned by the canvas). */
+export function pictureBox(o: ImageObject): PathObject {
+  const { rot: _turn, kind: _k, ...rest } = o;
+  return { ...rest, kind: "path", sub: rectSubs(0, 0, o.w, o.h), fill: null, stroke: o.stroke ?? null, width: o.width ?? 0 } as unknown as PathObject;
 }
 
 /** A point in box units of the shape's geometry box, as a local point (turned with the path). */

@@ -17,6 +17,29 @@ export function revealHits(visible: readonly ProjectedObject[], x: number, y: nu
   return pickAllByShape(visible.filter(pickable), x, y);
 }
 
+/** Why a thing under the pointer is shown but cannot be picked. */
+export type RevealWhy = "locked" | "hidden" | "mask";
+export interface DimHit {
+  readonly po: ProjectedObject;
+  readonly why: RevealWhy;
+}
+
+/**
+ * What lies under (x, y) that Reveal shows but a click cannot pick (ADR 0153), top first: locked things, the parts of a mask that cuts something
+ * there (`maskPos`), and hidden things (`hidden`: projected by the caller, they are in no index). Hits that can be picked are `revealHits`.
+ */
+export function dimHits(visible: readonly ProjectedObject[], hidden: readonly ProjectedObject[], x: number, y: number): DimHit[] {
+  const out: DimHit[] = [];
+  const seen = new Set<ObjectId>();
+  const add = (list: readonly ProjectedObject[], why: RevealWhy): void => {
+    for (const po of pickAllByShape(list, x, y)) if (!seen.has(po.obj.id)) { seen.add(po.obj.id); out.push({ po, why }); }
+  };
+  add(visible.filter((po) => po.obj.locked && !po.obj.hidden), "locked");
+  add(visible.flatMap((po) => (po.maskPos ?? []).filter((m) => !m.obj.hidden)), "mask");
+  add(hidden, "hidden");
+  return out;
+}
+
 /**
  * The thing a Ctrl+click picks: the top one under the pointer; with `below`, the one under the first of them that is already picked (so
  * repeated Ctrl+Alt+clicks go down the stack, and round to the top again). null when nothing is there.

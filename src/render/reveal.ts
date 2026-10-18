@@ -6,6 +6,7 @@
 import type { ProjectedObject } from "./projection";
 import { LABEL_FONT } from "./item-label";
 import type { SceneTheme } from "./scene-renderer";
+import type { DimHit } from "../interaction/reveal";
 import { itemCorners } from "./selection-frame";
 
 const finite = (v: readonly [number, number]): boolean => Math.abs(v[0]) < 1e6 && Math.abs(v[1]) < 1e6;
@@ -59,15 +60,31 @@ export function drawRevealOutlines(ctx: CanvasRenderingContext2D, hits: readonly
   ctx.restore();
 }
 
-/** The stack under the pointer: outlines, and the names of up to six of them, top first, beside the pointer. */
-export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly ProjectedObject[], at: { x: number; y: number }, theme: SceneTheme, name: (po: ProjectedObject) => string): void {
-  if (!hits.length) return;
+/** What can be seen under the pointer but not picked (locked, hidden, a mask's part): faint dotted outlines. */
+function drawDimOutlines(ctx: CanvasRenderingContext2D, dim: readonly DimHit[], theme: SceneTheme): void {
+  ctx.save();
+  ctx.setLineDash([2, 4]);
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = theme.selection;
+  ctx.lineWidth = 1.25;
+  for (const d of dim) if (traceOutline(ctx, d.po)) ctx.stroke();
+  ctx.restore();
+}
+
+/** The words for a thing: its name, and why it cannot be picked when it cannot. */
+export const revealWords = (name: string, why?: DimHit["why"]): string => (why ? `${name} (${why === "mask" ? "part of a mask" : why})` : name);
+
+/** The stack under the pointer: outlines, and the names of up to six of them, top first, beside the pointer; what cannot be picked comes last, dotted. */
+export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly ProjectedObject[], at: { x: number; y: number }, theme: SceneTheme, name: (po: ProjectedObject) => string, dim: readonly DimHit[] = []): void {
+  if (!hits.length && !dim.length) return;
   drawRevealOutlines(ctx, hits, theme);
+  drawDimOutlines(ctx, dim, theme);
   ctx.save();
   ctx.font = LABEL_FONT;
   ctx.textBaseline = "middle";
-  const shown = hits.slice(0, 6);
-  const rows = shown.map((po) => name(po));
+  const all = [...hits.map((po) => revealWords(name(po))), ...dim.map((d) => revealWords(name(d.po), d.why))];
+  const rows = all.slice(0, 6);
+  const shown = rows;
   const w = Math.max(...rows.map((t) => ctx.measureText(t).width)) + 12;
   const h = rows.length * 16 + 6;
   const x = at.x + 14, y = at.y + 14;
@@ -82,9 +99,9 @@ export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly Project
     ctx.fillStyle = i === 0 ? theme.selection : theme.landmarkLabel;
     ctx.fillText(t, x + 6, y + 3 + i * 16 + 8);
   });
-  if (hits.length > shown.length) {
+  if (all.length > shown.length) {
     ctx.fillStyle = theme.landmarkLabel;
-    ctx.fillText(`+ ${hits.length - shown.length} more`, x + 6, y + h + 9);
+    ctx.fillText(`+ ${all.length - shown.length} more`, x + 6, y + h + 9);
   }
   ctx.restore();
 }

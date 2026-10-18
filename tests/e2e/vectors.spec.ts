@@ -2409,6 +2409,12 @@ test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts
   expect(await px(530, 375)).toEqual(blue);
   await click(app, 410, 310);
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "where the mask cuts it away it cannot be picked").toHaveLength(0);
+  // Reveal shows the mask's own shape, which a click cannot pick (ADR 0153)
+  await p.mouse.move(550, 400);
+  await p.keyboard.down("Control");
+  await p.mouse.move(551, 401);
+  await expect(p.getByTestId("tool-hint")).toContainText("(part of a mask)");
+  await p.keyboard.up("Control");
   await click(app, 550, 400);
   expect(await p.evaluate(() => window.__canvastDebug.selection()).then((a) => a.length), "where it shows it can").toBeGreaterThan(0);
   await p.locator('[data-ctx="maskmenu"]').click();

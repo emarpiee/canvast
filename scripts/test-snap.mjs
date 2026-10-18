@@ -37,7 +37,11 @@ child.on("exit", async (code) => {
   await save();
   // keep the newest few snapshots
   const all = (await readdir(resolve(root, "test-builds"))).sort();
-  for (const old of all.slice(0, Math.max(0, all.length - KEEP))) await rm(resolve(root, "test-builds", old), { recursive: true, force: true });
+  for (const old of all.slice(0, Math.max(0, all.length - KEEP))) {
+    // (never one that is still running: its tests are reading that build)
+    const state = await readFile(resolve(root, "test-builds", old, "run.json"), "utf8").then((t) => JSON.parse(t).status, () => "none");
+    if (state !== "running") await rm(resolve(root, "test-builds", old), { recursive: true, force: true });
+  }
   console.log(`${run.status}  ${JSON.stringify(run.counts ?? {})}  ${dir.slice(root.length + 1)}`);
   process.exit(code ?? 1);
 });

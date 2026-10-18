@@ -8,7 +8,7 @@ import type { Rect } from "./geometry2d";
 import { clipPolygon, clipSegment } from "./geometry2d";
 import { ARROW_LEN, miterLimitOf } from "../doc/path";
 import type { Arrow, FlatPath } from "../doc/path";
-import { canvasPaint } from "./gradient";
+import { canvasPaint, pictureBox } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
 import { adjustPixel, cropOf, isNeutral } from "../doc/adjust";
@@ -421,7 +421,7 @@ export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp
 const PIXEL_RECT_THRESHOLD = 64;
 
 /** Corner radii of a picture in screen px: one for all or one for each corner (top left, top right, bottom right, bottom left), none more than half the shorter side; null when there is none. */
-function cornerRadiiPx(radius: number | readonly number[], ppu: number, halfW: number, halfH: number): number[] | null {
+export function cornerRadiiPx(radius: number | readonly number[], ppu: number, halfW: number, halfH: number): number[] | null {
   const cap = Math.min(halfW, halfH);
   const out = (typeof radius === "number" ? [radius, radius, radius, radius] : [...radius]).map((v) => Math.min(Math.max(0, v * ppu), cap));
   return out.some((v) => v > 0.01) ? out : null;
@@ -466,7 +466,7 @@ export function drawImageObject(
     if (o.stroke && wpx > 0.01) {
       ctx.save();
       const side = o.align;
-      ctx.strokeStyle = o.stroke;
+      ctx.strokeStyle = canvasPaint(ctx, pictureBox(o), o.stroke, po.proj, vp);
       ctx.lineJoin = o.join ?? "round";
       if (o.join === "miter" || o.join === undefined) ctx.miterLimit = o.miterAngle ? miterLimitOf(o.miterAngle) : 4;
       if (o.dash) {

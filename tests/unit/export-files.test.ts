@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jpegWithDpi, pdfOf, pngWithDpi } from "../../src/app/export-files";
+import { jpegWithDpi, pdfOf, pngWithDpi, webpWithDpi } from "../../src/app/export-files";
 import { crc32 } from "../../src/storage/zip";
 import { makePng } from "../e2e/png";
 
@@ -64,5 +64,28 @@ describe("export files", () => {
     const rows = s.slice(xrefAt).split("\n").filter((l) => /^\d{10} 00000 n $/.test(l));
     expect(rows.length).toBe(10);
     rows.forEach((r, i) => expect(s.slice(Number(r.slice(0, 10)), Number(r.slice(0, 10)) + `${i + 1} 0 obj`.length)).toBe(`${i + 1} 0 obj`));
+  });
+  it("a plain WebP becomes an extended one with its size and an EXIF resolution; an extended one keeps its chunks; other files are left alone", async () => {
+    const le = (n: number, k: number): number[] => Array.from({ length: k }, (_, i) => (n >>> (8 * i)) & 255);
+    const riff = (chunks: number[][]): Blob => new Blob([new Uint8Array([0x52, 0x49, 0x46, 0x46, ...le(4 + chunks.reduce((a, c) => a + c.length, 0), 4), 0x57, 0x45, 0x42, 0x50, ...chunks.flat()])]);
+    const chunk = (t: string, d: number[]): number[] => [...[...t].map((c) => c.charCodeAt(0)), ...le(d.length, 4), ...d, ...(d.length & 1 ? [0] : [])];
+    const vp8l = chunk("VP8L", [0x2f, ...le(9 | (4 << 14) | (1 << 28), 4), 1, 2, 3]); // 10 × 5, with alpha
+    const out = new Uint8Array(await (await webpWithDpi(riff([vp8l]), 300)).arrayBuffer());
+    const at = (o: number): string => String.fromCharCode(...out.subarray(o, o + 4));
+    expect(at(0) + at(8) + at(12)).toBe("RIFFWEBPVP8X");
+    expect(out[20]! & 0x18).toBe(0x18); // EXIF and alpha flags
+    expect([out[24]!, out[27]!]).toEqual([9, 4]); // width 10, height 5 (stored minus one)
+    expect(new DataView(out.buffer).getUint32(4, true)).toBe(out.length - 8);
+    const exifAt = out.length - 8 - 66;
+    expect(at(exifAt)).toBe("EXIF");
+    const dv = new DataView(out.buffer, exifAt + 8, 66);
+    expect(dv.getUint32(50, true)).toBe(300); // XResolution 300 / 1
+    expect(dv.getUint32(58, true)).toBe(300);
+    // again with another resolution: replaced, not doubled
+    const again = new Uint8Array(await (await webpWithDpi(new Blob([out]), 96)).arrayBuffer());
+    expect(again.length).toBe(out.length);
+    expect(new DataView(again.buffer, again.length - 66, 66).getUint32(50, true)).toBe(96);
+    const junk = new Blob([new Uint8Array([1, 2, 3])]);
+    expect(await webpWithDpi(junk, 300)).toBe(junk);
   });
 });

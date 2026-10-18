@@ -507,6 +507,17 @@ test("Export… of picked shapes uses their box (with the outline) as the shape,
   await expect(dlg.locator('[data-format="svg"]')).toBeVisible();
   const shape = await p.getByTestId("export-shape").innerText();
   expect(shape).toMatch(/Shape \d/);
+  // the same shape as a PDF is drawn by its paths, not a picture of them (ADR 0153); a WebP carries its resolution (EXIF)
+  await dlg.locator('[data-format="pdf"]').click();
+  const pdf = (await exportPng()).toString("latin1");
+  expect(pdf.startsWith("%PDF-1.4")).toBe(true);
+  expect(pdf, "paths, no picture").toContain(" cm");
+  expect(pdf).toMatch(/ c\n|\d l\n/);
+  expect(pdf).not.toContain("/Subtype /Image");
+  await dlg.locator('[data-format="webp"]').click();
+  const webp = (await exportPng()).toString("latin1");
+  expect(webp.slice(0, 4) + webp.slice(8, 16)).toBe("RIFFWEBPVP8X");
+  expect(webp).toContain("EXIF");
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });

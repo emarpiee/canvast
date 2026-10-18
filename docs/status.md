@@ -471,6 +471,14 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.19.2 — picture, reveal and export gaps (2026-10-19)
+
+- **Implemented:** [ADR 0153](adr/0153-picture-and-reveal-gaps-vector-pdf.md): gradient outline, radius dots and rounded picking for pictures; reveal of locked, hidden and mask parts, on Edit nodes and Lasso, spoken through the hint line; vector PDF; WebP resolution.
+- **Tested:** unit tests (vector PDF operators, WebP EXIF), E2E in pictures, frames (reveal), vectors (mask reveal) and sheets (PDF and WebP of a shape); the vector PDF was also rendered by a PDF viewer and looked right. Wide run: see the commit.
+- **Known failures:** the 14 Firefox text-editor tests of v0.19.1.
+- **Unverified:** the vector PDF in other viewers; a hidden-object count above 400 (only the first are revealed); phone width.
+- **Next bounded task:** the Firefox text-editor focus failure; a marquee that reveals what it would take.
+
 ## v0.19.1 — grouped menus, touch gestures, test snapshots (2026-10-19)
 
 - **Implemented:** ADR 0151 and 0152 (grouped Actions-bar menus, kind chips, long-press list, two/three-finger undo/redo, held-finger Shift/Alt, live rotate/ratio labels), `test:snap` and `test:status`.

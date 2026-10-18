@@ -29,6 +29,23 @@ function membersOfMask(doc: DocumentStore, by: string): CanvasObject[] {
   return list;
 }
 
+const hiddenCache = new WeakMap<DocumentStore, { revision: number; list: CanvasObject[] }>();
+/**
+ * The objects that are hidden (and not mask parts), projected for this view, to show where they are while Reveal is on (ADR 0153): they are in no
+ * index, so the list is made once for each state of the document and only the first `limit` of it is looked at.
+ */
+export function hiddenInView(doc: DocumentStore, fc: FC, vp: Viewport, limit = 400): ProjectedObject[] {
+  let c = hiddenCache.get(doc);
+  if (!c || c.revision !== doc.revision) hiddenCache.set(doc, (c = { revision: doc.revision, list: [...doc.all()].filter((o) => o.hidden && !o.isMask) }));
+  const out: ProjectedObject[] = [];
+  for (const o of c.list.slice(0, limit)) {
+    const cam = cameraIn(fc, o.frame ?? doc.space.world);
+    const po = cam && projectObject(o, cam, vp, { keepTiny: true });
+    if (po && !po.cover) out.push(po);
+  }
+  return out;
+}
+
 /** Give each object that has a mask (ADR 0144) the mask's objects, projected on their own, to be drawn through. A mask with nothing in it cuts nothing. */
 function withMasks(doc: DocumentStore, fc: FC, vp: Viewport, list: ProjectedObject[], now: (o: CanvasObject) => CanvasObject | null): ProjectedObject[] {
   if (!list.some((po) => po.obj.mask)) return list;

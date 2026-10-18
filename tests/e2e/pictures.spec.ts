@@ -475,4 +475,100 @@ test("a picture gets rounded corners and an outline with the same controls as a 
   expect(again.align).toBe("outside");
   expect(app.consoleErrors).toEqual([]);
 });
+test("a picture's corner radius has a dot on the canvas, a click in a cut corner does not pick it, and its outline can be a gradient with handles (ADR 0153)", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b0 = await boxOf(app, pic.id);
+  const mid = Math.round((b0.minY + b0.maxY) / 2);
+  const centre = Math.round((b0.minX + b0.maxX) / 2);
+  const away = async () => { await p.mouse.click(60, 650); await app.frame(); };
+  await p.mouse.click(centre, mid);
+  // the dot: drag it along the corner's diagonal and the radius follows, live
+  const d0 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  expect(d0, "a picked picture has the dot").toBeTruthy();
+  await app.drag({ x: d0[0], y: d0[1] }, { x: d0[0] + 40, y: d0[1] + 40 });
+  const r1 = ((await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number | number[] }).radius as number;
+  expect(r1).toBeGreaterThan(5);
+  await p.keyboard.press("Control+z");
+  expect(((await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number }).radius, "one undo step").toBeUndefined();
+  await p.keyboard.press("Control+y");
+  // a click in the cut corner picks what is behind it (nothing), a click just inside picks the picture
+  await p.locator("[data-sel-radius]").fill("60");
+  await p.locator("[data-sel-radius]").press("Enter");
+  await away();
+  await p.mouse.click(Math.round(b0.minX) + 3, Math.round(b0.minY) + 3);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "the cut corner is not the picture").toHaveLength(0);
+  await p.mouse.click(centre, mid);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(1);
+  // the outline: white first, then a gradient from white to nothing, left to right
+  await p.click("[data-outline-options]");
+  const width = p.locator(".op-width").first();
+  await width.fill("8");
+  await width.press("Enter");
+  await p.keyboard.press("Escape");
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="stroke"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await p.keyboard.press("Escape");
+  type Grad = { type: string; x0: number; x1: number };
+  const strokeOf = async () => ((await objs(app)).find((o) => o.id === pic.id) as unknown as { stroke?: Grad | string }).stroke;
+  expect(await strokeOf(), "the outline is a gradient").toMatchObject({ type: "linear", x0: 0, x1: 1 });
+  await away();
+  const white = (c: number[]) => c[0]! > 240 && c[1]! > 240 && c[2]! > 240;
+  expect(white(await px(app, Math.round(b0.minX) + 1, mid)), "the start of the gradient is white").toBe(true);
+  expect(white(await px(app, Math.round(b0.maxX) - 2, mid)), "the end of the line is gone").toBe(false);
+  // its handle on the canvas: the end dragged to the middle
+  await p.mouse.click(centre, mid);
+  await app.drag({ x: Math.round(b0.maxX) - 1, y: mid }, { x: centre, y: mid });
+  const g = (await strokeOf()) as Grad;
+  expect(g.x1).toBeGreaterThan(0.4);
+  expect(g.x1).toBeLessThan(0.6);
+  await p.keyboard.press("Control+z");
+  expect(((await strokeOf()) as Grad).x1, "one undo step").toBe(1);
+  // turned a quarter: the dot is on the turned picture, and still sets the radius
+  await app.drag({ x: centre, y: Math.round(b0.minY) - 26 }, { x: centre + Math.round(mid - b0.minY) + 26, y: mid }, 8);
+  const b1 = await boxOf(app, pic.id);
+  const d1 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  expect(d1[0]).toBeGreaterThan(b1.minX - 2);
+  expect(d1[0]).toBeLessThan(b1.maxX + 2);
+  expect(d1[1]).toBeGreaterThan(b1.minY - 2);
+  expect(d1[1]).toBeLessThan(b1.maxY + 2);
+  const radiusNow = async () => ((await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number }).radius;
+  const before = await radiusNow();
+  const cx1 = (b1.minX + b1.maxX) / 2, cy1 = (b1.minY + b1.maxY) / 2;
+  const dx = Math.sign(cx1 - d1[0]) * 25, dy = Math.sign(cy1 - d1[1]) * 25; // (inwards: a bigger radius)
+  await app.drag({ x: d1[0], y: d1[1] }, { x: d1[0] + dx, y: d1[1] + dy });
+  expect(await radiusNow(), "the dot on a turned picture sets the radius").not.toBe(before);
+  expect(app.consoleErrors).toEqual([]);
+});
 const key2 = (app: App, k: string) => app.page.keyboard.press(k);
+
+test("a curve's points are dragged with the mouse: a point added by a click, an end point moved, kept as one undo step each (the panel is not rebuilt under the drag)", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app, "grey.png", makePng(80, 60, () => [100, 100, 100, 255]));
+  const b = await boxOf(app, pic.id);
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await openAdjust(p);
+  const curve = p.locator(".adjust-pop [data-curve]");
+  await curve.scrollIntoViewIfNeeded();
+  const cb = (await curve.boundingBox())!;
+  const master = async () => (((await objs(app)).find((o) => o.id === pic.id)!.adjust as { curves?: { master: number[][] } } | undefined)?.curves?.master);
+  const mx = cb.x + cb.width / 2, my = cb.y + cb.height / 2;
+  await p.mouse.move(mx, my);
+  await p.mouse.down();
+  await p.mouse.move(mx + 20, my - 30, { steps: 8 }); // (a point is added where it is pressed, then dragged up and right)
+  await p.mouse.up();
+  const dragged = (await master())!;
+  expect(dragged).toHaveLength(3);
+  expect(dragged[1]![1], "the middle point went up").toBeGreaterThan(dragged[1]![0]! + 8);
+  await p.mouse.move(cb.x + 6, cb.y + cb.height - 6); // the black end
+  await p.mouse.down();
+  await p.mouse.move(cb.x + 6, cb.y + cb.height - 60, { steps: 8 });
+  await p.mouse.up();
+  expect((await master())![0]![1], "the end point was lifted").toBeGreaterThan(40);
+  await p.keyboard.press("Control+z");
+  expect((await master())![0]![1], "one undo step").toBe(0);
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -1,5 +1,7 @@
 import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
+import type { ImageObject } from "../doc/model";
+import { rectSubs } from "../doc/path";
 import type { SubPath } from "../doc/path";
 import { NODE, geometryBounds, isLine, nodeCount, segmentsOf } from "../doc/path";
 import { radiansFromAngle } from "../core/angle";
@@ -9,7 +11,7 @@ import { exactX, exactY, fromPx } from "../render/projection";
 import * as D from "../core/dyadic";
 import type { Gradient } from "../doc/paint";
 import { isGradient } from "../doc/paint";
-import { localGradient, localToBox } from "../render/gradient";
+import { localGradient, localToBox, pictureBox } from "../render/gradient";
 
 /**
  * Editing a path's nodes on screen (ADR 0099): where each node and handle is, and what a press at a point on the screen takes. Works
@@ -114,9 +116,26 @@ export function hitNodes(po: ProjectedObject, x: number, y: number, sel: { s: nu
   return hit;
 }
 
+/** Screen point → the unturned view of a turned picture or text (ADR 0153; the inverse of `outerAt`). Other objects: unchanged. */
+export function innerAt(po: ProjectedObject, x: number, y: number): [number, number] {
+  const t = po.rotated;
+  if (!t) return [x, y];
+  const ox = x - t.cx, oy = y - t.cy;
+  return [t.vvp.width / 2 + t.c * ox + t.s * oy, t.vvp.height / 2 - t.s * ox + t.c * oy];
+}
+
+/** A point of the unturned view of a turned picture or text → where it is on screen. Other objects: unchanged. */
+export function outerAt(po: ProjectedObject, x: number, y: number): [number, number] {
+  const t = po.rotated;
+  if (!t) return [x, y];
+  const ix = x - t.vvp.width / 2, iy = y - t.vvp.height / 2;
+  return [t.cx + t.c * ix - t.s * iy, t.cy + t.s * ix + t.c * iy];
+}
+
 /** A screen position as local units of the object (exact placement, then one rounding). */
 export function localOf(po: ProjectedObject, x: number, y: number): { x: number; y: number } {
   const p = po.proj;
+  if (po.rotated) [x, y] = innerAt(po, x, y); // (a turned picture is projected unturned: take the point back into that view)
   return { x: D.toNumber(D.add(p.lx, fromPx(p, x - p.cx))), y: D.toNumber(D.add(p.ly, fromPx(p, y - p.cy))) };
 }
 
@@ -155,13 +174,13 @@ const FAR = 1e5;
 
 /** The handles of the gradient of a path, where they are on screen (null: no gradient, or too far out of view to hold). */
 export function gradientHandles(po: ProjectedObject, focus: "fill" | "stroke" | null = null): GradientHandles | null {
-  const o = po.obj as PathObject;
-  if (po.cover) return null;
+  const o = po.obj.kind === "image" ? pictureBox(po.obj) : (po.obj as PathObject);
+  if (po.cover || (po.obj.kind !== "path" && po.obj.kind !== "image")) return null;
   const which = focus && isGradient(o[focus]) ? focus : isGradient(o.fill) ? "fill" : isGradient(o.stroke) ? "stroke" : null;
   if (!which) return null;
   const g = o[which] as Gradient;
   const p = po.proj;
-  const at = (x: number, y: number): [number, number] => [exactX(p, x), exactY(p, y)];
+  const at = (x: number, y: number): [number, number] => outerAt(po, exactX(p, x), exactY(p, y));
   const l = localGradient(o, g);
   let out: GradientHandles;
   if (l.type === "linear") {
@@ -181,8 +200,8 @@ export function gradientHandles(po: ProjectedObject, focus: "fill" | "stroke" | 
     out = { which, g, pts: [{ id: "c", x: cx, y: cy }, { id: "r", x: hx, y: hy }], ray: true, stops: [] };
   } else {
     const [cx, cy] = at(l.cx, l.cy);
-    const [rx] = at(l.cx + l.R, l.cy);
-    out = { which, g, pts: [{ id: "c", x: cx, y: cy }, { id: "r", x: rx, y: cy }], ring: { x: cx, y: cy, r: Math.abs(rx - cx) }, stops: [] };
+    const [rx, ry] = at(l.cx + l.R, l.cy);
+    out = { which, g, pts: [{ id: "c", x: cx, y: cy }, { id: "r", x: rx, y: ry }], ring: { x: cx, y: cy, r: Math.hypot(rx - cx, ry - cy) }, stops: [] };
   }
   return out.pts.every((q) => Math.abs(q.x) < FAR && Math.abs(q.y) < FAR) ? out : null;
 }
@@ -256,9 +275,12 @@ const MIN_DOT_PX = 18;
 const MAX_CORNER_DOTS = 64;
 
 export function cornerHandles(po: ProjectedObject, expanded = false, avoid: ReadonlyArray<{ x: number; y: number }> = []): CornerHandles | null {
-  const o = po.obj as PathObject;
-  if (po.cover || o.kind !== "path") return null;
-  const subs = editSubs(o);
+  if (po.cover) return null;
+  // A picture has the four corners of its box (ADR 0153), seen through its turn, if it has one.
+  const pic = po.obj.kind === "image" ? (po.obj as ImageObject) : null;
+  if (!pic && po.obj.kind !== "path") return null;
+  const o = (pic ? ({ kind: "path", radius: pic.radius } as unknown as PathObject) : po.obj) as PathObject;
+  const subs = pic ? rectSubs(0, 0, pic.w, pic.h) : editSubs(o);
   const p = po.proj;
   const dots: CornerDot[] = [];
   const screenSubs: SubPath[] = [];
@@ -268,7 +290,7 @@ export function cornerHandles(po: ProjectedObject, expanded = false, avoid: Read
     const n: number[] = [];
     for (let k = 0; k < nodeCount(sub); k++) {
       const b = k * NODE;
-      for (let h = 0; h < 6; h += 2) n.push(exactX(p, sub.n[b + h]!), exactY(p, sub.n[b + h + 1]!));
+      for (let h = 0; h < 6; h += 2) n.push(...outerAt(po, exactX(p, sub.n[b + h]!), exactY(p, sub.n[b + h + 1]!)));
       sx += n[k * NODE]!;
       sy += n[k * NODE + 1]!;
       sn++;

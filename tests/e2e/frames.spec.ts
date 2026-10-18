@@ -1998,6 +1998,57 @@ test("Ctrl+hover and Ctrl+click find a shape that has no fill and no outline (re
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Reveal also shows what cannot be picked (a locked thing, a hidden one) as dotted outlines with the reason in its words, and works on Edit nodes and Lasso; the words go to the hint line for a screen reader (ADR 0153)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 500 }, 8);
+  await p.keyboard.press("v");
+  const hint = p.getByTestId("tool-hint");
+  const hover = async () => {
+    await p.mouse.move(550, 400);
+    await p.keyboard.down("Control");
+    await p.mouse.move(551, 401);
+    await app.frame();
+  };
+  const release = async () => { await p.keyboard.up("Control"); await app.frame(); };
+  await hover();
+  await expect(hint, "a plain thing: its name").toContainText("Under the pointer: Rectangle");
+  await expect(hint).not.toContainText("locked");
+  await release();
+  // locked: it is shown, and the words say why a click would not take it
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const panel = p.getByTestId("layers-panel");
+  await panel.locator("li.layer").first().click();
+  await panel.locator('[data-do="lock"]').click();
+  await p.mouse.click(120, 650);
+  const edge = await p.evaluate(() => window.__canvastDebug.pixelAt(550, 300));
+  await hover();
+  await expect(hint).toContainText("Rectangle (locked)");
+  expect(await p.evaluate(() => window.__canvastDebug.pixelAt(550, 300)), "its dotted outline is drawn").not.toEqual(edge);
+  await p.mouse.down();
+  await p.mouse.up(); // (Ctrl+click: it cannot be picked)
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([]);
+  await release();
+  // hidden: it is in no index, but Reveal still finds it
+  await panel.getByRole("button", { name: /^Unlock / }).click();
+  await p.mouse.click(120, 650);
+  await p.keyboard.press("Control+a");
+  await panel.locator('[data-do="hide"]').click();
+  await p.mouse.click(120, 650);
+  await hover();
+  await expect(hint).toContainText("Rectangle (hidden)");
+  await release();
+  // Edit nodes and Lasso reveal too
+  for (const k of ["n", "l"]) {
+    await p.keyboard.press(k);
+    await hover();
+    await expect(hint, `tool ${k}`).toContainText("Under the pointer");
+    await release();
+  }
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("u");

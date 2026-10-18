@@ -399,8 +399,9 @@ function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, edito
 
 /** The main corner radius dot (large, filled), one small dot per corner when the corners are opened out, and a star's ratio handle (ADR 0105). */
 function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
-  if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
+  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image")) return;
   const po = selected[0]!;
+  if (po.obj.kind === "image" && (editor.selection.size !== 1 || po.obj.locked)) return;
   if (editor.selection.size !== 1 && (po.obj as PathObject).result === undefined) return; // (a group picked whole is its result alone on screen)
   const open = editor.cornersOpen === po.obj.id;
   const h = shapeHandles(po, open, editor);
@@ -530,7 +531,7 @@ function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["
 
 /** The axis or the rings of the gradient of the one selected path, with handles to drag (ADR 0100). */
 function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme, focus: "fill" | "stroke" | null): void {
-  if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
+  if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image")) return;
   const h = gradientHandles(selected[0]!, focus);
   if (!h) return;
   ctx.save();

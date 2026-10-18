@@ -17,6 +17,7 @@ import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
+import { pictureBox } from "../render/gradient";
 import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
@@ -329,8 +330,8 @@ export function attachTools(
    * Select what the user picked, widened to whole groups (at the level they are working at).
    * Picking something outside the group they entered leaves that group.
    */
-  // Reveal (interaction/reveal.ts, ADR 0149): Ctrl held over the canvas on Select shows the outline of everything under the pointer.
-  const reveal = createReveal(editor, () => g.kind === "none" && effectiveTool() === "select");
+  // Reveal (interaction/reveal.ts, ADR 0149): Ctrl held over the canvas on Select (and Edit nodes and Lasso, ADR 0153) shows the outline of everything under the pointer.
+  const reveal = createReveal(editor, () => g.kind === "none" && (effectiveTool() === "select" || effectiveTool() === "node" || effectiveTool() === "lasso"));
   const hasThingsOn = (sheet: CanvasObject): boolean => {
     for (const k of doc.all()) if (k.parent === sheet.id && !k.hidden) return true;
     return false;
@@ -710,6 +711,11 @@ export function attachTools(
   const gradientTarget = (): { po: ProjectedObject; o: PathObject } | null => {
     const one = nodeTarget();
     if (one) return one;
+    // a picture (ADR 0153): its corner radius and its outline's gradient, on its box as a rectangle path
+    if (editor.selection.size === 1) {
+      const pic = visible().find((p) => editor.selection.has(p.obj.id));
+      if (pic && pic.obj.kind === "image" && !pic.cover && !pic.obj.locked) return { po: pic, o: pictureBox(pic.obj) };
+    }
     const level = editor.entered.length;
     const objs = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
     const gid = objs[0]?.groups?.[level];

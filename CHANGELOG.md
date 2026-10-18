@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.2 — Picture, reveal and export gaps (2026-10-19)
+
+- **Pictures**: the outline can be a gradient (with handles on the canvas); a picked picture has the radius dots on the canvas (also turned); a click in a cut corner does not pick it (ADR 0153).
+- **Reveal** also shows locked things, hidden things and the parts of a mask, dotted, with the reason in the words; Edit nodes and Lasso reveal too; a screen reader hears the words through the hint line.
+- **Export**: PDF of plain shapes is vector (paths, gradients, dashes, transparency), a page that needs a picture stays a picture; WebP carries its resolution (EXIF).
+
 ## 0.19.1 — Gaps closed and the bars moved (2026-10-18)
 
 - **Grouped Actions-bar menus** (ADR 0151): Align (+Distribute), Arrange, Shapes (boolean ops), Masks and Path tools are one button each that opens a menu which stays open until Escape or a press outside; kind chips (All, Pictures, Media, Shapes, Strokes, Texts) at the start of the bar for a mixed pick.

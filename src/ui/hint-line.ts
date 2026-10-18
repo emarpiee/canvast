@@ -24,7 +24,7 @@ export function mountHintLine(editor: EditorState, doc: DocumentStore, mode: () 
   document.body.appendChild(el);
   let hover: string | null = null;
   const render = (): void => {
-    const text = mode() === "off" ? null : (hover ?? toolHint(editor, doc));
+    const text = mode() === "off" ? null : (hover ?? editor.revealText ?? toolHint(editor, doc));
     el.hidden = text === null;
     if (text !== null && el.textContent !== text) el.textContent = text;
   };

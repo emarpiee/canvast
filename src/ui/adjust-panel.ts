@@ -61,6 +61,8 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
       }
       return;
     }
+    // (a preview is on while a slider or a curve point is dragged: the stored adjustments are the old ones then, and rebuilding would end the drag)
+    if (shown && shown.ids === ids && shown.handle && editor.preview.kind === "replace") return;
     const same = shown && shown.ids === ids && shown.handle && adjustKey(cleanAdjust(shown.handle.current())) === adjustKey(sel.adjust);
     if (same) return;
     if (shown?.ids !== ids) settle();

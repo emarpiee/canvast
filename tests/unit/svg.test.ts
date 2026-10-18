@@ -6,6 +6,7 @@ import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/m
 import { geometryBounds, rectSubs } from "../../src/doc/path";
 import { arcToCubics, parsePathData } from "../../src/doc/svg-path";
 import { exportSvg, pathData } from "../../src/app/svg-export";
+import { pdfVectorOf } from "../../src/app/pdf-vector";
 import { dashChoice, lookFromChoices } from "../../src/doc/stroke-look";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -104,5 +105,26 @@ describe("dashes", () => {
     expect((deserializeObject(serializeObject(o)) as PathObject).dash).toEqual([3, 2]);
     expect(() => deserializeObject({ ...serializeObject(o), dash: [0, 0] })).toThrow();
     expect(() => deserializeObject({ ...serializeObject(o), dash: [1] })).toThrow();
+  });
+});
+
+describe("vector PDF (ADR 0153)", () => {
+  const doc = new DocumentStore();
+  it("writes fill, outline, alpha and a gradient as PDF operators on a flipped page; a mask or an arrow asks for a picture", () => {
+    const a = rect(0, 0, 100, 50, { fill: "#ff000080", stroke: "#00ff00", width: 4, dash: [3, 2], join: "miter", evenodd: true, opacity: 1 });
+    const v = pdfVectorOf([a], doc.space, 200, 100)!;
+    expect(v.content).toContain("1 0 0 rg");
+    expect(v.content).toContain("0 1 0 RG");
+    expect(v.content).toMatch(/\bB\*/); // fill and stroke, even-odd
+    expect(v.content).toContain(" d"); // dashes
+    expect(v.gs[0]).toContain("/ca 0.502");
+    const g = rect(0, 0, 10, 10, { fill: { type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: [{ o: 0, c: "#ff0000" }, { o: 1, c: "#0000ff" }] }, stroke: null });
+    const vg = pdfVectorOf([g], doc.space, 100, 100)!;
+    expect(vg.shadings).toHaveLength(1);
+    expect(vg.shadings[0]).toContain("/ShadingType 2");
+    expect(vg.content).toContain("/S0 sh");
+    expect(pdfVectorOf([rect(0, 0, 10, 10, { arrowEnd: "triangle" })], doc.space, 100, 100)).toBeNull();
+    expect(pdfVectorOf([rect(0, 0, 10, 10, { mask: { by: "x", mode: "alpha" } as never })], doc.space, 100, 100)).toBeNull();
+    expect(pdfVectorOf([rect(0, 0, 10, 10, { stroke: { type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: [{ o: 0, c: "#ff0000" }, { o: 1, c: "#0000ff" }] } })], doc.space, 100, 100)).toBeNull();
   });
 });

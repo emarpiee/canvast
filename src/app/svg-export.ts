@@ -48,15 +48,31 @@ export function pathData(subs: readonly SubPath[]): string {
   return out.join("");
 }
 
-interface Placed {
+export interface Placed {
   o: PathObject;
   subs: SubPath[];
   k: number;
   at: (x: number, y: number) => [number, number];
 }
 
-/** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
-export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => [], size?: { w: string; h: string }): string | null {
+export interface PathLayout {
+  /** The paths in the units of the first, and how to put another path in them. */
+  readonly placed: Placed[];
+  readonly place: (src: PathObject) => Placed | null;
+  /** The top left of the box (in those units) and the scale to the 1000-unit box; `w` × `h` is the box after scaling. */
+  readonly minX: number;
+  readonly minY: number;
+  readonly sc: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * The paths (hidden ones left out) put in the units of the first, with their box and its scale to 1000 units; null when there is nothing
+ * to draw or they are too far apart to be placed together. `evenPad`: every side gets half the widest outline (as Export… frames a pick),
+ * else each path adds its own half.
+ */
+export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, evenPad = false): PathLayout | null {
   const objs = paths.filter((o) => !o.hidden && o.sub.length > 0);
   if (!objs.length) return null;
   const base = objs[0]!;
@@ -77,10 +93,11 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     placed.push(p);
   }
   // The box of everything, with half the widest outline around it, scaled to SIZE.
+  const widest = evenPad ? Math.max(0, ...placed.map((p) => (p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0))) : 0;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of placed) {
     const b = geometryBounds(p.subs);
-    const h = p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0;
+    const h = evenPad ? widest : p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0;
     minX = Math.min(minX, b.minX - h);
     minY = Math.min(minY, b.minY - h);
     maxX = Math.max(maxX, b.maxX + h);
@@ -89,7 +106,14 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
   const span = Math.max(maxX - minX, maxY - minY);
   if (!(span > 0) || !Number.isFinite(span)) return null;
   const sc = SIZE / span;
-  const w = (maxX - minX) * sc, h = (maxY - minY) * sc;
+  return { placed, place, minX, minY, sc, w: (maxX - minX) * sc, h: (maxY - minY) * sc };
+}
+
+/** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
+export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => [], size?: { w: string; h: string }): string | null {
+  const lay = layoutPaths(paths, space);
+  if (!lay) return null;
+  const { placed, place, minX, minY, sc, w, h } = lay;
   const defs: string[] = [];
   const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null): string => {
     if (paint === null) return ` ${which}="none"`;

@@ -212,6 +212,8 @@ export class EditorState {
   message = "";
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
+  /** The words Reveal says for a screen reader (the hint line speaks them): what is under the pointer; null when nothing is revealed. */
+  revealText: string | null = null;
   /** When a finger's long press last opened the "under your finger" list (performance.now): the context menu the browser sends with the same long press is not wanted then. */
   fingerListAt = -Infinity;
   /** The things a Layers row (hovered or focused) stands for: they show their outline on the canvas (see `interaction/reveal.ts`). */
@@ -289,8 +291,8 @@ export class EditorState {
       return { ...o, ...(p.fill !== undefined ? { fill: p.fill } : {}), ...(p.stroke !== undefined ? { stroke: p.stroke } : {}) };
     }
     if (p.kind === "paint" && p.ids.includes(o.id) && o.kind === "image" && p.stroke !== undefined) {
-      const { stroke: _s, ...bare } = o; // (a picture's outline is one colour: a gradient shows its start)
-      return p.stroke === null ? bare : { ...bare, stroke: typeof p.stroke === "string" ? p.stroke : p.stroke.stops[0]!.c, width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
+      const { stroke: _s, ...bare } = o; 
+      return p.stroke === null ? bare : { ...bare, stroke: p.stroke, width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
     }
     if (p.kind === "nodes" && p.ids.includes(o.id) && o.kind === "path") {
       const { rot: _turned, ...flat } = o;

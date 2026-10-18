@@ -4,6 +4,8 @@ import { distToSegment, pointInPolygon, polygonsOverlap, polylineTouchesPolygon 
 import { itemCorners } from "./selection-frame";
 import type { ObjectId, PathObject } from "../doc/model";
 import { alignOf } from "../doc/model";
+import type { ImageObject } from "../doc/model";
+import { cornerRadiiPx } from "./draw-objects";
 import { exactStrokeEdgeDistancePx } from "./stroke-coverage";
 import { distanceToOutline, insideFill } from "../doc/path";
 
@@ -57,6 +59,7 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
   }
   if (po.obj.kind !== "stroke") {
     // Bounds-based picking (images and text boxes). Alpha-aware picking is not implemented yet.
+    if (po.obj.kind === "image" && po.obj.radius !== undefined) return insideRoundedBox(po, x, y, tol);
     return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
   }
   const reach = po.radius + tol;
@@ -68,6 +71,23 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
     if (distToSegment(x, y, q[i]!, q[i + 1]!, q[i + 2]!, q[i + 3]!) <= reach) return true;
   }
   return false;
+}
+
+/** Whether a point is on a picture with rounded corners (ADR 0153): in its box, but not in a corner the radius cuts away (within `tol` px of the curve counts). */
+function insideRoundedBox(po: ProjectedObject, x: number, y: number, tol: number): boolean {
+  const [l, t, r, bt] = po.q as unknown as [number, number, number, number];
+  if (x < l - tol || x > r + tol || y < t - tol || y > bt + tol) return false;
+  const radii = cornerRadiiPx((po.obj as ImageObject).radius!, po.proj.ppu, (r - l) / 2, (bt - t) / 2);
+  if (!radii) return true;
+  // top left, top right, bottom right, bottom left: the centre of each corner's arc, and whether the point lies in that corner's square
+  const arcs: Array<[number, number, number, boolean]> = [
+    [l + radii[0]!, t + radii[0]!, radii[0]!, x < l + radii[0]! && y < t + radii[0]!],
+    [r - radii[1]!, t + radii[1]!, radii[1]!, x > r - radii[1]! && y < t + radii[1]!],
+    [r - radii[2]!, bt - radii[2]!, radii[2]!, x > r - radii[2]! && y > bt - radii[2]!],
+    [l + radii[3]!, bt - radii[3]!, radii[3]!, x < l + radii[3]! && y > bt - radii[3]!],
+  ];
+  for (const [cx, cy, rad, inSquare] of arcs) if (inSquare && Math.hypot(x - cx, y - cy) > rad + tol) return false;
+  return true;
 }
 
 /** A closed outline as a polyline that returns to its first vertex. */
