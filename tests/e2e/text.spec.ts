@@ -563,3 +563,74 @@ test("words of a text can be underlined, struck through, given a colour and a si
   expect((await textObjects(p))[0]!.md).toBe(t!.md);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a text can be filled with a gradient and given an outline: set in the options bar, stored, drawn, and gone again when a plain colour is chosen (ADR 0130)", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 300, 300);
+  await p.keyboard.type("WWWWWW");
+  await finish(p);
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  const size = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+  await size.fill("80");
+  await size.press("Enter");
+  const [t] = await textObjects(p);
+  const box = async () => (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), t!.id))!.box;
+  const b0 = await box();
+  /** The ink in a slice of the text box: how many pixels differ from the background, and the darkest of them (the sum of the channels). */
+  const ink = (x0: number, x1: number) =>
+    p.evaluate(([a, c, y0, y1]) => {
+      let n = 0, red = 765;
+      const bg = window.__canvastDebug.pixelAt(5, 400);
+      for (let y = y0!; y < y1!; y += 5) for (let x = a!; x < c!; x += 5) {
+        const px = window.__canvastDebug.pixelAt(x, y);
+        if (Math.abs(px[0] - bg[0]) + Math.abs(px[1] - bg[1]) + Math.abs(px[2] - bg[2]) > 90) { n++; red = Math.min(red, px[0] + px[1] + px[2]); }
+      }
+      return { n, red };
+    }, [x0, x1, Math.round(b0.minY), Math.round(b0.maxY)] as const);
+  const mid = (b0.minX + b0.maxX) / 2;
+  const plainLeft = await ink(b0.minX, mid), plainRight = await ink(mid, b0.maxX);
+  expect(Math.abs(plainLeft.red - plainRight.red)).toBeLessThan(30); // one colour all through
+
+  // A linear gradient: the left half and the right half are not the same colour any more.
+  await p.getByRole("button", { name: "Text colour" }).click();
+  await p.locator('.colour-pop [data-mode="linear"]').click();
+  await expect.poll(async () => (await textObjects(p))[0]!["gradient"]).toMatchObject({ type: "linear" });
+  await p.keyboard.press("Escape");
+  const left = await ink(b0.minX, mid), right = await ink(mid, b0.maxX);
+  expect(left.n).toBeGreaterThan(50);
+  expect(right.red - left.red).toBeGreaterThan(80); // (a new gradient runs from the colour to nothing: the right half is lighter)
+
+  // An outline: a colour and a width; more is drawn round the letters, and it is stored as a share of the size.
+  const before = (await ink(b0.minX - 10, b0.maxX + 10)).n;
+  const w = p.getByRole("spinbutton", { name: "Text outline width (px at this zoom)" });
+  await w.fill("6");
+  await w.press("Enter");
+  await expect.poll(async () => (await textObjects(p))[0]!["outline"]).toMatchObject({ w: 6 / 80 });
+  expect((await ink(b0.minX - 10, b0.maxX + 10)).n).toBeGreaterThan(before * 1.05);
+  expect(await w.inputValue()).toBe("6");
+
+  // A plain colour takes the gradient away; width 0 takes the outline away.
+  await p.getByRole("button", { name: "Text colour" }).click();
+  await p.locator('.colour-pop [data-mode="solid"]').click();
+  await expect.poll(async () => (await textObjects(p))[0]!["gradient"]).toBeUndefined();
+  await p.keyboard.press("Escape");
+  await w.fill("0");
+  await w.press("Enter");
+  await expect.poll(async () => (await textObjects(p))[0]!["outline"]).toBeUndefined();
+
+  // Saved and read back.
+  await w.fill("3");
+  await w.press("Enter");
+  await p.getByRole("button", { name: "Text colour" }).click();
+  await p.locator('.colour-pop [data-mode="radial"]').click();
+  await p.keyboard.press("Escape");
+  const saved = (await textObjects(p))[0]!;
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  const back = (await textObjects(p))[0]!;
+  expect(back["gradient"]).toEqual(saved["gradient"]);
+  expect(back["outline"]).toEqual(saved["outline"]);
+  expect(app.consoleErrors).toEqual([]);
+});

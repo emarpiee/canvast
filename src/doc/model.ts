@@ -326,7 +326,7 @@ export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
     const l = layoutOf(o);
-    const p = TEXT_PAD_EM * o.size;
+    const p = (TEXT_PAD_EM + (o.outline?.w ?? 0)) * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
   }
   const p = o.points;

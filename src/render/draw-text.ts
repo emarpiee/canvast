@@ -1,7 +1,7 @@
 import { paintColor } from "./ink";
 import * as D from "../core/dyadic";
 import type { Viewport } from "../core/camera";
-import type { ImageObject, TextObject } from "../doc/model";
+import type { ImageObject, PathObject, TextObject } from "../doc/model";
 import { TEXT_PAD_EM } from "../doc/model";
 import type { Deco, Line, PlacedGlyph } from "../text/layout";
 import { DECO, LINE_HEIGHT, glyphScale, layoutOf } from "../text/layout";
@@ -10,6 +10,7 @@ import type { ProjectedObject, Projection } from "./projection";
 import { exactX, exactY, projX, projY, toPx } from "./projection";
 import type { RasterSource } from "./draw-objects";
 import { drawImageObject, paint } from "./draw-objects";
+import { canvasPaint } from "./gradient";
 
 /**
  * Text drawing (ADR 0013). Glyph positions come from the shared layout
@@ -82,8 +83,9 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       for (const g of line.glyphs) colours.add(g.color ?? o.color);
       for (const d of line.decos) colours.add(d.color ?? o.color);
     }
+    if (o.outline) strokeOutline(ctx, p, vp, o, lay, emPx, po.exact, sx, sy, minX, maxX, minY, maxY);
     for (const colour of colours) {
-      ctx.fillStyle = paintColor(colour);
+      ctx.fillStyle = o.gradient && colour === o.color ? canvasPaint(ctx, gradientHost(o, lay), o.gradient, p, vp) : paintColor(colour);
       ctx.beginPath();
       const path = new ExactPath(ctx, p, vp);
       let filled = false;
@@ -115,7 +117,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
         }
         for (const d of line.decos) {
           if ((d.color ?? o.color) !== colour || sx(d.x1) < minX || sx(d.x0) > maxX) continue;
-          addDeco(ctx, path, po, o, line, d, deep, sx, sy);
+          addDeco(ctx, path, o, line, d, deep, sx, sy);
           filled = true;
         }
       }
@@ -125,11 +127,42 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   ctx.restore();
 }
 
+/** The box a text gradient is placed on, as the path the gradient code wants (its layout box, unturned: the view is turned for a turned text). */
+function gradientHost(o: TextObject, lay: ReturnType<typeof layoutOf>): PathObject {
+  const w = lay.width * o.size;
+  const h = Math.max(lay.height * o.size, o.h ?? 0);
+  const n = [0, 0, 0, 0, 0, 0, w, 0, w, 0, w, 0, w, h, w, h, w, h, 0, h, 0, h, 0, h];
+  const { rot: _r, ...rest } = o;
+  return { ...rest, kind: "path", sub: [{ n, closed: true }], fill: null, stroke: null } as unknown as PathObject;
+}
+
+/** The line round the letters, drawn first so the letters cover its inner half: the glyph outlines (and decorations) stroked as wide as twice the outline. */
+function strokeOutline(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewport, o: TextObject, lay: ReturnType<typeof layoutOf>, emPx: number, exact: boolean, sx: (em: number) => number, sy: (em: number) => number, minX: number, maxX: number, minY: number, maxY: number): void {
+  const out = o.outline!;
+  ctx.beginPath();
+  const path = new ExactPath(ctx, p, vp);
+  for (const line of lay.lines) {
+    if (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY) continue;
+    const deep = !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX) || exact;
+    for (const g of line.glyphs) {
+      if (g.cp === 32 || !g.gid || sx(g.x + g.adv + TEXT_PAD_EM) < minX || sx(g.x - TEXT_PAD_EM) > maxX) continue;
+      const shifts = g.bold ? [0, BOLD_SHIFT_EM * glyphScale(line, g)] : [0];
+      for (const d of shifts) (deep ? addGlyphExact(path, o, line, g, d) : addGlyphFast(ctx, p, o, line, g, d));
+    }
+    for (const d of line.decos) addDeco(ctx, path, o, line, d, deep, sx, sy);
+  }
+  path.close();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.min(1e6, 2 * out.w * emPx);
+  ctx.strokeStyle = paintColor(out.c);
+  ctx.stroke();
+}
+
 /** The biggest size of a glyph on a line, as a multiple of the line's. */
 const lineBig = (line: Line): number => line.glyphs.reduce((m, g) => Math.max(m, g.k ?? 1), 1);
 
 /** The rectangle of an underline or a strikethrough: in doubles, or (at deep zoom) as exact lines in the same path as the glyphs. */
-function addDeco(ctx: CanvasRenderingContext2D, path: ExactPath, po: ProjectedObject, o: TextObject, line: Line, d: Deco, deep: boolean, sx: (em: number) => number, sy: (em: number) => number): void {
+function addDeco(ctx: CanvasRenderingContext2D, path: ExactPath, o: TextObject, line: Line, d: Deco, deep: boolean, sx: (em: number) => number, sy: (em: number) => number): void {
   const gs = line.scale * d.k;
   const thick = DECO.thick * gs;
   const y0 = line.baseline + (d.kind === "under" ? DECO.underOffset * gs : -DECO.strikeOffset * gs - thick / 2);
@@ -147,7 +180,6 @@ function addDeco(ctx: CanvasRenderingContext2D, path: ExactPath, po: ProjectedOb
   const c = [pt(d.x0, y0), pt(d.x1, y0), pt(d.x1, y1), pt(d.x0, y1)];
   for (let i = 0; i < 4; i++) path.segment([c[i]!, c[(i + 1) % 4]!]);
   path.close();
-  void po;
 }
 
 /** Glyph outline in doubles (bounded sizes only). */

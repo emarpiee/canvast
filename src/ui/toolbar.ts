@@ -222,6 +222,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
         <input type="file" hidden accept=".ttf,.otf,.woff" data-testid="font-input">
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
+        <button type="button" class="swatch swatch-paint" data-text-outline data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text outline" title="Text outline: the colour of the line round the letters (none to take it away)"><span data-paint-chip></span></button>
+        <label class="tb-count" data-text-wrap hidden title="Outline width, in px at this zoom (0: none)">Outline <input type="number" data-text-outline-w min="0" max="2000" step="any" inputmode="decimal" aria-label="Text outline width (px at this zoom)"></label>
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
@@ -426,12 +428,32 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const anchor = e.currentTarget as HTMLElement;
     openPaintPopover(anchor, {
       name: "Text colour",
-      paint: actions.selectedTextStyle()?.color ?? null,
+      paint: actions.selectedTextStyle()?.gradient ?? actions.selectedTextStyle()?.color ?? null,
       noneLabel: "No colour",
-      solidOnly: true,
-      onInput: (p) => typeof p === "string" && actions.setTextStyle({ color: p }, false),
-      onChange: (p) => typeof p === "string" && actions.setTextStyle({ color: p }),
+      modes: ["solid", "linear", "radial"],
+      onInput: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : { gradient: p }, false),
+      onChange: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : { gradient: p }),
     });
+  });
+  // The line round the letters: its colour here, its width beside it (px at this zoom, kept as a share of the size).
+  const outlineWidthEm = (px: number): number => {
+    const size = actions.selectedTextStyle()?.sizePx;
+    return size ? px / size : 0.05;
+  };
+  root.querySelector<HTMLElement>("[data-text-outline]")!.addEventListener("click", (e) => {
+    const t = actions.selectedTextStyle();
+    openPaintPopover(e.currentTarget as HTMLElement, {
+      name: "Text outline",
+      paint: t?.outline?.c ?? null,
+      noneLabel: "No outline",
+      modes: ["none", "solid"],
+      onInput: (p) => actions.setTextStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }, false),
+      onChange: (p) => actions.setTextStyle({ outline: typeof p === "string" ? { c: p, w: actions.selectedTextStyle()?.outline?.w ?? 0.05 } : null }),
+    });
+  });
+  liveNumber(root.querySelector<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
+    const t = actions.selectedTextStyle();
+    actions.setTextStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
   });
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));
@@ -741,7 +763,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (document.activeElement !== size) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
       for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));
       for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.setAttribute("aria-checked", String((b.dataset["textFit"] === "width") === txt.autoWidth));
-      root.querySelector<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = swatchBackground(txt.color);
+      root.querySelector<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = txt.gradient ? paintCss(txt.gradient) : swatchBackground(txt.color);
+      root.querySelector<HTMLElement>("[data-text-outline] [data-paint-chip]")!.style.background = txt.outline ? swatchBackground(txt.outline.c) : "transparent";
+      const ow = root.querySelector<HTMLInputElement>("[data-text-outline-w]")!;
+      if (document.activeElement !== ow) ow.value = txt.outline && txt.sizePx !== null ? String(Math.round(txt.outline.w * txt.sizePx * 100) / 100) : "0";
       const line = root.querySelector<HTMLInputElement>("[data-text-line]")!, track = root.querySelector<HTMLInputElement>("[data-text-track]")!;
       if (document.activeElement !== line) line.value = String(Math.round(txt.lineHeight * 100) / 100);
       if (document.activeElement !== track) track.value = String(Math.round(txt.tracking * 100));

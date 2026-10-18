@@ -597,7 +597,7 @@ async function start(): Promise<void> {
         return l ? styleOf(l) : null;
       },
       apply: (look, label) => {
-        setTextStyle(doc, editor, look, textPpu);
+        setTextStyle(doc, editor, { gradient: null, outline: null, ...look }, textPpu); // (a style without a gradient or an outline takes them away)
         editor.message = `Applied the text style “${label}”.`;
         editor.changed();
       },

@@ -390,8 +390,8 @@ export interface PaintPopoverOptions {
   /** Once, when a gesture ends or the kind changes. */
   onChange(paint: Paint | null): void;
   onClose?(): void;
-  /** Only a plain colour (with transparency) can be chosen: no None, Linear or Radial (a text's colour). */
-  solidOnly?: boolean;
+  /** The kinds of paint offered (default: all four). A text's fill has no None; a text's outline has only None and Colour. */
+  modes?: ReadonlyArray<"none" | "solid" | "linear" | "radial">;
 }
 
 type Mode = "none" | "solid" | "linear" | "radial";
@@ -433,10 +433,11 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
   const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial" };
-  modes.innerHTML = (["none", "solid", "linear", "radial"] as const).map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
+  const offered = o.modes ?? (["none", "solid", "linear", "radial"] as const);
+  modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
   const body = document.createElement("div");
   body.className = "paint-body";
-  if (o.solidOnly) pop.append(body);
+  if (offered.length === 1) pop.append(body);
   else pop.append(modes, body);
 
   let current: { destroy(): void } | null = null;
