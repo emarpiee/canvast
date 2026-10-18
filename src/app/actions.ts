@@ -24,11 +24,12 @@ import type { Adjust } from "../doc/adjust";
 import { cropEdges, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import type { Constraint } from "../doc/constraints";
-import { drawnParams, drawnSubs } from "../doc/path";
+import { NODE, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
+import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { exportSvg } from "./svg-export";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs } from "../doc/model";
+import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -1271,6 +1272,54 @@ export function convertTextToPath(doc: DocumentStore, editor: EditorState): void
   }
   doc.commit(doc.transaction(made.length === 1 ? "Convert text to path" : `Convert ${made.length} texts to paths`, made));
   editor.message = missing ? `${missing} character${missing === 1 ? "" : "s"} in a system font could not be turned into a path and ${missing === 1 ? "was" : "were"} left out.` : "";
+  editor.changed();
+}
+
+const simplifiable = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.result && !o.container && o.sub.some((s) => s.n.length / NODE > 2));
+export const canSimplify = (doc: DocumentStore, editor: EditorState): boolean => simplifiable(doc, editor).length > 0;
+const penStrokes = (doc: DocumentStore, editor: EditorState): StrokeObject[] => selected(doc, editor).filter((o): o is StrokeObject => o.kind === "stroke" && o.points.length >= 4);
+export const canStrokeToPath = (doc: DocumentStore, editor: EditorState): boolean => penStrokes(doc, editor).length > 0;
+
+/**
+ * Fewer nodes for the same shape (curve fitting within a fiftieth of the shape's longer side, but never finer than half its outline). A
+ * shape made by a tool (rectangle, polygon, rounded corners) is no longer that shape afterwards, so it loses its parameters. One undo step.
+ */
+export function simplifySelection(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const paths = simplifiable(doc, editor);
+  let before = 0;
+  let after = 0;
+  const next = paths.flatMap((o): PathObject[] => {
+    const b = geometryBounds(o.sub);
+    const tol = Math.max(Math.max(b.maxX - b.minX, b.maxY - b.minY) / 400, o.width / 8, Number.MIN_VALUE);
+    const sub = o.sub.map((s) => simplifySub(s, tol));
+    const count = (subs: readonly SubPath[]): number => subs.reduce((a, s) => a + s.n.length / NODE, 0);
+    if (count(sub) >= count(o.sub)) return [];
+    before += count(o.sub);
+    after += count(sub);
+    const { shape: _s, params: _p, radius: _r, base: _b, initial: _i, ...rest } = o;
+    return [{ ...rest, sub }];
+  });
+  if (!next.length) {
+    editor.message = "Those paths cannot be simplified further.";
+    editor.changed();
+    return;
+  }
+  doc.commit(doc.transaction(next.length === 1 ? "Simplify path" : `Simplify ${next.length} paths`, next));
+  editor.message = `${before} nodes became ${after}.`;
+  editor.changed();
+}
+
+/** Pen strokes as open paths of the same colour and width, with round ends (curve fitting within a quarter of the width): editable with Edit nodes. One undo step. */
+export function strokeToPath(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const made = penStrokes(doc, editor).map((o): CanvasObject => {
+    const { kind: _k, points: _pts, color, rot: _r, ...base } = o;
+    const path: PathObject = { ...base, kind: "path", sub: [fitPolyline(strokePoints(o), Math.max(o.width / 4, Number.MIN_VALUE))], fill: null, stroke: color, width: o.width };
+    return homeObject(normalizeUnit(path), doc.space);
+  });
+  if (!made.length) return;
+  doc.commit(doc.transaction(made.length === 1 ? "Pen stroke to path" : `${made.length} pen strokes to paths`, made));
   editor.changed();
 }
 

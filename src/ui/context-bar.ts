@@ -73,6 +73,11 @@ export interface ContextActions {
   /** Turn the selected text into paths (ADR 0102), and whether any is selected. */
   outline(): void;
   canOutline(): boolean;
+  /** Fewer nodes for the picked paths, and pen strokes turned into paths. */
+  simplify(): void;
+  canSimplify(): boolean;
+  strokeToPath(): void;
+  canStrokeToPath(): boolean;
   /** Set a picked text along a picked path (both picked), and take a text off its path (ADR 0131). */
   setOnPath(): void;
   canSetOnPath(): boolean;
@@ -121,6 +126,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
       btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
     group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Path", btn("simplify", ICONS.chartSpline, "Simplify the path: fewer nodes, the same shape"), btn("strokepath", ICONS.pencilRuler, "Turn the pen stroke into an editable path")) +
     group("Text", btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)"), btn("onpath", ICONS.route, "Set the text along the picked path (pick the text and the path)"), btn("offpath", ICONS.routeOff, "Take the text off its path: it is set straight again")) +
     group("Shapes",
       ...OPS.map((o) => btn("op", o.icon, o.aria, `data-op="${o.op}"`)),
@@ -160,6 +166,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "outline": actions.outline(); break;
       case "onpath": actions.setOnPath(); break;
       case "offpath": actions.takeOffPath(); break;
+      case "simplify": actions.simplify(); break;
+      case "strokepath": actions.strokeToPath(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
@@ -223,6 +231,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("outline").hidden = !actions.canOutline();
     q("onpath").hidden = !actions.canSetOnPath();
     q("offpath").hidden = !actions.canTakeOffPath();
+    q("simplify").hidden = !actions.canSimplify();
+    q("strokepath").hidden = !actions.canStrokeToPath();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();

@@ -2069,3 +2069,37 @@ test("a number's name can be dragged to change it (Sides before drawing a polygo
   expect(typeof made[2]!.fill).toBe("object"); // a gradient
   expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBe(3);
 });
+
+test("Simplify: a path of six collinear nodes becomes two; a pen stroke becomes an open path with the stroke's colour and width; one undo each", async ({ app }) => {
+  const p = app.page;
+  await key(app, "b");
+  for (const x of [400, 460, 520, 580, 640, 700]) await click(app, x, 300);
+  await key(app, "Enter");
+  const path = await last(app);
+  expect(path.sub[0]!.n.length / 6).toBe(6);
+  await key(app, "v");
+  await click(app, 550, 300);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([path.id]);
+  await p.click('[data-ctx="simplify"]', { timeout: 5000 });
+  expect((await last(app)).sub[0]!.n.length / 6, "collinear nodes are all but the ends").toBe(2);
+  await key(app, "Control+z");
+  expect((await last(app)).sub[0]!.n.length / 6).toBe(6);
+
+  await key(app, "p");
+  await p.mouse.move(400, 500);
+  await p.mouse.down();
+  for (let i = 1; i <= 60; i++) await p.mouse.move(400 + i * 5, 500 + Math.sin(i / 8) * 40);
+  await p.mouse.up();
+  await app.frame();
+  const stroke = await last(app);
+  expect(stroke.kind).toBe("stroke");
+  await key(app, "v");
+  await drag(app, [380, 420], [740, 600]); // a selection box round the stroke
+  await p.click('[data-ctx="strokepath"]', { timeout: 5000 });
+  const made = await last(app);
+  expect(made).toMatchObject({ kind: "path", fill: null, id: stroke.id });
+  expect(made.sub[0]!.n.length / 6, "a few nodes, not sixty").toBeLessThan(20);
+  expect(made.sub[0]!.closed).toBe(false);
+  await key(app, "Control+z");
+  expect((await last(app)).kind).toBe("stroke");
+});
