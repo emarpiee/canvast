@@ -1043,6 +1043,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-places { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .asset-places li { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
 .asset-place-n { color: var(--hud-muted); font-variant-numeric: tabular-nums; margin-left: var(--sp-2); }
+.asset-more h4 { margin: var(--sp-4) 0 var(--sp-1); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; }
 .asset-more { margin-top: var(--sp-8); color: var(--hud-muted); }
 .asset-more summary { cursor: pointer; }
 .asset-more dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-6); margin: var(--sp-4) 0 0; }

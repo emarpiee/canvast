@@ -2192,3 +2192,40 @@ test("a picture on the system clipboard (a screenshot) pastes onto the canvas as
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([createHash("sha256").update(png).digest("hex")]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("what a file says about itself is shown in its details (camera, settings, orientation), and a picture whose EXIF asks to be turned is shown turned (ADR 0138)", async ({ app }) => {
+  const p = app.page;
+  // a landscape JPEG made in the page, then given an EXIF block that asks for a quarter turn, a make and an ISO
+  const base64 = await p.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = 40;
+    c.height = 20;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#c33";
+    g.fillRect(0, 0, 40, 20);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), "image/jpeg", 0.9));
+    return btoa(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer())));
+  });
+  const jpeg = Buffer.from(base64, "base64");
+  const u16 = (v: number): number[] => [v & 255, v >> 8];
+  const u32 = (v: number): number[] => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  const entry = (tag: number, type: number, count: number, v: number[]): number[] => [...u16(tag), ...u16(type), ...u32(count), ...[...v, 0, 0, 0, 0].slice(0, 4)];
+  const exifAt = 8 + 2 + 3 * 12 + 4 + 6;
+  const tiff = [0x49, 0x49, 42, 0, 8, 0, 0, 0, ...u16(3), ...entry(0x010f, 2, 6, u32(8 + 2 + 3 * 12 + 4)), ...entry(0x0112, 3, 1, u16(6)), ...entry(0x8769, 4, 1, u32(exifAt)), ...u32(0), ...[..."Acme"].map((c) => c.charCodeAt(0)), 0, 0, ...u16(1), ...entry(0x8827, 3, 1, u16(800)), ...u32(0)];
+  const app1 = [...[..."Exif"].map((c) => c.charCodeAt(0)), 0, 0, ...tiff];
+  const file = Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, (app1.length + 2) >> 8, (app1.length + 2) & 255, ...app1]), jpeg.subarray(2)]);
+  await p.getByTestId("import-input").setInputFiles({ name: "turned.jpg", mimeType: "image/jpeg", buffer: file });
+  await expect.poll(async () => ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<{ kind: string }>).length).toBe(1);
+  const img = ((await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ w: number; h: number; pixelW: number; pixelH: number }>)[0]!;
+  expect(img.h, "shown turned: taller than wide").toBeGreaterThan(img.w);
+  expect(img.pixelH).toBeGreaterThan(img.pixelW);
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"]').first().click();
+  const meta = p.getByTestId("asset-metadata");
+  await expect(meta).toBeVisible();
+  await meta.locator("summary").click();
+  await expect(meta).toContainText("Acme");
+  await expect(meta).toContainText("Turned 90° right");
+  await expect(meta).toContainText("800");
+  expect(app.consoleErrors).toEqual([]);
+});

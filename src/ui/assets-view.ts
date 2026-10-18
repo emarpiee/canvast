@@ -1,4 +1,6 @@
 import { fileByFolders, filesOfPicker } from "../app/directory";
+import { readMetadata } from "../assets/metadata";
+import type { MetaRow } from "../assets/metadata";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
@@ -1394,12 +1396,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove ${instances === 1 ? "its" : "its"} ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first.</p>` : ""}` : ""}
       </div>
+      ${e?.present && !isCard(e) ? `<details class="asset-more" data-testid="asset-metadata" data-metadata hidden><summary>What the file says</summary><div data-metadata-body></div></details>` : ""}
       <details class="asset-more"><summary>Technical details</summary>
         <dl>
           ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd><dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
           <dt>Content hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 16)}…</dd>
         </dl>
       </details>`;
+    if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
@@ -1407,6 +1411,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (tagInput && hadFocus) tagInput.focus();
     // The viewer's favourite button follows the stored state.
     if (e && slideHash === e.hash) viewer.querySelector<HTMLElement>('[data-act="favorite"]')!.setAttribute("aria-pressed", String(fav));
+  };
+
+  /** What the file says about itself, put in the details panel when it has read it (ADR 0138). */
+  const fillMetadata = async (hash: string, type: string): Promise<void> => {
+    const rec = await assets.record(hash).catch(() => undefined);
+    if (!rec) return;
+    const video = /^(video|audio)\//.test(type);
+    if (video && rec.blob.size > 100 * 2 ** 20) return;
+    const bytes = new Uint8Array(await (video ? rec.blob : rec.blob.slice(0, 2 * 2 ** 20)).arrayBuffer());
+    const { rows } = await readMetadata(bytes, type);
+    const box = inspector.querySelector<HTMLElement>("[data-metadata]");
+    if (!box || inspector.dataset["hash"] !== hash || !rows.length) return;
+    const groups = new Map<string, MetaRow[]>();
+    for (const r of rows) (groups.get(r.group) ?? groups.set(r.group, []).get(r.group)!).push(r);
+    box.querySelector("[data-metadata-body]")!.innerHTML = [...groups].map(([g, rs]) => `<h4>${esc(g)}</h4><dl>${rs.map((r) => `<dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd>`).join("")}</dl>`).join("");
+    box.hidden = false;
   };
 
   /** Tags and folders of an entry (inspector). */
