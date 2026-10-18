@@ -22,4 +22,8 @@ The Actions bar (picture-up icon), the sheet bar and the command palette open on
 - The last unit, resolution, format, quality and background are remembered in the browser.
 - A live preview shows the shape (on a chequer when transparent) with its measures along the top and left.
 
-Not done: exporting several sheets at once, a PDF, and the printed size written in the file's metadata (the resolution is only used to work the size out).
+**Several sheets** picked together (and nothing but them and what is on them) are exported together, in reading order: the width chosen is the width of each, each with the height of its own shape; they leave as a ZIP of files, or as **one PDF with a page for each** at the physical size (pixels ÷ resolution × 72 points; a JPEG inside when there is a background, deflated RGB with an alpha plane when it is transparent). Copy works for one picture only.
+
+**Resolution in the file:** a PNG gets a `pHYs` chunk and a JPEG a JFIF density, so an editor or a printer reads the intended size (a 5 in picture says 5 in); `app/export-files.ts` holds these and the PDF writer.
+
+Not done: a vector PDF (its pages are pictures), per-sheet sizes in one go, and the resolution in a WebP.

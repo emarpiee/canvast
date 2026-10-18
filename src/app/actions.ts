@@ -1458,9 +1458,38 @@ export function exportTarget(doc: DocumentStore, editor: EditorState): ExportTar
   if (!sel.length) return null;
   const ids = new Set<ObjectId>([...sel.map((o) => o.id)]);
   for (const id of descendantsOf(doc.all(), new Set(ids))) ids.add(id);
-  const all = [...ids].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.hidden && !isMaskObject(o));
   const sheets = sel.filter((o) => isContainer(o) && !o.rot);
   const sheet = sheets.length === 1 && sel.every((o) => o.id === sheets[0]!.id || ids.has(o.id) && descendantsOf(doc.all(), new Set([sheets[0]!.id])).includes(o.id)) ? sheets[0]! : null;
+  return buildTarget(doc, sel, sheet);
+}
+
+/**
+ * Everything Export… would send out: one target, or one for each sheet when several sheets are picked (and nothing but them and what is on
+ * them), in reading order, so they can leave together (a ZIP, or the pages of one PDF).
+ */
+export function exportTargets(doc: DocumentStore, editor: EditorState): ExportTarget[] {
+  const sel = selected(doc, editor).filter((o) => !o.hidden && !isMaskObject(o));
+  const plainSheet = (o: CanvasObject): boolean => isContainer(o) && !o.rot && !isMaskSheet(o);
+  const sheets: CanvasObject[] = sel.filter(plainSheet);
+  if (sheets.length >= 2) {
+    const within = new Set<ObjectId>(sheets.map((o) => o.id));
+    for (const id of descendantsOf(doc.all(), new Set(within))) within.add(id);
+    if (sel.every((o) => within.has(o.id))) {
+      const rows = [...sheets].sort((a, b) => {
+        const ba = worldBounds(a), bb = worldBounds(b);
+        return D.cmp(ba.min.y, bb.min.y) || D.cmp(ba.min.x, bb.min.x);
+      });
+      return rows.map((sh) => buildTarget(doc, [sh], sh)).filter((t): t is ExportTarget => t !== null);
+    }
+  }
+  const one = exportTarget(doc, editor);
+  return one ? [one] : [];
+}
+
+function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sheet: CanvasObject | null): ExportTarget | null {
+  const ids = new Set<ObjectId>([...sel.map((o) => o.id)]);
+  for (const id of descendantsOf(doc.all(), new Set(ids))) ids.add(id);
+  const all = [...ids].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.hidden && !isMaskObject(o));
   const first = sheet ?? sel[0]!;
   const frame = first.frame ?? doc.space.world;
   const bounds = sheet ? worldBounds(sheet) : unionBounds(sel.map((o) => expressObjectIn(o, frame)));

@@ -7,24 +7,27 @@
 import type { Background, ExportTarget } from "../app/export-render";
 import { DPIS, MAX_AREA, MAX_SIDE, UNITS, clampSize, formatRatio, fromPx, presetOf, sizeSuggestions, toPx } from "../app/export-size";
 import type { Unit } from "../app/export-size";
+import { jpegWithDpi, pdfOf, pdfPageOf, pngWithDpi } from "../app/export-files";
 import { SHOT_FORMATS, encodeShot } from "../app/screenshot";
+import { writeZip } from "../storage/zip";
 import type { ShotFormat } from "../app/screenshot";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 
 export interface ExportDeps {
-  readonly target: ExportTarget;
-  /** The target drawn at `w` × `h` px. */
-  render(w: number, h: number, bg: Background): Promise<HTMLCanvasElement>;
-  /** The vectors as SVG text of this size (width and height as SVG writes them), or null when it cannot be. */
-  svg(size: { w: string; h: string }): string | null;
+  /** What is exported: one target, or one for each of several sheets (they leave together, as a ZIP or the pages of a PDF). */
+  readonly targets: readonly ExportTarget[];
+  /** A target drawn at `w` × `h` px. */
+  render(t: ExportTarget, w: number, h: number, bg: Background): Promise<HTMLCanvasElement>;
+  /** The vectors of a target as SVG text of this size (width and height as SVG writes them), or null when it cannot be. */
+  svg(t: ExportTarget, size: { w: string; h: string }): string | null;
   /** Put the file in the library (and tell the person, with a way to see it). */
   toLibrary(file: File): Promise<void>;
   /** A message for the person (the notice stack). */
   say(text: string): void;
 }
 
-type Format = ShotFormat | "svg";
+type Format = ShotFormat | "svg" | "pdf";
 interface Prefs {
   unit: Unit;
   dpi: number;
@@ -41,7 +44,7 @@ const loadPrefs = (): Prefs => {
     return {
       unit: UNITS.includes(raw.unit as Unit) ? (raw.unit as Unit) : DEFAULTS.unit,
       dpi: DPIS.includes(Number(raw.dpi)) ? Number(raw.dpi) : DEFAULTS.dpi,
-      format: raw.format === "png" || raw.format === "webp" || raw.format === "jpeg" || raw.format === "svg" ? raw.format : DEFAULTS.format,
+      format: raw.format === "png" || raw.format === "webp" || raw.format === "jpeg" || raw.format === "svg" || raw.format === "pdf" ? raw.format : DEFAULTS.format,
       quality: Math.min(100, Math.max(10, Number(raw.quality) || DEFAULTS.quality)),
       bg: raw.bg === "white" || raw.bg === "black" || raw.bg === "transparent" ? raw.bg : DEFAULTS.bg,
     };
@@ -64,15 +67,18 @@ const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u
 const PREVIEW_PX = 320;
 
 export function openExportDialog(deps: ExportDeps): void {
-  const t = deps.target;
+  const ts = deps.targets;
+  const t = ts[0]!;
+  const multi = ts.length > 1;
+  const allVectors = ts.every((x) => x.vectors);
   const prefs = loadPrefs();
-  if (prefs.format === "svg" && !t.vectors) prefs.format = "png";
+  if (prefs.format === "svg" && !allVectors) prefs.format = "png";
   // To begin with: the picture's own pixels, else the first size the shape is made for (A4, Full HD …), else the longer side 1920 px.
   const startW = t.ratio >= 1 ? 1920 : 1920 * t.ratio;
-  const exact = sizeSuggestions(t.ratio, 8).find((s) => s.exact);
-  let widthPx = t.original ? t.original.w : (exact?.w ?? startW);
+  const exact = multi ? undefined : sizeSuggestions(t.ratio, 8).find((s) => s.exact);
+  let widthPx = t.original && !multi ? t.original.w : (exact?.w ?? (multi ? 1080 : startW));
   // A size the shape is made for is taken whole (2480 × 3508 for A4), not worked out from a ratio that may differ in the last digit.
-  let whole: { w: number; h: number } | null = t.original ? { w: t.original.w, h: t.original.h } : exact ? { w: exact.w, h: exact.h } : null;
+  let whole: { w: number; h: number } | null = multi ? null : t.original ? { w: t.original.w, h: t.original.h } : exact ? { w: exact.w, h: exact.h } : null;
   let nameTouched = false;
   let busy = false;
 
@@ -83,24 +89,26 @@ export function openExportDialog(deps: ExportDeps): void {
   const preset = presetOf(t.ratio);
   dlg.innerHTML = `
     <header class="ex-head">
-      <h2 id="ex-title">Export <span class="ex-what">${esc(t.name)}</span></h2>
+      <h2 id="ex-title">Export <span class="ex-what">${multi ? `${ts.length} sheets` : esc(t.name)}</span></h2>
       <button type="button" class="ex-x" data-ex="close" aria-label="Close">${ICONS.x}</button>
     </header>
     <div class="ex-body">
       <div class="ex-stage">
-        <div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(t.ratio, 0.2), 5)}">
+        ${multi
+          ? `<div class="ex-minis" data-ex-minis>${ts.slice(0, 6).map((x, i) => `<figure class="ex-mini"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas></div><figcaption>${esc(x.name)} · ${esc(formatRatio(x.ratio))}</figcaption></figure>`).join("")}</div>`
+          : `<div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(t.ratio, 0.2), 5)}">
           <canvas class="ex-thumb" data-ex-thumb aria-label="Preview"></canvas>
           <span class="ex-dim ex-dim-w" data-ex-dim-w></span>
           <span class="ex-dim ex-dim-h" data-ex-dim-h></span>
-        </div>
-        <p class="ex-shape" data-testid="export-shape">Shape <strong>${esc(formatRatio(t.ratio))}</strong>${preset ? ` <span>· ${esc(preset.short)}</span>` : ""}</p>
+        </div>`}
+        <p class="ex-shape" data-testid="export-shape">${multi ? `<strong>${ts.length} sheets</strong> <span>· each at this width, its own shape</span>` : `Shape <strong>${esc(formatRatio(t.ratio))}</strong>${preset ? ` <span>· ${esc(preset.short)}</span>` : ""}`}</p>
       </div>
       <div class="ex-panel">
         <section class="ex-sec" aria-label="Size">
           <div class="ex-row">
-            <label class="ex-field">Width <input type="number" data-ex="w" min="0" step="any" inputmode="decimal" aria-label="Width"></label>
-            <span class="ex-times" title="The shape stays: change one side and the other follows" aria-hidden="true">×</span>
-            <label class="ex-field">Height <input type="number" data-ex="h" min="0" step="any" inputmode="decimal" aria-label="Height"></label>
+            <label class="ex-field">${multi ? "Width of each" : "Width"} <input type="number" data-ex="w" min="0" step="any" inputmode="decimal" aria-label="Width"></label>
+            <span class="ex-times"${multi ? " hidden" : ""} title="The shape stays: change one side and the other follows" aria-hidden="true">×</span>
+            <label class="ex-field"${multi ? " hidden" : ""}>Height <input type="number" data-ex="h" min="0" step="any" inputmode="decimal" aria-label="Height"></label>
             <div class="ex-seg" role="radiogroup" aria-label="Unit" data-ex-units>${UNITS.map((u) => `<button type="button" role="radio" data-unit="${u}" aria-checked="${u === prefs.unit}">${UNIT_LABEL[u]}</button>`).join("")}</div>
           </div>
           <div class="ex-row ex-row-dpi">
@@ -111,7 +119,7 @@ export function openExportDialog(deps: ExportDeps): void {
         </section>
         <section class="ex-sec" aria-label="File">
           <div class="ex-row">
-            <div class="ex-seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${t.vectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}</div>
+            <div class="ex-seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${allVectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}<button type="button" role="radio" data-format="pdf" aria-checked="${prefs.format === "pdf"}" title="One page for each picture, at the physical size">PDF</button></div>
             <label class="ex-field ex-quality" data-ex-quality>Quality <input type="range" data-ex="q" min="10" max="100" step="1" value="${prefs.quality}" aria-label="Quality"> <output data-ex-qout>${prefs.quality}%</output></label>
           </div>
           <div class="ex-row" data-ex-bgrow>
@@ -134,41 +142,49 @@ export function openExportDialog(deps: ExportDeps): void {
   const wIn = q<HTMLInputElement>('[data-ex="w"]'), hIn = q<HTMLInputElement>('[data-ex="h"]');
   const dpiSel = q<HTMLSelectElement>('[data-ex="dpi"]'), qIn = q<HTMLInputElement>('[data-ex="q"]'), nameIn = q<HTMLInputElement>('[data-ex="name"]');
   const note = q<HTMLElement>("[data-ex-note]"), readout = q<HTMLElement>("[data-ex-readout]"), chips = q<HTMLElement>("[data-ex-chips]");
-  const thumb = q<HTMLCanvasElement>("[data-ex-thumb]");
+  const thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   const radios = (sel: string): HTMLElement[] => [...dlg.querySelectorAll<HTMLElement>(sel)];
 
   const px = (): { w: number; h: number; capped: boolean } => (whole && whole.w === widthPx ? { ...whole, capped: false } : clampSize(widthPx, widthPx / t.ratio));
-  const ext = (): string => (prefs.format === "svg" ? "svg" : SHOT_FORMATS[prefs.format].ext);
+  /** The pixel size of target `i` at the width chosen: its own height from its own shape (the first one's is `px()`). */
+  const sizeOf = (i: number): { w: number; h: number } => (i === 0 ? px() : clampSize(widthPx, widthPx / ts[i]!.ratio));
+  const ext = (): string => (prefs.format === "svg" ? "svg" : prefs.format === "pdf" ? "pdf" : SHOT_FORMATS[prefs.format].ext);
 
   const refreshName = (): void => {
     const s = px();
-    if (!nameTouched) nameIn.value = `${slug(t.name)}-${prefs.format === "svg" ? "vector" : `${s.w}x${s.h}`}`;
+    if (!nameTouched) nameIn.value = multi ? `${slug(t.name)}-and-${ts.length - 1}-more` : `${slug(t.name)}-${prefs.format === "svg" ? "vector" : `${s.w}x${s.h}`}`;
     q("[data-ex-ext]").textContent = `.${ext()}`;
   };
 
   let thumbToken = 0;
   const refreshThumb = async (): Promise<void> => {
     const token = ++thumbToken;
-    const w = Math.max(8, Math.round(t.ratio >= 1 ? PREVIEW_PX : PREVIEW_PX * t.ratio)), h = Math.max(8, Math.round(w / t.ratio));
-    try {
-      const bg: Background = prefs.format === "jpeg" || prefs.format === "svg" ? "white" : prefs.bg;
-      const c = await deps.render(w, h, bg);
-      if (token !== thumbToken) return;
-      thumb.width = w;
-      thumb.height = h;
-      thumb.getContext("2d")!.clearRect(0, 0, w, h);
-      thumb.getContext("2d")!.drawImage(c, 0, 0);
-      thumb.dataset["ready"] = "1";
-      q("[data-ex-frame]").classList.toggle("is-checker", bg === "transparent");
-      thumb.dataset["bg"] = bg;
-    } catch {
-      // no preview: the numbers still work
+    const bg: Background = prefs.format === "jpeg" || prefs.format === "svg" ? "white" : prefs.bg;
+    const edge = multi ? 140 : PREVIEW_PX;
+    for (let i = 0; i < thumbs.length; i++) {
+      const x = ts[i]!;
+      const w = Math.max(8, Math.round(x.ratio >= 1 ? edge : edge * x.ratio)), h = Math.max(8, Math.round(w / x.ratio));
+      try {
+        const c = await deps.render(x, w, h, bg);
+        if (token !== thumbToken) return;
+        const th = thumbs[i]!;
+        th.width = w;
+        th.height = h;
+        th.getContext("2d")!.clearRect(0, 0, w, h);
+        th.getContext("2d")!.drawImage(c, 0, 0);
+        th.dataset["ready"] = "1";
+        th.closest(".ex-frame")!.classList.toggle("is-checker", bg === "transparent");
+        th.dataset["bg"] = bg;
+      } catch {
+        // no preview: the numbers still work
+      }
     }
   };
 
-  const suggestions = sizeSuggestions(t.ratio, 8);
-  if (t.original) suggestions.unshift({ label: "Original", w: t.original.w, h: t.original.h, dpi: null, exact: true });
-  chips.innerHTML = suggestions.map((c, i) => `<button type="button" class="ex-chip${c.exact ? " is-exact" : ""}" data-chip="${i}" aria-pressed="false" title="${esc(c.label)}: ${c.w} × ${c.h} px${c.dpi ? ` at ${c.dpi} ppi` : ""}"><b>${esc(c.label)}</b><span>${c.w} × ${c.h}</span></button>`).join("");
+  // (several sheets: widths only, as each has its own shape)
+  const suggestions = multi ? sizeSuggestions(1, 12).filter((s) => !s.exact).map((s) => ({ ...s, h: 0 })) : sizeSuggestions(t.ratio, 8);
+  if (t.original && !multi) suggestions.unshift({ label: "Original", w: t.original.w, h: t.original.h, dpi: null, exact: true });
+  chips.innerHTML = suggestions.map((c, i) => `<button type="button" class="ex-chip${c.exact ? " is-exact" : ""}" data-chip="${i}" aria-pressed="false" title="${esc(c.label)}: ${c.h ? `${c.w} × ${c.h}` : c.w} px${c.dpi ? ` at ${c.dpi} ppi` : ""}"><b>${esc(c.label)}</b><span>${c.h ? `${c.w} × ${c.h}` : `${c.w} px`}</span></button>`).join("");
   chips.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-chip]");
     if (!b) return;
@@ -194,22 +210,28 @@ export function openExportDialog(deps: ExportDeps): void {
     }
     wIn.step = hIn.step = u === "px" ? "1" : "any";
     const mp = (s.w * s.h) / 1e6;
-    readout.innerHTML = `<b>${s.w} × ${s.h} px</b> · ${mp < 0.1 ? "<0.1" : mp.toFixed(mp < 10 ? 2 : 1)} MP<br>${[["in", 2], ["cm", 1], ["mm", 0]].map(([k, d]) => `${Number(fromPx(s.w, k as Unit, prefs.dpi).toFixed(d as number))} × ${Number(fromPx(s.h, k as Unit, prefs.dpi).toFixed(d as number))} ${k}`).join(" · ")} <span class="ex-at">at ${prefs.dpi} ppi</span>`;
-    q("[data-ex-dim-w]").textContent = `${shown(fromPx(s.w, u, prefs.dpi), u)} ${UNIT_LABEL[u]}`;
-    q("[data-ex-dim-h]").textContent = `${shown(fromPx(s.h, u, prefs.dpi), u)} ${UNIT_LABEL[u]}`;
+    if (multi) {
+      readout.innerHTML = ts.slice(0, 5).map((x, i) => `<span>${esc(x.name)}: <b>${sizeOf(i).w} × ${sizeOf(i).h} px</b></span>`).join("<br>") + (ts.length > 5 ? `<br>+ ${ts.length - 5} more` : "") + ` <span class="ex-at">at ${prefs.dpi} ppi</span>`;
+    } else {
+      readout.innerHTML = `<b>${s.w} × ${s.h} px</b> · ${mp < 0.1 ? "<0.1" : mp.toFixed(mp < 10 ? 2 : 1)} MP<br>${[["in", 2], ["cm", 1], ["mm", 0]].map(([k, d]) => `${Number(fromPx(s.w, k as Unit, prefs.dpi).toFixed(d as number))} × ${Number(fromPx(s.h, k as Unit, prefs.dpi).toFixed(d as number))} ${k}`).join(" · ")} <span class="ex-at">at ${prefs.dpi} ppi</span>`;
+      q("[data-ex-dim-w]").textContent = `${shown(fromPx(s.w, u, prefs.dpi), u)} ${UNIT_LABEL[u]}`;
+      q("[data-ex-dim-h]").textContent = `${shown(fromPx(s.h, u, prefs.dpi), u)} ${UNIT_LABEL[u]}`;
+    }
     // (the chips are made once: a press on one must not be lost to them being redrawn when the field it leaves fires its change)
     for (const b of chips.querySelectorAll<HTMLElement>("[data-chip]")) b.setAttribute("aria-pressed", String(suggestions[Number(b.dataset["chip"])]!.w === s.w));
     note.textContent = s.capped ? `Capped at ${MAX_SIDE.toLocaleString("en")} px a side and ${(MAX_AREA / 1e6).toFixed(0)} MP: that is the most a picture can be.` : mp > 40 ? "A big picture: it can take a moment and a lot of memory." : "";
     const lossy = prefs.format === "webp" || prefs.format === "jpeg";
     q("[data-ex-quality]").hidden = !lossy;
     q("[data-ex-bgrow]").hidden = prefs.format === "svg";
+    q("[data-ex-quality]").hidden = !(lossy || prefs.format === "pdf");
     for (const b of radios("[data-bg]")) {
       b.setAttribute("aria-checked", String(b.dataset["bg"] === (prefs.format === "jpeg" && prefs.bg === "transparent" ? "white" : prefs.bg)));
       if (b.dataset["bg"] === "transparent") (b as HTMLButtonElement).disabled = prefs.format === "jpeg";
     }
     for (const b of radios("[data-unit]")) b.setAttribute("aria-checked", String(b.dataset["unit"] === u));
     for (const b of radios("[data-format]")) b.setAttribute("aria-checked", String(b.dataset["format"] === prefs.format));
-    q<HTMLButtonElement>('[data-ex="copy"]').disabled = busy;
+    q<HTMLButtonElement>('[data-ex="copy"]').disabled = busy || multi || prefs.format === "pdf";
+    q<HTMLButtonElement>('[data-ex="copy"]').title = multi || prefs.format === "pdf" ? "Copy works for one picture (PNG)" : "Copy the picture to the clipboard (as PNG)";
     refreshName();
   };
 
@@ -275,22 +297,55 @@ export function openExportDialog(deps: ExportDeps): void {
   });
   nameIn.addEventListener("input", () => (nameTouched = true));
 
-  /** The file, made at the size asked for. */
-  const make = async (as: Format): Promise<{ blob: Blob; ext: string; mime: string }> => {
-    const s = px();
-    const bgFor = (f: Format): Background => (f === "jpeg" ? (prefs.bg === "black" ? "black" : "white") : prefs.bg);
-    if (as === "svg") {
-      const u = prefs.unit;
-      const svg = deps.svg({ w: `${shown(fromPx(s.w, u, prefs.dpi), u)}${u === "px" ? "" : u}`, h: `${shown(fromPx(s.h, u, prefs.dpi), u)}${u === "px" ? "" : u}` });
-      if (!svg) throw new Error("this cannot be made as SVG");
-      return { blob: new Blob([svg], { type: "image/svg+xml" }), ext: "svg", mime: "image/svg+xml" };
-    }
-    const canvas = await deps.render(s.w, s.h, bgFor(as));
-    const enc = await encodeShot(canvas, as, prefs.quality);
-    return { blob: enc.blob, ext: SHOT_FORMATS[enc.format].ext, mime: SHOT_FORMATS[enc.format].mime };
+  interface Made { name: string; blob: Blob; mime: string }
+  const base = (): string => nameIn.value.trim().replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-") || slug(t.name);
+  const sizeText = (i: number): { w: string; h: string } => {
+    const z = sizeOf(i), u = prefs.unit;
+    const one = (v: number): string => `${shown(fromPx(v, u, prefs.dpi), u)}${u === "px" ? "" : u}`;
+    return { w: one(z.w), h: one(z.h) };
   };
-  const fileName = (e: string): string => `${nameIn.value.trim().replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-") || slug(t.name)}.${e}`;
+  /** The files, each made at the size asked for (one for each sheet; a PDF is one file with a page for each). */
+  const make = async (as: Format): Promise<Made[]> => {
+    const bgFor = (f: Format): Background => (f === "jpeg" ? (prefs.bg === "black" ? "black" : "white") : prefs.bg);
+    const stem = (i: number, e: string, withSize: boolean): string => (multi ? `${i + 1}-${slug(ts[i]!.name)}${withSize ? `-${sizeOf(i).w}x${sizeOf(i).h}` : ""}.${e}` : `${base()}.${e}`);
+    if (as === "pdf") {
+      const pages = [];
+      for (let i = 0; i < ts.length; i++) {
+        const z = sizeOf(i);
+        const bg = prefs.bg;
+        const canvas = await deps.render(ts[i]!, z.w, z.h, bg);
+        const jpeg = bg === "transparent" ? null : new Uint8Array(await (await encodeShot(canvas, "jpeg", prefs.quality)).blob.arrayBuffer());
+        pages.push(pdfPageOf(canvas, (z.w / prefs.dpi) * 72, (z.h / prefs.dpi) * 72, jpeg));
+      }
+      return [{ name: `${base()}.pdf`, blob: await pdfOf(pages), mime: "application/pdf" }];
+    }
+    const out: Made[] = [];
+    for (let i = 0; i < ts.length; i++) {
+      if (as === "svg") {
+        const svg = deps.svg(ts[i]!, sizeText(i));
+        if (!svg) throw new Error("this cannot be made as SVG");
+        out.push({ name: stem(i, "svg", false), blob: new Blob([svg], { type: "image/svg+xml" }), mime: "image/svg+xml" });
+        continue;
+      }
+      const z = sizeOf(i);
+      const canvas = await deps.render(ts[i]!, z.w, z.h, bgFor(as));
+      const enc = await encodeShot(canvas, as, prefs.quality);
+      // (the print resolution goes into the file: a 5 in picture says 5 in)
+      const blob = enc.format === "png" ? await pngWithDpi(enc.blob, prefs.dpi) : enc.format === "jpeg" ? await jpegWithDpi(enc.blob, prefs.dpi) : enc.blob;
+      out.push({ name: stem(i, SHOT_FORMATS[enc.format].ext, true), blob, mime: SHOT_FORMATS[enc.format].mime });
+    }
+    return out;
+  };
   const size = (b: Blob): string => (b.size < 1024 * 1024 ? `${Math.max(1, Math.round(b.size / 1024))} KB` : `${(b.size / 1024 / 1024).toFixed(1)} MB`);
+  const save = (blob: Blob, name: string): void => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  };
 
   const run = async (what: "download" | "copy" | "library"): Promise<void> => {
     if (busy) return;
@@ -300,24 +355,23 @@ export function openExportDialog(deps: ExportDeps): void {
     try {
       const s = px();
       if (what === "copy") {
-        const { blob } = await make(prefs.format === "svg" ? "png" : prefs.format === "jpeg" ? "png" : "png");
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        note.textContent = `Copied ${s.w} × ${s.h} px (${size(blob)}).`;
+        const [made] = await make("png");
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": made!.blob })]);
+        note.textContent = `Copied ${s.w} × ${s.h} px (${size(made!.blob)}).`;
       } else {
-        const { blob, ext: e, mime } = await make(prefs.format);
-        const name = fileName(e);
+        const files = await make(prefs.format);
         if (what === "download") {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = name;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-          note.textContent = `Saved “${name}”: ${prefs.format === "svg" ? "vector" : `${s.w} × ${s.h} px`}, ${size(blob)}.`;
+          if (files.length === 1) {
+            save(files[0]!.blob, files[0]!.name);
+            note.textContent = `Saved “${files[0]!.name}”: ${prefs.format === "svg" ? "vector" : prefs.format === "pdf" ? `${ts.length} page${ts.length === 1 ? "" : "s"}` : `${s.w} × ${s.h} px`}, ${size(files[0]!.blob)}.`;
+          } else {
+            const zip = await writeZip(files.map((f) => ({ name: f.name, data: f.blob })));
+            save(zip, `${base()}.zip`);
+            note.textContent = `Saved “${base()}.zip”: ${files.length} pictures, ${size(zip)}.`;
+          }
         } else {
-          await deps.toLibrary(new File([blob], name, { type: mime }));
-          note.textContent = `Kept “${name}” in the library (${size(blob)}).`;
+          for (const f of files) await deps.toLibrary(new File([f.blob], f.name, { type: f.mime }));
+          note.textContent = `Kept ${files.length === 1 ? `“${files[0]!.name}”` : `${files.length} files`} in the library (${size(new Blob(files.map((f) => f.blob)))}).`;
         }
       }
       savePrefs(prefs);

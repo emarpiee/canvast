@@ -23,6 +23,7 @@
 - **Reveal**: hold Ctrl and move over the canvas to see the outline of everything under the pointer (the shape, not a box; the top one strong, the ones below dashed, their names beside the pointer); Ctrl+click picks the very thing, deep in a group, a mask or a sheet.
 - **Align one thing to what holds it**: a single thing on a sheet (or in a group) is aligned with its sheet by the align buttons.
 - **Pictures get rounded corners and a border** (Radius, border colour and width in the Properties bar of a picked picture; ADR 0148).
+- **Export extras**: several picked sheets export together (a ZIP, or one PDF with a page for each at the physical size); a PNG or JPEG carries its resolution (pHYs, JFIF), and PDF is a format of the Export dialog.
 - **Paste lands under the pointer** (Ctrl+V, the menu, pasted SVG): the middle of the view only when the pointer is not on the canvas.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)

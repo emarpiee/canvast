@@ -2430,6 +2430,7 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-field input[type="number"] { appearance: textfield; }
 .ex-field input[type="number"]::-webkit-inner-spin-button, .ex-field input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .ex-field input:focus-visible, .ex-field select:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.ex-field[hidden], .ex-times[hidden] { display: none; }
 .ex-times { align-self: end; padding-bottom: var(--sp-4); color: var(--hud-muted); }
 .ex-label { color: var(--hud-muted); font: var(--font-meta); align-self: center; }
 .ex-seg { display: inline-flex; gap: var(--sp-1); padding: var(--sp-1); background: var(--hud-hover); border-radius: var(--r-sm); }
@@ -2468,3 +2469,7 @@ dialog.export-dlg.is-busy .ex-btn { opacity: 0.6; pointer-events: none; }
   .ex-body { grid-template-columns: minmax(0, 1fr); }
   .ex-stage { min-width: 0; padding-inline: var(--sp-13); }
 }
+.ex-minis { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-8); max-width: calc(var(--sp-15) * 6); }
+.ex-mini { display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); margin: 0; }
+.ex-mini .ex-frame { width: calc(var(--sp-15) * 2 * min(1, var(--shape))); }
+.ex-mini figcaption { max-width: calc(var(--sp-15) * 2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); font: var(--font-meta); }

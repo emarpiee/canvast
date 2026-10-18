@@ -442,6 +442,9 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   const bytes = fs.readFileSync(await download.path());
   expect(bytes.readUInt32BE(16), "the width in the PNG header").toBe(1080);
   expect(bytes.readUInt32BE(20)).toBe(720);
+  const phys = bytes.indexOf("pHYs");
+  expect(phys, "the resolution is written in the file").toBeGreaterThan(0);
+  expect(bytes.readUInt32BE(phys + 4), "150 ppi in pixels per metre").toBe(5906);
   // and it is the sheet: the rectangle where it is on it (a fifth across, a quarter down), the rest of the sheet white
   const at = await p.evaluate(async (b64) => {
     const bmp = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: "image/png" })); // (no fetch: the page may not make requests)
@@ -570,5 +573,41 @@ test("one thing on a sheet is aligned with its sheet (its parent), by the align 
   await key(app, "Control+z");
   await app.frame();
   expect((await box(rect.id)).minX, "two undos: where it was").toBeCloseTo(r0.minX, 0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Export… of several sheets: each at the width chosen with its own shape, together as a ZIP or as the pages of one PDF", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [420, 300], [720, 500]); // 3 : 2
+  await key(app, "c");
+  await drag(app, [800, 300], [1000, 700]); // 1 : 2
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  const dlg = p.getByTestId("export-dialog");
+  await expect(dlg).toBeVisible();
+  await expect(dlg.locator(".ex-what")).toHaveText("2 sheets");
+  await expect(dlg.locator('[data-ex="h"]')).toBeHidden(); // (each sheet has its own height)
+  await dlg.locator('[data-ex="w"]').fill("600");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("600 × 400 px");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("600 × 1200 px");
+  const [zip] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  expect(zip.suggestedFilename()).toMatch(/\.zip$/);
+  const z = fs.readFileSync(await zip.path());
+  const names = [...z.toString("latin1").matchAll(/(\d-sheet_\d+-\d+x\d+\.png)/g)].map((m) => m[1]);
+  expect(new Set(names).size, "a file for each sheet, named with its size").toBe(2);
+  expect(names.some((n) => n!.endsWith("600x400.png")) && names.some((n) => n!.endsWith("600x1200.png"))).toBe(true);
+  // the same sheets as one PDF: a page each, at the physical size (600 px at 300 ppi is 2 in = 144 pt)
+  await dlg.locator('[data-format="pdf"]').click();
+  await expect(dlg.locator('[data-ex="copy"]')).toBeDisabled();
+  const [pdf] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
+  const text = fs.readFileSync(await pdf.path()).toString("latin1");
+  expect(text.startsWith("%PDF-1.4")).toBe(true);
+  expect(text).toContain("/Count 2");
+  expect(text).toContain("/MediaBox [0 0 144 96]");
+  expect(text).toContain("/MediaBox [0 0 144 288]");
+  await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });
