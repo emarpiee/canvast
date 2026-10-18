@@ -317,6 +317,18 @@ test("an object on a sheet shows where it is from the sheet's corner, and X, Y, 
   await key(app, "Control+z");
   await app.frame();
   expect((await box(rect.id)).minX).toBeCloseTo(rb.minX, 0);
+  // the names X, Y, W and H scrub like the other numbers: drag the name to the right and the field grows (and the object moves)
+  const x0 = Number(await x.inputValue());
+  const label = (await x.locator("xpath=..").boundingBox())!;
+  await p.mouse.move(label.x + 4, label.y + label.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(label.x + 44, label.y + label.height / 2, { steps: 8 });
+  await p.mouse.up();
+  await app.frame();
+  expect(Number(await x.inputValue())).toBeGreaterThan(x0 + 5);
+  expect((await box(rect.id)).minX - sb.minX).toBeCloseTo(Number(await x.inputValue()), 0);
+  await key(app, "Control+z");
+  await app.frame();
   // a sheet itself, or an object that is on none, has no such fields
   await click(app, 700, 520);
   await expect(x).toBeHidden();

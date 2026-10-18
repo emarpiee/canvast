@@ -2239,6 +2239,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .more-btn { opacity: 1; color: inherit; }
 .toolbar .tb-count { display: inline-flex; flex: none; align-items: center; gap: var(--sp-3); font: var(--font-meta); color: var(--hud-muted); white-space: nowrap; }
 .toolbar .tb-count[hidden] { display: none; }
+.toolbar .tb-count label { display: inline-flex; align-items: center; gap: var(--sp-3); }
 .toolbar .tb-count select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .toolbar .tb-count[data-scrub], label[data-scrubbable] { cursor: ew-resize; user-select: none; }
 input[data-scrub-input] { cursor: ew-resize; user-select: text; }

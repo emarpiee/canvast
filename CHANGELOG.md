@@ -12,6 +12,7 @@
 - **Dice** (bottom bar, between Previous and Next view; also in the command palette): goes to a random place and zoom level with nothing of the canvas within two windows of it (`interaction/random-view.ts`); Previous view comes back.
 - **Scale contents** now also works when a sheet is resized with its handles (it only worked with the Size fields).
 - **Sheets deep in a zoom**: objects on a sheet that were filed in another frame than the sheet (near objects can be, once the zoom is deep) were left behind when the sheet was resized; they are now taken along, whatever the pins or Scale contents say (`planSheetScale`).
+- **Scrub**: the X, Y, W and H of "On sheet" and the sheet Size fields can be changed by dragging their names, like the other numbers.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)
 
