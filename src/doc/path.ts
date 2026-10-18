@@ -18,6 +18,8 @@ export interface SubPath {
 export const NODE = 6;
 /** The miter limit the stroke is drawn with and bounded by (canvas default is 10; shapes look better cut earlier). */
 export const MITER_LIMIT = 4;
+/** The miter limit (the longest point as a multiple of the half width) at which a corner of `deg` degrees is cut: sharper corners than that are bevelled. Absent: the default. */
+export const miterLimitOf = (deg: number | undefined): number => (deg === undefined ? MITER_LIMIT : 1 / Math.sin((Math.min(90, Math.max(1, deg)) * Math.PI) / 360));
 /** The most vertices one path is flattened to (a guard against a degenerate path, not a quality setting). */
 export const MAX_FLAT_POINTS = 60_000;
 
@@ -30,7 +32,16 @@ export interface StrokeStyle {
   /** Absent: round. */
   readonly join?: Join | undefined;
   readonly cap?: Cap | undefined;
+  /** The miter limit of the outline (see `miterLimitOf`); absent: `MITER_LIMIT`. */
+  readonly miter?: number | undefined;
+  /** The path has an arrow at an end: its heads reach `ARROW_LEN` widths past the end. */
+  readonly arrows?: boolean | undefined;
 }
+
+/** An arrow head is this many widths of the line long (and as wide as it is long). */
+export const ARROW_LEN = 4;
+export type Arrow = "triangle" | "open" | "dot";
+export const ARROWS: readonly Arrow[] = ["triangle", "open", "dot"];
 
 export const nodeCount = (s: SubPath): number => s.n.length / NODE;
 
@@ -158,10 +169,14 @@ export function paintBounds(subs: readonly SubPath[], style: StrokeStyle | null)
         const l = Math.hypot(dx, dy);
         if (l < 1e-9) continue; // straight on
         const m = 1 / Math.sqrt(Math.max(1e-12, (1 + t1[0] * t2[0] + t1[1] * t2[1]) / 2));
-        if (m > MITER_LIMIT) continue; // cut to a bevel by the limit
+        if (m > (style.miter ?? MITER_LIMIT)) continue; // cut to a bevel by the limit
         const [j] = [segs[k]![1]];
         tips.push([s.n[j * NODE]! + (dx / l) * h * m, s.n[j * NODE + 1]! + (dy / l) * h * m]);
       }
+    }
+    if (style.arrows && !s.closed) {
+      const r = ARROW_LEN * style.width;
+      for (const [x, y] of [[s.n[0]!, s.n[1]!], [s.n[(c - 1) * NODE]!, s.n[(c - 1) * NODE + 1]!]] as const) tips.push([x - r, y - r], [x + r, y + r]);
     }
     if (style.cap === "square" && !s.closed) {
       const first = tan[0]!.out;

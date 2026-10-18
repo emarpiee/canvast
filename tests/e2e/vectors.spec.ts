@@ -2103,3 +2103,66 @@ test("Simplify: a path of six collinear nodes becomes two; a pen stroke becomes 
   await key(app, "Control+z");
   expect((await last(app)).kind).toBe("stroke");
 });
+
+test("arrow heads: set at the start and end of an open line from Outline options, drawn, kept by undo and a reload, and written to SVG; none on a closed shape", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="line"]');
+  await drag(app, [400, 400], [700, 400]);
+  const line = await last(app);
+  const boxBefore = await screenBox(app, line.id);
+  await key(app, "v");
+  await click(app, 550, 400);
+  await p.click("[data-outline-options]");
+  await p.click('.outline-pop [data-arrow-end="triangle"]');
+  expect(await last(app)).toMatchObject({ arrowEnd: "triangle" });
+  await p.click('.outline-pop [data-arrow-start="dot"]');
+  expect(await last(app)).toMatchObject({ arrowEnd: "triangle", arrowStart: "dot" });
+  await key(app, "Escape");
+  const boxAfter = await screenBox(app, line.id);
+  expect(boxAfter.maxX - boxAfter.minX, "the heads are part of what it covers").toBeGreaterThan(boxBefore.maxX - boxBefore.minX + 4);
+  // the head is drawn at the end: a stroke-coloured pixel above the line, near its end, where the bare line has none
+  const ink = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const wide = (await last(app)).width * 4; // (the head's length in px at this zoom is 4 widths)
+  expect(await ink(698 - wide / 2, 400 - Math.max(2, wide / 4))).not.toEqual(await ink(450, 340));
+  await key(app, "Control+z");
+  expect(await last(app)).toMatchObject({ arrowEnd: "triangle" });
+  expect(await last(app), "one undo takes back the last head only").not.toHaveProperty("arrowStart");
+  await key(app, "Control+Shift+z");
+  expect(await last(app)).toMatchObject({ arrowEnd: "triangle", arrowStart: "dot" });
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await reload(app);
+  expect(await last(app)).toMatchObject({ arrowEnd: "triangle", arrowStart: "dot" });
+  // a closed shape has no ends: the options do not offer heads
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 500], [500, 560]);
+  await p.click("[data-outline-options]");
+  await expect(p.locator(".outline-pop [data-arrow-end]")).toHaveCount(0);
+});
+
+test("sharp corner limit: a corner of 18° is cut by default, comes to its point when the limit is lowered below it, and goes back with one undo", async ({ app }) => {
+  const p = app.page;
+  await key(app, "b");
+  await click(app, 400, 500);
+  await click(app, 700, 500);
+  await click(app, 400, 600);
+  await key(app, "Enter");
+  await key(app, "v");
+  await click(app, 550, 500);
+  await p.click("[data-outline-options]");
+  await p.click('.outline-pop [data-join="miter"]');
+  await expect(p.locator(".outline-pop [data-miter]")).toBeVisible();
+  const o = await last(app);
+  const cut = await screenBox(app, o.id);
+  await p.locator(".outline-pop [data-miter]").fill("10");
+  await p.locator(".outline-pop [data-miter]").press("Enter");
+  await expect.poll(async () => ((await last(app)) as unknown as { miterAngle?: number }).miterAngle).toBe(10);
+  expect((await screenBox(app, o.id)).maxX, "the point reaches further than the cut corner").toBeGreaterThan(cut.maxX + 3);
+  await p.click('.outline-pop [data-join="round"]');
+  await expect(p.locator(".outline-pop [data-miter-row]")).toBeHidden();
+  await key(app, "Escape");
+  await key(app, "Control+z");
+  await key(app, "Control+z");
+  expect(((await last(app)) as unknown as { miterAngle?: number }).miterAngle, "undone").toBeUndefined();
+});

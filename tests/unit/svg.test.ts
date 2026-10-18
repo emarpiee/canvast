@@ -56,6 +56,18 @@ describe("SVG export", () => {
     expect(d1! / w).toBeCloseTo(2, 2);
     expect(svg).toMatch(/viewBox="0 0 (1000|\d+\.?\d*) /);
   });
+  it("writes arrow heads of an open line as shapes beside it, turned along the line, and the dash start", () => {
+    const line = rect(0, 0, 0, 0, { sub: [{ n: [0, 0, 0, 0, 0, 0, 100, 0, 100, 0, 100, 0], closed: false }], fill: null, width: 4, arrowEnd: "triangle", arrowStart: "dot", dash: [3, 2], dashOffset: 1.5 });
+    const svg = exportSvg([line], doc.space)!;
+    expect(svg).toMatch(/<polygon points="[\d. -]+"/);
+    expect(svg).toMatch(/<circle cx="[\d.]+" cy="[\d.]+" r="/);
+    const w = Number(/stroke-width="([\d.]+)"/.exec(svg)![1]);
+    expect(Number(/stroke-dashoffset="([\d.]+)"/.exec(svg)![1]) / w).toBeCloseTo(1.5, 2);
+    // the triangle's tip is the end of the line (the right-most point), its base to the left of it
+    const pts = /<polygon points="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number);
+    expect(pts[2]).toBeGreaterThan(pts[0]!);
+    expect(pts[2]).toBeGreaterThan(pts[4]!);
+  });
   it("places paths of different units together exactly, and leaves hidden ones out", () => {
     const a = rect(0, 0, 100, 100);
     const b = rect(0, 0, 50, 50, { unit: 1, anchor: { x: D.fromNumber(200), y: D.ZERO } }); // unit 1: twice as big, 200 to the right

@@ -24,7 +24,7 @@ import type { Adjust } from "../doc/adjust";
 import { cropEdges, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import type { Constraint } from "../doc/constraints";
-import { NODE, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
+import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { exportSvg } from "./svg-export";
 import { parseSvg } from "./svg-import";
@@ -786,6 +786,45 @@ export function commitDashNumbers(doc: DocumentStore, editor: EditorState, n: { 
     return { ...rest, ...look };
   });
   doc.commit(doc.transaction(paths.length === 1 ? "Dash pattern" : `Dash pattern of ${paths.length} paths`, next));
+  editor.changed();
+}
+
+/** The angle below which a sharp corner of the first picked path is cut (degrees; the default when none was set). */
+export function selectedMiterAngle(doc: DocumentStore, editor: EditorState): number | null {
+  const o = editablePaths(doc, editor)[0];
+  return o ? Math.round(o.miterAngle ?? (2 * Math.asin(1 / MITER_LIMIT) * 180) / Math.PI) : null;
+}
+
+/** Set the angle below which sharp corners are cut on the picked paths (null: the default again): one undo step. */
+export function commitMiterAngle(doc: DocumentStore, editor: EditorState, deg: number | null): void {
+  const paths = editablePaths(doc, editor);
+  if (!paths.length || editor.blockEdit()) return;
+  const next = paths.map((o): PathObject => {
+    const { miterAngle: _m, ...rest } = o;
+    return deg === null ? rest : { ...rest, miterAngle: Math.min(90, Math.max(1, deg)) };
+  });
+  doc.commit(doc.transaction(paths.length === 1 ? "Sharp corner limit" : `Sharp corner limit of ${paths.length} paths`, next));
+  editor.changed();
+}
+
+const ARROW_NONE = "none";
+/** The arrow heads of the first picked path that has an open outline (null: there is none). */
+export function selectedArrows(doc: DocumentStore, editor: EditorState): { start: Arrow | "none"; end: Arrow | "none" } | null {
+  const o = editablePaths(doc, editor).find((p) => p.sub.some((s) => !s.closed));
+  return o ? { start: o.arrowStart ?? ARROW_NONE, end: o.arrowEnd ?? ARROW_NONE } : null;
+}
+
+/** Set or take away the arrow head at the start or the end of the picked open paths: one undo step. */
+export function commitArrows(doc: DocumentStore, editor: EditorState, patch: { start?: Arrow | "none"; end?: Arrow | "none" }): void {
+  const paths = editablePaths(doc, editor).filter((p) => p.sub.some((s) => !s.closed));
+  if (!paths.length || editor.blockEdit()) return;
+  const next = paths.map((o): PathObject => {
+    const { arrowStart: _s, arrowEnd: _e, ...rest } = o;
+    const start = patch.start ?? o.arrowStart ?? ARROW_NONE;
+    const end = patch.end ?? o.arrowEnd ?? ARROW_NONE;
+    return { ...rest, ...(start !== ARROW_NONE ? { arrowStart: start } : {}), ...(end !== ARROW_NONE ? { arrowEnd: end } : {}) };
+  });
+  doc.commit(doc.transaction(paths.length === 1 ? "Arrow heads" : `Arrow heads of ${paths.length} paths`, next));
   editor.changed();
 }
 

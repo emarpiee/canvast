@@ -12,7 +12,7 @@ import type { PaintPatch } from "../app/actions";
 import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
-import type { ShapeKind } from "../doc/path";
+import type { Arrow, ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
 import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
 import { fontFor } from "../text/fonts";
@@ -93,6 +93,12 @@ export interface ToolbarActions {
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
   /** Dash length, gap and start (in widths) of the first picked dashed path; null: none. */
   selectedDashNumbers(): { len: number; gap: number; offset: number } | null;
+  /** The arrow heads (start, end) of the first picked open path; null: none picked. */
+  selectedArrows(): { start: Arrow | "none"; end: Arrow | "none" } | null;
+  setArrows(patch: { start?: Arrow | "none"; end?: Arrow | "none" }): void;
+  /** The angle below which a sharp corner is cut (degrees), of the first picked path; null when none is picked. */
+  selectedMiterAngle(): number | null;
+  setMiterAngle(deg: number | null): void;
   setDashNumbers(n: { len?: number; gap?: number; offset?: number }): void;
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
 }
@@ -650,6 +656,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       dash: sel ? sel.dash : editor.shapeDash,
       dashNumbers: sel ? actions.selectedDashNumbers() ?? { len: 3, gap: 2, offset: 0 } : null,
       onDashNumbers: (n) => actions.setDashNumbers(n),
+      miterAngle: sel ? actions.selectedMiterAngle() : null,
+      onMiterAngle: (deg) => actions.setMiterAngle(deg),
+      arrows: sel ? actions.selectedArrows() : null,
+      onArrows: (patch) => actions.setArrows(patch),
       closed: sel ? sel.closed : editor.tool === "shape" && editor.shapeKind !== "line",
       onWidth: (px, final) => {
         if (sel) actions.setSelectedWidth(px, final);

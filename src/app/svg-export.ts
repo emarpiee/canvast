@@ -10,7 +10,8 @@ import type { PathObject } from "../doc/model";
 import { expressObjectIn, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient } from "../doc/paint";
-import { NODE, geometryBounds, mapSubs } from "../doc/path";
+import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
+import type { Arrow } from "../doc/path";
 import type { SubPath } from "../doc/path";
 import { localGradient } from "../render/gradient";
 
@@ -111,6 +112,42 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     const [cx, cy] = to(lg.cx, lg.cy).split(" ");
     return `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${num(lg.R * p.k * sc)}">${stops}</radialGradient>`;
   };
+  /** The arrow heads of an open path as shapes of the outline's paint, turned along the line at its ends (ADR 0142). */
+  const arrowsSvg = (p: Placed, subs: readonly SubPath[], width: number): string => {
+    const o = p.o;
+    if ((!o.arrowStart && !o.arrowEnd) || o.stroke === null) return "";
+    const L = ARROW_LEN * width;
+    let out = "";
+    const head = (kind: Arrow, x: number, y: number, ux: number, uy: number): void => {
+      const wx = -uy * L * 0.5, wy = ux * L * 0.5;
+      const bx = x - ux * L, by = y - uy * L;
+      const pts = `${num(bx + wx)} ${num(by + wy)} ${num(x)} ${num(y)} ${num(bx - wx)} ${num(by - wy)}`;
+      if (kind === "dot") out += `\n  <circle cx="${num(x)}" cy="${num(y)}" r="${num(L * 0.4)}"${paintAttr(p, "fill", o.stroke)}/>`;
+      else if (kind === "triangle") out += `\n  <polygon points="${pts}"${paintAttr(p, "fill", o.stroke)}/>`;
+      else out += `\n  <polyline points="${pts}" fill="none"${paintAttr(p, "stroke", o.stroke)} stroke-width="${num(width)}" stroke-linejoin="miter"/>`;
+    };
+    for (const s of subs) {
+      const c = s.n.length / NODE;
+      if (s.closed || c < 2) continue;
+      const dir = (i: number, j: number, hin: number, hout: number): [number, number] => {
+        // out of the line at node i: from the nearest control point (or neighbouring node) that is not the node itself
+        for (const [x, y] of [[s.n[i * NODE + hin]!, s.n[i * NODE + hin + 1]!], [s.n[j * NODE + hout]!, s.n[j * NODE + hout + 1]!], [s.n[j * NODE]!, s.n[j * NODE + 1]!]] as const) {
+          const dx = s.n[i * NODE]! - x, dy = s.n[i * NODE + 1]! - y, d = Math.hypot(dx, dy);
+          if (d > 1e-9) return [dx / d, dy / d];
+        }
+        return [1, 0];
+      };
+      if (o.arrowEnd) {
+        const [ux, uy] = dir(c - 1, c - 2, 2, 4);
+        head(o.arrowEnd, s.n[(c - 1) * NODE]!, s.n[(c - 1) * NODE + 1]!, ux, uy);
+      }
+      if (o.arrowStart) {
+        const [ux, uy] = dir(0, 1, 4, 2);
+        head(o.arrowStart, s.n[0]!, s.n[1]!, ux, uy);
+      }
+    }
+    return out;
+  };
   const body = placed.map((p) => {
     const o = p.o;
     const subs = mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
@@ -121,6 +158,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
       a += ` stroke-width="${num(width)}"`;
       if (o.join) a += ` stroke-linejoin="${o.join}"`;
       else a += ` stroke-linejoin="round"`;
+      if (o.miterAngle !== undefined && o.join === "miter") a += ` stroke-miterlimit="${num(miterLimitOf(o.miterAngle))}"`;
       a += ` stroke-linecap="${o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round")}"`;
       if (o.dash) a += ` stroke-dasharray="${num(o.dash[0] * width)} ${num(o.dash[1] * width)}"`;
       if (o.dash && o.dashOffset) a += ` stroke-dashoffset="${num(o.dashOffset * width)}"`;
@@ -128,7 +166,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     if (o.opacity < 1) a += ` opacity="${num(o.opacity)}"`;
     if (o.blend) a += ` style="mix-blend-mode:${o.blend}"`;
     if (o.name) a += ` id="${esc(o.name.replace(/\s+/g, "-"))}"`;
-    return `  <path${a}/>`;
+    return `  <path${a}/>` + arrowsSvg(p, subs, width);
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${num(w)}" height="${num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

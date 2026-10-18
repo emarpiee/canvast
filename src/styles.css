@@ -2242,6 +2242,7 @@ input[data-scrub-input]:focus { cursor: text; }
 /* The paint chooser: none, a colour, a linear or a radial gradient. */
 .outline-pop { display: grid; gap: var(--sp-4); min-width: 0; }
 .op-row { display: grid; grid-template-columns: 4.5rem 1fr; align-items: center; gap: var(--sp-4); }
+.op-row[hidden] { display: none; }
 .op-label { font: var(--font-meta); color: var(--hud-muted); }
 .op-choices { margin-bottom: 0; }
 .op-choices button[disabled] { opacity: 0.4; cursor: default; }

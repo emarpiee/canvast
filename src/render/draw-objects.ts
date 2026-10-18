@@ -6,7 +6,8 @@ import { fromPx, toPx } from "./projection";
 import * as D from "../core/dyadic";
 import type { Rect } from "./geometry2d";
 import { clipPolygon, clipSegment } from "./geometry2d";
-import { MITER_LIMIT } from "../doc/path";
+import { ARROW_LEN, miterLimitOf } from "../doc/path";
+import type { Arrow } from "../doc/path";
 import { canvasPaint } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
@@ -191,6 +192,64 @@ function addOutlinePath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: 
   }
 }
 
+/**
+ * The arrow heads of a path: at the first and last point of every open outline, turned along the line there, `ARROW_LEN` widths long (the
+ * line ends under a filled head). Drawn in the outline's paint, with the line's width.
+ */
+function drawArrows(c: CanvasRenderingContext2D, po: ProjectedObject, o: PathObject): void {
+  const w = c.lineWidth;
+  const L = ARROW_LEN * w;
+  const head = (kind: Arrow, x: number, y: number, bx: number, by: number): void => {
+    const d = Math.hypot(x - bx, y - by);
+    if (!(d > 0) || !Number.isFinite(d)) return;
+    const ux = (x - bx) / d, uy = (y - by) / d; // pointing out of the line
+    c.beginPath();
+    if (kind === "dot") {
+      c.arc(x, y, L * 0.4, 0, Math.PI * 2);
+      c.fillStyle = c.strokeStyle;
+      c.fill();
+      return;
+    }
+    const wing = (s: number): [number, number] => [x - ux * L - uy * L * 0.5 * s, y - uy * L + ux * L * 0.5 * s];
+    const [ax, ay] = wing(1), [bx2, by2] = wing(-1);
+    if (kind === "triangle") {
+      c.moveTo(x, y);
+      c.lineTo(ax, ay);
+      c.lineTo(bx2, by2);
+      c.closePath();
+      c.fillStyle = c.strokeStyle;
+      c.fill();
+    } else {
+      c.moveTo(ax, ay);
+      c.lineTo(x, y);
+      c.lineTo(bx2, by2);
+      c.lineJoin = "miter";
+      c.stroke();
+    }
+  };
+  const at = (p: ArrayLike<number>, i: number, away: 1 | -1): [number, number] => {
+    // the nearest vertex that is not on the end itself
+    const n = p.length / 2;
+    for (let j = i + away; j >= 0 && j < n; j += away) if (Math.hypot(p[j * 2]! - p[i * 2]!, p[j * 2 + 1]! - p[i * 2 + 1]!) > 1e-6) return [p[j * 2]!, p[j * 2 + 1]!];
+    return [p[i * 2]!, p[i * 2 + 1]!];
+  };
+  c.setLineDash([]);
+  c.lineCap = "butt";
+  for (const f of po.path ?? []) {
+    const p = f.pts;
+    const n = p.length / 2;
+    if (f.closed || n < 2) continue;
+    if (o.arrowEnd) {
+      const [bx, by] = at(p, n - 1, -1);
+      head(o.arrowEnd, p[(n - 1) * 2]!, p[(n - 1) * 2 + 1]!, bx, by);
+    }
+    if (o.arrowStart) {
+      const [bx, by] = at(p, 0, 1);
+      head(o.arrowStart, p[0]!, p[1]!, bx, by);
+    }
+  }
+}
+
 /** The dash pattern in screen px for an outline `w` px wide (the pattern is in widths, so it looks the same at any zoom). */
 const dashPattern = (d: readonly [number, number], w: number): number[] => [d[0] * w, d[1] * w];
 
@@ -220,7 +279,7 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       c.lineWidth = Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
       c.lineJoin = o.join ?? "round";
       c.lineCap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round"); // (a dot is a dash of no length: only round ends show it)
-      c.miterLimit = MITER_LIMIT;
+      c.miterLimit = miterLimitOf(o.miterAngle);
       if (o.dash) {
         c.setLineDash(dashPattern(o.dash, c.lineWidth));
         c.lineDashOffset = (o.dashOffset ?? 0) * c.lineWidth;
@@ -232,6 +291,7 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
         c.setLineDash([]);
         c.lineDashOffset = 0;
       }
+      if (o.arrowStart || o.arrowEnd) drawArrows(c, po, o);
     }
   };
   if (!(o.fill !== null && o.stroke !== null && (o.opacity < 1 || o.blend))) return paint(ctx, o, () => body(ctx));
@@ -276,7 +336,7 @@ function drawAlignedOutline(c: CanvasRenderingContext2D, po: ProjectedObject, vp
   a.strokeStyle = canvasPaint(a, o, o.stroke!, po.proj, vp);
   a.lineWidth = 2 * Math.max(2 * po.radius, MIN_VISIBLE_WIDTH);
   a.lineJoin = o.join ?? "round";
-  a.miterLimit = MITER_LIMIT;
+  a.miterLimit = miterLimitOf(o.miterAngle);
   a.lineCap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round");
   if (o.dash) {
     // The line is twice as wide as asked, so its end caps reach twice as far past a dash as a centred line's do: the dash is cut shorter by

@@ -19,7 +19,8 @@ const textPathBounds = (o: TextObject): LocalBounds => {
 const pathBoundsCache = new WeakMap<TextObject, LocalBounds>();
 import type { TextAlign } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
-import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
+import type { Align, Arrow, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
+import { ARROWS, miterLimitOf } from "./path";
 import type { Dash } from "./stroke-look";
 import { validAdjust } from "./adjust";
 import type { Adjust, Crop } from "./adjust";
@@ -220,6 +221,11 @@ export interface PathObject extends ObjectBase {
   readonly container?: { readonly clip: boolean };
   /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
   readonly dash?: Dash;
+  /** Corners sharper than this many degrees (1 to 90) are cut to a bevel instead of a point; absent = the default (29°). */
+  readonly miterAngle?: number;
+  /** An arrow head at the first or last node of every open sub-path (ADR 0142); absent = none. */
+  readonly arrowStart?: Arrow;
+  readonly arrowEnd?: Arrow;
   /** Where in the pattern the outline starts, in widths of the outline (absent: 0). */
   readonly dashOffset?: number;
   /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
@@ -244,13 +250,13 @@ export interface PathObject extends ObjectBase {
 export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
 
 /** The outline style of a path as `paintBounds` takes it (null: no outline). */
-export const pathStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap } | null => (o.stroke === null ? null : { width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}) });
+export const pathStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap; arrows?: boolean; miter?: number } | null => (o.stroke === null ? null : { width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}), ...(o.arrowStart || o.arrowEnd ? { arrows: true } : {}), ...(o.miterAngle !== undefined ? { miter: miterLimitOf(o.miterAngle) } : {}) });
 
 /** Where the outline of a path sits: undefined (centred) unless every sub-path is closed and `align` says inside or outside. */
 export const alignOf = (o: PathObject): Align | undefined => (o.align && o.stroke !== null && o.sub.length > 0 && o.sub.every((s) => s.closed) ? o.align : undefined);
 
 /** The outline as the bounds of the paint take it: an outline outside the edge reaches its whole width past it, one inside reaches nothing past it. */
-export const inkStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap } | null => {
+export const inkStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap; arrows?: boolean; miter?: number } | null => {
   const a = alignOf(o);
   return a === "inside" ? null : a === "outside" ? { ...pathStyle(o)!, width: o.width * 2 } : pathStyle(o);
 };
@@ -496,6 +502,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean")) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
+    if (o.miterAngle !== undefined && !(Number.isFinite(o.miterAngle) && o.miterAngle >= 1 && o.miterAngle <= 90)) throw new InvalidObjectError("bad miter angle");
+    for (const [what, v] of [["start", o.arrowStart], ["end", o.arrowEnd]] as const) if (v !== undefined && !ARROWS.includes(v)) throw new InvalidObjectError(`bad arrow ${what}`);
     if (o.dashOffset !== undefined && !(typeof o.dashOffset === "number" && Number.isFinite(o.dashOffset))) throw new InvalidObjectError("bad dash offset");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
     if (o.radius !== undefined) {
@@ -641,6 +649,9 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["dash"] !== undefined ? { dash: s["dash"] as Dash } : {}),
       ...(s["dashOffset"] !== undefined ? { dashOffset: s["dashOffset"] as number } : {}),
+      ...(s["miterAngle"] !== undefined ? { miterAngle: s["miterAngle"] as number } : {}),
+      ...(s["arrowStart"] !== undefined ? { arrowStart: s["arrowStart"] as Arrow } : {}),
+      ...(s["arrowEnd"] !== undefined ? { arrowEnd: s["arrowEnd"] as Arrow } : {}),
       ...(s["container"] !== undefined ? { container: s["container"] as { clip: boolean } } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),

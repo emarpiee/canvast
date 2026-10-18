@@ -1,5 +1,6 @@
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import { NOTE_CARD, NOTE_COLOURS } from "../text/text-style";
+import type { Arrow } from "../doc/path";
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
 import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
 import type { Gradient, Paint } from "../doc/paint";
@@ -529,6 +530,12 @@ export interface OutlineOptions {
   /** Dash length, gap and start in widths of the outline (null: not a dashed selection, the fields are left out). */
   dashNumbers?: { len: number; gap: number; offset: number } | null;
   onDashNumbers?(n: { len?: number; gap?: number; offset?: number }): void;
+  /** The angle (degrees) below which a sharp corner is cut to a bevel; null: not offered. */
+  miterAngle?: number | null;
+  onMiterAngle?(deg: number | null): void;
+  /** The arrow heads at the two ends of an open path (null: nothing picked that has an open outline). */
+  arrows?: { start: Arrow | "none"; end: Arrow | "none" } | null;
+  onArrows?(patch: { start?: Arrow | "none"; end?: Arrow | "none" }): void;
   onClose?(): void;
 }
 
@@ -549,13 +556,17 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     `<div class="op-row"><label class="op-label" for="op-width">Width</label><input id="op-width" class="op-width" type="number" min="0" step="0.5" inputmode="decimal" value="${o.widthPx === null ? "" : String(Math.round(o.widthPx * 100) / 100)}"><span class="op-unit">px</span></div>` +
     choices("align", "Position", [["inside", "Inside", "Inside: the whole width is inside the edge"], ["centre", "Centre", "Centre: half on each side of the edge"], ["outside", "Outside", "Outside: the whole width is outside the edge"]] as const, o.align, !o.closed) +
     choices("join", "Corners", [["miter", "Sharp", "Sharp corners"], ["round", "Round", "Round corners"], ["bevel", "Cut", "Cut (bevelled) corners"]] as const, o.join) +
+    (o.miterAngle != null ? `<div class="op-row" data-miter-row${o.join === "miter" ? "" : " hidden"}><label class="op-label" for="op-miter">Cut below</label><input id="op-miter" class="op-num" data-miter type="number" min="1" max="90" step="1" inputmode="decimal" value="${o.miterAngle}"><span class="op-unit">° corners</span></div>` : "") +
     choices("dash", "Line", [["solid", "Solid", "A solid line"], ["dashed", "Dashed", "Dashes (three widths long, two apart)"], ["dotted", "Dotted", "Dots (round ends)"]] as const, o.dash) +
     (o.dashNumbers ? [["len", "Dash", o.dashNumbers.len, "0"], ["gap", "Gap", o.dashNumbers.gap, "0"], ["offset", "Start", o.dashNumbers.offset, ""]].map(([k, l, v, min]) => `<div class="op-row" data-dash-row${o.dash === "solid" ? " hidden" : ""}><label class="op-label" for="op-d-${k}">${l}</label><input id="op-d-${k}" class="op-num" data-dash="${k}" type="number"${min !== "" ? ` min="${min}"` : ""} step="0.25" inputmode="decimal" value="${Math.round(Number(v) * 1000) / 1000}"><span class="op-unit">widths</span></div>`).join("") : "") +
     choices("cap", "Ends", [["butt", "Flat", "Flat ends, cut at the last node"], ["round", "Round", "Round ends"], ["square", "Square", "Square ends, reaching half the width past the last node"]] as const, o.cap) +
+    (o.arrows ? (["start", "end"] as const).map((k) => choices(`arrow-${k}`, k === "start" ? "Start" : "End", [["none", "None", "No arrow head"], ["triangle", "Solid", "A solid triangle"], ["open", "Open", "Two lines"], ["dot", "Dot", "A dot"]] as const, o.arrows![k])).join("") : "") +
     (o.closed ? "" : `<p class="op-note">An open line is always centred on its path.</p>`);
   scrubNumbers(pop);
   const width = pop.querySelector<HTMLInputElement>(".op-width")!;
   liveNumber(width, (v, final) => v >= 0 && o.onWidth(v, final));
+  const miter = pop.querySelector<HTMLInputElement>("[data-miter]");
+  if (miter) liveNumber(miter, (v, final) => final && v >= 1 && v <= 90 && o.onMiterAngle?.(v));
   for (const f of pop.querySelectorAll<HTMLInputElement>("[data-dash]")) liveNumber(f, (v, final) => final && o.onDashNumbers?.({ [f.dataset["dash"]!]: v }));
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
@@ -563,8 +574,13 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     const group = b.closest("[role=radiogroup]")!;
     for (const x of group.querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
     const d = b.dataset;
-    if (d["align"]) o.onStyle({ align: d["align"] as AlignChoice });
-    else if (d["join"]) o.onStyle({ join: d["join"] as JoinChoice });
+    if (d["arrowStart"] !== undefined) o.onArrows?.({ start: d["arrowStart"] as Arrow | "none" });
+    else if (d["arrowEnd"] !== undefined) o.onArrows?.({ end: d["arrowEnd"] as Arrow | "none" });
+    else if (d["align"]) o.onStyle({ align: d["align"] as AlignChoice });
+    else if (d["join"]) {
+      o.onStyle({ join: d["join"] as JoinChoice });
+      for (const r of pop.querySelectorAll<HTMLElement>("[data-miter-row]")) r.hidden = d["join"] !== "miter";
+    }
     else if (d["cap"]) o.onStyle({ cap: d["cap"] as CapChoice });
     else if (d["dash"]) {
       o.onStyle({ dash: d["dash"] as DashChoice });
