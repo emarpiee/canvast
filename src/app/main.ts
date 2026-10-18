@@ -1340,6 +1340,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Arrange", title: "Bring to front", keys: "Ctrl+]", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "front") },
       { group: "Arrange", title: "Send to back", keys: "Ctrl+[", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "back") },
       { group: "Arrange", title: "Detach from what it follows", enabled: () => onCanvas && canDetach(doc, editor), run: () => detachSelection(doc, editor) },
+      { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
       { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },

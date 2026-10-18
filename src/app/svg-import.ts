@@ -249,6 +249,10 @@ export function parseSvg(text: string): SvgImport | null {
       ...(st.join ? { join: st.join } : {}), ...(st.cap ? { cap: st.cap } : {}), ...(dash ? { dash } : {}), ...(id ? { name: id.slice(0, 80) } : {}),
     });
   };
+  // <use href="#id">: the referenced shape (or group, or the children of a symbol) drawn again where the use is, moved by its x and y.
+  const byId = new Map<string, Element>();
+  for (const e of docEl.querySelectorAll("[id]")) if (!byId.has(e.id)) byId.set(e.id, e);
+  let useDepth = 0;
   const SKIP = new Set(["defs", "clipPath", "mask", "pattern", "marker", "symbol", "style", "script", "title", "desc", "metadata", "linearGradient", "radialGradient", "foreignObject", "text"]);
   const walk = (el: Element, parent: Style, pm: Matrix, alpha: number, vw: number, vh: number): void => {
     if (shapes.length > 20000) return;
@@ -262,6 +266,16 @@ export function parseSvg(text: string): SvgImport | null {
       case "svg": case "g": case "a": case "switch":
         for (const c of el.children) walk(c, st, m, a, vw, vh);
         return;
+      case "use": {
+        const target = byId.get((el.getAttribute("href") ?? el.getAttribute("xlink:href") ?? "").replace(/^#/, ""));
+        if (!target || target === el || target.contains(el) || useDepth >= 8) return; // (a use of itself, or of what holds it, would never end)
+        useDepth++;
+        const um = mul(m, [1, 0, 0, 1, f("x", vw), f("y", vh)] as unknown as Matrix);
+        if (target.localName === "symbol") for (const c of target.children) walk(c, st, um, a, vw, vh);
+        else walk(target, st, um, a, vw, vh);
+        useDepth--;
+        return;
+      }
       case "path": add(el, parsePathData(el.getAttribute("d") ?? ""), st, m, a); return;
       case "rect": {
         const w = f("width", vw), h = f("height", vh);

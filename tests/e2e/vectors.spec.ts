@@ -2166,3 +2166,24 @@ test("sharp corner limit: a corner of 18° is cut by default, comes to its point
   await key(app, "Control+z");
   expect(((await last(app)) as unknown as { miterAngle?: number }).miterAngle, "undone").toBeUndefined();
 });
+
+test("pasted SVG text with <use> and a symbol becomes shapes (the used shape drawn again where the use is); copy as SVG puts the same text on the clipboard", async ({ app }) => {
+  const p = app.page;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><defs><path id="a" d="M0 0h10v10z"/><symbol id="s"><rect width="5" height="5"/></symbol></defs><use href="#a" x="20" y="5"/><use xlink:href="#s" x="50" y="50"/><g id="g"><use href="#g"/></g></svg>';
+  await p.evaluate((text) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, svg);
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
+  const [a, b] = await objs(app);
+  const wa = size(a!), wb = size(b!);
+  expect(wa.w / wb.w, "the triangle is twice as wide as the square").toBeCloseTo(2, 1);
+  // copy the picked shapes as SVG text
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })));
+  await p.keyboard.type("Copy the selection as SVG");
+  await key(app, "Enter");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.lastCopied())).toMatch(/^<svg[\s\S]*<path/);
+});
