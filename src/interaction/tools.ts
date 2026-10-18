@@ -1548,7 +1548,7 @@ export function attachTools(
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
         if (g.sheets) {
-          const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
+          const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius, editor.scaleSheetContents);
           editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
           replaceCommit = "Resize";
         } else editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };

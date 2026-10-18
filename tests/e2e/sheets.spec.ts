@@ -250,6 +250,10 @@ test("a sheet takes a paper or screen size from the presets, and Scale contents 
   await key(app, "Control+z");
   await app.frame();
   expect(await width()).toBeCloseTo(w0, 1);
+  // the same with the resize handle: dragging the right edge out by a third grows what is on the sheet by a third (Scale contents is still on)
+  await drag(app, [700, 400], [800, 400]);
+  await app.frame();
+  expect(Math.abs((await width()) - (w0 * 4) / 3)).toBeLessThan(3);
   expect(app.consoleErrors).toEqual([]);
 });
 
