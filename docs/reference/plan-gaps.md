@@ -180,3 +180,4 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | 3 | Hundreds of gigabytes; streaming archives measured at multi-GB sizes | Not offered; the browser's Blob size is the ceiling |
 | 4 | 60 and 120 FPS on reference devices; cold and warm startup benchmarks; a low-memory tier | Need devices and a recorded method |
 | 5 | Networks: split edges where they cross, a fill per region | Needs curve intersection on edges; ADR 0146 |
+| 6 | A layer clipped to the layer below (a toggle on a Layers row); the clipping mask of ADR 0144 works the other way round (the top shape cuts what is below) | Asked for 2026-10-18; needs a marker on the layer and the clip following moves and reordering |
