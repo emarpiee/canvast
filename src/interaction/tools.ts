@@ -1053,7 +1053,7 @@ export function attachTools(
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
     if (sel && canRotate(vis, editor) && !editor.blockEdit()) {
       const { frame, handle } = sel;
-      if (inRotateZone(s, frame, handle)) {
+      if (inRotateZone(s, frame, handle) && !itemLabelAt(hooks.labels(), s.x, s.y)) { // (a name above a sheet or picture is picked, not turned, even near a corner)
         const ids = [...editor.selection].filter((id) => doc.get(id));
         const centre = { x: frame.centre[0], y: frame.centre[1] };
         const single = ids.length === 1 ? doc.get(ids[0]!) : null;
@@ -1477,7 +1477,7 @@ export function attachTools(
       // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
       const b = editor.selectionBoxOnScreen;
       const p = local(e);
-      const rotating = !!b && b.rotatable && inRotateZone(p, b.frame, b.handle);
+      const rotating = !!b && b.rotatable && inRotateZone(p, b.frame, b.handle) && !itemLabelAt(hooks.labels(), p.x, p.y);
       el.classList.toggle("is-rotate", rotating);
       // A resize cursor over a corner handle, drawn along the diagonal the corner points along (turned boxes included).
       const hit = b && !el.classList.contains("is-rotate") ? resizeHandles(b.frame).find((q) => {

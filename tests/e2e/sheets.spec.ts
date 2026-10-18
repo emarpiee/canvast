@@ -21,7 +21,6 @@ const px = (app: App, x: number, y: number) => app.page.evaluate(([a, b]) => win
 /** The sheet at (400, 300) is picked by its name above its corner: the empty body of a sheet with things on it is ground, not the sheet. */
 const pickSheet = async (app: App) => {
   await expect.poll(() => app.page.evaluate(() => window.__canvastDebug.itemLabels().length)).toBeGreaterThan(0);
-  await click(app, 150, 650); // (nothing picked first)
   await click(app, 410, 291);
 };
 const selection = (app: App) => app.page.evaluate(() => window.__canvastDebug.selection());
