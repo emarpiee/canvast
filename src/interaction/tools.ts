@@ -723,9 +723,9 @@ export function attachTools(
   };
 
   /** Every handle on a shape names its value while the pointer is over it, not only while it is dragged (Radius, Ratio, Count, the gradient's ends). */
-  const hoverHandleLabel = (s: ScreenPoint): void => {
+  const hoverHandleLabel = (s: ScreenPoint, boxLabel: string | null = null): void => {
     const tgt = gradientTarget();
-    let text: string | null = null;
+    let text: string | null = boxLabel;
     let guide: ReturnType<typeof handleGuide> = null;
     if (tgt) {
       const open = editor.cornersOpen === tgt.o.id;
@@ -741,7 +741,7 @@ export function attachTools(
         if (hit) text = hit === "p0" ? "Gradient start" : hit === "p1" ? "Gradient end" : hit === "c" ? "Gradient centre" : "Gradient radius";
       }
     }
-    if (text) editor.handleLabel = { x: s.x, y: s.y, text, guide };
+    if (text) editor.handleLabel = editor.handleLabel?.text === text && !guide && boxLabel === text ? editor.handleLabel : { x: s.x, y: s.y, text, guide };
     else if (editor.handleLabel) editor.handleLabel = null;
     else return;
     editor.changed();
@@ -1234,6 +1234,7 @@ export function attachTools(
   };
 
   const onPointerMove = (e: PointerEvent): void => {
+    let boxLabel: string | null = null;
     const a = active.get(e.pointerId);
     if (a) a.p = local(e);
     if (pan.has(e.pointerId)) {
@@ -1244,7 +1245,8 @@ export function attachTools(
       // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
       const b = editor.selectionBoxOnScreen;
       const p = local(e);
-      el.classList.toggle("is-rotate", !!b && b.rotatable && inRotateZone(p, b.frame, b.handle));
+      const rotating = !!b && b.rotatable && inRotateZone(p, b.frame, b.handle);
+      el.classList.toggle("is-rotate", rotating);
       // A resize cursor over a corner handle, drawn along the diagonal the corner points along (turned boxes included).
       const hit = b && !el.classList.contains("is-rotate") ? resizeHandles(b.frame).find((q) => {
         const reach = q.edge ? HANDLE_SIZE_PX / 2 + 1 : HANDLE_SIZE_PX;
@@ -1258,8 +1260,9 @@ export function attachTools(
           el.dataset["hover"] = a < 22.5 || a >= 157.5 ? "ew" : a < 67.5 ? "nwse" : a < 112.5 ? "ns" : "nesw";
         }
       } else delete el.dataset["hover"];
+      boxLabel = rotating ? "Rotate" : hit ? (hit.edge ? (hit.edge === "n" || hit.edge === "s" ? "Resize height" : "Resize width") : "Resize") : null;
     }
-    if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) hoverHandleLabel(local(e));
+    if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) hoverHandleLabel(local(e), boxLabel);
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
       editor.changed();

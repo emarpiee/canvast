@@ -336,17 +336,27 @@ export function cornerHandles(po: ProjectedObject, expanded = false, avoid: Read
 /** Handles nearer than this to each other (px) are told apart: the one that moves goes to the nearest clear place along its own line. */
 export const HANDLE_CLEAR_PX = 20;
 
-/** The place nearest to (x, y) along one of the directions, at 0, 1, 2 or 3 steps, that is clear of every point in `avoid`; (x, y) when there is none. */
+/**
+ * The place nearest to (x, y) along one of the directions, at 0 to 6 steps, that is clear of every point in `avoid`. When none is (three
+ * or more handles in one spot), the candidate farthest from the nearest of them, so the handles are told apart as much as the lines allow.
+ */
 export function clearSpot(x: number, y: number, dirs: ReadonlyArray<readonly [number, number]>, avoid: ReadonlyArray<{ x: number; y: number }>): [number, number] {
-  const clear = (px: number, py: number): boolean => avoid.every((q) => Math.hypot(q.x - px, q.y - py) >= HANDLE_CLEAR_PX);
-  if (clear(x, y)) return [x, y];
-  for (let n = 1; n <= 3; n++) {
+  const gap = (px: number, py: number): number => avoid.reduce((m, q) => Math.min(m, Math.hypot(q.x - px, q.y - py)), Infinity);
+  if (gap(x, y) >= HANDLE_CLEAR_PX) return [x, y];
+  let best: [number, number] = [x, y];
+  let bestGap = gap(x, y);
+  for (let n = 1; n <= 6; n++) {
     for (const [dx, dy] of dirs) {
       const px = x + dx * HANDLE_CLEAR_PX * n, py = y + dy * HANDLE_CLEAR_PX * n;
-      if (clear(px, py)) return [px, py];
+      const g = gap(px, py);
+      if (g >= HANDLE_CLEAR_PX) return [px, py];
+      if (g > bestGap) {
+        best = [px, py];
+        bestGap = g;
+      }
     }
   }
-  return [x, y];
+  return best;
 }
 
 /**

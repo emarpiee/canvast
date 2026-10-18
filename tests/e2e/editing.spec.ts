@@ -580,6 +580,11 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   };
   const s0 = await size();
   let c = await frame();
+  // The resize handle names itself while the pointer is over it, and the label goes when the pointer leaves.
+  await p.mouse.move(c[2]![0], c[2]![1]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toBe("Resize");
+  await p.mouse.move(c[2]![0] + 150, c[2]![1] + 150);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
   // Free: the bottom-right corner follows the pointer in both axes, so the shape changes.
   await drag(c[2] as [number, number], [c[2]![0] + 60, c[2]![1] + 20]);
   const s1 = await size();
