@@ -62,3 +62,64 @@ describe("adjustments of a picture (ADR 0118)", () => {
     expect(half[0]).toBeLessThan(135); // half way from black to red
   });
 });
+
+describe("RGB, levels, curves and stacks of adjustments (v0.18.1)", () => {
+  it("red, green and blue add or take away a stop of that light", () => {
+    const [r, g, b] = adjustPixel(100, 100, 100, { red: 100 });
+    expect(r).toBeGreaterThan(190);
+    expect([g, b]).toEqual([100, 100]);
+    expect(adjustPixel(100, 100, 100, { blue: -100 })[2]).toBeLessThan(55);
+  });
+
+  it("levels stretch black to white and gamma bends the middle, for all channels or one", () => {
+    expect(adjustPixel(50, 50, 50, { levels: { master: { black: 50 } } })).toEqual([0, 0, 0]);
+    expect(adjustPixel(150, 150, 150, { levels: { master: { white: 150 } } })).toEqual([255, 255, 255]);
+    expect(adjustPixel(128, 128, 128, { levels: { master: { gamma: 2 } } })[0]).toBeGreaterThan(170); // above 1 lightens the middle
+    expect(adjustPixel(128, 128, 128, { levels: { master: { gamma: 0.5 } } })[0]).toBeLessThan(90);
+    const [r, g, b] = adjustPixel(100, 100, 100, { levels: { r: { white: 100 } } });
+    expect([r, g, b]).toEqual([255, 100, 100]);
+  });
+
+  it("a curve passes through its points and is smooth and monotone between them", () => {
+    const up = { curves: { master: [[0, 0], [128, 200], [255, 255]] as Array<[number, number]> } };
+    expect(adjustPixel(128, 128, 128, up)[0]).toBe(200);
+    expect(adjustPixel(0, 0, 0, up)[0]).toBe(0);
+    let last = -1;
+    for (let v = 0; v < 256; v += 5) {
+      const o = adjustPixel(v, v, v, up)[0];
+      expect(o).toBeGreaterThanOrEqual(last);
+      last = o;
+    }
+    expect(adjustPixel(40, 40, 40, { curves: { b: [[0, 0], [255, 0]] } })).toEqual([40, 40, 0]); // a flat curve zeroes a channel
+  });
+
+  it("a stack applies each layer to the result of the one before, and is kept tidy", () => {
+    const stack = { exposure: 0, red: 100, next: { levels: { master: { white: 200 } } } };
+    const one = adjustPixel(100, 100, 100, { red: 100 });
+    const both = adjustPixel(100, 100, 100, { red: 100, next: { levels: { master: { white: 200 } } } });
+    expect(both[0]).toBe(255); // 200 stretched to white
+    expect(both[1]).toBe(Math.round((100 / 200) * 255));
+    expect(one[0]).toBeLessThan(255);
+    expect(cleanAdjust(stack as never)).toEqual({ red: 100, next: { levels: { master: { white: 200 } } } });
+    expect(cleanAdjust({ next: { next: { next: {} } } } as never)).toBeUndefined(); // layers that change nothing go
+    expect(isNeutral({ next: { exposure: 10 } })).toBe(false);
+    expect(isNeutral({ next: {} })).toBe(true);
+    expect(adjustKey({ next: { red: 5 } })).not.toBe(adjustKey({ next: { red: 6 } }));
+    expect(needsNeighbours({ next: { blur: 10 } })).toBe(true);
+    // levels and curves that do nothing are dropped, bad ones are made right
+    expect(cleanAdjust({ levels: { master: { black: 0, white: 255, gamma: 1 } }, curves: { master: [[0, 0], [255, 255]] } })).toBeUndefined();
+    expect(cleanAdjust({ levels: { master: { black: 300, white: 10 } } })?.levels?.master).toEqual({ black: 254 }); // (white 255 is the default)
+  });
+
+  it("a gradient map with a clear stop makes the picture clear there", () => {
+    const px = [255, 255, 255, 255];
+    const map = { stops: [{ o: 0, c: "#000000" }, { o: 1, c: "#ffffff00" }], amount: 100 };
+    adjustPixelAlpha(px, { map });
+    expect(px[3]).toBeLessThan(10);
+  });
+});
+
+import { prepare } from "../../src/doc/adjust";
+function adjustPixelAlpha(d: number[], a: Parameters<typeof prepare>[0]): void {
+  prepare(a)(d, 0);
+}

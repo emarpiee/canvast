@@ -5,7 +5,7 @@
  * sidebar card of the Assets view (rows, rename, delete) and the unknown-kind safety need nothing more.
  */
 import type { Adjust } from "../doc/adjust";
-import { ADJUSTMENTS, cleanAdjust } from "../doc/adjust";
+import { ADJUSTMENTS, cleanAdjust, layersOf } from "../doc/adjust";
 import type { Gradient } from "../doc/paint";
 import { isColour, isGradient, isPaint } from "../doc/paint";
 import type { PaletteColour } from "./gpl";
@@ -55,7 +55,7 @@ export const ADJUSTMENT_KIND: StyleKind = {
   validate: (d) => (d && typeof d === "object" ? (cleanAdjust(d as Adjust) ?? null) : null),
   summary: (d) => {
     const a = d as Adjust;
-    const parts = [...(a.map ? [`Gradient map ${a.map.amount}%`] : []), ...ADJUSTMENTS.filter((s) => a[s.key]).map((s) => `${s.label} ${signed(a[s.key]!)}`)];
+    const parts = [...(a.map ? [`Gradient map ${a.map.amount}%`] : []), ...(a.levels ? ["Levels"] : []), ...(a.curves ? ["Curves"] : []), ...(a.next ? [`${layersOf(a).length} layers`] : []), ...ADJUSTMENTS.filter((s) => a[s.key]).map((s) => `${s.label} ${signed(a[s.key]!)}`)];
     return parts.length > 3 ? `${parts.slice(0, 3).join(", ")} and ${parts.length - 3} more` : parts.join(", ");
   },
 };

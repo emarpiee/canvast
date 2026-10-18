@@ -9,8 +9,8 @@ import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
-import { ADJUSTMENTS } from "../doc/adjust";
-import type { Adjust, AdjustKey } from "../doc/adjust";
+import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
+import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
 import { DEFAULT_INK, swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
@@ -722,15 +722,36 @@ const DEFAULT_MAP: readonly GradientStop[] = [{ o: 0, c: "#1e1b4b" }, { o: 1, c:
 
 /** Fill `host` (the body of the Adjust panel) with the adjustment controls for the picked pictures (ADR 0118; a dock panel, ADR 0123). Call again to show other pictures. */
 export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current(): Adjust } {
+  // The panel works on one layer of a stack at a time; changing layer builds it again for that layer.
+  let inner: { current(): Adjust } = buildAdjustLayer(host, o, 0, (adjust, layer) => {
+    inner = buildAdjustLayer(host, { ...o, adjust }, layer, go);
+  });
+  const go = (adjust: Adjust, layer: number): void => {
+    inner = buildAdjustLayer(host, { ...o, adjust }, layer, go);
+  };
+  return { current: () => inner.current() };
+}
+
+function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, go: (adjust: Adjust, layer: number) => void): { current(): Adjust } {
   closeChild();
+  const layers = layersOf(o.adjust).map((l) => {
+    const { next: _n, ...one } = l;
+    return one as Adjust;
+  });
+  if (!layers.length) layers.push({});
+  const idx = Math.max(0, Math.min(layerAt, layers.length - 1));
+  /** The whole stack with the layer being edited as it is now. */
+  const compose = (cur: Adjust): Adjust => layers.reduceRight<Adjust | undefined>((next, l, i) => ({ ...(i === idx ? cur : l), ...(next ? { next } : {}) }), undefined)!;
   const pop = document.createElement("div");
   pop.className = "adjust-pop";
   host.replaceChildren(pop);
   const rows = ADJUSTMENTS;
-  let cur: Adjust = { ...o.adjust };
+  let cur: Adjust = { ...layers[idx]! };
+  const emitInput = (): void => o.onInput(compose(cur));
+  const emitChange = (label: string): void => o.onChange(compose(cur), label);
   const GROUPS: Array<[string, readonly AdjustKey[]]> = [
     ["Light", ["exposure", "contrast", "highlights", "shadows"]],
-    ["Colour", ["temperature", "tint", "saturation", "vibrance"]],
+    ["Colour", ["temperature", "tint", "saturation", "vibrance", "red", "green", "blue"]],
     ["Detail", ["blur", "sharpen", "grain"]],
   ];
   const row = (s: (typeof rows)[number]): string =>
@@ -740,10 +761,18 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
   const mapSection = (): string =>
     `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("")}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
+  const CH: Array<[Channel, string]> = [["master", "All"], ["r", "Red"], ["g", "Green"], ["b", "Blue"]];
+  const chSelect = (name: string): string => `<select data-${name} aria-label="${name === "lv-ch" ? "Levels" : "Curve"}: which channel">${CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
+  const layerTabs = `<div class="adj-layers" role="group" aria-label="Layers of adjustments">${layers.map((_, i) => `<button type="button" data-layer="${i}" aria-pressed="${i === idx}">${i + 1}</button>`).join("")}${layers.length < MAX_LAYERS ? `<button type="button" data-layer-add aria-label="Add a layer of adjustments after this one" title="Add a layer: its numbers are applied to the result of the one before">+</button>` : ""}${layers.length > 1 ? `<button type="button" data-layer-del aria-label="Remove this layer" title="Remove this layer">${ICONS.x}</button>` : ""}</div>`;
+  const levelsSection = `<section class="adj-group" aria-label="Levels"><h4>Levels</h4><div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label">Black</label><input type="number" class="adj-num" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label">White</label><input type="number" class="adj-num" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label">Gamma</label><input type="number" class="adj-num" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
+  const curvesSection = `<section class="adj-group" aria-label="Curves"><h4>Curves</h4><div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
+    layerTabs +
     `<header class="adj-head"><h3>Adjust</h3><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span><button type="button" class="adj-reset" data-adj-reset>Reset</button></header>` +
     GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}</section>`).join("") +
     mapSection() +
+    levelsSection +
+    curvesSection +
     (o.stills ? "" : `<p class="op-note">Sharpen and grain can slow the playback of a big video.</p>`) +
     `<footer class="adj-foot"><div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save</button></div><button type="button" class="adj-open" data-adj-open>${ICONS.swatchBook}<span>Saved adjustments</span></button></footer>`;
   scrubNumbers(pop);
@@ -761,7 +790,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
         mapBar.style.backgroundImage = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops });
         if (!frame) frame = requestAnimationFrame(() => {
           frame = 0;
-          o.onInput(cur);
+          emitInput();
         });
       },
       onChange: (stops) => {
@@ -769,7 +798,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
         mapSelect.value = mapIndex();
         if (frame) cancelAnimationFrame(frame);
         frame = 0;
-        o.onChange(cur, "Adjust picture");
+        emitChange("Adjust picture");
       },
       onSave: (stops) => void o.styles.saveGradient(stops),
     });
@@ -801,7 +830,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
     // one preview a frame, the latest numbers (a fast drag makes many more input events than a screen can show)
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0;
-      o.onInput(cur);
+      emitInput();
     });
   });
   const setMap = (m: Adjust["map"]): void => {
@@ -820,7 +849,7 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
       requestAnimationFrame(openEditor); // (after the panel has taken its place, so the editor floats beside it)
     }
     mapOut.textContent = String(cur.map?.amount ?? 100);
-    o.onChange(cur, "Adjust picture");
+    emitChange("Adjust picture");
   });
   const mapAmount = pop.querySelector<HTMLInputElement>("[data-map-amount]")!;
   const mapOut = pop.querySelector<HTMLElement>("[data-map-out]")!;
@@ -830,13 +859,13 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
     mapOut.textContent = mapAmount.value;
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0;
-      o.onInput(cur);
+      emitInput();
     });
   });
   mapAmount.addEventListener("change", () => {
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
-    o.onChange(cur, "Adjust picture");
+    emitChange("Adjust picture");
   });
   pop.addEventListener("dblclick", (e) => {
     const key = (e.target as HTMLElement).closest<HTMLElement>("[data-adj-row]")?.dataset["adjRow"] as AdjustKey | undefined;
@@ -844,14 +873,14 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
     set(key, 0);
     const { [key]: _gone, ...rest } = cur;
     cur = rest;
-    o.onChange(cur, "Adjust picture");
+    emitChange("Adjust picture");
   });
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.dataset["adj"] || t.dataset["adjNum"]) {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      o.onChange(cur, "Adjust picture");
+      emitChange("Adjust picture");
     }
   });
   pop.addEventListener("click", (e) => {
@@ -869,8 +898,188 @@ export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current
       for (const s of rows) set(s.key, 0);
       cur = {};
       syncMap();
-      o.onChange(cur, "Reset adjustments");
+      syncLevels();
+      drawCurve();
+      emitChange("Reset adjustments");
+    } else if (b.dataset["layer"] !== undefined) go(compose(cur), Number(b.dataset["layer"]));
+    else if (b.hasAttribute("data-layer-add")) {
+      // a new, empty layer after the last (kept only once it changes something)
+      const withNew = (a: Adjust): Adjust => (a.next ? { ...a, next: withNew(a.next) } : { ...a, next: {} });
+      go(withNew(compose(cur)), layers.length);
+    }
+    else if (b.hasAttribute("data-layer-del")) {
+      const rest = layers.filter((_, i) => i !== idx);
+      const whole = rest.reduceRight<Adjust | undefined>((next, l) => ({ ...l, ...(next ? { next } : {}) }), undefined) ?? {};
+      o.onChange(whole, "Remove adjustment layer");
+      go(whole, Math.max(0, idx - 1));
     }
   });
-  return { current: () => cur };
+
+  // ---- levels (ADR 0136) -------------------------------------------------------------------------------------------------------
+  let lvCh: Channel = "master";
+  const lvInput = (k: "black" | "white" | "gamma"): HTMLInputElement => pop.querySelector<HTMLInputElement>(`[data-lv="${k}"]`)!;
+  const syncLevels = (): void => {
+    const l = cur.levels?.[lvCh];
+    lvInput("black").value = String(l?.black ?? 0);
+    lvInput("white").value = String(l?.white ?? 255);
+    lvInput("gamma").value = String(l?.gamma ?? 1);
+  };
+  pop.querySelector<HTMLSelectElement>("[data-lv-ch]")!.addEventListener("change", (e) => {
+    lvCh = (e.target as HTMLSelectElement).value as Channel;
+    syncLevels();
+  });
+  for (const k of ["black", "white", "gamma"] as const) {
+    lvInput(k).addEventListener("input", () => {
+      const v = Number(lvInput(k).value);
+      if (!Number.isFinite(v) || lvInput(k).value === "") return;
+      cur = { ...cur, levels: { ...cur.levels, [lvCh]: { ...cur.levels?.[lvCh], [k]: v } } };
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0;
+        emitInput();
+      });
+    });
+    lvInput(k).addEventListener("change", () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      emitChange("Adjust picture");
+      const clean = cleanAdjust(cur);
+      cur = { ...cur, ...(clean?.levels ? { levels: clean.levels } : { levels: undefined }) } as Adjust;
+      syncLevels();
+    });
+  }
+  syncLevels();
+
+  // ---- curves (ADR 0136) -------------------------------------------------------------------------------------------------------
+  let cvCh: Channel = "master";
+  let picked = -1;
+  const cv = pop.querySelector<HTMLCanvasElement>("[data-curve]")!;
+  const SIZE = 192, PAD = 6;
+  const toXY = (x: number, y: number): [number, number] => [PAD + (x / 255) * (SIZE - 2 * PAD), SIZE - PAD - (y / 255) * (SIZE - 2 * PAD)];
+  const fromXY = (px: number, py: number): [number, number] => [Math.max(0, Math.min(255, Math.round(((px - PAD) / (SIZE - 2 * PAD)) * 255))), Math.max(0, Math.min(255, Math.round(((SIZE - PAD - py) / (SIZE - 2 * PAD)) * 255)))];
+  const points = (): Array<[number, number]> => (cur.curves?.[cvCh] ? cur.curves[cvCh]!.map((p) => [p[0], p[1]] as [number, number]) : [[0, 0], [255, 255]]);
+  const setPoints = (pts: Array<[number, number]>): void => {
+    pts.sort((a, b) => a[0] - b[0]);
+    cur = { ...cur, curves: { ...cur.curves, [cvCh]: pts } };
+  };
+  const drawCurve = (): void => {
+    const g = cv.getContext("2d")!;
+    const css = getComputedStyle(cv);
+    g.clearRect(0, 0, SIZE, SIZE);
+    g.strokeStyle = css.getPropertyValue("--hud-border") || "#888";
+    g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const [x, y] = toXY((i * 255) / 4, (i * 255) / 4);
+      g.beginPath();
+      g.moveTo(x, PAD);
+      g.lineTo(x, SIZE - PAD);
+      g.moveTo(PAD, y);
+      g.lineTo(SIZE - PAD, y);
+      g.stroke();
+    }
+    const pts = points();
+    const f = curveFn(pts);
+    g.strokeStyle = css.getPropertyValue("--hud-accent") || "#0a7";
+    g.lineWidth = 2;
+    g.beginPath();
+    for (let x = 0; x <= 255; x += 3) {
+      const [px, py] = toXY(x, f(x));
+      if (x === 0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.stroke();
+    g.fillStyle = css.getPropertyValue("--hud-fg") || "#222";
+    pts.forEach(([x, y], i) => {
+      const [px, py] = toXY(x, y);
+      g.beginPath();
+      g.arc(px, py, i === picked ? 5 : 3.5, 0, 7);
+      g.fill();
+    });
+  };
+  const hit = (px: number, py: number): number => points().findIndex(([x, y]) => Math.hypot(toXY(x, y)[0] - px, toXY(x, y)[1] - py) <= 8);
+  const local = (e: PointerEvent): [number, number] => {
+    const r = cv.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * SIZE, ((e.clientY - r.top) / r.height) * SIZE];
+  };
+  const curveInput = (): void => {
+    if (!frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      emitInput();
+    });
+  };
+  cv.addEventListener("pointerdown", (e) => {
+    const [px, py] = local(e);
+    let i = hit(px, py);
+    if (i < 0) {
+      const pts = points();
+      if (pts.length >= MAX_CURVE_POINTS) return;
+      pts.push(fromXY(px, py));
+      setPoints(pts);
+      i = points().findIndex(([x, y]) => (x === fromXY(px, py)[0] && y === fromXY(px, py)[1]));
+      curveInput();
+    }
+    picked = i;
+    cv.setPointerCapture(e.pointerId);
+    cv.focus();
+    drawCurve();
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (picked < 0 || !(e.buttons & 1)) return;
+    const pts = points();
+    const [x, y] = fromXY(...local(e));
+    // between its neighbours (points stay in order) and anywhere up and down
+    const lo = picked > 0 ? pts[picked - 1]![0] + 1 : 0, hi = picked < pts.length - 1 ? pts[picked + 1]![0] - 1 : 255;
+    pts[picked] = [Math.max(lo, Math.min(hi, x)), y];
+    setPoints(pts);
+    drawCurve();
+    curveInput();
+  });
+  cv.addEventListener("pointerup", () => {
+    if (picked < 0) return;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    emitChange("Adjust picture");
+  });
+  cv.addEventListener("dblclick", (e) => {
+    const i = hit(...local(e as unknown as PointerEvent));
+    const pts = points();
+    if (i < 0 || pts.length <= 2) return;
+    pts.splice(i, 1);
+    picked = -1;
+    setPoints(pts);
+    drawCurve();
+    emitChange("Adjust picture");
+  });
+  cv.addEventListener("keydown", (e) => {
+    const pts = points();
+    if (e.key === "[" || e.key === "]") {
+      picked = (picked + (e.key === "]" ? 1 : -1) + pts.length) % pts.length;
+    } else if (picked >= 0 && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      const step = e.shiftKey ? 10 : 1;
+      const [x, y] = pts[picked]!;
+      pts[picked] = [Math.max(0, Math.min(255, x + (e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0))), Math.max(0, Math.min(255, y + (e.key === "ArrowUp" ? step : e.key === "ArrowDown" ? -step : 0)))];
+      setPoints(pts);
+      emitChange("Adjust picture");
+    } else if ((e.key === "Delete" || e.key === "Backspace") && picked >= 0 && pts.length > 2) {
+      pts.splice(picked, 1);
+      picked = -1;
+      setPoints(pts);
+      emitChange("Adjust picture");
+    } else return;
+    e.preventDefault();
+    drawCurve();
+  });
+  pop.querySelector<HTMLSelectElement>("[data-cv-ch]")!.addEventListener("change", (e) => {
+    cvCh = (e.target as HTMLSelectElement).value as Channel;
+    picked = -1;
+    drawCurve();
+  });
+  pop.querySelector<HTMLElement>("[data-cv-reset]")!.addEventListener("click", () => {
+    const { [cvCh]: _gone, ...rest } = cur.curves ?? {};
+    cur = { ...cur, curves: Object.keys(rest).length ? rest : undefined } as Adjust;
+    picked = -1;
+    drawCurve();
+    emitChange("Adjust picture");
+  });
+  drawCurve();
+  return { current: () => compose(cur) };
 }

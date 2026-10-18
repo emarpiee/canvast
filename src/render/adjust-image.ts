@@ -4,7 +4,7 @@
  * is a 3 x 3 unsharp mask; grain is the same noise on every draw (it is fixed to the pixel, not to the time).
  */
 import type { Adjust } from "../doc/adjust";
-import { adjustKey, prepare } from "../doc/adjust";
+import { adjustKey, isLayerColourNeutral, layersOf, prepare } from "../doc/adjust";
 import type { RasterSource } from "./draw-objects";
 
 /** Beyond this many pixels a source is drawn as it is: adjusting it would stall a frame (it is only so large when zoomed far in, where pixels are drawn one by one and adjusted one by one). */
@@ -19,8 +19,28 @@ const hash = (x: number, y: number): number => {
   return ((h ^ (h >>> 16)) >>> 0) / 0xffffffff - 0.5;
 };
 
+/** One layer of a stack without the ones after it. */
+const single = (l: Adjust): Adjust => {
+  const { next: _n, ...rest } = l;
+  return rest;
+};
+
 /** Draw into `c` what `draw` paints, adjusted: blur while drawing, then the colour of every pixel, sharpening and grain. */
 export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContext2D) => void, a: Adjust): boolean {
+  // a stack: the first layer is made from the picture, each next one from the result before it
+  const layers = layersOf(a);
+  if (layers.length > 1) {
+    if (!adjustInto(c, draw, single(layers[0]!))) return false;
+    for (const l of layers.slice(1)) {
+      const prev = document.createElement("canvas");
+      prev.width = c.width;
+      prev.height = c.height;
+      prev.getContext("2d")!.drawImage(c, 0, 0);
+      c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+      if (!adjustInto(c, (g) => g.drawImage(prev, 0, 0), single(l))) return false;
+    }
+    return true;
+  }
   const g = c.getContext("2d", { willReadFrequently: true });
   if (!g) return false;
   const w = c.width, h = c.height;
@@ -29,7 +49,7 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   g.filter = "none";
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
-  const colour = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance || a.map);
+  const colour = !isLayerColourNeutral(a);
   if (colour) {
     const px = prepare(a);
     for (let i = 0; i < d.length; i += 4) if (d[i + 3] !== 0) px(d, i);

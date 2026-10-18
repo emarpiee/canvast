@@ -115,7 +115,7 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   await p.mouse.click(60, 650);
   await p.mouse.click(...edge);
   await openAdjust(p);
-  await pop.getByRole("button", { name: "Reset" }).click();
+  await pop.getByRole("button", { name: "Reset", exact: true }).click();
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
@@ -311,5 +311,68 @@ test("Styles: a colour is saved from the colour picker, offered as Saved in the 
   await p.keyboard.press("Escape");
   await p.locator("[data-colour-open]").click();
   await expect(p.locator(".colour-pop").getByText("Saved", { exact: true })).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("adjustments: red, green and blue, levels, a curve and a stack of layers are kept on the picture, drawn, and each layer is edited on its own (ADR 0136)", async ({ app }) => {
+  const p = app.page;
+  const grey = makePng(80, 60, () => [100, 100, 100, 255]);
+  const pic = await place(app, "grey.png", grey);
+  const b = await boxOf(app, pic.id);
+  const at = [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)] as const;
+  await p.keyboard.press("v");
+  await p.mouse.click(...at);
+  await openAdjust(p);
+  const pop = p.locator(".adjust-pop");
+  const adjust = async () => (await objs(app)).find((o) => o.id === pic.id)!.adjust as Record<string, unknown> | undefined;
+  // red: a stop of red added
+  await pop.locator('[data-adj-num="red"]').fill("100");
+  await pop.locator('[data-adj-num="red"]').blur();
+  expect(await adjust()).toEqual({ red: 100 });
+  await app.frame();
+  const lit = await px(app, ...at);
+  expect(lit[0]).toBeGreaterThan(lit[1] + 60);
+  // levels of the red channel: its white point at 100 makes red full
+  await pop.locator("[data-lv-ch]").selectOption("r");
+  await pop.locator('[data-lv="white"]').fill("120");
+  await pop.locator('[data-lv="white"]').blur();
+  expect((await adjust())!["levels"]).toEqual({ r: { white: 120 } });
+  // a curve of the blue channel: a point added by a click on the curve, then moved down with the keyboard
+  await pop.locator("[data-cv-ch]").selectOption("b");
+  const curve = pop.locator("[data-curve]");
+  await curve.scrollIntoViewIfNeeded();
+  const cb = (await curve.boundingBox())!;
+  await p.mouse.click(cb.x + cb.width / 2, cb.y + cb.height / 2);
+  await curve.press("ArrowDown");
+  await curve.press("Shift+ArrowDown");
+  const blue = ((await adjust())!["curves"] as { b: number[][] }).b;
+  expect(blue).toHaveLength(3);
+  expect(blue[1]![1]).toBeLessThan(blue[1]![0]! - 5);
+  // a second layer: its own numbers, applied to the result of the first
+  await pop.getByRole("button", { name: "Add a layer of adjustments after this one" }).click();
+  await expect(pop.locator("[data-layer]")).toHaveCount(2);
+  await pop.locator('[data-adj-num="exposure"]').fill("30");
+  await pop.locator('[data-adj-num="exposure"]').blur();
+  const a2 = (await adjust())!;
+  expect(a2["red"]).toBe(100);
+  expect((a2["next"] as Record<string, unknown>)["exposure"]).toBe(30);
+  // the first layer is still as it was, and the second is only what it has
+  await pop.locator('[data-layer="0"]').click();
+  await expect(pop.locator('[data-adj-num="red"]')).toHaveValue("100");
+  await expect(pop.locator('[data-adj-num="exposure"]')).toHaveValue("0");
+  await pop.locator('[data-layer="1"]').click();
+  await expect(pop.locator('[data-adj-num="exposure"]')).toHaveValue("30");
+  // removing the second layer leaves the first
+  await pop.getByRole("button", { name: "Remove this layer" }).click();
+  expect((await adjust())!["next"]).toBeUndefined();
+  expect((await adjust())!["red"]).toBe(100);
+  // reset takes everything off, one undo brings it back
+  await pop.getByRole("button", { name: "Reset", exact: true }).click();
+  expect(await adjust()).toBeUndefined();
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(...at);
+  await p.keyboard.press("Control+z");
+  expect((await adjust())!["red"]).toBe(100);
   expect(app.consoleErrors).toEqual([]);
 });

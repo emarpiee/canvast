@@ -5,7 +5,8 @@
  * vibrance, sharpen, grain; blur is a CSS blur after it. The filters live in one hidden SVG in the page and are made as they are needed.
  */
 import type { Adjust } from "../doc/adjust";
-import { adjustKey, isNeutral } from "../doc/adjust";
+import { adjustKey, curveFn, isNeutral, layersOf } from "../doc/adjust";
+import type { CurvePoints, Levels } from "../doc/adjust";
 import { stopsAt } from "../doc/paint";
 
 const NS = "http://www.w3.org/2000/svg";
@@ -25,15 +26,35 @@ function toneTable(shadows: number, highlights: number): string {
   return out.join(" ");
 }
 
-function build(a: Adjust, id: string): string {
+/** The 33 samples of levels then curves for one channel, for a transfer table (null: nothing to do). */
+function channelTable(levels: Array<Levels | undefined>, curves: Array<CurvePoints | undefined>): string | null {
+  const ls = levels.filter((l) => l && ((l.black ?? 0) || (l.white ?? 255) !== 255 || (l.gamma ?? 1) !== 1));
+  const cs = curves.filter((c) => c && c.some(([x, y]) => x !== y)).map((c) => curveFn(c!));
+  if (!ls.length && !cs.length) return null;
+  return Array.from({ length: 33 }, (_, i) => {
+    let v = i / 32;
+    for (const l of ls) v = Math.max(0, Math.min(1, (v - (l!.black ?? 0) / 255) / ((l!.white ?? 255) / 255 - (l!.black ?? 0) / 255))) ** (1 / (l!.gamma ?? 1));
+    for (const c of cs) v = c(v * 255) / 255;
+    return n(v);
+  }).join(" ");
+}
+
+function build(top: Adjust, id: string): string {
   const f: string[] = [];
+  layersOf(top).forEach((a, layer) => layerPrimitives(a, `${id}-${layer}`, f));
+  return `<filter id="${id}" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">${f.join("")}</filter>`;
+}
+
+/** The filter primitives of one layer of a stack (the blur of a layer is a CSS blur, taken from the first layer only). */
+function layerPrimitives(a: Adjust, id: string, f: string[]): void {
   const e = (a.exposure ?? 0) / 100, c = (a.contrast ?? 0) / 100, t = (a.temperature ?? 0) / 100, ti = (a.tint ?? 0) / 100;
   const sh = (a.shadows ?? 0) / 100, hi = (a.highlights ?? 0) / 100;
   const transfer = (attrs: (ch: string) => string): string => ["R", "G", "B"].map((ch) => `<feFunc${ch} ${attrs(ch)}/>`).join("");
   if (e) f.push(`<feComponentTransfer>${transfer(() => `type="linear" slope="${n(2 ** (e * 1.5))}"`)}</feComponentTransfer>`);
   if (sh || hi) f.push(`<feComponentTransfer>${transfer(() => `type="table" tableValues="${toneTable(sh, hi)}"`)}</feComponentTransfer>`);
-  if (t || ti) {
-    const r = 1 + 0.25 * t + 0.06 * ti, g = 1 - 0.18 * ti, b = 1 - 0.25 * t + 0.06 * ti;
+  if (t || ti || a.red || a.green || a.blue) {
+    const gain = (v: number | undefined): number => 2 ** ((v ?? 0) / 100);
+    const r = (1 + 0.25 * t + 0.06 * ti) * gain(a.red), g = (1 - 0.18 * ti) * gain(a.green), b = (1 - 0.25 * t + 0.06 * ti) * gain(a.blue);
     f.push(`<feColorMatrix type="matrix" values="${n(r)} 0 0 0 0  0 ${n(g)} 0 0 0  0 0 ${n(b)} 0 0  0 0 0 1 0"/>`);
   }
   if (c) f.push(`<feComponentTransfer>${transfer(() => `type="linear" slope="${n(1 + c)}" intercept="${n(0.5 - 0.5 * (1 + c))}"`)}</feComponentTransfer>`);
@@ -63,7 +84,8 @@ function build(a: Adjust, id: string): string {
         `<feComposite in="SourceGraphic" in2="g-${id}" operator="arithmetic" k1="0" k2="1" k3="${n(amt)}" k4="${n(-amt / 2)}"/>`,
     );
   }
-  return `<filter id="${id}" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">${f.join("")}</filter>`;
+  const tabs = (["r", "g", "b"] as const).map((ch) => channelTable([a.levels?.master, a.levels?.[ch]], [a.curves?.master, a.curves?.[ch]]));
+  if (tabs.some(Boolean)) f.push(`<feComponentTransfer>${(["R", "G", "B"] as const).map((ch, k) => (tabs[k] ? `<feFunc${ch} type="table" tableValues="${tabs[k]}"/>` : "")).join("")}</feComponentTransfer>`);
 }
 
 /** The CSS `filter` for these adjustments: "" when there are none. */
@@ -71,7 +93,7 @@ export function playingFilter(a: Adjust | undefined): string {
   if (isNeutral(a) || !a) return "";
   const key = adjustKey(a);
   let id = made.get(key);
-  const needsSvg = !!(a.exposure || a.contrast || a.highlights || a.shadows || a.temperature || a.tint || a.saturation || a.vibrance || a.sharpen || a.grain || a.map);
+  const needsSvg = layersOf(a).some((l) => !!(l.exposure || l.contrast || l.highlights || l.shadows || l.temperature || l.tint || l.saturation || l.vibrance || l.red || l.green || l.blue || l.sharpen || l.grain || l.map || l.levels || l.curves));
   if (needsSvg && !id) {
     if (!host) {
       const svg = document.createElementNS(NS, "svg");
