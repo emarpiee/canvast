@@ -1512,12 +1512,8 @@ export function sheetSelection(doc: DocumentStore, editor: EditorState): void {
   const roots = rootsOf(picked);
   if (!roots.length) return;
   const f0 = roots[0]!.frame ?? doc.space.world;
-  if (!roots.every((o) => (o.frame ?? doc.space.world) === f0)) {
-    editor.message = "Putting objects on a sheet needs objects that are in one space.";
-    editor.changed();
-    return;
-  }
-  const b = unionBounds(roots)!;
+  // (deep in a zoom, near objects can be filed in different frames: the box is taken in the first one's, and they stay where they are filed)
+  const b = unionBounds(roots.map((o) => expressObjectIn(o, f0)))!;
   const unit = roots[0]!.unit;
   const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
   const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
@@ -1797,11 +1793,11 @@ export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed
     return;
   }
   const f0 = roots[0]!.frame ?? doc.space.world;
-  const b = unionBounds(roots)!;
+  const b = unionBounds(roots.map((o) => expressObjectIn(o, f0)))!;
   const unit = roots[0]!.unit;
   const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
   const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
-  if (!(w > 0 && h > 0 && Number.isFinite(w + h)) || !roots.every((o) => (o.frame ?? doc.space.world) === f0)) {
+  if (!(w > 0 && h > 0 && Number.isFinite(w + h))) {
     editor.message = "Those things have no common size to paint a mask on.";
     editor.changed();
     return;
@@ -1863,13 +1859,7 @@ export function makeClippingMask(doc: DocumentStore, editor: EditorState): void 
     editor.changed();
     return;
   }
-  const f0 = maskShape.frame ?? doc.space.world;
   const content = roots.filter((o) => o !== maskShape);
-  if (!content.every((o) => (o.frame ?? doc.space.world) === f0)) {
-    editor.message = "A clipping mask needs objects that are in one space.";
-    editor.changed();
-    return;
-  }
   const all = doc.ordered();
   const lowest = Math.min(...content.map((o) => o.z));
   const below = [...all].filter((o) => o.z < lowest && o.id !== maskShape.id).pop();
@@ -1976,7 +1966,7 @@ export function fitSheet(doc: DocumentStore, editor: EditorState): void {
   const next: CanvasObject[] = [];
   for (const s of selected(doc, editor).filter(isContainer)) {
     if (s.rot || s.radius !== undefined) continue;
-    const kids = [...doc.all()].filter((k) => k.parent === s.id && !k.hidden && (k.frame ?? doc.space.world) === (s.frame ?? doc.space.world));
+    const kids = [...doc.all()].filter((k) => k.parent === s.id && !k.hidden).map((k) => expressObjectIn(k, s.frame ?? doc.space.world));
     const b = kids.length ? unionBounds(kids) : null;
     if (!b) continue;
     const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -s.unit));
@@ -2230,7 +2220,7 @@ function pickedOnSheet(doc: DocumentStore, editor: EditorState): { o: CanvasObje
   if (sel.length !== 1) return null;
   const o = sel[0]!;
   const sheet = o.parent !== undefined ? doc.get(o.parent) : undefined;
-  return sheet && isContainer(sheet) && !o.locked && (o.frame ?? doc.space.world) === (sheet.frame ?? doc.space.world) ? { o, sheet } : null;
+  return sheet && isContainer(sheet) && !o.locked ? { o, sheet } : null;
 }
 
 /**
@@ -2240,7 +2230,7 @@ function pickedOnSheet(doc: DocumentStore, editor: EditorState): { o: CanvasObje
 export function boxOnSheet(doc: DocumentStore, editor: EditorState): { x: number; y: number; w: number; h: number; resizable: boolean } | null {
   const t = pickedOnSheet(doc, editor);
   if (!t) return null;
-  const b = worldBounds(t.o), sb = worldBounds(t.sheet);
+  const b = worldBounds(expressObjectIn(t.o, t.sheet.frame ?? doc.space.world)), sb = worldBounds(t.sheet); // (the object may be filed in another frame than its sheet)
   const x = D.toNumber(D.sub(b.min.x, sb.min.x)), y = D.toNumber(D.sub(b.min.y, sb.min.y));
   const w = D.toNumber(D.sub(b.max.x, b.min.x)), h = D.toNumber(D.sub(b.max.y, b.min.y));
   return Number.isFinite(x + y + w + h) ? { x, y, w, h, resizable: !t.o.rot && (t.o.kind === "path" || t.o.kind === "image") } : null;

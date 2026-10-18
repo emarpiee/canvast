@@ -27,3 +27,7 @@ The Storage tab of Settings has the backup: the last one (full or incremental), 
 ## Checked
 
 Unit: `tests/unit/ase-aco.test.ts`. End to end (both browsers): the incremental chain, the alone-and-wrong-chain refusals and the styles in `tests/e2e/archive.spec.ts`; the Settings > Storage tab there; palette files in `styles.spec.ts`; presets, scale contents and the measures in `sheets.spec.ts`.
+
+## Sheets and frames (v0.19.1)
+
+Deep in a zoom, near objects can be filed in different frames (the frame suits the size and position of each object). A sheet and what is on it are therefore not always in one frame, and every sheet function must not assume it. The rule: **express in the sheet's frame (`expressObjectIn`, exact) to measure or scale, leave each object filed where it is, and home it again if it was moved** (`planSheetScale`, `boxOnSheet`, `fitSheet`, putting objects on a sheet, brush masks). Before this, a resize left such objects behind, the On sheet fields were missing, and "needs objects that are in one space" refused. The fields are in px of the home zoom, shown in six significant digits (a sheet 0.0035 px wide is not "0"), and dragging a name moves a value by one screen pixel's worth (`data-scrub-step`), so a drag never sends an object tens of thousands of screen pixels away.

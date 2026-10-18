@@ -279,6 +279,42 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   await key(app, "Control+z");
   await app.frame();
   expect(await width()).toBeCloseTo(w0, 1);
+  // the fields: sizes and places deep in a zoom are px of the home zoom (here 1/65536 of a screen px), shown in full digits and not as 0,
+  // and dragging a name moves things by screen px, not by whole px (which would send the object off by 65,536 screen px)
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const sheet = (await objs(app)).at(-2)!;
+  await expect(p.locator("[data-sheet-w]")).not.toHaveValue("0");
+  expect(Number(await p.locator("[data-sheet-w]").inputValue()) * 65536).toBeCloseTo(300, -1);
+  await click(app, 450, 350);
+  const x = p.locator("[data-on-x]");
+  expect(Number(await x.inputValue()) * 65536, "the place from the corner, in screen px").toBeCloseTo((await box(rect.id)).minX - (await box(sheet.id)).minX, -1);
+  const x0 = (await box(rect.id)).minX;
+  const label = (await x.locator("xpath=..").boundingBox())!;
+  await p.mouse.move(label.x + 4, label.y + label.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(label.x + 44, label.y + label.height / 2, { steps: 8 });
+  await p.mouse.up();
+  await app.frame();
+  expect((await box(rect.id)).minX - x0, "40 dragged px move it about 40 screen px").toBeGreaterThan(30);
+  expect((await box(rect.id)).minX - x0).toBeLessThan(50);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("objects filed in different frames (one drawn deep in a zoom, one at home) can be put on one sheet, and the sheet can be fitted to them", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [400, 300], [500, 380]); // at home
+  await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "3p-5", cy: "1p-5", zi: 20, zf: 0, pz: 20 }));
+  await app.frame();
+  await drag(app, [400, 300], [500, 380]); // deep: another size, another frame
+  await key(app, "v");
+  await key(app, "Control+a");
+  await key(app, "Control+Alt+g");
+  await app.frame();
+  const all = await objs(app);
+  const sheet = all.find((o) => o.container);
+  expect(sheet, "a sheet was made, not a message about spaces").toBeDefined();
+  expect(all.filter((o) => o.parent === sheet!.id)).toHaveLength(2);
   expect(app.consoleErrors).toEqual([]);
 });
 

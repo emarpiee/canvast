@@ -68,6 +68,8 @@ export interface ToolbarActions {
   /** Where the one picked object on a sheet is and how big, in px from the sheet's corner (null: none is), and moving or resizing it. */
   boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
   moveOnSheet(x: number, y: number, final?: boolean): void;
+  /** What one screen pixel is in px (the unit of the sheet fields) at this zoom: the step of dragging their names. */
+  screenPx(): number;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
@@ -193,6 +195,9 @@ const SHEET_PRESETS: ReadonlyArray<{ group: string; items: ReadonlyArray<{ name:
 
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
+
+/** A length for a field: six significant digits, so a size deep in a zoom (0.0035 px) is not shown as 0. */
+const shown6 = (v: number): string => String(Number(v.toPrecision(6)));
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
@@ -892,18 +897,21 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-on-sheet]")!.hidden = !on;
     if (on) {
       root.querySelector<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
+      const stepPx = String(actions.screenPx());
+      for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = stepPx;
       for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
         const el = onSheet(f);
-        if (document.activeElement !== el) el.value = String(Math.round(v * 100) / 100);
+        if (document.activeElement !== el) el.value = shown6(v);
       }
     }
     const sz = pick && still ? actions.sheetSize() : null;
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = !sz;
     if (sz) {
       const u = Number(root.querySelector<HTMLSelectElement>("[data-sheet-unit]")!.value) || 1;
-      const round = (v: number): string => String(Math.round((v / u) * 1000) / 1000);
+      const round = (v: number): string => shown6(v / u);
       for (const [f, v] of [["[data-sheet-w]", sz.w], ["[data-sheet-h]", sz.h]] as const) {
         const el = root.querySelector<HTMLInputElement>(f)!;
+        el.dataset["scrubStep"] = String(actions.screenPx() / u);
         if (document.activeElement !== el) el.value = round(v);
       }
     }

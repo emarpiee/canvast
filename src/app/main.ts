@@ -795,6 +795,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     resizeSheet: (w, h, final) => resizeSheet(doc, editor, w, h, final),
     boxOnSheet: () => boxOnSheet(doc, editor),
     moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
+    screenPx: () => { const d = depthOf(view.frameCamera); return 2 ** -(Number(d.levels) + d.frac); },
     resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
     croppable: () => croppablePicture(doc, editor) !== null,
     cropped: () => isCropped(doc, editor),

@@ -50,14 +50,17 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
     const min = i.min === "" ? -Infinity : Number(i.min);
     const max = i.max === "" ? Infinity : Number(i.max);
     let st = step(i);
+    const world = Number(i.dataset["scrubStep"]); // (a value in world units: one dragged pixel moves it by what a screen pixel is, at any depth)
+    const perScreenPx = !st && world > 0 && Number.isFinite(world);
+    if (perScreenPx) st = world;
     const span = max - min;
     // a short range (a count) moves a step every 8 px, a long one every 2 px; "any" is a hundredth of the range, or 1
     if (!st) st = Number.isFinite(span) ? span / 100 : 1;
-    const perPx = span / st <= 60 ? 1 / 8 : 1 / 2;
+    const perPx = perScreenPx ? 1 : span / st <= 60 ? 1 / 8 : 1 / 2;
     let v = drag.start + Math.round(dx * perPx * (e.shiftKey ? 10 : 1)) * st;
     v = Math.min(max, Math.max(min, v));
-    const decimals = (String(st).split(".")[1] ?? "").length;
-    const text = v.toFixed(Math.min(decimals + (step(i) ? 0 : 2), 6));
+    const decimals = perScreenPx ? Math.max(0, Math.ceil(-Math.log10(st)) + 2) : (String(st).split(".")[1] ?? "").length;
+    const text = v.toFixed(Math.min(decimals + (step(i) ? 0 : perScreenPx ? 0 : 2), perScreenPx ? 20 : 6));
     if (text === i.value) return;
     i.value = String(Number(text));
     i.dispatchEvent(new Event("input", { bubbles: true }));
