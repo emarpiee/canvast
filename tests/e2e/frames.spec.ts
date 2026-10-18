@@ -1950,3 +1950,33 @@ test("Ctrl held over the canvas shows the outline of what is under the pointer a
   expect((await sel()).length, "the very thing").toBe(1);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Ctrl+hover and Ctrl+click find a shape that has no fill and no outline (reveal by shape, not by paint)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await p.click('[data-paint="fill"]');
+  await p.locator(".colour-pop .colour-none").click(); // no fill for the next shape
+  await p.keyboard.press("Escape");
+  await p.click('[data-paint="stroke"]');
+  await p.locator(".colour-pop .colour-none").click(); // and no outline
+  await p.keyboard.press("Escape");
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 500 }, 8);
+  const ghost = ((await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ id: string; fill: unknown; stroke: unknown }>).at(-1)!;
+  expect([ghost.fill, ghost.stroke]).toEqual([null, null]);
+  await p.keyboard.press("v");
+  await p.mouse.click(120, 650);
+  await app.frame();
+  const edge = await p.evaluate(() => window.__canvastDebug.pixelAt(550, 300)); // its top edge
+  await p.mouse.move(550, 400);
+  await p.keyboard.down("Control");
+  await p.mouse.move(551, 401);
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.pixelAt(550, 300)), "its outline is drawn although nothing of it is painted").not.toEqual(edge);
+  await p.keyboard.up("Control");
+  await p.keyboard.down("Control");
+  await p.mouse.click(550, 400);
+  await p.keyboard.up("Control");
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "Ctrl+click picks it").toEqual([ghost.id]);
+  expect(app.consoleErrors).toEqual([]);
+});

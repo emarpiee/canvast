@@ -30,7 +30,7 @@ import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
-import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
+import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, pickAllByShape, sweepHits } from "../render/hit-test";
 import { isContainer, isMaskSheet } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
@@ -1131,8 +1131,9 @@ export function attachTools(
     // is picked by a click, as there is nothing else to pick there.
     if (target && isContainer(target) && !isMaskSheet(target) && hasThingsOn(target)) target = null;
     // Ctrl (or Cmd) and a click picks the very thing under the pointer, however deep it is in a group or a mask, ground or not (what the outlines show).
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && hits[0]) {
-      target = hits[0].obj;
+    const deep = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey ? pickAllByShape(unlocked(vis), s.x, s.y)[0] : undefined;
+    if (deep) {
+      target = deep.obj;
       editor.entered = [...(target.groups ?? [])];
       editor.openMask = maskAbove(target)?.id ?? null;
     }

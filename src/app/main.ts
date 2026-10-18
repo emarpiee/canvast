@@ -29,7 +29,7 @@ import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
-import { pickAll } from "../render/hit-test";
+import { pickAll, pickAllByShape } from "../render/hit-test";
 import { mountContextMenu } from "../ui/context-menu";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -458,7 +458,7 @@ async function start(): Promise<void> {
     if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
     if (editor.revealAt && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp)).filter((po) => !po.obj.hidden && !po.obj.locked);
-      drawReveal(ctx, pickAll(all, editor.revealAt.x, editor.revealAt.y), editor.revealAt, theme, (po) => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item"));
+      drawReveal(ctx, pickAllByShape(all, editor.revealAt.x, editor.revealAt.y), editor.revealAt, theme, (po) => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item"));
     }
     const t3 = performance.now();
     const b: FrameBreakdown = {

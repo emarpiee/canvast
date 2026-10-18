@@ -109,6 +109,24 @@ export function sweepHits(po: ProjectedObject, x0: number, y0: number, x1: numbe
   return false;
 }
 
+/**
+ * Every object whose shape lies under the point, topmost first, whatever its paint: a path counts by its inside (even with no fill) or by
+ * its edge (even with no outline), so a sheet or a shape with nothing painted is found too. Used to reveal what is under the pointer.
+ */
+export function pickAllByShape(ordered: readonly ProjectedObject[], x: number, y: number, tol = HIT_TOLERANCE_PX): ProjectedObject[] {
+  const hits: ProjectedObject[] = [];
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const po = ordered[i]!;
+    if (po.obj.kind === "path" && !po.cover && !po.rotated && po.path) {
+      const b = po.box;
+      if (x < b.minX - tol || x > b.maxX + tol || y < b.minY - tol || y > b.maxY + tol) continue;
+      if (po.clip && !po.clip.every((c) => insideBody(c, x, y))) continue;
+      if (insideFill(po.fillPath ?? po.path, x, y, !!po.obj.evenodd) || distanceToOutline(po.path, x, y) <= (po.obj.stroke !== null ? po.radius : 0) + tol) hits.push(po);
+    } else if (hitsObject(po, x, y)) hits.push(po);
+  }
+  return hits;
+}
+
 /** All objects under the point, topmost first. `ordered` is in paint order. */
 export function pickAll(ordered: readonly ProjectedObject[], x: number, y: number): ProjectedObject[] {
   const hits: ProjectedObject[] = [];
