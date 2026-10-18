@@ -208,6 +208,8 @@ export class EditorState {
   marquee: { x0: number; y0: number; x1: number; y1: number } | null = null;
   /** A short message for the user; the notice stack (ui/notices.ts) takes it and shows it. */
   message = "";
+  /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
+  revealAt: { x: number; y: number } | null = null;
   /** A clipping mask (a sheet) that has been gone into by a double click: what is on it is picked one by one, as in an entered group. */
   openMask: string | null = null;
   /** Where the pointer is on the canvas (CSS px from its corner), or null when it is elsewhere: pasted things land there. Not a change: nothing redraws for it. */

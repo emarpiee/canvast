@@ -120,6 +120,8 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "Ctrl+] and Ctrl+[", does: "Bring to front, send to back" },
       { keys: "Ctrl+E", does: "Flatten: the selected text becomes paths (its letters' own outlines), a boolean group becomes one path" },
       { keys: "Alt+drag the selection", does: "Drag a copy; the original stays" },
+      { keys: "Hold Ctrl and move over the canvas", does: "Show the outline of everything under the pointer (the top one strong, the ones below dashed), with their names" },
+      { keys: "Ctrl+click", does: "Pick the very thing under the pointer, deep in a group, a mask or a sheet" },
       { keys: "Drag a handle", does: "Resize (a corner or a side of a picture is free; strokes and text keep their proportions)" },
       { keys: "Shift+drag a handle", does: "Resize keeping the proportions" },
       { keys: "Alt+drag a handle", does: "Resize about the middle" },

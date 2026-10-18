@@ -1916,3 +1916,37 @@ test("Layers: a group's guide line runs under its chevron and stops at its last 
   expect(lb.y + lb.height).toBeLessThan(ib.y + ib.height - 4);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Ctrl held over the canvas shows the outline of what is under the pointer and of what lies below it, and Ctrl+click picks the very thing, deep in a group (reveal)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 500 }, 8); // the big ellipse, below
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 450, y: 350 }, { x: 550, y: 430 }, 8); // a rectangle on it
+  await p.keyboard.press("v");
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Control+g"); // grouped: a click picks the group
+  await p.mouse.click(120, 650);
+  await app.frame();
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection());
+  const baseline = await p.evaluate(() => window.__canvastDebug.pixelAt(400 + 150, 300)); // on the ellipse's top edge
+  // Ctrl and move over the rectangle: both outlines appear (the ellipse's edge is drawn although it is not under the pointer's own shape)
+  await p.mouse.move(500, 390);
+  await p.keyboard.down("Control");
+  await p.mouse.move(501, 391);
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.pixelAt(400 + 150, 300)), "the outline of what lies below is drawn").not.toEqual(baseline);
+  await p.keyboard.up("Control");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.pixelAt(400 + 150, 300)), "and gone with Ctrl").toEqual(baseline);
+  // a plain click picks the whole group; Ctrl+click picks the rectangle itself
+  await p.mouse.click(500, 390);
+  expect((await sel()).length).toBe(2);
+  await p.mouse.click(120, 650);
+  await p.keyboard.down("Control");
+  await p.mouse.click(500, 390);
+  await p.keyboard.up("Control");
+  expect((await sel()).length, "the very thing").toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});
