@@ -233,6 +233,16 @@ export class EditorState {
     for (const fn of this.listeners) fn();
   }
 
+  private readonly redrawListeners = new Set<() => void>();
+  /** Something only the canvas shows changed (the reveal): the canvas redraws; panels and bars, which a `changed` would rebuild, are left as they are. */
+  redraw(): void {
+    for (const fn of this.redrawListeners) fn();
+  }
+  subscribeRedraw(fn: () => void): () => void {
+    this.redrawListeners.add(fn);
+    return () => this.redrawListeners.delete(fn);
+  }
+
   /** Returns true (and tells the user) when an edit must not happen. */
   blockEdit(): boolean {
     if (!this.readOnly) return false;

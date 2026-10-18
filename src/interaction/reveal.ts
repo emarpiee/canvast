@@ -51,7 +51,7 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     if (!next && !was) return;
     if (next && was && Math.abs(next.x - was.x) < 1 && Math.abs(next.y - was.y) < 1) return;
     editor.revealAt = next;
-    editor.changed();
+    editor.redraw(); // (the canvas only: a Layers panel being dragged in must not be rebuilt under the pointer)
   };
   return {
     /** The pointer moved (null: it left the canvas); `ctrlHeld` is the pointer event's. */
@@ -74,5 +74,5 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
 export function revealRow(editor: EditorState, ids: ReadonlySet<ObjectId> | null): void {
   if (editor.revealIds === ids || (editor.revealIds && ids && editor.revealIds.size === ids.size && [...ids].every((i) => editor.revealIds!.has(i)))) return;
   editor.revealIds = ids;
-  editor.changed();
+  editor.redraw();
 }

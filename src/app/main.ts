@@ -554,6 +554,7 @@ async function start(): Promise<void> {
     canvas.dataset["tool"] = editor.tool;
     invalidate();
   });
+  editor.subscribeRedraw(invalidate);
   canvas.dataset["tool"] = editor.tool;
 
   const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
