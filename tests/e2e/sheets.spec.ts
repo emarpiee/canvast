@@ -604,6 +604,9 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   // the pages follow the order shown: the first sheet moved later goes second
   await dlg.locator('[data-mini="0"] [data-move="1"]').click();
   await expect(dlg.locator('[data-mini="1"] .ex-page')).toHaveText("2");
+  // and a picture can be dragged to where it should go: back to the front
+  await dlg.locator('[data-mini="1"]').dragTo(dlg.locator('[data-mini="0"]'));
+  await dlg.locator('[data-mini="0"] [data-move="1"]').click(); // (one more later again, so the PDF below is the other way round)
   const [pdf] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
   const text = fs.readFileSync(await pdf.path()).toString("latin1");

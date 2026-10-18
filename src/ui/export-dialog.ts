@@ -148,7 +148,7 @@ export function openExportDialog(deps: ExportDeps): void {
       thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
       return;
     }
-    box.innerHTML = ts.slice(0, 12).map((x, i) => `<figure class="ex-mini" data-mini="${i}"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    box.innerHTML = ts.slice(0, 12).map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
     thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   };
   drawMinis();
@@ -208,6 +208,36 @@ export function openExportDialog(deps: ExportDeps): void {
     void refreshThumb();
   });
 
+  // Drag a picture to where it should go (the others move over): the same order as the buttons set.
+  const moveTo = (from: number, to: number): void => {
+    if (from === to || from < 0 || to < 0 || from >= ts.length || to >= ts.length) return;
+    const next = [...ts];
+    const [one] = next.splice(from, 1);
+    next.splice(to, 0, one!);
+    ts = next;
+    drawMinis();
+    refresh();
+    void refreshThumb();
+  };
+  let dragging = -1;
+  const minis = dlg.querySelector<HTMLElement>("[data-ex-minis]");
+  minis?.addEventListener("dragstart", (e) => {
+    dragging = Number((e.target as HTMLElement).closest<HTMLElement>("[data-mini]")?.dataset["mini"] ?? -1);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(dragging));
+    }
+  });
+  minis?.addEventListener("dragover", (e) => {
+    if (dragging >= 0 && (e.target as HTMLElement).closest("[data-mini]")) e.preventDefault();
+  });
+  minis?.addEventListener("drop", (e) => {
+    const to = Number((e.target as HTMLElement).closest<HTMLElement>("[data-mini]")?.dataset["mini"] ?? -1);
+    e.preventDefault();
+    if (dragging >= 0 && to >= 0) moveTo(dragging, to);
+    dragging = -1;
+  });
+  minis?.addEventListener("dragend", () => (dragging = -1));
   dlg.querySelector("[data-ex-minis]")?.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-move]");
     const at = Number(b?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
