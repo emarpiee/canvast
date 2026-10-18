@@ -171,6 +171,14 @@ describe("path objects far below the camera (render/coarse.ts)", () => {
   });
 });
 
+describe("a sheet's Scale contents (ADR 0133)", () => {
+  it("is stored with the sheet, survives a save and load, and only `true` is accepted", () => {
+    const sheet = path(rectSubs(0, 0, 10, 10), { container: { clip: true, scale: true } });
+    expect((deserializeObject(serializeObject(sheet)) as PathObject).container).toEqual({ clip: true, scale: true });
+    expect(() => validateObject({ ...sheet, container: { clip: true, scale: false as unknown as true } })).toThrow(InvalidObjectError);
+  });
+});
+
 // keep the unused helpers honest
 void smooth;
 void ({} as CanvasObject);

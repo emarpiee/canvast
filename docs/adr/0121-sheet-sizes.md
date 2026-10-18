@@ -13,3 +13,9 @@ A picked sheet shows its width and height in a unit the person chooses: px, in (
 
 ## Not done
 - Presets (A4, Letter, screens), a "scale contents" command (pin every child to Scale), and a sheet-relative measure for what is on it.
+
+## Fields in screen px, Scale contents per sheet (v0.19.1)
+
+The fields of a sheet and of an object on it (Size, X, Y, W, H) are **px as drawn at this zoom** (screen px, times the unit chosen: in, mm, cm), whatever the zoom, so a sheet that fills 160 px of the screen says 160 and not 0.0035. The stored sizes are unchanged (px of the home zoom, exact); the conversion is a power of two (`screenPerPx` in `main.ts`), applied at the edge of the toolbar. So the same sheet reads differently at another zoom, and a preset such as A4 (794 × 1123) gives the sheet that size on the screen at the present zoom; at Home zoom nothing differs. Dragging a field's name moves it by a screen pixel for each dragged pixel.
+
+Scale contents is a property of the sheet (`container.scale`, ADR 0133 and 0108), not a switch of the editor: it is kept with the sheet (saved, copied, undone: turning it on or off is one undo step), the button shows the state of the picked sheet, and a resize by the Size field or by the handles reads it from the sheet being resized.

@@ -243,6 +243,7 @@ test("a sheet takes a paper or screen size from the presets, and Scale contents 
   const sheetW = Number(await w.inputValue());
   await p.locator("[data-sheet-scale]").click();
   await expect(p.locator("[data-sheet-scale]")).toHaveAttribute("aria-pressed", "true");
+  expect((await objs(app)).find((o) => o.container)!.container, "kept with the sheet").toEqual({ clip: true, scale: true });
   await w.fill(String(sheetW * 2));
   await w.blur();
   await app.frame();
@@ -254,6 +255,12 @@ test("a sheet takes a paper or screen size from the presets, and Scale contents 
   await drag(app, [700, 400], [800, 400]);
   await app.frame();
   expect(Math.abs((await width()) - (w0 * 4) / 3)).toBeLessThan(3);
+  // it belongs to this sheet: another sheet starts without it, and the button shows the state of the sheet that is picked
+  await key(app, "c");
+  await drag(app, [900, 100], [1000, 160]);
+  await key(app, "v");
+  await expect(p.locator("[data-sheet-scale]")).toHaveAttribute("aria-pressed", "false");
+  expect((await objs(app)).filter((o) => o.container).map((o) => o.container!.scale)).toEqual([true, undefined]);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -279,15 +286,14 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   await key(app, "Control+z");
   await app.frame();
   expect(await width()).toBeCloseTo(w0, 1);
-  // the fields: sizes and places deep in a zoom are px of the home zoom (here 1/65536 of a screen px), shown in full digits and not as 0,
-  // and dragging a name moves things by screen px, not by whole px (which would send the object off by 65,536 screen px)
+  // the fields are in px as drawn at this zoom, so what they say is what is on the screen, whatever the zoom;
+  // and dragging a name moves things by a screen px for each dragged px
   const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
   const sheet = (await objs(app)).at(-2)!;
-  await expect(p.locator("[data-sheet-w]")).not.toHaveValue("0");
-  expect(Number(await p.locator("[data-sheet-w]").inputValue()) * 65536).toBeCloseTo(300, -1);
+  expect(Number(await p.locator("[data-sheet-w]").inputValue())).toBeCloseTo(300, 0);
   await click(app, 450, 350);
   const x = p.locator("[data-on-x]");
-  expect(Number(await x.inputValue()) * 65536, "the place from the corner, in screen px").toBeCloseTo((await box(rect.id)).minX - (await box(sheet.id)).minX, -1);
+  expect(Number(await x.inputValue()), "the place from the corner, in screen px").toBeCloseTo((await box(rect.id)).minX - (await box(sheet.id)).minX, -1);
   const x0 = (await box(rect.id)).minX;
   const label = (await x.locator("xpath=..").boundingBox())!;
   await p.mouse.move(label.x + 4, label.y + label.height / 2);

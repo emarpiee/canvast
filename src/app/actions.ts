@@ -1491,7 +1491,7 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
 export function setSheetClip(doc: DocumentStore, editor: EditorState, id: string, clip: boolean): void {
   const f = doc.get(id);
   if (editor.blockEdit() || !isContainer(f) || f.container.clip === clip) return;
-  doc.commit(doc.transaction(clip ? "Clip content" : "Show content outside the sheet", [{ ...f, container: { clip } }]));
+  doc.commit(doc.transaction(clip ? "Clip content" : "Show content outside the sheet", [{ ...f, container: { ...f.container, clip } }]));
   editor.changed();
 }
 
@@ -1926,6 +1926,18 @@ const pickedSheet = (doc: DocumentStore, editor: EditorState) => {
   return sheets.length === 1 && !sheets[0]!.rot ? sheets[0]! : null;
 };
 
+/** Whether the one picked sheet scales what is on it when it is resized (ADR 0133). */
+export const sheetScalesContents = (doc: DocumentStore, editor: EditorState): boolean => pickedSheet(doc, editor)?.container.scale === true;
+
+/** Turn Scale contents on or off for the picked sheet (a property of the sheet, so it is kept, copied and undone with it). */
+export function setSheetScale(doc: DocumentStore, editor: EditorState, on: boolean): void {
+  const s = pickedSheet(doc, editor);
+  if (editor.blockEdit() || !s || (s.container.scale === true) === on) return;
+  const { scale: _old, ...rest } = s.container;
+  doc.commit(doc.transaction(on ? "Scale contents with the sheet" : "Keep what is on the sheet as it is", [{ ...s, container: on ? { ...rest, scale: true } : rest }]));
+  editor.changed();
+}
+
 /** Width and height in px of the one picked sheet (ADR 0121), or null. */
 export function sheetSize(doc: DocumentStore, editor: EditorState): { w: number; h: number } | null {
   const s = pickedSheet(doc, editor);
@@ -1953,7 +1965,7 @@ export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, 
     return;
   }
   const group = [s, ...descendantsOf(doc.all(), new Set([s.id])).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o)];
-  const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false, editor.scaleSheetContents);
+  const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
   if (!final) return showReplaced(editor, [...plan.values()]);
   editor.preview = { kind: "none" };
   doc.commit(doc.transaction("Resize sheet", [...plan.values()]));

@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, sheetScalesContents, setSheetScale, resizeSheet, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -727,6 +727,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   const hintLine = { current: null as null | { refresh(): void } };
+  /** How many screen px a px of the home zoom is at this zoom (a power of two, with the fraction of the level). */
+  const screenPerPx = (): number => { const d = depthOf(view.frameCamera); return 2 ** (Number(d.levels) + d.frac); };
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
@@ -791,12 +793,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       else editor.changed();
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
-    sheetSize: () => sheetSize(doc, editor),
-    resizeSheet: (w, h, final) => resizeSheet(doc, editor, w, h, final),
-    boxOnSheet: () => boxOnSheet(doc, editor),
-    moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
-    screenPx: () => { const d = depthOf(view.frameCamera); return 2 ** -(Number(d.levels) + d.frac); },
-    resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
+    // The sheet fields are in px as drawn at this zoom (screen px), whatever the zoom: the stored sizes are in px of the home zoom.
+    sheetSize: () => { const s = sheetSize(doc, editor), k = screenPerPx(); return s && { w: s.w * k, h: s.h * k }; },
+    resizeSheet: (w, h, final) => { const k = screenPerPx(); resizeSheet(doc, editor, w / k, h / k, final); },
+    boxOnSheet: () => { const b = boxOnSheet(doc, editor), k = screenPerPx(); return b && { ...b, x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }; },
+    moveOnSheet: (x, y, final) => { const k = screenPerPx(); moveOnSheet(doc, editor, x / k, y / k, final); },
+    resizeOnSheet: (w, h, final) => { const k = screenPerPx(); resizeOnSheet(doc, editor, w / k, h / k, final); },
+    sheetScale: () => sheetScalesContents(doc, editor),
+    setSheetScale: (on) => setSheetScale(doc, editor, on),
     croppable: () => croppablePicture(doc, editor) !== null,
     cropped: () => isCropped(doc, editor),
     uncrop: () => uncropPicture(doc, editor),

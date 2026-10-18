@@ -53,11 +53,11 @@ export function constrainSpan(kind: HConstraint | VConstraint, L0: number, L1: n
 
 /**
  * The new state of everything in `objs` when their top ones are scaled about `fixed`: the sheets and plain objects among them are scaled,
- * what is on a sheet is moved (and stretched) by its constraint to the sheet's old and new box, level by level (`scaleContents`: all of it
+ * what is on a sheet is moved (and stretched) by its constraint to the sheet's old and new box, level by level (a sheet with `container.scale`: all of it
  * scales with the sheet, whatever its pins say). An object homed in another frame than its sheet (deep in a zoom, near objects can be filed in
  * different frames) is expressed in the sheet's frame, scaled there, and homed again.
  */
-export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean, scaleContents = false): Map<ObjectId, CanvasObject> {
+export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean): Map<ObjectId, CanvasObject> {
   const byId = new Map(objs.map((o) => [o.id, o]));
   const out = new Map<ObjectId, CanvasObject>();
   const kids = new Map<ObjectId, CanvasObject[]>();
@@ -91,7 +91,7 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
       const cb = worldBounds(c);
       const x0 = rel(cb.min.x, ob.min.x), x1 = rel(cb.max.x, ob.min.x);
       const y0 = rel(cb.min.y, ob.min.y), y1 = rel(cb.max.y, ob.min.y);
-      const k = scaleContents ? ({ h: "scale", v: "scale" } as const) : constraintOf(c); // (scale contents: whatever the pins say, everything grows with the sheet)
+      const k = old.container.scale === true ? ({ h: "scale", v: "scale" } as const) : constraintOf(c); // (scale contents: whatever the pins say, everything grows with the sheet)
       let [nx0, nx1] = constrainSpan(k.h, Lx0, Lx1, x0, x1);
       let [ny0, ny1] = constrainSpan(k.v, Ly0, Ly1, y0, y1);
       const sx = x1 > x0 ? (nx1 - nx0) / (x1 - x0) : 1;

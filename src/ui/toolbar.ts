@@ -68,8 +68,9 @@ export interface ToolbarActions {
   /** Where the one picked object on a sheet is and how big, in px from the sheet's corner (null: none is), and moving or resizing it. */
   boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
   moveOnSheet(x: number, y: number, final?: boolean): void;
-  /** What one screen pixel is in px (the unit of the sheet fields) at this zoom: the step of dragging their names. */
-  screenPx(): number;
+  /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
+  sheetScale(): boolean;
+  setSheetScale(on: boolean): void;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
@@ -256,14 +257,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-kind="picture" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
-        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in px from the sheet's top-left corner">On sheet
+        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in px as drawn at this zoom, from the sheet's top-left corner">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (px)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (px)"></label>
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (px)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (px)"></label></span></span>
-        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="Size of the sheet; only the sheet changes, what is on it follows its pin"><label>Size
+        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="Size of the sheet, as drawn at this zoom (px of the screen); only the sheet changes, what is on it follows its pin"><label>Size
           <input type="number" data-sheet-w min="0" step="any" inputmode="decimal" aria-label="Sheet width"></label> × <label><input type="number" data-sheet-h min="0" step="any" inputmode="decimal" aria-label="Sheet height"></label>
           <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select>
           <select data-sheet-preset aria-label="Sheet size preset" title="A paper or screen size: the sheet takes it (its top-left corner stays)"><option value="">Preset…</option>${SHEET_PRESETS.map((g) => `<optgroup label="${g.group}">${g.items.map((i) => `<option value="${i.w},${i.h}">${i.name} (${i.w} × ${i.h})</option>`).join("")}</optgroup>`).join("")}</select>
-          <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents: when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
+          <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
@@ -550,9 +551,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     sel.value = "";
     if (w && h) actions.resizeSheet(w, h, true);
   });
-  root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", (e) => {
-    editor.scaleSheetContents = !editor.scaleSheetContents;
-    (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(editor.scaleSheetContents));
+  root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
+    actions.setSheetScale(!actions.sheetScale());
   });
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
@@ -897,8 +897,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-on-sheet]")!.hidden = !on;
     if (on) {
       root.querySelector<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
-      const stepPx = String(actions.screenPx());
-      for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = stepPx;
+      for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = "1"; // (a dragged pixel is a pixel of the screen)
       for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
         const el = onSheet(f);
         if (document.activeElement !== el) el.value = shown6(v);
@@ -911,7 +910,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       const round = (v: number): string => shown6(v / u);
       for (const [f, v] of [["[data-sheet-w]", sz.w], ["[data-sheet-h]", sz.h]] as const) {
         const el = root.querySelector<HTMLInputElement>(f)!;
-        el.dataset["scrubStep"] = String(actions.screenPx() / u);
+        el.dataset["scrubStep"] = String(1 / u);
+        root.querySelector<HTMLElement>("[data-sheet-scale]")!.setAttribute("aria-pressed", String(actions.sheetScale()));
         if (document.activeElement !== el) el.value = round(v);
       }
     }

@@ -164,7 +164,6 @@ export class EditorState {
   /** Resizing keeps the corner radius its size (off: the radius scales with the shape, so it keeps its look). */
   lockRadius = false;
   /** Resizing a sheet scales what is on it too (all of it grows with the sheet), whatever its pins say. */
-  scaleSheetContents = false;
   /** Which paint's gradient the canvas handles belong to when both the fill and the outline have one (the last chip opened). */
   /** The shape whose corner radius dots are opened out to one per corner (a double-click or long press on the main dot); closes when another is picked. */
   /** Shapes lit up on the canvas while the pointer is on a colour that they use (Selection colours). */
