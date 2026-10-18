@@ -90,6 +90,8 @@ export interface HudStatus {
   toggleZen(): void;
   /** Save a screenshot of the canvas to the library (ADR 0080). */
   screenshot(): void;
+  /** Go to a random empty view, far from everything on the canvas (the dice). */
+  randomView(): void;
   subscribeSelection(fn: () => void): void;
   /** Lines of internal state shown under the frame-rate readout (memory, queues, index). */
   diagnostics(): string[];
@@ -122,6 +124,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
+      <button type="button" data-action="random-view" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dices}</button>
       <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Shift+Right)">${ICONS.cornerUpRight}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
@@ -170,6 +173,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "zoom-out") zoomByStep(view, -1);
     else if (action === "fit-selection") status.fit("selection");
     else if (action === "fit-all") status.fit("all");
+    else if (action === "random-view") status.randomView();
     else if (action === "cam-back") status.cameraBack();
     else if (action === "cam-fwd") status.cameraForward();
     else if (action === "home") goHome(view);

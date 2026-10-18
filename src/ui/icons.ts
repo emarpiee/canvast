@@ -28,6 +28,7 @@ import fullscreenSvg from "lucide-static/icons/fullscreen.svg";
 import slidersVerticalSvg from "lucide-static/icons/sliders-vertical.svg";
 import projectorSvg from "lucide-static/icons/projector.svg";
 import cornerUpLeftSvg from "lucide-static/icons/corner-up-left.svg";
+import dicesSvg from "lucide-static/icons/dices.svg";
 import cornerUpRightSvg from "lucide-static/icons/corner-up-right.svg";
 import copyCheckSvg from "lucide-static/icons/copy-check.svg";
 import scissorsSvg from "lucide-static/icons/scissors.svg";
@@ -449,6 +450,7 @@ export const ICONS = {
   slidersVertical: clean(slidersVerticalSvg),
   projector: clean(projectorSvg),
   cornerUpLeft: clean(cornerUpLeftSvg),
+  dices: clean(dicesSvg),
   cornerUpRight: clean(cornerUpRightSvg),
   copyCheck: clean(copyCheckSvg),
   scissors: clean(scissorsSvg),

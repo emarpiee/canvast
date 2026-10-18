@@ -9,6 +9,7 @@
 - **Bars**: Undo, Redo, Search and Import are at the foot of the tool rail after a separator; the Settings button is the last button of the bottom-right bar on the canvas (it stays at the top right in the Assets and Settings views); the tool rail has the same gap under the Assets bar as the panels have under the top right bar.
 - The dev panel is at most 20 rem wide (it covered the start of drags the tests make).
 - **Docked panels**: each side has its own width, so resizing the left stack no longer resizes the right one (older saved layouts give both sides their saved width). In the tool rail, Undo and Redo are now the last two buttons.
+- **Dice** (bottom bar, between Previous and Next view; also in the command palette): goes to a random place and zoom level with nothing of the canvas within two windows of it (`interaction/random-view.ts`); Previous view comes back.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)
 

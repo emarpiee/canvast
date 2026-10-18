@@ -71,6 +71,7 @@ import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
+import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
@@ -831,6 +832,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
   });
+  // The dice (interaction/random-view.ts): the camera goes to a random place and zoom with nothing of the canvas near.
+  const goRandomView = (): void => {
+    const fc = randomEmptyView(doc.space, viewIsEmpty(index, view.viewport));
+    if (fc) view.flyTo(fc);
+    else {
+      editor.message = "No empty view turned up: the canvas fills every place the dice may choose.";
+      editor.changed();
+    }
+  };
   // Screenshot (ADR 0080): what the canvas shows, without the selection outlines, saved to the library with the name, folder and tags of Settings > Screenshot.
   const takeScreenshot = async (): Promise<void> => {
     if (appView !== "canvas") return;
@@ -974,6 +984,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     hasSelection: () => editor.selection.size > 0,
     toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
     screenshot: () => void takeScreenshot(),
+    randomView: () => goRandomView(),
     subscribeSelection: (fn) => void editor.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
@@ -1386,6 +1397,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
       { group: "View", title: "Previous view", keys: "Alt+Shift+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
       { group: "View", title: "Next view", keys: "Alt+Shift+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
+      { group: "View", title: "Go to a random empty view", words: "dice random far away", enabled: () => onCanvas, run: () => goRandomView() },
       { group: "View", title: "Zen mode", keys: key(settings.get("key.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
       { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },

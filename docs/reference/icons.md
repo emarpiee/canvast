@@ -145,6 +145,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `copy-check` | Similar images (the library) |
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
+| `dices` | Random empty view (bottom-right controls) |
 | `projector` | Play the bookmarks as a tour |
 | `clipboard-list` | Copy the adjustments of a picture |
 | `clipboard-paste` | Paste adjustments |

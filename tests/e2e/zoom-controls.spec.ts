@@ -1,4 +1,4 @@
-import { expect, showTechnicalReadout, test } from "./harness";
+import { expect, reps, showTechnicalReadout, test } from "./harness";
 import type { App } from "./harness";
 
 /** Typed zoom levels (all builds) and the #debug developer navigation panel. */
@@ -120,5 +120,29 @@ test("dev panel: the bell button shows sample notices of every kind (to try how 
   expect(await shown.count()).toBeLessThanOrEqual(3); // the stack keeps the newest three
   await panel.getByRole("button", { name: "Show a sample notice" }).click();
   await expect(shown.first()).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the dice button goes to a random empty view, far from the content, with a new place and zoom each time, and Previous view comes back", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await app.drag({ x: 500, y: 400 }, { x: 640, y: 460 }, 6);
+  const info = p.getByRole("button", { name: /^Information shown/ });
+  for (let i = 0; i < 3 && (await info.getAttribute("data-mode")) !== "more"; i++) await info.click(); // "more" shows how many objects are in view
+  const readout = p.getByTestId("objects-readout");
+  await expect(readout).toContainText("1 object, 1 in view");
+  const dice = p.getByRole("button", { name: "Random empty view" });
+  const seen = new Set<string>();
+  for (let i = 0; i < reps(5, 3); i++) {
+    await dice.click();
+    await expect.poll(async () => (await app.camera()).cx, { message: "the camera goes away from the content" }).not.toBe("0");
+    await app.frame();
+    await expect(readout, "nothing of the canvas is in view").toContainText("0 in view");
+    const c = await app.camera();
+    seen.add(`${c.cx}|${c.cy}|${c.zi}.${c.zf}`);
+  }
+  expect(seen.size, "a different place each time").toBeGreaterThan(1);
+  await p.getByRole("button", { name: "Previous view" }).click();
+  await app.frame();
   expect(app.consoleErrors).toEqual([]);
 });
