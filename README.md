@@ -6,7 +6,7 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: v0.18.1, the backlog run after the text tool revamp (v0.18.0).** Done:
+> **Status: v0.19.0, vector networks, masks and the rest of the vector tools (after the backlog run, v0.18.1).** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
 > Canvases model with safe incremental saving, a shared Assets library with
 > tags, folders and file types, `.canvast` archives and plain ZIP export,
@@ -14,12 +14,16 @@ or network connection.
 > and GIFs with an on-canvas player, a Settings view, accessibility options and
 > search with AND, OR, XOR and NOT, crop and adjustments of pictures, video and
 > GIF, vectors, fonts from the library, and incremental backups. **Not done:**
-> the long tail of the vector tools (Vectors II), PDF page rendering, Phase 8
-> (scale and compatibility), Phase 9 (standalone release) and collaboration. Ratings,
-> saved searches and masks are left out on purpose. See
+> PDF page rendering, Phase 8 (scale and compatibility), Phase 9 (standalone
+> release) and collaboration. Ratings and saved searches are left out on purpose. See
 > [Roadmap and status](docs/status.md) and
 > [gaps against the plan](docs/reference/plan-gaps.md). This README describes
 > only what exists.
+>
+> **v0.19.0 in short:** **vector networks** (paths that meet at vertices, with their regions
+> filled), **masks** (a clipping mask of any shape, a mask by opacity or brightness, a brush mask painted
+> with the Pen), **Outline stroke** and **Taper**, **corner smoothing**, an **angular gradient**, **Edit nodes
+> on several paths** with a lasso, and **Divide** and the **Shape builder**. Details in the [changelog](CHANGELOG.md).
 >
 > **v0.18.1 in short:** the font engine reads TrueType, OpenType with CFF, WOFF,
 > WOFF2 and variable fonts (real bold and italic files, kerning, features, axes,
@@ -71,7 +75,7 @@ or network connection.
 
 ### Editing (Phase 0B)
 
-- **Vectors:** shapes and paths with fills, gradients, outlines (position, corners, ends, dashes), boolean groups, node editing with snapping, SVG in (paste SVG text, or Make vector copy of an SVG picture) and out (Save as SVG). Only what is picked moves; drag a number's name to change it.
+- **Vectors:** shapes and paths with fills, gradients (linear, radial, angular), outlines (position, corners, ends, dashes, arrow heads), outline stroke, taper, corner smoothing, boolean groups, divide and the shape builder, vector networks, masks, node editing on several paths with a lasso and with snapping, SVG in (paste SVG text, or Make vector copy of an SVG picture) and out (Save as SVG). Only what is picked moves; drag a number's name to change it.
 - **Pen:** freehand vector strokes in 4 colours, a size slider (0.5–128 px) with 3 presets, a thickness lock (new strokes keep the same width on the canvas at any zoom; on the Select tool it keeps line width when resizing), a stabilizer with adjustable strength, and "pen size follows zoom" while drawing; on the Select tool the size slider sets the thickness of the selected strokes (nested-frames branch; see ADR 0015, 0016). A stroke is
   authored at the current scale, so a 3 px line drawn 1,000 levels deep is a
   3 px line there. It stays crisp vector geometry at every magnification.
@@ -543,10 +547,6 @@ docs/status.md              roadmap and current status (single source of truth)
     show as neutral grey.
   - Marks cannot be selected; zoom in to edit.
 - **Not implemented:**
-  - the long tail of the vector tools (Vectors II in
-    [the roadmap](docs/status.md)): variable-width paths, corner smoothing,
-    an angular gradient, outline stroke, a shape builder, and selecting nodes
-    with a lasso or editing the nodes of several paths at once;
   - PDF pages as pictures (a PDF is kept and shown as a card with its page
     count), and 3D formats other than STL and OBJ (and those only as a
     preview card);
@@ -554,8 +554,9 @@ docs/status.md              roadmap and current status (single source of truth)
     OpenType positioning beyond kerning;
   - Phase 8 (large projects, search at scale) and Phase 9 (a clean-machine
     test, a reproducible build), and collaboration;
-  - left out on purpose: masks, ratings, saved searches, a minimap, vector
-    networks.
+  - in vector networks: edges that cross are not split, and the whole network
+    has one fill (no fill per region yet);
+  - left out on purpose: ratings, saved searches, a minimap.
 - **Text and system fonts.** Characters the bundled font lacks use the
   system font: their width comes from the browser, so such text can wrap
   differently on another computer, and in the editor its line can sit a

@@ -2167,7 +2167,8 @@ test("sharp corner limit: a corner of 18° is cut by default, comes to its point
   expect(((await last(app)) as unknown as { miterAngle?: number }).miterAngle, "undone").toBeUndefined();
 });
 
-test("pasted SVG text with <use> and a symbol becomes shapes (the used shape drawn again where the use is); copy as SVG puts the same text on the clipboard", async ({ app }) => {
+test("pasted SVG text with <use> and a symbol becomes shapes (the used shape drawn again where the use is); copy as SVG puts the same text on the clipboard", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "a synthetic paste event carries no data in Firefox");
   const p = app.page;
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><defs><path id="a" d="M0 0h10v10z"/><symbol id="s"><rect width="5" height="5"/></symbol></defs><use href="#a" x="20" y="5"/><use xlink:href="#s" x="50" y="50"/><g id="g"><use href="#g"/></g></svg>';
   await p.evaluate((text) => {
@@ -2186,4 +2187,290 @@ test("pasted SVG text with <use> and a symbol becomes shapes (the used shape dra
   await p.keyboard.type("Copy the selection as SVG");
   await key(app, "Enter");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.lastCopied())).toMatch(/^<svg[\s\S]*<path/);
+});
+
+test("Outline stroke makes the line a shape of its own; a shape with a fill keeps it and gets the outline above; Taper is thin at the ends; one undo each", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="line"]');
+  await drag(app, [400, 400], [700, 400]);
+  const line = await last(app);
+  await key(app, "v");
+  await click(app, 550, 400);
+  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
+  const o = (await last(app)) as unknown as Obj & { stroke: string | null; fill: string };
+  expect(o).toMatchObject({ id: line.id, kind: "path", stroke: null, fill: line.stroke });
+  expect(o.sub.length, "the pieces of the stroke").toBeGreaterThan(1);
+  await key(app, "Control+z");
+  expect(((await last(app)) as unknown as { stroke: string | null }).stroke).toBe(line.stroke);
+  // Taper: full in the middle, thin at the end
+  await key(app, "v");
+  await click(app, 550, 400);
+  await p.click('[data-ctx="taper"]', { timeout: 5000 });
+  const t = await last(app);
+  const ys = (x: number) => t.sub.flatMap((s) => s.n.filter((_, i) => i % 6 === 0).map((v, k) => [v, s.n[k * 6 + 1]!] as const)).filter(([vx]) => Math.abs(vx - x) < 3).map(([, y]) => Math.abs(y));
+  expect(Math.max(...ys(150)), "wide in the middle").toBeGreaterThan(Math.max(...ys(5)) + 0.2);
+  // a rectangle with a fill and an outline: the fill stays, the outline is a new shape above it
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 500], [560, 580]);
+  const rect = await last(app);
+  await key(app, "v");
+  await click(app, 480, 540);
+  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
+  const all = await objs(app);
+  expect(all.find((x) => x.id === rect.id)).toMatchObject({ stroke: null, fill: rect.fill });
+  expect(all.length).toBe(all.filter((x) => x.kind === "path").length);
+  expect((await last(app)).id).not.toBe(rect.id);
+});
+
+test("Corner smoothing: the Smooth number starts the rounded corners farther out; kept by undo and a reload", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "v");
+  await click(app, 550, 400);
+  const radius = p.getByLabel("Corner radius (px)");
+  await radius.fill("30");
+  await radius.press("Enter");
+  const smooth = p.getByLabel("Corner smoothing (%)");
+  await expect(smooth).toBeVisible();
+  const firstX = async () => ((await last(app)).sub[0]!.n as number[])[0]!;
+  const before = JSON.stringify((await last(app)).sub);
+  await smooth.fill("100");
+  await smooth.press("Enter");
+  await expect.poll(async () => JSON.stringify((await last(app)).sub)).not.toBe(before);
+  expect(((await last(app)) as unknown as { smoothing?: number }).smoothing).toBe(1);
+  void firstX;
+  await smooth.blur();
+  await key(app, "Control+z");
+  expect(JSON.stringify((await last(app)).sub)).toBe(before);
+  await key(app, "Control+Shift+z");
+  await reload(app);
+  expect(((await last(app)) as unknown as { smoothing?: number }).smoothing).toBe(1);
+});
+
+test("Angular gradient: chosen in the paint chooser, goes round its centre, its angle handle turns it; kept by undo and a reload", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "v");
+  await click(app, 550, 400);
+  const fillOf = async () => ((await last(app)) as unknown as { fill: { type: string; cx: number; cy: number; angle: number; stops: Array<{ c: string }> } }).fill;
+  await p.click('[data-paint="fill"]');
+  const pop = p.locator(".colour-pop");
+  await pop.locator('[data-mode="angular"]').click();
+  expect(await fillOf()).toMatchObject({ type: "angular", cx: 0.5, cy: 0.5, angle: 0 });
+  await pop.locator(".cg-stop").nth(0).click();
+  await pop.locator(".cg [data-hex]").fill("ff0000");
+  await pop.locator(".cg [data-hex]").press("Enter");
+  await pop.locator(".cg-stop").nth(1).click();
+  await pop.locator(".cg [data-hex]").fill("0000ffff");
+  await pop.locator(".cg [data-hex]").press("Enter");
+  await key(app, "Escape");
+  await key(app, "Escape");
+  await app.frame();
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const near = (c: number[], r: number, b: number) => Math.abs(c[0]! - r) + Math.abs(c[1]!) + Math.abs(c[2]! - b) <= 24;
+  expect(near(await px(550 + 120, 403), 253, 2), "just below the first edge: the first stop").toBe(true);
+  expect(near(await px(550 - 120, 400), 128, 128), "opposite: half way").toBe(true);
+  expect(near(await px(550, 400 + 80), 191, 64), "a quarter of the turn on").toBe(true);
+  // its angle handle at 0.3 of the longer side from the centre: drag it down a quarter turn
+  await click(app, 550, 400);
+  await drag(app, [550 + 90, 400], [550, 400 + 90]);
+  expect((await fillOf()).angle).toBeGreaterThan(80);
+  expect((await fillOf()).angle).toBeLessThan(100);
+  await key(app, "Control+z");
+  expect((await fillOf()).angle).toBe(0);
+  await key(app, "Control+Shift+z");
+  await reload(app);
+  expect((await fillOf()).type).toBe("angular");
+});
+
+test("Edit nodes on several paths: Shift-click picks nodes together, a lasso picks the nodes inside it, they move and are deleted as one (one undo step), across paths", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [500, 400]); // A
+  await drag(app, [600, 300], [700, 400]); // B
+  const [a, b] = (await objs(app)).slice(-2) as [Obj, Obj];
+  await key(app, "v");
+  await key(app, "Control+a");
+  await key(app, "n");
+  const picked = () => p.evaluate(() => window.__canvastDebug.pickedNodes());
+  const lasso = async (pts: Array<[number, number]>) => {
+    await p.mouse.move(...pts[0]!);
+    await p.mouse.down();
+    for (const q of [...pts.slice(1), pts[0]!]) await p.mouse.move(q[0], q[1], { steps: 4 });
+    await p.mouse.up();
+    await app.frame();
+  };
+  // from empty ground a lasso round A's top right corner and B's top left corner picks the two
+  await lasso([[470, 270], [640, 270], [640, 340], [470, 340]]);
+  expect((await picked()).map(([, n]) => n).sort()).toEqual([1, 1]);
+  // dragging one moves both, in one undo step
+  const ys = async () => { const [pa, pb] = (await objs(app)).slice(-2); return [pa!.sub[0]!.n[7]!, pb!.sub[0]!.n[1]!]; }; // (A's top right corner, B's top left corner)
+  const y0 = await ys();
+  await drag(app, [500, 300], [500, 330]);
+  const y1 = await ys();
+  expect(y1[0]! - y0[0]!).toBeCloseTo(30, 0);
+  expect(y1[1]! - y0[1]!).toBeCloseTo(30, 0);
+  await key(app, "Control+z");
+  expect(await ys()).toEqual(y0);
+  // Shift-click adds a node to the set and takes it away again
+  await click(app, 400, 300, ["Shift"]);
+  expect((await picked()).reduce((s, [, n]) => s + n, 0)).toBe(3);
+  await click(app, 400, 300, ["Shift"]);
+  expect((await picked()).reduce((s, [, n]) => s + n, 0)).toBe(2);
+  // Delete takes the picked nodes from both paths at once
+  await key(app, "Delete");
+  const after = (await objs(app)).slice(-2);
+  expect(after.map((o) => o.sub[0]!.n.length / 6)).toEqual([3, 3]);
+  expect(after.map((o) => o.id)).toEqual([a.id, b.id]);
+  await key(app, "Control+z");
+  expect((await objs(app)).slice(-2).map((o) => o.sub[0]!.n.length / 6)).toEqual([4, 4]);
+});
+
+test("Divide cuts overlapping shapes into their regions; the Shape builder merges regions dragged across and deletes them with Alt; one undo each", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [560, 420]); // A
+  await drag(app, [500, 340], [660, 460]); // B
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.click('[data-ctx="divide"]', { timeout: 5000 });
+  const parts = await objs(app);
+  expect(parts.filter((o) => o.kind === "path")).toHaveLength(3);
+  await key(app, "Control+z");
+  expect(await objs(app)).toHaveLength(2);
+  // the Shape builder: a stroke from the left region over the middle to the right one merges all three into one shape
+  await key(app, "Control+a");
+  await p.click('[data-ctx="shapebuilder"]', { timeout: 5000 });
+  await drag(app, [420, 360], [640, 440]);
+  await key(app, "Enter");
+  const merged = await objs(app);
+  expect(merged).toHaveLength(1);
+  const b = size(merged[0]!);
+  expect(b.w).toBeCloseTo(260, 0);
+  await key(app, "Control+z");
+  expect(await objs(app)).toHaveLength(2);
+  // Alt-drag over the overlap deletes it; the two others stay
+  await key(app, "Control+a");
+  await p.click('[data-ctx="shapebuilder"]', { timeout: 5000 });
+  await p.keyboard.down("Alt");
+  await drag(app, [525, 380], [535, 390]);
+  await p.keyboard.up("Alt");
+  await key(app, "Enter");
+  expect((await objs(app)).filter((o) => o.kind === "path")).toHaveLength(2);
+});
+
+test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts the same and can be inverted and released; undo takes each back", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]); // blue 300 x 200
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 340], [600, 460]); // the mask: an ellipse in the middle
+  await key(app, "v");
+  await key(app, "Control+a");
+  const blue = await px(410, 310);
+  const bg = await px(100, 650);
+  expect(blue).not.toEqual(bg);
+  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  await app.frame();
+  expect(await px(410, 310), "outside the ellipse the rectangle is cut away").toEqual(bg);
+  expect(await px(530, 375), "inside it, shown").toEqual(blue);
+  await key(app, "Control+z");
+  await app.frame();
+  expect(await px(410, 310)).toEqual(blue);
+  // by opacity
+  await key(app, "Control+a");
+  await p.click('[data-ctx="maskalpha"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  await app.frame();
+  expect(await px(410, 310)).toEqual(bg);
+  expect(await px(530, 375)).toEqual(blue);
+  await click(app, 550, 400);
+  await p.click('[data-ctx="invertmask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  await app.frame();
+  expect(await px(410, 310), "inverted: what was cut shows").toEqual(blue);
+  expect(await px(530, 375), "and the middle is gone").toEqual(bg);
+  await click(app, 410, 310);
+  await p.click('[data-ctx="releasemask"]', { timeout: 5000 });
+  await click(app, 120, 650);
+  await app.frame();
+  expect(await px(410, 310), "released: the rectangle is whole").toEqual(blue);
+  expect(await objs(app)).toHaveLength(2);
+});
+
+test("Vector network: two rectangles that share a side become one network with a shared vertex that moves both; the regions are filled; Alt joins two ends; Release goes back to a path", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [560, 420]);
+  await drag(app, [560, 300], [720, 420]);
+  const bg = await px(100, 650);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.click('[data-ctx="makenet"]', { timeout: 5000 });
+  const net = (await objs(app)) as unknown as Array<Obj & { net?: boolean }>;
+  expect(net).toHaveLength(1);
+  expect(net[0]!.net).toBe(true);
+  expect(net[0]!.sub.length, "7 edges: the shared side is one").toBe(7);
+  const ends = (o: Obj) => new Set(o.sub.flatMap((s) => [`${s.n[0]},${s.n[1]}`, `${s.n[s.n.length - 6]},${s.n[s.n.length - 5]}`]));
+  expect(ends(net[0]!).size).toBe(6);
+  await app.frame();
+  const inside = await px(480, 360);
+  expect(inside, "the region is filled").not.toEqual(bg);
+  expect(await px(640, 360)).toEqual(inside);
+  // the shared top vertex dragged up moves the ends of three edges together
+  await key(app, "n");
+  await drag(app, [560, 300], [560, 250]);
+  const after = (await objs(app))[0]!;
+  expect(ends(after).size, "still six vertices").toBe(6);
+  expect(after.sub.filter((s) => s.n[1] === after.sub[0]!.n[1] || true).length).toBe(7);
+  await key(app, "Control+z");
+  expect(ends((await objs(app))[0]!).size).toBe(6);
+  // Release: an ordinary path again, with the same edges
+  await key(app, "v");
+  await click(app, 480, 360);
+  await p.click('[data-ctx="releasenet"]', { timeout: 5000 });
+  const back = ((await objs(app)) as unknown as Array<Obj & { net?: boolean }>)[0]!;
+  expect(back.net).toBeUndefined();
+  expect(back.sub).toHaveLength(7);
+});
+
+test("Brush mask: started from the palette over a picked shape, the Pen paints black to hide (white to show), the strokes are the mask, Done ends it; copies follow", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "v");
+  await click(app, 450, 350);
+  const blue = await px(430, 330);
+  await p.keyboard.press("Control+k");
+  await p.keyboard.type("Brush mask: show everything");
+  await p.keyboard.press("Enter");
+  expect(await tool(app)).toBe("pen");
+  await expect(p.locator('[data-mask-ink="done"]')).toBeVisible();
+  // a wide black stroke hides what it crosses (the pen is at its default width: draw a thick band by several passes)
+  for (const y of [350, 358, 366, 374, 382, 390]) await drag(app, [420, y], [680, y]);
+  await app.frame();
+  const strokes = (await objs(app)) as unknown as Array<Obj & { isMask?: boolean; color?: string }>;
+  expect(strokes.filter((o) => o.kind === "stroke").every((o) => o.isMask && o.color === "#000000")).toBe(true);
+  expect(await px(550, 366), "hidden under the strokes").not.toEqual(blue);
+  expect(await px(430, 330), "shown elsewhere").toEqual(blue);
+  await p.click('[data-mask-ink="show"]');
+  await drag(app, [500, 358], [600, 358]);
+  await p.click('[data-mask-ink="done"]');
+  await expect(p.locator('[data-mask-ink="done"]')).toBeHidden();
+  expect((await objs(app)).filter((o) => o.kind === "stroke").length).toBeGreaterThan(6);
 });

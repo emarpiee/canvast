@@ -1,7 +1,8 @@
 import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { SubPath } from "../doc/path";
-import { NODE, isLine, nodeCount, segmentsOf } from "../doc/path";
+import { NODE, geometryBounds, isLine, nodeCount, segmentsOf } from "../doc/path";
+import { radiansFromAngle } from "../core/angle";
 import { cornersOf, maxFor, maxUniform } from "../doc/rounding";
 import type { ProjectedObject } from "../render/projection";
 import { exactX, exactY, fromPx } from "../render/projection";
@@ -144,6 +145,8 @@ export interface GradientHandles {
   readonly pts: ReadonlyArray<{ id: GradHandle; x: number; y: number }>;
   /** A radial gradient's outer ring, in px. */
   readonly ring?: { x: number; y: number; r: number };
+  /** An angular gradient's first edge: the ray from its centre along which the first stop sits (the handle is at its end). */
+  readonly ray?: boolean;
   /** The stops along a linear gradient's axis (for drawing). */
   readonly stops: ReadonlyArray<{ x: number; y: number; c: string }>;
 }
@@ -170,6 +173,12 @@ export function gradientHandles(po: ProjectedObject, focus: "fill" | "stroke" | 
       pts: [{ id: "p0", x: x0, y: y0 }, { id: "p1", x: x1, y: y1 }],
       stops: g.stops.map((s) => ({ x: x0 + (x1 - x0) * s.o, y: y0 + (y1 - y0) * s.o, c: s.c })),
     };
+  } else if (l.type === "angular") {
+    const b = geometryBounds(o.base ?? o.sub);
+    const reach = 0.3 * Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    const [cx, cy] = at(l.cx, l.cy);
+    const [hx, hy] = at(l.cx + Math.cos(l.a0) * reach, l.cy + Math.sin(l.a0) * reach);
+    out = { which, g, pts: [{ id: "c", x: cx, y: cy }, { id: "r", x: hx, y: hy }], ray: true, stops: [] };
   } else {
     const [cx, cy] = at(l.cx, l.cy);
     const [rx] = at(l.cx + l.R, l.cy);
@@ -197,10 +206,16 @@ export function moveGradientHandle(o: PathObject, g: Gradient, handle: GradHandl
   const [u, v] = localToBox(o, x, y);
   if (g.type === "linear") return handle === "p0" ? { ...g, x0: u, y0: v } : { ...g, x1: u, y1: v };
   if (handle === "c") return { ...g, cx: u, cy: v };
+  if (g.type === "angular") {
+    // the angle handle: the direction from the centre to the pointer, less the path's own turn
+    const l = localGradient(o, g);
+    const a = l.type === "angular" ? Math.atan2(y - l.cy, x - l.cx) - (o.rot ? radiansFromAngle(o.rot) : 0) : 0;
+    return { ...g, angle: ((((a * 180) / Math.PI) % 360) + 360) % 360 };
+  }
   // the radius handle: the distance from the centre, in units of the box's longer side
   const l = localGradient(o, g);
-  const side = l.type === "radial" && g.r > 0 ? l.R / g.r : 1;
-  return { ...g, r: Math.max(0.005, Math.hypot(x - (l.type === "radial" ? l.cx : 0), y - (l.type === "radial" ? l.cy : 0)) / side) };
+  const side = g.type === "radial" && l.type === "radial" && g.r > 0 ? l.R / g.r : 1;
+  return { ...g, r: Math.max(0.005, Math.hypot(x - (l.type === "radial" ? l.cx : 0), y - (l.type === "radial" ? l.cy : 0)) / side) } as Gradient;
 }
 
 

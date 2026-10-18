@@ -73,7 +73,10 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
   const ordered = [...objs].sort((a, b) => a.z - b.z);
   // (a frame copied with what is inside it: the copies name the copied frame; one copied alone keeps its frame)
   const copyId = new Map(ordered.map((o) => [o.id, newObjectId()]));
-  const out = ordered.map((o, i): CanvasObject => {
+  // A mask copied without anything it cuts is just objects again (they would be invisible otherwise).
+  const cuts = new Set(ordered.flatMap((o) => (o.mask ? [o.mask.by] : [])));
+  const out = ordered.map((o0, i): CanvasObject => {
+    const o: CanvasObject = o0.isMask && !(o0.groups ?? []).some((g) => cuts.has(g)) ? (({ isMask: _m, ...rest }) => rest as CanvasObject)(o0) : o0;
     const moved: CanvasObject = centre
       ? {
           ...o,
@@ -82,7 +85,7 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
           anchor: { x: D.add(target!.at.x, D.shift(D.sub(o.anchor.x, centre.x), k)), y: D.add(target!.at.y, D.shift(D.sub(o.anchor.y, centre.y), k)) },
         }
       : o;
-    return homeObject({ ...moved, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.attachmentTargetId !== null ? { attachmentTargetId: copyId.get(o.attachmentTargetId) ?? null } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
+    return homeObject({ ...moved, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.attachmentTargetId !== null ? { attachmentTargetId: copyId.get(o.attachmentTargetId) ?? null } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.mask ? { mask: { ...o.mask, by: regroup(o.mask.by) } } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
   });
   return { objects: out, moved: sameFrame };
 }

@@ -226,7 +226,7 @@ test("a video has every adjustment: highlights, shadows, tint, sharpen and grain
     await pop.locator(`[data-adj-num="${key}"]`).fill(val);
     await pop.locator(`[data-adj-num="${key}"]`).blur();
   }
-  expect((await objs(app)).find((o) => o.id === v!.id)!.adjust).toEqual({ shadows: 40, tint: -20, grain: 30 });
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === v!.id)!.adjust).toEqual({ shadows: 40, tint: -20, grain: 30 });
   // the player shows it through a filter that exists in the page and holds those steps
   await expect.poll(() => p.evaluate(() => document.querySelector<HTMLElement>("video.media-video")?.style.filter ?? "")).toMatch(/^url\("?#adj-/);
   const parts = await p.evaluate(() => {

@@ -35,7 +35,7 @@ function stretched(o: PathObject, kx: number, ky: number, keepRadius: boolean): 
   const own = radius === undefined ? {} : { radius };
   if (o.base) {
     const base = scaleSubs(o.base, kx, ky);
-    return { ...params, ...own, base, sub: roundCorners(base, radius!) };
+    return { ...params, ...own, base, sub: roundCorners(base, radius!, o.smoothing) };
   }
   return { ...params, ...own, sub: scaleSubs(o.sub, kx, ky) };
 }

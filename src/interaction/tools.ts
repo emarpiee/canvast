@@ -11,12 +11,13 @@ import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, Tex
 import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
+import { moveNodes, edgeBetween, deleteVertex } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
-import { handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
+import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -28,6 +29,7 @@ import { normalizeUnit, restack, worldBounds } from "../doc/edit-ops";
 import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
+import { cameraIn } from "../scene/frame-index";
 import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
 import { isContainer } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
@@ -36,12 +38,13 @@ import { cropEdges } from "../doc/crop";
 import { itemLabelAt } from "../render/item-label";
 import type { ItemLabel } from "../render/item-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
+import { projectObject } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, radiansFromAngle } from "../core/angle";
 import { PanGesture } from "./navigation";
-import { attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -165,7 +168,13 @@ type Gesture =
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
   | { kind: "pathnode"; pointerId: number; start: ScreenPoint; dragging: boolean }
   /** A node, a handle or a segment of the selected path (Edit nodes tool); `base` is the path's geometry when the press began. */
-  | { kind: "node"; pointerId: number; id: ObjectId; what: "point" | "in" | "out" | "seg"; s: number; k: number; t: number; base: readonly SubPath[]; start: ScreenPoint; startLocal: { x: number; y: number }; moved: boolean; smooth: boolean }
+  /** Nodes picked together (Shift-click or a lasso) being dragged, over one or several paths (ADR 0145); each path's geometry as the press began. */
+  | { kind: "nodes"; pointerId: number; start: ScreenPoint; bases: Map<ObjectId, { po: ProjectedObject; sub: readonly SubPath[]; from: { x: number; y: number } }>; moved: boolean }
+  /** Crossing the regions of the Shape builder (ADR 0145). */
+  | { kind: "builder"; pointerId: number }
+  /** A lasso drawn round nodes of the picked paths (Edit nodes). */
+  | { kind: "nodelasso"; pointerId: number; additive: boolean }
+  | { kind: "node"; pointerId: number; id: ObjectId; what: "point" | "in" | "out" | "seg"; s: number; k: number; t: number; prev: { s: number; k: number } | null; base: readonly SubPath[]; start: ScreenPoint; startLocal: { x: number; y: number }; moved: boolean; smooth: boolean }
   | {
       kind: "scale";
       pointerId: number;
@@ -254,7 +263,7 @@ export function attachTools(
   /** The objects the pointer can act on (all visible ones, minus those that fill the view when that option is on). */
   const visible = () => {
     // Inside a boolean group the members are what a pointer reaches, not the group's result (ADR 0103).
-    const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport, undefined, { entered: editor.entered, mode: "pick" });
+    const all = visibleObjects(doc, index, null, view.frameCamera, view.viewport, undefined, { entered: editor.entered, mode: "pick", also: editor.selection });
     return editor.ignoreFilling ? all.filter((po) => !fillsView(po)) : all;
   };
   /** What a click, lasso or box can take: locked objects are drawn but cannot be picked (ADR 0021). */
@@ -433,8 +442,11 @@ export function attachTools(
       }),
     );
     if (!strokes.length) return;
-    const made = strokes.length > 1 && pieces.some((d) => d.kind !== "fine") ? groupObjects(strokes, 0) : strokes;
-    doc.commit(doc.transaction("Draw stroke", made));
+    const grouped = strokes.length > 1 && pieces.some((d) => d.kind !== "fine") ? groupObjects(strokes, 0) : strokes;
+    // Painting a brush mask: the strokes are part of the mask, in its ink, and cut nothing on their own.
+    const m = editor.maskEdit;
+    const made = m ? grouped.map((o) => ({ ...o, ...(o.kind === "stroke" ? { color: m.ink } : {}), isMask: true as const, groups: [...m.groups, ...(o.groups ?? [])] }) as CanvasObject) : grouped;
+    doc.commit(doc.transaction(m ? "Paint the mask" : "Draw stroke", made));
   };
 
   // ---- shapes and paths (ADR 0099) ---------------------------------------
@@ -633,12 +645,15 @@ export function attachTools(
     const sub = editSubs(o);
     return { sub, flat: { ...flat, sub } };
   };
-  const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
+  /** The path with its nodes replaced: a rounded path keeps its radius (the nodes are the sharp ones, the rounding is made again). */
+  const rebuilt = (o: PathObject, sub: readonly SubPath[]): PathObject => {
     const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
-    // a rounded path keeps its radius: the nodes are the sharp ones, and the rounding is made again
     // (a radius for each corner no longer fits when nodes were added or taken away: it becomes the largest of them)
     const radius = o.radius !== undefined && typeof o.radius !== "number" && o.radius.length !== nodesIn(sub) ? Math.max(...o.radius) : o.radius;
-    const next = homeObject(normalizeUnit(o.base && radius !== undefined ? { ...flat, radius, base: sub, sub: roundCorners(sub, radius) } : { ...flat, sub }), doc.space);
+    return homeObject(normalizeUnit((o.base && radius !== undefined ? { ...flat, radius, base: sub, sub: roundCorners(sub, radius, o.smoothing) } : { ...flat, sub }) as PathObject), doc.space) as PathObject;
+  };
+  const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
+    const next = rebuilt(o, sub);
     doc.commit(doc.transaction(label, [next]));
   };
 
@@ -748,12 +763,80 @@ export function attachTools(
     editor.changed();
   };
 
+  /** The region of the open Shape builder under a screen point, if any (regions already deleted are not there). */
+  const builderFaceAt = (s: ScreenPoint): number | null => {
+    const b = editor.builder;
+    if (!b) return null;
+    for (let i = 0; i < b.faces.length; i++) {
+      if (b.deleted.has(i)) continue;
+      const o = b.faces[i]!.obj;
+      const cam = cameraIn(view.frameCamera, o.frame ?? b.world);
+      const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
+      if (po && !po.cover && insideBody(po, s.x, s.y)) return i;
+    }
+    return null;
+  };
+
+  /** Every picked path whose nodes can be edited (the Edit nodes tool works on all of them, ADR 0145). */
+  const nodeTargets = (): Array<{ po: ProjectedObject; o: PathObject }> =>
+    visible().filter((p) => editor.selection.has(p.obj.id) && p.obj.kind === "path" && !p.cover && !p.obj.locked).map((po) => ({ po, o: po.obj as PathObject }));
+
+  /** A press on a node of several picked paths or of nodes picked together: Shift toggles it in the set; otherwise the picked nodes (or this one) are dragged as one. */
+  const startMultiNodePress = (e: PointerEvent, s: ScreenPoint, targets: Array<{ po: ProjectedObject; o: PathObject }>): boolean => {
+    let best: { id: ObjectId; s: number; k: number; d: number } | null = null;
+    for (const t of targets) {
+      for (const n of nodesOnScreen(t.po)) {
+        const d = Math.hypot(n.p[0] - s.x, n.p[1] - s.y);
+        if (d <= NODE_REACH_PX && (!best || d < best.d)) best = { id: t.o.id, s: n.s, k: n.k, d };
+      }
+    }
+    if (!best) return false;
+    const key = `${best.s}:${best.k}`;
+    const has = editor.nodeMulti.get(best.id)?.has(key) ?? false;
+    if (e.shiftKey) {
+      // the one node being edited joins the set
+      if (editor.nodeSel && targets.length === 1 && editor.nodeMulti.size === 0) editor.nodeMulti.set(targets[0]!.o.id, new Set([`${editor.nodeSel.s}:${editor.nodeSel.k}`]));
+      editor.nodeSel = null;
+      const set = editor.nodeMulti.get(best.id) ?? new Set<string>();
+      if (has) set.delete(key);
+      else set.add(key);
+      if (set.size) editor.nodeMulti.set(best.id, set);
+      else editor.nodeMulti.delete(best.id);
+      editor.changed();
+      return true;
+    }
+    if (!has) {
+      editor.nodeMulti.clear();
+      editor.nodeMulti.set(best.id, new Set([key]));
+    }
+    editor.nodeSel = null;
+    const bases = new Map<ObjectId, { po: ProjectedObject; sub: readonly SubPath[]; from: { x: number; y: number } }>();
+    for (const id of editor.nodeMulti.keys()) {
+      const t = targets.find((x) => x.o.id === id);
+      if (t) bases.set(id, { po: t.po, sub: baked(t.o).sub, from: localOf(t.po, s.x, s.y) });
+    }
+    g = { kind: "nodes", pointerId: e.pointerId, start: s, bases, moved: false };
+    editor.changed();
+    return true;
+  };
+
   const startNodePress = (e: PointerEvent, s: ScreenPoint): boolean => {
+    if (editor.blockEdit()) return false;
+    const targets = nodeTargets();
+    if (targets.length > 1 || (targets.length === 1 && (e.shiftKey || editor.nodeMulti.size > 0))) {
+      // (on the only picked path, a plain press on a node that is not one of the picked ones goes back to editing that one node)
+      if (targets.length === 1 && !e.shiftKey) {
+        const hit = hitNodes(targets[0]!.po, s.x, s.y, null);
+        if (!(hit?.kind === "point" && editor.nodeMulti.get(targets[0]!.o.id)?.has(`${hit.s}:${hit.k}`))) editor.nodeMulti.clear();
+        else return startMultiNodePress(e, s, targets);
+      } else return startMultiNodePress(e, s, targets);
+    }
     const tgt = nodeTarget();
     if (!tgt || editor.blockEdit()) return false;
     const hit = hitNodes(tgt.po, s.x, s.y, editor.nodeSel);
     if (!hit) return false;
     const base = baked(tgt.o).sub;
+    const prev = editor.nodeSel;
     editor.nodeSel = { s: hit.s, k: hit.k };
     g = {
       kind: "node",
@@ -763,6 +846,7 @@ export function attachTools(
       s: hit.s,
       k: hit.k,
       t: hit.kind === "seg" ? hit.t : 0,
+      prev,
       base,
       start: s,
       startLocal: localOf(tgt.po, s.x, s.y),
@@ -808,7 +892,7 @@ export function attachTools(
     const b = g.k * NODE;
     const sub =
       g.what === "point"
-        ? moveNode(g.base, g.s, g.k, dx, dy)
+        ? (tgt.o.net ? moveNodes(g.base, [[g.s, g.k]], dx, dy) : moveNode(g.base, g.s, g.k, dx, dy))
         : moveHandle(g.base, g.s, g.k, g.what === "in" ? 2 : 4, sp.n[b + (g.what === "in" ? 2 : 4)]! + dx, sp.n[b + (g.what === "in" ? 3 : 5)]! + dy, g.smooth && !alt);
     editor.preview = { kind: "nodes", ids: [g.id], sub };
     editor.changed();
@@ -823,6 +907,17 @@ export function attachTools(
     const o = doc.get(gs.id);
     if (cancelled || !o || o.kind !== "path") return;
     if (gs.moved && p.kind === "nodes") return commitSub(o, p.sub, gs.what === "point" ? "Move node" : "Move handle");
+    if (o.net && altHeld && !gs.moved) {
+      // In a network, Alt on another end joins the two ends by an edge; Alt on an edge takes the edge away.
+      const end = (si: number, ki: number): [number, number] | null => {
+        const c = gs.base[si];
+        return c && (ki === 0 || ki === nodeCount(c) - 1) ? [c.n[ki * NODE]!, c.n[ki * NODE + 1]!] : null;
+      };
+      if (gs.what === "seg") return commitSub(o, gs.base.filter((_, i) => i !== gs.s), "Delete edge");
+      const a = gs.prev ? end(gs.prev.s, gs.prev.k) : null;
+      const b = end(gs.s, gs.k);
+      if (gs.what === "point" && a && b && (a[0] !== b[0] || a[1] !== b[1])) return commitSub(o, [...gs.base, edgeBetween(a, b)], "Add edge");
+    }
     if (gs.what === "seg") {
       commitSub(o, splitSegment(gs.base, gs.s, gs.k, gs.t), "Add node");
       editor.nodeSel = { s: gs.s, k: gs.k + 1 };
@@ -833,10 +928,46 @@ export function attachTools(
 
   /** Delete the selected node (the path goes with its last one). Returns whether there was one. */
   const deleteNode = (): boolean => {
+    if (editor.nodeMulti.size && !editor.blockEdit()) {
+      // the nodes picked together, on every path that has some (one undo step)
+      const upserts: PathObject[] = [];
+      const removes: ObjectId[] = [];
+      let count = 0;
+      for (const [id, keys] of editor.nodeMulti) {
+        const o = doc.get(id);
+        if (o?.kind !== "path") continue;
+        let sub = baked(o).sub;
+        const list = [...keys].map((k) => k.split(":").map(Number) as [number, number]).sort((a, b) => b[0] - a[0] || b[1] - a[1]); // (last first, so the places of the others hold)
+        if (o.net) {
+          // a vertex takes all its edges; a node inside an edge is just taken out of it
+          const gone = new Set<string>();
+          for (const [si, ki] of list) {
+            const c = sub[si];
+            if (!c) continue;
+            const ends = ki === 0 || ki === nodeCount(c) - 1;
+            if (ends) gone.add(`${c.n[ki * NODE]},${c.n[ki * NODE + 1]}`);
+          }
+          const interior = list.filter(([si, ki]) => { const c = sub[si]; return !!c && ki !== 0 && ki !== nodeCount(c) - 1; });
+          for (const [si, ki] of interior) sub = withNode(sub, si, ki, null);
+          for (const v of gone) { const [vx, vy] = v.split(",").map(Number); sub = deleteVertex(sub, vx!, vy!); }
+        } else for (const [si, ki] of list) sub = withNode(sub, si, ki, null);
+        count += list.length;
+        if (!sub.length) removes.push(id);
+        else upserts.push(rebuilt(o, sub));
+      }
+      editor.nodeMulti.clear();
+      if (!count) return false;
+      for (const id of removes) editor.selection.delete(id);
+      doc.commit(doc.transaction(count === 1 ? "Delete node" : `Delete ${count} nodes`, upserts, removes));
+      editor.changed();
+      return true;
+    }
     const tgt = nodeTarget();
     const sel = editor.nodeSel;
     if (!tgt || !sel || editor.blockEdit()) return false;
-    const sub = withNode(baked(tgt.o).sub, sel.s, sel.k, null);
+    const sub0 = baked(tgt.o).sub;
+    const picked = sub0[sel.s];
+    const sub = tgt.o.net && picked && (sel.k === 0 || sel.k === nodeCount(picked) - 1) ? deleteVertex(sub0, picked.n[sel.k * NODE]!, picked.n[sel.k * NODE + 1]!) : withNode(sub0, sel.s, sel.k, null);
     editor.nodeSel = null;
     if (!sub.length) deleteSelection(doc, editor);
     else commitSub(tgt.o, sub, "Delete node");
@@ -1187,6 +1318,15 @@ export function attachTools(
       el.classList.add("is-panning");
       return;
     }
+    if (editor.builder) {
+      // The Shape builder: a stroke across regions merges them (Alt: deletes them).
+      editor.builder.removing = e.altKey;
+      const first = builderFaceAt(s);
+      editor.builder.touched = first === null ? [] : [first];
+      g = { kind: "builder", pointerId: e.pointerId };
+      editor.changed();
+      return;
+    }
     switch (effectiveTool()) {
       case "pen": {
         if (editor.blockEdit()) {
@@ -1236,6 +1376,12 @@ export function attachTools(
         if (startNodePress(e, s) || startGradientPress(e, s)) break;
         // Not on a node: a click picks the path to edit (or clears), a drag from nothing is a box.
         const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null;
+        if (!hit && nodeTargets().length && !editor.blockEdit()) {
+          // from empty ground a drag draws a lasso round nodes to pick (a click clears the selection, as before)
+          g = { kind: "nodelasso", pointerId: e.pointerId, additive: e.shiftKey };
+          editor.lasso = [s.x, s.y];
+          break;
+        }
         g = { kind: "press", pointerId: e.pointerId, start: s, target: hit, additive: e.shiftKey };
         break;
       }
@@ -1286,9 +1432,25 @@ export function attachTools(
       editor.changed();
       return;
     }
+    if (editor.builder && g.kind === "none") {
+      const h = builderFaceAt(local(e));
+      if (h !== editor.builder.hover) {
+        editor.builder.hover = h;
+        editor.changed();
+      }
+      return;
+    }
     if (!("pointerId" in g) || g.pointerId !== e.pointerId) return;
     const s = local(e);
     switch (g.kind) {
+      case "builder": {
+        const f = builderFaceAt(s);
+        if (f !== null && editor.builder && !editor.builder.touched.includes(f)) {
+          editor.builder.touched.push(f);
+          editor.changed();
+        }
+        break;
+      }
       case "erase": {
         const events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
         for (const ce of events.length ? events : [e]) sweep(g, local(ce));
@@ -1311,9 +1473,25 @@ export function attachTools(
         break;
       }
       case "lasso":
+      case "nodelasso":
         editor.lasso!.push(s.x, s.y);
         editor.changed();
         break;
+      case "nodes": {
+        if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) < DRAG_THRESHOLD_PX) break;
+        g.moved = true;
+        const subs = new Map<ObjectId, readonly SubPath[]>();
+        for (const [id, b] of g.bases) {
+          const l = localOf(b.po, s.x, s.y);
+          const picks = [...(editor.nodeMulti.get(id) ?? [])].map((key) => key.split(":").map(Number) as [number, number]);
+          // (an end of an edge of a network moves its whole vertex: moveNodes does that; a plain path moves the nodes one by one)
+          const o = doc.get(id);
+          subs.set(id, o?.kind === "path" && o.net ? moveNodes(b.sub, picks, l.x - b.from.x, l.y - b.from.y) : picks.reduce((acc, [si, ki]) => moveNode(acc, si, ki, l.x - b.from.x, l.y - b.from.y), b.sub));
+        }
+        editor.preview = { kind: "nodes", ids: [...subs.keys()], sub: [...subs.values()][0]!, subs };
+        editor.changed();
+        break;
+      }
       case "press":
         if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) pressBecomesDrag(g, s, e.altKey);
         break;
@@ -1484,6 +1662,54 @@ export function attachTools(
         altHeld = e.altKey;
         finishNode(cancelled);
         break;
+      case "builder": {
+        const b = editor.builder;
+        if (b && !cancelled) {
+          if (b.removing) for (const i of b.touched) b.deleted.add(i);
+          else if (b.touched.length >= 2) {
+            // the regions crossed are one shape now, with any group they were already part of
+            const joined = new Set(b.touched);
+            const keep = b.merged.filter((grp) => !grp.some((i) => joined.has(i)));
+            for (const grp of b.merged) if (grp.some((i) => joined.has(i))) for (const i of grp) joined.add(i);
+            b.merged = [...keep, [...joined]];
+          }
+        }
+        if (b) b.touched = [];
+        break;
+      }
+      case "nodes": {
+        const p = editor.preview;
+        editor.preview = { kind: "none" };
+        if (cancelled || !g.moved || p.kind !== "nodes" || !p.subs) break;
+        const objs = [...p.subs].flatMap(([id, sub]) => {
+          const o = doc.get(id);
+          return o?.kind === "path" ? [rebuilt(o, sub)] : [];
+        });
+        if (objs.length) doc.commit(doc.transaction(objs.length === 1 ? "Move nodes" : `Move nodes of ${objs.length} paths`, objs));
+        break;
+      }
+      case "nodelasso": {
+        const poly = editor.lasso;
+        editor.lasso = null;
+        if (cancelled || !poly) break;
+        const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1);
+        if (Math.max(...xs) - Math.min(...xs) < DRAG_THRESHOLD_PX && Math.max(...ys) - Math.min(...ys) < DRAG_THRESHOLD_PX) {
+          if (!g.additive) editor.select([]); // a click on empty ground clears, as it did
+          break;
+        }
+        const next = new Map<ObjectId, Set<string>>(g.additive ? [...editor.nodeMulti].map(([id, set]) => [id, new Set(set)]) : []);
+        for (const t of nodeTargets()) {
+          for (const n of nodesOnScreen(t.po)) {
+            if (!pointInPolygon(n.p[0], n.p[1], poly)) continue;
+            const set = next.get(t.o.id) ?? new Set<string>();
+            set.add(`${n.s}:${n.k}`);
+            next.set(t.o.id, set);
+          }
+        }
+        editor.nodeSel = null;
+        editor.nodeMulti = next;
+        break;
+      }
       case "text":
         // Opened after the pointer is released, so the editor keeps the focus.
         editor.shapeDraft = null;
@@ -1549,6 +1775,11 @@ export function attachTools(
     altAlone = e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
+    if (editor.builder && g.kind === "none" && (e.key === "Enter" || e.key === "Escape")) {
+      finishShapeBuilder(doc, editor, e.key === "Enter");
+      e.preventDefault();
+      return;
+    }
     if (mod && key === "z") {
       if (g.kind !== "none") return;
       if (e.shiftKey) redo(doc, editor);

@@ -21,7 +21,8 @@ export interface GradientStopValue {
 }
 
 export interface GradientValue {
-  type: "linear" | "radial";
+  /** "angular" goes round the centre (`cx`, `cy`), the first stop at `angle` degrees; the host places it (the switch below offers only the other two). */
+  type: "linear" | "radial" | "angular";
   angle: number;
   cx: number;
   cy: number;
@@ -137,7 +138,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
     <div class="cg-row cg-radial">
       <label class="cg-field">${esc(L.centreX)} <input type="number" class="cp-num" data-cx min="-100" max="200" step="1" inputmode="numeric" aria-label="${esc(L.centreX)} %"></label>
       <label class="cg-field">${esc(L.centreY)} <input type="number" class="cp-num" data-cy min="-100" max="200" step="1" inputmode="numeric" aria-label="${esc(L.centreY)} %"></label>
-      <label class="cg-field">${esc(L.radius)} <input type="number" class="cp-num" data-r min="1" max="400" step="1" inputmode="numeric" aria-label="${esc(L.radius)} %"></label>
+      <label class="cg-field cg-r">${esc(L.radius)} <input type="number" class="cp-num" data-r min="1" max="400" step="1" inputmode="numeric" aria-label="${esc(L.radius)} %"></label>
     </div>
     <div data-picker></div>`;
   scrubNumbers(root);

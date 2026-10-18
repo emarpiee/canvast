@@ -20,6 +20,7 @@ export function duplicateRecords(records: readonly SerializedObject[], newId: ()
     if (Array.isArray(r["groups"])) s["groups"] = (r["groups"] as string[]).map(gid);
     if (r["groupNames"]) s["groupNames"] = mapKeys(r["groupNames"]);
     if (r["boolOps"]) s["boolOps"] = mapKeys(r["boolOps"]);
+    if (r["mask"] && typeof r["mask"] === "object") s["mask"] = { ...(r["mask"] as Record<string, unknown>), by: gid(String((r["mask"] as { by: unknown }).by)) };
     if (typeof r["result"] === "string") s["result"] = gid(r["result"]);
     return s;
   });

@@ -78,6 +78,27 @@ export interface ContextActions {
   canSimplify(): boolean;
   strokeToPath(): void;
   canStrokeToPath(): boolean;
+  /** The stroke of the picked paths as a shape (ADR 0143), plain or tapered. */
+  outlineStroke(profile?: "taper"): void;
+  canOutlineStroke(): boolean;
+  /** Masks (ADR 0144): cut the others by the top picked thing, by its opacity or brightness, or clip them to its outline; change or release a mask. */
+  makeMask(mode: "alpha" | "luminance"): void;
+  makeClippingMask(): void;
+  canMakeMask(): boolean;
+  /** Make the picked paths one vector network, or take a network back to a path (ADR 0146). */
+  makeNetwork(): void;
+  releaseNetwork(): void;
+  canMakeNetwork(): boolean;
+  canReleaseNetwork(): boolean;
+  /** Divide the picked shapes into their regions, or open the Shape builder on them to merge and delete regions by dragging (ADR 0145). */
+  divide(): void;
+  shapeBuilder(): void;
+  finishBuilder(apply: boolean): void;
+  canDivide(): boolean;
+  changeMask(change: { invert?: boolean; release?: true }): void;
+  selectMask(): void;
+  canReleaseMask(): boolean;
+  selectedMask(): { mode: "alpha" | "luminance"; invert: boolean } | null;
   /** Set a picked text along a picked path (both picked), and take a text off its path (ADR 0131). */
   setOnPath(): void;
   canSetOnPath(): boolean;
@@ -126,7 +147,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
       btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
     group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
-    group("Path", btn("simplify", ICONS.chartSpline, "Simplify the path: fewer nodes, the same shape"), btn("strokepath", ICONS.pencilRuler, "Turn the pen stroke into an editable path")) +
+    group("Path", btn("simplify", ICONS.chartSpline, "Simplify the path: fewer nodes, the same shape"), btn("strokepath", ICONS.pencilRuler, "Turn the pen stroke into an editable path"), btn("outlinestroke", ICONS.stamp, "Outline stroke: make the line a shape of its own"), btn("taper", ICONS.feather, "Taper: make the line a shape that is thin at both ends")) +
+    group("Network", btn("makenet", ICONS.network, "Vector network: join the picked paths where they meet and fill the regions they enclose"), btn("releasenet", ICONS.unplug, "Release the network: its edges are an ordinary path again")) +
+    group("Regions", btn("divide", ICONS.slice, "Divide: cut the picked shapes into the regions they overlap in"), btn("shapebuilder", ICONS.puzzle, "Shape builder: drag across regions to merge them, Alt-drag to delete them"), btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
+    group("Mask", btn("clipmask", ICONS.venetianMask, "Clipping mask: the top shape cuts what else is picked to its outline"), btn("maskalpha", ICONS.circleDashed, "Mask by opacity: the top thing shows the others only where it is solid"), btn("maskluma", ICONS.contrast, "Mask by brightness: the top thing shows the others where it is light"), btn("selectmask", ICONS.scanEye, "Pick the mask of the picked things, to move or edit it"), btn("invertmask", ICONS.circleSlash, "Invert the mask: show what it hides and hide what it shows"), btn("releasemask", ICONS.circleMinus, "Release the mask: what it cut is whole again")) +
     group("Text", btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)"), btn("onpath", ICONS.route, "Set the text along the picked path (pick the text and the path)"), btn("offpath", ICONS.routeOff, "Take the text off its path: it is set straight again")) +
     group("Shapes",
       ...OPS.map((o) => btn("op", o.icon, o.aria, `data-op="${o.op}"`)),
@@ -168,6 +192,20 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "offpath": actions.takeOffPath(); break;
       case "simplify": actions.simplify(); break;
       case "strokepath": actions.strokeToPath(); break;
+      case "makenet": actions.makeNetwork(); break;
+      case "releasenet": actions.releaseNetwork(); break;
+      case "divide": actions.divide(); break;
+      case "shapebuilder": actions.shapeBuilder(); break;
+      case "builderdone": actions.finishBuilder(true); break;
+      case "buildercancel": actions.finishBuilder(false); break;
+      case "clipmask": actions.makeClippingMask(); break;
+      case "maskalpha": actions.makeMask("alpha"); break;
+      case "maskluma": actions.makeMask("luminance"); break;
+      case "selectmask": actions.selectMask(); break;
+      case "invertmask": actions.changeMask({ invert: !(actions.selectedMask()?.invert ?? false) }); break;
+      case "releasemask": actions.changeMask({ release: true }); break;
+      case "outlinestroke": actions.outlineStroke(); break;
+      case "taper": actions.outlineStroke("taper"); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
@@ -233,6 +271,15 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("offpath").hidden = !actions.canTakeOffPath();
     q("simplify").hidden = !actions.canSimplify();
     q("strokepath").hidden = !actions.canStrokeToPath();
+    for (const k of ["clipmask", "maskalpha", "maskluma"]) q(k).hidden = !actions.canMakeMask();
+    q("makenet").hidden = !actions.canMakeNetwork();
+    q("releasenet").hidden = !actions.canReleaseNetwork();
+    for (const k of ["divide", "shapebuilder"]) q(k).hidden = !actions.canDivide() || editor.builder !== null;
+    for (const k of ["builderdone", "buildercancel"]) q(k).hidden = editor.builder === null;
+    for (const k of ["selectmask", "invertmask", "releasemask"]) q(k).hidden = !actions.canReleaseMask();
+
+    q("outlinestroke").hidden = !actions.canOutlineStroke();
+    q("taper").hidden = !actions.canOutlineStroke();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();

@@ -3,7 +3,7 @@ import type { Frame } from "../core/frames";
 import { expressExactIn, levelsBetween } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
-import type { CanvasObject, ObjectId } from "../doc/model";
+import type { CanvasObject, ObjectId, PathObject } from "../doc/model";
 import { pivotOf } from "../doc/model";
 import type { LassoFilter } from "../render/hit-test";
 import { localToWorld, rotateAbout, scaleAbout, translate } from "../doc/edit-ops";
@@ -31,11 +31,26 @@ export type Preview =
   /** A text object open in the editor overlay: hidden on the canvas, which shows the overlay instead. */
   | { kind: "edit"; ids: readonly ObjectId[] }
   /** Nodes of one path being dragged (ADR 0099): the path as it would be (a turned path is baked, so `rot` goes). */
-  | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[] }
+  | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[]; /** Several paths at once (nodes picked together): each path's own sub-paths; `sub` is then unused. */ subs?: ReadonlyMap<ObjectId, readonly SubPath[]> }
   /** The fill and/or outline of paths being changed in the colour picker (ADR 0099); committed once when the picker settles. */
   | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null }
   /** Objects shown as they would be after a change being dragged (a corner radius, a star's ratio): replaced whole, stored once when it ends. */
   | { kind: "replace"; ids: readonly ObjectId[]; objs: ReadonlyMap<ObjectId, CanvasObject> };
+
+/** The Shape builder at work (ADR 0145): the regions the picked shapes overlap in, drawn instead of the shapes, and what the person has done with them so far. */
+export interface ShapeBuilderState {
+  readonly faces: ReadonlyArray<{ readonly inside: readonly number[]; readonly obj: PathObject }>;
+  /** The shapes the regions came from (hidden while it is open, replaced when it is finished). */
+  readonly srcIds: readonly ObjectId[];
+  readonly world: Frame;
+  /** Groups of regions (indices) to be united into one shape each. */
+  merged: number[][];
+  deleted: Set<number>;
+  hover: number | null;
+  /** The regions the pointer has crossed in the stroke being made, and whether it removes them (Alt) instead of merging. */
+  touched: number[];
+  removing: boolean;
+}
 
 /** A shape being dragged out (the Shape tool): its box in local units of its own anchor, like a stroke's draft. */
 export interface DraftShape {
@@ -169,12 +184,18 @@ export class EditorState {
   shapeTips = 5;
   /** Waiting for a click on the object to attach the picked ones to (ADR 0109). */
   attachMode = false;
+  /** The Shape builder, while it is open; null otherwise. */
+  builder: ShapeBuilderState | null = null;
+  /** Painting a brush mask (ADR 0144): the groups new pen strokes join (the masked group and the mask group) and their colour (white shows, black hides); null when not painting. */
+  maskEdit: { groups: readonly [string, string]; ink: string } | null = null;
   /** The picture whose crop is being changed (ADR 0118): its box handles move its window instead of its size. */
   cropId: ObjectId | null = null;
   shapeDraft: DraftShape | null = null;
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */
   nodeSel: { s: number; k: number } | null = null;
+  /** The nodes picked together by Shift-click or a lasso in Edit nodes (ADR 0145), per path, as "sub-path:node" keys; they move and are deleted as one. Empty: the single node `nodeSel`, if any, is what is edited. */
+  nodeMulti: Map<ObjectId, Set<string>> = new Map();
   /** Pen stabilizer (interaction/stabilizer.ts): on/off and strength 0–100. */
   stabilizer = { on: false, strength: 50 };
   preview: Preview = { kind: "none" };
@@ -215,12 +236,14 @@ export class EditorState {
     this.tool = t;
     this.eraser = null;
     this.heldTool = null;
+    this.nodeMulti.clear();
     this.changed();
   }
 
   select(ids: Iterable<ObjectId>, additive = false): void {
     if (!additive) this.selection.clear();
     this.nodeSel = null;
+    this.nodeMulti.clear();
     for (const id of ids) this.selection.add(id);
     this.changed();
   }
@@ -241,7 +264,8 @@ export class EditorState {
     }
     if (p.kind === "nodes" && p.ids.includes(o.id) && o.kind === "path") {
       const { rot: _turned, ...flat } = o;
-      return o.base && o.radius !== undefined ? { ...flat, base: p.sub, sub: roundCorners(p.sub, o.radius) } : { ...flat, sub: p.sub };
+      const sub = p.subs?.get(o.id) ?? p.sub;
+      return o.base && o.radius !== undefined ? { ...flat, base: sub, sub: roundCorners(sub, o.radius, o.smoothing) } : { ...flat, sub };
     }
     if (p.kind === "move" && p.ids.includes(o.id)) {
       // A displacement only scales between frames: exact shift.

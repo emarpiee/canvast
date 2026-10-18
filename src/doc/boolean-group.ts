@@ -69,7 +69,7 @@ export function opOf(all: Iterable<CanvasObject>, gid: string): BoolOp | undefin
 }
 
 /** A path as a Boolean operand: its sub-paths turned and placed in the units of `base`, exactly (the anchors differ by an exact amount, the rest is one rounding). */
-function regionIn(o: PathObject, base: PathObject, space: FrameSpace): Region | null {
+export function regionIn(o: PathObject, base: PathObject, space: FrameSpace): Region | null {
   const e = expressObjectIn(o, base.frame ?? space.world) as PathObject;
   const k = 2 ** (e.unit - base.unit);
   const dx = D.toNumber(D.shift(D.sub(e.anchor.x, base.anchor.x), -base.unit));

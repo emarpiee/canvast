@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)
+
+**Vectors** (ADR 0143, 0145, 0146)
+- **Outline stroke** makes the line a shape of its own (width, corners, ends, dashes and arrow heads in it); **Taper** (and taper start, taper end, swell in the palette) makes it thin where you want: variable width as a shape. A path with a fill keeps it and gets the outline above.
+- **Corner smoothing** (Smooth, in the Properties bar of a rounded shape): the corners start farther out and blend into the line.
+- **Angular gradient** (a sweep round a centre) in the paint chooser, with its centre and first edge as handles on the canvas.
+- **Edit nodes on several paths**: Shift-click or a lasso from empty ground picks nodes together; dragging one moves all, Delete takes them all away, across paths, one undo step.
+- **Divide** cuts overlapping shapes into their regions; the **Shape builder** shows the regions and merges the ones you drag across (Alt deletes them).
+- **Vector networks**: join paths where they meet into one network whose edges can meet any number at a vertex, with the enclosed regions filled; a vertex moves with all its edges, Alt joins two ends by an edge, Alt on an edge removes it; Release goes back to a path.
+
+**Masks** (ADR 0144)
+- **Clipping mask**: the top shape cuts what else is picked to its outline (any shape; a sheet of any shape).
+- **Mask by opacity** or **by brightness** (soft edges stay soft), invert it, pick it to move it, release it; copies follow.
+- **Brush mask**: paint a mask with the Pen in white (shows) or black (hides) over a mask that starts shown or hidden; the mask is vector, so it stays sharp at any zoom.
+
 ## 0.18.1 — The backlog run (2026-10-18)
 
 **Text** (ADR 0130 to 0132, 0139, 0140)

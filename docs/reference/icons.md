@@ -8,6 +8,20 @@ One icon per function: two buttons that do different things never share an icon,
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
 | `sticky-note` | Note tool (a text on a card) |
+| `stamp` | Outline stroke: make the line a shape (Actions bar) |
+| `feather` | Taper: make the line a shape thin at both ends (Actions bar) |
+| `venetian-mask` | Clipping mask: the top shape cuts what else is picked (Actions bar) |
+| `circle-dashed` | Mask by opacity (Actions bar) |
+| `contrast` | Mask by brightness (Actions bar) |
+| `scan-eye` | Pick the mask of the picked things (Actions bar) |
+| `circle-slash` | Invert the mask (Actions bar) |
+| `circle-minus` | Release the mask (Actions bar) |
+| `sun` | Paint the mask in white: the Pen shows (Actions bar) |
+| `moon` | Paint the mask in black: the Pen hides (Actions bar) |
+| `slice` | Divide the picked shapes into the regions they overlap in (Actions bar) |
+| `puzzle` | Shape builder (Actions bar) |
+| `network` | Vector network: join the picked paths (Actions bar) |
+| `unplug` | Release the network (Actions bar) |
 | `route` | Set the picked text along the picked path (Actions bar) |
 | `route-off` | Take a text off its path (Actions bar) |
 | `case-sensitive` | Font options of a text (kerning, features, axes) |

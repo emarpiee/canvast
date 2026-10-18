@@ -35,7 +35,7 @@ export function withShapeParams(o: PathObject, patch: ShapePatch): PathObject | 
   if (o.radius === undefined) return { ...o, params, sub: base };
   // (a radius for each corner no longer fits when the corners are not the same in number: it becomes the one that was largest)
   const radius = typeof o.radius === "number" || o.radius.length === nodesIn(base) ? o.radius : Math.max(...o.radius);
-  return { ...o, params, radius, base, sub: roundCorners(base, radius) };
+  return { ...o, params, radius, base, sub: roundCorners(base, radius, o.smoothing) };
 }
 
 /**
@@ -48,7 +48,7 @@ export function withRadius(o: PathObject, radius: Radius): PathObject {
   if (o.result !== undefined) return zero ? (rest as PathObject) : { ...rest, radius: typeof radius === "number" ? clampRadius(sharpOf(o), radius) : Math.max(...radius) };
   const base = sharpOf(o);
   const r = clampRadius(base, radius);
-  return zero ? { ...rest, sub: base } : { ...rest, radius: r, base, sub: roundCorners(base, r) };
+  return zero ? { ...rest, sub: base } : { ...rest, radius: r, base, sub: roundCorners(base, r, o.smoothing) };
 }
 
 /** Whether the path has corners that a radius would round (or is rounded now); a boolean group's result is judged by its own outline. */

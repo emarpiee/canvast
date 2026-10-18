@@ -137,6 +137,8 @@ export interface DebugHook {
   drawnHandles(): Array<[number, number]>;
   /** The words beside a handle being dragged, or null. */
   handleLabel(): string | null;
+  /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
+  pickedNodes(): Array<[string, number]>;
   /** The line the hovered or dragged radius or ratio handle slides along (screen px), or null. */
   handleGuide(): { x0: number; y0: number; x1: number; y1: number } | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
@@ -421,6 +423,7 @@ export function installDebugHook(
       return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
     },
     handleLabel: () => editor.handleLabel?.text ?? null,
+    pickedNodes: () => [...editor.nodeMulti].map(([id, set]) => [id, set.size] as [string, number]),
     handleGuide: () => editor.handleLabel?.guide ?? null,
     drawnHandles: () => editor.drawnHandles.map(([x, y]) => [x, y] as [number, number]),
     qualityLevel: () => deps.quality.level,

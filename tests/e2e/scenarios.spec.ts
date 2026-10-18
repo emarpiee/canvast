@@ -121,7 +121,8 @@ test("U10: groups, a link to a picture and the order survive a save and reopen w
   expect(after.filter((o) => o.attachmentTargetId !== null)).toEqual([]);
 });
 
-test("scenario I: switching between the canvas, the Assets view and Settings a thousand times leaves no nodes, listeners or memory behind", async ({ app, context }) => {
+test("scenario I: switching between the canvas, the Assets view and Settings a thousand times leaves no nodes, listeners or memory behind", async ({ app, context, browserName }) => {
+  test.skip(browserName !== "chromium", "reads the browser's own metrics through the DevTools protocol (Chromium only)");
   const p = app.page;
   const cdp = await context.newCDPSession(p);
   await cdp.send("Performance.enable");

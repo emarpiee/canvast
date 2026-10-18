@@ -92,6 +92,20 @@ import textAlignJustifyIcon from "lucide-static/icons/align-justify.svg";
 import textAutoWidthIcon from "lucide-static/icons/move-horizontal.svg";
 import textFixedWidthIcon from "lucide-static/icons/wrap-text.svg";
 import stickyNoteSvg from "lucide-static/icons/sticky-note.svg";
+import venetianMaskSvg from "lucide-static/icons/venetian-mask.svg";
+import circleDashedSvg from "lucide-static/icons/circle-dashed.svg";
+import contrastSvg from "lucide-static/icons/contrast.svg";
+import scanEyeSvg from "lucide-static/icons/scan-eye.svg";
+import circleSlashSvg from "lucide-static/icons/circle-slash.svg";
+import circleMinusSvg from "lucide-static/icons/circle-minus.svg";
+import sunSvg from "lucide-static/icons/sun.svg";
+import moonSvg from "lucide-static/icons/moon.svg";
+import sliceSvg from "lucide-static/icons/slice.svg";
+import puzzleSvg from "lucide-static/icons/puzzle.svg";
+import networkSvg from "lucide-static/icons/network.svg";
+import unplugSvg from "lucide-static/icons/unplug.svg";
+import stampSvg from "lucide-static/icons/stamp.svg";
+import featherSvg from "lucide-static/icons/feather.svg";
 import splineIcon from "lucide-static/icons/spline.svg";
 import circleOffIcon from "lucide-static/icons/circle-off.svg";
 import circleHelpIcon from "lucide-static/icons/circle-help.svg";
@@ -272,6 +286,20 @@ export const ICONS = {
   textFixedWidth: clean(textFixedWidthIcon),
   spline: clean(splineIcon),
   stickyNote: clean(stickyNoteSvg),
+  stamp: clean(stampSvg),
+  network: clean(networkSvg),
+  unplug: clean(unplugSvg),
+  slice: clean(sliceSvg),
+  puzzle: clean(puzzleSvg),
+  sun: clean(sunSvg),
+  moon: clean(moonSvg),
+  venetianMask: clean(venetianMaskSvg),
+  circleDashed: clean(circleDashedSvg),
+  contrast: clean(contrastSvg),
+  scanEye: clean(scanEyeSvg),
+  circleSlash: clean(circleSlashSvg),
+  circleMinus: clean(circleMinusSvg),
+  feather: clean(featherSvg),
   circleOff: clean(circleOffIcon),
   circleHelp: clean(circleHelpIcon),
   frame: clean(frameIcon),

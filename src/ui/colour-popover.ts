@@ -260,7 +260,7 @@ function installCloseRules(): void {
 /** The gradient as the editor of the package takes it: an angle, or a centre and radius. */
 export function gradientToValue(g: Gradient): GradientValue {
   const stops = g.stops.map((s) => ({ offset: s.o, colour: s.c }));
-  return g.type === "linear" ? { type: "linear", angle: angleOf(g), cx: 0.5, cy: 0.5, r: 0.5, stops } : { type: "radial", angle: 0, cx: g.cx, cy: g.cy, r: g.r, stops };
+  return g.type === "linear" ? { type: "linear", angle: angleOf(g), cx: 0.5, cy: 0.5, r: 0.5, stops } : g.type === "angular" ? { type: "angular", angle: g.angle, cx: g.cx, cy: g.cy, r: 0.5, stops } : { type: "radial", angle: 0, cx: g.cx, cy: g.cy, r: g.r, stops };
 }
 
 /**
@@ -272,6 +272,10 @@ export function gradientFromValue(prev: Gradient, v: GradientValue): Gradient {
   if (v.type === "linear") {
     const kept = prev.type === "linear" && Math.abs(angleOf(prev) - v.angle) < 0.5 ? prev : null;
     return kept ? { ...kept, stops } : linearAt(v.angle, stops);
+  }
+  if (v.type === "angular") {
+    const kept = prev.type === "angular" && Math.abs(prev.cx - v.cx) < 0.005 && Math.abs(prev.cy - v.cy) < 0.005 && Math.abs(prev.angle - v.angle) < 0.5 ? prev : null;
+    return kept ? { ...kept, stops } : { type: "angular", cx: v.cx, cy: v.cy, angle: v.angle % 360, stops };
   }
   const kept = prev.type === "radial" && Math.abs(prev.cx - v.cx) < 0.005 && Math.abs(prev.cy - v.cy) < 0.005 && Math.abs(prev.r - v.r) < 0.005 ? prev : null;
   return kept ? { ...kept, stops } : { type: "radial", cx: v.cx, cy: v.cy, r: v.r, stops };
@@ -393,10 +397,10 @@ export interface PaintPopoverOptions {
   onChange(paint: Paint | null): void;
   onClose?(): void;
   /** The kinds of paint offered (default: all four). A text's fill has no None; a text's outline has only None and Colour. */
-  modes?: ReadonlyArray<"none" | "solid" | "linear" | "radial">;
+  modes?: ReadonlyArray<"none" | "solid" | "linear" | "radial" | "angular">;
 }
 
-type Mode = "none" | "solid" | "linear" | "radial";
+type Mode = "none" | "solid" | "linear" | "radial" | "angular";
 
 /** Open the paint chooser under `anchor`: None, Solid, Linear or Radial, with the colour picker or the gradient editor below. */
 export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): void {
@@ -434,8 +438,8 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.className = "paint-modes";
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
-  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial" };
-  const offered = o.modes ?? (["none", "solid", "linear", "radial"] as const);
+  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial", angular: "Angular" };
+  const offered = o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const);
   modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
   const body = document.createElement("div");
   body.className = "paint-body";

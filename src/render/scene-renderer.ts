@@ -7,6 +7,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject } from "./projection";
 import type { RasterSource } from "./draw-objects";
+import { drawMasked } from "./mask";
 import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
@@ -97,6 +98,50 @@ export function drawObjects(
     if (run.length) strokeBatch(ctx, run, strokeLineWidth(run[0]!), vp);
     run = [];
   };
+  const paintOne = (c: CanvasRenderingContext2D, po: ProjectedObject): void => {
+    // On a clipping sheet (ADR 0108): cut by the sheet's shape (rounded corners, turned, exact at depth, as it is drawn itself).
+    if (po.clip) {
+      c.save();
+      for (const cl of po.clip) {
+        c.beginPath();
+        addFillPath(c, cl, vp);
+        c.clip(cl.obj.kind === "path" && cl.obj.evenodd ? "evenodd" : "nonzero");
+      }
+    }
+    if (po.rotated) {
+      // A turned image or text: draw the unturned one into the widened viewport, with the canvas turned.
+      const t = po.rotated;
+      c.save();
+      c.translate(t.cx, t.cy);
+      c.rotate(Math.atan2(t.s, t.c));
+      c.translate(-t.vvp.width / 2, -t.vvp.height / 2);
+      if (po.obj.kind === "text") drawText(c, t.inner, t.vvp, dpr);
+      else if (po.obj.kind === "image") {
+        const shown = shownEdge(t.inner);
+        const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
+        const key = rasterKey(po.obj);
+        const src = assets.get(key, shown, edge);
+        if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
+        drawImageObject(c, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
+      }
+      c.restore();
+    } else if (po.cover) {
+      const src = po.obj.kind === "image" ? assets.get(rasterKey(po.obj)) : null;
+      if (po.obj.kind === "image" && !src) pending = true;
+      drawCover(c, po, vp, src, theme.imagePlaceholder);
+    } else if (po.obj.kind === "stroke") drawStroke(c, po, vp);
+    else if (po.obj.kind === "text") drawText(c, po, vp, dpr);
+    else if (po.obj.kind === "path") drawPath(c, po, vp);
+    else {
+      const shown = shownEdge(po);
+      const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
+      const key = rasterKey(po.obj);
+      const src = assets.get(key, shown, edge);
+      if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
+      drawImageObject(c, po, vp, dpr, src, theme.imagePlaceholder);
+    }
+    if (po.clip) c.restore();
+  };
   for (const po of list) {
     if (batchable(po)) {
       const r = runs.get(po) ?? -1;
@@ -106,48 +151,9 @@ export function drawObjects(
       continue;
     }
     flush();
-    // On a clipping sheet (ADR 0108): cut by the sheet's shape (rounded corners, turned, exact at depth, as it is drawn itself).
-    if (po.clip) {
-      ctx.save();
-      for (const c of po.clip) {
-        ctx.beginPath();
-        addFillPath(ctx, c, vp);
-        ctx.clip(c.obj.kind === "path" && c.obj.evenodd ? "evenodd" : "nonzero");
-      }
-    }
-    if (po.rotated) {
-      // A turned image or text: draw the unturned one into the widened viewport, with the canvas turned.
-      const t = po.rotated;
-      ctx.save();
-      ctx.translate(t.cx, t.cy);
-      ctx.rotate(Math.atan2(t.s, t.c));
-      ctx.translate(-t.vvp.width / 2, -t.vvp.height / 2);
-      if (po.obj.kind === "text") drawText(ctx, t.inner, t.vvp, dpr);
-      else if (po.obj.kind === "image") {
-        const shown = shownEdge(t.inner);
-        const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
-        const key = rasterKey(po.obj);
-        const src = assets.get(key, shown, edge);
-        if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
-        drawImageObject(ctx, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
-      }
-      ctx.restore();
-    } else if (po.cover) {
-      const src = po.obj.kind === "image" ? assets.get(rasterKey(po.obj)) : null;
-      if (po.obj.kind === "image" && !src) pending = true;
-      drawCover(ctx, po, vp, src, theme.imagePlaceholder);
-    } else if (po.obj.kind === "stroke") drawStroke(ctx, po, vp);
-    else if (po.obj.kind === "text") drawText(ctx, po, vp, dpr);
-    else if (po.obj.kind === "path") drawPath(ctx, po, vp);
-    else {
-      const shown = shownEdge(po);
-      const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
-      const key = rasterKey(po.obj);
-      const src = assets.get(key, shown, edge);
-      if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
-      drawImageObject(ctx, po, vp, dpr, src, theme.imagePlaceholder);
-    }
-    if (po.clip) ctx.restore();
+    const mask = po.obj.mask && po.maskPos?.length ? po.maskPos : null;
+    if (mask) drawMasked(ctx, (c) => paintOne(c, po), (c) => { for (const m of mask) paintOne(c, m); }, po.obj.mask!.mode, po.obj.mask!.invert === true);
+    else paintOne(ctx, po);
   }
   flush();
   return pending;
@@ -168,6 +174,7 @@ export function drawOverlays(
   members: readonly ProjectedObject[] = [],
   labels: readonly ItemLabel[] = [],
 ): void {
+  if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp);
   // The names above the items (ADR 0108, 0125).
   if (labels.length) {
     ctx.save();
@@ -353,11 +360,13 @@ export function drawOverlays(
 
 /** Nodes and handles of the one selected path, for the Edit nodes tool: squares for nodes, circles for the handles of the selected one. */
 function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
-  if (selected.length !== 1) return;
-  const po = selected[0]!;
-  if (po.obj.kind !== "path" || po.cover) return;
+  // Every picked path shows its nodes (ADR 0145); the handles of a node are shown when one path is picked and one node is being edited.
+  for (const po of selected) if (po.obj.kind === "path" && !po.cover) drawPathNodes(ctx, po, editor, theme, selected.length === 1 ? editor.nodeSel : null, editor.nodeMulti.get(po.obj.id));
+}
+
+function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, editor: EditorState, theme: SceneTheme, sel: { s: number; k: number } | null, picked: ReadonlySet<string> | undefined): void {
+  void editor;
   const half = HANDLE_SIZE_PX / 2;
-  const sel = editor.nodeSel;
   ctx.save();
   ctx.strokeStyle = theme.selection;
   ctx.lineWidth = 1.25;
@@ -379,7 +388,7 @@ function drawNodes(ctx: CanvasRenderingContext2D, selected: readonly ProjectedOb
     }
   }
   for (const n of nodes) {
-    const on = !!sel && n.s === sel.s && n.k === sel.k;
+    const on = (!!sel && n.s === sel.s && n.k === sel.k) || (picked?.has(`${n.s}:${n.k}`) ?? false);
     ctx.fillStyle = on ? theme.selection : theme.handleFill;
     ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
     ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
@@ -503,6 +512,21 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
   ctx.restore();
 }
 
+/** The regions of the open Shape builder (ADR 0145) as they will look, the ones being crossed or merged washed with colour (red when they are being deleted). */
+function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["builder"]>, fc: FrameCamera, vp: Viewport): void {
+  b.faces.forEach((f, i) => {
+    if (b.deleted.has(i)) return;
+    const cam = cameraIn(fc, f.obj.frame ?? b.world);
+    const po = cam && projectObject(f.obj, cam, vp, { keepTiny: true });
+    if (!cam || !po || po.cover) return;
+    drawPath(ctx, po, vp);
+    const on = b.touched.includes(i) || b.hover === i;
+    if (!on && !b.merged.some((grp) => grp.includes(i))) return;
+    const wash = projectObject({ ...f.obj, fill: on ? (b.removing ? "#dc262699" : "#2563eb99") : "#2563eb55", stroke: null }, cam, vp, { keepTiny: true });
+    if (wash && !wash.cover) drawPath(ctx, wash, vp);
+  });
+}
+
 /** The axis or the rings of the gradient of the one selected path, with handles to drag (ADR 0100). */
 function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], theme: SceneTheme, focus: "fill" | "stroke" | null): void {
   if (selected.length !== 1 || selected[0]!.obj.kind !== "path") return;
@@ -516,6 +540,13 @@ function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly P
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.arc(h.ring.x, h.ring.y, Math.min(h.ring.r, 1e5), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (h.ray) {
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(h.pts[0]!.x, h.pts[0]!.y);
+    ctx.lineTo(h.pts[1]!.x, h.pts[1]!.y);
     ctx.stroke();
     ctx.setLineDash([]);
   } else {

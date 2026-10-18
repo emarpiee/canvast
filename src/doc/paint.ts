@@ -28,7 +28,19 @@ export interface RadialGradient {
   readonly stops: readonly GradientStop[];
 }
 
-export type Gradient = LinearGradient | RadialGradient;
+/** Colours going round a centre (a conic gradient): the first stop at `angle` degrees (0: pointing right, clockwise), the last just before it comes round again. */
+export interface AngularGradient {
+  readonly type: "angular";
+  /** Centre, in box units. */
+  readonly cx: number;
+  readonly cy: number;
+  /** Where the first stop is, in degrees clockwise from pointing right (0 to 360). */
+  readonly angle: number;
+  readonly stops: readonly GradientStop[];
+}
+
+export type Gradient = LinearGradient | RadialGradient | AngularGradient;
+export type GradientKind = Gradient["type"];
 export type Paint = string | Gradient;
 
 export const MAX_STOPS = 32;
@@ -53,6 +65,7 @@ export function isPaint(v: unknown): v is Paint {
   }
   if (g["type"] === "linear") return num(g["x0"]) && num(g["y0"]) && num(g["x1"]) && num(g["y1"]) && (g["x0"] !== g["x1"] || g["y0"] !== g["y1"]);
   if (g["type"] === "radial") return num(g["cx"]) && num(g["cy"]) && num(g["r"]) && (g["r"] as number) > 0;
+  if (g["type"] === "angular") return num(g["cx"]) && num(g["cy"]) && num(g["angle"]) && (g["angle"] as number) >= 0 && (g["angle"] as number) < 360;
   return false;
 }
 
@@ -121,22 +134,23 @@ export const colourOfPaintAt = (p: Paint, t: number): string => (isGradient(p) ?
 export function paintCss(p: Paint): string {
   if (!isGradient(p)) return p;
   const list = p.stops.map((s) => `${s.c} ${Math.round(s.o * 1000) / 10}%`).join(", ");
+  if (p.type === "angular") return `conic-gradient(from ${Math.round(p.angle + 90)}deg at ${Math.round(p.cx * 100)}% ${Math.round(p.cy * 100)}%, ${list})`; // (CSS starts upward, ours to the right)
   if (p.type === "radial") return `radial-gradient(circle at ${Math.round(p.cx * 100)}% ${Math.round(p.cy * 100)}%, ${list})`;
   const deg = Math.round(((Math.atan2(p.y1 - p.y0, p.x1 - p.x0) * 180) / Math.PI + 90 + 360) % 360);
   return `linear-gradient(${deg}deg, ${list})`;
 }
 
 /** A gradient made from a colour: the colour fading to nothing (linear: across the box, left to right; radial: from the middle). */
-export function gradientFrom(colour: string, type: "linear" | "radial"): Gradient {
+export function gradientFrom(colour: string, type: GradientKind): Gradient {
   const clear = hexOf([...rgbaOf(colour).slice(0, 3), 0] as unknown as Rgba);
   const stops: GradientStop[] = [{ o: 0, c: colour }, { o: 1, c: clear }];
-  return type === "linear" ? { type, x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops } : { type, cx: 0.5, cy: 0.5, r: 0.5, stops };
+  return type === "linear" ? { type, x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops } : type === "angular" ? { type, cx: 0.5, cy: 0.5, angle: 0, stops } : { type, cx: 0.5, cy: 0.5, r: 0.5, stops };
 }
 
 /** The same stops as the other kind of gradient. */
-export function asKind(g: Gradient, type: "linear" | "radial"): Gradient {
+export function asKind(g: Gradient, type: GradientKind): Gradient {
   if (g.type === type) return g;
-  return type === "linear" ? { type, x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: g.stops } : { type, cx: 0.5, cy: 0.5, r: 0.5, stops: g.stops };
+  return type === "linear" ? { type, x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops: g.stops } : type === "angular" ? { type, cx: g.type === "radial" ? g.cx : 0.5, cy: g.type === "radial" ? g.cy : 0.5, angle: 0, stops: g.stops } : { type, cx: g.type === "angular" ? g.cx : 0.5, cy: g.type === "angular" ? g.cy : 0.5, r: 0.5, stops: g.stops };
 }
 
 /** The angle of a linear gradient, in degrees (0: left to right, 90: top to bottom). */

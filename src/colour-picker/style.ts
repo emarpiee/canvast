@@ -100,7 +100,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .cg-row .cp-tool { flex: none; align-self: flex-end; }
 .cg-text { width: 28px; font-size: var(--cp-text); }
 .cg-text:disabled { opacity: 0.4; cursor: default; }
-.cg[data-type="linear"] .cg-radial, .cg[data-type="radial"] .cg-linear { display: none; }
+.cg[data-type="linear"] .cg-radial, .cg[data-type="radial"] .cg-linear, .cg[data-type="angular"] .cg-r { display: none; }
 .cp-groups { display: flex; flex-direction: column; gap: var(--cp-gap-sm); }
 .cp-groups:empty { display: none; }
 .cp-group-h { color: var(--cp-muted); font-size: var(--cp-text-sm); margin-bottom: 3px; }

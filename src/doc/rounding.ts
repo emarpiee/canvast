@@ -14,6 +14,9 @@ import { NODE, cubicOf, nodeCount } from "./path";
 type Cubic = [number, number, number, number, number, number, number, number];
 
 const SAMPLES = 24;
+/** How much farther from its corner a fully smoothed (1) curve starts, and how much longer its handles are (corner smoothing, ADR 0143). */
+const SMOOTH_REACH = 0.6;
+const SMOOTH_HANDLE = 0.45;
 /** A path turning by less than this (radians) at a node is going straight on: not a corner. */
 const STRAIGHT = 0.01;
 
@@ -219,7 +222,7 @@ function cutEdge(e: Edge, lo: number, hi: number): Cut {
 }
 
 /** The nodes of a sub-path, rounded. `flat0`: how many nodes the earlier sub-paths had (an array radius counts nodes across them all). */
-function roundSub(s: SubPath, r: Radius, flat0: number): SubPath {
+function roundSub(s: SubPath, r: Radius, flat0: number, smoothing = 0): SubPath {
   const c = nodeCount(s);
   const { corners, edges } = analyse(s);
   if (!edges.length) return s;
@@ -227,7 +230,7 @@ function roundSub(s: SubPath, r: Radius, flat0: number): SubPath {
   const demand = new Array<number>(c).fill(0);
   corners.forEach((q, k) => {
     const rad = q ? radiusFor(r, flat0 + k) : 0;
-    if (q && rad > 0) demand[k] = rad / Math.tan(q.theta / 2);
+    if (q && rad > 0) demand[k] = (rad / Math.tan(q.theta / 2)) * (1 + SMOOTH_REACH * smoothing);
   });
   const share = (e: Edge): number => {
     const ask = demand[e.from]! + demand[e.to]!;
@@ -245,7 +248,10 @@ function roundSub(s: SubPath, r: Radius, flat0: number): SubPath {
     const a = cuts[q.inEdge]!, b = cuts[q.outEdge]!;
     const chord = Math.hypot(b.start[0] - a.end[0], b.start[1] - a.end[1]);
     const phi = Math.acos(Math.max(-1, Math.min(1, a.endTan[0] * b.startTan[0] + a.endTan[1] * b.startTan[1])));
-    const hh = phi > 1e-3 ? (4 / 3) * Math.tan(phi / 4) * (chord / (2 * Math.sin(phi / 2))) : 0;
+    const circular = phi > 1e-3 ? (4 / 3) * Math.tan(phi / 4) * (chord / (2 * Math.sin(phi / 2))) : 0;
+    // Smoothing: the curve starts farther from the corner (above) and its handles are longer, so it leaves the line without a visible start
+    // (a curve of continuous curvature), never past the corner itself.
+    const hh = Math.min(circular * (1 + SMOOTH_HANDLE * smoothing), (0.95 * chord) / (2 * Math.max(1e-6, Math.cos(phi / 2))));
     return { out: [a.end[0] + a.endTan[0] * hh, a.end[1] + a.endTan[1] * hh], into: [b.start[0] - b.startTan[0] * hh, b.start[1] - b.startTan[1] * hh] };
   };
   const out: number[] = [];
@@ -281,10 +287,10 @@ function roundSub(s: SubPath, r: Radius, flat0: number): SubPath {
 }
 
 /** The sub-paths with their corners rounded by `r` (see the file's note); nodes that are not corners, and the ends of open sub-paths, are as they were. */
-export function roundCorners(subs: readonly SubPath[], r: Radius): SubPath[] {
+export function roundCorners(subs: readonly SubPath[], r: Radius, smoothing = 0): SubPath[] {
   let flat = 0;
   return subs.map((s) => {
-    const done = roundSub(s, r, flat);
+    const done = roundSub(s, r, flat, smoothing);
     flat += nodeCount(s);
     return done;
   });

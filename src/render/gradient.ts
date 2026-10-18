@@ -1,5 +1,5 @@
 import * as D from "../core/dyadic";
-import { cosSin } from "../core/angle";
+import { cosSin, radiansFromAngle } from "../core/angle";
 import type { Viewport } from "../core/camera";
 import type { PathObject } from "../doc/model";
 import { pathStyle } from "../doc/model";
@@ -22,7 +22,9 @@ import type { Projection } from "./projection";
  */
 export type LocalGradient =
   | { readonly type: "linear"; readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number }
-  | { readonly type: "radial"; readonly cx: number; readonly cy: number; readonly R: number };
+  | { readonly type: "radial"; readonly cx: number; readonly cy: number; readonly R: number }
+  /** `a0`: where the first stop is, in radians clockwise from pointing right, turned with the path. */
+  | { readonly type: "angular"; readonly cx: number; readonly cy: number; readonly a0: number };
 
 /** The turn of a path (about the centre of its unturned paint bounds, as `pathSubs`) and its inverse, in local units. */
 export function turner(o: PathObject): { turn(x: number, y: number): [number, number]; unturn(x: number, y: number): [number, number] } {
@@ -58,6 +60,10 @@ export function localGradient(o: PathObject, g: Gradient): LocalGradient {
     const [x1, y1] = boxToLocal(o, g.x1, g.y1);
     return { type: "linear", x0, y0, x1, y1 };
   }
+  if (g.type === "angular") {
+    const [cx, cy] = boxToLocal(o, g.cx, g.cy);
+    return { type: "angular", cx, cy, a0: (g.angle * Math.PI) / 180 + (o.rot ? radiansFromAngle(o.rot) : 0) };
+  }
   const b = geometryBounds(o.base ?? o.sub);
   const [cx, cy] = boxToLocal(o, g.cx, g.cy);
   return { type: "radial", cx, cy, R: g.r * Math.max(b.maxX - b.minX, b.maxY - b.minY) };
@@ -65,6 +71,7 @@ export function localGradient(o: PathObject, g: Gradient): LocalGradient {
 
 /** The offset along the gradient of a local point. */
 export function offsetAt(l: LocalGradient, x: number, y: number): number {
+  if (l.type === "angular") return ((((Math.atan2(y - l.cy, x - l.cx) - l.a0) / (2 * Math.PI)) % 1) + 1) % 1;
   if (l.type === "radial") return l.R > 0 ? Math.hypot(x - l.cx, y - l.cy) / l.R : 0;
   const ax = l.x1 - l.x0;
   const ay = l.y1 - l.y0;
@@ -103,6 +110,16 @@ export function canvasPaint(ctx: CanvasRenderingContext2D, o: PathObject, paint:
     return along(ax / len, ay / len, offsetAt(l, cx, cy), hv / len);
   }
   const d = Math.hypot(cx - l.cx, cy - l.cy);
+  if (l.type === "angular") {
+    if (Number.isFinite(ppu) && d <= 20 * hv) {
+      // The centre is near the view: the real sweep round it.
+      return make(ctx.createConicGradient(l.a0, sx + (l.cx - cx) * ppu, sy + (l.cy - cy) * ppu), sliceStops(paint.stops, 0, 1));
+    }
+    // Far from the view the colour changes by the angle across it, along the direction at right angles to the way to the centre.
+    const ux = d > 0 ? (cx - l.cx) / d : 1;
+    const uy = d > 0 ? (cy - l.cy) / d : 0;
+    return along(-uy, ux, offsetAt(l, cx, cy), d > 0 ? hv / (2 * Math.PI * d) : 0);
+  }
   if (Number.isFinite(ppu) && d <= 20 * hv) {
     // The centre is near the view: true rings, their radii in px of the distance (bounded by the view, whatever the gradient's size).
     const t0 = Math.max(0, (d - hv) / l.R);

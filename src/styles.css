@@ -385,7 +385,7 @@ html, body {
 
 .hud-dev {
   position: absolute;
-  left: 12px;
+  left: 50px; /* (clear of the tool rail, which is 8 to 46 px from the left) */
   top: 180px;
   pointer-events: auto;
   display: flex;
@@ -398,6 +398,7 @@ html, body {
   font: var(--text-sm) var(--font-ui);
 }
 .dev-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.hud-dev .dev-row button, .hud-dev .dev-row select { font-size: var(--text-xs); }
 /* Twelve jump buttons in two rows: the panel stays as small as before (tests and hands rely on the canvas around it). */
 .dev-jumps { display: grid; grid-template-columns: repeat(6, 1fr); }
 .dev-jumps button { min-width: 0; padding: var(--sp-2) 1px; font-size: var(--text-xs); }
@@ -2368,3 +2369,8 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
   select option:checked { color: var(--hud-accent-fg); background: var(--hud-accent); }
 }
 .toolbar input[data-text-size] { width: calc(var(--sp-14) + var(--sp-6)); }
+
+/* Phones: the library's toolbar keeps to four rows (the thumbnail size is for a wider screen), so the grid starts high enough to be tapped above the details sheet. */
+@media (max-width: 640px) {
+  .assets-size { display: none; }
+}

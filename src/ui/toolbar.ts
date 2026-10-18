@@ -87,6 +87,9 @@ export interface ToolbarActions {
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
   /** The corner radius (px at this zoom) of the first picked path that has corners to round; `perCorner`: a rectangle, which takes one per corner. */
+  /** The corner smoothing (0 to 100) of the first picked rounded shape; null when none. */
+  selectedSmoothing(): number | null;
+  setSmoothing(pct: number, final?: boolean): void;
   selectedCorners(): { radiusPx: number[]; nodes: number; mixed: boolean } | null;
   /** Round the corners of the picked paths: one value, or one for every corner (four for a rectangle: top left, top right, bottom right, bottom left). */
   cornersSelected(px: number[], final?: boolean): void;
@@ -99,6 +102,8 @@ export interface ToolbarActions {
   /** The angle below which a sharp corner is cut (degrees), of the first picked path; null when none is picked. */
   selectedMiterAngle(): number | null;
   setMiterAngle(deg: number | null): void;
+  /** Paint the brush mask in white (shows) or black (hides), or finish it. */
+  paintMask(ink: "show" | "hide" | "done"): void;
   setDashNumbers(n: { len?: number; gap?: number; offset?: number }): void;
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
 }
@@ -214,6 +219,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     <div class="toolbar" data-cmd-group="Properties" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
       <div class="tb-group tb-options tb-subject" data-for="select node" role="radiogroup" aria-label="Edit which kind of item" hidden></div>
+      <div class="tb-group tb-options" data-for="" data-mask-paint role="group" aria-label="Paint the mask">
+        <button type="button" data-mask-ink="show" aria-label="Paint the mask in white: the Pen shows" title="Paint the mask in white: the Pen shows">${ICONS.sun}</button>
+        <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
+        <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
+      </div>
       <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
         <span class="tb-recents" data-recents data-no-command role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
@@ -228,6 +238,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
         <label class="tb-count" data-kind="shape" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
+        <label class="tb-count" data-kind="shape" data-scrub="smooth" data-sel-smooth-wrap hidden title="Drag the name left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
         <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-kind="shape" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
         <label class="tb-count" data-kind="any" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
@@ -549,11 +560,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
+  liveNumber(root.querySelector<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
 
   // Drag a number's name to change it, live (one undo step when released): the quick way to a radius, a count, a ratio.
   const scrubs: Record<string, { to(start: number, dx: number): number; apply(v: number, final: boolean): void }> = {
     radius: { to: (v, dx) => Math.max(0, v + dx), apply: (v, f) => actions.cornersSelected([v], f) },
+    smooth: { to: (v, dx) => Math.max(0, Math.min(100, Math.round(v + dx / 2))), apply: (v, f) => actions.setSmoothing(v, f) },
     sides: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ sides: v }, f) },
     tips: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ tips: v }, f) },
     inner: { to: (v, dx) => Math.max(5, Math.min(95, Math.round(v + dx / 2))), apply: (v, f) => actions.shapeSelected({ inner: v / 100 }, f) },
@@ -706,6 +719,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (d["subject"]) {
       editor.subject = d["subject"];
       editor.changed();
+    } else if (d["maskInk"]) {
+      actions.paintMask(d["maskInk"] as "show" | "hide" | "done");
     } else if (d["penKind"]) {
       editor.penKind = d["penKind"] as PenKind;
       editor.changed();
@@ -821,9 +836,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const still = editor.preview.kind === "none"; // (not while something is being dragged: the numbers wait for it to end)
     const shp = pick && still ? actions.selectedShape() : null;
     const crn = pick && still ? actions.selectedCorners() : null;
+    const smoothing = pick && still ? actions.selectedSmoothing() : null;
     const round2 = (v: number): string => String(Math.round(v * 100) / 100);
     const fields: Array<[string, boolean, string]> = [
       ["radius", !!crn, crn && !crn.mixed ? round2(crn.radiusPx[0] ?? 0) : ""],
+      ["smooth", smoothing !== null, String(smoothing ?? 0)],
       ["sides", shp?.shape === "polygon", String(shp?.sides ?? 0)],
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
@@ -988,6 +1005,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else for (const el of root.querySelectorAll<HTMLElement>(".toolbar [data-off]")) el.removeAttribute("data-off");
     // The bar shows what the current tool offers and is gone when there is nothing to show.
     const row = root.querySelector<HTMLElement>(".tb-options-row")!;
+    root.querySelector<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
+    for (const b of root.querySelectorAll<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
     syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
     root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(row);

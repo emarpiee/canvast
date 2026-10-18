@@ -1,6 +1,6 @@
-# Gaps against the engineering plan (checked 2026-10-17, updated 2026-10-18, v0.18.1, `main`)
+# Gaps against the engineering plan (checked 2026-10-17, updated 2026-10-18, v0.19.0, `main`)
 
-Owner decisions of 2026-10-17: **masks, ratings and saved searches are out of scope**; they are listed as Decided against, not as gaps.
+Owner decisions of 2026-10-17: **ratings and saved searches are out of scope**; they are listed as Decided against, not as gaps. (Masks were left out then and added on 2026-10-18, ADR 0144.)
 
 Checked item by item against the plan: sections 4 to 9, the detailed specifications of section 14 that name features (14.8 to 14.17, 14.21, 14.31 to 14.42, 14.46, 14.51 to 14.54) and the roadmap of section 16. The plan is outside the repository (the vault note `zettel/endless_canvas-complete_engineering_plan-expanded-claude.md`). "Gap" means the plan asks for it and the app does not do it. This file replaces the check of 2026-10-16.
 
@@ -12,15 +12,15 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 
 | Area | Done | Partial | Gap | Decided | Unverified | Not started |
 | --- | --- | --- | --- | --- | --- | --- |
-| §4 Content types | 28 | 1 | 1 | 2 | 0 | 0 |
-| §5 Non-destructive editing | 5 | 0 | 0 | 1 | 0 | 0 |
+| §4 Content types | 32 | 1 | 0 | 0 | 0 | 0 |
+| §5 Non-destructive editing | 6 | 0 | 0 | 0 | 0 | 0 |
 | §6 Assets and search | 9 | 1 | 0 | 4 | 0 | 0 |
 | §7 Storage and portability | 7 | 1 | 2 | 1 | 0 | 0 |
 | §8 Performance | 3 | 1 | 1 | 2 | 1 | 0 |
 | §9 UI, Settings and accessibility | 15 | 2 | 0 | 0 | 0 | 0 |
 | §14 Hierarchy, selection, clipboard and tests | 11 | 4 | 0 | 1 | 0 | 0 |
 | §14.41 and roadmap | 0 | 1 | 1 | 0 | 0 | 2 |
-| **Rows counted** | **78** | **11** | **5** | **11** | **1** | **2** |
+| **Rows counted** | **83** | **11** | **4** | **8** | **1** | **2** |
 
 ## §4 Content types
 
@@ -28,7 +28,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | --- | --- | --- |
 | Raster import, place, resize, rotate, flip, group, hide, lock | Done | Images, GIF, WebP, JPEG, PNG; item rotation about a pivot (ADR 0018). |
 | Raster crop | Done (ADR 0118, 0137) | Stills, video and GIF. |
-| Raster masks | Decided against | Left out (owner, 2026-10-17). |
+| Raster masks | Done (ADR 0144) | A mask by opacity or brightness (any object, a picture too), and a brush mask painted with the Pen (vector strokes, so sharp at any zoom). |
 | Raster adjustments | Done (ADR 0118) | See §5. |
 | Resolution-aware display, thumbnails, large images | Done | Tile cache, reduced copies, stored WebP thumbnails (ADR 0009, 0030, 0034). |
 | Image pyramids / mipmaps, tiled decode, colour profiles, EXIF orientation | Done (ADR 0138) | Reduced copies and tiles stand in for a stored pyramid (decided: no per-level storage); EXIF and colour profiles are read and shown, and the orientation is applied. |
@@ -40,9 +40,10 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Stroke position (inside, centre, outside), outline corners and ends | Done | ADR 0104; Outline options on the options bar. |
 | Corner radius (every shape with corners, curves included, per corner, boolean groups), sides, points and ratio editable after drawing | Done | ADR 0105; per-corner radii on a boolean group's result are not. |
 | Dashes, arrow heads, sharp-corner limit | Done (ADR 0107, 0139, 0142) | Solid, dashed, dotted, and a custom length, gap and start; an arrow head (solid, open, dot) at each end of an open line; the angle below which a sharp corner is cut. |
-| Clipping | Decided against | Clipping masks of arbitrary shapes are out with masks (owner, 2026-10-17); a sheet clips to its rectangle (ADR 0108). |
+| Clipping | Done (ADR 0108, 0144) | A sheet clips to its rectangle; a clipping mask is a sheet of any shape. |
 | Simplify a path, pen stroke to path | Done (ADR 0139) | Curve fitting; one undo step each. |
-| Variable-width paths, corner smoothing, angular gradient, outline stroke, shape builder, lasso of nodes and editing nodes of several paths | **Gap** | Vectors II (see `docs/status.md`): each needs geometry or a node-selection model that is not in the code. |
+| Variable-width paths, corner smoothing, angular gradient, outline stroke, shape builder, lasso of nodes and editing nodes of several paths | Done (ADR 0143, 0145) | Variable width is a Taper made as a shape; the Shape builder takes up to six shapes. |
+| Vector networks | Done (ADR 0146) | Edges meet at vertices, regions are filled; edges that cross are not split, one fill for the whole network. |
 | Freehand: four pens (fine, pencil, ink, marker), pressure, variable width, stabilizer | Done | ADR 0037. Distinct stroke dynamics; marker doubles as the highlighter. |
 | Tilt | Done (ADR 0113) | Ink nib angle and pencil breadth follow the lean; mouse and touch unchanged. |
 | Object eraser (swept, one undoable step, never deletes the original) | Done | ADR 0022. Whole-group option. |
@@ -65,7 +66,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | --- | --- | --- |
 | Per-object opacity and blend modes | Done (ADR 0047) | |
 | Crop | Done for stills (ADR 0118) | |
-| Mask | Decided against | Left out (owner, 2026-10-17). |
+| Mask | Done (ADR 0144) | |
 | Exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, RGB, curves, levels, blur, sharpen, grain | Done (ADR 0118, 0136) | |
 | Editable, reorderable stacks; Copy and Paste Adjustments across image, video and GIF | Done (ADR 0118, 0136) | Layers of adjustments that can be added, reordered, hidden and removed. |
 | Copy Rendered Media (adjustments baked in) | Done for stills (ADR 0118) | Copy as picture, and Make a new picture. |
@@ -174,8 +175,8 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 
 | Order | Gap | Why |
 | --- | --- | --- |
-| 1 | Vectors II: variable-width paths, corner smoothing, angular gradient, outline stroke, shape builder, lasso of nodes and nodes of several paths | Each needs stroke offsetting, region finding or a multi-node selection model that is not in the code |
-| 2 | PDF page rendering and other 3D formats | A renderer to ship offline (its size in the single file is the cost) |
-| 3 | Phase 8 (large projects, search at scale, qualification matrix, update-safe origin) and Phase 9 (clean-machine test, reproducible build) | Each is a phase of its own in `docs/status.md` |
-| 4 | Hundreds of gigabytes; streaming archives measured at multi-GB sizes | Not offered; the browser's Blob size is the ceiling |
-| 5 | 60 and 120 FPS on reference devices; cold and warm startup benchmarks; a low-memory tier | Need devices and a recorded method |
+| 1 | PDF page rendering and other 3D formats | A renderer to ship offline (its size in the single file is the cost) |
+| 2 | Phase 8 (large projects, search at scale, qualification matrix, update-safe origin) and Phase 9 (clean-machine test, reproducible build) | Each is a phase of its own in `docs/status.md` |
+| 3 | Hundreds of gigabytes; streaming archives measured at multi-GB sizes | Not offered; the browser's Blob size is the ceiling |
+| 4 | 60 and 120 FPS on reference devices; cold and warm startup benchmarks; a low-memory tier | Need devices and a recorded method |
+| 5 | Networks: split edges where they cross, a fill per region | Needs curve intersection on edges; ADR 0146 |

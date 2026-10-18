@@ -10,11 +10,43 @@ import type { ProjectedObject } from "./projection";
 import { cellFrame, coverObject, projectEntry, projectObject } from "./projection";
 import { approxCoarse, classifyCoarse } from "./coarse";
 import { ancestorsOf } from "../doc/containers";
+import { maskMembers } from "../doc/masks";
 import type { FrameCamera as FC } from "../core/frames";
 
 /** How see-through a moving selection looks, and the largest selection that gets it (above that, drawing it one by one would slow the drag). */
 export const GHOST_OPACITY = 0.6;
 export const GHOST_MAX = 200;
+/** How see-through a picked mask is drawn. */
+export const MASK_GHOST = 0.45;
+
+const maskCache = new WeakMap<DocumentStore, { revision: number; byGroup: Map<string, CanvasObject[]> }>();
+/** The objects of a mask group, in paint order (cached until the document changes). */
+function membersOfMask(doc: DocumentStore, by: string): CanvasObject[] {
+  let c = maskCache.get(doc);
+  if (!c || c.revision !== doc.revision) maskCache.set(doc, (c = { revision: doc.revision, byGroup: new Map() }));
+  let list = c.byGroup.get(by);
+  if (!list) c.byGroup.set(by, (list = maskMembers(doc.all(), by)));
+  return list;
+}
+
+/** Give each object that has a mask (ADR 0144) the mask's objects, projected on their own, to be drawn through. A mask with nothing in it cuts nothing. */
+function withMasks(doc: DocumentStore, fc: FC, vp: Viewport, list: ProjectedObject[], now: (o: CanvasObject) => CanvasObject | null): ProjectedObject[] {
+  if (!list.some((po) => po.obj.mask)) return list;
+  for (const po of list) {
+    const m = po.obj.mask;
+    if (!m) continue;
+    const mine: ProjectedObject[] = [];
+    for (const o0 of membersOfMask(doc, m.by)) {
+      const o = o0.hidden ? null : now(o0); // (a mask being moved cuts as it is moved)
+      if (!o) continue;
+      const cam = cameraIn(fc, o.frame ?? doc.space.world);
+      const p = cam ? projectObject(o, cam, vp, { keepTiny: true }) : null;
+      if (p) mine.push(p);
+    }
+    if (mine.length) po.maskPos = mine;
+  }
+  return list;
+}
 
 export interface VisibleStats {
   levelsVisited: number;
@@ -39,6 +71,8 @@ export interface VisibleStats {
 export interface BoolView {
   readonly entered: readonly string[];
   readonly mode: "pick" | "members";
+  /** Also these objects when they are masks (ADR 0144): a picked mask is shown and reachable, though it is in no index. */
+  readonly also?: ReadonlySet<ObjectId>;
 }
 
 const operandCache = new WeakMap<DocumentStore, { revision: number; byGroup: Map<string, CanvasObject[]> }>();
@@ -128,13 +162,19 @@ export function visibleObjects(
     project(shown);
   }
   if (bool?.mode === "pick" && inner && !editor) for (const o of operandsIn(doc, inner)) if (!o.hidden) project(o);
+  // A picked mask is shown a little see-through, over what it cuts, so it can be seen and moved; unpicked it is not in the index at all.
+  const maskIds = bool?.also ?? (editor ? editor.selection : null);
+  if (maskIds) for (const id of maskIds) {
+    const o = doc.get(id);
+    if (o?.isMask && !o.hidden) project({ ...o, opacity: o.opacity * MASK_GHOST } as CanvasObject);
+  }
   out.sort((a, b) => a.obj.z - b.obj.z || (a.obj.id < b.obj.id ? -1 : a.obj.id > b.obj.id ? 1 : 0));
   if (stats) {
     stats.levelsVisited = levelsVisited;
     stats.cellsProbed = cellsProbed;
     stats.candidates = candidates;
   }
-  return withClips(doc, fc, vp, out);
+  return withMasks(doc, fc, vp, withClips(doc, fc, vp, out), (o) => (editor && previewIds.has(o.id) ? editor.previewed(o) : o));
 }
 
 /**

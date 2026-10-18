@@ -93,7 +93,7 @@ export function strokeLineWidth(po: ProjectedObject): number {
 
 /** True when a stroke can share one `stroke()` call with neighbours of the same paint. */
 export function batchable(po: ProjectedObject): boolean {
-  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1 && !po.obj.blend && !po.clip;
+  return po.obj.kind === "stroke" && !po.exact && !po.cover && po.obj.opacity === 1 && !po.obj.blend && !po.clip && !po.obj.mask;
 }
 
 /**

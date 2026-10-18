@@ -1,6 +1,7 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
+import { netFaces } from "../doc/network";
 import { localBounds, pathSubs, pivotOf, strokePoints, unrotatedBounds } from "../doc/model";
 import type { FlatPath } from "../doc/path";
 import { FLAT_TOLERANCE_PX, flatten } from "../doc/path";
@@ -142,6 +143,8 @@ export interface ProjectedObject {
   /** The frames this object is cut by, outermost first (ADR 0108): each frame's own projection; what lies outside any of them is neither drawn nor picked. */
   // (set in place after projecting: a projected object keeps lazy parts that a copy would lose)
   clip?: readonly ProjectedObject[] | undefined;
+  /** The objects of the mask that cuts this one (ADR 0144), each as projected on its own; absent when it has none or the mask is empty. */
+  maskPos?: readonly ProjectedObject[] | undefined;
 }
 
 export interface RotatedView {
@@ -304,6 +307,20 @@ function pathFromScreen(
     return a;
   });
   const flats = flatten(subs, q, FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN);
+  // A vector network is stroked by its edges and filled by the regions they enclose (ADR 0146).
+  let fills: FlatPath[] | undefined;
+  if (o.net) {
+    const faces = netFaces(subs);
+    const fq = faces.map((s) => {
+      const a = new Float64Array(s.n.length);
+      for (let i = 0; i < a.length; i += 2) {
+        a[i] = px(s.n[i]!);
+        a[i + 1] = py(s.n[i + 1]!);
+      }
+      return a;
+    });
+    fills = flatten(faces, fq, FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN);
+  }
   let total = 0;
   for (const f of flats) total += f.pts.length;
   const all = new Float64Array(total);
@@ -320,7 +337,7 @@ function pathFromScreen(
   const corner = (x: number, y: number): [number, number] => [px(cx0 + c.c * (x - cx0) - c.s * (y - cy0)), py(cy0 + c.s * (x - cx0) + c.c * (y - cy0))];
   const corners = o.rot ? [corner(ub.minX, ub.minY), corner(ub.maxX, ub.minY), corner(ub.maxX, ub.maxY), corner(ub.minX, ub.maxY)] : undefined;
   const radius = o.stroke === null ? 0 : (proj ? toPx(proj, D.fromNumber(o.width / 2)) : (px(o.width / 2) - px(0)));
-  return new Projected(o, box, all, radius, false, cam, vp, proj, flats, corners);
+  return new Projected(o, box, all, radius, false, cam, vp, proj, flats, corners, fills);
 }
 
 const localBoundsUnturned = (o: Extract<CanvasObject, { kind: "path" }>): LocalBounds => unrotatedBounds(o);

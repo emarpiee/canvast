@@ -10,6 +10,7 @@ import type { PathObject } from "../doc/model";
 import { expressObjectIn, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient } from "../doc/paint";
+import { netFaces } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
 import type { Arrow } from "../doc/path";
 import type { SubPath } from "../doc/path";
@@ -109,6 +110,14 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
       const [x1, y1] = to(lg.x1, lg.y1).split(" ");
       return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}">${stops}</linearGradient>`;
     }
+    if (lg.type === "angular") {
+      // (SVG has no sweep: a linear gradient from the centre along the first edge stands in, over the shape's size)
+      const b = geometryBounds(p.o.base ?? p.o.sub);
+      const reach = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+      const [x0, y0] = to(lg.cx, lg.cy).split(" ");
+      const [x1, y1] = to(lg.cx + Math.cos(lg.a0) * reach, lg.cy + Math.sin(lg.a0) * reach).split(" ");
+      return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}">${stops}</linearGradient>`;
+    }
     const [cx, cy] = to(lg.cx, lg.cy).split(" ");
     return `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${num(lg.R * p.k * sc)}">${stops}</radialGradient>`;
   };
@@ -152,7 +161,10 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     const o = p.o;
     const subs = mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
     const width = o.width * p.k * sc;
-    let a = ` d="${pathData(subs)}"` + paintAttr(p, "fill", o.fill) + paintAttr(p, "stroke", o.stroke);
+    const map = (xs: readonly SubPath[]): SubPath[] => mapSubs(xs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
+    // A vector network (ADR 0146): the regions its edges enclose are filled, the edges are stroked.
+    const regions = o.net ? map(netFaces(p.subs)) : null;
+    let a = ` d="${pathData(regions && o.stroke !== null ? subs : (regions ?? subs))}"` + (regions && o.stroke !== null ? ' fill="none"' : paintAttr(p, "fill", o.fill)) + paintAttr(p, "stroke", o.stroke);
     if (o.fill !== null && o.evenodd) a += ` fill-rule="evenodd"`;
     if (o.stroke !== null) {
       a += ` stroke-width="${num(width)}"`;
@@ -166,7 +178,8 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     if (o.opacity < 1) a += ` opacity="${num(o.opacity)}"`;
     if (o.blend) a += ` style="mix-blend-mode:${o.blend}"`;
     if (o.name) a += ` id="${esc(o.name.replace(/\s+/g, "-"))}"`;
-    return `  <path${a}/>` + arrowsSvg(p, subs, width);
+    const fillPart = regions && o.stroke !== null && o.fill !== null ? `  <path d="${pathData(regions)}"${paintAttr(p, "fill", o.fill)}${o.evenodd ? ' fill-rule="evenodd"' : ""}${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}/>\n` : "";
+    return fillPart + `  <path${a}/>` + arrowsSvg(p, subs, width);
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${num(w)}" height="${num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

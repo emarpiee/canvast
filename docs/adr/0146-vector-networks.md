@@ -1,0 +1,10 @@
+# ADR 0146 — Vector networks
+
+- Status: accepted (v0.19.0)
+
+A network is a path with `net: true` whose sub-paths are its **edges**: chains of nodes from one vertex to another. A vertex is where chains end at exactly one point, so any number of edges can meet at one, which a path cannot do. The regions the edges enclose are filled; they are not stored but found from the edges (`netFaces`: the faces of the planar graph, walked with their inside on one side, the outer boundary of each connected piece left out). Edges are stored as plain sub-paths, so every move, stretch, turn and unit change works on a network, and two ends at one point stay at one point (the same map gives the same result): no second structure can go stale.
+
+- **Make a vector network** from picked paths: closed sub-paths are cut into one edge per segment, open ones stay chains; ends within a small distance (0.3 % of the size) become one vertex; an end lying on another edge splits that edge there; the same edge twice (a shared side) is one. It keeps the look of the top path and the first fill any has. **Release the network** goes back to an ordinary path of the same edges.
+- **Editing** is in Edit nodes: dragging an end moves its whole vertex with every edge that meets it; Delete takes a vertex and its edges; **Alt**-clicking another end after picking one joins them by an edge; Alt on an edge takes it away; a click on an edge adds a node in it as before.
+- **Drawing and picking** use the edges for the outline and the regions for the fill (`fillPath`), so a click inside a region picks the network. Export as SVG writes the regions as a filled path and the edges as a stroked one.
+- **Limits.** Edges are taken not to cross except at vertices (crossings are not split; Make a network splits where an end meets an edge, not where two edges cross). Every region has the one fill of the object (no fill per region yet). At extreme magnification the regions are classified from the same data and may be dimmed approximations. Corners where edges meet are caps, not joins (the stroke of each edge is its own), so a sharp corner of a network outline uses the cap setting.

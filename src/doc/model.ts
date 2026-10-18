@@ -83,6 +83,10 @@ interface ObjectBase {
   readonly blend?: BlendMode;
   /** In-canvas tags (ADR 0062): labels of this instance, separate from an asset's library tags; absent = none. */
   readonly tags?: readonly string[];
+  /** A mask (ADR 0144): the objects of the group `by` (those with `isMask`) hide or show this one, by their opacity (`alpha`) or their brightness (`luminance`); `invert` swaps hidden and shown. */
+  readonly mask?: { readonly by: string; readonly mode: "alpha" | "luminance"; readonly invert?: true };
+  /** This object is part of a mask (of the group `mask.by` of another object): it is not drawn or picked on its own, only used to cut that object. */
+  readonly isMask?: true;
   /** Not drawn, picked or indexed while true (ADR 0021); absent = shown. */
   readonly hidden?: boolean;
   /** Drawn, but cannot be picked, selected or edited while true (ADR 0021); absent = unlocked. */
@@ -228,6 +232,8 @@ export interface PathObject extends ObjectBase {
   readonly arrowEnd?: Arrow;
   /** Where in the pattern the outline starts, in widths of the outline (absent: 0). */
   readonly dashOffset?: number;
+  /** A vector network (ADR 0146): the sub-paths are edges (chains from one vertex to another; ends at exactly one point are one vertex), and the regions they enclose are filled. */
+  readonly net?: true;
   /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
   readonly align?: Align;
   /** Fill rule: absent is non-zero. */
@@ -239,6 +245,8 @@ export interface PathObject extends ObjectBase {
    */
   readonly radius?: Radius;
   readonly base?: readonly SubPath[];
+  /** Corner smoothing 0 to 1 (ADR 0143): the rounded corners start farther out and blend into the line; absent = a plain circular arc. Only with a radius. */
+  readonly smoothing?: number;
   /** The shape as it was when "Set initial shape" was pressed (ADR 0106): kept with the object, so it survives whatever happens after, and can be come back to. */
   readonly initial?: InitialShape;
   /** What the shape is made from (box, sides, points, ratio, corner radius), present while its nodes are still the shape's own (ADR 0105). */
@@ -472,6 +480,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.boolOps !== undefined && !(typeof o.boolOps === "object" && o.boolOps !== null && Object.keys(o.boolOps).length > 0 && Object.entries(o.boolOps).every(([k, v]) => (o.groups ?? []).includes(k) && ["union", "intersect", "subtract", "exclude"].includes(v)))) throw new InvalidObjectError("bad boolean groups");
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
   if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && isTag(t)))) throw new InvalidObjectError("bad tags");
+  if (o.mask !== undefined && !(typeof o.mask === "object" && o.mask !== null && typeof o.mask.by === "string" && ID_RE.test(o.mask.by) && (o.mask.mode === "alpha" || o.mask.mode === "luminance") && (o.mask.invert === undefined || o.mask.invert === true))) throw new InvalidObjectError("bad mask");
+  if (o.isMask !== undefined && o.isMask !== true) throw new InvalidObjectError("isMask is true or absent");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
   if (o.kind === "stroke") {
@@ -502,6 +512,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean")) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
+    if (o.net !== undefined && o.net !== true) throw new InvalidObjectError("net is true or absent");
+    if (o.smoothing !== undefined && !(Number.isFinite(o.smoothing) && o.smoothing > 0 && o.smoothing <= 1)) throw new InvalidObjectError("bad corner smoothing");
     if (o.miterAngle !== undefined && !(Number.isFinite(o.miterAngle) && o.miterAngle >= 1 && o.miterAngle <= 90)) throw new InvalidObjectError("bad miter angle");
     for (const [what, v] of [["start", o.arrowStart], ["end", o.arrowEnd]] as const) if (v !== undefined && !ARROWS.includes(v)) throw new InvalidObjectError(`bad arrow ${what}`);
     if (o.dashOffset !== undefined && !(typeof o.dashOffset === "number" && Number.isFinite(o.dashOffset))) throw new InvalidObjectError("bad dash offset");
@@ -614,6 +626,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["boolOps"] !== undefined ? { boolOps: s["boolOps"] as Record<string, BoolOp> } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
     ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
+    ...(s["mask"] !== undefined ? { mask: { ...(s["mask"] as { by: string; mode: "alpha" }) } } : {}),
+    ...(s["isMask"] === true ? { isMask: true as const } : {}),
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
     ...(s["locked"] === true ? { locked: true as const } : {}),
     ...(frame && frame !== frame.space.world ? { frame } : {}),
@@ -649,6 +663,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["dash"] !== undefined ? { dash: s["dash"] as Dash } : {}),
       ...(s["dashOffset"] !== undefined ? { dashOffset: s["dashOffset"] as number } : {}),
+      ...(s["net"] === true ? { net: true as const } : {}),
+      ...(s["smoothing"] !== undefined ? { smoothing: s["smoothing"] as number } : {}),
       ...(s["miterAngle"] !== undefined ? { miterAngle: s["miterAngle"] as number } : {}),
       ...(s["arrowStart"] !== undefined ? { arrowStart: s["arrowStart"] as Arrow } : {}),
       ...(s["arrowEnd"] !== undefined ? { arrowEnd: s["arrowEnd"] as Arrow } : {}),

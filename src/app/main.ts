@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -759,6 +759,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
     selectedDashNumbers: () => selectedDashNumbers(doc, editor),
     setDashNumbers: (n) => commitDashNumbers(doc, editor, n),
+    paintMask: (ink) => paintMask(editor, ink),
     selectedMiterAngle: () => selectedMiterAngle(doc, editor),
     setMiterAngle: (deg) => commitMiterAngle(doc, editor, deg),
     selectedArrows: () => selectedArrows(doc, editor),
@@ -811,6 +812,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
     },
     shapeSelected: (change, final = true) => commitShape(doc, editor, change, final),
+    selectedSmoothing: () => selectedSmoothing(doc, editor),
+    setSmoothing: (pct, final = true) => commitSmoothing(doc, editor, pct, final),
     selectedCorners: () => {
       const o = selectedCorners(doc, editor);
       if (!o) return null;
@@ -1040,6 +1043,23 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       simplify: () => simplifySelection(doc, editor),
       canSimplify: () => canSimplify(doc, editor),
       strokeToPath: () => strokeToPath(doc, editor),
+      outlineStroke: (profile) => outlineStroke(doc, editor, profile),
+      makeNetwork: () => makeNetwork(doc, editor),
+      releaseNetwork: () => releaseNetwork(doc, editor),
+      canMakeNetwork: () => canMakeNetwork(doc, editor),
+      canReleaseNetwork: () => canReleaseNetwork(doc, editor),
+      divide: () => divide(doc, editor),
+      shapeBuilder: () => startShapeBuilder(doc, editor),
+      finishBuilder: (apply) => finishShapeBuilder(doc, editor, apply),
+      canDivide: () => canDivide(doc, editor),
+      makeMask: (mode) => makeMask(doc, editor, mode),
+      makeClippingMask: () => makeClippingMask(doc, editor),
+      canMakeMask: () => canMakeMask(doc, editor),
+      changeMask: (change) => changeMask(doc, editor, change),
+      selectMask: () => selectTheMask(doc, editor),
+      canReleaseMask: () => canReleaseMask(doc, editor),
+      selectedMask: () => selectedMask(doc, editor),
+      canOutlineStroke: () => canOutlineStroke(doc, editor),
       canStrokeToPath: () => canStrokeToPath(doc, editor),
       combine: (op) => combineSelection(doc, editor, op),
       booleanState: () => booleanSelection(doc, editor)?.op ?? null,
@@ -1340,6 +1360,23 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Arrange", title: "Bring to front", keys: "Ctrl+]", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "front") },
       { group: "Arrange", title: "Send to back", keys: "Ctrl+[", enabled: () => onCanvas && sel, run: () => arrangeSelection(doc, editor, "back") },
       { group: "Arrange", title: "Detach from what it follows", enabled: () => onCanvas && canDetach(doc, editor), run: () => detachSelection(doc, editor) },
+      { group: "Shape", title: "Vector network", words: "join paths regions graph", enabled: () => onCanvas && canMakeNetwork(doc, editor), run: () => makeNetwork(doc, editor) },
+      { group: "Shape", title: "Release the network", words: "paths edges", enabled: () => onCanvas && canReleaseNetwork(doc, editor), run: () => releaseNetwork(doc, editor) },
+      { group: "Shape", title: "Divide into regions", words: "pathfinder cut overlap", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => divide(doc, editor) },
+      { group: "Shape", title: "Shape builder", words: "merge regions overlap unite delete", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => startShapeBuilder(doc, editor) },
+      { group: "Mask", title: "Clipping mask", words: "clip cut shape", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeClippingMask(doc, editor) },
+      { group: "Mask", title: "Mask by opacity", words: "alpha cut transparent", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "alpha") },
+      { group: "Mask", title: "Mask by brightness", words: "luminance greyscale light dark cut", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "luminance") },
+      { group: "Mask", title: "Brush mask: show everything, paint black to hide", words: "paint erase reveal", enabled: () => onCanvas && sel && !editor.maskEdit, run: () => startBrushMask(doc, editor, true) },
+      { group: "Mask", title: "Brush mask: hide everything, paint white to show", words: "paint reveal", enabled: () => onCanvas && sel && !editor.maskEdit, run: () => startBrushMask(doc, editor, false) },
+      { group: "Mask", title: "Paint the mask in white", words: "show reveal", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "show") },
+      { group: "Mask", title: "Paint the mask in black", words: "hide", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "hide") },
+      { group: "Mask", title: "Done painting the mask", words: "finish stop", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "done") },
+      { group: "Mask", title: "Pick the mask", words: "select edit move", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => selectTheMask(doc, editor) },
+      { group: "Mask", title: "Invert the mask", words: "swap show hide", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { invert: !(selectedMask(doc, editor)?.invert ?? false) }) },
+      { group: "Mask", title: "Release the mask", words: "remove unmask", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { release: true }) },
+      { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
+      ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor, profile) })),
       { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
       { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
