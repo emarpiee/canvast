@@ -11,3 +11,25 @@ export const isOff = (e: HTMLElement): boolean => !!e.hidden || e.hasAttribute("
 export function syncGroups(bar: HTMLElement, wanted: (group: HTMLElement) => boolean = () => true): void {
   for (const g of bar.querySelectorAll<HTMLElement>(":scope > .tb-group")) g.hidden = g.hasAttribute("data-off") || !wanted(g) || ![...g.children].some((c) => !isOff(c as HTMLElement));
 }
+
+/**
+ * A bar of the standard shape: a `.toolbar` with one row of groups that scrolls sideways, with faded ends, when it is wider than its room.
+ * Every bar that sits in the top stack (the Properties bar, the colours of a selection) is made this way and kept right with
+ * `syncGroups` and `syncScroll`; a new one needs no CSS of its own.
+ */
+export function createBar(label: string): { el: HTMLElement; row: HTMLElement } {
+  const el = document.createElement("div");
+  el.className = "toolbar";
+  el.setAttribute("role", "toolbar");
+  el.setAttribute("aria-label", label);
+  el.hidden = true;
+  const row = document.createElement("div");
+  row.className = "tb-options-row";
+  el.append(row);
+  return { el, row };
+}
+
+/** Mark a row that is wider than its room, so its ends fade (CSS `[data-scroll]`). */
+export function syncScroll(row: HTMLElement): void {
+  row.toggleAttribute("data-scroll", row.scrollWidth > row.clientWidth + 1);
+}

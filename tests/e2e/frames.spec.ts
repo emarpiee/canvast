@@ -1720,7 +1720,7 @@ test("phone layout (360 px wide): the bars stack in rows, the tools sit below th
   const nav = (await rect("#nav .view-switch"))!;
   const crumb = (await rect(".nav-crumb"))!;
   const dock = (await rect("#toolbar > .dock"))!;
-  const options = (await rect("#toolbar > .toolbar"))!;
+  const options = (await rect("#toolbar > .toolbar[aria-label=\"Tool options\"]"))!;
   const rail = (await rect("#toolbar > .rail"))!;
   const panel = (await rect("#side-panels > .dock-item:not([hidden])"))!;
   const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -1741,7 +1741,7 @@ test("medium screen (800 px wide): the tool options get their own row under the 
   const rect = (sel: string) => p.locator(sel).first().boundingBox();
   const nav = (await rect("#nav"))!;
   const dock = (await rect("#toolbar > .dock"))!;
-  const options = (await rect("#toolbar > .toolbar"))!;
+  const options = (await rect("#toolbar > .toolbar[aria-label=\"Tool options\"]"))!;
   const rail = (await rect("#toolbar > .rail"))!;
   const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   for (const [name, a, b] of [["nav/dock", nav, dock], ["nav/options", nav, options], ["dock/options", dock, options], ["options/rail", options, rail]] as const) expect(overlap(a, b), `${name} overlap`).toBe(false);

@@ -27,7 +27,8 @@ export interface LayersActions {
   moveAbove(ids: readonly string[], aboveId: string): void;
   /** Put the stacking order in name order (ADR 0059); only the order changes, never a position. `order` is front to back. */
   setOrder(order: readonly string[], label: string): void;
-  setOpacity(ids: readonly string[], opacity: number): void;
+  /** `final` false: only shown while the slider is dragged; true: stored (one undo step). */
+  setOpacity(ids: readonly string[], opacity: number, final?: boolean): void;
   /** Blend mode of objects (null = normal), ADR 0047. */
   setBlend(ids: readonly string[], blend: BlendMode | null): void;
   /** Name an object or a group (its id); empty = automatic label. */
@@ -379,7 +380,10 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       refocusFilter = true;
       render();
     }
-    if (t.matches("[data-opacity]")) t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
+    if (t.matches("[data-opacity]")) {
+      t.parentElement!.querySelector("output")!.textContent = `${t.value}%`;
+      actions.setOpacity([...editor.selection], Number(t.value) / 100, false); // live: the canvas follows the slider
+    }
   });
   // `change` fires once, when the slider is released: one undo step per drag.
   panel.addEventListener("change", (e) => {

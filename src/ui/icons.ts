@@ -43,7 +43,7 @@ import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
 import fileCodeSvg from "lucide-static/icons/file-code.svg";
 import vectorPolygonSvg from "lucide-static/icons/vector-polygon.svg";
 import squareRoundCornerSvg from "lucide-static/icons/square-round-corner.svg";
-import outlineOptionsSvg from "lucide-static/icons/sliders-horizontal.svg";
+import outlineOptionsSvg from "lucide-static/icons/line-style.svg";
 import play from "lucide-static/icons/play.svg";
 import pause from "lucide-static/icons/pause.svg";
 import rewind from "lucide-static/icons/rewind.svg";

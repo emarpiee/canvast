@@ -240,7 +240,7 @@ export interface CornerHandles {
 const MIN_DOT_PX = 18;
 const MAX_CORNER_DOTS = 64;
 
-export function cornerHandles(po: ProjectedObject, expanded = false): CornerHandles | null {
+export function cornerHandles(po: ProjectedObject, expanded = false, avoid: ReadonlyArray<{ x: number; y: number }> = []): CornerHandles | null {
   const o = po.obj as PathObject;
   if (po.cover || o.kind !== "path") return null;
   const subs = editSubs(o);
@@ -299,6 +299,10 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
     const [ox, oy] = at(0);
     const [ix, iy] = at(1);
     ratio = { x: ix, y: iy, cx: mx, cy: my, outer: Math.hypot(ox - mx, oy - my) };
+    // Not on another handle: along the circle round the middle (the ratio is its distance from the middle, which this keeps).
+    const rx = (iy - my) / Math.max(1e-6, Math.hypot(ix - mx, iy - my)), ry = -(ix - mx) / Math.max(1e-6, Math.hypot(ix - mx, iy - my));
+    const at2 = clearSpot(ix, iy, [[-rx, -ry], [rx, ry]], avoid);
+    ratio = { ...ratio, x: at2[0], y: at2[1] };
   }
   let count: CornerHandles["count"] = null;
   if (sub && o.params && (o.shape === "polygon" || o.shape === "star") && nodeCount(sub) >= 3) {
@@ -315,7 +319,11 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
     my /= m;
     const [x0, y0] = at(0);
     const [x1, y1] = at(step);
-    count = { x: x1, y: y1, cx: mx, cy: my, a0: Math.atan2(y0 - my, x0 - mx), n: m };
+    // Not on another handle: along the line from the middle (the count is read from the angle, which this keeps).
+    const len = Math.max(1e-6, Math.hypot(x1 - mx, y1 - my));
+    const ux = (x1 - mx) / len, uy = (y1 - my) / len;
+    const at3 = clearSpot(x1, y1, [[ux, uy], [-ux, -uy]], avoid);
+    count = { x: at3[0], y: at3[1], cx: mx, cy: my, a0: Math.atan2(y0 - my, x0 - mx), n: m };
   }
   const first = dots[0] ?? null;
   if (!first && !ratio && !count) return null;
@@ -323,6 +331,30 @@ export function cornerHandles(po: ProjectedObject, expanded = false): CornerHand
   const main = first && expanded && centre ? { ...first, x: centre.x, y: centre.y } : first;
   const out: CornerHandles = { main, corners: o.result !== undefined ? [] : dots, centre, ratio, count };
   return !main || (Math.abs(main.x) < FAR && Math.abs(main.y) < FAR) ? out : null;
+}
+
+/** Handles nearer than this to each other (px) are told apart: the one that moves goes to the nearest clear place along its own line. */
+export const HANDLE_CLEAR_PX = 20;
+
+/** The place nearest to (x, y) along one of the directions, at 0, 1, 2 or 3 steps, that is clear of every point in `avoid`; (x, y) when there is none. */
+export function clearSpot(x: number, y: number, dirs: ReadonlyArray<readonly [number, number]>, avoid: ReadonlyArray<{ x: number; y: number }>): [number, number] {
+  const clear = (px: number, py: number): boolean => avoid.every((q) => Math.hypot(q.x - px, q.y - py) >= HANDLE_CLEAR_PX);
+  if (clear(x, y)) return [x, y];
+  for (let n = 1; n <= 3; n++) {
+    for (const [dx, dy] of dirs) {
+      const px = x + dx * HANDLE_CLEAR_PX * n, py = y + dy * HANDLE_CLEAR_PX * n;
+      if (clear(px, py)) return [px, py];
+    }
+  }
+  return [x, y];
+}
+
+/**
+ * `cornerHandles` kept off the other gizmos on screen, the gradient's handles and the selection box's (the one place the shape's gizmos
+ * agree on where each is: what is drawn, what is hovered and what a press takes).
+ */
+export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { gradientFocus: "fill" | "stroke" | null; drawnHandles: ReadonlyArray<readonly [number, number]> }): CornerHandles | null {
+  return cornerHandles(po, expanded, [...(gradientHandles(po, editor.gradientFocus)?.pts ?? []), ...editor.drawnHandles.map(([x, y]) => ({ x, y }))]);
 }
 
 export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };

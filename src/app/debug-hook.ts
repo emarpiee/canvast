@@ -41,7 +41,7 @@ import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
 import type { QualityGovernor } from "./quality";
 import { selectedFrame } from "../render/scene-renderer";
-import { cornerHandles } from "../interaction/path-edit";
+import { shapeHandles } from "../interaction/path-edit";
 import { visibleObjects } from "../render/scene-view";
 
 /**
@@ -415,7 +415,7 @@ export function installDebugHook(
     },
     cornerDots: () => {
       const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
-      const h = po && cornerHandles(po, editor.cornersOpen === po.obj.id);
+      const h = po && shapeHandles(po, editor.cornersOpen === po.obj.id, editor);
       return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
     },
     handleLabel: () => editor.handleLabel?.text ?? null,

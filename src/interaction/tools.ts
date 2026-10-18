@@ -13,7 +13,9 @@ import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
-import { cornerHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
+import { paramsOf } from "../doc/shape-params";
+import { DEFAULT_INNER } from "../doc/path";
+import { shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -658,7 +660,7 @@ export function attachTools(
     const tgt = gradientTarget();
     if (!tgt || editor.blockEdit() || editor.tool !== "select") return false;
     const open = editor.cornersOpen === tgt.o.id;
-    const h = cornerHandles(tgt.po, open);
+    const h = shapeHandles(tgt.po, open, editor);
     const pick = h && hitCornerHandle(h, s.x, s.y, open);
     if (!h || !pick) return false;
     const dot = pick.what === "corner" ? pick.dot : pick.what === "main" ? h.main : null;
@@ -682,7 +684,7 @@ export function attachTools(
     if (!g.moved) return;
     const tgt = gradientTarget();
     const open = !!tgt && editor.cornersOpen === tgt.o.id;
-    const h = tgt && cornerHandles(tgt.po, open);
+    const h = tgt && shapeHandles(tgt.po, open, editor);
     if (!tgt || !h) return;
     const ppu = tgt.po.proj.ppu;
     if (g.what === "ratio" && h.ratio) {
@@ -717,6 +719,29 @@ export function attachTools(
     if (!tgt) return;
     const l = localOf(tgt.po, s.x, s.y);
     previewPaint(doc, editor, { [g.which]: moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y) });
+  };
+
+  /** Every handle on a shape names its value while the pointer is over it, not only while it is dragged (Radius, Ratio, Count, the gradient's ends). */
+  const hoverHandleLabel = (s: ScreenPoint): void => {
+    const tgt = gradientTarget();
+    let text: string | null = null;
+    if (tgt) {
+      const open = editor.cornersOpen === tgt.o.id;
+      const h = shapeHandles(tgt.po, open, editor);
+      const pick = h && hitCornerHandle(h, s.x, s.y, open);
+      if (pick && h) {
+        const prm = paramsOf(tgt.o);
+        text = pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
+      } else {
+        const gh = gradientHandles(tgt.po, editor.gradientFocus);
+        const hit = gh && hitGradient(gh, s.x, s.y);
+        if (hit) text = hit === "p0" ? "Gradient start" : hit === "p1" ? "Gradient end" : hit === "c" ? "Gradient centre" : "Gradient radius";
+      }
+    }
+    if (text) editor.handleLabel = { x: s.x, y: s.y, text };
+    else if (editor.handleLabel) editor.handleLabel = null;
+    else return;
+    editor.changed();
   };
 
   const startNodePress = (e: PointerEvent, s: ScreenPoint): boolean => {
@@ -1231,6 +1256,7 @@ export function attachTools(
         }
       } else delete el.dataset["hover"];
     }
+    if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) hoverHandleLabel(local(e));
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
       editor.changed();
@@ -1467,7 +1493,7 @@ export function attachTools(
     const unit = gradientTarget();
     if (unit) {
       const open = editor.cornersOpen === unit.o.id;
-      const dots = cornerHandles(unit.po, open);
+      const dots = shapeHandles(unit.po, open, editor);
       const pick = dots && hitCornerHandle(dots, s.x, s.y, open);
       if (pick?.what === "main") {
         toggleCorners(unit.o.id);
@@ -1605,6 +1631,10 @@ export function attachTools(
   // Moving onto a bar or panel over the canvas ends the hover (the resize cursor must not stay on the canvas).
   const onLeave = (): void => {
     delete el.dataset["hover"];
+    if (g.kind === "none" && editor.handleLabel) {
+      editor.handleLabel = null;
+      editor.changed();
+    }
   };
   el.addEventListener("pointerleave", onLeave);
   // Leaving the Path tool ends the path being drawn (open).

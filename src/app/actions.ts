@@ -312,11 +312,13 @@ export function setFlagOn(doc: DocumentStore, editor: EditorState, ids: readonly
 }
 
 /** Set the opacity of specific objects (the Layers panel's slider); one undo step. */
-export function setOpacityOn(doc: DocumentStore, editor: EditorState, ids: readonly string[], opacity: number): void {
+export function setOpacityOn(doc: DocumentStore, editor: EditorState, ids: readonly string[], opacity: number, final = true): void {
   if (editor.blockEdit()) return;
   const objs = ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && o.opacity !== opacity);
-  if (!objs.length) return;
-  doc.commit(doc.transaction("Set opacity", objs.map((o) => ({ ...o, opacity }))));
+  if (!final) return showReplaced(editor, objs.map((o) => ({ ...o, opacity })));
+  editor.preview = { kind: "none" };
+  if (objs.length) doc.commit(doc.transaction("Set opacity", objs.map((o) => ({ ...o, opacity }))));
+  editor.changed();
 }
 
 /** Set the blend mode of specific objects (null = normal); one undo step (ADR 0047). */
@@ -798,8 +800,8 @@ function derivedPreview(doc: DocumentStore, next: readonly PathObject[]): PathOb
   return [...tx.after.values()].filter((o): o is PathObject => !!o && o.kind === "path");
 }
 
-/** Show these objects as they would be (a number being dragged), without storing them. */
-function showReplaced(editor: EditorState, next: readonly CanvasObject[]): void {
+/** Show these objects as they would be (a number being changed), without storing them: the live look of every field, until it is committed. */
+export function showReplaced(editor: EditorState, next: readonly CanvasObject[]): void {
   editor.preview = next.length ? { kind: "replace", ids: next.map((o) => o.id), objs: new Map(next.map((o) => [o.id, o] as const)) } : { kind: "none" };
   editor.changed();
 }
@@ -1381,14 +1383,22 @@ export function sheetSize(doc: DocumentStore, editor: EditorState): { w: number;
  * Give the picked sheet a size in px (ADR 0121), its top-left corner fixed. Only the sheet changes size: what is on it follows its own
  * pin (left/top by default, so it stays as it is; "Scale" makes it grow with the sheet). One undo step.
  */
-export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, h: number): void {
+export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, h: number, final = true): void {
   const s = pickedSheet(doc, editor);
   const now = sheetSize(doc, editor);
   if (editor.blockEdit() || !s || !now || !(w > 0 && h > 0 && Number.isFinite(w + h))) return;
   const kx = w / now.w, ky = h / now.h;
-  if (Math.abs(kx - 1) < 1e-9 && Math.abs(ky - 1) < 1e-9) return;
+  if (Math.abs(kx - 1) < 1e-9 && Math.abs(ky - 1) < 1e-9) {
+    if (final && editor.preview.kind !== "none") {
+      editor.preview = { kind: "none" };
+      editor.changed();
+    }
+    return;
+  }
   const group = [s, ...descendantsOf(doc.all(), new Set([s.id])).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o)];
   const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
+  if (!final) return showReplaced(editor, [...plan.values()]);
+  editor.preview = { kind: "none" };
   doc.commit(doc.transaction("Resize sheet", [...plan.values()]));
   editor.changed();
 }

@@ -794,6 +794,7 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   await pop.locator('[data-align="inside"]').click();
   await key(app, "Escape");
   expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
+  await app.frame();
   expect(dark(await px(510, 400))).toBe(true); // now it is over the fill
   expect(dark(await px(490, 400))).toBe(false);
   await p.click("[data-outline-options]");
@@ -1095,6 +1096,11 @@ test("corner radius dots: a radius pushed to its limit comes back; one dot per c
   await key(app, "v");
   await click(app, 400, 500);
   const main0 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  // the handle names its value while the pointer is over it, not only while it is dragged
+  await p.mouse.move(main0[0], main0[1]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toMatch(/^Radius /);
+  await p.mouse.move(main0[0] + 150, main0[1] + 60);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
   await p.mouse.dblclick(main0[0], main0[1]);
   await app.frame();
   expect(await tool(app)).toBe("select"); // (not Edit nodes)
@@ -1324,9 +1330,9 @@ test("a rounded star keeps its box when its radius, points or ratio change, and 
   };
   await key(app, "u");
   await p.click('[data-shape-kind="star"]');
-  await drag(app, [400, 300], [800, 700]);
+  await drag(app, [400, 200], [800, 600]); // (clear of the Actions bar along the bottom)
   await key(app, "v");
-  await click(app, 600, 520);
+  await click(app, 600, 420);
   const plain = await frame();
   for (const [sel, v] of [["[data-sel-radius]", "14"], ["[data-sel-inner]", "9"], ["[data-sel-inner]", "5"], ["[data-sel-radius]", "60"], ["[data-sel-tips]", "7"]] as const) {
     await set(sel, v);
@@ -1904,6 +1910,39 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   list = await all();
   expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(1); // a union with a shape inside it is the big one alone
   expect(await px(640, 400)).toEqual([37, 99, 235]);
+});
+
+test("numbers are live: dragging the outline width's name or its field changes the shape while the pointer is still down, and stores one undo step on release", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const dark = (c: number[] | null) => !!c && Math.abs(c[0]! - 31) < 14 && Math.abs(c[1]! - 35) < 14 && Math.abs(c[2]! - 41) < 14;
+  await key(app, "u");
+  await drag(app, [500, 300], [800, 500]);
+  await key(app, "v");
+  await click(app, 650, 400);
+  await p.click("[data-outline-options]");
+  const width = p.locator(".outline-pop .op-width");
+  const start = Number(await width.inputValue());
+  const before = (await objs(app)).length;
+  expect(dark(await px(494, 400)), "a thin outline does not reach 6 px outside the edge").toBe(false);
+  for (const grab of ["label", "field"] as const) {
+    if (!(await width.isVisible())) await p.click("[data-outline-options]"); // (an undo closes the pop-up)
+    const box = (await (grab === "label" ? p.locator(".outline-pop label[for=op-width]") : width).boundingBox())!;
+    await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await p.mouse.down();
+    await p.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2, { steps: 8 });
+    await app.frame();
+    // (still down: nothing is stored yet, and the canvas already shows it)
+    expect(dark(await px(494, 400)), `${grab}: the outline is wider while the pointer is down`).toBe(true);
+    await p.mouse.up();
+    await app.frame();
+    expect(Number(await width.inputValue()), `${grab}: the field says the new width`).toBeGreaterThan(start + 5);
+    await p.keyboard.press("Control+z"); // one undo step for the whole drag
+    await app.frame();
+    expect(dark(await px(494, 400)), `${grab}: one undo takes the whole drag back`).toBe(false);
+  }
+  expect((await objs(app)).length).toBe(before);
+  expect(app.consoleErrors).toEqual([]);
 });
 
 test("outline ends (flat, round, square) show on a dashed outline inside, centred and outside the edge alike", async ({ app }) => {

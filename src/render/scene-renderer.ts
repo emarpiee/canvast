@@ -10,7 +10,7 @@ import type { RasterSource } from "./draw-objects";
 import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
-import { cornerHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
+import { shapeHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
@@ -393,7 +393,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
   const po = selected[0]!;
   if (editor.selection.size !== 1 && (po.obj as PathObject).result === undefined) return; // (a group picked whole is its result alone on screen)
   const open = editor.cornersOpen === po.obj.id;
-  const h = cornerHandles(po, open);
+  const h = shapeHandles(po, open, editor);
   if (!h) return;
   ctx.save();
   ctx.lineWidth = 1.25;

@@ -14,18 +14,24 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
   const mark = (l: HTMLElement | null): HTMLElement | null => {
     if (!l || l.dataset["scrub"] !== undefined || l.closest("[data-scrub-root]") !== root || !numberOf(l)) return null;
     l.dataset["scrubbable"] = "";
+    numberOf(l)!.dataset["scrubInput"] = ""; // (the field scrubs too, wherever its label is: wrapped or `for`)
     if (!l.title) l.title = hint;
     return l;
   };
   for (const l of root.querySelectorAll<HTMLElement>("label")) mark(l);
-  root.addEventListener("pointerover", (e) => mark((e.target as HTMLElement).closest<HTMLElement>("label")));
+  root.addEventListener("pointerover", (e) => {
+    const t = e.target as HTMLElement;
+    mark(t instanceof HTMLInputElement ? (t.labels?.[0] ?? t.closest<HTMLElement>("label")) : t.closest<HTMLElement>("label"));
+  });
   const step = (i: HTMLInputElement): number => {
     const s = Number(i.step);
     return Number.isFinite(s) && s > 0 ? s : 0; // "any": decided from the range
   };
   root.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
-    const label = mark(t.closest<HTMLElement>("label")) ?? t.closest<HTMLElement>("label[data-scrubbable]");
+    // A press on a field counts as a press on its label (the one that wraps it, or names it by `for`).
+    const own = t instanceof HTMLInputElement ? (t.labels?.[0] ?? t.closest<HTMLElement>("label")) : t.closest<HTMLElement>("label");
+    const label = mark(own) ?? (own?.matches("label[data-scrubbable]") ? own : null);
     if (!label || e.button !== 0 || label.closest("[data-scrub-root]") !== root) return; // (a nested root handles its own)
     const input = numberOf(label)!;
     if (input.disabled || input.readOnly) return;

@@ -1,6 +1,7 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import { esc } from "./format";
-import { syncGroups } from "./bar";
+import { createBar, syncGroups, syncScroll } from "./bar";
+import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
 import type { CanvasObject } from "../doc/model";
 import type { TextLook, lookOf } from "../text/text-style";
@@ -34,7 +35,7 @@ export interface ToolbarActions {
   depth(): { levels: bigint; frac: number };
   clearFlag(flag: "hidden" | "locked"): void;
   /** Set the thickness (screen px at this zoom) of the selected strokes and paths: one undo step. */
-  setSelectedWidth(px: number): void;
+  setSelectedWidth(px: number, final?: boolean): void;
   /** The fill and outline of the first selected path, or null when no path is selected. */
   selectedPaint(): { fill: Paint | null; stroke: Paint | null } | null;
   /** Show (final false: while the picker is dragged) or store (final true) a new fill or outline on the selected paths. */
@@ -62,7 +63,7 @@ export interface ToolbarActions {
   setPin(patch: { h?: string; v?: string }): void;
   /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
   sheetSize(): { w: number; h: number } | null;
-  resizeSheet(w: number, h: number): void;
+  resizeSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
   cropped(): boolean;
@@ -235,7 +236,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-initial-update hidden aria-label="Update initial shape: replace the saved shape with the shape as it is now" title="Update initial shape: replace the saved shape with the shape as it is now">${ICONS.save}</button>
         <button type="button" data-initial-reset hidden aria-label="Reset to initial shape: put the shape back as it was saved" title="Reset to initial shape: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
-      <div class="tb-group tb-options" data-for="select node" data-kind="shape" data-sel-colours hidden></div>
+      <div class="tb-group tb-options" data-for="select node" data-sel-colours hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
@@ -284,6 +285,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
     </div>
   `;
+  // The colours of a selection are a second bar of their own, just under this one (the same bar component, ADR 0128).
+  const colourBar = createBar("Colours of the selection");
+  colourBar.row.append(root.querySelector("[data-sel-colours]")!);
+  // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
+  const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
+  const outlineHome = outlineBtn.parentElement!;
+  root.querySelector(".toolbar")!.after(colourBar.el);
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
@@ -294,12 +302,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("input", (e) => {
     editor.penWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
     if (editor.lock) editor.lock = { ...actions.depth(), px: editor.penWidthPx };
+    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, false); // live: the selected strokes follow the slider
     editor.changed();
   });
 
   // On Select the slider also sets the selected strokes' thickness, once on release (one undo step).
   root.querySelector<HTMLInputElement>("[data-size]")!.addEventListener("change", () => {
-    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx);
+    if (editor.tool === "select") actions.setSelectedWidth(editor.penWidthPx, true);
   });
 
   scrubNumbers(root);
@@ -349,16 +358,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
 
   // The numbers of the picked shape (a polygon's sides, a star's points and ratio, a corner radius): changed after the shape is drawn.
   const shapeInput = (sel: string, apply: (v: number) => { sides?: number; tips?: number; inner?: number; radiusPx?: number } | null): void => {
-    root.querySelector<HTMLInputElement>(sel)!.addEventListener("change", (e) => {
-      const v = Number((e.target as HTMLInputElement).value);
-      const change = Number.isFinite(v) ? apply(v) : null;
-      if (change) actions.shapeSelected(change);
+    liveNumber(root.querySelector<HTMLInputElement>(sel)!, (v, final) => {
+      const change = apply(v);
+      if (change) actions.shapeSelected(change, final);
     });
   };
-  root.querySelector<HTMLInputElement>("[data-sel-radius]")!.addEventListener("change", (e) => {
-    const parts = (e.target as HTMLInputElement).value.trim().split(/[\s,]+/).map(Number);
-    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts);
-  });
+  // (one value, or one for every corner)
+  const radiusInput = root.querySelector<HTMLInputElement>("[data-sel-radius]")!;
+  const radiusApply = (final: boolean): void => {
+    const parts = radiusInput.value.trim().split(/[\s,]+/).map(Number);
+    if (parts.every((v) => Number.isFinite(v) && v >= 0) && (parts.length === 1 || parts.length === actions.selectedCorners()?.nodes)) actions.cornersSelected(parts, final);
+  };
+  radiusInput.addEventListener("input", () => radiusApply(false));
+  radiusInput.addEventListener("change", () => radiusApply(true));
   // The font list is read from the library when the menu is opened (and after an import); the selected font is always shown.
   const fontSelect = root.querySelector<HTMLSelectElement>("[data-text-font]")!;
   const fontInput = root.querySelector<HTMLInputElement>("[data-testid=font-input]")!;
@@ -405,10 +417,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       askFonts();
     });
   });
-  root.querySelector<HTMLInputElement>("[data-text-size]")!.addEventListener("change", (e) => {
-    const v = Number((e.target as HTMLInputElement).value);
-    if (Number.isFinite(v) && v > 0) actions.setTextStyle({ sizePx: v });
-  });
+  liveNumber(root.querySelector<HTMLInputElement>("[data-text-size]")!, (v, final) => v > 0 && actions.setTextStyle({ sizePx: v }, final));
   // (these buttons keep the focus where it is, so a text being edited stays open and takes the change)
   for (const b of root.querySelectorAll<HTMLElement>("[data-text-align], [data-text-fit]")) b.addEventListener("mousedown", (e) => e.preventDefault());
   for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.addEventListener("click", () => actions.setTextStyle({ align: b.dataset["textAlign"] as "left" }));
@@ -424,23 +433,17 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (p) => typeof p === "string" && actions.setTextStyle({ color: p }),
     });
   });
-  root.querySelector<HTMLInputElement>("[data-text-line]")!.addEventListener("change", (e) => {
-    const v = Number((e.target as HTMLInputElement).value);
-    if (Number.isFinite(v)) actions.setTextStyle({ lineHeight: v });
-  });
-  root.querySelector<HTMLInputElement>("[data-text-track]")!.addEventListener("change", (e) => {
-    const v = Number((e.target as HTMLInputElement).value);
-    if (Number.isFinite(v)) actions.setTextStyle({ tracking: v / 100 });
-  });
+  liveNumber(root.querySelector<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
+  liveNumber(root.querySelector<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
   const sheetUnit = (): number => Number(sheetField("[data-sheet-unit]").value) || 1;
-  const sheetCommit = (): void => {
+  const sheetApply = (final: boolean): void => {
     const w = Number(sheetField("[data-sheet-w]").value) * sheetUnit(), h = Number(sheetField("[data-sheet-h]").value) * sheetUnit();
-    if (w > 0 && h > 0) actions.resizeSheet(w, h);
+    if (w > 0 && h > 0) actions.resizeSheet(w, h, final);
   };
-  for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) sheetField(f).addEventListener("change", sheetCommit);
+  for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) liveNumber(sheetField(f), (_v, final) => sheetApply(final));
   sheetField("[data-sheet-unit]").addEventListener("change", () => editor.changed()); // (the same size, said in another unit)
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
@@ -562,8 +565,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       align: sel ? sel.align : editor.shapeAlign,
       dash: sel ? sel.dash : editor.shapeDash,
       closed: sel ? sel.closed : editor.tool === "shape" && editor.shapeKind !== "line",
-      onWidth: (px) => {
-        if (sel) actions.setSelectedWidth(px);
+      onWidth: (px, final) => {
+        if (sel) actions.setSelectedWidth(px, final);
         else {
           // 0 is no outline for the next shape (the width is kept for when it is turned on); a width turns one on
           if (px === 0) editor.shapeStroke = null;
@@ -812,7 +815,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       root.querySelector<HTMLElement>("[data-initial-update]")!.hidden = !st || st.saved === 0;
       root.querySelector<HTMLElement>("[data-initial-reset]")!.hidden = !st || st.saved === 0;
     }
-    root.querySelector<HTMLElement>("[data-outline-options]")!.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
+    const outlineAt = several ? root.querySelector<HTMLElement>("[data-sel-colours]")! : outlineHome;
+    if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineBtn);
+    outlineBtn.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
@@ -877,7 +882,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const row = root.querySelector<HTMLElement>(".tb-options-row")!;
     syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
     root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
-    row.toggleAttribute("data-scroll", row.scrollWidth > row.clientWidth + 1);
+    syncScroll(row);
+    syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
+    colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
+    syncScroll(colourBar.row);
   };
   editor.subscribe(update);
   doc.subscribe(update);

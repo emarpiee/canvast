@@ -144,7 +144,7 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   const panel = p.locator("#settings-view");
   const root = p.locator("html");
   const clear = async () => {
-    const [nav, tools] = await Promise.all([p.locator("#nav").boundingBox(), p.locator("#toolbar > .toolbar").boundingBox()]);
+    const [nav, tools] = await Promise.all([p.locator("#nav").boundingBox(), p.locator("#toolbar > .toolbar[aria-label=\"Tool options\"]").boundingBox()]);
     return tools!.x >= nav!.x + nav!.width - 1 || tools!.y >= nav!.y + nav!.height - 1;
   };
   expect(await clear(), "100%: the tools are clear of the view tabs").toBe(true);

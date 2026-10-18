@@ -138,7 +138,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `settings` | Settings |
 | `shapes` | Erase whole groups |
 | `slash` | Line shape |
-| `sliders-horizontal` | Outline options (width, position, corners, ends) |
+| `line-style` | Outline options (width, position, corners, ends, dashes) |
 | `sparkle` | Star shape |
 | `spline-pointer` | Path tool (curves) |
 | `square-arrow-out-up-left` | Take the shapes out of the boolean group |

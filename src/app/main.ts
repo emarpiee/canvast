@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedShape, commitShape, selectedCorners, commitCorners, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetSize, resizeSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -580,7 +580,7 @@ async function start(): Promise<void> {
     setClip: (id, clip) => setSheetClip(doc, editor, id, clip),
     moveAbove: (ids, above) => moveAbove(doc, editor, ids, above),
     setOrder: (order, label) => setStackOrder(doc, editor, order, label),
-    setOpacity: (ids, opacity) => setOpacityOn(doc, editor, ids, opacity),
+    setOpacity: (ids, opacity, final) => setOpacityOn(doc, editor, ids, opacity, final),
     setBlend: (ids, blend) => setBlendOn(doc, editor, ids, blend),
     rename: (key, name) => renameLayer(doc, editor, key, name),
     names: assetNames,
@@ -707,7 +707,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     redo: () => redo(doc, editor),
     clearFlag: (flag) => clearFlag(doc, editor, flag),
     depth: () => depthOf(view.frameCamera),
-    setSelectedWidth: (px) => {
+    setSelectedWidth: (px, final = true) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes and paths out of double range are skipped.
       const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po): CanvasObject[] => {
         const ppu = po.cover ? 0 : po.proj.ppu;
@@ -716,7 +716,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: "#1f2329" } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
         return px > 0 ? [{ ...po.obj, width: px / ppu }] : [];
       });
+      if (!final) return showReplaced(editor, next);
+      editor.preview = { kind: "none" };
       if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
+      editor.changed();
     },
     selectedPaint: () => selectedPaint(doc, editor),
     selectedOutline: () => {
@@ -760,7 +763,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
     sheetSize: () => sheetSize(doc, editor),
-    resizeSheet: (w, h) => resizeSheet(doc, editor, w, h),
+    resizeSheet: (w, h, final) => resizeSheet(doc, editor, w, h, final),
     croppable: () => croppablePicture(doc, editor) !== null,
     cropped: () => isCropped(doc, editor),
     uncrop: () => uncropPicture(doc, editor),

@@ -7,6 +7,7 @@ import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { esc } from "./format";
 import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
+import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { ADJUSTMENTS } from "../doc/adjust";
 import type { Adjust, AdjustKey } from "../doc/adjust";
@@ -520,7 +521,8 @@ export interface OutlineOptions {
   dash: DashChoice;
   /** Every sub-path is closed: the outline can sit inside or outside the edge, and corners matter more than ends. */
   closed: boolean;
-  onWidth(px: number): void;
+  /** The width changed: `final` false while it is being typed or dragged (show it), true once it is settled (store it). */
+  onWidth(px: number, final: boolean): void;
   onStyle(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
   onClose?(): void;
 }
@@ -547,10 +549,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     (o.closed ? "" : `<p class="op-note">An open line is always centred on its path.</p>`);
   scrubNumbers(pop);
   const width = pop.querySelector<HTMLInputElement>(".op-width")!;
-  width.addEventListener("change", () => {
-    const v = Number(width.value);
-    if (v >= 0 && width.value.trim() !== "") o.onWidth(v);
-  });
+  liveNumber(width, (v, final) => v >= 0 && o.onWidth(v, final));
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b || b.disabled) return;
