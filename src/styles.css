@@ -1564,7 +1564,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   #toolbar { top: calc((var(--nav-bottom) + var(--near) + var(--dock-h) + var(--near)) / var(--ui-scale, 1)); left: var(--edge); right: var(--edge); justify-content: stretch; }
   #toolbar > .toolbar { width: 100%; max-width: none; }
   /* The tools sit below the rows, never under them; the panels go to their right. */
-  #toolbar > .rail { top: max(calc(50vh / var(--ui-scale, 1)), calc((var(--bar-bottom, 140px) + 160px) / var(--ui-scale, 1))); }
+  /* Under the bars, and no lower than the Actions bar: a short window scrolls the rail instead of letting it run under the bar. */
+  #toolbar > .rail { top: calc((var(--bar-bottom, 140px) + var(--near)) / var(--ui-scale, 1)); max-height: calc(100dvh - 3 * var(--sp-14) - var(--sp-6) - (var(--bar-bottom, 110px) + var(--near)) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
   #side-panels { top: calc(var(--bar-bottom, 140px) + var(--near)); left: calc(var(--rail-right, 52px) + var(--near)); right: var(--edge); width: auto; max-height: calc(100% - var(--bar-bottom, 140px) - 84px); overflow: auto; }
   /* The readout and the view controls keep to the bottom edge, the readout narrower. */
   .hud-readout { max-width: calc(100vw - 8 * var(--ctl)); overflow: hidden; }
@@ -1634,7 +1635,8 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
   :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
   #toolbar { top: calc(var(--edge) + var(--row) + var(--near)); left: var(--edge); right: var(--edge); justify-content: center; }
   #toolbar > .toolbar { max-width: 100%; }
-  #toolbar > .rail { top: max(calc(50vh / var(--ui-scale, 1)), calc((var(--bar-bottom, 110px) + 160px) / var(--ui-scale, 1))); }
+  /* Under the bars, and no lower than the Actions bar: a short window scrolls the rail instead of letting it run under the bar. */
+  #toolbar > .rail { top: calc((var(--bar-bottom, 110px) + var(--near)) / var(--ui-scale, 1)); max-height: calc(100dvh - 3 * var(--sp-14) - var(--sp-6) - (var(--bar-bottom, 110px) + var(--near)) / var(--ui-scale, 1)); overflow-y: auto; scrollbar-width: none; }
 }
 /* Phones: the options are one row that scrolls sideways instead of wrapping into a tall box. */
 @media (max-width: 640px) {
@@ -2053,6 +2055,8 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .hud-bottom > .hud-controls { position: static; order: 1; align-self: flex-end; margin: 0 var(--edge) var(--near); }
 .hint-float { position: fixed; z-index: var(--z-edge); left: var(--edge); right: calc(var(--edge) + 22rem); bottom: calc(var(--sp-14) + var(--sp-3)); font: var(--font-meta); color: var(--hud-muted); text-align: left; text-wrap: balance; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); pointer-events: none; }
 .hint-float[hidden] { display: none; }
+/* A phone has no room beside the bottom right controls: the line takes the full width, above the Actions bar. */
+@media (max-width: 640px) { .hint-float { left: var(--edge); right: var(--edge); bottom: calc(4 * var(--sp-14)); text-align: center; } }
 .hud-readout .hud-diag { display: contents; margin: 0; font: inherit; }
 .hud-readout .hud-save { padding: 0; text-align: left; }
 
