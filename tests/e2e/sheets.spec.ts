@@ -641,7 +641,7 @@ test("Ctrl+click on the empty body of a sheet picks the sheet alone (not what is
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Export… of many sheets lists every one of them for ordering, past the previews that are drawn", async ({ app }) => {
+test("Export… of many sheets lists every one of them for ordering, each with a small preview drawn when it is on screen", async ({ app }) => {
   const p = app.page;
   // 26 small sheets: more than get a drawn preview
   await key(app, "c");
@@ -651,9 +651,12 @@ test("Export… of many sheets lists every one of them for ordering, past the pr
   await p.getByRole("button", { name: /^Export…/ }).first().click();
   const dlg = p.getByTestId("export-dialog");
   await expect(dlg.locator("[data-mini]")).toHaveCount(26);
-  await expect(dlg.locator("[data-ex-thumb]")).toHaveCount(24);
+  await expect(dlg.locator("[data-ex-thumb]"), "a picture for every one").toHaveCount(26);
+  await expect(dlg.locator('[data-mini="0"] [data-ex-thumb][data-ready]')).toHaveCount(1); // (those on screen are drawn first)
   const last = dlg.locator('[data-mini="25"]');
+  await expect(last.locator("[data-ex-thumb][data-ready]"), "not drawn until it is on screen").toHaveCount(0);
   await last.scrollIntoViewIfNeeded();
+  await expect(last.locator("[data-ex-thumb][data-ready]"), "drawn when it scrolls into view").toHaveCount(1);
   await last.locator('[data-move="-1"]').click(); // the last one moves earlier: it can be reached and moved
   await expect(dlg.locator('[data-mini="24"] .ex-page')).toHaveText("25");
   await key(app, "Escape");

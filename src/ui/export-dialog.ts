@@ -65,8 +65,6 @@ const UNIT_LABEL: Record<Unit, string> = { px: "px", in: "in", cm: "cm", mm: "mm
 const decimals = (u: Unit): number => (u === "px" ? 0 : u === "in" ? 2 : 1);
 const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u))));
 const PREVIEW_PX = 320;
-/** How many of several sheets get a rendered preview (the rest are numbered boxes of their shape, as movable as the others). */
-const PREVIEWS = 24;
 
 export function openExportDialog(deps: ExportDeps): void {
   let ts = [...deps.targets]; // (in the order the pictures leave: the pages of a PDF, the files of a ZIP; the person can change it)
@@ -150,7 +148,7 @@ export function openExportDialog(deps: ExportDeps): void {
       thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
       return;
     }
-    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}">${i < PREVIEWS ? `<canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas>` : ""}<b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
     thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   };
   drawMinis();
@@ -167,30 +165,74 @@ export function openExportDialog(deps: ExportDeps): void {
     q("[data-ex-ext]").textContent = `.${ext()}`;
   };
 
+  // Previews: a single one is drawn at once; the pictures of several sheets are drawn small, one at a time, only when they are on screen (as the
+  // list scrolls), and kept for as long as the background stays the same, so moving a page about redraws nothing.
   let thumbToken = 0;
-  const refreshThumb = async (): Promise<void> => {
-    const token = ++thumbToken;
-    const bg: Background = prefs.format === "jpeg" || prefs.format === "svg" ? "white" : prefs.bg;
-    const edge = multi ? 140 : PREVIEW_PX;
-    for (let i = 0; i < thumbs.length; i++) {
-      const x = ts[i]!;
-      const w = Math.max(8, Math.round(x.ratio >= 1 ? edge : edge * x.ratio)), h = Math.max(8, Math.round(w / x.ratio));
-      try {
-        const c = await deps.render(x, w, h, bg);
+  const cache = new Map<ExportTarget, HTMLCanvasElement>();
+  let cacheBg: Background | "" = "";
+  const seen = new Set<HTMLElement>();
+  let observer: IntersectionObserver | null = null;
+  const previewBg = (): Background => (prefs.format === "jpeg" || prefs.format === "svg" ? "white" : prefs.bg);
+  const paintThumb = async (i: number, token: number): Promise<void> => {
+    const x = ts[i]!, th = thumbs[i]!;
+    const bg = previewBg();
+    const edge = multi ? (ts.length > 8 ? 96 : 140) : PREVIEW_PX;
+    const w = Math.max(8, Math.round(x.ratio >= 1 ? edge : edge * x.ratio)), h = Math.max(8, Math.round(w / x.ratio));
+    try {
+      let c = cache.get(x);
+      if (!c) {
+        c = await deps.render(x, w, h, bg);
         if (token !== thumbToken) return;
-        const th = thumbs[i]!;
-        th.width = w;
-        th.height = h;
-        th.getContext("2d")!.clearRect(0, 0, w, h);
-        th.getContext("2d")!.drawImage(c, 0, 0);
-        th.dataset["ready"] = "1";
-        th.closest(".ex-frame")!.classList.toggle("is-checker", bg === "transparent");
-        th.dataset["bg"] = bg;
-      } catch {
-        // no preview: the numbers still work
+        cache.set(x, c);
       }
+      th.width = w;
+      th.height = h;
+      th.getContext("2d")!.clearRect(0, 0, w, h);
+      th.getContext("2d")!.drawImage(c, 0, 0);
+      th.dataset["ready"] = "1";
+      th.closest(".ex-frame")!.classList.toggle("is-checker", bg === "transparent");
+      th.dataset["bg"] = bg;
+    } catch {
+      // no preview: the numbers still work
     }
   };
+  const refreshThumb = async (): Promise<void> => {
+    const token = ++thumbToken;
+    if (cacheBg !== previewBg()) {
+      cache.clear();
+      cacheBg = previewBg();
+    }
+    for (let i = 0; i < thumbs.length; i++) {
+      // (several sheets: only those on screen now; the others when they scroll into view)
+      if (multi && observer && !seen.has(thumbs[i]!.closest<HTMLElement>("[data-mini]")!)) continue;
+      await paintThumb(i, token);
+      if (token !== thumbToken) return;
+      if (multi) await new Promise((r) => setTimeout(r)); // (a breath between pictures: the dialog stays responsive)
+    }
+  };
+  /** After the list is drawn again: watch which pictures are on screen. */
+  const watchMinis = (): void => {
+    observer?.disconnect();
+    seen.clear();
+    const box = dlg.querySelector<HTMLElement>("[data-ex-minis]");
+    if (!box || typeof IntersectionObserver === "undefined") {
+      for (const f of dlg.querySelectorAll<HTMLElement>("[data-mini]")) seen.add(f);
+      return;
+    }
+    observer = new IntersectionObserver((entries) => {
+      let any = false;
+      for (const en of entries) {
+        if (en.isIntersecting && !seen.has(en.target as HTMLElement)) {
+          seen.add(en.target as HTMLElement);
+          any = true;
+        }
+      }
+      if (any) void refreshThumb();
+    }, { root: box });
+    for (const f of box.querySelectorAll<HTMLElement>("[data-mini]")) observer.observe(f);
+  };
+
+  watchMinis();
 
   // (several sheets: widths only, as each has its own shape)
   const suggestions = multi ? sizeSuggestions(1, 12).filter((s) => !s.exact).map((s) => ({ ...s, h: 0 })) : sizeSuggestions(t.ratio, 8);
@@ -218,6 +260,7 @@ export function openExportDialog(deps: ExportDeps): void {
     next.splice(to, 0, one!);
     ts = next;
     drawMinis();
+    watchMinis();
     refresh();
     void refreshThumb();
   };
@@ -248,6 +291,7 @@ export function openExportDialog(deps: ExportDeps): void {
     if (to < 0 || to >= ts.length) return;
     ts = ts.map((x, i, all) => (i === at ? all[to]! : i === to ? all[at]! : x)); // (the two change places)
     drawMinis();
+    watchMinis();
     refresh();
     void refreshThumb();
     dlg.querySelector<HTMLButtonElement>(`[data-mini="${to}"] [data-move="${b.dataset["move"]}"]`)?.focus();

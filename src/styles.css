@@ -2482,4 +2482,3 @@ dialog.export-dlg.is-busy .ex-btn { opacity: 0.6; pointer-events: none; }
 .ex-move:disabled { opacity: 0.3; cursor: default; }
 .ex-move:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .ex-minis { max-height: calc(var(--sp-15) * 5); overflow-y: auto; padding: var(--sp-4); }
-.ex-mini .ex-frame:not(:has(canvas)) { background: var(--hud-hover); }
