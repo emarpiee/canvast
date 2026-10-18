@@ -84,6 +84,9 @@ import { setColourStyles } from "../ui/colour-popover";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
+import { CommandRegistry } from "../commands/registry";
+import { barCommands } from "../commands/from-bars";
+import { settingCommands } from "../commands/settings-commands";
 import type { Command } from "../ui/command-palette";
 import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels } from "../render/item-label";
@@ -1266,8 +1269,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
 
-  // The command palette (ADR 0117): Ctrl+K or Ctrl+Shift+P finds any command by words.
-  const palette = mountCommandPalette(() => {
+  // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
+  // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.
+  const registry = new CommandRegistry();
+  registry.setProvider("app", () => {
     const sel = editor.selection.size > 0;
     const onCanvas = appView === "canvas";
     const key = (k: string): string => k.toUpperCase();
@@ -1300,20 +1305,22 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
       { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
-      ...dock.commands().map((c): Command => ({ ...c, enabled: () => onCanvas && (c.enabled?.() ?? true) })),
       { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
       { group: "Go to", title: "Assets view", words: "library", run: () => setView("assets") },
       { group: "Go to", title: "Shortcuts", keys: "?", words: "keys keyboard help", run: () => { setView("settings"); settingsView.show("shortcuts"); } },
       { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
       { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
-      ...SETTINGS_TABS.flatMap((t) => [
-        { group: "Settings", title: t.label, words: "preferences options", run: () => { setView("settings"); settingsView.show(t.id); } } as Command,
-        ...(t.rows ?? []).map((r): Command => ({ group: "Setting", title: `${r.label}`, words: `${t.label} ${r.help ?? ""}`, run: () => { setView("settings"); settingsView.show(t.id); } })),
-      ]),
     ];
     return list;
   });
+  registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, enabled: () => appView === "canvas" && (c.enabled?.() ?? true) })));
+  registry.setProvider("settings", () => [
+    ...SETTINGS_TABS.map((t): Command => ({ group: "Settings", kind: "settings", title: t.label, words: "preferences options", run: () => { setView("settings"); settingsView.show(t.id); } })),
+    ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
+  ]);
+  registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
+  const palette = mountCommandPalette(registry);
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.key.toLowerCase() !== "k" && !(e.shiftKey && e.key.toLowerCase() === "p"))) return;
     if ((e.target as HTMLElement | null)?.closest?.("dialog")) return;

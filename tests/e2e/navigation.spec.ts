@@ -368,3 +368,41 @@ test("the command palette: / or Ctrl+K opens it and it finds a command by its wo
   await expect(palette).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the command palette has the bars' buttons and the settings as commands, and @kind narrows it (ADR 0129)", async ({ app }) => {
+  const p = app.page;
+  const palette = p.getByTestId("command-palette");
+  const box = p.locator(".palette-input");
+  const titles = () => palette.locator(".palette-title").allTextContents();
+  await p.keyboard.press("u");
+  await app.drag({ x: 500, y: 300 }, { x: 700, y: 420 }, 4);
+  await p.keyboard.press("v");
+  await p.mouse.click(600, 360);
+  // A button of the Actions bar (not in any list of the app's own) is found, says which bar it is on, and does what the button does.
+  await p.keyboard.press("Control+k");
+  await box.fill("lock selection");
+  await expect(palette.locator(".palette-group").first()).toHaveText("Actions");
+  await p.keyboard.press("Enter");
+  await expect.poll(async () => ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<Record<string, unknown>>).filter((o) => o["locked"] === true).length).toBe(1);
+  // Controls of the Properties bar and the view buttons are there too (a field is focused, a button pressed).
+  await p.keyboard.press("Control+k");
+  await box.fill("@toolbar item names");
+  expect(await titles()).toContain("Item names");
+  // @ alone offers the kinds; @kind narrows to one and the other words still apply.
+  await box.fill("@");
+  const kinds = await titles();
+  expect(kinds).toEqual(expect.arrayContaining(["@toolbar", "@settings", "@tool"]));
+  await box.fill("@toolbar");
+  await p.keyboard.press("ArrowDown");
+  await p.keyboard.press("ArrowUp");
+  await box.fill("@settings theme");
+  const themed = await titles();
+  expect(themed.length).toBeGreaterThan(1);
+  expect(themed).toContain("Theme: Dark");
+  expect(await palette.locator(".palette-group").allTextContents()).toEqual(themed.map(() => "Setting"));
+  // A choice of a setting is a command: it sets it.
+  await box.fill("@settings theme dark");
+  await p.keyboard.press("Enter");
+  await expect(p.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(app.consoleErrors).toEqual([]);
+});

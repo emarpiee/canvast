@@ -429,21 +429,22 @@ html, body {
 #nav { position: fixed; left: 12px; top: 12px; z-index: var(--z-edge); display: flex; align-items: flex-start; gap: var(--sp-4); pointer-events: none; }
 .nav { position: relative; pointer-events: auto; }
 /* The navigator pill (ADR 0079): the Canvas view's tab and the board/canvas switcher in one control, the first of the top bar. */
-.nav-pill { display: inline-flex; align-items: center; gap: var(--sp-1); max-width: min(46vw, 400px); padding: var(--sp-1); font: var(--weight-medium) var(--text-md) var(--font-ui); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); backdrop-filter: blur(6px); }
-.nav-crumb, .nav-chev { display: inline-flex; align-items: center; gap: var(--sp-3); height: 29px; color: inherit; font: inherit; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.nav-crumb { min-width: 0; padding: 0 var(--sp-5); overflow: hidden; }
-.nav-crumb svg { flex: none; width: 16px; height: 16px; }
+.nav-pill { display: inline-flex; align-items: center; gap: var(--sp-4); max-width: min(46vw, 400px); font: var(--weight-medium) var(--text-md) var(--font-ui); }
+/* The infinity button is the Canvas view's tab and the only boxed part; the name and its arrow float beside it as one control. */
+.nav-crumb { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); box-sizing: border-box; padding: 0; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(6px); cursor: pointer; }
+.nav-crumb svg { flex: none; width: 18px; height: 18px; }
+.nav-name-btn { display: inline-flex; align-items: center; gap: var(--sp-3); min-width: 0; height: var(--bar-h); padding: 0 var(--sp-4); color: inherit; font: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); }
+.nav-name-btn svg { flex: none; width: 16px; height: 16px; color: var(--hud-muted); }
 .nav-crumb-text { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .nav-crumb-board, .nav-crumb-canvas { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-crumb-board { flex: 0 1 auto; max-width: 6em; }
 .nav-crumb-canvas { flex: 0 1 auto; max-width: 10em; }
 #workspace { flex: 0 1 auto; min-width: 0; }
-.nav-chev { flex: none; justify-content: center; width: 28px; padding: 0; color: var(--hud-muted); }
-.nav-chev svg { width: 16px; height: 16px; }
-.nav-crumb:hover, .nav-chev:hover { background: var(--hud-hover); }
+.nav-crumb:hover { background: var(--hud-hover); }
+.nav-name-btn:hover { background: var(--hud-hover); }
 .nav-pill[data-active="true"] .nav-crumb { background: var(--hud-accent); color: var(--hud-accent-fg); }
-.nav-chev:hover, .nav-chev[aria-expanded="true"] { color: var(--hud-fg); }
-.nav-crumb:focus-visible, .nav-chev:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.nav-name-btn:hover svg, .nav-name-btn[aria-expanded="true"] svg { color: var(--hud-fg); }
+.nav-crumb:focus-visible, .nav-name-btn:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .nav-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -830,13 +831,13 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 #toolbar > .rail {
   position: fixed;
   left: calc(12px / var(--ui-scale, 1));
-  top: calc(50vh / var(--ui-scale, 1));
-  transform: translateY(-50%);
+  /* At the top, just under the top-left controls (not floating in the middle of the left edge), so the room below it is the canvas's. */
+  top: calc((var(--edge) + var(--ctl) + var(--near)) / var(--ui-scale, 1));
   z-index: 3;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  padding: var(--sp-3);
+  padding: var(--pad);
   pointer-events: auto;
   background: var(--hud-bg);
   border: 1px solid var(--hud-border);
@@ -852,7 +853,7 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .toolbar { border-radius: var(--r-lg); padding: var(--sp-3); }
 .toolbar button, .hud-controls button { border-radius: var(--r-md); }
 .toolbar button { min-width: 34px; height: 34px; }
-.hud-readout, .hud-controls, .nav-pill, .view-switch, .toast { border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.hud-readout, .hud-controls, .view-switch, .toast { border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
 .hud-readout { padding: var(--sp-4) var(--sp-6); gap: var(--sp-2); font: var(--weight-medium) var(--text-sm)/1.35 var(--font-ui); font-variant-numeric: tabular-nums; }
 .hud-zoom { font: var(--weight-semibold) var(--text-lg)/1.3 var(--font-ui); font-variant-numeric: tabular-nums; }
 .hud-pos, .hud-save { color: var(--hud-muted); }
@@ -871,7 +872,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .set-preset:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
 
 /* The dock: history, panels and import, at the top right. The options bar between it and the view tabs shows only what the tool offers. */
-#toolbar > .dock { position: fixed; top: calc(12px / var(--ui-scale, 1)); right: calc(12px / var(--ui-scale, 1)); z-index: 3; display: flex; gap: var(--sp-3); padding: var(--sp-3); pointer-events: auto; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+#toolbar > .dock { position: fixed; top: calc(12px / var(--ui-scale, 1)); right: calc(12px / var(--ui-scale, 1)); z-index: 3; display: flex; gap: var(--sp-3); padding: var(--pad); pointer-events: auto; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .dock button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-md); background: transparent; color: inherit; cursor: pointer; }
 .dock button:hover:not(:disabled) { background: var(--hud-hover); }
 .dock button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
@@ -888,18 +889,27 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
    Every floating element on the canvas has the same height (a 36 px control and 4 px of padding on each side, 44 px), the same
    radius, border and shadow, sits 12 px from the window edge, and keeps 8 px from its neighbour. */
 :root { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; }
+/* The thickness every floating bar has (the Properties bar, the Actions bar, the dock, the rail, the view controls, the view tabs): a control, the padding on both sides and the border. */
+:root { --bar-h: calc(var(--ctl) + 2 * var(--pad) + 2px); }
 .rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .rail button, .dock button, .toolbar button, .view-switch button, .hud-controls button, .ctx-bar button, .tb-options-row button { min-width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r, var(--r-md)); }
 .rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
 .rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
 .view-switch button { padding: 0 var(--sp-6); gap: var(--sp-3); }
 .view-switch button svg { width: 16px; height: 16px; }
-.nav-pill { height: calc(var(--ctl) + 2 * var(--pad) + 2px); box-sizing: border-box; border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.nav-pill { height: var(--bar-h); }
 .view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); }
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); }
+/* Settings: the last control of the top right, a bar of its own (so it is there in every view). */
+.view-settings { position: fixed; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
+.view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
+.view-settings button svg { width: 18px; height: 18px; }
+.view-settings button:hover { background: var(--hud-hover); }
+.view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+.view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -943,7 +953,7 @@ body[data-view="assets"] #notices { bottom: 92px; }
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
 #assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--canvas-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #assets-view[hidden] { display: none; }
-.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); }
+.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }

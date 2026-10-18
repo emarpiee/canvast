@@ -489,7 +489,7 @@ test("canvases and boards can be duplicated, moved up and down, and a canvas mov
   await p.getByTestId("workspace-chevron").click();
   await p.getByRole("button", { name: /^More actions for canvas Canvas 1/ }).click();
   await p.getByRole("menuitem", { name: /^Duplicate canvas/ }).click();
-  await expect(p.getByTestId("view-canvas")).toContainText("Canvas 1 copy"); // the copy is open
+  await expect(p.getByTestId("workspace-nav")).toContainText("Canvas 1 copy"); // the copy is open
   expect(await objects()).toBe(n);
   expect((await p.evaluate(() => window.__canvastDebug.objects())).some((o) => o.id === first), "new ids").toBe(false);
 

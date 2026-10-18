@@ -17,9 +17,10 @@ export function syncGroups(bar: HTMLElement, wanted: (group: HTMLElement) => boo
  * Every bar that sits in the top stack (the Properties bar, the colours of a selection) is made this way and kept right with
  * `syncGroups` and `syncScroll`; a new one needs no CSS of its own.
  */
-export function createBar(label: string): { el: HTMLElement; row: HTMLElement } {
+export function createBar(label: string, commandGroup: string): { el: HTMLElement; row: HTMLElement } {
   const el = document.createElement("div");
   el.className = "toolbar";
+  el.dataset["cmdGroup"] = commandGroup; // (what the command palette calls its controls, src/commands/from-bars.ts)
   el.setAttribute("role", "toolbar");
   el.setAttribute("aria-label", label);
   el.hidden = true;

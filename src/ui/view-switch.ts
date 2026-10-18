@@ -3,18 +3,19 @@ import { ICONS } from "./icons";
 export type AppView = "canvas" | "assets" | "settings";
 
 /**
- * The top-level switch to the Assets view and the Settings view: two buttons that act as tabs (Left and Right move between them, as in
- * a tab list). The Canvas view is the navigator's pill, the first control, which names the open board and canvas (ADR 0079); here no tab
- * is selected while the canvas is open.
+ * The top-level switch to the Assets view, and the way into the Settings view: the Assets tab here, and the Settings button at the far end of
+ * the top right, beside the dock and in every view (`data-view="settings"`, pressed while Settings is open; any button with that attribute opens it). The Canvas view is the
+ * navigator's infinity button, the first control (ADR 0079); here no tab is selected while the canvas is open.
  */
 export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void): (v: AppView) => void {
   root.innerHTML = `
-    <div class="view-switch" role="tablist" aria-label="View">
+    <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Assets view">${ICONS.images}<span>Assets</span></button>
-      <button type="button" role="tab" data-view="settings" data-testid="view-settings" title="Settings">${ICONS.settings}<span>Settings</span></button>
-    </div>`;
+    </div>
+    <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const set = (v: AppView): void => {
+    for (const b of document.querySelectorAll<HTMLElement>('[data-view="settings"]')) b.setAttribute("aria-pressed", String(v === "settings"));
     for (const t of tabs) {
       const on = t.dataset["view"] === v;
       t.setAttribute("aria-selected", String(on));
@@ -24,6 +25,9 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
   root.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLButtonElement>('[role="tab"]');
     if (t) onSelect(t.dataset["view"] as AppView);
+  });
+  document.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest('[data-view="settings"]')) onSelect("settings");
   });
   root.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;

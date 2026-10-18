@@ -196,22 +196,22 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("view tabs: arrow keys move between Assets and Settings, the Canvas is the board pill; Assets is remembered over a reload, Settings is not (ADR 0048, 0079)", async ({ app }) => {
+test("views: the Assets tab, the Settings button at the end of the dock and the Canvas infinity button; Assets is remembered over a reload, Settings is not (ADR 0048, 0079)", async ({ app }) => {
   const p = app.page;
   const view = () => p.evaluate(() => window.__canvastDebug.appView());
   await expect(p.getByTestId("view-canvas")).toHaveAttribute("aria-current", "page");
   await p.getByTestId("view-assets").click();
   expect(await view()).toBe("assets");
   await expect(p.getByTestId("view-canvas")).not.toHaveAttribute("aria-current", "page");
-  await p.getByTestId("view-assets").focus(); // the opened view took the focus; the arrow keys work on the tab list
-  await p.keyboard.press("ArrowRight");
+  await p.getByTestId("view-settings").click();
   expect(await view()).toBe("settings");
-  await expect(p.getByTestId("view-settings")).toHaveAttribute("aria-selected", "true");
-  await p.keyboard.press("ArrowRight"); // wraps to the first tab
+  await expect(p.getByTestId("view-settings")).toHaveAttribute("aria-pressed", "true");
+  await expect(p.getByTestId("view-assets")).toHaveAttribute("aria-selected", "false");
+  await p.getByTestId("view-assets").click();
   expect(await view()).toBe("assets");
-  await p.keyboard.press("ArrowLeft"); // and back round
-  expect(await view()).toBe("settings");
-  await p.getByTestId("view-canvas").click(); // the board pill is the way back to the canvas
+  await expect(p.getByTestId("view-settings")).toHaveAttribute("aria-pressed", "false");
+  await p.getByTestId("view-settings").click();
+  await p.getByTestId("view-canvas").click(); // the infinity button is the way back to the canvas
   expect(await view()).toBe("canvas");
   await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Collaboration" }).click();
@@ -247,7 +247,7 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
         const f = (v: number) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
         return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
       };
-      const tab = getComputedStyle(document.querySelector('.view-switch [aria-selected="true"]')!);
+      const tab = getComputedStyle(document.querySelector('[data-view="settings"][aria-pressed="true"]')!);
       const a = lum(rgb(tab.backgroundColor));
       const b = lum(rgb(tab.color));
       const bg = rgb(getComputedStyle(document.body).backgroundColor);

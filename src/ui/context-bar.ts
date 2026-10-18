@@ -94,6 +94,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const bar = document.createElement("div");
   bar.className = "ctx-bar";
   bar.dataset["testid"] = "context-bar";
+  bar.dataset["cmdGroup"] = "Actions";
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Selection actions");
   bar.hidden = true;

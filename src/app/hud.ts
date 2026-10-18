@@ -111,7 +111,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <span class="hud-fps" data-testid="fps-readout" aria-live="off" hidden></span>
       <div class="hud-fps hud-diag" data-testid="diagnostics" aria-live="off" hidden></div>
     </div>
-    <div class="hud-controls" role="toolbar" aria-label="Navigation">
+    <div class="hud-controls" data-cmd-group="View controls" role="toolbar" aria-label="Navigation">
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>

@@ -166,12 +166,12 @@ const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind =
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
-    <div class="rail" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
+    <div class="rail" data-cmd-group="Tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
       ).join("")}
     </div>
-    <div class="dock" role="toolbar" aria-label="History and panels">
+    <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="History and panels">
       <div class="tb-group">
         <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
@@ -186,11 +186,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <input type="file" multiple hidden data-testid="import-input">
     </div>
-    <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
+    <div class="toolbar" data-cmd-group="Properties" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
       <div class="tb-group tb-options tb-subject" data-for="select node" role="radiogroup" aria-label="Edit which kind of item" hidden></div>
       <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
-        <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
+        <span class="tb-recents" data-recents data-no-command role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="shape path" role="radiogroup" aria-label="Shape or path">
@@ -236,7 +236,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-initial-update hidden aria-label="Update initial shape: replace the saved shape with the shape as it is now" title="Update initial shape: replace the saved shape with the shape as it is now">${ICONS.save}</button>
         <button type="button" data-initial-reset hidden aria-label="Reset to initial shape: put the shape back as it was saved" title="Reset to initial shape: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
-      <div class="tb-group tb-options" data-for="select node" data-sel-colours hidden role="group" aria-label="Colours of the selection"></div>
+      <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
@@ -286,7 +286,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
   `;
   // The colours of a selection are a second bar of their own, just under this one (the same bar component, ADR 0128).
-  const colourBar = createBar("Colours of the selection");
+  const colourBar = createBar("Colours of the selection", "Colours");
   colourBar.row.append(root.querySelector("[data-sel-colours]")!);
   // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;

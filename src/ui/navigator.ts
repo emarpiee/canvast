@@ -17,9 +17,9 @@ import type { AppView } from "./view-switch";
 export function mountNavigator(root: HTMLElement, session: Session, openCanvasView: () => void): (v: AppView) => void {
   root.innerHTML = `
     <div class="nav">
-      <div class="nav-pill" data-testid="workspace-nav" data-active="true">
-        <button type="button" class="nav-crumb" data-testid="view-canvas" aria-current="page" title="Canvas view">${ICONS.infinity}<span class="nav-crumb-text"></span></button>
-        <button type="button" class="nav-chev" data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" aria-label="Switch board or canvas" title="Switch board or canvas">${ICONS.chevronDown}</button>
+      <div class="nav-pill" data-cmd-group="Navigate" data-testid="workspace-nav" data-active="true">
+        <button type="button" class="nav-crumb" data-testid="view-canvas" aria-current="page" aria-label="Canvas view" title="Canvas view">${ICONS.infinity}</button>
+        <button type="button" class="nav-name-btn" data-testid="workspace-chevron" aria-haspopup="true" aria-expanded="false" title="Switch board or canvas"><span class="nav-crumb-text"></span>${ICONS.chevronDown}</button>
       </div>
       <div class="nav-menu" role="menu" data-testid="workspace-menu" hidden></div>
     </div>
@@ -29,7 +29,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     </div>`;
   const crumb = root.querySelector<HTMLButtonElement>(".nav-crumb")!;
   const crumbText = root.querySelector<HTMLElement>(".nav-crumb-text")!;
-  const chev = root.querySelector<HTMLButtonElement>(".nav-chev")!;
+  const chev = root.querySelector<HTMLButtonElement>(".nav-name-btn")!;
   const pill = root.querySelector<HTMLElement>(".nav-pill")!;
   let view: AppView = "canvas";
   const menu = root.querySelector<HTMLElement>(".nav-menu")!;
@@ -130,7 +130,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     // Each name is cut with an ellipsis to its own room (CSS), so a long name never pushes the tabs beside the pill; the full names are in the tooltip.
     if (entry && canvas) crumbText.innerHTML = `<span class="nav-crumb-board">${esc(entry.board.name)}</span><span class="nav-crumb-sep"> › </span><span class="nav-crumb-canvas">${esc(canvas.name)}</span>`;
     else crumbText.textContent = "Canvas";
-    crumb.title = tree && entry && canvas ? `${tree.workspace.displayName} › ${entry.board.name} › ${canvas.name}. Canvas view` : "Canvas view";
+    chev.title = tree && entry && canvas ? `${tree.workspace.displayName} › ${entry.board.name} › ${canvas.name}. Switch board or canvas` : "Switch board or canvas";
     banner.hidden = !session.readOnly;
     if (!menu.hidden) renderMenu();
   };
@@ -145,7 +145,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     }
   };
 
-  // The name is the Canvas view's tab: from another view it goes there; on the canvas it opens the menu. The chevron always opens it.
+  // The infinity button is the Canvas view's tab: from another view it goes there; on the canvas it opens the menu. The name with its arrow (one control, floating without a box) always opens the menu.
   crumb.addEventListener("click", () => (view === "canvas" ? setOpen(menu.hidden === true) : openCanvasView()));
   chev.addEventListener("click", () => setOpen(menu.hidden === true));
   root.addEventListener("keydown", (e) => {
