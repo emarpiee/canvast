@@ -611,3 +611,25 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Ctrl+click on the empty body of a sheet picks the sheet alone (not what is on it), and moving it carries what is on it", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  const sheet = (await objs(app)).at(-1)!;
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 150, 650);
+  await p.keyboard.down("Control");
+  await p.mouse.click(600, 450);
+  await p.keyboard.up("Control");
+  expect(await selection(app), "the sheet, and only it").toEqual([sheet.id]);
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const r0 = await box(rect.id);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.itemLabels().length)).toBeGreaterThan(0);
+  await drag(app, [412, 291], [512, 291]); // by its name
+  expect((await box(rect.id)).minX - r0.minX, "what is on it went with it").toBeCloseTo(100, 0);
+  expect(app.consoleErrors).toEqual([]);
+});

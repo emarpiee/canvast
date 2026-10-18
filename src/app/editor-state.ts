@@ -270,6 +270,10 @@ export class EditorState {
     if (p.kind === "paint" && p.ids.includes(o.id) && o.kind === "path") {
       return { ...o, ...(p.fill !== undefined ? { fill: p.fill } : {}), ...(p.stroke !== undefined ? { stroke: p.stroke } : {}) };
     }
+    if (p.kind === "paint" && p.ids.includes(o.id) && o.kind === "image" && p.stroke !== undefined) {
+      const { stroke: _s, ...bare } = o; // (a picture's outline is one colour: a gradient shows its start)
+      return p.stroke === null ? bare : { ...bare, stroke: typeof p.stroke === "string" ? p.stroke : p.stroke.stops[0]!.c, width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
+    }
     if (p.kind === "nodes" && p.ids.includes(o.id) && o.kind === "path") {
       const { rot: _turned, ...flat } = o;
       const sub = p.subs?.get(o.id) ?? p.sub;

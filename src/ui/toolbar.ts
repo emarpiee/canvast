@@ -80,9 +80,6 @@ export interface ToolbarActions {
   cropped(): boolean;
   uncrop(): void;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
-  /** The corner radius and border of the first picked picture, and changing them (ADR 0148). */
-  pictureLook(): { radius: number; border: { color: string; width: number } | null } | null;
-  setPictureLook(patch: { radius?: number; border?: { color?: string; width?: number } }, final?: boolean): void;
   /** The saved adjustments, and saving the numbers as one (ADR 0120). */
   adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }>; saveGradient(stops: readonly GradientStop[]): Promise<void> };
   previewAdjust(a: Adjust): void;
@@ -242,7 +239,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <label class="tb-count" data-kind="shape" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
+        <label class="tb-count" data-kind="shape picture" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-kind="shape" data-scrub="smooth" data-sel-smooth-wrap hidden title="Drag the name left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
         <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-kind="shape" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
@@ -252,10 +249,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-kind="picture" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <label class="tb-count" data-kind="picture" data-pic-radius-wrap hidden title="Round the corners of the picture. Drag the name to change it.">Radius <input type="number" data-pic-radius min="0" step="any" inputmode="decimal" aria-label="Picture corner radius"></label>
-        <span class="tb-count" data-kind="picture" data-pic-border-wrap hidden title="A border round the picture: its colour, and its width (0 takes it away)">
-          <button type="button" class="swatch swatch-paint" data-pic-border-colour aria-haspopup="dialog" aria-expanded="false" aria-label="Picture border colour"><span data-paint-chip></span></button>
-          <label>Border <input type="number" data-pic-border-w min="0" step="any" inputmode="decimal" aria-label="Picture border width"></label></span>
         <button type="button" data-kind="picture" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
@@ -293,8 +286,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-initial-reset hidden aria-label="Reset to initial shape: put the shape back as it was saved" title="Reset to initial shape: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
-      <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet">
-        <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
+      <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet picture">
+        <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
@@ -537,22 +530,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
   const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
-  // A picture's rounded corners and border (ADR 0148).
-  liveNumber(root.querySelector<HTMLInputElement>("[data-pic-radius]")!, (v, final) => v >= 0 && actions.setPictureLook({ radius: v }, final));
-  liveNumber(root.querySelector<HTMLInputElement>("[data-pic-border-w]")!, (v, final) => v >= 0 && actions.setPictureLook({ border: { width: v } }, final));
-  const borderColour = root.querySelector<HTMLButtonElement>("[data-pic-border-colour]")!;
-  borderColour.addEventListener("click", () => {
-    const look = actions.pictureLook();
-    if (!look) return;
-    if (!look.border) actions.setPictureLook({ border: {} }, true); // (a first border: white and thin, then the colour is chosen)
-    openColourPopover(borderColour, {
-      name: "Picture border colour",
-      value: actions.pictureLook()?.border?.color ?? "#ffffff",
-      alpha: true,
-      onInput: (hex) => actions.setPictureLook({ border: { color: hex } }, false),
-      onChange: (hex) => actions.setPictureLook({ border: { color: hex } }, true),
-    });
-  });
   const onSheet = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
   for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => actions.moveOnSheet(Number(onSheet("[data-on-x]").value), Number(onSheet("[data-on-y]").value), final));
   for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => actions.resizeOnSheet(Number(onSheet("[data-on-w]").value), Number(onSheet("[data-on-h]").value), final));
@@ -930,15 +907,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     crop.classList.toggle("is-applied", cropped);
     crop.setAttribute("aria-label", cropped ? "Crop the picture (cropped)" : "Crop the picture");
     root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
-    const look = pick && still ? actions.pictureLook() : null;
-    root.querySelector<HTMLElement>("[data-pic-radius-wrap]")!.hidden = !look;
-    root.querySelector<HTMLElement>("[data-pic-border-wrap]")!.hidden = !look;
-    if (look) {
-      const rIn = root.querySelector<HTMLInputElement>("[data-pic-radius]")!, wIn = root.querySelector<HTMLInputElement>("[data-pic-border-w]")!;
-      if (document.activeElement !== rIn) rIn.value = String(Number(look.radius.toPrecision(5)));
-      if (document.activeElement !== wIn) wIn.value = look.border ? String(Number(look.border.width.toPrecision(5))) : "0";
-      (borderColour.querySelector("[data-paint-chip]") as HTMLElement).style.background = look.border ? swatchBackground(look.border.color) : "transparent";
-    }
     const adj = pick && still ? actions.selectedAdjust() : null;
     const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
     adjustBtn.hidden = !adj;

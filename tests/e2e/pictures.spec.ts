@@ -416,56 +416,63 @@ test("a video plays at the speed set for it and can be cropped: the player shows
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a picture gets rounded corners and a border (ADR 0148): the corner shows what is behind it, the border is drawn round the edge, one undo each, and they survive a reload", async ({ app }) => {
+test("a picture gets rounded corners and an outline with the same controls as a shape (ADR 0148): Radius, and the Outline options (width, position); one undo each, and they survive a reload", async ({ app }) => {
   const p = app.page;
   const pic = await place(app);
   await p.keyboard.press("v");
   const b0 = await boxOf(app, pic.id);
-  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
-  const radius = p.locator("[data-pic-radius]");
-  await expect(radius).toBeVisible();
-  await expect(radius).toHaveValue("0");
+  const mid = Math.round((b0.minY + b0.maxY) / 2);
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), mid);
+  const radius = p.locator("[data-sel-radius]");
+  await expect(radius, "the shape's own Radius field").toBeVisible();
+  await expect(p.locator('[data-paint="fill"]'), "a picture has no fill").toBeHidden();
+  await expect(p.locator('[data-paint="stroke"]')).toBeVisible();
   const corner = [Math.round(b0.minX) + 3, Math.round(b0.minY) + 3] as const;
-  const away = async () => { await p.mouse.click(60, 650); await app.frame(); }; // (no selection box over the corner when it is read)
-  const pickAgain = async () => { await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2)); await app.frame(); };
+  const away = async () => { await p.mouse.click(60, 650); await app.frame(); }; // (no selection box over what is read)
+  const pickAgain = async () => { await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), mid); await app.frame(); };
   await away();
   const inside = await px(app, corner[0], corner[1]);
   const behind = await px(app, corner[0], Math.round(b0.minY) - 4); // (the ground just above the corner)
   expect(inside, "a square corner shows the picture").not.toEqual(behind);
   await pickAgain();
-  const half = Math.min(pic.w, pic.h) / 2;
-  await radius.fill(String(half));
+  await radius.fill("40");
   await radius.press("Enter");
   await app.frame();
-  expect((await objs(app)).find((o) => o.id === pic.id)).toMatchObject({ radius: half });
+  const rounded = (await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number };
+  expect(rounded.radius).toBeCloseTo(40, 0);
   await away();
   expect(await px(app, corner[0], corner[1]), "a rounded corner shows what is behind it").toEqual(behind);
   await pickAgain();
-  // a border: white and thin to begin with, then its width
-  const width = p.locator("[data-pic-border-w]");
+  // the outline: the shape's popover, a width and a position
+  await p.click("[data-outline-options]");
+  const width = p.locator(".op-width").first();
+  await expect(width).toBeVisible();
   await width.fill("6");
   await width.press("Enter");
+  await p.locator('[data-align="outside"]').click();
+  await key2(app, "Escape");
   await app.frame();
-  const look = (await objs(app)).find((o) => o.id === pic.id) as unknown as { border?: { color: string; width: number } };
-  expect(look.border).toEqual({ color: "#ffffff", width: 6 });
-  const mid = Math.round((b0.minY + b0.maxY) / 2);
+  const look = (await objs(app)).find((o) => o.id === pic.id) as unknown as { stroke?: string; width?: number; align?: string };
+  expect(look.stroke, "white to begin with, as a shape's first outline").toBe("#ffffff");
+  expect(look.width).toBeCloseTo(6, 0);
+  expect(look.align).toBe("outside");
   await away();
-  expect(await px(app, Math.round(b0.minX) + 1, mid), "the border is on the edge").toEqual([255, 255, 255]);
+  expect(await px(app, Math.round(b0.minX) - 3, mid), "the line is outside the edge").toEqual([255, 255, 255]);
+  expect(await px(app, Math.round(b0.minX) + 3, mid), "and none of it over the picture").not.toEqual([255, 255, 255]);
   await pickAgain();
-  await key2(app, "Control+z");
-  await key2(app, "Control+z");
-  expect((await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number; border?: unknown }).toMatchObject({});
-  expect(((await objs(app)).find((o) => o.id === pic.id) as unknown as { border?: unknown }).border).toBeUndefined();
-  await key2(app, "Control+y");
-  await key2(app, "Control+y");
+  for (let i = 0; i < 3; i++) await key2(app, "Control+z");
+  const bare = (await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number; stroke?: string; align?: string };
+  expect([bare.radius, bare.stroke, bare.align], "three undo steps take all of it away").toEqual([undefined, undefined, undefined]);
+  for (let i = 0; i < 3; i++) await key2(app, "Control+y");
   await app.frame();
   await expect(p.getByTestId("save-status")).toContainText("Saved"); // (the debounced save has landed)
   await p.reload();
   await p.waitForFunction(() => window.__canvastDebug !== undefined);
   await expect.poll(async () => (await objs(app)).length).toBe(1);
-  const again = (await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number; border?: { width: number } };
-  expect(again.radius).toBe(half);
-  expect(again.border!.width).toBe(6);
+  const again = (await objs(app)).find((o) => o.id === pic.id) as unknown as { radius?: number; stroke?: string; align?: string };
+  expect(again.radius).toBeCloseTo(40, 0);
+  expect(again.stroke).toBe("#ffffff");
+  expect(again.align).toBe("outside");
   expect(app.consoleErrors).toEqual([]);
 });
 const key2 = (app: App, k: string) => app.page.keyboard.press(k);

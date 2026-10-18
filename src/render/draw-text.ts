@@ -398,7 +398,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
   const offY = D.mul(D.fromNumber(line.top), SIZE);
   const w = (pixelW / R) * gs * o.size;
   const h = (pixelH / R) * gs * o.size;
-  const img: ImageObject = { ...o, kind: "image", assetId: "", w, h, pixelW, pixelH, opacity: 1 };
+  const img = { ...o, kind: "image", assetId: "", w, h, pixelW, pixelH, opacity: 1 } as unknown as ImageObject; // (a glyph's raster: the text's own fields are never read as an outline)
   // The raster's projection: the text's, with the origin moved to the raster's corner.
   const lx = D.sub(p.lx, offX);
   const ly = D.sub(p.ly, offY);

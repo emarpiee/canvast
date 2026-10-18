@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, selectedPictureLook, setPictureLook, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -744,7 +744,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes and paths out of double range are skipped.
       const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po): CanvasObject[] => {
         const ppu = po.cover ? 0 : po.proj.ppu;
-        if (!((po.obj.kind === "stroke" || po.obj.kind === "path") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity)) return [];
+        if (!((po.obj.kind === "stroke" || po.obj.kind === "path" || po.obj.kind === "image") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity)) return [];
+        // A picture's outline works as a shape's: 0 takes it away (the width is kept), a width turns one on (white, as a first outline).
+        if (po.obj.kind === "image") {
+          const { stroke: _s, ...bare } = po.obj;
+          return px > 0 ? [{ ...bare, stroke: po.obj.stroke ?? "#ffffff", width: px / ppu }] : po.obj.stroke === undefined ? [] : [bare];
+        }
         // A shape's outline of 0 is no outline (its width is kept for when it is turned on again); a width on one without an outline turns one on.
         if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: "#1f2329" } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
         return px > 0 ? [{ ...po.obj, width: px / ppu }] : [];
@@ -758,10 +763,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectedOutline: () => {
       const o = selectedOutline(doc, editor);
       if (!o) return null;
-      const first = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "path") as PathObject | undefined;
+      const first = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "path" || x?.kind === "image") as PathObject | ImageObject | undefined;
       const po = first && visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === first.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
-      return { ...o, widthPx: ppu > 0 && ppu < Infinity ? first!.width * ppu : null };
+      const wLocal = first?.kind === "image" ? (first.stroke === undefined ? 0 : (first.width ?? 0)) : first?.width;
+      return { ...o, widthPx: ppu > 0 && ppu < Infinity && wLocal !== undefined ? wLocal * ppu : null };
     },
     outlineSelected: (patch) => commitOutline(doc, editor, patch),
     selectedDashNumbers: () => selectedDashNumbers(doc, editor),
@@ -802,8 +808,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     boxOnSheet: () => boxOnSheet(doc, editor),
     moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
     resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
-    pictureLook: () => selectedPictureLook(doc, editor),
-    setPictureLook: (patch, final) => setPictureLook(doc, editor, patch, final),
     exportSelection: () => openExport(),
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),

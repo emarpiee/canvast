@@ -142,10 +142,20 @@ export interface ImageObject extends ObjectBase {
   readonly crop?: Crop;
   /** Non-destructive adjustments (ADR 0118); absent = none. */
   readonly adjust?: Adjust;
-  /** Rounded corners (ADR 0148): the radius in local units, the same at all four corners; absent = square. Never more than half the shorter side. */
-  readonly radius?: number;
-  /** A line round the picture (its border), centred on its edge (ADR 0148): its colour (#rrggbb or #rrggbbaa) and width in local units. */
-  readonly border?: { readonly color: string; readonly width: number };
+  /**
+   * Rounded corners and an outline, as a shape has them (ADR 0148): the same fields, the same controls. `radius`: local units, one value or one
+   * for each corner (top left, top right, bottom right, bottom left); absent = square. `stroke` is a solid colour (a picture's outline has no
+   * gradient), `width` in local units, and `join`, `cap`, `align`, `dash`, `dashOffset`, `miterAngle` mean what they mean for a path.
+   */
+  readonly radius?: number | readonly number[];
+  readonly stroke?: string;
+  readonly width?: number;
+  readonly join?: Join;
+  readonly cap?: Cap;
+  readonly align?: Align;
+  readonly dash?: readonly [number, number];
+  readonly dashOffset?: number;
+  readonly miterAngle?: number;
 }
 
 /** The library asset an object uses: a picture's file, or the font file a text is set in (undefined: none). */
@@ -501,8 +511,17 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
     if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
-    if (o.radius !== undefined && !(Number.isFinite(o.radius) && o.radius >= 0)) throw new InvalidObjectError("bad radius");
-    if (o.border !== undefined && !(typeof o.border === "object" && o.border !== null && COLOR_RE.test(o.border.color) && Number.isFinite(o.border.width) && o.border.width > 0)) throw new InvalidObjectError("bad border");
+    if (o.radius !== undefined) {
+      const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
+      if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
+    }
+    if (o.stroke !== undefined && !(typeof o.stroke === "string" && COLOR_RE.test(o.stroke) && o.width !== undefined && Number.isFinite(o.width) && o.width > 0)) throw new InvalidObjectError("bad outline");
+    if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
+    if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
+    if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
+    if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
+    if (o.dashOffset !== undefined && !(typeof o.dashOffset === "number" && Number.isFinite(o.dashOffset))) throw new InvalidObjectError("bad dash offset");
+    if (o.miterAngle !== undefined && !(Number.isFinite(o.miterAngle) && o.miterAngle >= 1 && o.miterAngle <= 90)) throw new InvalidObjectError("bad miter angle");
     if (o.media !== undefined && !(["video", "gif", "audio"].includes(o.media.kind) && Number.isFinite(o.media.t) && o.media.t >= 0 && typeof o.media.repeat === "boolean" && (o.media.speed === undefined || (Number.isFinite(o.media.speed) && o.media.speed >= 0.25 && o.media.speed <= 4)) && (o.media.range === undefined || (Array.isArray(o.media.range) && o.media.range.length === 2 && Number.isFinite(o.media.range[0]) && Number.isFinite(o.media.range[1]) && o.media.range[0] >= 0 && o.media.range[1] > o.media.range[0])))) throw new InvalidObjectError("bad media state");
   } else if (o.kind === "path") {
     if (!Array.isArray(o.sub) || o.sub.length < 1 || o.sub.length > MAX_SUBPATHS) throw new InvalidObjectError("a path needs 1 to 4096 sub-paths");
@@ -655,8 +674,15 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
       ...(s["adjust"] !== undefined ? { adjust: s["adjust"] as Adjust } : {}),
-      ...(s["radius"] !== undefined ? { radius: s["radius"] as number } : {}),
-      ...(s["border"] !== undefined ? { border: s["border"] as { color: string; width: number } } : {}),
+      ...(s["radius"] !== undefined ? { radius: s["radius"] as number | number[] } : {}),
+      ...(s["stroke"] !== undefined ? { stroke: s["stroke"] as string } : {}),
+      ...(s["width"] !== undefined ? { width: s["width"] as number } : {}),
+      ...(s["join"] !== undefined ? { join: s["join"] as Join } : {}),
+      ...(s["cap"] !== undefined ? { cap: s["cap"] as Cap } : {}),
+      ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
+      ...(s["dash"] !== undefined ? { dash: s["dash"] as [number, number] } : {}),
+      ...(s["dashOffset"] !== undefined ? { dashOffset: s["dashOffset"] as number } : {}),
+      ...(s["miterAngle"] !== undefined ? { miterAngle: s["miterAngle"] as number } : {}),
     };
   } else if (s.kind === "path") {
     if (!Array.isArray(s["sub"])) throw new InvalidObjectError("sub-paths missing");

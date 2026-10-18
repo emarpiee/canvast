@@ -412,6 +412,13 @@ export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp
 /** Above this many CSS px per source pixel, pixels are drawn as exact rectangles. */
 const PIXEL_RECT_THRESHOLD = 64;
 
+/** Corner radii of a picture in screen px: one for all or one for each corner (top left, top right, bottom right, bottom left), none more than half the shorter side; null when there is none. */
+function cornerRadiiPx(radius: number | readonly number[], ppu: number, halfW: number, halfH: number): number[] | null {
+  const cap = Math.min(halfW, halfH);
+  const out = (typeof radius === "number" ? [radius, radius, radius, radius] : [...radius]).map((v) => Math.min(Math.max(0, v * ppu), cap));
+  return out.some((v) => v > 0.01) ? out : null;
+}
+
 export function drawImageObject(
   ctx: CanvasRenderingContext2D,
   po: ProjectedObject,
@@ -430,27 +437,48 @@ export function drawImageObject(
   const cr = Math.min(r, view.maxX);
   const cb = Math.min(b, view.maxY);
   if (cr <= cl || cb <= ct) return;
-  // Rounded corners (ADR 0148): the picture is cut to the rounded rectangle of its own box (not of what is visible of it), and its border runs round that.
-  const rpx = o.radius ? Math.min(o.radius * po.proj.ppu, (r - l) / 2, (b - t) / 2) : 0;
-  const rounded = rpx > 0.01 && typeof ctx.roundRect === "function";
-  const wpx = o.border ? o.border.width * po.proj.ppu : 0;
+  // Rounded corners and an outline (ADR 0148), as a shape has them: the picture is cut to the rounded rectangle of its own box (not of what is
+  // visible of it), and its outline runs round that, centred on the edge or inside or outside it, joined, dashed.
+  const radii = o.radius === undefined ? null : cornerRadiiPx(o.radius, po.proj.ppu, (r - l) / 2, (b - t) / 2);
+  const rounded = !!radii && typeof ctx.roundRect === "function";
+  const boxPath = (): void => {
+    if (rounded) ctx.roundRect(l, t, r - l, b - t, radii!);
+    else ctx.rect(l, t, r - l, b - t);
+  };
+  const wpx = o.stroke && o.width ? o.width * po.proj.ppu : 0;
   paint(ctx, o, () => {
     if (rounded) {
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(l, t, r - l, b - t, rpx);
+      boxPath();
       ctx.clip();
     }
     drawPictureBody();
     if (rounded) ctx.restore();
-    if (o.border && wpx > 0.01) {
+    if (o.stroke && wpx > 0.01) {
       ctx.save();
-      ctx.strokeStyle = o.border.color;
-      ctx.lineWidth = wpx;
-      ctx.lineJoin = "round";
+      const side = o.align;
+      ctx.strokeStyle = o.stroke;
+      ctx.lineJoin = o.join ?? "round";
+      if (o.join === "miter" || o.join === undefined) ctx.miterLimit = o.miterAngle ? miterLimitOf(o.miterAngle) : 4;
+      if (o.dash) {
+        ctx.setLineDash([o.dash[0] * wpx, o.dash[1] * wpx]);
+        ctx.lineDashOffset = (o.dashOffset ?? 0) * wpx;
+        ctx.lineCap = o.dash[0] === 0 ? "round" : (o.cap ?? "butt");
+      }
+      if (side) {
+        // inside or outside the edge: a line twice as wide, kept on the one side of the edge
+        ctx.beginPath();
+        if (side === "inside") boxPath();
+        else {
+          ctx.rect(-1e5, -1e5, 2e5, 2e5);
+          boxPath();
+        }
+        ctx.clip(side === "inside" ? "nonzero" : "evenodd");
+        ctx.lineWidth = wpx * 2;
+      } else ctx.lineWidth = wpx;
       ctx.beginPath();
-      if (rounded) ctx.roundRect(l, t, r - l, b - t, rpx);
-      else ctx.rect(l, t, r - l, b - t);
+      boxPath();
       ctx.stroke();
       ctx.restore();
     }

@@ -31,7 +31,7 @@ import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, pickAllByShape, sweepHits } from "../render/hit-test";
-import { isContainer, isMaskSheet } from "../doc/containers";
+import { descendantsOf, isContainer, isMaskSheet } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { cropEdges } from "../doc/crop";
@@ -155,7 +155,7 @@ type Gesture =
   | { kind: "erase"; pointerId: number; last: ScreenPoint; picked: Set<ObjectId>; trail: ScreenPoint[] }
   /** Cropping the picked picture (ADR 0118): a side or corner of its box moves its window of the source. */
   | { kind: "crop"; pointerId: number; base: ImageObject; sides: { l: boolean; r: boolean; t: boolean; b: boolean }; start: ScreenPoint; ppu: number }
-  | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null }
+  | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null; exact?: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean }
@@ -1151,7 +1151,7 @@ export function attachTools(
     } else {
       cycleIndex = 0;
     }
-    g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey, ...(click ? { click } : {}) };
+    g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey, ...(click ? { click } : {}), ...(deep ? { exact: true } : {}) };
   };
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
@@ -1161,7 +1161,10 @@ export function attachTools(
     if (t && draggable) {
       // Alt held as the drag starts: the drag carries a copy (placed exactly on the original) and the original stays.
       if (alt && !editor.blockEdit()) duplicateSelection(doc, editor, view, 0);
-      const ids = [...editor.selection].filter((id) => doc.get(id));
+      // A sheet always carries what is on it, picked with it or not.
+      const picked = [...editor.selection].filter((id) => doc.get(id));
+      const carried = descendantsOf(doc.all(), new Set(picked.filter((id) => isContainer(doc.get(id)))));
+      const ids = [...new Set([...picked, ...carried])];
       g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, snap: editor.snap ? snapContext(ids, view.frame) : null };
       updateMove(s);
       return;
@@ -1682,6 +1685,8 @@ export function attachTools(
           if (g.additive && editor.selection.has(t.id)) {
             editor.selection.delete(t.id);
             editor.changed();
+          } else if (g.exact) {
+            editor.select([t.id], g.additive); // Ctrl+click: exactly this thing (a sheet without what is on it)
           } else {
             pick([t.id], g.additive);
           }

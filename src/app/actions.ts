@@ -709,10 +709,16 @@ const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] =>
   // (the shapes inside a boolean group take no paint from outside it: the group's result has the look; they are painted when it is entered)
   selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
 
+/** The picked pictures (not locked): they take an outline and rounded corners as shapes do (ADR 0148), by the same controls. */
+const outlinedPictures = (doc: DocumentStore, editor: EditorState): ImageObject[] => selected(doc, editor).filter((o): o is ImageObject => o.kind === "image" && !o.locked);
+/** What takes an outline: the picked paths and pictures, in the order they are picked. */
+const lined = (doc: DocumentStore, editor: EditorState): Array<PathObject | ImageObject> => selected(doc, editor).filter((o): o is PathObject | ImageObject => !o.locked && (o.kind === "image" || (o.kind === "path" && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)))));
+
 /** What a saved colour or gradient can be put on: the picked shapes, texts (the letters' fill and outline) and pen strokes (one colour). */
-const paintTargets = (doc: DocumentStore, editor: EditorState): Array<PathObject | TextObject | StrokeObject> => [
+const paintTargets = (doc: DocumentStore, editor: EditorState): Array<PathObject | TextObject | StrokeObject | ImageObject> => [
   ...editablePaths(doc, editor),
   ...selected(doc, editor).filter((o): o is TextObject | StrokeObject => (o.kind === "text" || o.kind === "stroke") && !o.locked),
+  ...outlinedPictures(doc, editor),
 ];
 
 /** How many selected things a colour or gradient can be put on. */
@@ -722,7 +728,7 @@ export const paintTargetCount = (doc: DocumentStore, editor: EditorState): numbe
 export function selectionColours(doc: DocumentStore, editor: EditorState): string[] {
   const out: string[] = [];
   for (const o of paintTargets(doc, editor)) {
-    const paints: Array<Paint | null | undefined> = o.kind === "path" ? [o.fill, o.stroke] : o.kind === "text" ? [o.color, o.outline?.c] : [o.color];
+    const paints: Array<Paint | null | undefined> = o.kind === "path" ? [o.fill, o.stroke] : o.kind === "text" ? [o.color, o.outline?.c] : o.kind === "image" ? [o.stroke] : [o.color];
     for (const p of paints) if (typeof p === "string" && !out.includes(p.slice(0, 7).toLowerCase())) out.push(p.slice(0, 7).toLowerCase());
   }
   return out;
@@ -732,7 +738,13 @@ export function selectionColours(doc: DocumentStore, editor: EditorState): strin
 const firstColour = (p: Paint): string => (typeof p === "string" ? p : p.stops[0]!.c);
 
 /** `o` with a fill and outline patch applied the way its kind takes it: a shape has both; a text fills its letters and outlines them; a stroke has one colour. */
-function paintedWith(o: PathObject | TextObject | StrokeObject, patch: PaintPatch): PathObject | TextObject | StrokeObject {
+function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch): PathObject | TextObject | StrokeObject | ImageObject {
+  if (o.kind === "image") {
+    // a picture has an outline only, one colour: a gradient gives its start; none takes the outline away (its width is kept for when it is turned on)
+    if (patch.stroke === undefined) return o;
+    const { stroke: _s, ...rest } = o;
+    return patch.stroke === null ? rest : { ...rest, stroke: firstColour(patch.stroke), width: o.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE) };
+  }
   if (o.kind === "path") return { ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) };
   if (o.kind === "stroke") {
     const p = patch.fill ?? patch.stroke;
@@ -752,8 +764,8 @@ function paintedWith(o: PathObject | TextObject | StrokeObject, patch: PaintPatc
 
 /** The fill and outline of the first selected path, or null when none is selected. */
 export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: Paint | null; stroke: Paint | null } | null {
-  const o = editablePaths(doc, editor)[0];
-  return o ? { fill: o.fill, stroke: o.stroke } : null;
+  const o = lined(doc, editor)[0];
+  return o ? (o.kind === "image" ? { fill: null, stroke: o.stroke ?? null } : { fill: o.fill, stroke: o.stroke }) : null;
 }
 
 export interface PaintPatch {
@@ -763,7 +775,7 @@ export interface PaintPatch {
 
 /** Show a new fill or outline on the selected paths without storing it (the picker is still being dragged). */
 export function previewPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
-  const ids = editablePaths(doc, editor).map((o) => o.id);
+  const ids = lined(doc, editor).map((o) => o.id);
   if (!ids.length || editor.blockEdit()) return;
   editor.preview = { kind: "paint", ids, ...patch };
   editor.changed();
@@ -782,21 +794,21 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
 
 /** The corners, ends and place on the edge of the first selected path's outline (null: no path is selected). `closed`: every sub-path is closed, so the outline can be inside or outside. */
 export function selectedOutline(doc: DocumentStore, editor: EditorState): { join: JoinChoice; cap: CapChoice; align: AlignChoice; dash: DashChoice; closed: boolean } | null {
-  const o = editablePaths(doc, editor)[0];
-  return o ? { join: joinChoice(o), cap: capChoice(o), align: alignChoice(o), dash: dashChoice(o), closed: o.sub.length > 0 && o.sub.every((s) => s.closed) } : null;
+  const o = lined(doc, editor)[0];
+  return o ? { join: joinChoice(o as PathObject), cap: capChoice(o as PathObject), align: alignChoice(o as PathObject), dash: dashChoice(o as PathObject), closed: o.kind === "image" || (o.sub.length > 0 && o.sub.every((s) => s.closed)) } : null;
 }
 
 /** Dash length, gap and start, in widths of the outline, of the first selected path (null: it has no dashes). */
 export function selectedDashNumbers(doc: DocumentStore, editor: EditorState): { len: number; gap: number; offset: number } | null {
-  const o = editablePaths(doc, editor)[0];
+  const o = lined(doc, editor)[0];
   return o?.dash ? { len: o.dash[0], gap: o.dash[1], offset: o.dashOffset ?? 0 } : null;
 }
 
 /** Set the dash numbers of the selected dashed paths: one undo step. A pattern of no length and no gap is refused. */
 export function commitDashNumbers(doc: DocumentStore, editor: EditorState, n: { len?: number; gap?: number; offset?: number }): void {
-  const paths = editablePaths(doc, editor).filter((o) => o.dash);
+  const paths = lined(doc, editor).filter((o) => o.dash);
   if (!paths.length || editor.blockEdit()) return;
-  const next = paths.map((o): PathObject => {
+  const next = paths.map((o): PathObject | ImageObject => {
     const len = n.len ?? o.dash![0];
     const gap = n.gap ?? o.dash![1];
     const { dashOffset: _o, cap: _c, ...rest } = o;
@@ -811,15 +823,15 @@ export function commitDashNumbers(doc: DocumentStore, editor: EditorState, n: { 
 
 /** The angle below which a sharp corner of the first picked path is cut (degrees; the default when none was set). */
 export function selectedMiterAngle(doc: DocumentStore, editor: EditorState): number | null {
-  const o = editablePaths(doc, editor)[0];
+  const o = lined(doc, editor)[0];
   return o ? Math.round(o.miterAngle ?? (2 * Math.asin(1 / MITER_LIMIT) * 180) / Math.PI) : null;
 }
 
 /** Set the angle below which sharp corners are cut on the picked paths (null: the default again): one undo step. */
 export function commitMiterAngle(doc: DocumentStore, editor: EditorState, deg: number | null): void {
-  const paths = editablePaths(doc, editor);
+  const paths = lined(doc, editor);
   if (!paths.length || editor.blockEdit()) return;
-  const next = paths.map((o): PathObject => {
+  const next = paths.map((o): PathObject | ImageObject => {
     const { miterAngle: _m, ...rest } = o;
     return deg === null ? rest : { ...rest, miterAngle: Math.min(90, Math.max(1, deg)) };
   });
@@ -857,19 +869,19 @@ export interface OutlinePatch {
 
 /** Change the corners, ends or place on the edge of the selected paths' outlines: one undo step. */
 export function commitOutline(doc: DocumentStore, editor: EditorState, patch: OutlinePatch): void {
-  const paths = editablePaths(doc, editor);
+  const paths = lined(doc, editor);
   if (!paths.length || editor.blockEdit()) return;
-  const next = paths.map((o): PathObject => {
+  const next = paths.map((o): PathObject | ImageObject => {
     const { join: _j, cap: _c, align: _a, dash: _d, dashOffset: _o, ...rest } = o;
-    const dash = patch.dash ?? dashChoice(o);
-    const look = lookFromChoices(patch.join ?? joinChoice(o), patch.dash === "dotted" ? "round" : patch.cap ?? capChoice(o), patch.align ?? alignChoice(o), undefined, dash);
+    const dash = patch.dash ?? dashChoice(o as PathObject);
+    const look = lookFromChoices(patch.join ?? joinChoice(o as PathObject), patch.dash === "dotted" ? "round" : patch.cap ?? capChoice(o as PathObject), patch.align ?? alignChoice(o as PathObject), undefined, dash);
     // a changed preset starts its own pattern at 0; any other change keeps the numbers the user typed
     const keep: StrokeLook = {};
     if (patch.dash === undefined && o.dash) {
       keep.dash = o.dash;
       if (o.dashOffset) keep.dashOffset = o.dashOffset;
     }
-    return { ...rest, ...look, ...keep };
+    return { ...rest, ...look, ...keep } as PathObject | ImageObject;
   });
   const label = patch.align !== undefined ? "Outline position" : patch.dash !== undefined ? "Outline dashes" : patch.join !== undefined ? "Outline corners" : "Outline ends";
   doc.commit(doc.transaction(paths.length === 1 ? label : `${label} of ${paths.length} paths`, next));
@@ -879,9 +891,11 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
 const paintKey = (p: Paint | null): string => JSON.stringify(p);
 
 /** The paints of one picked thing, by part: a shape's fill and outline, a text's fill (its gradient, else its colour) and outline, a stroke's colour. */
-function paintsOf(o: PathObject | TextObject | StrokeObject): Array<{ part: "fill" | "stroke"; paint: Paint }> {
+function paintsOf(o: PathObject | TextObject | StrokeObject | ImageObject): Array<{ part: "fill" | "stroke"; paint: Paint }> {
   const out: Array<{ part: "fill" | "stroke"; paint: Paint }> = [];
-  if (o.kind === "path") {
+  if (o.kind === "image") {
+    if (o.stroke !== undefined) out.push({ part: "stroke", paint: o.stroke });
+  } else if (o.kind === "path") {
     if (o.fill !== null) out.push({ part: "fill", paint: o.fill });
     if (o.stroke !== null) out.push({ part: "stroke", paint: o.stroke });
   } else if (o.kind === "text") {
@@ -913,14 +927,14 @@ export function selectionPaints(doc: DocumentStore, editor: EditorState): { coun
 export function recolour(doc: DocumentStore, editor: EditorState, from: Paint, to: Paint | null, final: boolean): void {
   if (editor.blockEdit()) return;
   const key = paintKey(from);
-  const next: Array<PathObject | TextObject | StrokeObject> = [];
+  const next: Array<PathObject | TextObject | StrokeObject | ImageObject> = [];
   for (const o of paintTargets(doc, editor)) {
     const hit = paintsOf(o).filter((x) => paintKey(x.paint) === key).map((x) => x.part);
     if (!hit.length) continue;
     const patch: PaintPatch = { ...(hit.includes("fill") ? { fill: to } : {}), ...(hit.includes("stroke") ? { stroke: to } : {}) };
     if (o.kind !== "path" && to === null) {
-      // nothing to take away from a text's letters or a stroke: only a text's outline can go
-      if (o.kind === "text" && hit.includes("stroke")) next.push(paintedWith(o, { stroke: null }));
+      // nothing to take away from a text's letters or a stroke: only a text's (or a picture's) outline can go
+      if ((o.kind === "text" || o.kind === "image") && hit.includes("stroke")) next.push(paintedWith(o, { stroke: null }));
       continue;
     }
     next.push(paintedWith(o, patch));
@@ -984,7 +998,12 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
  * straight lines, a boolean group's result): in local units, with whether it takes one radius per corner (a rectangle made as one).
  */
 export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: string; radius: Radius; nodes: number; mixed: boolean } | null {
-  for (const o of editablePaths(doc, editor)) {
+  for (const o of lined(doc, editor)) {
+    if (o.kind === "image") {
+      // a picture has four corners, like a rectangle
+      const r = o.radius ?? 0;
+      return { id: o.id, radius: r, nodes: 4, mixed: typeof r !== "number" && new Set(r).size > 1 };
+    }
     if (!(hasCorners(o) || (o.result !== undefined && canRound(o.sub)))) continue;
     const r = o.radius ?? 0;
     return { id: o.id, radius: r, nodes: o.result !== undefined ? 0 : nodesIn(o.base ?? o.sub), mixed: typeof r !== "number" && new Set(r).size > 1 };
@@ -1009,15 +1028,25 @@ export function commitCornerAt(doc: DocumentStore, editor: EditorState, id: stri
 /** Round the corners of the selected paths (px at this zoom: one value, or four for a rectangle: top left, top right, bottom right, bottom left): one undo step. */
 export function commitCorners(doc: DocumentStore, editor: EditorState, px: readonly number[], ppuOf: (id: string) => number, final = true): void {
   if (editor.blockEdit() || !px.length) return;
-  const next: PathObject[] = [];
-  for (const o of editablePaths(doc, editor)) {
+  const next: Array<PathObject | ImageObject> = [];
+  for (const o of lined(doc, editor)) {
+    if (o.kind === "image") {
+      const ppuI = ppuOf(o.id);
+      if (!(ppuI > 0 && ppuI < Infinity)) continue;
+      const cap = Math.min(o.w, o.h) / 2;
+      const local = px.map((v) => Math.min(Math.max(0, v / ppuI), cap));
+      const { radius: _r, ...rest } = o;
+      const radius = px.length > 1 && px.length === 4 ? local : local[0]!;
+      next.push(typeof radius === "number" && radius === 0 ? rest : { ...rest, radius });
+      continue;
+    }
     if (!(hasCorners(o) || (o.result !== undefined && canRound(o.sub)))) continue;
     const ppu = ppuOf(o.id);
     if (!(ppu > 0 && ppu < Infinity)) continue;
     const each = o.result === undefined && px.length > 1 && px.length === nodesIn(o.base ?? o.sub); // one for every corner (a rectangle: four)
     next.push(withRadius(o, each ? px.map((v) => v / ppu) : px[0]! / ppu));
   }
-  if (!final) return showReplaced(editor, next.some((o) => o.result !== undefined) ? derivedPreview(doc, next) : next);
+  if (!final) return showReplaced(editor, next.some((o) => o.kind === "path" && o.result !== undefined) ? derivedPreview(doc, next.filter((o): o is PathObject => o.kind === "path")) : next);
   editor.preview = { kind: "none" };
   if (!next.length) return editor.changed();
   doc.commit(doc.transaction(next.length === 1 ? "Corner radius" : `Corner radius of ${next.length} shapes`, next));
@@ -2148,37 +2177,6 @@ export function setTextStyle(doc: DocumentStore, editor: EditorState, look: Text
 
 /** The picked pictures (stills, video and GIF; audio has no picture). */
 const pictures = (doc: DocumentStore, editor: EditorState): ImageObject[] => selected(doc, editor).filter((o): o is ImageObject => o.kind === "image" && o.media?.kind !== "audio" && !o.locked);
-
-/** The corner radius and border of the first picked picture (in its own units), and how many are picked; null when none is. */
-export function selectedPictureLook(doc: DocumentStore, editor: EditorState): { radius: number; border: { color: string; width: number } | null; count: number } | null {
-  const ps = pictures(doc, editor);
-  return ps.length ? { radius: ps[0]!.radius ?? 0, border: ps[0]!.border ?? null, count: ps.length } : null;
-}
-
-/**
- * Round the corners of the picked pictures and give them a border (ADR 0148). `radius` in each picture's own units (never more than half its
- * shorter side); `border`: a colour and/or a width (0 takes it away; a first one is white and a fiftieth of the shorter side). One undo step
- * (shown only while `final` is false, for a number being scrubbed).
- */
-export function setPictureLook(doc: DocumentStore, editor: EditorState, patch: { radius?: number; border?: { color?: string; width?: number } }, final = true): void {
-  const ps = pictures(doc, editor);
-  if (!ps.length || editor.blockEdit()) return;
-  const next = ps.map((o): CanvasObject => {
-    const { radius: _r, border: _b, ...rest } = o;
-    const half = Math.min(o.w, o.h) / 2;
-    const radius = patch.radius !== undefined ? Math.min(Math.max(0, patch.radius), half) : o.radius;
-    let border = o.border;
-    if (patch.border) {
-      const width = patch.border.width !== undefined ? patch.border.width : (border?.width ?? Math.max(Math.min(o.w, o.h) / 50, Number.MIN_VALUE));
-      border = width > 0 && Number.isFinite(width) ? { color: patch.border.color ?? border?.color ?? "#ffffff", width } : undefined;
-    }
-    return { ...rest, ...(radius ? { radius } : {}), ...(border ? { border } : {}) } as CanvasObject;
-  });
-  if (!final) return showReplaced(editor, next);
-  editor.preview = { kind: "none" };
-  doc.commit(doc.transaction(patch.radius !== undefined ? "Round the corners" : "Border", next));
-  editor.changed();
-}
 
 /** The one picked picture that can be cropped: a still, upright (null otherwise). */
 export function croppablePicture(doc: DocumentStore, editor: EditorState): ImageObject | null {

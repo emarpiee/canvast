@@ -22,7 +22,8 @@
 - **The empty body of a sheet with things on it is ground**: a click clears and a drag draws the selection box, so the sheet is not moved by accident; pick it by its name, its Layers row, a box, or Shift+Enter from what is on it (Enter goes in). **Release the mask** gives the shape back with the fill and outline it had.
 - **Reveal**: hold Ctrl and move over the canvas to see the outline of everything under the pointer (the shape, not a box; the top one strong, the ones below dashed, their names beside the pointer); Ctrl+click picks the very thing, deep in a group, a mask or a sheet.
 - **Align one thing to what holds it**: a single thing on a sheet (or in a group) is aligned with its sheet by the align buttons.
-- **Pictures get rounded corners and a border** (Radius, border colour and width in the Properties bar of a picked picture; ADR 0148).
+- **Pictures get rounded corners and an outline, with the shape controls** (ADR 0148): the shape's Radius field (one value or four corners) and its Outline swatch and Outline options (width, inside/centre/outside, corners, dashes); a picture has no fill.
+- **Ctrl+click picks exactly the thing** under the pointer, including a sheet alone (without what is on it); moving a sheet always carries what is on it.
 - **Export extras**: several picked sheets export together (a ZIP, or one PDF with a page for each at the physical size); a PNG or JPEG carries its resolution (pHYs, JFIF), and PDF is a format of the Export dialog.
 - **Paste lands under the pointer** (Ctrl+V, the menu, pasted SVG): the middle of the view only when the pointer is not on the canvas.
 
