@@ -13,7 +13,7 @@ import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../text/markdown";
 import { layoutOf } from "../text/layout";
-import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
+import { NEW_TEXT_PX, NOTE_CARD, NOTE_INK, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
 import { paintColor } from "../render/ink";
@@ -150,6 +150,11 @@ export function mountTextEditor(
       box.style.transform = "";
     }
     box.style.color = paintColor(target.color);
+    // A card (a note): the space round the words, its colour and its rounding, inside the box.
+    box.style.boxSizing = target.card ? "border-box" : "";
+    box.style.padding = target.card ? `${target.card.pad * em}px` : "";
+    box.style.background = target.card ? paintColor(target.card.fill) : "";
+    box.style.borderRadius = target.card ? `${target.card.radius * em}px` : "";
     box.style.setProperty("--gap", String(target.paraGap ?? 0.6));
     box.style.setProperty("--indent", String(target.indent ?? 0));
     // Case as set (the words stay as typed); a set height with where the words sit in it.
@@ -235,10 +240,12 @@ export function mountTextEditor(
     } else {
       const f = 2 ** cam.zf;
       const unit = -cam.zi;
-      const look = editor.textLook;
+      // The Note tool makes a text with a card (and dark ink on it) unless the look says otherwise.
+      const look = editor.tool === "note" ? { color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD } : editor.textLook;
       const size = (look.sizePx ?? NEW_TEXT_PX) / f;
-      // A click: the point is the middle of the first line. A drag: the top-left corner of the box that was drawn.
-      const anchor = drawn ? at : { x: at.x, y: D.sub(at.y, D.shift(D.fromNumber(size * 0.65), unit)) };
+      const pad = look.card?.pad ?? 0;
+      // A click: the point is the middle of the first line (inside the card's space). A drag: the top-left corner of the box that was drawn.
+      const anchor = drawn ? at : { x: D.sub(at.x, D.shift(D.fromNumber(size * pad), unit)), y: D.sub(at.y, D.shift(D.fromNumber(size * (0.65 + pad)), unit)) };
       // `at` is in the camera frame's coordinates: the new text starts there.
       const frame = view.frame === doc.space.world ? {} : { frame: view.frame };
       const base: TextObject = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: drawn ? drawn.widthPx / f : size, size, color: look.color ?? editor.penColor };
@@ -360,7 +367,7 @@ export function mountTextEditor(
   });
   fontSelect.addEventListener("change", () => {
     const hash = fontSelect.value;
-    const r = wordsRange;
+    const r = selectedRange()?.cloneRange() ?? wordsRange; // (the selection as it is now, else the last one seen)
     fontSelect.value = "";
     if (!r) return needWords();
     box.focus({ preventScroll: true });

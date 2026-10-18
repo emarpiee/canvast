@@ -78,6 +78,14 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
   paint(ctx, o, () => {
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
+    if (o.card) {
+      // The card behind the words (a note): the whole box, with rounded corners.
+      const x0 = sx(0), y0 = sy(0), x1 = sx(lay.width), y1 = sy(lay.height);
+      ctx.fillStyle = paintColor(o.card.fill);
+      ctx.beginPath();
+      ctx.roundRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0), Math.min(o.card.radius * emPx, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2));
+      ctx.fill();
+    }
     // One pass per colour (nearly always one): a range with a colour of its own is filled apart from the rest.
     const colours = new Set<string>();
     for (const line of lay.lines) {

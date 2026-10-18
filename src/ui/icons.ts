@@ -91,6 +91,7 @@ import textAlignRightIcon from "lucide-static/icons/align-right.svg";
 import textAlignJustifyIcon from "lucide-static/icons/align-justify.svg";
 import textAutoWidthIcon from "lucide-static/icons/move-horizontal.svg";
 import textFixedWidthIcon from "lucide-static/icons/wrap-text.svg";
+import stickyNoteSvg from "lucide-static/icons/sticky-note.svg";
 import splineIcon from "lucide-static/icons/spline.svg";
 import circleOffIcon from "lucide-static/icons/circle-off.svg";
 import circleHelpIcon from "lucide-static/icons/circle-help.svg";
@@ -270,6 +271,7 @@ export const ICONS = {
   textAutoWidth: clean(textAutoWidthIcon),
   textFixedWidth: clean(textFixedWidthIcon),
   spline: clean(splineIcon),
+  stickyNote: clean(stickyNoteSvg),
   circleOff: clean(circleOffIcon),
   circleHelp: clean(circleHelpIcon),
   frame: clean(frameIcon),

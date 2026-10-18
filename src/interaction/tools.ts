@@ -1222,6 +1222,7 @@ export function attachTools(
         startSelectPress(e, s);
         break;
       case "text":
+      case "note":
         g = { kind: "text", pointerId: e.pointerId, start: s, moved: false };
         break;
       case "shape":

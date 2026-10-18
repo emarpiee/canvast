@@ -23,6 +23,8 @@ export interface TextLook {
   readonly gradient?: Gradient | null;
   /** A line round the letters (colour and width in em); null = none. */
   readonly outline?: { readonly c: string; readonly w: number } | null;
+  /** A card behind the words (a note): colour, space round the words and corner radius in em; null = none. */
+  readonly card?: { readonly fill: string; readonly pad: number; readonly radius: number } | null;
   /** A set height in screen px at the zoom it is read or applied at, like a size; null = as tall as the words. */
   readonly heightPx?: number | null;
   /** Where the words sit in a set height. */
@@ -46,6 +48,19 @@ export interface TextLook {
 /** Feature tags and axis values kept tidy: sorted, no repeats, finite numbers, a few of them. */
 const tidyFeatures = (f: readonly string[]): string[] => [...new Set(f.filter((t) => /^[A-Za-z0-9 ]{4}$/.test(t)))].sort().slice(0, 32);
 const tidyAxes = (a: Readonly<Record<string, number>>): Record<string, number> => Object.fromEntries(Object.entries(a).filter(([k, v]) => /^[A-Za-z0-9 ]{4}$/.test(k) && Number.isFinite(v)).sort(([x], [y]) => x.localeCompare(y)).slice(0, 8));
+
+/** The colours a note's card is offered in, and the card a new note has (yellow, the space round the words and the rounding in em). */
+export const NOTE_COLOURS: ReadonlyArray<{ fill: string; name: string }> = [
+  { fill: "#ffe58a", name: "Yellow" },
+  { fill: "#ffc9d6", name: "Pink" },
+  { fill: "#c8f0c0", name: "Green" },
+  { fill: "#bfe3ff", name: "Blue" },
+  { fill: "#ffd7a8", name: "Orange" },
+  { fill: "#ffffff", name: "White" },
+];
+export const NOTE_CARD = { fill: NOTE_COLOURS[0]!.fill, pad: 0.6, radius: 0.3 } as const;
+/** The ink a note is written in until another is chosen (the card is light whatever the theme). */
+export const NOTE_INK = "#1f2329";
 
 /** Size of a new text, in screen px. */
 export const NEW_TEXT_PX = 16;
@@ -74,6 +89,7 @@ export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "siz
     assetId: o.assetId ?? null,
     gradient: o.gradient ?? null,
     outline: o.outline ?? null,
+    card: o.card ?? null,
   };
 }
 
@@ -89,6 +105,7 @@ export function toolLook(look: TextLook, penColor: string): ReturnType<typeof lo
     assetId: look.assetId ?? null,
     gradient: look.gradient ?? null,
     outline: look.outline ?? null,
+    card: look.card ?? null,
     heightPx: null,
     valign: look.valign ?? "top",
     paraGap: look.paraGap ?? BLOCK_GAP,
@@ -110,7 +127,7 @@ export function fitWidth(o: TextObject): TextObject {
 
 /** The text with the given look fields applied: values kept in range, defaults left out of the stored form, the width refitted. */
 export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
-  const { lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, assetId: _i, gradient: _g, outline: _ol, h: _h, valign: _v, paraGap: _pg, indent: _in, caps: _c, maxLines: _ml, kerning: _k, features: _fe, axes: _ax, ...rest } = o;
+  const { lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, assetId: _i, gradient: _g, outline: _ol, card: _cd, h: _h, valign: _v, paraGap: _pg, indent: _in, caps: _c, maxLines: _ml, kerning: _k, features: _fe, axes: _ax, ...rest } = o;
   const lineHeight = look.lineHeight !== undefined ? clamp(look.lineHeight, LOOK_LIMITS.lineHeight) : o.lineHeight;
   const tracking = look.tracking !== undefined ? clamp(look.tracking, LOOK_LIMITS.tracking) : o.tracking;
   const align = look.align !== undefined ? look.align : o.align;
@@ -118,6 +135,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
   const assetId = look.assetId !== undefined ? (look.assetId ?? undefined) : o.assetId;
   const gradient = look.gradient !== undefined ? (look.gradient ?? undefined) : o.gradient;
   const outline = look.outline !== undefined ? (look.outline ?? undefined) : o.outline;
+  const card = look.card !== undefined ? (look.card ?? undefined) : o.card;
   let h = o.h;
   if (look.heightPx === null) h = undefined;
   else if (look.heightPx !== undefined && ppu > 0 && ppu < Infinity) h = look.heightPx / ppu;
@@ -140,6 +158,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
     ...(assetId ? { assetId } : {}),
     ...(gradient ? { gradient } : {}),
     ...(outline ? { outline: { c: outline.c, w: clamp(outline.w, [0.001, 1]) } } : {}),
+    ...(card ? { card: { fill: card.fill, pad: clamp(card.pad, [0, 5]), radius: clamp(card.radius, [0, 5]) } } : {}),
     ...(h !== undefined ? { h } : {}),
     ...(h !== undefined && valign && valign !== "top" ? { valign } : {}),
     ...(paraGap !== undefined && paraGap !== BLOCK_GAP ? { paraGap } : {}),
@@ -155,7 +174,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
 }
 
 export const sameLook = (a: TextObject, b: TextObject): boolean =>
-  a.size === b.size && a.w === b.w && a.color === b.color && a.assetId === b.assetId && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth && JSON.stringify(a.gradient) === JSON.stringify(b.gradient) && JSON.stringify(a.outline) === JSON.stringify(b.outline) && a.h === b.h && a.valign === b.valign && a.paraGap === b.paraGap && a.indent === b.indent && a.caps === b.caps && a.maxLines === b.maxLines && a.kerning === b.kerning && JSON.stringify(a.features) === JSON.stringify(b.features) && JSON.stringify(a.axes) === JSON.stringify(b.axes);
+  a.size === b.size && a.w === b.w && a.color === b.color && a.assetId === b.assetId && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth && JSON.stringify(a.gradient) === JSON.stringify(b.gradient) && JSON.stringify(a.outline) === JSON.stringify(b.outline) && JSON.stringify(a.card) === JSON.stringify(b.card) && a.h === b.h && a.valign === b.valign && a.paraGap === b.paraGap && a.indent === b.indent && a.caps === b.caps && a.maxLines === b.maxLines && a.kerning === b.kerning && JSON.stringify(a.features) === JSON.stringify(b.features) && JSON.stringify(a.axes) === JSON.stringify(b.axes);
 
 /**
  * A look kept as a saved style (a Styles kind): size, line height, letter spacing, alignment, colour, gradient and outline. The width mode is the text's own

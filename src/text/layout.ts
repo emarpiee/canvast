@@ -147,10 +147,36 @@ const heights = new WeakMap<TextLayout, Map<string, TextLayout>>();
  * paragraphs, case, line limit, and a set height with where the words sit in it) shape it.
  */
 export function layoutOf(o: TextObject): TextLayout {
-  const l = layoutText(o.md, o.autoWidth || o.onPath ? Infinity : o.w / o.size, o);
+  const pad = o.card?.pad ?? 0;
+  const inner = setInside(o, pad);
+  return pad ? padded(inner, pad, o.h === undefined ? undefined : o.h / o.size) : inner;
+}
+
+const paddings = new WeakMap<TextLayout, Map<string, TextLayout>>();
+
+/** The layout moved in by the space of a card on every side (the box grows by as much, or is `H` tall when it has a set height). */
+function padded(l: TextLayout, pad: number, H: number | undefined): TextLayout {
+  const key = `${pad}|${H}`;
+  let by = paddings.get(l);
+  if (!by) paddings.set(l, (by = new Map()));
+  let r = by.get(key);
+  if (!r) {
+    r = {
+      lines: l.lines.map((ln) => ({ ...ln, top: ln.top + pad, bottom: ln.bottom + pad, baseline: ln.baseline + pad, glyphs: ln.glyphs.map((g) => ({ ...g, x: g.x + pad })), decos: ln.decos.map((d) => ({ ...d, x0: d.x0 + pad, x1: d.x1 + pad })) })),
+      width: l.width + 2 * pad,
+      height: H ?? l.height + 2 * pad,
+    };
+    by.set(key, r);
+  }
+  return r;
+}
+
+/** The layout of the words inside the card's space (none: the whole box), with a set height and where the words sit in it. */
+function setInside(o: TextObject, pad: number): TextLayout {
+  const l = layoutText(o.md, o.autoWidth || o.onPath ? Infinity : Math.max(0.5, o.w / o.size - 2 * pad), o);
   if (o.h === undefined) return l;
   // A set height: the box is that tall, and the words sit at the top, the middle or the bottom of it (never above the top).
-  const H = o.h / o.size;
+  const H = Math.max(0, o.h / o.size - 2 * pad);
   const dy = o.valign === "middle" ? Math.max(0, (H - l.height) / 2) : o.valign === "bottom" ? Math.max(0, H - l.height) : 0;
   const key = `${H}|${dy}`;
   let by = heights.get(l);

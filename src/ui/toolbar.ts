@@ -106,6 +106,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "sheet", icon: ICONS.sheetTool, label: "Sheet", key: "C" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
+  { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "M" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
 
@@ -240,7 +241,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents: when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text select node" data-kind="text">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
         <button type="button" data-text-font-options data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Font options" title="Font options: kerning, the features of the font (ligatures, small capitals, numerals...) and the axes of a variable font">${ICONS.fontOptions}</button>
@@ -252,10 +253,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text select node" data-kind="text" role="radiogroup" aria-label="Text alignment">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text alignment">
         ${TEXT_ALIGNS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-align="${a.id}" aria-label="${a.label}" title="${a.label}">${a.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="text select node" data-kind="text" role="radiogroup" aria-label="Text width">
+      <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text width">
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="select node" data-kind="shape" role="group" aria-label="Initial shape">
@@ -499,7 +500,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const t = actions.selectedTextStyle();
     if (!t) return;
     openTextBoxPopover(e.currentTarget as HTMLElement, {
-      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign,
+      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, card: t.card,
       onChange: (patch, final) => actions.setTextStyle(patch, final),
     });
   });
@@ -817,7 +818,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
-    const txt = (pick && still) || editor.tool === "text" ? actions.selectedTextStyle() : null;
+    const txt = (pick && still) || editor.tool === "text" || editor.tool === "note" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
       wantFonts(txt.assetId ?? "");

@@ -327,9 +327,12 @@ const textSampler: CoarseSampler<TextObject> = {
         }
       }
     }
-    return inside ? { color: o.color } : "miss";
+    if (inside || !o.card) return inside ? { color: o.color } : "miss";
+    // between the letters of a note: its card (away from the edges and rounded corners, where the exact path decides)
+    const r = o.card.radius * o.size + m;
+    return lx > r && lx < lay.width * o.size - r && ly > r && ly < lay.height * o.size - r ? { color: o.card.fill } : "exact";
   },
-  approx: (o) => ({ color: o.color }),
+  approx: (o) => ({ color: o.card?.fill ?? o.color }),
 };
 
 /**

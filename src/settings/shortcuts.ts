@@ -7,9 +7,9 @@ import type { SettingKey, SettingsStore } from "./settings";
  * fixed and listed there so the list is the one place to look. A tool key is one plain letter (no modifier), so it never clashes
  * with the Ctrl and Shift combinations below.
  */
-export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "node", "pen", "shape", "path", "sheet", "lasso", "text", "eraser"];
+export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "node", "pen", "shape", "path", "sheet", "lasso", "text", "note", "eraser"];
 
-export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", node: "Edit nodes", pen: "Pen", shape: "Shape", path: "Path (curves)", sheet: "Sheet", lasso: "Lasso", text: "Text", eraser: "Object eraser" };
+export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", node: "Edit nodes", pen: "Pen", shape: "Shape", path: "Path (curves)", sheet: "Sheet", lasso: "Lasso", text: "Text", note: "Note", eraser: "Object eraser" };
 
 export const TOOL_KEY_SETTING: Record<Tool, SettingKey> = {
   hand: "key.hand",
@@ -21,6 +21,7 @@ export const TOOL_KEY_SETTING: Record<Tool, SettingKey> = {
   sheet: "key.sheet",
   lasso: "key.lasso",
   text: "key.text",
+  note: "key.note",
   eraser: "key.eraser",
 };
 

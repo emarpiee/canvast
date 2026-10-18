@@ -605,7 +605,9 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 
 /* Text editing overlay (ui/text-editor.ts). Spacing mirrors text/layout.ts:
    line height 1.3, block gap 0.6 em, list item gap 0.2 em, list indent 1.5 em. */
-#canvas[data-tool="text"] { cursor: text; }
+#canvas[data-tool="text"], #canvas[data-tool="note"] { cursor: text; }
+.note-colour { width: var(--sp-9); height: var(--sp-9); padding: 0; border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.note-colour[aria-checked="true"] { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .text-editor {
   position: absolute;
   box-sizing: content-box;

@@ -12,7 +12,7 @@ import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "eraser" | "shape" | "path" | "node" | "sheet";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 

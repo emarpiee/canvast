@@ -933,3 +933,57 @@ test("words of their own font: chosen in the text's format bar, stored as a span
   await finish(p);
   expect((await textObjects(p))[0]!.md).toBe("Hamburg AVA 123");
 });
+
+test("Note tool (M): a text on a card made in one click; the card is part of its box, can be recoloured, narrowed, taken away with one undo, and is kept after a reload", async ({ app }) => {
+  const p = app.page;
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const plain = async (): Promise<number> => {
+    await newText(p, 300, 500);
+    await p.keyboard.type("Remember the milk");
+    await finish(p);
+    const t = (await textObjects(p)).at(-1)!;
+    const b = await box(t.id);
+    return b.maxX - b.minX;
+  };
+  const plainWidth = await plain();
+  await p.keyboard.press("m");
+  expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("note");
+  await p.mouse.click(300, 300);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.type("Remember the milk");
+  await finish(p);
+  const note = (await textObjects(p)).at(-1)! as Obj & { card?: { fill: string; pad: number; radius: number }; color: string };
+  expect(note.card).toEqual({ fill: "#ffe58a", pad: 0.6, radius: 0.3 });
+  expect(note.color).toBe("#1f2329");
+  const b0 = await box(note.id);
+  expect(b0.maxX - b0.minX, "the card adds its space on both sides").toBeGreaterThan(plainWidth + 10);
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  const near = await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [Math.round(b0.minX) + 8, Math.round((b0.minY + b0.maxY) / 2)]);
+  expect(near, "the card's yellow behind the words").toEqual([255, 229, 138]);
+
+  // Take the card away: the box is narrower, the yellow is gone, and one undo brings it back
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2));
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  await p.locator('.colour-pop [data-card="none"]').click();
+  expect((await textObjects(p)).at(-1)!["card"]).toBeUndefined();
+  await p.keyboard.press("Escape");
+  const b1 = await box(note.id);
+  expect(b1.maxX - b1.minX).toBeLessThan(b0.maxX - b0.minX - 10);
+  await p.keyboard.press("Control+z");
+  expect((await textObjects(p)).at(-1)!["card"]).toMatchObject({ fill: "#ffe58a" });
+  // Another colour, with more space round the words
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  await p.locator('.colour-pop [data-card="#bfe3ff"]').click();
+  await p.locator('.colour-pop [data-field="cardPad"]').fill("1.2");
+  await p.locator('.colour-pop [data-field="cardPad"]').press("Enter");
+  await expect.poll(async () => (await textObjects(p)).at(-1)!["card"]).toEqual({ fill: "#bfe3ff", pad: 1.2, radius: 0.3 });
+  await p.keyboard.press("Escape");
+
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect((await textObjects(p)).at(-1)!["card"]).toEqual({ fill: "#bfe3ff", pad: 1.2, radius: 0.3 });
+  expect(app.consoleErrors).toEqual([]);
+});

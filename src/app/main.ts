@@ -77,7 +77,7 @@ import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
 import { describeFile } from "../assets/file-kind";
-import { styleOf, toolLook } from "../text/text-style";
+import { NOTE_CARD, NOTE_INK, styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
@@ -775,11 +775,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       await fontLoader.ensure(record.hash);
       return record.hash;
     },
-    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, editor.penColor) : selectedTextStyle(doc, editor, textPpu)),
+    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, editor.penColor) : editor.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD }, editor.penColor) : selectedTextStyle(doc, editor, textPpu)),
     setTextStyle: (look, final = true) => {
-      if (editor.tool === "text") editor.textLook = { ...editor.textLook, ...look };
+      if (editor.tool === "text" || editor.tool === "note") editor.textLook = { ...editor.textLook, ...look };
       if (textEditor.isOpen) textEditor.restyle(look);
-      else if (editor.tool !== "text") setTextStyle(doc, editor, look, textPpu, final);
+      else if (editor.tool !== "text" && editor.tool !== "note") setTextStyle(doc, editor, look, textPpu, final);
       else editor.changed();
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),

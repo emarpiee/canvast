@@ -97,6 +97,7 @@ export const SETTINGS = {
   "key.pen": { scope: "device", default: "p", validate: letter, effect: "immediate" } as Def<string>,
   "key.lasso": { scope: "device", default: "l", validate: letter, effect: "immediate" } as Def<string>,
   "key.text": { scope: "device", default: "t", validate: letter, effect: "immediate" } as Def<string>,
+  "key.note": { scope: "device", default: "m", validate: letter, effect: "immediate" } as Def<string>,
   "key.eraser": { scope: "device", default: "e", validate: letter, effect: "immediate" } as Def<string>,
   // Stepping the selection between items (ADR 0058, 0072): W A S D by default.
   "key.navUp": { scope: "device", default: "w", validate: letter, effect: "immediate" } as Def<string>,
