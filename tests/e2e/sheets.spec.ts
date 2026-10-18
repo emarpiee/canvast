@@ -640,3 +640,22 @@ test("Ctrl+click on the empty body of a sheet picks the sheet alone (not what is
   expect((await box(rect.id)).minX - r0.minX, "what is on it went with it").toBeCloseTo(100, 0);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Export… of many sheets lists every one of them for ordering, past the previews that are drawn", async ({ app }) => {
+  const p = app.page;
+  // 26 small sheets: more than get a drawn preview
+  await key(app, "c");
+  for (let i = 0; i < 26; i++) await drag(app, [420 + (i % 13) * 50, 300 + Math.floor(i / 13) * 120], [450 + (i % 13) * 50, 380 + Math.floor(i / 13) * 120]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  const dlg = p.getByTestId("export-dialog");
+  await expect(dlg.locator("[data-mini]")).toHaveCount(26);
+  await expect(dlg.locator("[data-ex-thumb]")).toHaveCount(24);
+  const last = dlg.locator('[data-mini="25"]');
+  await last.scrollIntoViewIfNeeded();
+  await last.locator('[data-move="-1"]').click(); // the last one moves earlier: it can be reached and moved
+  await expect(dlg.locator('[data-mini="24"] .ex-page')).toHaveText("25");
+  await key(app, "Escape");
+  expect(app.consoleErrors).toEqual([]);
+});

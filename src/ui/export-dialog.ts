@@ -65,6 +65,8 @@ const UNIT_LABEL: Record<Unit, string> = { px: "px", in: "in", cm: "cm", mm: "mm
 const decimals = (u: Unit): number => (u === "px" ? 0 : u === "in" ? 2 : 1);
 const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u))));
 const PREVIEW_PX = 320;
+/** How many of several sheets get a rendered preview (the rest are numbered boxes of their shape, as movable as the others). */
+const PREVIEWS = 24;
 
 export function openExportDialog(deps: ExportDeps): void {
   let ts = [...deps.targets]; // (in the order the pictures leave: the pages of a PDF, the files of a ZIP; the person can change it)
@@ -148,7 +150,7 @@ export function openExportDialog(deps: ExportDeps): void {
       thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
       return;
     }
-    box.innerHTML = ts.slice(0, 12).map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}">${i < PREVIEWS ? `<canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas>` : ""}<b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
     thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   };
   drawMinis();
