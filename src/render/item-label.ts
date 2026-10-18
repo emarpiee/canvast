@@ -48,12 +48,13 @@ export function itemName(o: CanvasObject, fileName: (hash: string) => string | u
   return o.kind === "image" ? fileName(o.assetId) || "Picture" : undefined;
 }
 
-export function itemLabels(list: readonly ProjectedObject[], picked: ReadonlySet<ObjectId>, vp: Viewport, fileName: (hash: string) => string | undefined): ItemLabel[] {
+export function itemLabels(list: readonly ProjectedObject[], picked: ReadonlySet<ObjectId>, vp: Viewport, fileName: (hash: string) => string | undefined, show: "all" | "picked" | "off" = "all"): ItemLabel[] {
   const out: ItemLabel[] = [];
+  if (show === "off") return out;
   for (const po of list) {
     const o = po.obj;
     if (!isLabelled(o) || o.hidden || po.cover) continue;
-    if ((o.parent !== undefined || !(isContainer(o) || o.kind === "image")) && !picked.has(o.id)) continue;
+    if ((show === "picked" || o.parent !== undefined || !(isContainer(o) || o.kind === "image")) && !picked.has(o.id)) continue;
     const b = po.box;
     if (!Number.isFinite(b.minX + b.maxX + b.minY) || b.maxX - b.minX < MIN_SHEET_PX || b.maxX < 0 || b.minX > vp.width || b.maxY < 0 || b.minY > vp.height) continue;
     const text = itemName(o, fileName);

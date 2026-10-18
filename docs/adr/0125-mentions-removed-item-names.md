@@ -10,6 +10,10 @@
 - **Names above items are one list** (`src/render/item-label.ts`, formerly the sheet labels). The same list is drawn and picked. Sheets, pictures, videos, sounds and file cards (a picture by its file name, from the catalog) always carry one; any other item shows its layer name while it is picked (always showing them would crowd the canvas). An item inside a sheet shows it only while picked, as sheets always did. The file name comes from `AssetNames` (`src/app/asset-names.ts`), the one cache the Layers panel and the labels share.
 - Every kind of file is already an item on the canvas (ADR 0078: a card with its extension chip); this only makes it named.
 
+## Addendum: who sees the names
+
+A button in the bottom-right bar (and Settings > Appearance > Item names) cycles three modes, kept per device: **Always** (the rule above), **When picked** (only the names of the picked items) and **Hidden**. Icons: `captions`, `scan-text`, `captions-off`.
+
 ## Not done
 
-A setting to hide the names; names for unnamed strokes, shapes and texts.
+Names for unnamed strokes, shapes and texts.

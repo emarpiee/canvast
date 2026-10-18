@@ -164,6 +164,9 @@ import distH from "lucide-static/icons/align-horizontal-distribute-center.svg";
 import distV from "lucide-static/icons/align-vertical-distribute-center.svg";
 import grid3x3 from "lucide-static/icons/grid-3x3.svg";
 import gripIcon from "lucide-static/icons/grip.svg";
+import captionsSvg from "lucide-static/icons/captions.svg";
+import captionsOffSvg from "lucide-static/icons/captions-off.svg";
+import scanTextSvg from "lucide-static/icons/scan-text.svg";
 import squareIcon from "lucide-static/icons/square.svg";
 import arrowUpDown from "lucide-static/icons/arrow-up-down.svg";
 import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
@@ -348,6 +351,9 @@ export const ICONS = {
   distV: clean(distV),
   grid3x3: clean(grid3x3),
   gripIcon: clean(gripIcon),
+  captions: clean(captionsSvg),
+  captionsOff: clean(captionsOffSvg),
+  scanText: clean(scanTextSvg),
   squareIcon: clean(squareIcon),
   star: clean(starIcon),
   trash2: clean(trash2),

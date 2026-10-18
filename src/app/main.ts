@@ -425,8 +425,8 @@ async function start(): Promise<void> {
     // Selection outlines need the visible selected objects; query only when something is selected.
     // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.
     // The names above the items (ADR 0108, 0125): only looked for when the canvas has an item that can carry one.
-    const labelList = labelIds.size ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
-    labels = itemLabels(labelList, editor.selection, vp, (h) => assetNames.get(h));
+    const labelList = labelIds.size && settings.get("ui.names") !== "off" ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
+    labels = itemLabels(labelList, editor.selection, vp, (h) => assetNames.get(h), settings.get("ui.names"));
     const members = editor.entered.length ? visibleObjects(doc, index, editor, fc, vp, undefined, { entered: editor.entered, mode: "members" }) : [];
     const selected = editor.selection.size
       ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
@@ -945,6 +945,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),
+    itemNames: () => settings.get("ui.names"),
+    setItemNames: (m) => void settings.set("ui.names", m),
+    subscribeItemNames: (fn) => void settings.subscribe((key) => key === "ui.names" && fn()),
     pattern: () => settings.get("ui.pattern"),
     setPattern: (p) => void settings.set("ui.pattern", p),
     subscribePattern: (fn) => void settings.subscribe((key) => key === "ui.pattern" && fn()),
@@ -1236,6 +1239,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         hintLine.current?.refresh();
         return;
       case "ui.pattern":
+      case "ui.names":
         invalidate();
         return;
       case "ui.hue":

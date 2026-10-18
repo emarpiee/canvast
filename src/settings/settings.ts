@@ -112,6 +112,7 @@ export const SETTINGS = {
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "subtle", "full"), effect: "immediate" } as Def<"system" | "reduce" | "subtle" | "full">,
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
+  "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,
   "arrange.gap": { scope: "device", default: "normal", validate: oneOf("none", "tight", "normal", "wide", "wider"), effect: "immediate" } as Def<"none" | "tight" | "normal" | "wide" | "wider">,

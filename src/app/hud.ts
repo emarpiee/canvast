@@ -49,7 +49,16 @@ const PATTERNS: readonly CanvasPattern[] = ["grid", "dots", "scale", "none"];
 const PATTERN_LABEL: Record<CanvasPattern, string> = { grid: "Grid", dots: "Dots", scale: "Multi-scale grid", none: "None" };
 const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots: ICONS.gripIcon, scale: ICONS.grid2x2, none: ICONS.squareIcon };
 
+export type ItemNames = "all" | "picked" | "off";
+const NAMES: readonly ItemNames[] = ["all", "picked", "off"];
+const NAMES_LABEL: Record<ItemNames, string> = { all: "shown on every item", picked: "shown on the picked items", off: "hidden" };
+const NAMES_ICON: Record<ItemNames, string> = { all: ICONS.captions, picked: ICONS.scanText, off: ICONS.captionsOff };
+
 export interface HudStatus {
+  /** The names above items (Settings > Appearance > Item names), and a way to change them. */
+  itemNames(): ItemNames;
+  setItemNames(mode: ItemNames): void;
+  subscribeItemNames(fn: () => void): void;
   /** Show a short message to the user. */
   notify(message: string): void;
   /** Short save-state text, e.g. "Saved". */
@@ -105,6 +114,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     <div class="hud-controls" role="toolbar" aria-label="Navigation">
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
+      <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
       <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save what the canvas shows to the library (Settings > Screenshot)">${ICONS.camera}</button>
       <span class="hud-sep" role="separator"></span>
@@ -166,6 +176,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "zen") status.toggleZen();
     else if (action === "screenshot") status.screenshot();
     else if (action === "pattern") status.setPattern(PATTERNS[(PATTERNS.indexOf(status.pattern()) + 1) % PATTERNS.length]!);
+    else if (action === "names") status.setItemNames(NAMES[(NAMES.indexOf(status.itemNames()) + 1) % NAMES.length]!);
     else if (action === "info") status.setInfoMode(MODES[(MODES.indexOf(status.infoMode()) + 1) % MODES.length]!);
   });
 
@@ -251,6 +262,18 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   };
   status.subscribePattern(applyPattern);
   applyPattern();
+  // The names button: its icon, what it does now and what the next click does.
+  const namesButton = root.querySelector<HTMLElement>('[data-action="names"]')!;
+  const applyNames = (): void => {
+    const m = status.itemNames();
+    const next = NAMES[(NAMES.indexOf(m) + 1) % NAMES.length]!;
+    namesButton.innerHTML = NAMES_ICON[m];
+    namesButton.dataset["names"] = m;
+    namesButton.setAttribute("aria-label", `Item names: ${NAMES_LABEL[m]}`);
+    namesButton.title = `Item names: ${NAMES_LABEL[m]}. Click for ${NAMES_LABEL[next]}.`;
+  };
+  status.subscribeItemNames(applyNames);
+  applyNames();
 
   // Click the read-out to type an absolute zoom level (anchored at the centre).
   const closeInput = (): void => {
