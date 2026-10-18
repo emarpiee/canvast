@@ -144,7 +144,7 @@ test("resizing a sheet moves and stretches what is on it by its pin; Fit to cont
 
   // fit: the sheet shrinks to what is on it
   await click(app, 410, 291);
-  await p.locator("[data-fit-sheet]").click();
+  await p.locator('[data-ctx=\"fitsheet\"]').click();
   await app.frame();
   const fit = await box(sheet.id);
   const [ba, bb] = [await box(a.id), await box(b.id)];
@@ -162,7 +162,7 @@ test("Attach: the picked objects follow the object clicked next when it moves; D
   const b = (await objs(app)).at(-1)!;
   await key(app, "v");
   await click(app, 440, 340); // A
-  await p.locator("[data-attach]").click();
+  await p.locator('[data-ctx=\"attach\"]').click();
   await expect(p.getByText("Click the object to attach", { exact: false })).toBeVisible();
   await click(app, 640, 340); // B is the target
   expect((await objs(app)).find((o) => o.id === a.id)).toMatchObject({ attachmentTargetId: b.id });
@@ -177,7 +177,7 @@ test("Attach: the picked objects follow the object clicked next when it moves; D
   // detach: A alone, then moving B leaves it
   await click(app, 150, 650);
   await click(app, 440, 340);
-  await p.locator("[data-detach]").click();
+  await p.locator('[data-ctx=\"detach\"]').click();
   expect(((await objs(app)).find((o) => o.id === a.id) as unknown as { attachmentTargetId: string | null }).attachmentTargetId).toBeNull();
   await click(app, 150, 650);
   await click(app, 640, 340);

@@ -16,3 +16,7 @@
 *Unverified:* the dpr2 and chromium-cpu projects; the full suite (not run since v0.16.0); fonts other than Inter Black and Regular; a font the browser refuses (drawn from outlines, no test).
 
 *Committed:* yes, one commit per slice. *Next bounded task:* underline and strikethrough, or per-range size and colour (backlog section 1).
+
+## Bars revamp (ADR 0128), 2026-10-18
+
+*Tested:* Chromium: vectors, frames, sheets, text, pictures, editing, a11y, files, styles, dock, organize, assets, bookmarks, settings, navigation, screenshot, archive; tests moved from menus to buttons (combine, arrange and align, initial shape, selection tool options, the colours of a selection, attach, fit sheet), the hint-line tests move the pointer off the Actions bar first, the corner-dots test draws its shape clear of the bar along the bottom. The player's bar keeps clear of the Actions bar (`ui/media-player.ts`). Screenshots at 390, 900 and 1280 px wide. *Known flaky:* the convert-text-to-path ink centre test (as before).

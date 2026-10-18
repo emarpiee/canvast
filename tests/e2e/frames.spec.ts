@@ -648,11 +648,11 @@ test("option: ignore the object that fills the view, so zooming far into somethi
   await app.drag({ x: 300, y: 400 }, { x: 980, y: 400 }, 6);
   const [id] = await p.evaluate(() => window.__canvastDebug.objectFrames().map((o) => o.id));
   await p.keyboard.press("v");
-  // (the option is in the Selection tool options menu now)
-  const item = () => p.getByRole("menuitemradio", { name: "Ignore the object that fills the view" });
+  // (the option is a button in the Properties bar: it shows while nothing is picked)
+  const item = () => p.locator("[data-ignore-fill]");
   const ignore = {
-    click: async () => { await p.locator("[data-select-more]").click(); await item().click(); },
-    checked: async () => { await p.locator("[data-select-more]").click(); const v = await item().getAttribute("aria-checked"); await p.keyboard.press("Escape"); return v; },
+    click: async () => { await item().click(); },
+    checked: async () => item().getAttribute("aria-pressed"),
   };
   const selected = () => p.evaluate(() => window.__canvastDebug.selection());
   // A band that does not fill the view (3 levels in: 64 px wide) stays selectable with the option on.
@@ -979,8 +979,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await app.frame();
   await expect.poll(ink, { message: "still hidden after a reload (the canvas is painted again once the saved canvas has loaded)" }).toBe(none);
-  await p.locator("[data-select-more]").click();
-  await p.getByRole("menuitem", { name: "Show all hidden" }).click();
+  await p.getByRole("button", { name: "Show all hidden" }).click();
   await app.frame();
   expect(await ink()).toBe(drawn);
   // Locked: drawn, but a click, a box and select-all all miss it.
@@ -993,8 +992,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.keyboard.press("Control+a");
   expect(await sel(), "select all skips it").toEqual([]);
   expect(await ink(), "still drawn").toBe(drawn);
-  await p.locator("[data-select-more]").click();
-  await p.getByRole("menuitem", { name: /^Unlock all/ }).click();
+  await p.getByRole("button", { name: /^Unlock all/ }).click();
   await p.mouse.click(600, 300);
   expect((await sel()).length).toBe(1);
 });
@@ -1504,11 +1502,9 @@ test("selection boxes follow the rotation, rotation works from outside a corner,
   const turned = await rots();
   expect(turned.every((r) => r === turned[0] && r > 0), "all four turned by the same angle").toBe(true);
   // The box can be axis-aligned instead.
-  await p.locator("[data-select-more]").click();
-  await p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ }).click();
+  await p.locator("[data-box-axis]").click();
   expect((await frame())!.angle).toBe(0);
-  await p.locator("[data-select-more]").click();
-  await p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ }).click();
+  await p.locator("[data-box-axis]").click();
   // Turning from just outside a corner (the handle may be out of the view for a big selection).
   const before = (await rots())[0]!;
   const f2 = (await frame())!;
@@ -1576,19 +1572,18 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   const at = [[420, 260], [560, 400], [700, 300], [500, 520]] as const;
   for (const [x, y] of at) await app.drag({ x, y }, { x: x + 60, y: y + 40 }, 4);
   await p.keyboard.press("v");
+  const LAYOUT_ID: Record<string, string> = { Left: "align:left", "In stacking order": "grid:stack" };
   const menuItem = async (name: string): Promise<void> => {
-    await p.getByRole("button", { name: "Arrange and align" }).click();
-    await p.getByRole("menuitem", { name }).click();
+    await p.locator(`[data-ctx="layout"][data-layout="${LAYOUT_ID[name]}"]`).click();
   };
-  // The Arrange button is in the selection bar and only with two or more selected; two cannot be distributed, and the message says so.
+  // The align buttons are in the Actions bar and only with two or more selected; two cannot be distributed, and the message says so.
   await p.mouse.click(450, 280);
-  await expect(p.getByRole("button", { name: "Arrange and align" })).toBeHidden();
+  await expect(p.locator('[data-ctx="layout"][data-layout="align:left"]')).toBeHidden();
   await p.keyboard.down("Shift");
   await p.mouse.click(590, 420);
   await p.keyboard.up("Shift");
-  await expect(p.getByRole("button", { name: "Arrange and align" })).toBeVisible();
-  await menuItem("Horizontally");
-  await expect(p.getByTestId("toast")).toContainText("Select at least 3 items");
+  await expect(p.locator('[data-ctx="layout"][data-layout="align:left"]')).toBeVisible();
+  await expect(p.locator('[data-ctx="layout"][data-layout="distribute:x"]'), "two cannot be distributed: the button is not offered").toBeHidden();
   await p.keyboard.press("Control+a");
   const before = await boxes();
   await menuItem("Left");
@@ -1603,15 +1598,13 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   expect(new Set(grid.map((b) => Math.round(b.minY))).size, "2 rows").toBe(2);
   await p.keyboard.press("Control+z");
   expect((await boxes()).map((b) => Math.round(b.minX))).toEqual(before.map((b) => Math.round(b.minX)));
-  // The space between the items of a grid is chosen in the same menu; choosing another one lays the grid just made out again (ADR 0074).
+  // The space between the items of a grid is chosen beside the grid buttons; choosing another one lays the grid just made out again (ADR 0074).
   const extent = async (): Promise<number> => {
     const bs = await boxes();
     return Math.max(...bs.map((b) => b.maxX)) - Math.min(...bs.map((b) => b.minX));
   };
   const setGap = async (name: string): Promise<void> => {
-    await p.getByRole("button", { name: "Arrange and align" }).click();
-    await p.getByRole("menuitemradio", { name }).click();
-    await p.keyboard.press("Escape");
+    await p.locator(`[data-ctx="gap"][data-gap="${name.toLowerCase()}"]`).click();
   };
   await menuItem("In stacking order");
   const normal = await extent();
@@ -1619,8 +1612,7 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   expect(await extent()).toBeGreaterThan(normal + 20);
   await setGap("None");
   expect(await extent()).toBeLessThan(normal - 5);
-  await p.getByRole("button", { name: "Arrange and align" }).click();
-  await expect(p.getByRole("menuitemradio", { name: "None" })).toHaveAttribute("aria-checked", "true");
+  await expect(p.locator('[data-ctx="gap"][data-gap="none"]')).toHaveAttribute("aria-pressed", "true");
   expect(app.consoleErrors).toEqual([]);
 });
 

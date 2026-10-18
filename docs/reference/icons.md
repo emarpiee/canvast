@@ -46,7 +46,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `chevrons-up-down` | In stacking order |
 | `circle` | Ellipse shape |
 | `circle-help` | How to combine search words |
-| `combine` | Combine shapes (the selection bar) |
 | `copy` | Duplicate |
 | `download` | Download original (library details and selection bar) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
@@ -88,7 +87,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `magnet` | Snap to other objects |
 | `map-pin` | Place on Board 1 › Canvas 1 |
 | `maximize` | Full screen |
-| `merge` | Flatten a boolean group into one path (the Combine menu) |
+| `merge` | Flatten a boolean group into one path (Actions bar) |
+| `split` | Release the shapes of a boolean group (Actions bar) |
 | `minus` | Zoom out |
 | `mouse-pointer-2` | Select |
 | `mouse-pointer-ban` | Ignore the object that fills the view |
@@ -119,7 +119,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `clipboard` | Copy a picture to the clipboard as it looks |
 | `copy-plus` | Make a new picture of it as it looks |
 | `list-restart` | Reset the adjustments of a picture |
-| `pin` | Initial shape (set, update, reset) |
+| `pin` | Set initial shape |
+| `save` | Update initial shape |
+| `rotate-ccw-square` | Reset to initial shape |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
 | `pentagon` | Shape tool |

@@ -8,7 +8,7 @@ import shapeToolSvg from "lucide-static/icons/pentagon.svg";
 import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
 import nodeToolSvg from "lucide-static/icons/waypoints.svg";
 import vectorSquareSvg from "lucide-static/icons/vector-square.svg";
-import combineIconSvg from "lucide-static/icons/combine.svg";
+import releaseBooleanSvg from "lucide-static/icons/split.svg";
 import squaresUniteSvg from "lucide-static/icons/squares-unite.svg";
 import squaresIntersectSvg from "lucide-static/icons/squares-intersect.svg";
 import squaresSubtractSvg from "lucide-static/icons/squares-subtract.svg";
@@ -81,6 +81,8 @@ import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
 import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
+import saveIconSvg from "lucide-static/icons/save.svg";
+import resetShapeSvg from "lucide-static/icons/rotate-ccw-square.svg";
 import textStyleIcon from "lucide-static/icons/a-large-small.svg";
 import textAlignLeftIcon from "lucide-static/icons/align-left.svg";
 import textAlignCenterIcon from "lucide-static/icons/align-center.svg";
@@ -241,6 +243,8 @@ export const ICONS = {
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),
   textStyle: clean(textStyleIcon),
+  save: clean(saveIconSvg),
+  resetShape: clean(resetShapeSvg),
   textAlignLeft: clean(textAlignLeftIcon),
   textAlignCenter: clean(textAlignCenterIcon),
   textAlignRight: clean(textAlignRightIcon),
@@ -361,7 +365,7 @@ export const ICONS = {
   pathTool: clean(pathToolSvg),
   nodeTool: clean(nodeToolSvg),
   vectorSquare: clean(vectorSquareSvg),
-  combineIcon: clean(combineIconSvg),
+  releaseBoolean: clean(releaseBooleanSvg),
   squaresUnite: clean(squaresUniteSvg),
   squaresIntersect: clean(squaresIntersectSvg),
   squaresSubtract: clean(squaresSubtractSvg),

@@ -101,6 +101,8 @@ export class EditorState {
   /** Tool restored when a temporary hand (space) ends. */
   heldTool: Tool | null = null;
   selection = new Set<ObjectId>();
+  /** The kind of picked item the Properties bar shows when the selection mixes kinds (a chip chooses it; ADR 0128). */
+  subject: string | null = null;
   lassoFilter: LassoFilter = "strokes";
   penColor: string = PEN_COLORS[0];
   /** What the Text tool makes (ADR 0126): the look of the next text; a colour left out is the pen colour. */

@@ -1435,7 +1435,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await p.mouse.click(1100, 700);
   await expect(box).toBeHidden();
   expect((await selection()).length).toBe(2);
-  await p.mouse.click(1100, 700);
+  await p.mouse.click(1100, 450);
   expect((await selection()).length).toBe(0);
   await p.keyboard.press("Control+f");
   await box.fill("/.png");

@@ -6,16 +6,15 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
-import { openMoreMenu } from "./more-menu";
-import type { MenuItem } from "./more-menu";
+import { syncGroups } from "./bar";
 import type { BoolOp } from "../doc/boolean";
 
 /**
- * The selection action bar (ADR 0051): a small bar next to the selected objects with what is most often wanted next: duplicate,
- * group or ungroup, bring to front, send to back, lock, hide and delete. The same actions as the toolbar (it stays as it is), put
- * where the pointer already is. It follows the selection box through pan and zoom, sits below it (the rotate handle is above) or
- * above it when the screen edge is in the way, and is hidden while the selection is being moved, scaled or turned, while text is
- * being edited, and with the Hand, Pen, Text and eraser tools (which do not select).
+ * The Actions bar (ADR 0051, 0128): what you can DO to the selection, in one row at a fixed place (bottom centre, above the readout), never
+ * attached to an item, so it neither covers the picture nor jumps about. The row is made of groups that show when they apply: Duplicate,
+ * group, tag, library and file actions, resets, text to path, shapes combined (a button for each operation), sheet and attach commands,
+ * align, distribute and grid with the space between items, order, lock, hide, delete. Nothing is in a menu. What the selection LOOKS like
+ * (colour, size, font) is the Properties bar's, at the top.
  */
 export interface ContextActions {
   duplicate(): void;
@@ -24,7 +23,6 @@ export interface ContextActions {
   resetProportions(): void;
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean };
-  /** The selection holds pictures, videos or audio that are in the library, and showing them there. */
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
   fileSelection(): { hash: string; open: boolean } | null;
   /** Any file of the library is picked: its original can be downloaded (several as a ZIP; ADR 0119). */
@@ -32,7 +30,15 @@ export interface ContextActions {
   /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
   releaseSheet(): void;
   canReleaseSheet(): boolean;
-  /** Pictures (ADR 0118): what can be done with the picked ones now (null: none is a picture). */
+  putOnSheet(): void;
+  fitSheet(): void;
+  canFitSheet(): boolean;
+  /** Attach the picked objects to the object clicked next, and detach them (ADR 0109). */
+  attach(): void;
+  detach(): void;
+  canDetach(): boolean;
+  /** Copy the Markdown of the picked texts. */
+  copyMarkdown(): void;
   pictureTools(): { still: boolean; canPaste: boolean } | null;
   copyAdjust(): void;
   pasteAdjust(): void;
@@ -76,8 +82,13 @@ export interface ContextActions {
   deleteSelection(): void;
 }
 
-const GAP = 12;
-const MARGIN = 8;
+const GAP_SHORT: Record<GapKey, string> = { none: "0", tight: "S", normal: "M", wide: "L", wider: "XL" };
+const OPS: Array<{ op: BoolOp; icon: string; label: string; aria: string }> = [
+  { op: "union", icon: ICONS.squaresUnite, label: "Union", aria: "Union: join the shapes into one" },
+  { op: "intersect", icon: ICONS.squaresIntersect, label: "Intersect", aria: "Intersect: keep only where the shapes overlap" },
+  { op: "subtract", icon: ICONS.squaresSubtract, label: "Subtract", aria: "Subtract: take the shapes in front away from the one at the back" },
+  { op: "exclude", icon: ICONS.squaresExclude, label: "Exclude overlap", aria: "Exclude overlap: keep everything but where the shapes overlap" },
+];
 
 export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean): { update(): void } {
   const bar = document.createElement("div");
@@ -86,157 +97,71 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Selection actions");
   bar.hidden = true;
-  const btn = (act: string, icon: string, label: string): string => `<button type="button" data-ctx="${act}" aria-label="${label}" title="${label}">${icon}</button>`;
+  const btn = (act: string, icon: string, label: string, extra = ""): string => `<button type="button" data-ctx="${act}" ${extra} aria-label="${label}" title="${label}">${icon}</button>`;
+  const group = (name: string, ...items: string[]): string => `<div class="tb-group" role="group" aria-label="${name}">${items.join("")}</div>`;
+  const layoutButtons = (head: string): string =>
+    LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => btn("layout", i.icon, head === "Align" ? `Align ${i.label.toLowerCase()}` : head === "Arrange" ? `Arrange in a grid: ${i.label.toLowerCase()}` : `Distribute ${i.label.toLowerCase()}`, `data-layout="${i.id}"`)).join("");
   bar.innerHTML =
-    btn("duplicate", ICONS.copy, "Duplicate") +
-    btn("group", ICONS.group, "Group") +
-    btn("ungroup", ICONS.ungroup, "Ungroup") +
-    `<span class="ctx-sep" aria-hidden="true"></span>` +
-    btn("tag", ICONS.tag, "Tag the selection") +
-    btn("library", ICONS.library, "View in the library") +
-    btn("download", ICONS.download, "Download the original file (several files: one ZIP; an edited picture comes with its original)") +
-    btn("open", ICONS.externalLink, "Open in a new tab") +
-    btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture") +
-    btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures") +
-    btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)") +
-    btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it") +
-    btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)") +
-    btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file") +
-    `<span class="ctx-sep" aria-hidden="true"></span>` +
-    btn("unrotate", ICONS.rotateCcw, "Reset rotation") +
-    btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)") +
-    `<span class="ctx-sep" aria-hidden="true"></span>` +
-    btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)") +
-    btn("flatten", ICONS.merge, "Flatten the boolean group into one path (Ctrl+E)") +
-    btn("combine", ICONS.combineIcon, "Combine shapes (union, intersect, subtract, exclude); on a boolean group: its operation, flatten, release") +
-    `<span class="ctx-sep" aria-hidden="true"></span>` +
-    btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away") +
-    btn("layout", ICONS.blocks, "Arrange and align") +
-    btn("front", ICONS.bringToFront, "Bring to front") +
-    btn("back", ICONS.sendToBack, "Send to back") +
-    `<span class="ctx-sep" aria-hidden="true"></span>` +
-    btn("lock", ICONS.lockKeyhole, "Lock selection") +
-    btn("hide", ICONS.eyeOff, "Hide selection") +
-    btn("delete", ICONS.trash, "Delete selection");
+    group("Items", btn("duplicate", ICONS.copy, "Duplicate"), btn("group", ICONS.group, "Group"), btn("ungroup", ICONS.ungroup, "Ungroup"), btn("tag", ICONS.tag, "Tag the selection")) +
+    group("Files",
+      btn("library", ICONS.library, "View in the library"),
+      btn("download", ICONS.download, "Download the original file (several files: one ZIP; an edited picture comes with its original)"),
+      btn("open", ICONS.externalLink, "Open in a new tab"),
+      btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
+      btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures"),
+      btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
+      btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
+      btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)"),
+      btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
+      btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
+    group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Text", btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)")) +
+    group("Shapes",
+      ...OPS.map((o) => btn("op", o.icon, o.aria, `data-op="${o.op}"`)),
+      btn("addgroup", ICONS.squarePlus, "Add the shapes to the boolean group: they become shapes of it, with its operation"),
+      btn("takeout", ICONS.squareOut, "Take the shapes out of the boolean group: they stay where they are"),
+      btn("flatten", ICONS.merge, "Flatten the boolean group into one path (Ctrl+E)"),
+      btn("release", ICONS.releaseBoolean, "Release the shapes: take the boolean group apart, the shapes stay as they are")) +
+    group("Sheet and attach",
+      btn("puton", ICONS.sheetSelection, "Put the picked objects on a sheet (Ctrl+Alt+G)"),
+      btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away"),
+      btn("fitsheet", ICONS.shrink, "Fit the sheet to what is on it"),
+      btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
+      btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +
+    group("Align", layoutButtons("Align"), layoutButtons("Distribute")) +
+    group("Grid", layoutButtons("Arrange"), ...GAP_ORDER.map((g) => `<button type="button" class="ctx-gap" data-ctx="gap" data-gap="${g}" aria-pressed="false" aria-label="Space between items: ${GAP_LABEL[g].toLowerCase()}" title="Space between the items of a grid: ${GAP_LABEL[g].toLowerCase()}">${GAP_SHORT[g]}</button>`)) +
+    group("Order", btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back")) +
+    group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
   host.appendChild(bar);
-  // The Arrange menu (grid, align, distribute) opens from the bar and floats beside it.
-  const menu = document.createElement("div");
-  menu.className = "layout-menu ctx-layout-menu";
-  menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", "Arrange and align");
-  menu.dataset["testid"] = "layout-menu";
-  menu.hidden = true;
-  // After the grid choices: the space between the items of a grid, as a row of choices (one is chosen; the menu stays open).
-  const gapRow = `<div class="layout-head" id="layout-gap-head">Space between items</div><div class="layout-gaps" role="group" aria-labelledby="layout-gap-head">${GAP_ORDER.map((g) => `<button type="button" role="menuitemradio" aria-checked="false" data-gap="${g}">${GAP_LABEL[g]}</button>`).join("")}</div>`;
-  menu.innerHTML = LAYOUT_MENU.map((g, n) => `<div class="layout-head">${g.head}</div>${g.items.map((i) => `<button type="button" role="menuitem" data-layout="${i.id}">${i.icon}<span>${i.label}</span></button>`).join("")}${n === 0 ? gapRow : ""}`).join("");
-  const showGap = (): void => {
-    for (const b of menu.querySelectorAll<HTMLElement>("[data-gap]")) b.setAttribute("aria-checked", String(b.dataset["gap"] === actions.gap()));
-  };
-  host.appendChild(menu);
-  const closeMenu = (): void => {
-    menu.hidden = true;
-    bar.querySelector('[data-ctx="layout"]')?.setAttribute("aria-expanded", "false");
-  };
-  const placeMenu = (): void => {
-    const r = bar.getBoundingClientRect();
-    const h = host.getBoundingClientRect();
-    const mw = menu.offsetWidth;
-    const mh = menu.offsetHeight;
-    let top = r.bottom - h.top + 6;
-    if (top + mh > h.height - MARGIN) top = Math.max(MARGIN, r.top - h.top - 6 - mh);
-    let left = Math.max(MARGIN, Math.min(r.left - h.left + r.width / 2 - mw / 2, h.width - mw - MARGIN));
-    // Not over the selected items: under the bar, above it, or beside the selection, whichever covers them least.
-    const sel = editor.selectionBoxOnScreen;
-    if (sel) {
-      const xs = sel.frame.corners.map((c) => c[0] - h.left);
-      const ys = sel.frame.corners.map((c) => c[1] - h.top);
-      const box = { l: Math.min(...xs) - MARGIN, t: Math.min(...ys) - MARGIN, r: Math.max(...xs) + MARGIN, b: Math.max(...ys) + MARGIN };
-      const over = (x: number, y: number): number => Math.max(0, Math.min(x + mw, box.r) - Math.max(x, box.l)) * Math.max(0, Math.min(y + mh, box.b) - Math.max(y, box.t));
-      const fit = (x: number, y: number): [number, number] => [Math.max(MARGIN, Math.min(h.width - mw - MARGIN, x)), Math.max(MARGIN, Math.min(h.height - mh - MARGIN, y))];
-      const opts: Array<[number, number]> = [
-        [left, top],
-        fit(left, r.top - h.top - 6 - mh),
-        fit(left, r.bottom - h.top + 6),
-        fit(box.r + MARGIN, top),
-        fit(box.l - MARGIN - mw, top),
-        fit(box.r + MARGIN, box.t),
-        fit(box.l - MARGIN - mw, box.t),
-      ];
-      const best = opts.reduce((a, c) => (over(c[0], c[1]) < over(a[0], a[1]) ? c : a));
-      left = best[0];
-      top = best[1];
-    }
-    menu.style.left = `${Math.round(left)}px`;
-    menu.style.top = `${Math.round(top)}px`;
-  };
-  menu.addEventListener("click", (e) => {
-    const gap = (e.target as HTMLElement).closest<HTMLElement>("[data-gap]");
-    if (gap) {
-      actions.setGap(gap.dataset["gap"] as GapKey);
-      showGap();
-      return;
-    }
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-layout]");
-    if (!b) return;
-    const [kind, arg] = b.dataset["layout"]!.split(":") as [string, string];
-    closeMenu();
-    actions.layout(kind === "grid" ? { grid: arg as SortKey } : kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" });
-  });
-  menu.addEventListener("pointerdown", (e) => e.stopPropagation());
-  menu.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeMenu();
-      bar.querySelector<HTMLElement>('[data-ctx="layout"]')?.focus();
-      e.stopPropagation();
-    }
-  });
-  document.addEventListener("pointerdown", (e) => {
-    if (!menu.hidden && !(e.target as HTMLElement).closest(".ctx-bar, .ctx-layout-menu")) closeMenu();
-  });
-  const q = (act: string): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]`)!;
+  const q = (act: string, extra = ""): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]${extra}`)!;
+  const each = (act: string, f: (b: HTMLButtonElement) => void): void => bar.querySelectorAll<HTMLButtonElement>(`[data-ctx="${act}"]`).forEach(f);
 
   bar.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ctx]");
-    if (!b) return;
+    if (!b || (b as HTMLButtonElement).disabled) return;
     switch (b.dataset["ctx"]) {
-      case "layout":
-        menu.hidden = !menu.hidden;
-        b.setAttribute("aria-expanded", String(!menu.hidden));
-        if (!menu.hidden) {
-          showGap();
-          placeMenu();
-          menu.querySelector<HTMLElement>("button")?.focus();
-        }
-        break;
-      case "combine": {
-        // On a selection of shapes: the four operations make a boolean group. On a boolean group: the same four change its operation (the
-        // current one ticked), and it can be flattened into one path or released into its shapes again.
-        const cur = actions.booleanState();
-        const pick = (op: BoolOp, label: string, icon: string, aria: string): MenuItem => ({ label, icon, aria, ...(cur ? { checked: cur === op } : {}), run: () => actions.combine(op) });
-        const join = actions.groupJoin();
-        openMoreMenu(b, [
-          ...(join === "add" ? [{ label: "Add to the group", icon: ICONS.squarePlus, aria: "Add the shapes to the boolean group: they become shapes of it, with its operation", run: () => actions.addToGroup() }] : []),
-          ...(join === "out" ? [{ label: "Take out of the group", icon: ICONS.squareOut, aria: "Take the shapes out of the boolean group: they stay where they are", run: () => actions.takeOutOfGroup() }] : []),
-          ...(actions.canCombine() ? [
-          pick("union", "Union", ICONS.squaresUnite, "Union: join the shapes into one"),
-          pick("intersect", "Intersect", ICONS.squaresIntersect, "Intersect: keep only where the shapes overlap"),
-          pick("subtract", "Subtract", ICONS.squaresSubtract, "Subtract: take the shapes in front away from the one at the back"),
-          pick("exclude", "Exclude overlap", ICONS.squaresExclude, "Exclude overlap: keep everything but where the shapes overlap"),
-          ...(cur ? [
-            { label: "Flatten", icon: ICONS.merge, aria: "Flatten: make it one path, without the shapes inside (Ctrl+E)", run: () => actions.flattenBoolean() },
-            { label: "Release shapes", icon: ICONS.ungroup, aria: "Release the shapes: take the group apart, the shapes stay as they are", run: () => actions.releaseBoolean() },
-          ] : [])
-        ] : []),
-], cur ? "Boolean group" : "Combine shapes");
+      case "layout": {
+        const [kind, arg] = b.dataset["layout"]!.split(":") as [string, string];
+        actions.layout(kind === "grid" ? { grid: arg as SortKey } : kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" });
         break;
       }
+      case "gap": actions.setGap(b.dataset["gap"] as GapKey); update(); break;
+      case "op": actions.combine(b.dataset["op"] as BoolOp); break;
+      case "addgroup": actions.addToGroup(); break;
+      case "takeout": actions.takeOutOfGroup(); break;
+      case "release": actions.releaseBoolean(); break;
       case "flatten": actions.flattenBoolean(); break;
       case "outline": actions.outline(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
       case "open": actions.openFile(); break;
+      case "puton": actions.putOnSheet(); break;
       case "unsheet": actions.releaseSheet(); break;
+      case "fitsheet": actions.fitSheet(); break;
+      case "attach": actions.attach(); break;
+      case "detach": actions.detach(); break;
+      case "copymd": actions.copyMarkdown(); break;
       case "vectorise": actions.vectorise(); break;
       case "copyadj": actions.copyAdjust(); break;
       case "pasteadj": actions.pasteAdjust(); break;
@@ -258,22 +183,35 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   // The bar must not start a drag or a selection change on the canvas below it.
   bar.addEventListener("pointerdown", (e) => e.stopPropagation());
 
-  let lastKey = "";
-  let settling = false;
   const update = (): void => {
-    const box = editor.selectionBoxOnScreen;
-    const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "lasso") && editor.preview.kind === "none" && !!box;
-    if (!show || !box) {
+    const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "node" || editor.tool === "lasso") && editor.preview.kind === "none";
+    if (!show) {
       if (!bar.hidden) bar.hidden = true;
-      closeMenu();
-      lastKey = "";
       return;
     }
     const sel = [...editor.selection].map((id) => doc.get(id)).filter((o) => !!o);
-    q("group").hidden = sel.length < 2 || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
-    q("layout").hidden = sel.length < 2 && !(sel.length === 1 && (sel[0]!.groups?.length ?? 0) > 0); // (one shape inside a group is lined up with the group)
-    q("combine").hidden = !(actions.canCombine() || actions.groupJoin() !== null);
-    q("flatten").hidden = actions.booleanState() === null;
+    const many = sel.length >= 2;
+    q("group").hidden = !many || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
+    q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
+    const lined = many || (sel.length === 1 && (sel[0]!.groups?.length ?? 0) > 0); // (one shape inside a group is lined up with the group)
+    each("layout", (b) => {
+      const kind = b.dataset["layout"]!.split(":")[0];
+      b.hidden = kind === "grid" ? !many : kind === "distribute" ? sel.length < 3 : !lined;
+    });
+    each("gap", (b) => {
+      b.hidden = !many;
+      b.setAttribute("aria-pressed", String(b.dataset["gap"] === actions.gap()));
+    });
+    const cur = actions.booleanState();
+    const join = actions.groupJoin();
+    each("op", (b) => {
+      b.hidden = !actions.canCombine() && cur === null;
+      b.setAttribute("aria-pressed", String(cur === b.dataset["op"]));
+    });
+    q("addgroup").hidden = join !== "add";
+    q("takeout").hidden = join !== "out";
+    q("flatten").hidden = cur === null;
+    q("release").hidden = cur === null;
     q("outline").hidden = !actions.canOutline();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
@@ -281,67 +219,25 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("download").hidden = !actions.canDownload();
     q("open").hidden = !file?.open;
     q("unsheet").hidden = !actions.canReleaseSheet();
+    q("puton").hidden = false;
+    q("fitsheet").hidden = !actions.canFitSheet();
+    q("attach").hidden = false;
+    q("attach").setAttribute("aria-pressed", String(editor.attachMode));
+    q("detach").hidden = !actions.canDetach();
+    q("copymd").hidden = !sel.some((o) => o!.kind === "text");
     q("vectorise").hidden = !actions.svgPicture();
     const pic = actions.pictureTools();
     q("copyadj").hidden = !pic;
     q("pasteadj").hidden = !pic;
-    (q("pasteadj") as HTMLButtonElement).disabled = !pic?.canPaste;
+    q("pasteadj").disabled = !pic?.canPaste;
     q("copypng").hidden = !pic?.still;
     q("bake").hidden = !pic?.still;
     q("exportsvg").hidden = !actions.canExportSvg();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
-    if (sel.length < 2) closeMenu();
-    q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
     bar.hidden = false;
-    // A divider only between two groups that both have a button showing.
-    let seen = false;
-    let pending: HTMLElement | null = null;
-    for (const c of bar.children as Iterable<HTMLElement>) {
-      if (c.classList.contains("ctx-sep")) {
-        c.hidden = true;
-        pending = seen ? c : null;
-      } else if (!c.hidden) {
-        if (pending) pending.hidden = false;
-        pending = null;
-        seen = true;
-      }
-    }
-    const xs = box.frame.corners.map((c) => c[0]);
-    const ys = box.frame.corners.map((c) => c[1]);
-    const w = bar.offsetWidth;
-    const h = bar.offsetHeight;
-    const vw = host.clientWidth;
-    const vh = host.clientHeight;
-    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-    // The bar goes below the selection when there is room, else above its turn handle. A picture with a player (video, audio, GIF) has the
-    // player's bar on one side of it (below, or above when the view's edge leaves no room below): this bar then takes the first place that
-    // is inside the view and clear of the player's bar: below the selection, above it, below the player, above the player.
-    const hostBox = host.getBoundingClientRect();
-    const playerEl = sel.length === 1 && "media" in sel[0]! && sel[0].media ? host.querySelector<HTMLElement>(".media-bar:not([hidden])") : null;
-    const pr = playerEl && playerEl.style.display !== "none" ? playerEl.getBoundingClientRect() : null;
-    const player = pr ? { top: pr.top - hostBox.top, bottom: pr.bottom - hostBox.top } : null;
-    const clear = (t: number): boolean => !player || t + h + 2 <= player.top || t >= player.bottom + 2;
-    const fits = (t: number): boolean => t >= MARGIN && t + h <= vh - MARGIN && clear(t);
-    const candidates = [Math.max(...ys) + GAP, Math.min(...ys) - GAP - h - 24, ...(player ? [player.bottom + GAP, player.top - GAP - h] : [])];
-    let top = candidates.find(fits) ?? candidates[0]!;
-    top = Math.max(MARGIN, Math.min(top, vh - h - MARGIN));
-    const left = Math.max(MARGIN, Math.min(cx - w / 2, vw - w - MARGIN));
-    // The player's bar places itself in its own update; look again once it has, so the two agree.
-    if (playerEl && !settling) {
-      settling = true;
-      requestAnimationFrame(() => {
-        update(); // (settling is still on: this look does not ask for another)
-        settling = false;
-      });
-    }
-    const key = `${Math.round(left)},${Math.round(top)}`;
-    if (key !== lastKey) {
-      bar.style.left = `${Math.round(left)}px`;
-      bar.style.top = `${Math.round(top)}px`;
-      lastKey = key;
-      if (!menu.hidden) placeMenu();
-    }
+    syncGroups(bar);
+    bar.toggleAttribute("data-scroll", bar.scrollWidth > bar.clientWidth + 1);
   };
   editor.subscribe(update);
   return { update };

@@ -527,6 +527,14 @@ async function start(): Promise<void> {
   const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor);
+  const copySelectedMarkdown = (): void => {
+    const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
+    if (!md.length) return;
+    void copyText(md.join("\n\n")).then(() => {
+      editor.message = "Copied Markdown";
+      editor.changed();
+    });
+  };
   /** Screen px per local unit of a text at this view (0 when it is not on screen). */
   const textPpu = (id: string): number => {
     const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === id);
@@ -751,12 +759,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       else editor.changed();
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
-    canFitSheet: () => canFitSheet(doc, editor),
-    fitSheet: () => fitSheet(doc, editor),
     sheetSize: () => sheetSize(doc, editor),
     resizeSheet: (w, h) => resizeSheet(doc, editor, w, h),
-    sheetSelection: () => sheetSelection(doc, editor),
-    canDetach: () => canDetach(doc, editor),
     croppable: () => croppablePicture(doc, editor) !== null,
     cropped: () => isCropped(doc, editor),
     uncrop: () => uncropPicture(doc, editor),
@@ -769,7 +773,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     canPasteAdjust: () => canPasteAdjustments(),
     copyRendered: () => void copyRenderedPicture(doc, editor, assets),
     bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
-    detachSelection: () => detachSelection(doc, editor),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
@@ -791,14 +794,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       }, final);
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
-    copyMarkdown: () => {
-      const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
-      if (!md.length) return;
-      void copyText(md.join("\n\n")).then(() => {
-        editor.message = "Copied Markdown";
-        editor.changed();
-      });
-    },
   });
   // Screenshot (ADR 0080): what the canvas shows, without the selection outlines, saved to the library with the name, folder and tags of Settings > Screenshot.
   const takeScreenshot = async (): Promise<void> => {
@@ -1082,6 +1077,16 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         void assetsView.reveal(hashes);
       },
       group: () => groupSelection(doc, editor),
+      putOnSheet: () => sheetSelection(doc, editor),
+      fitSheet: () => fitSheet(doc, editor),
+      canFitSheet: () => canFitSheet(doc, editor),
+      attach: () => {
+        editor.attachMode = !editor.attachMode;
+        editor.changed();
+      },
+      detach: () => detachSelection(doc, editor),
+      canDetach: () => canDetach(doc, editor),
+      copyMarkdown: () => copySelectedMarkdown(),
       releaseSheet: () => releaseSheets(doc, editor),
       canReleaseSheet: () => [...editor.selection].some((id) => isContainer(doc.get(id))),
       ungroup: () => ungroupSelection(doc, editor),

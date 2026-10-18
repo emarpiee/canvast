@@ -1,5 +1,8 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import { esc } from "./format";
+import { syncGroups } from "./bar";
+import { isContainer } from "../doc/containers";
+import type { CanvasObject } from "../doc/model";
 import type { TextLook, lookOf } from "../text/text-style";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
@@ -9,7 +12,6 @@ import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
-import { moreButton, openMoreMenu } from "./more-menu";
 import type { GradientStop } from "../doc/paint";
 import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
 import type { Adjust } from "../doc/adjust";
@@ -28,8 +30,6 @@ export interface ToolbarActions {
   openSearch(prefix?: string): void;
   undo(): void;
   redo(): void;
-  /** Copy the Markdown of the selected text objects. */
-  copyMarkdown(): void;
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
   clearFlag(flag: "hidden" | "locked"): void;
@@ -51,7 +51,7 @@ export interface ToolbarActions {
   /** Change one paint to another everywhere the picked shapes use it. */
   recolourSelected(from: Paint, to: Paint | null, final: boolean): void;
   /** The first picked polygon or star whose numbers can still be changed (null: none): its sides, points and star ratio (0-1). */
-  /** How the first picked object on a sheet follows it (null: none is on one), and changing it; fitting a picked sheet to what is on it (ADR 0108). */
+  /** How the first picked object on a sheet follows it (null: none is on one), and changing it (ADR 0108). */
   selectedPin(): { h: string; v: string } | null;
   /** The look of the text being edited, else of the Text tool (when it is the tool), else of the first picked text (null: none), and changing it (ADR 0126). */
   selectedTextStyle(): ReturnType<typeof lookOf> | null;
@@ -60,12 +60,9 @@ export interface ToolbarActions {
   fonts(): Promise<Array<{ hash: string; name: string; unusable: string }>>;
   importFont(file: File): Promise<string | null>;
   setPin(patch: { h?: string; v?: string }): void;
-  canFitSheet(): boolean;
   /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
   sheetSize(): { w: number; h: number } | null;
   resizeSheet(w: number, h: number): void;
-  sheetSelection(): void;
-  canDetach(): boolean;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
   cropped(): boolean;
@@ -80,8 +77,6 @@ export interface ToolbarActions {
   canPasteAdjust(): boolean;
   copyRendered(): void;
   bake(): void;
-  detachSelection(): void;
-  fitSheet(): void;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -164,6 +159,10 @@ const TEXT_FITS = [
   { id: "fixed", label: "Fixed width", title: "Fixed width: the words wrap at the box's width (drag a box to make one)", icon: ICONS.textFixedWidth },
 ] as const;
 
+const KIND_LABEL: Record<string, string> = { sheet: "Sheet", shape: "Shape", text: "Text", picture: "Picture", stroke: "Stroke" };
+/** The kind of picked item the Properties bar sorts its controls by. */
+const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
+
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
     <div class="rail" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
@@ -188,6 +187,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="toolbar" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">
+      <div class="tb-group tb-options tb-subject" data-for="select node" role="radiogroup" aria-label="Edit which kind of item" hidden></div>
       <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
         <span class="tb-recents" data-recents role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
@@ -201,44 +201,42 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <label class="tb-count" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
-        <label class="tb-count" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
-        <label class="tb-count" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
-        <label class="tb-count" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
+        <label class="tb-count" data-kind="shape" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the name left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
+        <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the name left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
+        <label class="tb-count" data-kind="shape" data-scrub="tips" data-sel-tips-wrap hidden title="Drag the name left or right to change it">Points <input type="number" data-sel-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
+        <label class="tb-count" data-kind="any" data-pin-wrap hidden title="How it follows its sheet when the sheet is resized">Pin
           <select data-pin-h aria-label="Pin horizontally: how it follows the sheet's width"><option value="left">Left</option><option value="right">Right</option><option value="both">Left and right</option><option value="center">Centre</option><option value="scale">Scale</option></select>
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
-        <button type="button" data-attach hidden aria-label="Attach the picked objects to another object" title="Attach: the picked objects follow the object you click next when it moves">${ICONS.link}</button>
-        <button type="button" data-detach hidden aria-label="Detach the picked objects" title="Detach: the picked objects stop following another object">${ICONS.unlink}</button>
-        <button type="button" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
-        <button type="button" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
-        <button type="button" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <button type="button" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
-        <button type="button" data-put-on-sheet hidden aria-label="Put the picked objects on a sheet" title="Put the picked objects on a sheet (Ctrl+Alt+G)">${ICONS.sheetSelection}</button>
-        <span class="tb-count" data-sheet-size hidden title="Size of the sheet; only the sheet changes, what is on it follows its pin">Size
+        <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
+        <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
+        <button type="button" data-kind="picture" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
+        <button type="button" data-kind="picture" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
+        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="Size of the sheet; only the sheet changes, what is on it follows its pin">Size
           <input type="number" data-sheet-w min="0" step="any" inputmode="decimal" aria-label="Sheet width"> × <input type="number" data-sheet-h min="0" step="any" inputmode="decimal" aria-label="Sheet height">
           <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select></span>
-        <button type="button" data-fit-sheet hidden aria-label="Fit the sheet to what is on it" title="Fit the sheet to what is on it">${ICONS.shrink}</button>
-        <label class="tb-count" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
+        <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text select node">
-        <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span><b class="swatch-name">Colour</b></button>
-        <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)">Font <select data-text-font aria-label="Font"></select></label>
+      <div class="tb-group tb-options" data-for="text select node" data-kind="text">
+        <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
+        <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
         <input type="file" hidden accept=".ttf,.otf,.woff" data-testid="font-input">
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
-      <div class="tb-group tb-options" data-for="text select node" role="radiogroup" aria-label="Text alignment">
+      <div class="tb-group tb-options" data-for="text select node" data-kind="text" role="radiogroup" aria-label="Text alignment">
         ${TEXT_ALIGNS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-align="${a.id}" aria-label="${a.label}" title="${a.label}">${a.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="text select node" role="radiogroup" aria-label="Text width">
+      <div class="tb-group tb-options" data-for="text select node" data-kind="text" role="radiogroup" aria-label="Text width">
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="select node">
-        <button type="button" class="initial-btn" data-initial hidden aria-haspopup="menu" aria-expanded="false" aria-label="Initial shape" title="Initial shape: save the shape as it is now, and come back to it later">${ICONS.pin}</button>
+      <div class="tb-group tb-options" data-for="select node" data-kind="shape" role="group" aria-label="Initial shape">
+        <button type="button" data-initial-set hidden aria-label="Set initial shape: save the shape as it is now" title="Set initial shape: save the shape as it is now, to come back to it later">${ICONS.pin}</button>
+        <button type="button" data-initial-update hidden aria-label="Update initial shape: replace the saved shape with the shape as it is now" title="Update initial shape: replace the saved shape with the shape as it is now">${ICONS.save}</button>
+        <button type="button" data-initial-reset hidden aria-label="Reset to initial shape: put the shape back as it was saved" title="Reset to initial shape: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
-      <div class="tb-group tb-options" data-for="select node" data-sel-colours hidden></div>
-      <div class="tb-group tb-options" data-for="shape path select node">
+      <div class="tb-group tb-options" data-for="select node" data-kind="shape" data-sel-colours hidden></div>
+      <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet">
         <button type="button" class="swatch swatch-paint" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
@@ -250,7 +248,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="pen select" role="group" aria-label="Size">
+      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke tool" role="group" aria-label="Size">
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-pen-only data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
         ).join("")}
@@ -261,17 +259,17 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="stab" data-stab aria-pressed="false" aria-label="Stabilizer" title="Stabilizer: smooths hand wobble; the brush follows the pointer on a rope">${ICONS.waves}</button>
         <input type="range" class="size" data-strength min="1" max="100" step="1" aria-label="Stabilizer strength" title="Stabilizer strength (rope length)" hidden>
       </div>
-      <div class="tb-group tb-options" data-for="pen select" role="group" aria-label="Keep size">
-        <button type="button" class="follow" data-pen-only data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
-        <button type="button" class="lock" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
-        <button type="button" class="lock" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
+      <div class="tb-group tb-options" data-for="pen select" data-kind="stroke shape tool" role="group" aria-label="Keep size">
+        <button type="button" class="follow" data-kind="stroke tool" data-pen-only data-follow aria-pressed="false" aria-label="Pen size follows zoom" title="Pen size follows zoom: while drawing, the pen keeps its size on screen when you zoom (the line gets thinner or thicker along its length)">${ICONS.scaling}</button>
+        <button type="button" class="lock" data-kind="shape" data-lock-radius aria-pressed="false" hidden aria-label="Lock corner radius" title="Lock corner radius: resizing a shape keeps its corner radius (off: the radius scales with the shape, so it keeps its look)">${ICONS.squareRoundCorner}</button>
+        <button type="button" class="lock" data-kind="stroke tool" data-lock aria-pressed="false" aria-label="Lock thickness" title="Lock thickness: new strokes keep this width on the canvas at any zoom; resizing a stroke keeps its line width">${ICONS.lock}</button>
       </div>
-      <div class="tb-group tb-options" data-for="select">
-        <button type="button" class="snap" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
-        ${moreButton("Selection tool options", "data-select-more")}
-      </div>
-      <div class="tb-group tb-options" data-for="select text">
-        <button type="button" data-action="copy-md" aria-label="Copy Markdown" title="Copy Markdown of the selected text" hidden>${ICONS.clipboardCopy}</button>
+      <div class="tb-group tb-options" data-for="select node" role="group" aria-label="Selection options">
+        <button type="button" class="snap" data-kind="any" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
+        <button type="button" class="snap" data-kind="any" data-box-axis aria-pressed="false" aria-label="Axis-aligned selection box" title="Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation">${ICONS.boxSelect}</button>
+        <button type="button" class="snap" data-kind="tool" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: zoomed far into an object it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
+        <button type="button" data-kind="tool" data-action="show-all" aria-label="Show all hidden" title="Show all hidden objects">${ICONS.eye}</button>
+        <button type="button" data-kind="tool" data-action="unlock-all" aria-label="Unlock all" title="Unlock all locked objects">${ICONS.lockKeyholeOpen}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser" role="group" aria-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
@@ -436,7 +434,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
   root.querySelector<HTMLSelectElement>("[data-pin-h]")!.addEventListener("change", (e) => actions.setPin({ h: (e.target as HTMLSelectElement).value }));
   root.querySelector<HTMLSelectElement>("[data-pin-v]")!.addEventListener("change", (e) => actions.setPin({ v: (e.target as HTMLSelectElement).value }));
-  root.querySelector<HTMLElement>("[data-fit-sheet]")!.addEventListener("click", () => actions.fitSheet());
   const sheetField = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
   const sheetUnit = (): number => Number(sheetField("[data-sheet-unit]").value) || 1;
   const sheetCommit = (): void => {
@@ -445,7 +442,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) sheetField(f).addEventListener("change", sheetCommit);
   sheetField("[data-sheet-unit]").addEventListener("change", () => editor.changed()); // (the same size, said in another unit)
-  root.querySelector<HTMLElement>("[data-put-on-sheet]")!.addEventListener("click", () => actions.sheetSelection());
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
     editor.cropId = editor.cropId ? null : (id ?? null);
@@ -458,11 +454,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.adjustOpen = !editor.adjustOpen; // the Adjust panel (ui/adjust-panel.ts, ADR 0123)
     editor.changed();
   });
-  root.querySelector<HTMLElement>("[data-attach]")!.addEventListener("click", () => {
-    editor.attachMode = !editor.attachMode;
-    editor.changed();
-  });
-  root.querySelector<HTMLElement>("[data-detach]")!.addEventListener("click", () => actions.detachSelection());
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
@@ -518,7 +509,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
   let colourEditing = false;
-  const SEL_CHIPS = 6;
+  // Every colour of the selection has its chip (the row scrolls when there are many): none is kept in a menu.
+  const SEL_CHIPS = Infinity;
   const chipPaint = (p: Paint): string => (typeof p === "string" ? `linear-gradient(${swatchBackground(p)}, ${swatchBackground(p)})` : paintCss(p));
   const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : "Gradient");
   const usage = (it: { fills: number; strokes: number }): string =>
@@ -607,7 +599,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const d = b.dataset;
-    if (d["penKind"]) {
+    if (d["subject"]) {
+      editor.subject = d["subject"];
+      editor.changed();
+    } else if (d["penKind"]) {
       editor.penKind = d["penKind"] as PenKind;
       editor.changed();
     } else if (d["tool"]) editor.setTool(d["tool"] as Tool);
@@ -620,10 +615,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["selColour"] !== undefined) {
       editColour(b, Number(d["selColour"]));
-    } else if (d["selColourMore"] !== undefined) {
-      // The colours that did not fit as chips, in a list: the colour and what uses it.
-      const rest = actions.selectionPaints().items.slice(SEL_CHIPS);
-      openMoreMenu(b, rest.map((it, k) => ({ label: `${paintName(it.paint)} · ${usage(it)}`, icon: `<span class="menu-swatch" style="--paint:${chipPaint(it.paint)}"></span>`, run: () => editColour(b, SEL_CHIPS + k) })), "Colours of the selection");
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
     } else if (d["paint"]) {
@@ -663,23 +654,18 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
-    } else if (d["initial"] !== undefined) {
-      const st = actions.initialShapeState();
-      if (!st) return;
-      const some = st.saved > 0;
-      openMoreMenu(b, [
-        ...(st.saved < st.count ? [{ label: some ? "Set initial shape (where there is none)" : "Set initial shape", aria: "Set initial shape: save the shape as it is now", run: () => actions.setInitialShape(true) }] : []),
-        { label: "Update initial shape", aria: "Update initial shape: replace the saved shape with the shape as it is now", disabled: !some, run: () => actions.setInitialShape(false) },
-        { label: "Reset to initial shape", aria: "Reset to initial shape: put the shape back as it was saved", disabled: !some, run: () => actions.resetToInitialShape() },
-      ], "Initial shape");
-    } else if (d["selectMore"] !== undefined) {
-      // What is seldom wanted on Select, kept out of the bar: bringing things back, and two ways the selection behaves.
-      openMoreMenu(b, [
-        { label: "Show all hidden", icon: ICONS.eye, run: () => actions.clearFlag("hidden") },
-        { label: "Unlock all", icon: ICONS.lockKeyholeOpen, run: () => actions.clearFlag("locked") },
-        { label: "Axis-aligned selection box", aria: "Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation", icon: ICONS.boxSelect, checked: editor.alignBox, run: () => { editor.alignBox = !editor.alignBox; editor.changed(); } },
-        { label: "Ignore the object that fills the view", icon: ICONS.pointerBan, checked: editor.ignoreFilling, run: () => { editor.ignoreFilling = !editor.ignoreFilling; editor.changed(); } },
-      ], "Selection tool options");
+    } else if (d["initialSet"] !== undefined) {
+      actions.setInitialShape(true);
+    } else if (d["initialUpdate"] !== undefined) {
+      actions.setInitialShape(false);
+    } else if (d["initialReset"] !== undefined) {
+      actions.resetToInitialShape();
+    } else if (d["boxAxis"] !== undefined) {
+      editor.alignBox = !editor.alignBox;
+      editor.changed();
+    } else if (d["ignoreFill"] !== undefined) {
+      editor.ignoreFilling = !editor.ignoreFilling;
+      editor.changed();
     } else if (d["snap"] !== undefined) {
       editor.snap = !editor.snap;
       editor.changed();
@@ -701,7 +687,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "redo") actions.redo();
     else if (d["action"] === "show-all") actions.clearFlag("hidden");
     else if (d["action"] === "unlock-all") actions.clearFlag("locked");
-    else if (d["action"] === "copy-md") actions.copyMarkdown();
   });
 
   const update = (): void => {
@@ -776,11 +761,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     adjustBtn.classList.toggle("is-applied", adjusted);
     adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
     root.querySelector<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
-    root.querySelector<HTMLElement>("[data-attach]")!.hidden = !(pick && still && editor.selection.size > 0);
-    root.querySelector<HTMLElement>("[data-attach]")!.setAttribute("aria-pressed", String(editor.attachMode));
-    root.querySelector<HTMLElement>("[data-detach]")!.hidden = !(pick && still && actions.canDetach());
-    root.querySelector<HTMLElement>("[data-put-on-sheet]")!.hidden = !(pick && still && editor.selection.size > 0);
-    root.querySelector<HTMLElement>("[data-fit-sheet]")!.hidden = !(pick && still && actions.canFitSheet());
     const sz = pick && still ? actions.sheetSize() : null;
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = !sz;
     if (sz) {
@@ -812,8 +792,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
             .map((it, i) => {
               return `<button type="button" class="swatch swatch-paint" data-sel-colour="${i}"${it.fills ? "" : " data-ring"} aria-haspopup="dialog" aria-expanded="false" aria-label="${paintName(it.paint)}, used by ${usage(it)}" title="${paintName(it.paint)}: used by ${usage(it)}; change it everywhere in the selection"><span data-paint-chip style="--paint:${chipPaint(it.paint)}"></span></button>`;
             })
-            .join("") +
-          (all.length > SEL_CHIPS ? `<button type="button" class="swatch swatch-more" data-sel-colour-more aria-haspopup="menu" aria-expanded="false" aria-label="${all.length - SEL_CHIPS} more colours" title="${all.length - SEL_CHIPS} more colours of the selection">+${all.length - SEL_CHIPS}</button>` : "");
+            .join("");
       }
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
@@ -822,11 +801,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
     const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;
-    const initialBtn = root.querySelector<HTMLElement>("[data-initial]")!;
     if (editor.preview.kind === "none") {
       const st = (editor.tool === "select" || editor.tool === "node") ? actions.initialShapeState() : null;
-      initialBtn.hidden = !st;
-      initialBtn.setAttribute("aria-pressed", String(!!st && st.saved > 0)); // (lit when a shape is saved)
+      root.querySelector<HTMLElement>("[data-initial-set]")!.hidden = !st || st.saved >= st.count;
+      root.querySelector<HTMLElement>("[data-initial-update]")!.hidden = !st || st.saved === 0;
+      root.querySelector<HTMLElement>("[data-initial-reset]")!.hidden = !st || st.saved === 0;
     }
     root.querySelector<HTMLElement>("[data-outline-options]")!.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
@@ -855,6 +834,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
     root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
+    root.querySelector<HTMLElement>("[data-box-axis]")!.setAttribute("aria-pressed", String(editor.alignBox));
+    root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
     const lockR = root.querySelector<HTMLElement>("[data-lock-radius]")!;
@@ -865,14 +846,33 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
     root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
-    root.querySelector<HTMLButtonElement>('[data-action="copy-md"]')!.hidden = ![...editor.selection].some((id) => doc.get(id)?.kind === "text");
     // On Select the pen-size slider sets the thickness of selected strokes: with only shapes (or pictures, text) picked it is not theirs to set
     // (a shape's width is in Outline options), so it is not offered.
     const penSize = root.querySelector<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
-    // The options bar shows what the current tool offers and is gone when there is nothing to show.
-    for (const g of root.querySelectorAll<HTMLElement>(".tb-options")) g.hidden = !g.dataset["for"]!.split(" ").includes(editor.tool) || ![...g.children].some((c) => !(c as HTMLElement).hidden);
-    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...root.querySelectorAll<HTMLElement>(".tb-options")].some((g) => !g.hidden);
+    // One row, one kind at a time (ADR 0128): when the picked items are of different kinds, chips at the start choose which kind's
+    // properties the row shows; what is for another kind is switched off, never moved into a menu.
+    const picking = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none";
+    const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
+    const chosen = kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
+    const chips = root.querySelector<HTMLElement>(".tb-subject")!;
+    const chipHtml = kinds.length > 1 ? kinds.map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection">${KIND_LABEL[k]}</button>`).join("") : "";
+    if (chips.dataset["html"] !== chipHtml) {
+      chips.dataset["html"] = chipHtml;
+      chips.innerHTML = chipHtml;
+    }
+    chips.hidden = !chipHtml;
+    if (picking) {
+      for (const el of root.querySelectorAll<HTMLElement>(".toolbar [data-kind]")) {
+        const ks = el.dataset["kind"]!.split(" ");
+        el.toggleAttribute("data-off", !(ks.includes("any") || (chosen ? ks.includes(chosen) : ks.includes("tool"))));
+      }
+    } else for (const el of root.querySelectorAll<HTMLElement>(".toolbar [data-off]")) el.removeAttribute("data-off");
+    // The bar shows what the current tool offers and is gone when there is nothing to show.
+    const row = root.querySelector<HTMLElement>(".tb-options-row")!;
+    syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
+    root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
+    row.toggleAttribute("data-scroll", row.scrollWidth > row.clientWidth + 1);
   };
   editor.subscribe(update);
   doc.subscribe(update);

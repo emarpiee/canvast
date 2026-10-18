@@ -568,8 +568,7 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
     return Math.abs(c[0]! - fill[0]!) + Math.abs(c[1]! - fill[1]!) + Math.abs(c[2]! - fill[2]!) < 12;
   };
   const menu = async (item: string) => {
-    await p.locator('[data-ctx="combine"]').click();
-    await p.getByRole(/^(Union|Intersect|Subtract|Exclude)/.test(item) ? "menuitemradio" : "menuitem", { name: new RegExp(`^${item}`) }).or(p.getByRole("menuitem", { name: new RegExp(`^${item}`) })).first().click();
+    await p.locator(`[data-ctx="op"][data-op="${item.toLowerCase()}"]`).click();
     await app.frame();
   };
   type G = Obj & { result?: string; groups?: string[]; boolOps?: Record<string, string> };
@@ -580,9 +579,9 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
   await drag(app, [500, 300], [700, 400]); // at the back
   await drag(app, [600, 350], [800, 450]); // in front, overlapping its bottom right
   await key(app, "v");
-  await expect(p.locator('[data-ctx="combine"]')).toBeHidden(); // nothing selected yet
+  await expect(p.locator('[data-ctx="op"]').first()).toBeHidden(); // nothing selected yet
   await p.keyboard.press("Control+a");
-  await expect(p.locator('[data-ctx="combine"]')).toBeVisible();
+  await expect(p.locator('[data-ctx="op"]').first()).toBeVisible();
 
   await menu("Union");
   let list = await all();
@@ -599,21 +598,18 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
   expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBe(3);
 
   // the operation changes later, with the current one ticked
-  await p.locator('[data-ctx="combine"]').click();
-  await expect(p.getByRole("menuitemradio", { name: /^Union/ })).toHaveAttribute("aria-checked", "true");
-  await p.getByRole("menuitemradio", { name: /^Intersect/ }).click();
+  await expect(p.locator('[data-ctx="op"][data-op="union"]')).toHaveAttribute("aria-pressed", "true");
+  await p.locator('[data-ctx="op"][data-op="intersect"]').click();
   await app.frame();
   expect(await filled(650, 375)).toBe(true);
   expect(await filled(550, 350)).toBe(false);
   expect(await filled(750, 430)).toBe(false);
   expect((await all())).toHaveLength(3); // the same objects, a different result
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitemradio", { name: /^Subtract/ }).click();
+  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
   await app.frame();
   expect(await filled(550, 350)).toBe(true);
   expect(await filled(650, 375)).toBe(false);
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitemradio", { name: /^Exclude/ }).click();
+  await p.locator('[data-ctx="op"][data-op="exclude"]').click();
   await app.frame();
   expect(await filled(550, 350)).toBe(true);
   expect(await filled(650, 375)).toBe(false);
@@ -641,8 +637,7 @@ test("Boolean groups: enter one to edit its shapes, the result follows as you dr
   await drag(app, [600, 350], [800, 450]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const gid = (await res()).result!;
 
@@ -709,8 +704,7 @@ test("Boolean groups: enter one to edit its shapes, the result follows as you dr
 
   // release: the two shapes come back as separate, plain shapes where they were
   await click(app, 750, 430);
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Release/ }).click();
+  await p.locator('[data-ctx="release"]').click();
   await app.frame();
   list = await all();
   expect(list).toHaveLength(2);
@@ -728,8 +722,7 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
   await drag(app, [600, 350], [800, 450]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Subtract/ }).click();
+  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
   await app.frame();
   const first = (await all()).find((o) => o.result !== undefined)!;
 
@@ -757,8 +750,7 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
   await key(app, "v");
   await p.keyboard.press("Control+a");
   await app.frame();
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const nested = await all();
   expect(nested).toHaveLength(5); // the first group (two shapes and its result), the new shape, and the outer group's result
@@ -862,8 +854,8 @@ test("a boolean group's gradient is moved with its handles on the canvas, picked
   await drag(app, [640, 340], [900, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await p.mouse.move(300, 650); // (a button under the pointer names itself in the hint line)
   await app.frame();
   const r = await result();
   expect((r.fill as unknown as Grad).x1).toBe(1);
@@ -997,8 +989,7 @@ test("corner radius on every kind of shape: one value or four on a rectangle, an
   await key(app, "v");
   await click(app, 720, 540);
   await click(app, 920, 640, ["Shift"]);
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const before = (await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!;
   expect(await nodes(before)).toBe(8);
@@ -1100,9 +1091,9 @@ test("corner radius dots: a radius pushed to its limit comes back; one dot per c
   // a rectangle: open the corners out with a double-click on the main dot, and set one corner alone
   await key(app, "u");
   await p.click('[data-shape-kind="rect"]');
-  await drag(app, [300, 560], [500, 680]);
+  await drag(app, [300, 440], [500, 560]); // (clear of the Actions bar along the bottom)
   await key(app, "v");
-  await click(app, 400, 620);
+  await click(app, 400, 500);
   const main0 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
   await p.mouse.dblclick(main0[0], main0[1]);
   await app.frame();
@@ -1148,8 +1139,7 @@ test("a boolean group turns with its shapes: its box stays turned instead of sna
   await drag(app, [600, 360], [800, 480]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const turn = async (deg: number) => {
     const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
@@ -1186,16 +1176,14 @@ test("nested boolean groups: a group inside a group; moving, turning, rounding a
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   // a third shape, subtracted from the group as a whole
   await key(app, "u");
   await drag(app, [560, 380], [660, 440]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Subtract/ }).click();
+  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
   await app.frame();
   expect(await all()).toHaveLength(5); // three shapes and two results
   const rs = await results();
@@ -1404,24 +1392,20 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await key(app, "v");
   await p.keyboard.press("Control+a");
   await app.frame();
-  // six chips and "+2": the seven fills and the dark outline are eight colours
-  await expect(p.locator("[data-sel-colour]")).toHaveCount(6);
-  const more = p.locator("[data-sel-colour-more]");
-  await expect(more).toHaveText("+2");
-  await more.click();
-  await expect(p.getByRole("menuitem")).toHaveCount(2);
-  await key(app, "Escape");
+  // a chip for every colour, none in a menu: the seven fills and the dark outline are eight colours
+  await expect(p.locator("[data-sel-colour]")).toHaveCount(8);
+  await expect(p.locator("[data-sel-colour-more]")).toHaveCount(0);
   // dividers between the groups of the selection bar, a button names itself in the hint
-  expect(await p.locator(".ctx-sep:not([hidden])").count()).toBeGreaterThan(0);
+  expect(await p.locator(".ctx-bar .tb-group:not([hidden])").count()).toBeGreaterThan(1);
   await p.hover('[data-ctx="duplicate"]');
   await expect(hint).toHaveText("Duplicate");
   await p.mouse.move(300, 650);
-  // the seldom-used options of the Select tool are in one menu
-  await p.locator("[data-select-more]").click();
-  await expect(p.getByRole("menuitem", { name: "Show all hidden" })).toBeVisible();
-  await expect(p.getByRole("menuitemradio", { name: /^Axis-aligned selection box/ })).toBeVisible();
+  // the options of the Select tool are buttons of the Properties bar, none in a menu
   await key(app, "Escape");
-  await expect(p.locator('.toolbar [data-action="show-all"]')).toHaveCount(0);
+  await click(app, 300, 650); // (nothing picked)
+  await expect(p.getByRole("button", { name: "Show all hidden" })).toBeVisible();
+  await expect(p.getByRole("button", { name: /^Axis-aligned selection box/ })).toBeVisible();
+  await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Appearance" }).click();
@@ -1438,8 +1422,7 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   const lastP = async () => (await last(app)) as P;
   const world = (o: P) => ({ w: o.params!.box![2]! * 2 ** o.unit, nodes: o.sub[0]!.n.length / 6 }); // (the box the shape fills: rounding does not change it)
   const menu = async (name: RegExp) => {
-    await p.click("[data-initial]");
-    await p.getByRole("menuitem", { name }).click();
+    await p.getByRole("button", { name }).click();
     await app.frame();
   };
   await key(app, "u");
@@ -1447,11 +1430,10 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   await drag(app, [500, 300], [740, 540]);
   await key(app, "v");
   await click(app, 620, 420);
-  // nothing saved yet: the button is there, only "Set initial shape" can be chosen
-  await p.click("[data-initial]");
-  await expect(p.getByRole("menuitem", { name: /^Reset to initial shape/ })).toBeDisabled();
-  await expect(p.getByRole("menuitem", { name: /^Update initial shape/ })).toBeDisabled();
-  await key(app, "Escape");
+  // nothing saved yet: only "Set initial shape" is there (the update and reset buttons come once a shape is saved)
+  await expect(p.locator("[data-initial-set]")).toBeVisible();
+  await expect(p.locator("[data-initial-reset]")).toBeHidden();
+  await expect(p.locator("[data-initial-update]")).toBeHidden();
   await menu(/^Set initial shape/);
   const first = world(await lastP());
   expect((await lastP()).initial).toBeDefined();
@@ -1522,16 +1504,14 @@ test("a boolean group takes more shapes and gives them back: Add to the group, T
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   await key(app, "u");
   await drag(app, [300, 300], [440, 420]); // a third shape, apart from the group
   await key(app, "v");
   await click(app, 560, 330); // the group
   await click(app, 370, 360, ["Shift"]); // and the shape beside it
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Add the shapes to the boolean group/ }).click();
+  await p.locator('[data-ctx="addgroup"]').click();
   await app.frame();
   let list = await all();
   const third = list.find((o) => o.result === undefined && size(o).w === 140)!;
@@ -1542,8 +1522,7 @@ test("a boolean group takes more shapes and gives them back: Add to the group, T
   await p.mouse.dblclick(560, 330);
   await app.frame();
   await click(app, 370, 360);
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Take the shapes out of the boolean group/ }).click();
+  await p.locator('[data-ctx="takeout"]').click();
   await app.frame();
   list = await all();
   expect(list.find((o) => o.id === third.id)!.groups).toBeUndefined();
@@ -1599,8 +1578,7 @@ test("a boolean group's corner radius updates live while it is dragged, like a p
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const corner = await px(507, 307); // (inside the sharp corner)
   const lb = (await p.locator('[data-scrub="radius"]').boundingBox())!;
@@ -1624,22 +1602,20 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const members = async () => ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
   const centreX = (o: G) => (o.sub[0]!.n[0]! + o.sub[0]!.n[6]!) / 2 * 2 ** o.unit + parseFloat(o.ax.replace("p", "e")) * 0; // (local, in the object's own units)
   void centreX;
   const before = (await members()).map((o) => o.ax);
   expect(new Set(before).size).toBe(2);
-  // the arrange menu does not cover the selection
-  await p.locator('[data-ctx="layout"]').click();
-  const menu = (await p.locator(".ctx-layout-menu").boundingBox())!;
+  // the Actions bar is at a fixed place and does not cover the selection
+  const bar = (await p.getByTestId("context-bar").boundingBox())!;
   const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
   const xs = f.corners.map((c) => c[0]), ys = f.corners.map((c) => c[1]);
-  const overlaps = menu.x < Math.max(...xs) && menu.x + menu.width > Math.min(...xs) && menu.y < Math.max(...ys) && menu.y + menu.height > Math.min(...ys);
-  expect(overlaps, "the menu is off the selected shapes").toBe(false);
-  await p.getByRole("menuitem", { name: "Centre" }).click();
+  const overlaps = bar.x < Math.max(...xs) && bar.x + bar.width > Math.min(...xs) && bar.y < Math.max(...ys) && bar.y + bar.height > Math.min(...ys);
+  expect(overlaps, "the bar is off the selected shapes").toBe(false);
+  await p.locator('[data-ctx="layout"][data-layout="align:centre"]').click();
   await app.frame();
   const after = await members();
   // each member now has its middle at the same x on the screen
@@ -1674,8 +1650,7 @@ test("Shift snaps a turned boolean group to steps of 15 degrees of its whole tur
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const turn = async (to: number, shift: boolean) => {
     // grab the rotate handle and move the pointer round the middle until the box shows about `to` degrees
@@ -1716,8 +1691,7 @@ test("a boolean group goes through the ordinary edits as one shape: stretch (tur
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const widthOf = async () => { const f = await frame(); return Math.hypot(f.corners[1]![0] - f.corners[0]![0], f.corners[1]![1] - f.corners[0]![1]); };
   const w0 = await widthOf();
@@ -1768,8 +1742,7 @@ test("one shape inside a group aligns with the group, as in any design tool", as
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   const shapes = ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
   const [a, b] = shapes;
@@ -1778,8 +1751,7 @@ test("one shape inside a group aligns with the group, as in any design tool", as
   await click(app, 800, 440); // the back/front shape's own area: one shape picked
   const sel = await p.evaluate(() => window.__canvastDebug.selection());
   expect(sel).toHaveLength(1);
-  await p.locator('[data-ctx="layout"]').click(); // the Arrange button is there for a single shape in a group
-  await p.getByRole("menuitem", { name: "Left" }).click();
+  await p.locator('[data-ctx="layout"][data-layout="align:left"]').click(); // the align buttons are there for a single shape in a group
   await app.frame();
   const left = async (id: string) => (await screenBox(app, id)).minX;
   const moved = sel[0]!;
@@ -1798,8 +1770,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
     return [(bb.minX + bb.maxX) / 2 - (ba.minX + ba.maxX) / 2, (bb.minY + bb.maxY) / 2 - (ba.minY + ba.maxY) / 2];
   };
   const menu = async (name: RegExp) => {
-    await p.click("[data-initial]");
-    await p.getByRole("menuitem", { name }).click();
+    await p.getByRole("button", { name }).click();
     await app.frame();
   };
   await key(app, "u");
@@ -1807,8 +1778,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   await menu(/^Set initial shape/); // the group picked whole
   const saved = await gap();
@@ -1825,8 +1795,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await key(app, "Escape");
   await key(app, "Escape");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitemradio", { name: /^Subtract/ }).click();
+  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
   await app.frame();
   await p.locator("[data-sel-radius]").fill("12");
   await p.locator("[data-sel-radius]").press("Enter");
@@ -1879,8 +1848,8 @@ test("the line under the tool options says what to do: per tool, with a shape pi
   expect(await tool(app)).toBe("select");
   // a boolean group, and inside it
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await p.mouse.move(300, 650); // (a button under the pointer names itself in the hint line)
   await app.frame();
   await expect(hint).toContainText("Boolean group");
   await expect(p.locator('[data-ctx="flatten"]')).toBeVisible(); // Flatten is on the bar, not only in the menu
@@ -1910,8 +1879,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   expect(await objs(app)).toHaveLength(2);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Subtract/ }).click();
+  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
   await app.frame();
   let list = await all();
   expect(list).toHaveLength(3);
@@ -1931,8 +1899,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   await p.keyboard.press("Control+z");
   expect(await all()).toHaveLength(2);
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="combine"]').click();
-  await p.getByRole("menuitem", { name: /^Union/ }).click();
+  await p.locator('[data-ctx="op"][data-op="union"]').click();
   await app.frame();
   list = await all();
   expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(1); // a union with a shape inside it is the big one alone

@@ -304,8 +304,15 @@ html, body {
 }
 
 /* Tools and actions on the first row; the options of the current tool on a second row, so a long set of options never grows into the top-left controls. */
-.tb-options-row { flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--hud-border); }
+.tb-options-row { flex: 1 1 100%; display: flex; flex-wrap: nowrap; justify-content: safe center; gap: var(--sp-3); overflow-x: auto; scrollbar-width: none; }
 .tb-options-row[hidden] { display: none; }
+.tb-options-row::-webkit-scrollbar { display: none; }
+.tb-options-row > .tb-group { flex: none; }
+/* When the row is wider than the room it has, it scrolls sideways and its ends fade: the one place the bar gives way, never into a menu. */
+.tb-options-row[data-scroll], .ctx-bar[data-scroll] { mask-image: linear-gradient(to right, transparent, var(--hud-bg) var(--sp-10), var(--hud-bg) calc(100% - var(--sp-10)), transparent); }
+/* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
+[data-off] { display: none !important; }
+.toolbar .tb-chip { width: auto; padding: 0 var(--sp-5); font: var(--font-meta); }
 .tb-group { display: flex; gap: var(--sp-1); align-items: center; }
 .tb-group[hidden] { display: none; }
 /* The one separator of every bar of groups (the options bar, the dock, any new one): a line before a group that follows a group that is shown,
@@ -338,7 +345,9 @@ html, body {
 .toolbar .swatch-current span { width: var(--icon-md); height: var(--icon-md); box-shadow: 0 0 0 2px var(--hud-bg), 0 0 0 3px var(--hud-fg); }
 .toolbar .size { width: 84px; accent-color: var(--hud-accent); }
 .toolbar .size-out { font: var(--font-value); min-width: 38px; opacity: 0.8; }
-.toolbar .swatch.is-on, .toolbar .width.is-on, .toolbar .pen-kind[aria-checked="true"], .toolbar .lock[aria-pressed="true"], .toolbar .stab[aria-pressed="true"], .toolbar .follow[aria-pressed="true"], .toolbar .ignore-fill[aria-pressed="true"], .toolbar .snap[aria-pressed="true"], .toolbar .layers-toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+.toolbar .swatch.is-on, .toolbar .width.is-on { box-shadow: inset 0 0 0 2px var(--hud-accent); }
+/* One meaning for "on" in every bar: a filled button. A ring means "this colour or size" (a choice among swatches), never a switch. */
+.toolbar button[aria-pressed="true"], .dock button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); box-shadow: none; }
 .toolbar .width span { width: 16px; border-radius: var(--r-xs); background: currentColor; }
 
 .toast {
@@ -673,23 +682,6 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 
 /* Arrange / align / distribute menu (ui/toolbar.ts). */
 .layout-wrap { position: relative; display: inline-flex; }
-.layout-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  min-width: 190px;
-  padding: var(--sp-3);
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--hud-lift);
-  backdrop-filter: blur(6px);
-}
-.layout-menu[hidden] { display: none; }
-.layout-head { padding: var(--sp-3) var(--sp-4) var(--sp-1); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }
-.layout-menu button { display: block; width: 100%; text-align: left; padding: var(--sp-3) var(--sp-4); border: 0; background: none; color: var(--hud-fg); font: inherit; border-radius: var(--r-sm); cursor: pointer; }
-.layout-menu button:hover { background: var(--hud-hover); }
 
 /* On-canvas video player (ui/media-player.ts) */
 .media-video { position: absolute; pointer-events: none; z-index: var(--z-item); background: var(--black); object-fit: fill; }
@@ -817,16 +809,19 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
   :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }
 }
 
-/* Selection action bar (ui/context-bar.ts). */
-.ctx-bar { position: absolute; z-index: var(--z-item-bar); display: flex; gap: var(--sp-1); padding: var(--sp-2); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); backdrop-filter: blur(6px); box-shadow: var(--hud-lift); }
+/* The Actions bar (ui/context-bar.ts, ADR 0128): one row at a fixed place, bottom centre above the readout; never attached to an item. */
+.ctx-bar { position: absolute; left: 50%; bottom: calc(2 * var(--sp-14) + var(--sp-6)); z-index: var(--z-edge); display: flex; align-items: center; max-width: calc(100% - 2 * var(--edge)); transform: translateX(-50%); overflow-x: auto; scrollbar-width: none; backdrop-filter: blur(6px); }
+.ctx-bar::-webkit-scrollbar { display: none; }
 .ctx-bar[hidden] { display: none; }
-.ctx-bar button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.ctx-bar .tb-group { flex: none; }
+.ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
-.ctx-sep { align-self: stretch; width: 1px; margin: var(--sp-1) 0; background: var(--hud-border); }
-.ctx-sep[hidden] { display: none; }
 .ctx-bar button[data-ctx="delete"]:hover { color: var(--canvas-danger); }
-.ctx-bar button:hover { background: var(--hud-hover); }
+.ctx-bar button:hover:not(:disabled) { background: var(--hud-hover); }
+.ctx-bar button:disabled { opacity: 0.35; cursor: default; }
+.ctx-bar button[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .ctx-bar button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.ctx-bar .ctx-gap { width: auto; min-width: var(--ctl); padding: 0 var(--sp-3); font: var(--font-meta); }
 
 /* ---- Interface skin (ADR 0052) -------------------------------------------------------------------------------------
    Surfaces are quiet and lifted by one shadow; the accent marks only what is active; numbers are tabular; labels are sentence case. */
@@ -879,7 +874,6 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .dock button:hover:not(:disabled) { background: var(--hud-hover); }
 .dock button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .dock button:disabled { opacity: 0.35; cursor: default; }
-.dock button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
 .toolbar[hidden] { display: none; }
 .tb-options-row { padding-top: 0; border-top: 0; }
 .set-control { flex-wrap: wrap; }
@@ -903,7 +897,10 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--near)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--edge) + var(--near)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+/* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
+#toolbar > .toolbar { min-width: 0; }
+.tb-options-row { min-width: 0; }
 .toolbar { min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 .tb-options-row { gap: var(--gap); align-items: center; }
 .hud-readout { left: var(--edge); bottom: var(--edge); }
@@ -1196,18 +1193,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-actual img { cursor: zoom-out; }
 
 /* The Arrange menu: its items are plain rows, not toolbar buttons (the toolbar's fixed control height made a long label overlap the next one). */
-.layout-menu { min-width: max-content; width: max-content; max-width: min(320px, calc(100vw - 2 * var(--edge))); padding: var(--sp-3); border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
-.toolbar .layout-menu button, .tb-options-row .layout-menu button { display: flex; align-items: center; width: 100%; height: auto; min-height: var(--ctl); min-width: 0; padding: 0 var(--sp-6); white-space: nowrap; border-radius: var(--r-md); }
-.layout-head { padding: var(--sp-4) var(--sp-6) var(--sp-1); }
-.layout-head:first-child { padding-top: var(--sp-2); }
 
 /* The Arrange menu, laid out: icon and label on the left of each row, sections divided by a rule. */
-.toolbar .layout-menu button, .tb-options-row .layout-menu button { justify-content: flex-start; gap: var(--sp-5); text-align: left; font-size: var(--text-md); }
-.layout-menu button svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
-.layout-menu button:hover svg { color: var(--hud-fg); }
-.layout-head + button { margin-top: var(--sp-1); }
-.layout-menu button + .layout-head { margin-top: var(--sp-3); padding-top: var(--sp-5); border-top: 1px solid var(--hud-border); }
-.layout-menu { width: 270px; }
 
 /* The player: the scrubber takes the whole top row and the bar is wide enough to use it. */
 .media-bar { width: min(560px, calc(100% - 24px)); padding: var(--sp-4) var(--sp-6); gap: var(--sp-4); }
@@ -1524,8 +1511,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .viewer.is-actual .viewer-checker { display: none; }
 
 /* The Arrange menu now opens from the selection action bar. */
-.ctx-layout-menu { position: absolute; z-index: var(--z-item-pop); width: 270px; max-height: calc(100% - 16px); overflow: auto; }
-.ctx-layout-menu button { display: flex; align-items: center; justify-content: flex-start; gap: var(--sp-5); width: 100%; min-height: var(--ctl); padding: 0 var(--sp-6); text-align: left; font-size: var(--text-md); white-space: nowrap; border-radius: var(--r-md); }
 
 /* ---- Search the canvas (ADR 0060): one type size (13px) throughout ---- */
 .cs { position: absolute; z-index: 20; top: calc(var(--bar-bottom, 56px) + 12px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100% - 24px)); display: grid; font: var(--text-md)/1.4 var(--font-ui); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); overflow: hidden; }
@@ -1857,9 +1842,6 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 .assets-search-pop kbd { font: inherit; font-size: var(--text-sm); opacity: 0.75; }
 
 /* Arrange menu: the space between items, a row of choices (ADR 0074). */
-.layout-gaps { display: flex; gap: var(--sp-1); padding: var(--sp-1) var(--sp-4) var(--sp-3); }
-.toolbar .layout-menu .layout-gaps button, .tb-options-row .layout-menu .layout-gaps button, .layout-menu .layout-gaps button { display: inline-flex; justify-content: center; width: auto; flex: 1 1 auto; min-height: 30px; padding: 0 var(--sp-3); font-size: var(--text-sm); border-radius: var(--r-pill); }
-.layout-menu .layout-gaps button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 
 /* Zen mode (ADR 0075): the floating bars and panels fade out and show again while the pointer is over them or the focus is inside. */
 :root[data-zen="on"] #nav, :root[data-zen="on"] #toolbar > .rail, :root[data-zen="on"] #toolbar > .dock, :root[data-zen="on"] #toolbar > .toolbar,
@@ -1869,9 +1851,7 @@ body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right
 :root[data-zen="on"] .hud-readout:hover, :root[data-zen="on"] .hud-readout:focus-within, :root[data-zen="on"] .hud-controls:hover, :root[data-zen="on"] .hud-controls:focus-within,
 :root[data-zen="on"] #side-panels:hover, :root[data-zen="on"] #side-panels:focus-within, :root[data-zen="on"] #side-panels-left:hover, :root[data-zen="on"] #side-panels-left:focus-within, :root[data-zen="on"] .ctx-bar:hover, :root[data-zen="on"] .ctx-bar:focus-within,
 /* A saving problem is never hidden. */
-:root[data-zen="on"] .hud-readout:has(.hud-save[data-state="error"], .hud-save[data-state="unavailable"], .hud-save[data-state="conflict"], .hud-save[data-state="readonly"]),
-/* The menu that opened from a bar keeps its bar shown. */
-:root[data-zen="on"] .ctx-bar:has([aria-expanded="true"]) { opacity: 1; }
+:root[data-zen="on"] .hud-readout:has(.hud-save[data-state="error"], .hud-save[data-state="unavailable"], .hud-save[data-state="conflict"], .hud-save[data-state="readonly"]) { opacity: 1; }
 
 /* Floating Tags panel (ui/tags-panel.ts, ADR 0076) */
 .tags-body { display: flex; flex-direction: column; gap: var(--sp-6); flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--sp-4) var(--sp-4) var(--sp-5); }
@@ -2356,4 +2336,4 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
   select option:hover, select option:focus-visible { background: var(--hud-hover); }
   select option:checked { color: var(--hud-accent-fg); background: var(--hud-accent); }
 }
-.toolbar input[data-text-size] { width: calc(var(--sp-14) + var(--sp-14)); }
+.toolbar input[data-text-size] { width: calc(var(--sp-14) + var(--sp-6)); }
