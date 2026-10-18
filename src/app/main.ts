@@ -845,7 +845,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       pattern: settings.get("shot.pattern"),
       transparent: settings.get("shot.transparent"),
       ui: settings.get("shot.interface"),
-      area: settings.get("shot.area"),
       folder: settings.get("shot.folder").trim(),
       name: settings.get("shot.name"),
       style: settings.get("shot.nameStyle"),
@@ -862,7 +861,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const vp = view.viewport;
       const visible = visibleObjects(doc, index, null, view.frameCamera, vp);
       const picked = editor.selection.size ? visible.filter((po) => editor.selection.has(po.obj.id)) : [];
-      const inShot = cfg.area === "selection" && picked.length ? picked : visible;
+      const inShot = picked.length ? picked : visible; // the selection, or the whole view when nothing is picked
       if (cfg.ui) {
         try {
           pic = await withInterface(pic, host, document.getElementById("nav")!, vp.width, vp.height);
@@ -871,7 +870,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
           editor.changed();
         }
       }
-      if (cfg.area === "selection" && picked.length) {
+      if (picked.length) {
         const x0 = Math.max(0, Math.min(...picked.map((po) => po.box.minX)) - 12);
         const y0 = Math.max(0, Math.min(...picked.map((po) => po.box.minY)) - 12);
         const x1 = Math.min(vp.width, Math.max(...picked.map((po) => po.box.maxX)) + 12);
@@ -916,6 +915,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         }
       }
       editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
+      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
       editor.changed();
     } catch (e) {
       editor.message = `Could not save the screenshot: ${(e as Error).message}`;

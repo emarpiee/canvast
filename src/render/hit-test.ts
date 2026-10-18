@@ -26,6 +26,8 @@ export function insideBody(po: ProjectedObject, x: number, y: number): boolean {
 
 export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_TOLERANCE_PX): boolean {
   if (po.clip && !po.clip.every((c) => insideBody(c, x, y))) return false; // cut away by a sheet: not there to be picked
+  // Cut away by a mask (ADR 0144): picked only where a mask shape is (or is not, when inverted). Shape only: a mask's own brightness or softness is not read.
+  if (po.obj.mask && po.maskPos?.length && po.maskPos.some((m) => hitsObject(m, x, y, 0)) === (po.obj.mask.invert === true)) return false;
   const b = po.box;
   const t = po.rotated;
   if (t) {

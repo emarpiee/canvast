@@ -78,6 +78,15 @@ describe("SVG export", () => {
     expect(xs[1]! / xs[0]!).toBeGreaterThan(1); // b starts to the right of a
     expect(exportSvg([], doc.space)).toBeNull();
   });
+  it("writes a mask as an SVG mask on its object, a black sheet under a brightness mask, a filter when inverted", () => {
+    const m = rect(10, 10, 30, 30, { isMask: true, fill: "#ffffff", stroke: null });
+    const a = rect(0, 0, 100, 50, { mask: { by: "g1", mode: "luminance" } });
+    const svg = exportSvg([a], doc.space, () => [m])!;
+    expect(svg).toMatch(/<mask id="m0"[^>]*>.*fill="#000"\/>.*<path/s);
+    expect(svg).toContain('<g mask="url(#m0)">');
+    expect(exportSvg([{ ...a, mask: { by: "g1", mode: "alpha", invert: true } }], doc.space, () => [m])).toMatch(/<filter id="i0">.*<g filter="url\(#i0\)">/s);
+    expect(exportSvg([a], doc.space)).not.toContain("<mask");
+  });
   it("writes gradients as defs and a cubic where a segment is curved", () => {
     const g = rect(0, 0, 10, 10, { fill: { type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: [{ o: 0, c: "#000000" }, { o: 1, c: "#ffffff" }] } });
     expect(exportSvg([g], doc.space)).toMatch(/<linearGradient id="g0" gradientUnits="userSpaceOnUse".*<stop offset="1" stop-color="#ffffff"\/>/);

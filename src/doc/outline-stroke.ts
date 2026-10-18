@@ -5,6 +5,8 @@
 import type { PathObject } from "./model";
 import type { Arrow, SubPath } from "./path";
 import { ARROW_LEN, NODE, corner, miterLimitOf, nodeCount } from "./path";
+import { booleanOp } from "./boolean";
+import { alignOf } from "./model";
 import { WIDTH_PROFILES, strokeToSubs } from "./stroker";
 import type { WidthProfile } from "./stroker";
 
@@ -73,6 +75,25 @@ export function outlineOf(o: PathObject, profile?: WidthProfile): SubPath[] {
       const [ux, uy] = outward(s, false);
       out.push(...arrowSubs(o.arrowEnd, s.n[(c - 1) * NODE]!, s.n[(c - 1) * NODE + 1]!, ux, uy, o.width));
     }
+  }
+  return out;
+}
+
+/**
+ * The outline of a closed path that sits inside or outside its edge (`align`), as a shape: the centred outline of twice the width, kept
+ * where the shape is (inside) or removed from it (outside). A centred path gives `outlineOf`. null when the outlines graze each other in a
+ * way the Boolean code cannot settle (the caller then makes the centred one).
+ */
+export function alignedOutlineOf(o: PathObject, profile?: WidthProfile): SubPath[] | null {
+  const align = alignOf(o);
+  if (!align) return outlineOf(o, profile);
+  // Piece by piece: each piece of the outline is a simple polygon, which the Boolean code settles where the whole (overlapping, non-zero) cannot.
+  const shape = { subs: o.sub, evenodd: o.evenodd === true };
+  const out: SubPath[] = [];
+  for (const piece of outlineOf({ ...o, width: o.width * 2 }, profile)) {
+    const r = booleanOp(align === "inside" ? "intersect" : "subtract", [{ subs: [piece], evenodd: false }, shape]);
+    if (!r) return null;
+    out.push(...r);
   }
   return out;
 }

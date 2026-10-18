@@ -2395,7 +2395,10 @@ test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts
   await app.frame();
   expect(await px(410, 310)).toEqual(bg);
   expect(await px(530, 375)).toEqual(blue);
+  await click(app, 410, 310);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "where the mask cuts it away it cannot be picked").toHaveLength(0);
   await click(app, 550, 400);
+  expect(await p.evaluate(() => window.__canvastDebug.selection()).then((a) => a.length), "where it shows it can").toBeGreaterThan(0);
   await p.click('[data-ctx="invertmask"]', { timeout: 5000 });
   await click(app, 120, 650);
   await app.frame();

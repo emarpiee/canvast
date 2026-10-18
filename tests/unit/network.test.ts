@@ -38,6 +38,14 @@ describe("vector networks (ADR 0146)", () => {
     expect(sq.length).toBe(4);
     expect(netFaces(sq).length).toBe(1);
   });
+  it("edges that cross are cut at the crossing: a square with both diagonals (one a curve) makes four regions with one centre vertex", () => {
+    const curve: SubPath = { n: [100, 0, 100, 0, 70, 30, 0, 100, 30, 70, 0, 100], closed: false }; // from (100,0) to (0,100), bowed a little
+    const net = buildNetwork([rectSubs(0, 0, 100, 100), [line(0, 0, 100, 100)], [curve]], 0.01);
+    expect(net.length, "4 sides + 2 halves of each diagonal").toBe(8);
+    expect(verticesOf(net).filter((v) => v.degree === 4).length).toBe(1);
+    expect(netFaces(net).length).toBe(4);
+    expect(buildNetwork([[line(0, 0, 100, 0)], [line(0, 50, 100, 60)]], 0.01).length, "lines that do not cross stay whole").toBe(2);
+  });
   it("moving a vertex moves every edge end there and their handles; deleting it takes its edges", () => {
     const e = square(0, 0, 100);
     const moved = moveVertex(e, 100, 100, 10, -20);

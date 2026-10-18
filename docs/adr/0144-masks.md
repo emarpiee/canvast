@@ -20,4 +20,6 @@ The top picked closed shape becomes a **sheet of its own shape** (ADR 0108): `co
 
 Command "Brush mask: show everything, paint black to hide" (or the other way round) puts a white (or black) rectangle over the picked things as a mask by brightness, and the Pen then paints into the mask while it is open (`editor.maskEdit`): its strokes are `isMask`, in the mask group, black or white by the ink chosen (Actions bar: white/black/Done). Nothing is rasterised: the mask is vector strokes, so it stays sharp at any zoom.
 
-Not done: picking respects the mask (an object is picked by its own shape), SVG export ignores masks, a text or picture used as a mask works (any object does) but the Pen is the only way to paint one.
+Added later (v0.19.1): picking respects a mask by its shape (an object is picked only where a mask shape is, or is not when inverted; the mask's own softness or brightness is not read) and SVG export writes masks as `<mask>` (inverted ones through a filter).
+
+Not done: a text or picture used as a mask works (any object does) but the Pen is the only way to paint one.

@@ -6,7 +6,7 @@ place images and edit at whatever scale you reach. The app ships as **one
 self-contained HTML file** that works from `file://` with no server, account
 or network connection.
 
-> **Status: v0.19.0, vector networks, masks and the rest of the vector tools (after the backlog run, v0.18.1).** Done:
+> **Status: v0.19.1, vector networks, masks and the rest of the vector tools (after the backlog run, v0.18.1).** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
 > Canvases model with safe incremental saving, a shared Assets library with
 > tags, folders and file types, `.canvast` archives and plain ZIP export,

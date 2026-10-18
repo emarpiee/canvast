@@ -55,20 +55,25 @@ interface Placed {
 }
 
 /** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
-export function exportSvg(paths: readonly PathObject[], space: FrameSpace): string | null {
+export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => []): string | null {
   const objs = paths.filter((o) => !o.hidden && o.sub.length > 0);
   if (!objs.length) return null;
   const base = objs[0]!;
   const f0 = base.frame ?? space.world;
-  const placed: Placed[] = [];
-  for (const src of objs) {
+  const place = (src: PathObject): Placed | null => {
     const e = expressObjectIn(src, f0) as PathObject;
     const k = 2 ** (e.unit - base.unit);
     const dx = D.toNumber(D.shift(D.sub(e.anchor.x, base.anchor.x), -base.unit));
     const dy = D.toNumber(D.shift(D.sub(e.anchor.y, base.anchor.y), -base.unit));
     if (!(k > 0 && Number.isFinite(k + dx + dy))) return null;
     const at = (x: number, y: number): [number, number] => [x * k + dx, y * k + dy];
-    placed.push({ o: e, subs: mapSubs(pathSubs(e), at), k, at });
+    return { o: e, subs: mapSubs(pathSubs(e), at), k, at };
+  };
+  const placed: Placed[] = [];
+  for (const src of objs) {
+    const p = place(src);
+    if (!p) return null;
+    placed.push(p);
   }
   // The box of everything, with half the widest outline around it, scaled to SIZE.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -157,7 +162,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     }
     return out;
   };
-  const body = placed.map((p) => {
+  const render = (p: Placed): string => {
     const o = p.o;
     const subs = mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
     const width = o.width * p.k * sc;
@@ -180,6 +185,34 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
     if (o.name) a += ` id="${esc(o.name.replace(/\s+/g, "-"))}"`;
     const fillPart = regions && o.stroke !== null && o.fill !== null ? `  <path d="${pathData(regions)}"${paintAttr(p, "fill", o.fill)}${o.evenodd ? ' fill-rule="evenodd"' : ""}${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}/>\n` : "";
     return fillPart + `  <path${a}/>` + arrowsSvg(p, subs, width);
+  };
+  // Masks (ADR 0144): the mask group's paths become an SVG <mask>; an inverted one is turned by a filter. A mask that cannot be placed is left out.
+  const maskIds = new Map<string, string | null>();
+  const maskFor = (by: string, mode: "alpha" | "luminance", invert: boolean): string | null => {
+    const key = `${by}/${mode}/${invert}`;
+    if (maskIds.has(key)) return maskIds.get(key)!;
+    const members = maskOf(by).filter((m) => !m.hidden && m.sub.length > 0).map(place);
+    const id = `m${maskIds.size}`;
+    if (!members.length || members.includes(null)) { maskIds.set(key, null); return null; }
+    const inner = members.map((m) => render(m!)).join("\n");
+    // luminance counts transparent as black, so a black sheet goes under the shapes; the invert filters flip what they let through
+    const sheet = mode === "luminance" ? `<rect width="${num(w)}" height="${num(h)}" fill="#000"/>` : "";
+    let content = sheet + inner;
+    if (invert) {
+      const fid = `i${maskIds.size}`;
+      defs.push(mode === "alpha"
+        ? `<filter id="${fid}"><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -1 1"/></filter>`
+        : `<filter id="${fid}"><feComponentTransfer><feFuncR type="linear" slope="-1" intercept="1"/><feFuncG type="linear" slope="-1" intercept="1"/><feFuncB type="linear" slope="-1" intercept="1"/></feComponentTransfer></filter>`);
+      content = `<g filter="url(#${fid})">${content}</g>`;
+    }
+    defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${num(w)}" height="${num(h)}">${content}</mask>`);
+    maskIds.set(key, id);
+    return id;
+  };
+  const body = placed.map((p) => {
+    const m = p.o.mask ? maskFor(p.o.mask.by, p.o.mask.mode, p.o.mask.invert === true) : null;
+    const out = render(p);
+    return m ? `  <g mask="url(#${m})">\n${out}\n  </g>` : out;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${num(w)}" height="${num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

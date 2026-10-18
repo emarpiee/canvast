@@ -20,10 +20,13 @@ test("the Screenshot button saves the view to the library: webp, in the Screensh
   expect(shot!.type).toBe("image/webp");
   expect(shot!.folder).toBe("Screenshots");
   expect(shot!.tags).toEqual(["screenshot"]);
+  // the notice has a View button that opens the Assets view
+  await p.getByTestId("toast").getByRole("button", { name: "View" }).click();
+  expect(await p.evaluate(() => window.__canvastDebug.appView())).toBe("assets");
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Settings > Screenshot: format, name, folder, tags and area are used; the pattern and the interface can be left out or put in (ADR 0080)", async ({ app }) => {
+test("Settings > Screenshot: format, name, folder and tags are used; the pattern and the interface can be left out or put in (ADR 0080)", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Screenshot" }).click();

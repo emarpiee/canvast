@@ -196,25 +196,28 @@ const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discre
 
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
-    <div class="rail" data-cmd-group="Tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
+    <div class="rail" data-cmd-group="Tools">
+      <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
       ).join("")}
-    </div>
-    <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="History and panels">
-      <div class="tb-group">
+      </div>
+      <span class="rail-sep" role="separator"></span>
+      <div class="rail-tools" role="group" aria-label="History, search and import">
         <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
         <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
-      </div>
-      <div class="tb-group">
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
+        <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
+      </div>
+      <input type="file" multiple hidden data-testid="import-input">
+    </div>
+    <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="Panels">
+      <div class="tb-group">
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
-        <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
       </div>
-      <input type="file" multiple hidden data-testid="import-input">
     </div>
     <div class="toolbar" data-cmd-group="Properties" role="toolbar" aria-label="Tool options" hidden>
       <div class="tb-options-row">

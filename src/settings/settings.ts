@@ -125,7 +125,6 @@ export const SETTINGS = {
   "shot.pattern": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.interface": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.transparent": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.area": { scope: "device", default: "view", validate: oneOf("view", "selection"), effect: "immediate" } as Def<"view" | "selection">,
   "shot.folder": { scope: "device", default: "Screenshots", validate: text(60), effect: "immediate" } as Def<string>,
   "shot.name": { scope: "device", default: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "shot.nameStyle": { scope: "device", default: "snake", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,

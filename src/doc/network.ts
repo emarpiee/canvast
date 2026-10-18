@@ -156,6 +156,75 @@ function nearest(c: SubPath, x: number, y: number): { d: number; k: number; t: n
   return best;
 }
 
+/** The edge `c` cut at segment `k`, position `t`, into two edges that meet at the vertex `v` (the new node is moved onto it, handles with it). */
+function splitAt(c: SubPath, k: number, t: number, v: readonly [number, number]): [SubPath, SubPath] {
+  const cut = splitSegment([c], 0, k, t)[0]!;
+  const m = (k + 1) * NODE;
+  const n = [...cut.n];
+  const dx = v[0] - n[m]!, dy = v[1] - n[m + 1]!;
+  for (let q = 0; q < NODE; q += 2) {
+    n[m + q] = n[m + q]! + dx;
+    n[m + q + 1] = n[m + q + 1]! + dy;
+  }
+  n[m] = v[0];
+  n[m + 1] = v[1];
+  return [{ n: n.slice(0, m + NODE), closed: false }, { n: n.slice(m), closed: false }];
+}
+
+type Cub = ReturnType<typeof cubicOf>;
+const cubicAt = (q: Cub, t: number): [number, number] => {
+  const u = 1 - t;
+  return [u * u * u * q[0] + 3 * u * u * t * q[2] + 3 * u * t * t * q[4] + t * t * t * q[6], u * u * u * q[1] + 3 * u * u * t * q[3] + 3 * u * t * t * q[5] + t * t * t * q[7]];
+};
+const cubicSlope = (q: Cub, t: number): [number, number] => {
+  const u = 1 - t;
+  return [3 * u * u * (q[2] - q[0]) + 6 * u * t * (q[4] - q[2]) + 3 * t * t * (q[6] - q[4]), 3 * u * u * (q[3] - q[1]) + 6 * u * t * (q[5] - q[3]) + 3 * t * t * (q[7] - q[5])];
+};
+
+const FLAT = 24;
+const EDGE_T = 1e-6;
+/** The first place two different edges cross in their insides (not at an end of either, which are vertices already): both positions on the curves. */
+function firstCrossing(chains: readonly SubPath[]): { i: number; j: number; a: { k: number; t: number }; b: { k: number; t: number }; x: number; y: number } | null {
+  const boxOf = (q: Cub): [number, number, number, number] => [Math.min(q[0], q[2], q[4], q[6]), Math.min(q[1], q[3], q[5], q[7]), Math.max(q[0], q[2], q[4], q[6]), Math.max(q[1], q[3], q[5], q[7])];
+  for (let i = 0; i < chains.length; i++) {
+    for (let j = i + 1; j < chains.length; j++) {
+      for (let ka = 0; ka + 1 < nodeCount(chains[i]!); ka++) {
+        const qa = cubicOf(chains[i]!.n, ka, ka + 1), ba = boxOf(qa);
+        for (let kb = 0; kb + 1 < nodeCount(chains[j]!); kb++) {
+          const qb = cubicOf(chains[j]!.n, kb, kb + 1), bb = boxOf(qb);
+          if (ba[2] < bb[0] || bb[2] < ba[0] || ba[3] < bb[1] || bb[3] < ba[1]) continue;
+          const pa = Array.from({ length: FLAT + 1 }, (_, p) => cubicAt(qa, p / FLAT));
+          const pb = Array.from({ length: FLAT + 1 }, (_, p) => cubicAt(qb, p / FLAT));
+          for (let p = 0; p < FLAT; p++) {
+            for (let r = 0; r < FLAT; r++) {
+              const [x1, y1] = pa[p]!, [x2, y2] = pa[p + 1]!, [x3, y3] = pb[r]!, [x4, y4] = pb[r + 1]!;
+              const den = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3);
+              if (Math.abs(den) <= 1e-9 * Math.hypot(x2 - x1, y2 - y1) * Math.hypot(x4 - x3, y4 - y3)) continue; // parallel or lying on each other: no single crossing
+              const u = ((x3 - x1) * (y4 - y3) - (y3 - y1) * (x4 - x3)) / den;
+              const w = ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) / den;
+              if (u < 0 || u > 1 || w < 0 || w > 1) continue;
+              let t = (p + u) / FLAT, s = (r + w) / FLAT;
+              for (let it = 0; it < 6; it++) { // Newton on a(t) = b(s)
+                const [ax, ay] = cubicAt(qa, t), [bx, by] = cubicAt(qb, s);
+                const [da, db] = [cubicSlope(qa, t), cubicSlope(qb, s)];
+                const det = -da[0] * db[1] + db[0] * da[1];
+                if (Math.abs(det) < 1e-300) break;
+                const ex = bx - ax, ey = by - ay;
+                t = Math.min(1, Math.max(0, t + (-ex * db[1] + db[0] * ey) / det));
+                s = Math.min(1, Math.max(0, s + (da[0] * ey - da[1] * ex) / det));
+              }
+              if (t < EDGE_T || t > 1 - EDGE_T || s < EDGE_T || s > 1 - EDGE_T) continue;
+              const [ax, ay] = cubicAt(qa, t), [bx, by] = cubicAt(qb, s);
+              return { i, j, a: { k: ka, t }, b: { k: kb, t: s }, x: (ax + bx) / 2, y: (ay + by) / 2 };
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Edges from paths: closed sub-paths are cut into one edge per segment, open ones are kept as chains. Ends within `tol` of each other
  * become one vertex (the same point), and an end that lies on another edge splits that edge there, so paths that meet become one network.
@@ -202,19 +271,7 @@ export function buildNetwork(paths: ReadonlyArray<readonly SubPath[]>, tol: numb
       if (ka === key(v[0], v[1]) || kb === key(v[0], v[1])) continue;
       const h = nearest(c, v[0], v[1]);
       if (!(h.d <= tol)) continue;
-      const cut = splitSegment([c], 0, h.k, h.t)[0]!;
-      const m = (h.k + 1) * NODE;
-      const n = [...cut.n];
-      const dx = v[0] - n[m]!, dy = v[1] - n[m + 1]!;
-      for (let q = 0; q < NODE; q += 2) {
-        n[m + q] = n[m + q]! + dx;
-        n[m + q + 1] = n[m + q + 1]! + dy;
-      }
-      n[m] = v[0];
-      n[m + 1] = v[1];
-      const left: SubPath = { n: n.slice(0, m + NODE), closed: false };
-      const right: SubPath = { n: n.slice(m), closed: false };
-      chains.splice(i, 1, left, right);
+      chains.splice(i, 1, ...splitAt(c, h.k, h.t, v));
     }
   }
   // the same edge twice (two shapes that share a side) is one edge
@@ -222,6 +279,15 @@ export function buildNetwork(paths: ReadonlyArray<readonly SubPath[]>, tol: numb
   const kept: SubPath[] = [];
   for (const c of chains) if (!kept.some((k) => k.n.length === c.n.length && (k.n.every((v, i) => v === c.n[i]) || k.n.every((v, i) => v === reversed(c)[i])))) kept.push(c);
   chains = kept;
+  // 3. two edges that cross are cut at the crossing, both ends of the cuts at one point (a loop restarts after each cut)
+  for (let guard = 0; guard < 10000; guard++) {
+    const hit = firstCrossing(chains);
+    if (!hit) break;
+    const { i, j, a, b, x, y } = hit;
+    const ci = chains[i]!, cj = chains[j]!;
+    chains.splice(j, 1, ...splitAt(cj, b.k, b.t, [x, y]));
+    chains.splice(i, 1, ...splitAt(ci, a.k, a.t, [x, y]));
+  }
   return chains.filter((c) => nodeCount(c) >= 2 && !(nodeCount(c) === 2 && first(c)[0] === last(c)[0] && first(c)[1] === last(c)[1]));
 }
 

@@ -20,6 +20,8 @@ export interface Notice {
   readonly progress?: number | null;
   /** Notices with the same channel replace each other (all importing messages, say). */
   readonly channel?: string;
+  /** A button on the notice (e.g. View); it runs and the notice goes. */
+  readonly action?: { readonly label: string; run(): void };
 }
 
 /** The kind, progress and channel a plain message means. */
@@ -60,7 +62,7 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
     const bar = n.kind === "progress" ? `<span class="notice-bar${n.progress == null ? " is-unknown" : ""}"><span style="width:${Math.round((n.progress ?? 0) * 100)}%"></span></span>` : "";
     s.el.className = `notice is-${n.kind}`;
     s.el.setAttribute("role", n.kind === "error" ? "alert" : "status");
-    s.el.innerHTML = `<span class="notice-icon">${icon(n)}</span><span class="notice-body"><span class="notice-text">${esc(n.text)}</span>${bar}</span><button type="button" class="notice-close" aria-label="Dismiss">${ICONS.x}</button>`;
+    s.el.innerHTML = `<span class="notice-icon">${icon(n)}</span><span class="notice-body"><span class="notice-text">${esc(n.text)}</span>${bar}</span>${n.action ? `<button type="button" class="notice-action">${esc(n.action.label)}</button>` : ""}<button type="button" class="notice-close" aria-label="Dismiss">${ICONS.x}</button>`;
   };
   const remove = (s: Shown): void => {
     if (s.timer) clearTimeout(s.timer);
@@ -89,7 +91,12 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
     const s: Shown = { el, notice: n, timer: null };
     fill(s, n);
     el.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).closest(".notice-close")) remove(s);
+      const t = e.target as HTMLElement;
+      if (t.closest(".notice-close")) remove(s);
+      else if (t.closest(".notice-action")) {
+        s.notice.action?.run();
+        remove(s);
+      }
     });
     el.addEventListener("pointerenter", () => s.timer && clearTimeout(s.timer));
     el.addEventListener("pointerleave", () => arm(s));
@@ -107,8 +114,10 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
     }
     if (!editor.message) return;
     const text = editor.message;
+    const action = editor.messageAction;
     editor.message = "";
-    push(classify(text));
+    editor.messageAction = null;
+    push(action ? { ...classify(text), action } : classify(text));
   });
   return { push, subscribe: (fn) => void mirrors.push(fn) };
 }

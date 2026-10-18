@@ -387,6 +387,7 @@ html, body {
   position: absolute;
   left: 50px; /* (clear of the tool rail, which is 8 to 46 px from the left) */
   top: 180px;
+  max-width: 20rem; /* ends before x = 370: tests and hands start drags around (380, 240..260), so it must not reach there */
   pointer-events: auto;
   display: flex;
   flex-direction: column;
@@ -844,7 +845,7 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
   position: fixed;
   left: calc(12px / var(--ui-scale, 1));
   /* At the top, just under the top-left controls (not floating in the middle of the left edge), so the room below it is the canvas's. */
-  top: calc((var(--edge) + var(--ctl) + var(--near)) / var(--ui-scale, 1));
+  top: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); /* the same gap under the Assets bar as the panels have under the top right bar */
   z-index: 3;
   display: flex;
   flex-direction: column;
@@ -857,6 +858,8 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
   box-shadow: var(--hud-lift);
   backdrop-filter: blur(8px);
 }
+.rail-tools { display: contents; }
+.rail-sep { align-self: stretch; flex: none; height: 1px; margin: var(--sp-1) var(--sp-2); background: var(--hud-border); }
 .rail button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; color: var(--hud-fg); background: transparent; border: 0; border-radius: var(--r-lg); cursor: pointer; }
 .rail button svg { width: 20px; height: 20px; }
 .rail button:hover { background: var(--hud-hover); }
@@ -912,8 +915,8 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .nav-pill { height: var(--bar-h); }
 .view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); }
-/* Settings: the last control of the top right, a bar of its own (so it is there in every view). */
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); }
+/* Settings: a bar of its own at the top right in the Assets and Settings views; on the canvas the button is the last one of the bottom-right bar (view-switch.ts moves it). */
 .view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
@@ -921,7 +924,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -945,6 +948,9 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .notice-icon svg { width: var(--icon-md); height: var(--icon-md); }
 .notice-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
 .notice-text { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.notice-action { flex: none; padding: var(--sp-2) var(--sp-5); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-md); font: var(--font-control); cursor: pointer; }
+.notice-action:hover { border-color: var(--hud-accent); }
+.notice-action:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .notice-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--sp-10); height: var(--sp-10); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
 .notice-close svg { width: var(--icon-sm); height: var(--icon-sm); }
 .notice-close:hover { color: var(--hud-fg); background: var(--hud-hover); }

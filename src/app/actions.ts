@@ -26,12 +26,13 @@ import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import type { Constraint } from "../doc/constraints";
 import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
-import { outlineOf } from "../doc/outline-stroke";
+import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
 import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
 import { buildNetwork } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
 import { exportSvg } from "./svg-export";
+import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
@@ -1359,7 +1360,9 @@ export function outlineStroke(doc: DocumentStore, editor: EditorState, profile?:
   for (const o of paths) {
     const { rot: _r0, base: _b0, ...flat } = o;
     const turned: PathObject = o.rot ? { ...flat, sub: pathSubs(o) } : o;
-    const sub = outlineOf(turned, profile);
+    const aligned = alignedOutlineOf(turned, profile);
+    if (!aligned) editor.message = "That outline could not be made inside or outside the edge; it is centred.";
+    const sub = aligned ?? outlineOf(turned, profile);
     if (!sub.length) continue;
     const { join: _j, cap: _c, align: _a, dash: _d, dashOffset: _do, arrowStart: _as, arrowEnd: _ae, miterAngle: _m, shape: _s, params: _p, radius: _r, base: _b, initial: _i, evenodd: _e, rot: _rot, sub: _sub, fill, stroke, ...keep } = o;
     const shape: PathObject = { ...keep, kind: "path", sub, fill: stroke, stroke: null, width: o.width };
@@ -1433,12 +1436,12 @@ export function strokeToPath(doc: DocumentStore, editor: EditorState): void {
 }
 
 /** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
-const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o));
+const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && !isMaskObject(o));
 
 export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean => svgPaths(doc, editor).length > 0;
 
 /** The picked paths as SVG text (ADR 0107), or null when none is picked or they cannot be placed together. */
-export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space);
+export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"));
 
 /**
  * Put the shapes of SVG text on the canvas (ADR 0107): centred in the view, the longer side half of the shorter side of the view, grouped

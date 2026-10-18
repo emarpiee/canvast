@@ -8,7 +8,7 @@ The stroke of a path becomes a shape of its own. A stroke is cut into the pieces
 
 - **Outline stroke** (Actions bar, palette): a path with no fill becomes the shape in place (the stroke's paint is its fill); one with a fill keeps it and gets the outline as a new shape above (`… outline`). A turned path is baked turned.
 - **Width profiles** (Taper on the bar; taper, taper start, taper end and swell in the palette): the same, with the width a function of the length along each sub-path (`WIDTH_PROFILES`). The result is a shape: the centre line is not kept (Undo brings it back). Variable width is therefore an operation, not a live property.
-- Not done: an outline *inside or outside* the edge is made centred; that needs the Boolean tools on shapes whose outlines graze.
+- Outline *inside or outside* the edge (v0.19.1, `alignedOutlineOf`): the centred outline of twice the width, piece by piece, intersected with the shape (inside) or subtracted from it (outside). Piece by piece because the whole outline overlaps itself and the Boolean code gives up on it; if one piece still cannot be settled the outline is made centred and a message says so.
 
 ## Corner smoothing
 

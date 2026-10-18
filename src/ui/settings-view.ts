@@ -144,7 +144,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       { key: "shot.format", label: "Picture format", help: "WebP is small and keeps transparency; PNG is lossless and bigger; JPEG is small but has no transparency. If the browser cannot write WebP, PNG is used.", control: { kind: "select", options: [["webp", "WebP"], ["png", "PNG"], ["jpeg", "JPEG"]] } },
       { key: "shot.quality", label: "Quality", help: "For WebP and JPEG. Higher is sharper and bigger.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
-      { key: "shot.area", label: "Area", help: "The whole view, or only the box around the selected items (the whole view when nothing is selected).", control: { kind: "select", options: [["view", "The whole view"], ["selection", "The selection"]] } },
       { key: "shot.pattern", label: "Include the canvas pattern", help: "The grid or dots behind the content.", control: { kind: "toggle" } },
       { key: "shot.transparent", label: "Transparent background", help: "No background colour behind the content (WebP and PNG; JPEG is filled white). Turn the pattern off too for a clean cut-out.", control: { kind: "toggle" } },
       { key: "shot.interface", label: "Include the interface", help: "The floating bars and panels over the canvas (the toolbar, panels, readout). Off by default: a clean picture of the canvas.", control: { kind: "toggle" } },

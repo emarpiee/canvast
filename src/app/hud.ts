@@ -116,7 +116,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
-      <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save what the canvas shows to the library (Settings > Screenshot)">${ICONS.camera}</button>
+      <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save the selection to the library, or the whole view when nothing is selected (format, folder and tags in Settings > Screenshot)">${ICONS.camera}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>

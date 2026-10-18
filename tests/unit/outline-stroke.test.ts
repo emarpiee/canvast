@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PathObject } from "../../src/doc/model";
-import { outlineOf } from "../../src/doc/outline-stroke";
+import { alignedOutlineOf, outlineOf } from "../../src/doc/outline-stroke";
 import * as D from "../../src/core/dyadic";
-import { geometryBounds } from "../../src/doc/path";
+import { geometryBounds, rectSubs } from "../../src/doc/path";
 
 const path = (extra: Partial<PathObject> = {}): PathObject => ({ id: "a", kind: "path", anchor: { x: D.ZERO, y: D.ZERO }, unit: 0, z: 1, opacity: 1, attachmentTargetId: null, sub: [{ n: [0, 0, 0, 0, 0, 0, 100, 0, 100, 0, 100, 0], closed: false }], fill: null, stroke: "#000000", width: 10, ...extra });
 
@@ -24,9 +24,19 @@ describe("outline of a path's stroke", () => {
     const t = geometryBounds(outlineOf(path({ cap: "butt" }), "taper-end"));
     expect(t.maxY).toBeLessThanOrEqual(5.0001);
   });
+  it("inside or outside the edge: the double-width outline kept where the shape is, or taken out of it", () => {
+    const box = path({ sub: rectSubs(0, 0, 100, 50), join: "miter", width: 10 });
+    const inside = alignedOutlineOf({ ...box, align: "inside" })!;
+    const bi = geometryBounds(inside);
+    [bi.minX, bi.maxX, bi.minY, bi.maxY].forEach((v, i) => expect(v).toBeCloseTo([0, 100, 0, 50][i]!, 6)); // nothing past the edge
+    expect(inside.length).toBeGreaterThan(0);
+    const outside = geometryBounds(alignedOutlineOf({ ...box, align: "outside" })!);
+    [outside.minX, outside.maxX, outside.minY, outside.maxY].forEach((v, i) => expect(v).toBeCloseTo([-10, 110, -10, 60][i]!, 6)); // its whole width past the edge
+    expect(geometryBounds(alignedOutlineOf(box)!)).toEqual(geometryBounds(outlineOf(box))); // centred: unchanged
+  });
 });
 
-import { rectSubs } from "../../src/doc/path";
+
 import { roundCorners } from "../../src/doc/rounding";
 
 describe("corner smoothing", () => {
