@@ -569,6 +569,68 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
   (pop.querySelector<HTMLElement>("[role=radio][aria-checked=true]:not(:disabled)") ?? width).focus();
 }
 
+// ---- Paragraph and box options of a text (ADR 0130) ----------------------------------------------------------------------------
+
+export interface TextBoxOptions {
+  paraGap: number;
+  indent: number;
+  caps: "upper" | "lower" | "title" | "small" | null;
+  maxLines: number | null;
+  /** The set height in px at this zoom, or null for as tall as the words. */
+  heightPx: number | null;
+  valign: "top" | "middle" | "bottom";
+  /** `final` false while a number is being typed or dragged (show it), true once it is settled (store it). */
+  onChange(patch: { paraGap?: number; indent?: number; caps?: TextBoxOptions["caps"]; maxLines?: number | null; heightPx?: number | null; valign?: TextBoxOptions["valign"] }, final: boolean): void;
+  onClose?(): void;
+}
+
+/** Space between paragraphs, first-line indent, case, a line limit, and a set height with where the words sit in it. */
+export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  const pop = document.createElement("div");
+  pop.className = "colour-pop outline-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Paragraph and box options");
+  const num = (key: string, label: string, value: string, unit: string, min: number, step: string): string =>
+    `<div class="op-row"><label class="op-label" for="tb-${key}">${label}</label><input id="tb-${key}" class="op-width" data-field="${key}" type="number" min="${min}" step="${step}" inputmode="decimal" value="${value}"><span class="op-unit">${unit}</span></div>`;
+  const choices = (key: string, label: string, items: ReadonlyArray<[string, string, string]>, value: string): string =>
+    `<div class="op-row"><span class="op-label" id="tb-${key}">${label}</span><div class="paint-modes op-choices" role="radiogroup" aria-labelledby="tb-${key}">${items
+      .map(([v, text, tip]) => `<button type="button" role="radio" data-${key}="${v}" aria-checked="${v === value}" title="${tip}">${text}</button>`)
+      .join("")}</div></div>`;
+  pop.innerHTML =
+    num("paraGap", "Paragraph space", String(Math.round(o.paraGap * 100) / 100), "em", 0, "0.05") +
+    num("indent", "First line in", String(Math.round(o.indent * 100) / 100), "em", 0, "0.1") +
+    choices("caps", "Case", [["none", "Aa", "As typed"], ["upper", "AA", "UPPER CASE"], ["lower", "aa", "lower case"], ["title", "Ab", "Title Case: every word starts with a capital"], ["small", "Sc", "Small caps: lower case letters as smaller capitals"]], o.caps ?? "none") +
+    num("maxLines", "Most lines", o.maxLines === null ? "0" : String(o.maxLines), "0 = all", 0, "1") +
+    num("heightPx", "Height", o.heightPx === null ? "0" : String(Math.round(o.heightPx * 100) / 100), "px, 0 = auto", 0, "any") +
+    choices("valign", "Words sit", [["top", "Top", "At the top of the height"], ["middle", "Middle", "In the middle of the height"], ["bottom", "Bottom", "At the bottom of the height"]], o.valign);
+  scrubNumbers(pop);
+  for (const input of pop.querySelectorAll<HTMLInputElement>("input[data-field]")) {
+    const key = input.dataset["field"]!;
+    liveNumber(input, (v, final) => {
+      if (!(v >= 0)) return;
+      if (key === "maxLines") o.onChange({ maxLines: v >= 1 ? Math.round(v) : null }, final);
+      else if (key === "heightPx") o.onChange({ heightPx: v > 0 ? v : null }, final);
+      else if (key === "paraGap") o.onChange({ paraGap: v }, final);
+      else o.onChange({ indent: v }, final);
+    });
+  }
+  pop.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
+    if (!b) return;
+    for (const x of b.closest("[role=radiogroup]")!.querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
+    if (b.dataset["caps"]) o.onChange({ caps: b.dataset["caps"] === "none" ? null : (b.dataset["caps"] as TextBoxOptions["caps"]) }, true);
+    else o.onChange({ valign: b.dataset["valign"] as TextBoxOptions["valign"] }, true);
+  });
+  document.body.appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
+  pop.querySelector<HTMLElement>("input")!.focus();
+}
+
 // ---- Adjust: the non-destructive adjustments of a picture (ADR 0118) -------------------------------------------------------------
 
 export interface AdjustOptions {

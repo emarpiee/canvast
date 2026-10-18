@@ -63,6 +63,16 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.getByTestId("choose-ok").click();
   for (const id of [a.id, b.id]) await expect.poll(async () => ((await objs(app)).find((o) => o.id === id)!.stroke as Grad).type).toBe("linear");
 
+  // a text takes a saved gradient too, on its letters
+  await p.keyboard.press("t");
+  await p.mouse.click(300, 520);
+  await p.keyboard.type("Hi");
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 528);
+  await card("Gradient 1").click();
+  await expect.poll(async () => ((await objs(app)).find((o) => o.kind === "text") as Obj & { gradient?: Grad }).gradient?.type).toBe("linear");
+
   // written as a GIMP gradient, and a file of that kind read back
   const [file] = await Promise.all([p.waitForEvent("download"), (async () => {
     await panel.getByRole("button", { name: /^More actions for style Gradient 1/ }).click();

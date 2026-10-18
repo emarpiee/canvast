@@ -17,3 +17,17 @@
 - **Drawing.** The gradient goes through `canvasPaint` like a path's, on a stand-in path made of the text's box (no turn: a turned text is drawn in a turned view). The outline is the glyph outlines and decorations stroked twice as wide as `w` and drawn first, so the letters cover its inner half and `w` is the visible width outside them; a letter the font lacks has none. At deep zoom the outline uses the same exact path as the fill.
 - **Options bar.** The text colour button now offers Colour, Linear and Radial (no None); beside it an Outline button (None or Colour) and a width field in px at this zoom (0 removes it). `openPaintPopover` takes `modes` instead of `solidOnly`.
 - **As outlines** (flatten to path): the gradient and the outline are not carried over (a path has them of its own to set).
+
+## Slice C: set height, paragraphs, nested lists
+
+- **A set height** (`h`, local units, scaled with the text) makes the box that tall whatever the words need; `valign` (top, middle, bottom) places the words in it, never above the top (words taller than the box start at the top and run past it). `layoutOf` shifts the lines and caches the shifted layout by its layout, so the hot path is a lookup. A text without `h` is as tall as its words, as before.
+- **Paragraphs.** `paraGap` is the space between paragraphs in em (default 0.6), `indent` how far the first line of a plain paragraph starts in (not headings, not list items; wrapping and justify take it into account).
+- **Nested lists.** A list item has a `level` (0 to 5), written as two spaces of indent per level (a tab counts as two). Numbers count on per level (`listNumbers`: going in starts at 1, going out goes on with that level's count, a bullet or paragraph ends it); bullets go round `•`, `–`; the indent grows by 1.5 em per level. In the editor Tab and Shift+Tab make the item a level deeper or shallower (the browser's own indent and outdent), and the DOM, a list in a list or a list beside an item as Chrome makes it, is read back into levels.
+- **Options.** One popover on the Properties bar (Paragraph and box options): paragraph space, first line, case, most lines, height, where the words sit.
+
+## Slice D: case, a line limit, links, colour styles on text
+
+- **Case** (`caps`: upper, lower, title, small): applied to the letters when they are set, so the words stay as typed (and the editor shows them with CSS `text-transform` and `font-variant-caps`). `ß` becomes `SS` in capitals; small caps draw lower case letters as capitals at 0.8 of the size, which is the same per-glyph size a range has.
+- **A line limit** (`maxLines`): the layout is cut at the limit and the last line ends in `…`, taken back until it fits the width. Nothing is lost: the words are all there when the limit is taken away.
+- **Links.** `[words](address)` in Markdown; only `http`, `https` and `mailto` addresses (anything else stays words, as typed), written with `( ) space < > " \` percent-encoded so the Markdown stays whole. Linked words are underlined; the editor bar has Link of the selected words (a small dialog, an empty address takes it away; the editor stays open while it is up); Ctrl or Cmd and a click on linked words in the Select tool opens the address in a new tab (`noopener`).
+- **Colour styles on text and pen strokes.** A saved colour or gradient applies to the fill of a text (a gradient on its letters) or its outline, and to a pen stroke (one colour: the start of a gradient). The colours of the selection bar and Recolour cover texts and strokes too.

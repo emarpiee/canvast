@@ -5,9 +5,9 @@ import { parseFont } from "../../src/text/font";
 import type { Font } from "../../src/text/font";
 import { layoutOf, layoutText, setFont, LINE_HEIGHT } from "../../src/text/layout";
 import { LOOK_LIMITS, lookOf, withLook } from "../../src/text/text-style";
-import { canonical, normalizeSpans, parse, serialize } from "../../src/text/markdown";
+import { canonical, listNumbers, normalizeSpans, parse, serialize } from "../../src/text/markdown";
 import type { Block } from "../../src/text/markdown";
-import { deserializeObject, localBounds, serializeObject, validateObject } from "../../src/doc/model";
+import { deserializeObject, localBounds, newObjectId, serializeObject, validateObject } from "../../src/doc/model";
 import type { TextObject } from "../../src/doc/model";
 import { scaleAbout } from "../../src/doc/edit-ops";
 
@@ -102,6 +102,29 @@ describe("markdown", () => {
     expect(canonical('<span style="color:#00f;font-size:5%">x</span>')).toBe('<span style="font-size:10%">x</span>'); // a colour of 3 digits is dropped; a size under 10% is raised
   });
 
+  it("links: [words](address) for a web or mail address only, anything else stays words; the address is kept safe (v0.18.1)", () => {
+    const spans = parse("go [here **now**](https://e.com/a b) or [there](https://e.com/x%20y) not [this](javascript:alert(1)) nor [that](ftp://x)")[0]!.spans;
+    expect(spans.filter((x) => x.link).map((x) => [x.text, x.link, x.bold])).toEqual([["there", "https://e.com/x%20y", false]]); // (an address with a space in it is not one)
+    expect(spans.map((x) => x.text).join("")).toContain("[this](javascript:alert(1))"); // (the words stay as typed, escaped on writing)
+    const md = canonical("a [one **two** three](https://e.com/p?q=1) b");
+    expect(md).toBe("a [one **two** three](https://e.com/p?q=1) b");
+    expect(parse(md)[0]!.spans.filter((x) => x.link)).toHaveLength(3); // one, two (bold), three
+    expect(parse("[x](mailto:a@b.c)")[0]!.spans[0]!.link).toBe("mailto:a@b.c");
+    expect(canonical("[x](https://e.com/a%29b)")).toBe("[x](https://e.com/a%29b)");
+    const lay = layoutText("[ab](https://e.com)", 50).lines[0]!;
+    expect(lay.glyphs[0]!.link).toBe("https://e.com");
+    expect(lay.decos.map((d) => d.kind)).toEqual(["under"]); // a link is underlined
+  });
+
+  it("nested lists: two spaces of indent are a level, numbers count on per level (v0.18.1)", () => {
+    const md = "1. one\n  - a\n  - b\n    1. deep\n2. two\n  1. x\n3. three";
+    const blocks = parse(md);
+    expect(blocks.map((b) => b.level ?? 0)).toEqual([0, 1, 1, 2, 0, 1, 0]);
+    expect(serialize(blocks)).toBe(md);
+    expect(listNumbers(blocks)).toEqual([1, 0, 0, 1, 2, 1, 3]);
+    expect(canonical("- a\n\t- b")).toBe("- a\n  - b"); // a tab is two spaces
+  });
+
   it("round-trips arbitrary text exactly (canonical form is a fixed point)", () => {
     let seed = 7;
     const rnd = (n: number): number => ((seed = (seed * 1103515245 + 12345) % 2 ** 31), seed % n);
@@ -122,9 +145,11 @@ describe("markdown", () => {
             ...(rnd(3) === 0 ? { strike: true } : {}),
             ...(rnd(3) === 0 ? { color: ["#ff0000", "#00ff0080"][rnd(2)]! } : {}),
             ...(rnd(3) === 0 ? { scale: [0.5, 1.5, 2][rnd(3)]! } : {}),
+            ...(rnd(5) === 0 ? { link: "https://e.com/p%28q" } : {}),
           });
         }
-        bs.push({ type: types[rnd(types.length)]!, spans });
+        const type = types[rnd(types.length)]!;
+        bs.push({ type, spans, ...((type === "ul" || type === "ol") && rnd(3) === 0 ? { level: rnd(4) + 1 } : {}) });
       }
       const md = serialize(bs);
       expect(serialize(parse(md)), md).toBe(md);
@@ -168,6 +193,61 @@ describe("layout", () => {
     expect(layoutText("~~ab~~ ~~cd~~", 50).lines[0]!.decos).toHaveLength(1); // the space between is struck too: one run
     expect(layoutText("~~ab~~ cd", 50).lines[0]!.decos).toHaveLength(1);
     expect(layoutText("ab", 50).lines[0]!.decos).toEqual([]);
+  });
+
+  it("paragraph space, first-line indent, case, a line limit with an ellipsis, a set height and where the words sit in it, nested list items (v0.18.1)", () => {
+    // paragraph space: the gap between two paragraphs is the setting
+    const two = (gap?: number) => layoutText("aa\n\nbb", 50, gap === undefined ? {} : { paraGap: gap }).lines;
+    expect(two()[1]!.top - two()[0]!.bottom).toBeCloseTo(0.6);
+    expect(two(2)[1]!.top - two(2)[0]!.bottom).toBeCloseTo(2);
+    // first-line indent: the first line of a paragraph (not a heading, not a list item) starts further in, the others do not
+    const ind = layoutText("aaa bbb ccc ddd eee fff", 5, { indent: 1 }).lines;
+    expect(ind.length).toBeGreaterThan(1);
+    expect(ind[0]!.glyphs[0]!.x).toBeCloseTo(1);
+    expect(ind[1]!.glyphs[0]!.x).toBeCloseTo(0);
+    expect(layoutText("# aaa", 50, { indent: 1 }).lines[0]!.glyphs[0]!.x).toBeCloseTo(0);
+    // case: the letters change, the words stay as typed (the text is the same)
+    const cps = (md: string, caps?: "upper" | "lower" | "title" | "small") => layoutText(md, 50, caps ? { caps } : {}).lines[0]!.glyphs.map((g) => String.fromCodePoint(g.cp)).join("");
+    expect(cps("ab Cd", "upper")).toBe("AB CD");
+    expect(cps("ab Cd", "lower")).toBe("ab cd");
+    expect(cps("ab cD", "title")).toBe("Ab CD");
+    expect(cps("ab Cd", "small")).toBe("AB CD");
+    expect(layoutText("ab Cd", 50, { caps: "small" }).lines[0]!.glyphs.map((g) => g.k ?? 1)).toEqual([0.8, 0.8, 1, 1, 0.8]); // the capital stays full size
+    expect(cps("straße", "upper")).toBe("STRASSE");
+    // a line limit: cut at the limit, the last line ends in an ellipsis inside the width
+    const cut = layoutText("aaa bbb ccc ddd eee fff", 4, { maxLines: 2 });
+    expect(cut.lines).toHaveLength(2);
+    const last = cut.lines[1]!.glyphs;
+    expect(last[last.length - 1]!.cp).toBe(0x2026);
+    expect(last[last.length - 1]!.x + last[last.length - 1]!.adv).toBeLessThanOrEqual(4 + 1e-9);
+    expect(layoutText("aaa bbb", 50, { maxLines: 3 }).lines).toHaveLength(1); // not cut: no ellipsis
+    expect(layoutText("aaa", 50, { maxLines: 3 }).lines[0]!.glyphs.map((g) => g.cp)).not.toContain(0x2026);
+    // nested list items: deeper indent, and the bullet changes with the level
+    const nest = layoutText("- a\n  - b\n    - c", 50).lines;
+    expect(nest[1]!.glyphs[1]!.x).toBeGreaterThan(nest[0]!.glyphs[1]!.x);
+    expect(nest[2]!.glyphs[1]!.x).toBeGreaterThan(nest[1]!.glyphs[1]!.x);
+    expect(nest[0]!.glyphs[0]!.cp).toBe(0x2022);
+    expect(nest[1]!.glyphs[0]!.cp).toBe(0x2013);
+    const num = layoutText("1. a\n  1. b\n2. c", 50).lines.map((l) => String.fromCodePoint(l.glyphs[0]!.cp));
+    expect(num).toEqual(["1", "1", "2"]);
+  });
+
+  it("a set height is the box's height, and the words sit at the top, in the middle or at the bottom of it (v0.18.1)", () => {
+    const o = (extra: Partial<TextObject>): TextObject => ({ id: newObjectId(), kind: "text", anchor: { x: D.ZERO, y: D.ZERO }, unit: 0, z: 1, opacity: 1, attachmentTargetId: null, md: "ab", w: 100, size: 10, color: "#000000", ...extra });
+    const auto = layoutOf(o({}));
+    expect(auto.height).toBeCloseTo(LINE_HEIGHT);
+    const tall = (valign?: "middle" | "bottom") => layoutOf(o({ h: 100, ...(valign ? { valign } : {}) }));
+    expect(tall().height).toBe(10); // em of the size
+    expect(tall().lines[0]!.top).toBe(auto.lines[0]!.top); // top
+    expect(tall("middle").lines[0]!.top).toBeCloseTo((10 - LINE_HEIGHT) / 2);
+    expect(tall("bottom").lines[0]!.bottom).toBeCloseTo(10);
+    expect(layoutOf(o({ h: 5, valign: "bottom" })).lines[0]!.top).toBe(0); // words taller than the box start at the top and run past it
+    expect(layoutOf(o({ h: 100 }))).toBe(layoutOf(o({ h: 100 }))); // cached
+    expect(localBounds(o({ h: 100 })).maxY - localBounds(o({ h: 100 })).minY).toBeCloseTo(100 + 2 * 0.25 * 10); // (the padding the box has)
+    expect(validateObject(deserializeObject(serializeObject(o({ h: 100, valign: "middle", paraGap: 1, indent: 2, caps: "small", maxLines: 3 })))).kind).toBe("text");
+    expect(() => validateObject(o({ h: -1 }))).toThrow();
+    expect(() => validateObject(o({ maxLines: 0 }))).toThrow();
+    expect(scaleAbout(o({ h: 100 }), { x: D.ZERO, y: D.ZERO }, 2, 2)).toMatchObject({ h: 200, size: 20, w: 200 });
   });
 
   it("sizes headings and indents list items", () => {

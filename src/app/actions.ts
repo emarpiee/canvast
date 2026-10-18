@@ -10,8 +10,8 @@ import { isCard } from "../assets/file-kind";
 import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, TextObject } from "../doc/model";
-import { withLook, lookOf, sameLook } from "../text/text-style";
+import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, StrokeObject, TextObject } from "../doc/model";
+import { fitWidth, withLook, lookOf, sameLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
@@ -28,7 +28,7 @@ import { drawnParams, drawnSubs } from "../doc/path";
 import { exportSvg } from "./svg-export";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId } from "../doc/model";
+import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs } from "../doc/model";
 import { worldBounds } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -687,14 +687,45 @@ const editablePaths = (doc: DocumentStore, editor: EditorState): PathObject[] =>
   // (the shapes inside a boolean group take no paint from outside it: the group's result has the look; they are painted when it is entered)
   selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
 
-/** How many selected shapes a colour or gradient can be put on. */
-export const paintTargetCount = (doc: DocumentStore, editor: EditorState): number => editablePaths(doc, editor).length;
+/** What a saved colour or gradient can be put on: the picked shapes, texts (the letters' fill and outline) and pen strokes (one colour). */
+const paintTargets = (doc: DocumentStore, editor: EditorState): Array<PathObject | TextObject | StrokeObject> => [
+  ...editablePaths(doc, editor),
+  ...selected(doc, editor).filter((o): o is TextObject | StrokeObject => (o.kind === "text" || o.kind === "stroke") && !o.locked),
+];
 
-/** The solid colours the selected shapes use, without transparency, each once, in the order they are met. */
+/** How many selected things a colour or gradient can be put on. */
+export const paintTargetCount = (doc: DocumentStore, editor: EditorState): number => paintTargets(doc, editor).length;
+
+/** The solid colours the selected shapes, texts and strokes use, without transparency, each once, in the order they are met. */
 export function selectionColours(doc: DocumentStore, editor: EditorState): string[] {
   const out: string[] = [];
-  for (const o of editablePaths(doc, editor)) for (const p of [o.fill, o.stroke]) if (typeof p === "string" && !out.includes(p.slice(0, 7).toLowerCase())) out.push(p.slice(0, 7).toLowerCase());
+  for (const o of paintTargets(doc, editor)) {
+    const paints: Array<Paint | null | undefined> = o.kind === "path" ? [o.fill, o.stroke] : o.kind === "text" ? [o.color, o.outline?.c] : [o.color];
+    for (const p of paints) if (typeof p === "string" && !out.includes(p.slice(0, 7).toLowerCase())) out.push(p.slice(0, 7).toLowerCase());
+  }
   return out;
+}
+
+/** The first colour of a paint: a gradient on a thing that has one colour only (a pen stroke) gives its start. */
+const firstColour = (p: Paint): string => (typeof p === "string" ? p : p.stops[0]!.c);
+
+/** `o` with a fill and outline patch applied the way its kind takes it: a shape has both; a text fills its letters and outlines them; a stroke has one colour. */
+function paintedWith(o: PathObject | TextObject | StrokeObject, patch: PaintPatch): PathObject | TextObject | StrokeObject {
+  if (o.kind === "path") return { ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) };
+  if (o.kind === "stroke") {
+    const p = patch.fill ?? patch.stroke;
+    return p ? { ...o, color: firstColour(p) } : o;
+  }
+  let t: TextObject = o;
+  if (patch.fill) {
+    const { gradient: _g, ...rest } = t;
+    t = typeof patch.fill === "string" ? { ...rest, color: patch.fill } : { ...t, gradient: patch.fill };
+  }
+  if (patch.stroke === null) {
+    const { outline: _o, ...rest } = t;
+    t = rest;
+  } else if (patch.stroke) t = { ...t, outline: { c: firstColour(patch.stroke), w: t.outline?.w ?? 0.05 } };
+  return t;
 }
 
 /** The fill and outline of the first selected path, or null when none is selected. */
@@ -719,11 +750,10 @@ export function previewPaint(doc: DocumentStore, editor: EditorState, patch: Pai
 /** Store a new fill or outline on the selected paths: one undo step. */
 export function commitPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
   editor.preview = { kind: "none" };
-  const differs = (o: PathObject): boolean => (patch.fill !== undefined && o.fill !== patch.fill) || (patch.stroke !== undefined && o.stroke !== patch.stroke);
-  const paths = editablePaths(doc, editor).filter(differs);
-  if (paths.length && !editor.blockEdit()) {
+  const next = paintTargets(doc, editor).map((o) => [o, paintedWith(o, patch)] as const).filter(([o, n]) => JSON.stringify(paintsOf(o)) !== JSON.stringify(paintsOf(n))); // (the paints only: an object holds big numbers JSON cannot write)
+  if (next.length && !editor.blockEdit()) {
     const what = patch.fill !== undefined && patch.stroke !== undefined ? "fill and outline" : patch.fill !== undefined ? "fill" : "outline";
-    doc.commit(doc.transaction(paths.length === 1 ? `Change ${what}` : `Change ${what} of ${paths.length} paths`, paths.map((o) => ({ ...o, ...(patch.fill !== undefined ? { fill: patch.fill } : {}), ...(patch.stroke !== undefined ? { stroke: patch.stroke } : {}) }))));
+    doc.commit(doc.transaction(next.length === 1 ? `Change ${what}` : `Change ${what} of ${next.length} objects`, next.map(([, n]) => n)));
   }
   editor.changed();
 }
@@ -758,39 +788,56 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
 
 const paintKey = (p: Paint | null): string => JSON.stringify(p);
 
-/** The paints the picked shapes use, each once (a gradient counts as one paint, equal ones together), in the order they first appear, with how many fills and outlines use it; `count`: how many shapes. */
+/** The paints of one picked thing, by part: a shape's fill and outline, a text's fill (its gradient, else its colour) and outline, a stroke's colour. */
+function paintsOf(o: PathObject | TextObject | StrokeObject): Array<{ part: "fill" | "stroke"; paint: Paint }> {
+  const out: Array<{ part: "fill" | "stroke"; paint: Paint }> = [];
+  if (o.kind === "path") {
+    if (o.fill !== null) out.push({ part: "fill", paint: o.fill });
+    if (o.stroke !== null) out.push({ part: "stroke", paint: o.stroke });
+  } else if (o.kind === "text") {
+    out.push({ part: "fill", paint: o.gradient ?? o.color });
+    if (o.outline) out.push({ part: "stroke", paint: o.outline.c });
+  } else out.push({ part: "fill", paint: o.color });
+  return out;
+}
+
+/** The paints the picked shapes, texts and strokes use, each once (a gradient counts as one paint, equal ones together), in the order they first appear, with how many fills and outlines use it; `count`: how many things. */
 export function selectionPaints(doc: DocumentStore, editor: EditorState): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number; ids: string[] }> } {
-  const paths = editablePaths(doc, editor);
+  const targets = paintTargets(doc, editor);
   const seen = new Map<string, { paint: Paint; fills: number; strokes: number; ids: string[] }>();
-  for (const o of paths) {
-    for (const which of ["fill", "stroke"] as const) {
-      const v = o[which];
-      if (v === null) continue;
+  for (const o of targets) {
+    for (const { part, paint: v } of paintsOf(o)) {
       const k = paintKey(v);
       const e = seen.get(k) ?? { paint: v, fills: 0, strokes: 0, ids: [] };
       if (!e.ids.includes(o.id)) e.ids.push(o.id);
-      if (which === "fill") e.fills++;
+      if (part === "fill") e.fills++;
       else e.strokes++;
       seen.set(k, e);
     }
   }
   // The most used first, then in the order they first appear.
-  return { count: paths.length, items: [...seen.values()].map((e, i) => ({ e, i })).sort((a, b) => b.e.fills + b.e.strokes - (a.e.fills + a.e.strokes) || a.i - b.i).map((x) => x.e) };
+  return { count: targets.length, items: [...seen.values()].map((e, i) => ({ e, i })).sort((a, b) => b.e.fills + b.e.strokes - (a.e.fills + a.e.strokes) || a.i - b.i).map((x) => x.e) };
 }
 
-/** Change one paint to another everywhere the picked shapes use it (fills and outlines): a colour, a gradient (each shape keeps its own box), or none. Shown while a picker is dragged, stored once. */
+/** Change one paint to another everywhere the picked shapes, texts and strokes use it (fills and outlines): a colour, a gradient (each shape keeps its own box; a stroke takes the first colour of it), or none (a text and a stroke keep their colour). Shown while a picker is dragged, stored once. */
 export function recolour(doc: DocumentStore, editor: EditorState, from: Paint, to: Paint | null, final: boolean): void {
   if (editor.blockEdit()) return;
   const key = paintKey(from);
-  const next: PathObject[] = [];
-  for (const o of editablePaths(doc, editor)) {
-    const fill = paintKey(o.fill) === key;
-    const stroke = paintKey(o.stroke) === key;
-    if (fill || stroke) next.push({ ...o, ...(fill ? { fill: to } : {}), ...(stroke ? { stroke: to } : {}) });
+  const next: Array<PathObject | TextObject | StrokeObject> = [];
+  for (const o of paintTargets(doc, editor)) {
+    const hit = paintsOf(o).filter((x) => paintKey(x.paint) === key).map((x) => x.part);
+    if (!hit.length) continue;
+    const patch: PaintPatch = { ...(hit.includes("fill") ? { fill: to } : {}), ...(hit.includes("stroke") ? { stroke: to } : {}) };
+    if (o.kind !== "path" && to === null) {
+      // nothing to take away from a text's letters or a stroke: only a text's outline can go
+      if (o.kind === "text" && hit.includes("stroke")) next.push(paintedWith(o, { stroke: null }));
+      continue;
+    }
+    next.push(paintedWith(o, patch));
   }
   if (!final) return showReplaced(editor, next);
   editor.preview = { kind: "none" };
-  if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Change colour" : `Change colour of ${next.length} shapes`, next));
+  if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Change colour" : `Change colour of ${next.length} objects`, next));
   editor.changed();
 }
 
@@ -1604,5 +1651,53 @@ export async function bakePicture(
   const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
   doc.commit(doc.transaction("Make a new picture of it as it looks", [placed]));
   editor.select([placed.id]);
+  editor.changed();
+}
+
+// ---- Text on a path (ADR 0131) ----------------------------------------------------------------------------------------------------
+
+/** The one picked text and the one picked path a text can be put on, when exactly those two are picked (and neither is turned or in another frame). */
+function textAndPath(doc: DocumentStore, editor: EditorState): { text: TextObject; path: PathObject } | null {
+  const sel = selected(doc, editor);
+  if (sel.length !== 2) return null;
+  const text = sel.find((o): o is TextObject => o.kind === "text" && !o.locked);
+  const path = sel.find((o): o is PathObject => o.kind === "path" && o.sub.some((s) => s.n.length >= 12));
+  return text && path && text.frame === path.frame && !text.rot ? { text, path } : null;
+}
+
+/** Whether a text and a path are picked: the text can be set along the path. */
+export const canSetOnPath = (doc: DocumentStore, editor: EditorState): boolean => textAndPath(doc, editor) !== null;
+
+/** Whether a picked text runs along a curve: it can be taken off. */
+export const canTakeOffPath = (doc: DocumentStore, editor: EditorState): boolean => selected(doc, editor).some((o) => o.kind === "text" && o.onPath !== undefined && !o.locked);
+
+/** Set the picked text along the picked path: the text keeps a copy of the path's first sub-path (in its own units), one undo step. The path stays where it is. */
+export function setTextOnPath(doc: DocumentStore, editor: EditorState): void {
+  const tp = textAndPath(doc, editor);
+  if (!tp || editor.blockEdit()) return;
+  const { text, path } = tp;
+  const sub = pathSubs(path).find((s) => s.n.length >= 12)!;
+  // the path's local units to the text's: the path's anchor relative to the text's (exact), then the units' ratio
+  const k = 2 ** (path.unit - text.unit);
+  const dx = D.toNumber(D.shift(D.sub(path.anchor.x, text.anchor.x), -text.unit));
+  const dy = D.toNumber(D.shift(D.sub(path.anchor.y, text.anchor.y), -text.unit));
+  const n = sub.n.map((v, i) => v * k + (i % 2 === 0 ? dx : dy));
+  if (!n.every((v) => Number.isFinite(v))) {
+    editor.message = "The path is too far from the text to set it along.";
+    editor.changed();
+    return;
+  }
+  doc.commit(doc.transaction("Set text on path", [{ ...text, onPath: { n, closed: sub.closed } }]));
+  editor.changed();
+}
+
+/** Take the picked texts off their curves: they are set straight again, as wide as they were. */
+export function takeTextOffPath(doc: DocumentStore, editor: EditorState): void {
+  const next = selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && o.onPath !== undefined && !o.locked).map((o) => {
+    const { onPath: _p, ...rest } = o;
+    return fitWidth(rest);
+  });
+  if (!next.length || editor.blockEdit()) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Take text off path" : `Take ${next.length} texts off paths`, next));
   editor.changed();
 }

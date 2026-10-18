@@ -73,6 +73,11 @@ export interface ContextActions {
   /** Turn the selected text into paths (ADR 0102), and whether any is selected. */
   outline(): void;
   canOutline(): boolean;
+  /** Set a picked text along a picked path (both picked), and take a text off its path (ADR 0131). */
+  setOnPath(): void;
+  canSetOnPath(): boolean;
+  takeOffPath(): void;
+  canTakeOffPath(): boolean;
   /** Arrange in a grid, align or distribute the selection. */
   layout(cmd: LayoutCommand): void;
   /** The space between items in a grid (ADR 0074), and choosing another one (a grid just made is laid out again with it). */
@@ -116,7 +121,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
       btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
     group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
-    group("Text", btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)")) +
+    group("Text", btn("outline", ICONS.replace, "Convert text to path (Ctrl+E)"), btn("onpath", ICONS.route, "Set the text along the picked path (pick the text and the path)"), btn("offpath", ICONS.routeOff, "Take the text off its path: it is set straight again")) +
     group("Shapes",
       ...OPS.map((o) => btn("op", o.icon, o.aria, `data-op="${o.op}"`)),
       btn("addgroup", ICONS.squarePlus, "Add the shapes to the boolean group: they become shapes of it, with its operation"),
@@ -153,6 +158,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "release": actions.releaseBoolean(); break;
       case "flatten": actions.flattenBoolean(); break;
       case "outline": actions.outline(); break;
+      case "onpath": actions.setOnPath(); break;
+      case "offpath": actions.takeOffPath(); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;
@@ -214,6 +221,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("flatten").hidden = cur === null;
     q("release").hidden = cur === null;
     q("outline").hidden = !actions.canOutline();
+    q("onpath").hidden = !actions.canSetOnPath();
+    q("offpath").hidden = !actions.canTakeOffPath();
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();

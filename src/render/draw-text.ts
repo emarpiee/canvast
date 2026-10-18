@@ -35,7 +35,8 @@ import { canvasPaint } from "./gradient";
 /** Above this many CSS px per em, glyphs are drawn from exact outlines. */
 export const DEEP_EM_PX = 2000;
 /** Italic shear (x += SKEW · height above baseline), exact in binary (≈ 11.5°). */
-export const SKEW = 13 / 64;
+import { SKEW, glyphMap } from "../text/glyph-space";
+export { SKEW };
 export const BOLD_SHIFT_EM = 1 / 32;
 
 /** Culling margin around the viewport (CSS px). */
@@ -107,7 +108,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
           } else if (deep) {
             for (const d of shifts) addGlyphExact(path, o, line, g, d);
             filled = true;
-          } else if (opaque && faceReady(o.assetId)) {
+          } else if (opaque && faceReady(o.assetId) && !o.onPath) {
             setFont(`${linePx}px ${familyFor(o.assetId)}`);
             for (const d of shifts) glyphText(String.fromCodePoint(g.cp), sx(g.x + d), sy(line.baseline), g.italic);
           } else {
@@ -115,7 +116,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
             filled = true;
           }
         }
-        for (const d of line.decos) {
+        for (const d of o.onPath ? [] : line.decos) {
           if ((d.color ?? o.color) !== colour || sx(d.x1) < minX || sx(d.x0) > maxX) continue;
           addDeco(ctx, path, o, line, d, deep, sx, sy);
           filled = true;
@@ -149,7 +150,7 @@ function strokeOutline(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewpor
       const shifts = g.bold ? [0, BOLD_SHIFT_EM * glyphScale(line, g)] : [0];
       for (const d of shifts) (deep ? addGlyphExact(path, o, line, g, d) : addGlyphFast(ctx, p, o, line, g, d));
     }
-    for (const d of line.decos) addDeco(ctx, path, o, line, d, deep, sx, sy);
+    for (const d of o.onPath ? [] : line.decos) addDeco(ctx, path, o, line, d, deep, sx, sy);
   }
   path.close();
   ctx.lineJoin = "round";
@@ -188,6 +189,24 @@ function addGlyphFast(ctx: CanvasRenderingContext2D, p: Projection, o: TextObjec
   const c = (o.size * glyphScale(line, g)) / f.unitsPerEm;
   const ox = (g.x + shiftEm) * o.size;
   const oy = line.baseline * o.size;
+  if (o.onPath) {
+    // On a curve: every point goes through the glyph map (the straight case below stays as it was: it is the hot one).
+    const m = glyphMap(o, line, g, shiftEm);
+    const px = (fx: number, fy: number): [number, number] => (m.at(fx, fy), [projX(p, m.x), projY(p, m.y)]);
+    for (const contour of f.glyph(g.gid).contours) {
+      contour.forEach((s, i) => {
+        if (i === 0) ctx.moveTo(...px(s[0]!, s[1]!));
+        if (s.length === 4) ctx.lineTo(...px(s[2]!, s[3]!));
+        else {
+          const [cx, cy] = px(s[2]!, s[3]!);
+          const [ex, ey] = px(s[4]!, s[5]!);
+          ctx.quadraticCurveTo(cx, cy, ex, ey);
+        }
+      });
+      ctx.closePath();
+    }
+    return;
+  }
   const X = (fx: number, fy: number): number => projX(p, ox + (g.italic ? fx + fy * SKEW : fx) * c);
   const Y = (fy: number): number => projY(p, oy - fy * c);
   for (const contour of f.glyph(g.gid).contours) {
@@ -211,10 +230,18 @@ function addGlyphExact(path: ExactPath, o: TextObject, line: Line, g: PlacedGlyp
   const C = D.mul(SIZE, D.fromNumber(glyphScale(line, g) / f.unitsPerEm));
   const ox = D.mul(D.fromNumber(g.x + shiftEm), SIZE);
   const oy = D.mul(D.fromNumber(line.baseline), SIZE);
-  const pt = (fx: number, fy: number): Pt => ({
-    x: D.add(ox, D.mul(D.fromNumber(g.italic ? fx + fy * SKEW : fx), C)),
-    y: D.sub(oy, D.mul(D.fromNumber(fy), C)),
-  });
+  const m = o.onPath ? glyphMap(o, line, g, shiftEm) : null;
+  const pt = (fx: number, fy: number): Pt => {
+    if (m) {
+      // (a text on a curve is placed in doubles, then exactly: the curve is the text's own local geometry, like a path's nodes)
+      m.at(fx, fy);
+      return { x: D.fromNumber(m.x), y: D.fromNumber(m.y) };
+    }
+    return {
+      x: D.add(ox, D.mul(D.fromNumber(g.italic ? fx + fy * SKEW : fx), C)),
+      y: D.sub(oy, D.mul(D.fromNumber(fy), C)),
+    };
+  };
   for (const contour of f.glyph(g.gid).contours) {
     for (const s of contour) {
       const pts: Pt[] = [];

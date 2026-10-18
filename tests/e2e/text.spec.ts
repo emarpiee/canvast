@@ -383,8 +383,8 @@ test("Layers panel: sort by name (A to Z, Z to A; a group by its name, then what
   expect(await where(), "no position changed").toEqual(before);
   // The group row has a count and its members are drawn indented under guide lines.
   await expect(panel.locator("li.layer.is-group .layer-count")).toHaveText("2");
-  const depth = await panel.locator(`li.layer[data-key="${idOf("kiwi")}"]`).evaluate((e) => getComputedStyle(e, "::before").width);
-  expect(parseFloat(depth)).toBeGreaterThan(10);
+  // (polled: Firefox may answer "auto" for the guide's width until the row is laid out)
+  await expect.poll(async () => parseFloat(await panel.locator(`li.layer[data-key="${idOf("kiwi")}"]`).evaluate((e) => getComputedStyle(e, "::before").width))).toBeGreaterThan(10);
   // Undo puts the old order back.
   await p.keyboard.press("Control+z");
   await p.keyboard.press("Control+z");
@@ -632,5 +632,173 @@ test("a text can be filled with a gradient and given an outline: set in the opti
   const back = (await textObjects(p))[0]!;
   expect(back["gradient"]).toEqual(saved["gradient"]);
   expect(back["outline"]).toEqual(saved["outline"]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Tab nests a list item; the paragraph and box options (space, first line, case, most lines, set height and where the words sit) are stored and kept after a reload (ADR 0130)", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 300, 300);
+  await p.keyboard.type("one");
+  await p.getByRole("button", { name: "Bulleted list" }).click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("two");
+  await p.keyboard.press("Tab");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("three");
+  await p.keyboard.press("Shift+Tab");
+  await finish(p);
+  expect((await textObjects(p))[0]!.md).toBe("- one\n  - two\n- three");
+
+  // A deeper item is further in on the canvas.
+  const [t] = await textObjects(p);
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  const field = (name: string) => p.locator(`.colour-pop [data-field="${name}"]`);
+  await field("paraGap").fill("1.5");
+  await field("paraGap").press("Enter");
+  await field("maxLines").fill("2");
+  await field("maxLines").press("Enter");
+  await field("heightPx").fill("120");
+  await field("heightPx").press("Enter");
+  await p.locator('.colour-pop [data-caps="upper"]').click();
+  await p.locator('.colour-pop [data-valign="middle"]').click();
+  const now = async () => (await textObjects(p)).find((o) => o.id === t!.id)!;
+  await expect.poll(async () => (await now())["caps"]).toBe("upper");
+  expect(await now()).toMatchObject({ paraGap: 1.5, maxLines: 2, valign: "middle" });
+  expect(((await now())["h"] as number) * 2 ** (((await now())["unit"]) as number)).toBeCloseTo(120, 3);
+  // The box is as tall as it was set, not as the words need.
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), t!.id))!.box;
+  expect(box.maxY - box.minY).toBeGreaterThan(120);
+  expect(box.maxY - box.minY).toBeLessThan(130);
+  await p.keyboard.press("Escape");
+
+  // Back to the defaults: 0 lines, 0 height and "As typed" take the settings away again.
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  await field("maxLines").fill("0");
+  await field("maxLines").press("Enter");
+  await field("heightPx").fill("0");
+  await field("heightPx").press("Enter");
+  await p.locator('.colour-pop [data-caps="none"]').click();
+  await expect.poll(async () => (await now())["caps"]).toBeUndefined();
+  expect(await now()).not.toHaveProperty("h");
+  expect(await now()).not.toHaveProperty("maxLines");
+  await p.keyboard.press("Escape");
+
+  // Kept after a reload.
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  await p.locator('.colour-pop [data-caps="small"]').click();
+  await p.keyboard.press("Escape");
+  const saved = await now();
+  expect(saved["caps"]).toBe("small");
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect((await textObjects(p))[0]).toMatchObject({ caps: "small", paraGap: 1.5, md: "- one\n  - two\n- three" });
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("selected words can be made a link (web or mail address only, shown underlined); Ctrl+click on them opens it in a new tab (ADR 0130)", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 300, 300);
+  await p.keyboard.type("go there now");
+  const select = async (from: number, count: number) => {
+    await p.keyboard.press("Home");
+    for (let i = 0; i < from; i++) await p.keyboard.press("ArrowRight");
+    for (let i = 0; i < count; i++) await p.keyboard.press("Shift+ArrowRight");
+  };
+  await select(3, 5);
+  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await p.getByTestId("prompt-input").fill("javascript:alert(1)");
+  await p.getByTestId("prompt-input").press("Enter");
+  await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
+  await expect(p.getByTestId("text-editor")).toBeVisible(); // the dialog did not end the edit
+  await select(3, 5);
+  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await p.getByTestId("prompt-input").fill("https://example.com/a(b)");
+  await p.getByTestId("prompt-input").press("Enter");
+  await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
+  await finish(p);
+  const [t] = await textObjects(p);
+  expect(t!.md).toBe("go [there](https://example.com/a%28b%29) now");
+
+  // Ctrl+click on the words opens the address (the call is watched here, so the test makes no request); a click elsewhere on the text opens nothing.
+  await p.evaluate(() => {
+    (window as unknown as { __opened: unknown[][] }).__opened = [];
+    window.open = ((...a: unknown[]) => ((window as unknown as { __opened: unknown[][] }).__opened.push(a), null)) as typeof window.open;
+  });
+  await p.keyboard.press("v");
+  const box = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), t!.id))!.box;
+  const y = (box.minY + box.maxY) / 2;
+  await p.keyboard.down("Control");
+  await p.mouse.click(box.minX + 40, y); // on "there"
+  await p.keyboard.up("Control");
+  await expect.poll(() => p.evaluate(() => (window as unknown as { __opened: unknown[][] }).__opened.length)).toBe(1);
+  expect(await p.evaluate(() => (window as unknown as { __opened: unknown[][] }).__opened[0])).toEqual(["https://example.com/a%28b%29", "_blank", "noopener,noreferrer"]);
+  await p.keyboard.down("Control");
+  await p.mouse.click(box.minX + 4, y); // on "go"
+  await p.keyboard.up("Control");
+  expect(await p.evaluate(() => (window as unknown as { __opened: unknown[][] }).__opened.length)).toBe(1);
+
+  // Open it again to take the link away: an empty address.
+  await p.mouse.dblclick(box.minX + 4, y);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.press("Control+a");
+  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await expect(p.getByTestId("prompt-input")).toHaveValue("");
+  await p.getByTestId("prompt-input").fill("");
+  await p.getByTestId("prompt-input").press("Enter");
+  await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
+  await finish(p);
+  expect((await textObjects(p))[0]!.md).toBe("go there now");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a text is set along a picked path (a copy of its curve), runs along it and is taken off again (ADR 0131)", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 300, 560);
+  await p.keyboard.type("Along the line");
+  await finish(p);
+  await p.keyboard.press("u");
+  await p.click('[data-shape-kind="line"]');
+  await app.drag({ x: 300, y: 320 }, { x: 560, y: 480 }, 6);
+  const [text, line] = [(await textObjects(p))[0]!, (await objects(p)).find((o) => o.kind === "path")!];
+  const box = async () => (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), text.id))!.box;
+  const flat = await box();
+  expect(flat.maxY - flat.minY).toBeLessThan(40);
+
+  // Pick both and set the text along the line.
+  await p.keyboard.press("v");
+  await p.mouse.click(flat.minX + 12, (flat.minY + flat.maxY) / 2);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(430, 400);
+  await p.keyboard.up("Shift");
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(2);
+  await p.getByRole("button", { name: "Set the text along the picked path (pick the text and the path)" }).click();
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { n: number[] } | undefined)?.n.length).toBeGreaterThanOrEqual(12);
+  const along = await box();
+  expect(along.maxY - along.minY).toBeGreaterThan(60); // the words climb down the diagonal
+  expect(app.consoleErrors).toEqual([]);
+
+  // The letters are on the line: ink near it, and the straight text's old place is empty.
+  const onLine = await p.evaluate(() => {
+    let n = 0;
+    for (let t = 0.05; t < 0.95; t += 0.01) {
+      const x = 300 + 260 * t, y = 320 + 160 * t;
+      for (let dy = -18; dy <= 2; dy += 2) { const px = window.__canvastDebug.pixelAt(Math.round(x), Math.round(y + dy)); if (px[0] + px[1] + px[2] < 300) n++; }
+    }
+    return n;
+  });
+  expect(onLine).toBeGreaterThan(30);
+
+  // Taking it off sets it straight again, and undo puts it back on.
+  await p.getByRole("button", { name: "Take the text off its path: it is set straight again" }).click();
+  await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeUndefined();
+  const back = await box();
+  expect(back.maxY - back.minY).toBeLessThan(40);
+  await p.keyboard.press(`${mod}+z`);
+  await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeDefined();
+  expect(line.kind).toBe("path");
   expect(app.consoleErrors).toEqual([]);
 });

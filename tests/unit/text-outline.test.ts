@@ -20,6 +20,22 @@ const text = (md: string, extra: Partial<TextObject> = {}): TextObject => ({ id:
 const flat = (subs: readonly SubPath[]) => flatten(subs, subs.map((s) => Float64Array.from(s.n)), FLAT_TOLERANCE_PX / 10, { minX: -1e9, minY: -1e9, maxX: 1e9, maxY: 1e9 }, 0);
 
 describe("text as outlines", () => {
+  it("a text on a straight path along x is the same outline, with its baseline on the path (v0.18.1)", () => {
+    const n = [0, 0, 0, 0, 0, 0, 5000, 0, 5000, 0, 5000, 0];
+    const flatO = text("Hag");
+    const onPath = text("Hag", { onPath: { n, closed: false } });
+    const a = geometryBounds(textOutline(flatO).sub), b = geometryBounds(textOutline(onPath).sub);
+    const baseline = layoutText(flatO.md, flatO.w / flatO.size).lines[0]!.baseline * flatO.size;
+    expect(b.minX).toBeCloseTo(a.minX, 3);
+    expect(b.maxX).toBeCloseTo(a.maxX, 3);
+    expect(b.minY).toBeCloseTo(a.minY - baseline, 3);
+    expect(b.maxY).toBeCloseTo(a.maxY - baseline, 3);
+    // along a vertical path (down) the letters are turned a quarter: the outline is as tall as the text was wide
+    const down = geometryBounds(textOutline(text("Hag", { onPath: { n: [0, 0, 0, 0, 0, 0, 0, 5000, 0, 5000, 0, 5000], closed: false } })).sub);
+    expect(down.maxY - down.minY).toBeCloseTo(a.maxX - a.minX, 0);
+    expect(textOutline(text("Hag", { onPath: { n, closed: false }, md: "~~Hag~~" })).sub.length).toBe(textOutline(text("Hag", { onPath: { n, closed: false } })).sub.length); // (no line through letters on a curve)
+  });
+
   it("an underline is one outline with the letters it touches, and a text without one has the same outline as before (v0.18.1)", () => {
     const plain = textOutline(text("Ig")).sub;
     const under = textOutline(text("<u>Ig</u>")).sub;

@@ -4,7 +4,8 @@ import { pivotOf } from "../doc/model";
 import { booleanOp } from "../doc/boolean";
 import type { SubPath } from "../doc/path";
 import { rotateSubs } from "../doc/path";
-import { BOLD_SHIFT_EM, SKEW } from "../render/draw-text";
+import { BOLD_SHIFT_EM } from "../render/draw-text";
+import { glyphMap } from "./glyph-space";
 import { DECO, glyphScale, layoutOf } from "./layout";
 import { fontFor } from "./fonts";
 
@@ -27,30 +28,27 @@ export function textOutline(o: TextObject): TextOutline {
   const subs: SubPath[] = [];
   let missing = 0;
   for (const line of lay.lines) {
-    const oy = line.baseline * o.size;
     const lineStart = subs.length;
     for (const g of line.glyphs) {
       if (g.cp === 32) continue;
       const gs = glyphScale(line, g);
-      const c = (o.size * gs) / f.unitsPerEm;
       if (!g.gid) {
         missing++;
         continue;
       }
       const copy = (shiftEm: number): SubPath[] => {
-        const ox = (g.x + shiftEm) * o.size;
-        const X = (fx: number, fy: number): number => ox + (g.italic ? fx + fy * SKEW : fx) * c;
-        const Y = (fy: number): number => oy - fy * c;
+        const m = glyphMap(o, line, g, shiftEm);
+        // (the same map the drawing uses: straight on its line, or turned along the curve)
+        const P = (fx: number, fy: number): readonly [number, number] => (m.at(fx, fy), [m.x, m.y]);
         const out: SubPath[] = [];
         for (const contour of f.glyph(g.gid).contours) {
           const n: number[] = [];
           contour.forEach((s, i) => {
-            const x0 = X(s[0]!, s[1]!);
-            const y0 = Y(s[1]!);
+            const [x0, y0] = P(s[0]!, s[1]!);
             let ox1 = x0, oy1 = y0;
             if (s.length === 6) {
               // a quadratic as a cubic: the handle at the start is two thirds of the way to the control point
-              const cx = X(s[2]!, s[3]!), cy = Y(s[3]!);
+              const [cx, cy] = P(s[2]!, s[3]!);
               ox1 = x0 + (2 / 3) * (cx - x0);
               oy1 = y0 + (2 / 3) * (cy - y0);
             }
@@ -58,7 +56,7 @@ export function textOutline(o: TextObject): TextOutline {
             const prev = contour[(i - 1 + contour.length) % contour.length]!;
             let ix = x0, iy = y0;
             if (prev.length === 6) {
-              const cx = X(prev[2]!, prev[3]!), cy = Y(prev[3]!);
+              const [cx, cy] = P(prev[2]!, prev[3]!);
               ix = x0 + (2 / 3) * (cx - x0);
               iy = y0 + (2 / 3) * (cy - y0);
             }
@@ -76,7 +74,7 @@ export function textOutline(o: TextObject): TextOutline {
       const joined = booleanOp("union", [{ subs: copy(0), evenodd: false }, { subs: copy(BOLD_SHIFT_EM * gs), evenodd: false }]);
       subs.push(...(joined && joined.length ? joined : [...copy(0), ...copy(BOLD_SHIFT_EM * gs)]));
     }
-    if (line.decos.length) {
+    if (line.decos.length && !o.onPath) {
       // The lines under and through the letters, joined with them into one outline (no edges inside it).
       const rects: SubPath[] = line.decos.map((d) => {
         const gs = line.scale * d.k;

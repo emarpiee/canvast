@@ -15,6 +15,7 @@ import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnPara
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
+import { linkAt } from "../text/layout";
 import { handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
@@ -853,6 +854,15 @@ export function attachTools(
       return;
     }
     if (startGradientPress(e, s) || startCornerPress(e, s)) return;
+    // Ctrl or Cmd and a click on a link of a text opens it in a new tab (nothing is picked).
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      const top = pickAll(unlocked(visible()), s.x, s.y)[0];
+      const url = top && top.obj.kind === "text" ? linkAt(top.obj, localOf(top, s.x, s.y)) : null;
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
     const vis = visible();
     // Rotate and resize handles take priority when a selection is visible.
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;

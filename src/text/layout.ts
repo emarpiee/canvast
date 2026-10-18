@@ -1,7 +1,7 @@
 import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
-import { parse } from "./markdown";
+import { listNumbers, parse } from "./markdown";
 import { fontFor, onFontsChange, setBundledFont } from "./fonts";
 
 /**
@@ -30,6 +30,8 @@ export interface PlacedGlyph {
   readonly color?: string;
   readonly under?: true;
   readonly strike?: true;
+  /** Where the glyph links to (its words were a link); links are underlined. */
+  readonly link?: string;
 }
 
 /** A line under or through a run of glyphs, in em of the body size from the object's left, with the size and colour of the run. */
@@ -73,10 +75,22 @@ export interface TextStyle {
   readonly align?: TextAlign;
   /** The font file (a library asset's hash) the text is set in; absent = the bundled font. */
   readonly assetId?: string;
+  /** The space between paragraphs in em (default BLOCK_GAP). */
+  readonly paraGap?: number;
+  /** How far the first line of a paragraph starts in, in em. */
+  readonly indent?: number;
+  /** A change of case applied when the letters are set; `small` draws lower case as smaller capitals. */
+  readonly caps?: "upper" | "lower" | "title" | "small";
+  /** At most this many lines; the last ends in "…" when words were cut. */
+  readonly maxLines?: number;
 }
 
 export const LINE_HEIGHT = 1.3;
 export const BLOCK_GAP = 0.6;
+/** The size of the capitals that stand for lower case letters in small caps, as a multiple of the size. */
+export const SMALL_CAPS = 0.8;
+/** The bullets of the levels of a list, going round. */
+export const BULLETS = ["•", "–"] as const;
 export const ITEM_GAP = 0.2;
 export const LIST_INDENT = 1.5;
 export const BLOCK_SCALE: Record<BlockType, number> = { p: 1, h1: 2, h2: 1.5, h3: 1.25, ul: 1, ol: 1 };
@@ -103,20 +117,38 @@ export function textFont(): Font {
 }
 
 export function layoutText(md: string, wrapEm: number, style: TextStyle = {}): TextLayout {
-  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId } = style;
-  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${md}`;
+  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId, paraGap = BLOCK_GAP, indent = 0, caps, maxLines } = style;
+  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${paraGap}|${indent}|${caps ?? ""}|${maxLines ?? ""}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm, lineHeight, tracking, align, assetId);
+    l = compute(md, wrapEm, { lineHeight, tracking, align, assetId, paraGap, indent, caps, maxLines });
     cache.set(key, l);
   }
   return l;
 }
 
-/** The layout of a text object: the one place that knows how its fields (width, auto width, line height, letter spacing, alignment) shape it. */
+const heights = new WeakMap<TextLayout, Map<string, TextLayout>>();
+
+/**
+ * The layout of a text object: the one place that knows how its fields (width, auto width, line height, letter spacing, alignment,
+ * paragraphs, case, line limit, and a set height with where the words sit in it) shape it.
+ */
 export function layoutOf(o: TextObject): TextLayout {
-  return layoutText(o.md, o.autoWidth ? Infinity : o.w / o.size, o);
+  const l = layoutText(o.md, o.autoWidth || o.onPath ? Infinity : o.w / o.size, o);
+  if (o.h === undefined) return l;
+  // A set height: the box is that tall, and the words sit at the top, the middle or the bottom of it (never above the top).
+  const H = o.h / o.size;
+  const dy = o.valign === "middle" ? Math.max(0, (H - l.height) / 2) : o.valign === "bottom" ? Math.max(0, H - l.height) : 0;
+  const key = `${H}|${dy}`;
+  let by = heights.get(l);
+  if (!by) heights.set(l, (by = new Map()));
+  let r = by.get(key);
+  if (!r) {
+    r = { lines: dy ? l.lines.map((ln) => ({ ...ln, top: ln.top + dy, bottom: ln.bottom + dy, baseline: ln.baseline + dy })) : l.lines, width: l.width, height: H };
+    by.set(key, r);
+  }
+  return r;
 }
 
 interface Ch {
@@ -127,9 +159,25 @@ interface Ch {
   color: string | undefined;
   under: boolean;
   strike: boolean;
+  link: string | undefined;
 }
 
-function compute(md: string, wrapEm: number, lineHeight: number, tracking: number, align: TextAlign, assetId: string | undefined): TextLayout {
+/** The characters a letter becomes under a change of case (a few letters become two), and the size a small capital has. */
+function caseOf(cp: number, caps: TextStyle["caps"], wordStart: boolean): { cps: number[]; k: number } {
+  const ch = String.fromCodePoint(cp);
+  const to = (t: string): number[] => [...t].map((c) => c.codePointAt(0)!);
+  if (caps === "upper") return { cps: to(ch.toUpperCase()), k: 1 };
+  if (caps === "lower") return { cps: to(ch.toLowerCase()), k: 1 };
+  if (caps === "title") return { cps: wordStart ? to(ch.toUpperCase()) : [cp], k: 1 };
+  if (caps === "small") {
+    const up = ch.toUpperCase();
+    return up !== ch && ch === ch.toLowerCase() ? { cps: to(up), k: SMALL_CAPS } : { cps: [cp], k: 1 };
+  }
+  return { cps: [cp], k: 1 };
+}
+
+function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "lineHeight" | "tracking" | "align" | "paraGap" | "indent">> & { assetId: string | undefined; caps: TextStyle["caps"] | undefined; maxLines: number | undefined }): TextLayout {
+  const { lineHeight, tracking, align, assetId, paraGap, indent: firstIndent, caps, maxLines } = style;
   const f = fontFor(assetId);
   const upm = f.unitsPerEm;
   const advance = (cp: number): { gid: number; adv: number } => {
@@ -140,15 +188,23 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
   let width = Number.isFinite(wrapEm) ? wrapEm : 0;
   let y = 0;
   const blocks = parse(md);
-  let n = 0;
+  const numbers = listNumbers(blocks);
   blocks.forEach((b, bi) => {
     const s = BLOCK_SCALE[b.type];
     const list = b.type === "ul" || b.type === "ol";
-    const indent = list ? LIST_INDENT : 0;
-    n = b.type === "ol" && blocks[bi - 1]?.type === "ol" ? n + 1 : 1;
+    const level = list ? b.level ?? 0 : 0;
+    const indent = list ? LIST_INDENT * (level + 1) : 0;
+    const startIn = b.type === "p" ? firstIndent : 0; // the first line of a paragraph starts further in
     const avail = wrapEm - indent;
     const chars: Ch[] = [];
-    for (const sp of b.spans) for (const c of sp.text) chars.push({ cp: c.codePointAt(0)!, bold: sp.bold, italic: sp.italic, k: sp.scale ?? 1, color: sp.color, under: sp.underline === true, strike: sp.strike === true });
+    let wordStart = true;
+    for (const sp of b.spans) {
+      for (const c of sp.text) {
+        const { cps, k } = caseOf(c.codePointAt(0)!, caps, wordStart);
+        wordStart = c === " ";
+        for (const cp of cps) chars.push({ cp, bold: sp.bold, italic: sp.italic, k: (sp.scale ?? 1) * k, color: sp.color, under: sp.underline === true || sp.link !== undefined, strike: sp.strike === true, link: sp.link });
+      }
+    }
     let line: Array<Ch & { gid: number; adv: number }> = [];
     let first = true;
     const emit = (glyphs: typeof line, last = false): void => {
@@ -157,26 +213,26 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
       const lh = lineHeight * s * big;
       const placed: PlacedGlyph[] = [];
       if (first && list) {
-        let mx = 0.4;
-        for (const c of b.type === "ul" ? "•" : `${n}.`) {
+        let mx = 0.4 + LIST_INDENT * level;
+        for (const c of b.type === "ul" ? BULLETS[level % BULLETS.length]! : `${numbers[bi]}.`) {
           const a = advance(c.codePointAt(0)!);
           placed.push({ cp: c.codePointAt(0)!, gid: a.gid, x: mx, adv: a.adv, bold: false, italic: false });
           mx += a.adv;
         }
       }
-      let x = indent;
+      let x = indent + (first ? startIn : 0);
       for (const g of glyphs) {
-        placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}) });
+        placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}), ...(g.link ? { link: g.link } : {}) });
         x += g.adv * s;
       }
-      if (align === "justify" && !last && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent, wrapEm);
+      if (align === "justify" && !last && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), wrapEm);
       width = Math.max(width, x);
       const content = ((f.ascender - f.descender) / upm) * s * big;
       lines.push({ top: y, bottom: y + lh, baseline: y + (lh - content) / 2 + (f.ascender / upm) * s * big, scale: s, glyphs: placed, decos: [] });
       y += lh;
       first = false;
     };
-    let x = 0;
+    let x = startIn;
     let lastSpace = -1;
     for (const c of chars) {
       if (c.cp < 32) continue;
@@ -195,8 +251,24 @@ function compute(md: string, wrapEm: number, lineHeight: number, tracking: numbe
     }
     emit(line, true);
     const next = blocks[bi + 1];
-    if (next) y += list && next.type === b.type ? ITEM_GAP : BLOCK_GAP;
+    if (next) y += list && (next.type === "ul" || next.type === "ol") ? ITEM_GAP : paraGap;
   });
+  if (maxLines !== undefined && lines.length > maxLines) {
+    // Cut at the limit, and say so: the last line ends in an ellipsis that is kept inside the width.
+    lines.length = maxLines;
+    y = lines[maxLines - 1]!.bottom;
+    const ln = lines[maxLines - 1]!;
+    const glyphs = ln.glyphs.slice();
+    const dots = advance(0x2026);
+    const lastG = glyphs[glyphs.length - 1];
+    const k = lastG?.k ?? 1;
+    const em = ln.scale * k;
+    const end = (): number => (glyphs.length ? glyphs[glyphs.length - 1]!.x + glyphs[glyphs.length - 1]!.adv : 0);
+    while (glyphs.length && (glyphs[glyphs.length - 1]!.cp === 32 || (Number.isFinite(wrapEm) && end() + dots.adv * em > wrapEm))) glyphs.pop();
+    glyphs.push({ cp: 0x2026, gid: dots.gid, x: end(), adv: dots.adv * em, bold: false, italic: false, ...(k !== 1 ? { k } : {}) });
+    lines[maxLines - 1] = { ...ln, glyphs };
+    width = Math.max(width, end());
+  }
   if (align === "center" || align === "right") {
     // The width the lines align in: the set width, or (no wrapping) the widest line.
     const W = Number.isFinite(wrapEm) ? Math.max(wrapEm, width) : width;
@@ -245,4 +317,15 @@ function justify(placed: PlacedGlyph[], n: number, indent: number, wrapEm: numbe
     if (g.cp === 32) shift += extra;
   }
   return wrapEm;
+}
+
+/** The address a click at `p` (local units of the text, from its top-left) would follow, if the letter there is a link. */
+export function linkAt(o: TextObject, p: { x: number; y: number }): string | null {
+  const x = p.x / o.size;
+  const y = p.y / o.size;
+  for (const line of layoutOf(o).lines) {
+    if (y < line.top || y > line.bottom) continue;
+    for (const g of line.glyphs) if (g.link && x >= g.x && x <= g.x + g.adv) return g.link;
+  }
+  return null;
 }

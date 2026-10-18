@@ -11,7 +11,7 @@ import { homeObject, newObjectId, pivotOf } from "../doc/model";
 import { radiansFromAngle } from "../core/angle";
 import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
-import { MAX_MARKDOWN_LENGTH, parse, serialize } from "../text/markdown";
+import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../text/markdown";
 import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
@@ -20,6 +20,7 @@ import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { openColourPopover } from "./colour-popover";
+import { promptDialog } from "./confirm";
 
 /**
  * WYSIWYG text editing with a native contenteditable overlay placed exactly
@@ -62,6 +63,7 @@ const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
   { cmd: "italic", icon: ICONS.italic, label: "Italic (Ctrl+I)" },
   { cmd: "underline", icon: ICONS.underline, label: "Underline (Ctrl+U)" },
   { cmd: "strike", icon: ICONS.strikethrough, label: "Strikethrough (Ctrl+Shift+X)" },
+  { cmd: "link", icon: ICONS.textLink, label: "Link of the selected words" },
   { cmd: "colour", icon: ICONS.textColour, label: "Colour of the selected words" },
   { cmd: "bigger", icon: ICONS.textBigger, label: "Make the selected words bigger" },
   { cmd: "smaller", icon: ICONS.textSmaller, label: "Make the selected words smaller" },
@@ -128,7 +130,7 @@ export function mountTextEditor(
     const em = target.size * ppu;
     box.style.left = `${s.x}px`;
     box.style.top = `${s.y}px`;
-    box.style.width = target.autoWidth ? "max-content" : `${target.w * ppu}px`;
+    box.style.width = target.autoWidth || target.onPath ? "max-content" : `${target.w * ppu}px`;
     box.style.minWidth = target.autoWidth ? `${em * 0.5}px` : "";
     box.style.textAlign = target.align ?? "left";
     box.style.fontSize = `${em}px`;
@@ -142,6 +144,15 @@ export function mountTextEditor(
       box.style.transform = "";
     }
     box.style.color = paintColor(target.color);
+    box.style.setProperty("--gap", String(target.paraGap ?? 0.6));
+    box.style.setProperty("--indent", String(target.indent ?? 0));
+    // Case as set (the words stay as typed); a set height with where the words sit in it.
+    box.style.textTransform = target.caps === "upper" ? "uppercase" : target.caps === "lower" ? "lowercase" : target.caps === "title" ? "capitalize" : "";
+    box.style.fontVariantCaps = target.caps === "small" ? "small-caps" : "";
+    box.style.height = target.h !== undefined ? `${target.h * ppu}px` : "";
+    box.style.display = target.h !== undefined ? "flex" : "";
+    box.style.flexDirection = target.h !== undefined ? "column" : "";
+    box.style.justifyContent = target.valign === "middle" ? "center" : target.valign === "bottom" ? "flex-end" : "";
     box.style.fontFamily = `${familyFor(target.assetId)}, ${FALLBACK_FAMILY}`;
     box.style.lineHeight = String(target.lineHeight ?? 1.3);
     box.style.letterSpacing = `${target.tracking ?? 0}em`;
@@ -276,6 +287,28 @@ export function mountTextEditor(
     getSelection()?.removeAllRanges();
     getSelection()?.addRange(sel);
   };
+  /** A link for the selected words: asks for the address (http, https or mailto; empty takes the link away). */
+  const linkSelection = (): void => {
+    const r = selectedRange();
+    if (!r) return needWords();
+    const saved = r.cloneRange();
+    const at = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : (r.startContainer as HTMLElement);
+    const now = at?.closest("a")?.getAttribute("href") ?? "";
+    void promptDialog({ title: "Link", lines: ["Where do the selected words go? A web address (https://…) or an email (mailto:…). Leave it empty to take the link away. Ctrl+click on the words opens it."], value: now, confirmLabel: "Set link" }).then((url) => {
+      if (url === null) return;
+      box.focus({ preventScroll: true });
+      const sel = getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(saved);
+      const clean = url.trim();
+      if (!clean) document.execCommand("unlink");
+      else if (isLinkUrl(linkUrlOf(clean))) document.execCommand("createLink", false, linkUrlOf(clean));
+      else {
+        editor.message = "A link must be a web address (https://…) or an email (mailto:…).";
+        editor.changed();
+      }
+    });
+  };
   /** The colour of the selected words, chosen in the colour picker (the selection is kept while the picker has the focus). */
   const pickSelectionColour = (anchor: HTMLElement): void => {
     const r = selectedRange();
@@ -315,6 +348,7 @@ export function mountTextEditor(
     else if (cmd === "strike") document.execCommand("strikeThrough");
     else if (cmd === "bigger" || cmd === "smaller") resizeSelection(cmd === "bigger" ? 1.25 : 0.8);
     else if (cmd === "colour") pickSelectionColour(e.target as HTMLElement);
+    else if (cmd === "link") linkSelection();
     else document.execCommand("formatBlock", false, `<${cmd === "p" ? "div" : cmd}>`);
   });
   box.addEventListener("keydown", (e) => {
@@ -330,6 +364,16 @@ export function mountTextEditor(
       document.execCommand("strikeThrough");
       return;
     }
+    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // In a list, Tab makes the item a level deeper and Shift+Tab a level shallower; elsewhere the key leaves the box as usual.
+      const at = getSelection()?.anchorNode;
+      const inList = !!(at && (at.nodeType === Node.TEXT_NODE ? at.parentElement : (at as HTMLElement))?.closest("li"));
+      if (inList) {
+        e.preventDefault();
+        document.execCommand(e.shiftKey ? "outdent" : "indent");
+      }
+      return;
+    }
     if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
       e.preventDefault();
       commit();
@@ -342,7 +386,7 @@ export function mountTextEditor(
     document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") ?? "");
   });
   // The options bar and its pop-ups (size, font, colour...) change the text while it is open: using them does not end the edit.
-  const OPTIONS = ".toolbar, .colour-pop";
+  const OPTIONS = ".toolbar, .colour-pop, dialog.confirm";
   const inside = (n: EventTarget | null): boolean => n instanceof Element && (box.contains(n) || bar.contains(n) || n.closest(OPTIONS) !== null);
   box.addEventListener("focusout", (e) => {
     if (inside(e.relatedTarget)) return;
@@ -382,22 +426,42 @@ function blocksToHtml(blocks: readonly Block[]): string {
       let h = esc(s.text);
       if (s.italic) h = `<i>${h}</i>`;
       if (s.bold) h = `<b>${h}</b>`;
+      if (s.link) h = `<a href="${esc(s.link)}">${h}</a>`;
       if (s.strike) h = `<s>${h}</s>`;
       if (s.underline) h = `<u>${h}</u>`;
       const css = [s.color ? `color:${cssOfHex(s.color)}` : "", s.scale && s.scale !== 1 ? `font-size:${s.scale * 100}%` : ""].filter(Boolean).join(";");
       return css ? `<span style="${css}">${h}</span>` : h;
     }).join("");
+  // Lists nest: a stack of the open lists; an item stays open until the next one (it may hold a deeper list).
+  const stack: Array<"ul" | "ol"> = [];
+  const closeTo = (depth: number): void => {
+    while (stack.length > depth) html += `</li></${stack.pop()}>`;
+  };
   for (const b of blocks) {
     const l = b.type === "ul" || b.type === "ol" ? b.type : null;
-    if (list !== l) {
-      if (list) html += `</${list}>`;
-      if (l) html += `<${l}>`;
-      list = l;
+    if (!l) {
+      closeTo(0);
+      const tag = b.type === "p" ? "div" : b.type;
+      html += `<${tag}>${spans(b.spans)}</${tag}>`;
+      continue;
     }
-    const tag = l ? "li" : b.type === "p" ? "div" : b.type;
-    html += `<${tag}>${spans(b.spans)}</${tag}>`;
+    const depth = (b.level ?? 0) + 1;
+    closeTo(depth);
+    if (stack.length === depth) {
+      html += "</li>";
+      if (stack[depth - 1] !== l) {
+        html += `</${stack.pop()}>`;
+        stack.push(l);
+        html += `<${l}>`;
+      }
+    }
+    while (stack.length < depth) {
+      stack.push(l);
+      html += `<${l}>`;
+    }
+    html += `<li>${spans(b.spans)}`;
   }
-  if (list) html += `</${list}>`;
+  closeTo(0);
   return html;
 }
 
@@ -406,30 +470,37 @@ const HEADING: Record<string, BlockType> = { H1: "h1", H2: "h2", H3: "h3", H4: "
 /** Read the editing surface back into blocks; styles come from the computed style of each text run. */
 export function domToBlocks(root: HTMLElement): Block[] {
   const blocks: Block[] = [];
-  let cur: { type: BlockType; spans: Span[] } | null = null;
+  let cur: { type: BlockType; spans: Span[]; level?: number } | null = null;
   const end = (): void => {
     if (cur?.spans.length) blocks.push(cur);
     cur = null;
   };
-  const start = (type: BlockType): void => {
+  const start = (type: BlockType, level = 0): void => {
     end();
-    cur = { type, spans: [] };
+    cur = { type, spans: [], ...(level ? { level } : {}) };
+  };
+  /** The address of the link an element sits in (a browser may have made one of its own: only a safe one is kept). */
+  const linkOf = (el: HTMLElement): string | undefined => {
+    const href = el.closest("a")?.getAttribute("href") ?? "";
+    return isLinkUrl(href) ? href : undefined;
   };
   const rootColor = getComputedStyle(root).color;
   const rootPx = parseFloat(getComputedStyle(root).fontSize);
   /** Whether an element, or one it sits in (up to the box), is decorated with `line` (underline, line-through). */
   const decorated = (el: HTMLElement | null, line: string): boolean => {
-    for (; el && el !== root; el = el.parentElement) if (getComputedStyle(el).textDecorationLine.includes(line)) return true;
+    // (a link is underlined by being a link: that is not an underline of the words)
+    for (; el && el !== root; el = el.parentElement) if (el.tagName !== "A" && getComputedStyle(el).textDecorationLine.includes(line)) return true;
     return false;
   };
-  const walk = (n: Node, type: BlockType, blockPx = rootPx): void => {
+  const walk = (n: Node, type: BlockType, blockPx = rootPx, level = 0): void => {
     if (n.nodeType === Node.TEXT_NODE) {
       const text = (n as Text).data.replace(/[ \r\n\t]/g, " ");
       if (!text) return;
-      if (!cur) start(type);
+      if (!cur) start(type, level);
       const el = n.parentElement!;
       const cs = getComputedStyle(el);
       const scale = Math.round((parseFloat(cs.fontSize) / blockPx) * 10000) / 10000;
+      const link = linkOf(el);
       cur!.spans.push({
         text,
         bold: Number(cs.fontWeight) >= 600,
@@ -438,6 +509,7 @@ export function domToBlocks(root: HTMLElement): Block[] {
         ...(decorated(el, "line-through") ? { strike: true } : {}),
         ...(cs.color !== rootColor ? { color: hexOfCss(cs.color) } : {}),
         ...(Math.abs(scale - 1) > 0.004 ? { scale } : {}),
+        ...(link ? { link } : {}),
       });
       return;
     }
@@ -446,17 +518,18 @@ export function domToBlocks(root: HTMLElement): Block[] {
     if (tag === "BR") return end();
     if (tag === "UL" || tag === "OL") {
       end();
-      for (const c of n.childNodes) walk(c, tag === "UL" ? "ul" : "ol", blockPx);
+      // (a list inside an item is one level deeper)
+      for (const c of n.childNodes) walk(c, tag === "UL" ? "ul" : "ol", blockPx, type === "ul" || type === "ol" ? level + 1 : 0);
       return end();
     }
     const block = HEADING[tag] ?? (tag === "LI" || tag === "DIV" || tag === "P" ? type : null);
     if (block) {
-      start(block);
+      start(block, level);
       const px = parseFloat(getComputedStyle(n).fontSize) || blockPx;
-      for (const c of n.childNodes) walk(c, block, px);
+      for (const c of n.childNodes) walk(c, block, px, level);
       return end();
     }
-    for (const c of n.childNodes) walk(c, type, blockPx);
+    for (const c of n.childNodes) walk(c, type, blockPx, level);
   };
   for (const c of root.childNodes) walk(c, "p");
   end();

@@ -14,7 +14,7 @@ import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
-import { openColourPopover, openOutlinePopover, openPaintPopover, recentColours } from "./colour-popover";
+import { openColourPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
 import type { Adjust } from "../doc/adjust";
 import { setAdjustPreviewing } from "../render/adjust-image";
 import type { DocumentStore } from "../doc/document-store";
@@ -224,6 +224,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
         <button type="button" class="swatch swatch-paint" data-text-outline data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text outline" title="Text outline: the colour of the line round the letters (none to take it away)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Outline width, in px at this zoom (0: none)">Outline <input type="number" data-text-outline-w min="0" max="2000" step="any" inputmode="decimal" aria-label="Text outline width (px at this zoom)"></label>
+        <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the name to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the name to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
@@ -454,6 +455,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
     const t = actions.selectedTextStyle();
     actions.setTextStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
+  });
+  root.querySelector<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
+    const t = actions.selectedTextStyle();
+    if (!t) return;
+    openTextBoxPopover(e.currentTarget as HTMLElement, {
+      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign,
+      onChange: (patch, final) => actions.setTextStyle(patch, final),
+    });
   });
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-line]")!, (v, final) => actions.setTextStyle({ lineHeight: v }, final));
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-track]")!, (v, final) => actions.setTextStyle({ tracking: v / 100 }, final));

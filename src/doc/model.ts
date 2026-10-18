@@ -5,6 +5,18 @@ import type { Frame, FrameSpace } from "../core/frames";
 import { expressExactIn, levelsBetween, rehome } from "../core/frames";
 import { TURN, cosSin } from "../core/angle";
 import { layoutOf } from "../text/layout";
+import { pathTextBounds } from "../text/glyph-space";
+
+const textPathBounds = (o: TextObject): LocalBounds => {
+  let b = pathBoundsCache.get(o);
+  if (!b) {
+    const r = pathTextBounds(o);
+    const p = (TEXT_PAD_EM + (o.outline?.w ?? 0)) * o.size;
+    pathBoundsCache.set(o, (b = { minX: r.minX - p, minY: r.minY - p, maxX: r.maxX + p, maxY: r.maxY + p }));
+  }
+  return b;
+};
+const pathBoundsCache = new WeakMap<TextObject, LocalBounds>();
 import type { TextAlign } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
 import type { Align, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
@@ -172,6 +184,8 @@ export interface TextObject extends ObjectBase {
   readonly caps?: "upper" | "lower" | "title" | "small";
   /** At most this many lines; the last shows "…" when words were cut. Absent = all of them. */
   readonly maxLines?: number;
+  /** A curve the words run along (nodes of six numbers, local units of the text; a copy of a path's first sub-path made when the text was put on it). The text does not wrap then; a second line sits below the first. */
+  readonly onPath?: { readonly n: readonly number[]; readonly closed: boolean };
 }
 
 /**
@@ -325,6 +339,7 @@ export function unrotatedBounds(o: CanvasObject): LocalBounds {
   if (o.kind === "path") return paintBounds(o.base ?? o.sub, inkStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
+    if (o.onPath) return textPathBounds(o);
     const l = layoutOf(o);
     const p = (TEXT_PAD_EM + (o.outline?.w ?? 0)) * o.size;
     return { minX: -p, minY: -p, maxX: l.width * o.size + p, maxY: l.height * o.size + p };
@@ -521,6 +536,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.indent !== undefined && !(Number.isFinite(o.indent) && o.indent >= 0 && o.indent <= 20)) throw new InvalidObjectError("bad indent");
     if (o.caps !== undefined && !(o.caps === "upper" || o.caps === "lower" || o.caps === "title" || o.caps === "small")) throw new InvalidObjectError("bad case");
     if (o.maxLines !== undefined && !(Number.isInteger(o.maxLines) && o.maxLines >= 1 && o.maxLines <= 10000)) throw new InvalidObjectError("bad line limit");
+    if (o.onPath !== undefined && !(Array.isArray(o.onPath.n) && o.onPath.n.length >= 12 && o.onPath.n.length % 6 === 0 && o.onPath.n.length <= 6 * 20000 && o.onPath.n.every((v) => Number.isFinite(v)) && typeof o.onPath.closed === "boolean")) throw new InvalidObjectError("bad text path");
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }
@@ -618,7 +634,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     };
   } else if (s.kind === "text") {
     // Imported or older text is stored in canonical form.
-    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["assetId"] !== undefined ? { assetId: String(s["assetId"]) } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}), ...(s["gradient"] !== undefined ? { gradient: s["gradient"] as Gradient } : {}), ...(s["outline"] !== undefined ? { outline: s["outline"] as { c: string; w: number } } : {}), ...(s["h"] !== undefined ? { h: s["h"] as number } : {}), ...(s["valign"] !== undefined ? { valign: s["valign"] as "middle" } : {}), ...(s["paraGap"] !== undefined ? { paraGap: s["paraGap"] as number } : {}), ...(s["indent"] !== undefined ? { indent: s["indent"] as number } : {}), ...(s["caps"] !== undefined ? { caps: s["caps"] as "upper" } : {}), ...(s["maxLines"] !== undefined ? { maxLines: s["maxLines"] as number } : {}) };
+    o = { ...base, kind: "text", md: canonical(String(s["md"])), w: s["w"] as number, size: s["size"] as number, color: String(s["color"]), ...(s["lineHeight"] !== undefined ? { lineHeight: s["lineHeight"] as number } : {}), ...(s["tracking"] !== undefined ? { tracking: s["tracking"] as number } : {}), ...(s["assetId"] !== undefined ? { assetId: String(s["assetId"]) } : {}), ...(s["align"] !== undefined ? { align: s["align"] as "center" } : {}), ...(s["autoWidth"] === true ? { autoWidth: true as const } : {}), ...(s["gradient"] !== undefined ? { gradient: s["gradient"] as Gradient } : {}), ...(s["outline"] !== undefined ? { outline: s["outline"] as { c: string; w: number } } : {}), ...(s["h"] !== undefined ? { h: s["h"] as number } : {}), ...(s["valign"] !== undefined ? { valign: s["valign"] as "middle" } : {}), ...(s["paraGap"] !== undefined ? { paraGap: s["paraGap"] as number } : {}), ...(s["indent"] !== undefined ? { indent: s["indent"] as number } : {}), ...(s["caps"] !== undefined ? { caps: s["caps"] as "upper" } : {}), ...(s["maxLines"] !== undefined ? { maxLines: s["maxLines"] as number } : {}), ...(s["onPath"] !== undefined ? { onPath: { n: [...((s["onPath"] as { n: number[] }).n ?? [])], closed: (s["onPath"] as { closed: boolean }).closed } } : {}) };
   } else {
     throw new InvalidObjectError(`unknown kind ${s.kind}`);
   }

@@ -4,6 +4,10 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `route` | Set the picked text along the picked path (Actions bar) |
+| `route-off` | Take a text off its path (Actions bar) |
+| `link-2` | Link of the selected words (text editor bar) |
+| `rows-3` | Paragraph and box options of a text (paragraph space, first line, case, most lines, height) |
 | `underline` | Underline the selected words (text editor bar) |
 | `strikethrough` | Strike through the selected words (text editor bar) |
 | `baseline` | Colour of the selected words (text editor bar) |

@@ -261,6 +261,7 @@ const textSampler: CoarseSampler<TextObject> = {
     } catch {
       return "exact"; // the font is not loaded yet
     }
+    if (o.onPath) return "exact"; // (the letters sit on a curve: no outline of the straight layout to test)
     const lay = layoutOf(o);
     const upm = font.unitsPerEm;
     let inside = false;

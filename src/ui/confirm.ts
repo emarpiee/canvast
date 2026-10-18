@@ -85,3 +85,50 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
     dlg.querySelector<HTMLInputElement>('input[name="choose"]:checked')?.focus();
   });
 }
+
+export interface PromptOptions {
+  title: string;
+  lines: string[];
+  value: string;
+  confirmLabel: string;
+}
+
+/** Modal question with one line to type in. Resolves with the text (possibly empty) when confirmed, or null when cancelled. */
+export function promptDialog(opts: PromptOptions): Promise<string | null> {
+  const dlg = document.createElement("dialog");
+  dlg.className = "confirm";
+  dlg.dataset["testid"] = "prompt-dialog";
+  dlg.setAttribute("aria-labelledby", "prompt-title");
+  dlg.innerHTML = `
+    <h2 id="prompt-title">${esc(opts.title)}</h2>
+    ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
+    <input type="text" class="prompt-input" data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="off" spellcheck="false" value="${esc(opts.value)}">
+    <div class="confirm-actions">
+      <button type="button" data-testid="prompt-cancel" value="cancel">Cancel</button>
+      <button type="button" class="is-primary" data-testid="prompt-ok" value="ok">${esc(opts.confirmLabel)}</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
+  return new Promise((resolve) => {
+    let answer: string | null = null;
+    dlg.addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest("button");
+      if (!b) return;
+      if (b.value === "ok") answer = input.value;
+      dlg.close();
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      answer = input.value;
+      dlg.close();
+    });
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      resolve(answer);
+    });
+    dlg.showModal();
+    input.focus();
+    input.select();
+  });
+}
