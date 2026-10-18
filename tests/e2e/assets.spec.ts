@@ -2154,3 +2154,41 @@ test("the library filters by size, shape and colour, and lists look-alikes toget
   await expect.poll(names, { timeout: 8000 }).toEqual(["photo-bright.png", "photo.png"]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a folder is imported with every file in it, and the files are put in library folders that follow its folders (ADR 0134)", async ({ app }, info) => {
+  const p = app.page;
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const root = mkdtempSync(resolve(tmpdir(), "canvast-dir-"));
+  mkdirSync(resolve(root, "pics/sub"), { recursive: true });
+  mkdirSync(resolve(root, "pics/.hidden"), { recursive: true });
+  const a = makePng(4, 4, () => [200, 20, 20, 255]), b = makePng(4, 4, () => [20, 200, 20, 255]), c = makePng(4, 4, () => [20, 20, 200, 255]);
+  writeFileSync(resolve(root, "pics/a.png"), a);
+  writeFileSync(resolve(root, "pics/sub/b.png"), b);
+  writeFileSync(resolve(root, "pics/.hidden/c.png"), c); // hidden: left out
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-folder-input").setInputFiles(resolve(root, "pics"));
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.assetListing())).entries.filter((e) => e.folderIds.length).length).toBe(2); // (imported, then filed)
+  const listing = await p.evaluate(() => window.__canvastDebug.assetListing());
+  const folders = listing.folders.map((f) => [f.name, listing.folders.find((q) => q.id === f.parentId)?.name ?? null]).sort();
+  expect(folders).toEqual([["pics", null], ["sub", "pics"]]);
+  const inFolder = (hash: string) => listing.entries.find((e) => e.hash === hash)!.folderIds.map((id) => listing.folders.find((f) => f.id === id)!.name);
+  expect(inFolder(createHash("sha256").update(a).digest("hex"))).toEqual(["pics"]);
+  expect(inFolder(createHash("sha256").update(b).digest("hex"))).toEqual(["sub"]);
+  expect(app.consoleErrors).toEqual([]);
+  void info;
+});
+
+test("a picture on the system clipboard (a screenshot) pastes onto the canvas as a picture, kept in the library (ADR 0134)", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "Firefox ignores the data of a synthetic paste event; a real paste takes the same path");
+  const p = app.page;
+  const png = makePng(6, 6, () => [10, 120, 240, 255]);
+  await p.evaluate((bytes) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([new Uint8Array(bytes)], "image.png", { type: "image/png" }));
+    window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, [...png]);
+  await expect.poll(async () => ((await p.evaluate(() => window.__canvastDebug.objects())) as Array<{ kind: string }>).filter((o) => o.kind === "image").length).toBe(1);
+  expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([createHash("sha256").update(png).digest("hex")]);
+  expect(app.consoleErrors).toEqual([]);
+});

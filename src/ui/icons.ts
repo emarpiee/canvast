@@ -71,6 +71,7 @@ import searchIcon from "lucide-static/icons/search.svg";
 import chevronsDownUp from "lucide-static/icons/chevrons-down-up.svg";
 import chevronsUpDown from "lucide-static/icons/chevrons-up-down.svg";
 import folderIcon from "lucide-static/icons/folder.svg";
+import folderInputIcon from "lucide-static/icons/folder-input.svg";
 import folderPlusIcon from "lucide-static/icons/folder-plus.svg";
 import folderXIcon from "lucide-static/icons/folder-x.svg";
 import leafIcon from "lucide-static/icons/leaf.svg";
@@ -247,6 +248,7 @@ export const ICONS = {
   chevronsUpDown: clean(chevronsUpDown),
   folder: clean(folderIcon),
   folderPlus: clean(folderPlusIcon),
+  folderInput: clean(folderInputIcon),
   folderX: clean(folderXIcon),
   leaf: clean(leafIcon),
   imageDown: clean(imageDownIcon),

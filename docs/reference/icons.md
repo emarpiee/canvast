@@ -8,6 +8,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `route` | Set the picked text along the picked path (Actions bar) |
 | `route-off` | Take a text off its path (Actions bar) |
 | `case-sensitive` | Font options of a text (kerning, features, axes) |
+| `folder-input` | Import a folder (Assets view) |
 | `link-2` | Link of the selected words (text editor bar) |
 | `rows-3` | Paragraph and box options of a text (paragraph space, first line, case, most lines, height) |
 | `underline` | Underline the selected words (text editor bar) |

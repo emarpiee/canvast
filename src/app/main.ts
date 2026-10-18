@@ -69,6 +69,7 @@ import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
+import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
 import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
@@ -528,7 +529,7 @@ async function start(): Promise<void> {
   });
   canvas.dataset["tool"] = editor.tool;
 
-  const importFiles = (files: File[]): void => void importImages(files, assets, doc, view, editor);
+  const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);
   const textEditor = mountTextEditor(host, view, doc, editor);
   const copySelectedMarkdown = (): void => {
@@ -1390,8 +1391,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     for (const f of all.filter(isArchiveFile)) void runImport(session, f);
     const files = all.filter((f) => !isArchiveFile(f));
     if (!files.length) return;
-    if (appView === "assets") void assetsView.importFiles(files);
-    else importFiles(files);
+    // (files that came from a folder are then put in library folders of the same names)
+    void (appView === "assets" ? assetsView.importFiles(files) : importFiles(files)).then(() => fileByFolders(session, files));
   };
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
   // the dragged thumbnail over as a new file and store it as an asset of its own.
@@ -1399,6 +1400,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   window.addEventListener("dragstart", () => (internalDrag = true));
   window.addEventListener("dragend", () => (internalDrag = false));
   window.addEventListener("drop", (e) => {
+    const entries = entriesOfDrop(e.dataTransfer);
+    if (!internalDrag && hasFolder(entries)) {
+      // a folder: every file in it comes in, in the library folders it had
+      e.preventDefault();
+      void filesOfEntries(entries).then(receive);
+      return;
+    }
     const files = [...(e.dataTransfer?.files ?? [])];
     if (internalDrag) {
       if (files.length) e.preventDefault();
