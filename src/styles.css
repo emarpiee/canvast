@@ -2482,3 +2482,13 @@ dialog.export-dlg.is-busy .ex-btn { opacity: 0.6; pointer-events: none; }
 .ex-move:disabled { opacity: 0.3; cursor: default; }
 .ex-move:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .ex-minis { max-height: calc(var(--sp-15) * 5); overflow-y: auto; padding: var(--sp-4); }
+/* Several sheets: the dialog takes the height of the window and the pictures take the room of the left half, scrolling when there are more. */
+dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height: calc(100dvh - 2 * var(--edge)); width: min(72rem, calc(100vw - 2 * var(--edge))); }
+.is-multi .ex-body { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+.is-multi .ex-stage { min-width: 0; min-height: 0; padding: 0; align-items: stretch; }
+.is-multi .ex-minis { flex: 1; min-height: 0; max-height: none; max-width: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sp-15) * 1.6), 1fr)); gap: var(--sp-8) var(--sp-5); justify-items: center; align-content: start; padding: var(--sp-6); background: color-mix(in oklch, var(--hud-hover) 35%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
+.is-multi .ex-mini .ex-frame { width: calc(var(--sp-15) * 1.4 * min(1, var(--shape))); }
+.is-multi .ex-mini figcaption { max-width: calc(var(--sp-15) * 1.6); }
+.is-multi .ex-shape { text-align: center; }
+.is-multi .ex-panel { overflow-y: auto; min-height: 0; }
+@media (max-width: 720px) { .is-multi .ex-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; } }

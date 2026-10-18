@@ -83,7 +83,7 @@ export function openExportDialog(deps: ExportDeps): void {
   let busy = false;
 
   const dlg = document.createElement("dialog");
-  dlg.className = "export-dlg";
+  dlg.className = multi ? "export-dlg is-multi" : "export-dlg";
   dlg.dataset["testid"] = "export-dialog";
   dlg.setAttribute("aria-labelledby", "ex-title");
   const preset = presetOf(t.ratio);
