@@ -901,3 +901,24 @@ test("a selection being moved is drawn a little see-through, and back to its own
   expect(Number((await objects(app))[0]!["opacity"] ?? 1)).toBe(1);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("right click on the canvas opens a menu of what fits: on a shape it picks it and offers Duplicate, Group, Delete...; on empty canvas it offers Select everything; a choice runs and the menu closes", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await app.drag({ x: 400, y: 300 }, { x: 560, y: 400 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(120, 650); // nothing picked
+  await p.mouse.click(480, 350, { button: "right" });
+  const menu = p.getByRole("menu", { name: "Canvas actions" });
+  await expect(menu).toBeVisible();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(1);
+  await expect(menu.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Select everything" })).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "Duplicate" }).click();
+  await expect(menu).toBeHidden();
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(2);
+  await p.mouse.click(120, 650, { button: "right" });
+  await expect(p.getByRole("menuitem", { name: "Select everything" })).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+});

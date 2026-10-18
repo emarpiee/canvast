@@ -29,6 +29,8 @@ import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { visibleObjects } from "../render/scene-view";
+import { pickAll } from "../render/hit-test";
+import { mountContextMenu } from "../ui/context-menu";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -1321,6 +1323,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(settings.get(TOOL_KEY_SETTING[t]) as string), enabled: () => onCanvas, run: () => editor.setTool(t) })),
       { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
+      { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => void copySelection(doc, editor, view) },
+      { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
+      { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
       { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
       { group: "Edit", title: "Select everything", keys: "Ctrl+A", words: "all", enabled: () => onCanvas, run: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)) },
@@ -1354,6 +1359,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
     ];
     return list;
+  });
+  // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
+  mountContextMenu(canvas, registry, {
+    active: () => appView === "canvas" && !textEditor.isOpen,
+    pickAt: (x, y) => {
+      const hit = pickAll(visibleObjects(doc, index, null, view.frameCamera, view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
+      if (hit && !editor.selection.has(hit.id)) editor.select([hit.id]);
+      return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
+    },
   });
   registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, enabled: () => appView === "canvas" && (c.enabled?.() ?? true) })));
   registry.setProvider("settings", () => [

@@ -276,7 +276,7 @@ html, body {
 
 .hud-debug {
   left: 12px;
-  bottom: 12px; /* (the dock's left stack starts at the top: the debug text stays clear of it) */
+  top: 60px;
   margin: 0;
   padding: var(--sp-4) var(--sp-5);
   font: var(--text-xs)/1.4 var(--font-mono);
