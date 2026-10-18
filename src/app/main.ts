@@ -66,7 +66,7 @@ import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
-import { TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
+import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { isArchiveFile, runExport, runImport } from "../ui/archive-ui";
@@ -85,6 +85,7 @@ import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
 import { CommandRegistry } from "../commands/registry";
+import { Macros } from "../commands/macros";
 import { barCommands } from "../commands/from-bars";
 import { settingCommands } from "../commands/settings-commands";
 import type { Command } from "../ui/command-palette";
@@ -1320,6 +1321,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     ...settingCommands(SETTINGS_TABS, settings, (tab) => { setView("settings"); settingsView.show(tab); }),
   ]);
   registry.setProvider("bars", () => (appView === "canvas" ? barCommands() : []));
+  // Boards and canvases of the navigator, and the fixed shortcuts of Settings > Shortcuts (choosing one opens that list).
+  registry.setProvider("navigator", () => {
+    const tree = session.tree;
+    if (!tree) return [];
+    const out: Command[] = [];
+    for (const { board, canvases } of tree.boards) {
+      for (const c of canvases) out.push({ id: `canvas:${c.id}`, group: "Canvas", kind: "canvas", title: `${board.name} / ${c.name}`, words: "open go switch board", enabled: () => session.current?.canvasId !== c.id, run: () => { setView("canvas"); void session.openCanvas(c.id); } });
+    }
+    out.push({ group: "Canvas", kind: "canvas", title: "Rename this canvas", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the canvas", run: (n) => void session.renameCanvas(session.current!.canvasId, n) }, run: () => undefined });
+    out.push({ group: "Canvas", kind: "canvas", title: "Rename this board", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the board", run: (n) => void session.renameBoard(session.current!.boardId, n) }, run: () => undefined });
+    return out;
+  });
+  registry.setProvider("shortcuts", () => FIXED_SHORTCUTS.flatMap((g) => g.items.map((i): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, keys: i.keys, words: g.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } }))));
+  const macros = new Macros(registry, (text) => { editor.message = text; editor.changed(); });
   const palette = mountCommandPalette(registry);
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey || (e.key.toLowerCase() !== "k" && !(e.shiftKey && e.key.toLowerCase() === "p"))) return;

@@ -18,8 +18,12 @@ export interface Command {
   keys?: string;
   /** Extra words that find it ("redo" for "Undo"). */
   words?: string;
+  /** Found only when a kind is typed (`@shortcut undo`), so a long list of one kind does not crowd the plain search. */
+  quiet?: boolean;
   /** False when it cannot be done now: it is not offered. */
   enabled?: () => boolean;
+  /** A command that needs a value (a name, a number): the palette asks for it after the command is chosen and then calls `takes.run`. */
+  takes?: { prompt: string; run(value: string): void };
   run(): void;
 }
 

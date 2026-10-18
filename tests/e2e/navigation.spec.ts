@@ -406,3 +406,44 @@ test("the command palette has the bars' buttons and the settings as commands, an
   await expect(p.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the command palette: recents first, a command that takes a value, canvases and shortcuts as commands, and a recorded macro that replays (ADR 0129)", async ({ app }) => {
+  const p = app.page;
+  const palette = p.getByTestId("command-palette");
+  const box = p.locator(".palette-input");
+  const titles = () => palette.locator(".palette-title").allTextContents();
+  const run = async (q: string) => {
+    await p.keyboard.press("Control+k");
+    await box.fill(q);
+    await p.keyboard.press("Enter");
+  };
+  // A command that takes a value asks for it in the box, then does it.
+  await run("rename this canvas");
+  await expect(box).toHaveAttribute("placeholder", "New name of the canvas");
+  await box.fill("Ocean");
+  await p.keyboard.press("Enter");
+  await expect(p.getByTestId("workspace-chevron")).toContainText("Ocean");
+  // The canvas just named is a command, and so is a fixed shortcut; the last command used comes first when nothing is typed.
+  await run("new canvas");
+  await expect(p.getByTestId("workspace-chevron")).not.toContainText("Ocean");
+  await p.keyboard.press("Control+k");
+  await box.fill("@canvas ocean");
+  expect((await titles()).some((t) => t.endsWith(" / Ocean"))).toBe(true);
+  await box.fill("@shortcut undo");
+  expect(await titles()).toContain("Undo");
+  await box.fill("");
+  expect((await titles())[0]).toBe("New canvas");
+  await p.keyboard.press("Escape");
+  // Record a macro of two commands, save it, run it.
+  await run("record a macro");
+  await run("select everything");
+  await run("zoom in");
+  await run("save the macro");
+  await box.fill("Zoomer");
+  await p.keyboard.press("Enter");
+  const zoom = () => p.evaluate(() => JSON.stringify(window.__canvastDebug.camera()));
+  const before = await zoom();
+  await run("@macro run zoomer");
+  await expect.poll(zoom).not.toEqual(before);
+  expect(app.consoleErrors).toEqual([]);
+});

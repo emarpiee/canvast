@@ -16,6 +16,9 @@ The palette's list was built inline in `main.ts`, so a new button or setting was
 - **`@kind` narrows the palette** (`parseQuery`, `findCommands`): `@settings theme`, `@toolbar lock`, `@tool`; the start of a kind is enough (`@set`); the other words still apply. Typing `@` (or `@se`) lists the kinds there are, with how many commands each has; Enter completes one and goes on typing. The kind of a command is its own `kind`, else its group in lower case as one word.
 - **Macros** (not built) fit without changing any of this: a macro is a provider (`setProvider("macros", …)`) whose commands run others with `registry.run(id)`; the ids of the commands are stable (`kind:title`, numbered when two share one) and `@macro` is a kind of its own.
 
-## Not done
+## Added later (v0.18.1)
 
-Macros, commands with arguments (a number to set, a name to give), recently used first, the key map of Settings > Shortcuts as commands, and the board and canvas lists of the navigator.
+- **Recents:** with nothing typed, the commands used last (up to 8, on this device) come first.
+- **Commands that take a value** (`takes: { prompt, run }`): the box asks for the value (a new name) after the command is chosen. `registry.run(id, arg)` passes it. Today: rename this canvas, rename this board, save the macro.
+- **Macros** (`src/commands/macros.ts`): "Record a macro" starts a recording of the commands run through the registry (from the palette); "Save the macro" (it takes the name) stores it on this device in `localStorage`; `@macro` lists "Run <name>" and "Delete the macro <name>". A step that cannot be done at playback is skipped and the notice says how many ran. Buttons clicked directly are not recorded, only commands run from the palette.
+- **Boards and canvases** are commands (`@canvas`), and the fixed shortcuts of Settings > Shortcuts are commands (`@shortcut`, `quiet`: found only when the kind is typed, so they do not crowd the plain search; choosing one opens the shortcut list).

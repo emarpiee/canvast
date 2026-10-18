@@ -6,6 +6,8 @@ import { esc } from "./format";
 import type { Command } from "../commands/types";
 import type { CommandRegistry } from "../commands/registry";
 import { findCommands, parseQuery } from "../commands/registry";
+import { loadRecentCommands, rememberCommand } from "../commands/recents";
+import type { ResolvedCommand } from "../commands/types";
 
 // The commands and the way they are found live in src/commands (ADR 0129); the palette is only the box that shows them.
 export type { Command };
@@ -32,6 +34,9 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
   let shown: Row[] = [];
   let active = 0;
   let before: HTMLElement | null = null;
+  /** The command waiting for its value (a name, a number): the box is then an input for that value. */
+  let asking: ResolvedCommand | null = null;
+  const placeholder = input.placeholder;
 
   const rowsFor = (query: string): Row[] => {
     const parsed = parseQuery(query);
@@ -39,9 +44,22 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
       // "@" or "@set": the kinds there are, to choose from.
       return registry.kinds().filter((k) => k.kind.startsWith(parsed.kind!)).map((k): Row => ({ kind: "filter", word: k.kind, count: k.count }));
     }
-    return findCommands(registry.all(), query).map((command): Row => ({ kind: "command", command }));
+    const found = findCommands(registry.all(), query);
+    if (parsed.kind === null && parsed.words.length === 0) {
+      // Nothing typed: the commands used last come first.
+      const recent = loadRecentCommands();
+      const rank = (c: Command): number => { const i = recent.indexOf((c as ResolvedCommand).id); return i < 0 ? recent.length : i; };
+      found.sort((a, b) => rank(a) - rank(b)); // stable: the rest keep their order
+    }
+    return found.map((command): Row => ({ kind: "command", command }));
   };
   const render = (): void => {
+    if (asking) {
+      shown = [];
+      list.innerHTML = `<li class="palette-empty" role="presentation">${esc(asking.takes!.prompt)} Enter to do it, Escape to close.</li>`;
+      input.setAttribute("aria-activedescendant", "");
+      return;
+    }
     shown = rowsFor(input.value).slice(0, MAX_SHOWN);
     active = Math.min(active, Math.max(0, shown.length - 1));
     list.innerHTML = shown.length
@@ -60,6 +78,8 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
   const close = (): void => {
     if (root.hidden) return;
     root.hidden = true;
+    asking = null;
+    input.placeholder = placeholder;
     before?.focus?.();
     before = null;
   };
@@ -72,10 +92,21 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
       render();
       return;
     }
+    const c = r.command as ResolvedCommand;
+    if (c.takes) {
+      // A command that needs a value: the box asks for it.
+      asking = c;
+      input.value = "";
+      input.placeholder = c.takes.prompt;
+      render();
+      return;
+    }
     close();
-    r.command.run();
+    if (!registry.run(c.id)) c.run(); // run by id so the recents and a macro recorder hear of it
+    rememberCommand(c.id);
   };
   input.addEventListener("input", () => {
+    if (asking) return;
     active = 0;
     render();
   });
@@ -84,6 +115,13 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       active = (active + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % Math.max(1, shown.length);
       render();
+    } else if (e.key === "Enter" && asking) {
+      const c = asking;
+      const value = input.value.trim();
+      if (!value) return void e.preventDefault();
+      close();
+      registry.run(c.id, value);
+      rememberCommand(c.id);
     } else if (e.key === "Enter") run(shown[active]);
     else if (e.key === "Escape" || (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey))) close();
     else return;

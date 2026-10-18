@@ -52,12 +52,24 @@ export class CommandRegistry {
     return this.all().find((c) => c.id === id);
   }
 
-  /** Run a command by id if it exists and can be done now; false when not. */
-  run(id: string): boolean {
+  /** Run a command by id if it exists and can be done now; false when not. `arg` is the value of a command that takes one. */
+  run(id: string, arg?: string): boolean {
     const c = this.get(id);
     if (!c || (c.enabled && !c.enabled())) return false;
-    c.run();
+    if (c.takes) {
+      if (arg === undefined) return false;
+      c.takes.run(arg);
+    } else c.run();
+    this.listeners.forEach((fn) => fn(c, arg));
     return true;
+  }
+
+  private readonly listeners = new Set<(c: ResolvedCommand, arg?: string) => void>();
+
+  /** Told after every command that ran by `run` (the palette's recents and the macro recorder listen). */
+  onRun(fn: (c: ResolvedCommand, arg?: string) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 
   /** The kinds there are now, with how many commands each has (what `@` offers). */
@@ -99,6 +111,7 @@ export function findCommands(all: readonly Command[], query: string): Command[] 
   const scored: Array<{ c: Command; score: number }> = [];
   for (const c of all) {
     if (c.enabled && !c.enabled()) continue;
+    if (c.quiet && !kind) continue;
     if (kind !== null && kind !== "" && ![kindOf(c), ...(c.kinds ?? [])].some((k) => k.startsWith(kind)) && !c.group.toLowerCase().startsWith(kind)) continue;
     const title = c.title.toLowerCase();
     const hay = `${c.group} ${c.title} ${c.words ?? ""}`.toLowerCase();
