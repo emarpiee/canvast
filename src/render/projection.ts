@@ -1,10 +1,12 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, LocalBounds } from "../doc/model";
-import { netFaces } from "../doc/network";
+import { regionSplit } from "../doc/network";
 import { localBounds, pathSubs, pivotOf, strokePoints, unrotatedBounds } from "../doc/model";
-import type { FlatPath } from "../doc/path";
+import type { FlatPath, SubPath } from "../doc/path";
+import type { Paint } from "../doc/paint";
 import { FLAT_TOLERANCE_PX, flatten } from "../doc/path";
+import { liveOutline } from "../doc/outline-stroke";
 import { cosSin } from "../core/angle";
 import { approxPath, classifyPath } from "./coarse";
 import { exactPath, isStraight, outlineStrokes } from "./path-exact";
@@ -132,6 +134,8 @@ export interface ProjectedObject {
   /** The same, for the outline when it is too wide for the canvas (its capsules as polygons to fill), and the strokes they came from (for picking). */
   readonly strokePolys?: readonly (readonly number[])[] | undefined;
   readonly synth?: readonly ProjectedObject[] | undefined;
+  /** A network with fills of their own for some regions (ADR 0150): the regions with the path's fill, and each region with its own. `fillPath` holds all that show. */
+  readonly regionFills?: { readonly stroked?: true; readonly base: readonly FlatPath[]; readonly own: ReadonlyArray<{ readonly paint: Paint; readonly flats: readonly FlatPath[] }> } | undefined;
   /** The four corners of the object's own (turned) bounds on screen, when that is not the bounding box (turned paths). */
   readonly corners?: readonly (readonly [number, number])[] | undefined;
   /**
@@ -175,6 +179,7 @@ class Projected implements ProjectedObject {
     readonly fillPath?: readonly FlatPath[] | undefined,
     readonly strokePolys?: readonly (readonly number[])[] | undefined,
     readonly synth?: readonly ProjectedObject[] | undefined,
+    readonly regionFills?: ProjectedObject["regionFills"],
   ) {
     this.p = proj;
   }
@@ -309,17 +314,20 @@ function pathFromScreen(
   const flats = flatten(subs, q, FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN);
   // A vector network is stroked by its edges and filled by the regions they enclose (ADR 0146).
   let fills: FlatPath[] | undefined;
+  let regionFills: ProjectedObject["regionFills"];
   if (o.net) {
-    const faces = netFaces(subs);
-    const fq = faces.map((s) => {
-      const a = new Float64Array(s.n.length);
-      for (let i = 0; i < a.length; i += 2) {
-        a[i] = px(s.n[i]!);
-        a[i + 1] = py(s.n[i + 1]!);
-      }
-      return a;
-    });
-    fills = flatten(faces, fq, FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN);
+    const split = regionSplit(o);
+    const view = { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height };
+    const flat = (faces: readonly SubPath[]): FlatPath[] => flatten(faces, faces.map((s) => Float64Array.from(s.n, (v: number, i: number) => (i % 2 === 0 ? px(v) : py(v)))), FLAT_TOLERANCE_PX, view, PATH_CULL_MARGIN);
+    const base = o.fill !== null ? flat(split.base) : [];
+    const own = split.own.filter((r): r is { paint: Paint; sub: SubPath } => r.paint !== null).map((r) => ({ paint: r.paint, flats: flat([r.sub]) }));
+    fills = [...base, ...own.flatMap((r) => r.flats)];
+    if (own.length) regionFills = { base, own };
+  } else if (o.profile && o.stroke !== null) {
+    // a live width profile (ADR 0150): the line is the shape of its outline, filled with the outline's paint; the path itself is still what is picked and edited
+    const out = liveOutline(o);
+    const own = [{ paint: o.stroke, flats: flatten(out, out.map((s) => Float64Array.from(s.n, (v: number, i: number) => (i % 2 === 0 ? px(v) : py(v)))), FLAT_TOLERANCE_PX, { minX: 0, minY: 0, maxX: vp.width, maxY: vp.height }, PATH_CULL_MARGIN) }];
+    regionFills = { base: o.fill !== null ? flats : [], own, stroked: true };
   }
   let total = 0;
   for (const f of flats) total += f.pts.length;
@@ -337,7 +345,7 @@ function pathFromScreen(
   const corner = (x: number, y: number): [number, number] => [px(cx0 + c.c * (x - cx0) - c.s * (y - cy0)), py(cy0 + c.s * (x - cx0) + c.c * (y - cy0))];
   const corners = o.rot ? [corner(ub.minX, ub.minY), corner(ub.maxX, ub.minY), corner(ub.maxX, ub.maxY), corner(ub.minX, ub.maxY)] : undefined;
   const radius = o.stroke === null ? 0 : (proj ? toPx(proj, D.fromNumber(o.width / 2)) : (px(o.width / 2) - px(0)));
-  return new Projected(o, box, all, radius, false, cam, vp, proj, flats, corners, fills);
+  return new Projected(o, box, all, radius, false, cam, vp, proj, flats, corners, fills, undefined, undefined, regionFills);
 }
 
 const localBoundsUnturned = (o: Extract<CanvasObject, { kind: "path" }>): LocalBounds => unrotatedBounds(o);

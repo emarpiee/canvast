@@ -3,6 +3,7 @@
  * reads a path's own join, ends, dashes and arrow heads and returns the shapes (closed polygons, to be filled with the non-zero rule).
  */
 import type { PathObject } from "./model";
+import { pathSubs } from "./model";
 import type { Arrow, SubPath } from "./path";
 import { ARROW_LEN, NODE, corner, miterLimitOf, nodeCount } from "./path";
 import { booleanOp } from "./boolean";
@@ -94,6 +95,19 @@ export function alignedOutlineOf(o: PathObject, profile?: WidthProfile): SubPath
     const r = booleanOp(align === "inside" ? "intersect" : "subtract", [{ subs: [piece], evenodd: false }, shape]);
     if (!r) return null;
     out.push(...r);
+  }
+  return out;
+}
+
+const liveCache = new WeakMap<PathObject, readonly SubPath[]>();
+
+/** The shape a path with a live width profile (`profile`) is drawn as: its outline, in the path's turned local units. Made once per object. */
+export function liveOutline(o: PathObject): readonly SubPath[] {
+  let out = liveCache.get(o);
+  if (!out) {
+    const { rot: _r, base: _b, ...flat } = o;
+    out = outlineOf({ ...flat, sub: pathSubs(o) }, o.profile);
+    liveCache.set(o, out);
   }
   return out;
 }

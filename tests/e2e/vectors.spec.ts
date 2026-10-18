@@ -2207,7 +2207,10 @@ test("Outline stroke makes the line a shape of its own; a shape with a fill keep
   await key(app, "v");
   await click(app, 550, 400);
   await p.click('[data-ctx="taper"]', { timeout: 5000 });
+  expect(await last(app), "Taper stays live: the path is kept with a profile").toMatchObject({ id: line.id, profile: "taper", stroke: line.stroke });
+  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
   const t = await last(app);
+  expect(t, "Outline stroke bakes it").not.toHaveProperty("profile");
   const ys = (x: number) => t.sub.flatMap((s) => s.n.filter((_, i) => i % 6 === 0).map((v, k) => [v, s.n[k * 6 + 1]!] as const)).filter(([vx]) => Math.abs(vx - x) < 3).map(([, y]) => Math.abs(y));
   expect(Math.max(...ys(150)), "wide in the middle").toBeGreaterThan(Math.max(...ys(5)) + 0.2);
   // a rectangle with a fill and an outline: the fill stays, the outline is a new shape above it
@@ -2433,8 +2436,19 @@ test("Vector network: two rectangles that share a side become one network with a
   const inside = await px(480, 360);
   expect(inside, "the region is filled").not.toEqual(bg);
   expect(await px(640, 360)).toEqual(inside);
-  // the shared top vertex dragged up moves the ends of three edges together
+  // a click inside one region in Edit nodes picks it: the fill then colours it alone, and a reload keeps it (ADR 0150)
   await key(app, "n");
+  await click(app, 480, 360);
+  await p.click('[data-paint="fill"]');
+  await p.locator(".colour-pop [data-hex]").fill("e11d48");
+  await p.locator(".colour-pop [data-hex]").press("Enter");
+  await key(app, "Escape");
+  await app.frame();
+  const red = await px(480, 360);
+  expect(red, "the picked region has its own fill").not.toEqual(inside);
+  expect(await px(640, 360), "the other keeps the path's").toEqual(inside);
+  expect(((await objs(app))[0] as unknown as { regions: { fills: unknown[] } }).regions.fills).toHaveLength(1);
+  // the shared top vertex dragged up moves the ends of three edges together
   await drag(app, [560, 300], [560, 250]);
   const after = (await objs(app))[0]!;
   expect(ends(after).size, "still six vertices").toBe(6);

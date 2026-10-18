@@ -7,9 +7,12 @@
  *
  * Edges are taken not to cross except at vertices (`buildNetwork` splits edges where one meets another).
  */
+import type { PathObject } from "./model";
+import type { Paint } from "./paint";
 import type { SubPath } from "./path";
-import { NODE, corner, cubicOf, cubicPoints, moveNode, nodeCount, splitSegment } from "./path";
+import { flatten, insideFill, NODE, corner, cubicOf, cubicPoints, moveNode, nodeCount, splitSegment } from "./path";
 
+const EVERYWHERE = { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
 const key = (x: number, y: number): string => `${x},${y}`;
 
 const first = (c: SubPath): [number, number] => [c.n[0]!, c.n[1]!];
@@ -20,7 +23,12 @@ export const endsOf = (c: SubPath): [string, string] => [key(...first(c)), key(.
 
 // ---- Regions ------------------------------------------------------------------------------------------------------------------------
 
-const faceCache = new WeakMap<readonly SubPath[], SubPath[]>();
+/** A region and the half-edges (2·edge for forward, 2·edge + 1 for backward) that walk round it. */
+export interface Cell {
+  readonly sub: SubPath;
+  readonly halves: readonly number[];
+}
+const faceCache = new WeakMap<readonly SubPath[], readonly Cell[]>();
 
 /** The direction an edge leaves its first (forward) or last (backward) vertex in: toward its first handle, else the next node. */
 function leaving(c: SubPath, forward: boolean): [number, number] {
@@ -71,10 +79,14 @@ function areaOf(nodes: readonly number[][]): number {
  * inside on the left; the outer boundary of each connected piece is walked the other way round and is left out. Regions inside regions
  * are separate loops (filled together), as are the regions of separate pieces.
  */
-export function netFaces(edges: readonly SubPath[]): SubPath[] {
+export const netFaces = (edges: readonly SubPath[]): SubPath[] => netCells(edges).map((c) => c.sub);
+
+/** The regions with the half-edges round each (numbered by the place of the edge in `edges`), so a region can be named by one of them. */
+export function netCells(edges: readonly SubPath[]): readonly Cell[] {
   const cached = faceCache.get(edges);
   if (cached) return cached;
-  const chains = edges.filter((c) => nodeCount(c) >= 2);
+  const keep = edges.map((_, i) => i).filter((i) => nodeCount(edges[i]!) >= 2);
+  const chains = keep.map((i) => edges[i]!);
   const at = new Map<string, number[]>(); // vertex -> the half-edges that leave it
   const dest: string[] = [];
   const angle: number[] = [];
@@ -95,7 +107,7 @@ export function netFaces(edges: readonly SubPath[]): SubPath[] {
     return list[(list.indexOf(h ^ 1) - 1 + list.length) % list.length]!;
   };
   const seen = new Set<number>();
-  const out: SubPath[] = [];
+  const out: Cell[] = [];
   for (let start = 0; start < chains.length * 2; start++) {
     if (seen.has(start)) continue;
     const cycle: number[] = [];
@@ -124,7 +136,7 @@ export function netFaces(edges: readonly SubPath[]): SubPath[] {
         nodes.pop();
       }
     }
-    if (nodes.length >= 2 && areaOf(nodes) > 0) out.push({ n: nodes.flat(), closed: true });
+    if (nodes.length >= 2 && areaOf(nodes) > 0) out.push({ sub: { n: nodes.flat(), closed: true }, halves: cycle.map((h) => 2 * keep[h >> 1]! + (h & 1)) });
   }
   faceCache.set(edges, out);
   return out;
@@ -347,4 +359,45 @@ export function moveNodes(edges: readonly SubPath[], picks: ReadonlyArray<readon
     out = moveVertex(out, x, y, dx, dy);
   }
   return out;
+}
+
+// ---- A fill per region (ADR 0150) ---------------------------------------------------------------------------------------------------
+
+/** The regions told apart by their fill: those with none of their own, and each one that has (a paint of null: left empty). Own fills only count while the edges are still as many as when they were set. */
+export function regionSplit(o: { sub: readonly SubPath[]; regions?: PathObject["regions"] | undefined }): { base: SubPath[]; own: Array<{ paint: Paint | null; sub: SubPath }> } {
+  const cells = netCells(o.sub);
+  const r = o.regions && o.regions.edges === o.sub.length ? o.regions.fills : [];
+  const base: SubPath[] = [];
+  const own: Array<{ paint: Paint | null; sub: SubPath }> = [];
+  for (const c of cells) {
+    const hit = r.find(([h]) => c.halves.includes(h));
+    if (hit) own.push({ paint: hit[1], sub: c.sub });
+    else base.push(c.sub);
+  }
+  return { base, own };
+}
+
+/** The name (a half-edge) of the region that holds the point (x, y) of the path's own units, or null. */
+export function cellAt(edges: readonly SubPath[], x: number, y: number): number | null {
+  for (const c of netCells(edges)) {
+    const f = flatten([c.sub], [Float64Array.from(c.sub.n)], 1e-3 * (Math.abs(x) + Math.abs(y) + 1), EVERYWHERE, 0);
+    if (insideFill(f, x, y, false)) return c.halves[0]!;
+  }
+  return null;
+}
+
+/** `o`'s own fills with the region named `at` given `paint` (equal to the path's fill: its own fill is taken away). Fills of a region that is gone are dropped. */
+export function withRegionFill(o: { sub: readonly SubPath[]; regions?: PathObject["regions"] | undefined; fill: Paint | null }, at: number, paint: Paint | null): NonNullable<PathObject["regions"]> {
+  const live = o.regions && o.regions.edges === o.sub.length ? o.regions.fills : [];
+  const cell = netCells(o.sub).find((c) => c.halves.includes(at));
+  const others = live.filter(([h]) => !cell || !cell.halves.includes(h));
+  const same = JSON.stringify(paint) === JSON.stringify(o.fill);
+  return { edges: o.sub.length, fills: same || !cell ? others : [...others, [at, paint]] };
+}
+
+/** The fill the region named `at` shows: its own, else the path's. */
+export function regionFillAt(o: { sub: readonly SubPath[]; regions?: PathObject["regions"] | undefined; fill: Paint | null }, at: number): Paint | null {
+  const cell = netCells(o.sub).find((c) => c.halves.includes(at));
+  const own = cell && o.regions && o.regions.edges === o.sub.length ? o.regions.fills.find(([h]) => cell.halves.includes(h)) : undefined;
+  return own ? own[1] : o.fill;
 }

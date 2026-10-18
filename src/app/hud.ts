@@ -6,6 +6,8 @@ import { MAX_JUMP_LEVELS, goHome, parseZoomLevel, viewLevel, zoomByStep, zoomTo 
 import type { FrameStats } from "./frame-stats";
 import { FpsMeter } from "./fps-meter";
 import { ICONS } from "../ui/icons";
+import { openColourPopover } from "../ui/colour-popover";
+import { hexOfCss } from "../ui/text-editor";
 
 /** Simple: zoom and whether it is saved, in plain words. More: adds position, objects and how smoothly it runs. Technical: the numbers. Hidden: nothing. */
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
@@ -45,6 +47,8 @@ function plainSave(state: string): string {
 }
 
 export type CanvasPattern = "grid" | "dots" | "scale" | "none";
+/** How long the background button is held to reset the colour (ms). */
+const BACKGROUND_HOLD_MS = 600;
 const PATTERNS: readonly CanvasPattern[] = ["grid", "dots", "scale", "none"];
 const PATTERN_LABEL: Record<CanvasPattern, string> = { grid: "Grid", dots: "Dots", scale: "Multi-scale grid", none: "None" };
 const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots: ICONS.gripIcon, scale: ICONS.grid2x2, none: ICONS.squareIcon };
@@ -69,6 +73,10 @@ export interface HudStatus {
   pattern(): CanvasPattern;
   setPattern(pattern: CanvasPattern): void;
   subscribePattern(fn: () => void): void;
+  /** The colour behind the canvas (#rrggbb; empty: the app's own), and a way to change it. */
+  background(): string;
+  setBackground(hex: string): void;
+  subscribeBackground(fn: () => void): void;
   /** What the readout shows (Settings > Appearance > Information shown), and a way to change it. */
   infoMode(): InfoMode;
   setInfoMode(mode: InfoMode): void;
@@ -115,6 +123,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     </div>
     <div class="hud-controls" data-cmd-group="View controls" role="toolbar" aria-label="Navigation">
       <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
+      <button type="button" data-action="background" aria-haspopup="dialog" aria-label="Canvas background colour" title="Canvas background colour. Hold to go back to the app's own.">${ICONS.paintBucket}</button>
       <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
       <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
@@ -266,6 +275,35 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
   };
   status.subscribePattern(applyPattern);
   applyPattern();
+  // The background button: a click opens the picker; holding it (any mouse button, or a long touch) goes back to the app's own colour.
+  const bgButton = root.querySelector<HTMLElement>('[data-action="background"]')!;
+  let holdTimer = 0;
+  let held = false;
+  const applyBackground = (): void => {
+    bgButton.dataset["custom"] = status.background() ? "true" : "false";
+  };
+  status.subscribeBackground(applyBackground);
+  applyBackground();
+  bgButton.addEventListener("pointerdown", () => {
+    held = false;
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => {
+      held = true;
+      if (status.background()) status.setBackground("");
+      status.notify("Canvas background: the app's own colour");
+    }, BACKGROUND_HOLD_MS);
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) bgButton.addEventListener(ev, () => window.clearTimeout(holdTimer));
+  bgButton.addEventListener("contextmenu", (e) => e.preventDefault()); // (a long touch and a right click: the hold above is what they do)
+  bgButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (held) { held = false; return; }
+    openColourPopover(bgButton, {
+      name: "Canvas background colour",
+      value: status.background() || hexOfCss(getComputedStyle(document.body).backgroundColor),
+      onInput: (hex) => status.setBackground(hex.slice(0, 7).toLowerCase()),
+    });
+  });
   // The names button: its icon, what it does now and what the next click does.
   const namesButton = root.querySelector<HTMLElement>('[data-action="names"]')!;
   const applyNames = (): void => {

@@ -169,6 +169,7 @@ import boxSelect from "lucide-static/icons/box-select.svg";
 import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
+import paintBucketSvg from "lucide-static/icons/paint-bucket.svg";
 import pipetteSvg from "lucide-static/icons/pipette.svg";
 import slidersHorizontalSvg from "lucide-static/icons/sliders-horizontal.svg";
 import blendSvg from "lucide-static/icons/blend.svg";
@@ -374,6 +375,7 @@ export const ICONS = {
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
   pipette: clean(pipetteSvg),
+  paintBucket: clean(paintBucketSvg),
   bookmark: clean(bookmark),
   bookmarkPlus: clean(bookmarkPlus),
   chevronDown: clean(chevronDown),

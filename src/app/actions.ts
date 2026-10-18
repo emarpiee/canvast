@@ -28,7 +28,7 @@ import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, 
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
 import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
-import { buildNetwork } from "../doc/network";
+import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
 import { exportSvg } from "./svg-export";
@@ -765,6 +765,7 @@ function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, pa
 /** The fill and outline of the first selected path, or null when none is selected. */
 export function selectedPaint(doc: DocumentStore, editor: EditorState): { fill: Paint | null; stroke: Paint | null } | null {
   const o = lined(doc, editor)[0];
+  if (o?.kind === "path" && o.net && editor.region?.id === o.id) return { fill: regionFillAt(o, editor.region.at), stroke: o.stroke };
   return o ? (o.kind === "image" ? { fill: null, stroke: o.stroke ?? null } : { fill: o.fill, stroke: o.stroke }) : null;
 }
 
@@ -777,6 +778,7 @@ export interface PaintPatch {
 export function previewPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
   const ids = lined(doc, editor).map((o) => o.id);
   if (!ids.length || editor.blockEdit()) return;
+  if (editor.region && patch.fill !== undefined) return; // (a picked region is coloured when the picker lets go)
   editor.preview = { kind: "paint", ids, ...patch };
   editor.changed();
 }
@@ -784,6 +786,18 @@ export function previewPaint(doc: DocumentStore, editor: EditorState, patch: Pai
 /** Store a new fill or outline on the selected paths: one undo step. */
 export function commitPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
   editor.preview = { kind: "none" };
+  const r = editor.region;
+  const net = r ? doc.get(r.id) : undefined;
+  if (r && net?.kind === "path" && net.net && patch.fill !== undefined && editor.selection.size === 1 && editor.selection.has(r.id) && !net.locked) {
+    // a region of a network is picked: its fill is the one that changes (ADR 0150)
+    const regions = withRegionFill(net, r.at, patch.fill);
+    if (!editor.blockEdit() && JSON.stringify(regions) !== JSON.stringify(net.regions)) {
+      const { regions: _r, ...rest } = net;
+      doc.commit(doc.transaction("Change region fill", [regions.fills.length ? { ...rest, regions } : rest]));
+    }
+    if (patch.stroke === undefined) { editor.changed(); return; }
+    patch = { stroke: patch.stroke };
+  }
   const next = paintTargets(doc, editor).map((o) => [o, paintedWith(o, patch)] as const).filter(([o, n]) => JSON.stringify(paintsOf(o)) !== JSON.stringify(paintsOf(n))); // (the paints only: an object holds big numbers JSON cannot write)
   if (next.length && !editor.blockEdit()) {
     const what = patch.fill !== undefined && patch.stroke !== undefined ? "fill and outline" : patch.fill !== undefined ? "fill" : "outline";
@@ -1394,20 +1408,22 @@ export const canOutlineStroke = (doc: DocumentStore, editor: EditorState): boole
  * the shape in place (the same object, the stroke's paint as its fill); one with a fill keeps it and gets the shape as a new object above.
  * Width, corners, ends, dashes and arrow heads are in the shape. One undo step.
  */
-export function outlineStroke(doc: DocumentStore, editor: EditorState, profile?: WidthProfile): void {
+export function outlineStroke(doc: DocumentStore, editor: EditorState, given?: WidthProfile): void {
   if (editor.blockEdit()) return;
   const paths = strokable(doc, editor);
   const changed: CanvasObject[] = [];
   const picked: string[] = [];
   const all = doc.ordered();
+  let profile = given;
   for (const o of paths) {
+    profile = given ?? o.profile; // (a live width profile goes into the shape)
     const { rot: _r0, base: _b0, ...flat } = o;
     const turned: PathObject = o.rot ? { ...flat, sub: pathSubs(o) } : o;
     const aligned = alignedOutlineOf(turned, profile);
     if (!aligned) editor.message = "That outline could not be made inside or outside the edge; it is centred.";
     const sub = aligned ?? outlineOf(turned, profile);
     if (!sub.length) continue;
-    const { join: _j, cap: _c, align: _a, dash: _d, dashOffset: _do, arrowStart: _as, arrowEnd: _ae, miterAngle: _m, shape: _s, params: _p, radius: _r, base: _b, initial: _i, evenodd: _e, rot: _rot, sub: _sub, fill, stroke, ...keep } = o;
+    const { profile: _pf, net: _nt, regions: _rg, join: _j, cap: _c, align: _a, dash: _d, dashOffset: _do, arrowStart: _as, arrowEnd: _ae, miterAngle: _m, shape: _s, params: _p, radius: _r, base: _b, initial: _i, evenodd: _e, rot: _rot, sub: _sub, fill, stroke, ...keep } = o;
     const shape: PathObject = { ...keep, kind: "path", sub, fill: stroke, stroke: null, width: o.width };
     if (fill !== null) {
       const bare: PathObject = { ...keep, kind: "path", sub: o.sub, fill, stroke: null, width: o.width, ...(o.rot ? { rot: o.rot } : {}), ...(o.shape ? { shape: o.shape } : {}), ...(o.params ? { params: o.params } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.base ? { base: o.base } : {}), ...(o.evenodd ? { evenodd: true as const } : {}) };
@@ -1427,6 +1443,19 @@ export function outlineStroke(doc: DocumentStore, editor: EditorState, profile?:
   }
   doc.commit(doc.transaction(profile ? `Width: ${profile}` : paths.length === 1 ? "Outline stroke" : `Outline stroke of ${paths.length} paths`, changed));
   editor.select(picked);
+  editor.changed();
+}
+
+/** Give the picked lines a width profile that stays live (a taper, ADR 0150), or take it away with null; asking for the one they have takes it away. One undo step. */
+export function setWidthProfile(doc: DocumentStore, editor: EditorState, profile: WidthProfile | null): void {
+  if (editor.blockEdit()) return;
+  const paths = strokable(doc, editor).filter((o) => !o.net);
+  const next = paths.map((o) => {
+    const { profile: _p, ...rest } = o;
+    return profile && o.profile !== profile ? { ...rest, profile } : rest;
+  });
+  if (!next.length) return;
+  doc.commit(doc.transaction(profile ? `Width: ${profile}` : "Width: even", next));
   editor.changed();
 }
 
@@ -1710,7 +1739,7 @@ export function releaseNetwork(doc: DocumentStore, editor: EditorState): void {
   if (editor.blockEdit()) return;
   const nets = networkable(doc, editor).filter((o) => o.net);
   if (!nets.length) return;
-  doc.commit(doc.transaction("Release the network", nets.map((o) => { const { net: _n, ...rest } = o; return rest as PathObject; })));
+  doc.commit(doc.transaction("Release the network", nets.map((o) => { const { net: _n, regions: _rg, ...rest } = o; return rest as PathObject; })));
   editor.changed();
 }
 

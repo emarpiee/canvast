@@ -11,7 +11,7 @@ import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, Tex
 import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
-import { moveNodes, edgeBetween, deleteVertex } from "../doc/network";
+import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
@@ -1441,6 +1441,19 @@ export function attachTools(
         break;
       case "node": {
         if (startNodePress(e, s) || startGradientPress(e, s)) break;
+        // Inside a region of the one picked network: a click picks the region, and the fill then colours it alone (ADR 0150).
+        const net = nodeTarget();
+        if (net?.o.net && !editor.blockEdit()) {
+          const l = localOf(net.po, s.x, s.y);
+          const at = cellAt(baked(net.o).sub, l.x, l.y);
+          if (at !== null) {
+            editor.region = { id: net.o.id, at };
+            editor.message = "Region picked: change the fill to colour it alone.";
+            editor.changed();
+            break;
+          }
+        }
+        editor.region = null;
         // Not on a node: a click picks the path to edit (or clears), a drag from nothing is a box.
         const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null;
         if (!hit && nodeTargets().length && !editor.blockEdit()) {

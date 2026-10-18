@@ -1,4 +1,6 @@
 import * as D from "../core/dyadic";
+import type { WidthProfile } from "./stroker";
+import { PROFILE_NAMES } from "./stroker";
 import { formatTags, isTag } from "./tags";
 import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
@@ -249,6 +251,10 @@ export interface PathObject extends ObjectBase {
   readonly dashOffset?: number;
   /** A vector network (ADR 0146): the sub-paths are edges (chains from one vertex to another; ends at exactly one point are one vertex), and the regions they enclose are filled. */
   readonly net?: true;
+  /** A width profile of the outline that stays live (a taper, ADR 0150): the line is drawn as the shape `outlineOf` makes with it. Ignored on a network and at depths doubles cannot place. */
+  readonly profile?: WidthProfile;
+  /** A fill of their own for some regions of a network (ADR 0150): each region is named by one of the half-edges round it (2·edge, +1 backward); a paint of null leaves it empty. `edges`: how many edges there were when set; if the edges are added or taken away the fills no longer apply. */
+  readonly regions?: { readonly edges: number; readonly fills: readonly (readonly [number, Paint | null])[] };
   /** Absent: the outline is centred on the edge. Only closed shapes can have it inside or outside (`alignOf`). */
   readonly align?: Align;
   /** Fill rule: absent is non-zero. */
@@ -538,7 +544,9 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
     if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true) && (o.container.was === undefined || (typeof o.container.was === "object" && o.container.was !== null && [o.container.was.fill, o.container.was.stroke].every((v) => v === null || isPaint(v)))))) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
+    if (o.profile !== undefined && !PROFILE_NAMES.includes(o.profile)) throw new InvalidObjectError("bad width profile");
     if (o.net !== undefined && o.net !== true) throw new InvalidObjectError("net is true or absent");
+    if (o.regions !== undefined && !(o.net === true && typeof o.regions === "object" && o.regions !== null && Number.isInteger(o.regions.edges) && Array.isArray(o.regions.fills) && o.regions.fills.every((f: unknown) => Array.isArray(f) && f.length === 2 && Number.isInteger(f[0]) && (f[1] === null || isPaint(f[1]))))) throw new InvalidObjectError("bad regions");
     if (o.smoothing !== undefined && !(Number.isFinite(o.smoothing) && o.smoothing > 0 && o.smoothing <= 1)) throw new InvalidObjectError("bad corner smoothing");
     if (o.miterAngle !== undefined && !(Number.isFinite(o.miterAngle) && o.miterAngle >= 1 && o.miterAngle <= 90)) throw new InvalidObjectError("bad miter angle");
     for (const [what, v] of [["start", o.arrowStart], ["end", o.arrowEnd]] as const) if (v !== undefined && !ARROWS.includes(v)) throw new InvalidObjectError(`bad arrow ${what}`);
@@ -698,7 +706,9 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["align"] !== undefined ? { align: s["align"] as Align } : {}),
       ...(s["dash"] !== undefined ? { dash: s["dash"] as Dash } : {}),
       ...(s["dashOffset"] !== undefined ? { dashOffset: s["dashOffset"] as number } : {}),
+      ...(s["profile"] !== undefined ? { profile: s["profile"] as WidthProfile } : {}),
       ...(s["net"] === true ? { net: true as const } : {}),
+      ...(s["regions"] !== undefined ? { regions: s["regions"] as NonNullable<PathObject["regions"]> } : {}),
       ...(s["smoothing"] !== undefined ? { smoothing: s["smoothing"] as number } : {}),
       ...(s["miterAngle"] !== undefined ? { miterAngle: s["miterAngle"] as number } : {}),
       ...(s["arrowStart"] !== undefined ? { arrowStart: s["arrowStart"] as Arrow } : {}),

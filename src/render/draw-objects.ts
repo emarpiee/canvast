@@ -7,7 +7,7 @@ import * as D from "../core/dyadic";
 import type { Rect } from "./geometry2d";
 import { clipPolygon, clipSegment } from "./geometry2d";
 import { ARROW_LEN, miterLimitOf } from "../doc/path";
-import type { Arrow } from "../doc/path";
+import type { Arrow, FlatPath } from "../doc/path";
 import { canvasPaint } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
 import { paintColor } from "./ink";
@@ -147,8 +147,8 @@ const inReach = (pts: Float64Array, vp: Viewport, margin: number): boolean => {
 };
 
 /** Add every outline to the current path as a filled polygon (clipped to the view when it reaches far outside it). */
-export function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
-  for (const f of po.fillPath ?? po.path!) {
+export function addFillPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, only?: readonly FlatPath[]): void {
+  for (const f of only ?? po.fillPath ?? po.path!) {
     let p: ArrayLike<number> = f.pts;
     if (p.length < 6) continue;
     if (!inReach(f.pts, vp, PATH_REACH)) {
@@ -262,12 +262,20 @@ let layer: HTMLCanvasElement | null = null;
 export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport): void {
   const o = po.obj as PathObject;
   const body = (c: CanvasRenderingContext2D): void => {
+    const rf = po.regionFills;
     if (o.fill !== null) {
       c.fillStyle = canvasPaint(c, o, o.fill, po.proj, vp);
       c.beginPath();
-      addFillPath(c, po, vp);
+      addFillPath(c, po, vp, rf?.base);
       c.fill(o.evenodd ? "evenodd" : "nonzero");
     }
+    for (const r of rf?.own ?? []) {
+      c.fillStyle = canvasPaint(c, o, r.paint, po.proj, vp);
+      c.beginPath();
+      addFillPath(c, po, vp, r.flats);
+      c.fill();
+    }
+    if (rf?.stroked) return; // (a live width profile: its outline was filled above)
     if (o.stroke !== null && po.strokePolys) {
       // Too wide for the canvas to stroke: its exact coverage, as polygons.
       c.fillStyle = canvasPaint(c, o, o.stroke, po.proj, vp);

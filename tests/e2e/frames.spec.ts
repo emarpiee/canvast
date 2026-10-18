@@ -2028,3 +2028,25 @@ test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (
   expect(await edge(), "and gone when the pointer leaves").toEqual(before);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("canvas background: the button beside the pattern one opens a picker that colours the canvas; holding it goes back to the app's own colour", async ({ app }) => {
+  const p = app.page;
+  const button = p.getByRole("button", { name: "Canvas background colour" });
+  const bg = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--canvas-bg").trim());
+  expect(await bg(), "the app's own colour comes from the stylesheet").not.toBe("#336699");
+  await button.click();
+  await p.locator(".colour-pop [data-hex]").fill("336699");
+  await p.locator(".colour-pop [data-hex]").press("Enter");
+  await p.keyboard.press("Escape");
+  expect(await bg()).toBe("#336699");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await bg(), "kept over a reload").toBe("#336699");
+  const box = (await button.boundingBox())!;
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await p.mouse.down({ button: "right" });
+  await p.waitForTimeout(800);
+  await p.mouse.up({ button: "right" });
+  expect(await bg(), "held: the colour is the app's own again").not.toBe("#336699");
+  await expect(p.locator(".colour-pop")).toBeHidden();
+});

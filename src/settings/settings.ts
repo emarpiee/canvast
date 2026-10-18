@@ -107,6 +107,8 @@ export const SETTINGS = {
   "ui.hue": { scope: "device", default: 178, validate: range(0, 360), effect: "immediate" } as Def<number>,
   "ui.vivid": { scope: "device", default: 100, validate: range(0, 150), effect: "immediate" } as Def<number>,
   "ui.pattern": { scope: "device", default: "grid", validate: oneOf("grid", "dots", "scale", "none"), effect: "immediate" } as Def<"grid" | "dots" | "scale" | "none">,
+  /** The colour behind the canvas as #rrggbb; empty is the app's own (it follows the theme and the hue dials). */
+  "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact"), effect: "immediate" } as Def<"comfortable" | "compact">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.slideSeconds": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 120 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

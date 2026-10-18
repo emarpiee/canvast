@@ -53,7 +53,7 @@ export function hitsObject(po: ProjectedObject, x: number, y: number, tol = HIT_
         if (side && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd) === (side === "inside") && distanceToOutline(flats, x, y) <= 2 * po.radius + tol) return true;
       }
     }
-    return po.obj.fill !== null && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd);
+    return (po.obj.fill !== null || (!!po.regionFills && !po.regionFills.stroked)) && insideFill(po.fillPath ?? flats, x, y, !!po.obj.evenodd);
   }
   if (po.obj.kind !== "stroke") {
     // Bounds-based picking (images and text boxes). Alpha-aware picking is not implemented yet.

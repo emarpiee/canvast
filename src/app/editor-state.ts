@@ -193,6 +193,8 @@ export class EditorState {
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */
   nodeSel: { s: number; k: number } | null = null;
+  /** The region of a network picked by a click inside it in Edit nodes (ADR 0150), named by a half-edge: the fill the toolbar sets then goes to it alone. */
+  region: { id: ObjectId; at: number } | null = null;
   /** The nodes picked together by Shift-click or a lasso in Edit nodes (ADR 0145), per path, as "sub-path:node" keys; they move and are deleted as one. Empty: the single node `nodeSel`, if any, is what is edited. */
   nodeMulti: Map<ObjectId, Set<string>> = new Map();
   /** Pen stabilizer (interaction/stabilizer.ts): on/off and strength 0–100. */
@@ -255,6 +257,7 @@ export class EditorState {
     this.tool = t;
     this.eraser = null;
     this.heldTool = null;
+    this.region = null;
     this.nodeMulti.clear();
     this.changed();
   }
@@ -262,6 +265,7 @@ export class EditorState {
   select(ids: Iterable<ObjectId>, additive = false): void {
     if (!additive) this.selection.clear();
     this.nodeSel = null;
+    this.region = null;
     this.nodeMulti.clear();
     for (const id of ids) this.selection.add(id);
     if (!this.selection.size) this.openMask = null; // (nothing picked: no mask is gone into)

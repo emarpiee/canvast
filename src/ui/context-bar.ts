@@ -83,6 +83,8 @@ export interface ContextActions {
   canStrokeToPath(): boolean;
   /** The stroke of the picked paths as a shape (ADR 0143), plain or tapered. */
   outlineStroke(profile?: "taper"): void;
+  /** A width profile that stays live (ADR 0150): on, or off when it is already the line's. */
+  setWidthProfile(profile: "taper" | null): void;
   canOutlineStroke(): boolean;
   /** Masks (ADR 0144): cut the others by the top picked thing, by its opacity or brightness, or clip them to its outline; change or release a mask. */
   makeMask(mode: "alpha" | "luminance"): void;
@@ -151,7 +153,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
       btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
     group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
-    group("Path", btn("simplify", ICONS.chartSpline, "Simplify the path: fewer nodes, the same shape"), btn("strokepath", ICONS.pencilRuler, "Turn the pen stroke into an editable path"), btn("outlinestroke", ICONS.stamp, "Outline stroke: make the line a shape of its own"), btn("taper", ICONS.feather, "Taper: make the line a shape that is thin at both ends")) +
+    group("Path", btn("simplify", ICONS.chartSpline, "Simplify the path: fewer nodes, the same shape"), btn("strokepath", ICONS.pencilRuler, "Turn the pen stroke into an editable path"), btn("outlinestroke", ICONS.stamp, "Outline stroke: make the line a shape of its own"), btn("taper", ICONS.feather, "Taper: the line is thin at both ends (stays editable; click again to take it away). Outline stroke makes it a shape.")) +
     group("Network", btn("makenet", ICONS.network, "Vector network: join the picked paths where they meet and fill the regions they enclose"), btn("releasenet", ICONS.unplug, "Release the network: its edges are an ordinary path again")) +
     group("Regions", btn("divide", ICONS.slice, "Divide: cut the picked shapes into the regions they overlap in"), btn("shapebuilder", ICONS.puzzle, "Shape builder: drag across regions to merge them, Alt-drag to delete them"), btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
     group("Mask", btn("clipmask", ICONS.venetianMask, "Clipping mask: the top shape cuts what else is picked to its outline"), btn("maskalpha", ICONS.circleDashed, "Mask by opacity: the top thing shows the others only where it is solid"), btn("maskluma", ICONS.contrast, "Mask by brightness: the top thing shows the others where it is light"), btn("selectmask", ICONS.scanEye, "Pick the mask of the picked things, to move or edit it"), btn("invertmask", ICONS.circleSlash, "Invert the mask: show what it hides and hide what it shows"), btn("releasemask", ICONS.circleMinus, "Release the mask: what it cut is whole again")) +
@@ -209,7 +211,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "invertmask": actions.changeMask({ invert: !(actions.selectedMask()?.invert ?? false) }); break;
       case "releasemask": actions.changeMask({ release: true }); break;
       case "outlinestroke": actions.outlineStroke(); break;
-      case "taper": actions.outlineStroke("taper"); break;
+      case "taper": actions.setWidthProfile("taper"); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "download": actions.downloadFile(); break;

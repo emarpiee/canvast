@@ -15,7 +15,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -292,6 +292,9 @@ async function start(): Promise<void> {
     const root = document.documentElement;
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
     root.style.setProperty("--hue", String(settings.get("ui.hue")));
+    const bg = settings.get("ui.background");
+    if (bg) root.style.setProperty("--canvas-bg", bg);
+    else root.style.removeProperty("--canvas-bg"); // the app's own, from the theme
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
     if (settings.get("ui.density") === "comfortable") root.dataset["density"] = "comfortable";
     else delete root.dataset["density"]; // compact is the default
@@ -1040,6 +1043,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     pattern: () => settings.get("ui.pattern"),
     setPattern: (p) => void settings.set("ui.pattern", p),
     subscribePattern: (fn) => void settings.subscribe((key) => key === "ui.pattern" && fn()),
+    background: () => settings.get("ui.background"),
+    setBackground: (hex) => void settings.set("ui.background", hex),
+    subscribeBackground: (fn) => void settings.subscribe((key) => key === "ui.background" && fn()),
     infoMode: () => settings.get("ui.info"),
     setInfoMode: (m) => void settings.set("ui.info", m),
     subscribeInfo: (fn) => void settings.subscribe((key) => key === "ui.info" && fn()),
@@ -1100,6 +1106,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       canSimplify: () => canSimplify(doc, editor),
       strokeToPath: () => strokeToPath(doc, editor),
       outlineStroke: (profile) => outlineStroke(doc, editor, profile),
+      setWidthProfile: (profile) => setWidthProfile(doc, editor, profile),
       makeNetwork: () => makeNetwork(doc, editor),
       releaseNetwork: () => releaseNetwork(doc, editor),
       canMakeNetwork: () => canMakeNetwork(doc, editor),
@@ -1371,6 +1378,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return;
       case "ui.hue":
+      case "ui.background":
       case "ui.vivid":
         // The canvas colours follow the dials too: read them again and redraw.
         applyAppearance();
@@ -1434,7 +1442,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Mask", title: "Invert the mask", words: "swap show hide", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { invert: !(selectedMask(doc, editor)?.invert ?? false) }) },
       { group: "Mask", title: "Release the mask", words: "remove unmask", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { release: true }) },
       { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
-      ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor, profile) })),
+      ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, profile) })),
+      { group: "Path", title: "Width: even", words: "variable width taper remove", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, null) },
       { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
       { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
       { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },

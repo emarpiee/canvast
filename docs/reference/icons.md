@@ -64,6 +64,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `palette` | Styles panel: Palettes tab |
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `pipette` | Styles panel: Edit a colour (menu item) |
+| `paintBucket` | Navigation bar: Canvas background colour (hold to go back to the default) |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |
 | `box-select` | Axis-aligned selection box |

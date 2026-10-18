@@ -4,13 +4,14 @@
  * readable numbers. Kept: fill and outline colour with transparency, linear and radial gradients, width, corners, ends, dashes, the fill
  * rule, opacity and blend mode, names. Not kept: an outline's inside or outside position (drawn centred), which SVG has no word for.
  */
+import { outlineOf } from "../doc/outline-stroke";
 import type { FrameSpace } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { PathObject } from "../doc/model";
 import { expressObjectIn, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient } from "../doc/paint";
-import { netFaces } from "../doc/network";
+import { regionSplit } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
 import type { Arrow } from "../doc/path";
 import type { SubPath } from "../doc/path";
@@ -168,10 +169,13 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     const width = o.width * p.k * sc;
     const map = (xs: readonly SubPath[]): SubPath[] => mapSubs(xs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
     // A vector network (ADR 0146): the regions its edges enclose are filled, the edges are stroked.
-    const regions = o.net ? map(netFaces(p.subs)) : null;
-    let a = ` d="${pathData(regions && o.stroke !== null ? subs : (regions ?? subs))}"` + (regions && o.stroke !== null ? ' fill="none"' : paintAttr(p, "fill", o.fill)) + paintAttr(p, "stroke", o.stroke);
-    if (o.fill !== null && o.evenodd) a += ` fill-rule="evenodd"`;
-    if (o.stroke !== null) {
+    // A live width profile (ADR 0150): the outline's shape is filled with the outline's paint, and the line itself is not stroked.
+    const live = !!o.profile && !o.net && o.stroke !== null;
+    const split = o.net ? regionSplit({ sub: p.subs, regions: o.regions }) : null;
+    const regions = split ? map(split.base) : null;
+    let a = ` d="${pathData(subs)}"` + (split ? ' fill="none"' : paintAttr(p, "fill", o.fill)) + (live ? "" : paintAttr(p, "stroke", o.stroke));
+    if (!split && o.fill !== null && o.evenodd) a += ` fill-rule="evenodd"`;
+    if (o.stroke !== null && !live) {
       a += ` stroke-width="${num(width)}"`;
       if (o.join) a += ` stroke-linejoin="${o.join}"`;
       else a += ` stroke-linejoin="round"`;
@@ -183,7 +187,17 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     if (o.opacity < 1) a += ` opacity="${num(o.opacity)}"`;
     if (o.blend) a += ` style="mix-blend-mode:${o.blend}"`;
     if (o.name) a += ` id="${esc(o.name.replace(/\s+/g, "-"))}"`;
-    const fillPart = regions && o.stroke !== null && o.fill !== null ? `  <path d="${pathData(regions)}"${paintAttr(p, "fill", o.fill)}${o.evenodd ? ' fill-rule="evenodd"' : ""}${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}/>\n` : "";
+    const common = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}`;
+    const fillPart = split
+      ? [...(o.fill !== null && regions!.length ? [`  <path d="${pathData(regions!)}"${paintAttr(p, "fill", o.fill)}${o.evenodd ? ' fill-rule="evenodd"' : ""}${common}/>\n`] : []),
+        ...split.own.filter((r) => r.paint !== null).map((r) => `  <path d="${pathData(map([r.sub]))}"${paintAttr(p, "fill", r.paint)}${common}/>\n`)].join("")
+      : "";
+    if (live) {
+      const { rot: _r, base: _b, ...flat } = o;
+      const shape = outlineOf({ ...flat, sub: subs, width }, o.profile);
+      const common2 = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}`;
+      return (o.fill !== null ? `  <path${a}/>\n` : "") + `  <path d="${pathData(shape)}"${paintAttr(p, "fill", o.stroke)}${common2}/>`;
+    }
     return fillPart + `  <path${a}/>` + arrowsSvg(p, subs, width);
   };
   // Masks (ADR 0144): the mask group's paths become an SVG <mask>; an inverted one is turned by a filter. A mask that cannot be placed is left out.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNetwork, deleteVertex, edgeBetween, moveVertex, netFaces, verticesOf } from "../../src/doc/network";
+import { buildNetwork, cellAt, deleteVertex, edgeBetween, moveVertex, netFaces, regionSplit, verticesOf, withRegionFill } from "../../src/doc/network";
 import { geometryBounds, rectSubs } from "../../src/doc/path";
 import type { SubPath } from "../../src/doc/path";
 
@@ -75,5 +75,20 @@ describe("shapes that share a side", () => {
     const net = buildNetwork([rectSubs(0, 0, 100, 100), rectSubs(100, 0, 100, 100)], 0.01);
     expect(net.length).toBe(7);
     expect(netFaces(net).length).toBe(2);
+  });
+});
+
+describe("a fill per region (ADR 0150)", () => {
+  const sub = [...square(0, 0, 100), edgeBetween([0, 0], [100, 100])]; // two triangles
+  it("names a region by a point, keeps its fill apart, and takes it away when it equals the path's", () => {
+    const lower = cellAt(sub, 80, 20)!, upper = cellAt(sub, 20, 80)!;
+    expect(lower).not.toBe(upper);
+    expect(cellAt(sub, 500, 500)).toBeNull();
+    const o = { sub, fill: "#111111" as const, regions: withRegionFill({ sub, fill: "#111111" }, lower, "#ff0000") };
+    const split = regionSplit(o);
+    expect(split.base.length).toBe(1);
+    expect(split.own).toEqual([{ paint: "#ff0000", sub: expect.anything() }]);
+    expect(withRegionFill(o, lower, "#111111").fills).toEqual([]);
+    expect(regionSplit({ ...o, sub: [...sub, edgeBetween([0, 0], [0, 50])] }).own).toEqual([]); // edges changed: the own fills no longer apply
   });
 });

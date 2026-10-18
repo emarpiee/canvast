@@ -5,8 +5,9 @@ import type { TermSum } from "../core/frames";
 import { termsAdd, termsLead, termsScale, termsShift } from "../core/frames";
 import type { CanvasObject, ImageObject, PathObject, StrokeObject, TextObject } from "../doc/model";
 import { localBounds, pathSubs, pivotOf, strokePoints } from "../doc/model";
-import type { FlatPath } from "../doc/path";
-import { netFaces } from "../doc/network";
+import type { FlatPath, SubPath } from "../doc/path";
+import type { Paint } from "../doc/paint";
+import { regionSplit } from "../doc/network";
 import { distanceToOutline, flatten, insideFill } from "../doc/path";
 import { paintAt } from "./gradient";
 import { cosSin } from "../core/angle";
@@ -163,20 +164,26 @@ function flatOf(o: PathObject): readonly FlatPath[] {
   return f;
 }
 
-/** What fills a path: its own outline, or for a vector network (ADR 0146) the regions its edges enclose. */
-const fillFlats = new WeakMap<PathObject, readonly FlatPath[]>();
-function fillOf(o: PathObject): readonly FlatPath[] {
-  if (!o.net) return flatOf(o);
+/** What fills a path: its own outline, or for a vector network (ADR 0146) the regions its edges enclose, those with a fill of their own (ADR 0150) kept apart. */
+interface Fill { readonly all: readonly FlatPath[]; readonly own: ReadonlyArray<{ paint: Paint; flats: readonly FlatPath[] }> }
+const fillFlats = new WeakMap<PathObject, Fill>();
+function fillOf(o: PathObject): Fill {
+  if (!o.net) return { all: flatOf(o), own: [] };
   let f = fillFlats.get(o);
   if (!f) {
     const b = localBounds(o);
     const size = Math.max(b.maxX - b.minX, b.maxY - b.minY) || 1;
-    const faces = netFaces(pathSubs(o));
-    f = flatten(faces, faces.map((s) => Float64Array.from(s.n)), size * 2e-4, EVERYWHERE, 0);
+    const flat = (faces: readonly SubPath[]): FlatPath[] => flatten(faces, faces.map((s) => Float64Array.from(s.n)), size * 2e-4, EVERYWHERE, 0);
+    const split = regionSplit(o);
+    const own = split.own.filter((r): r is { paint: Paint; sub: SubPath } => r.paint !== null).map((r) => ({ paint: r.paint, flats: flat([r.sub]) }));
+    f = { all: [...(o.fill !== null ? flat(split.base) : []), ...own.flatMap((r) => r.flats)], own };
     fillFlats.set(o, f);
   }
   return f;
 }
+
+/** The paint a point inside the fill has: the one of the region that holds it, else the path's. */
+const fillPaintAt = (o: PathObject, ff: Fill, lx: number, ly: number): Paint | null => ff.own.find((r) => insideFill(r.flats, lx, ly, false))?.paint ?? o.fill;
 
 const pathSampler: CoarseSampler<PathObject> = {
   classify(o, { lx, ly, m }) {
@@ -187,13 +194,16 @@ const pathSampler: CoarseSampler<PathObject> = {
       const h = o.width / 2;
       if (d <= h - m) return { color: paintAt(o, o.stroke, lx, ly) };
       if (d < h + m) return "exact"; // the edge of the outline is within the view
-    } else if (distanceToOutline(ff, lx, ly) < m) return "exact"; // the edge of the fill is
-    return o.fill !== null && insideFill(ff, lx, ly, !!o.evenodd) ? { color: paintAt(o, o.fill, lx, ly) } : "miss";
+    } else if (distanceToOutline(ff.all, lx, ly) < m) return "exact"; // the edge of the fill is
+    const p = insideFill(ff.all, lx, ly, !!o.evenodd) ? fillPaintAt(o, ff, lx, ly) : null;
+    return p !== null ? { color: paintAt(o, p, lx, ly) } : "miss";
   },
   approx(o, { lx, ly }) {
     const f = flatOf(o);
     if (o.stroke !== null && distanceToOutline(f, lx, ly) <= o.width / 2) return { color: paintAt(o, o.stroke, lx, ly) };
-    return { color: o.fill !== null && insideFill(fillOf(o), lx, ly, !!o.evenodd) ? paintAt(o, o.fill, lx, ly) : "transparent" };
+    const ff = fillOf(o);
+    const p = insideFill(ff.all, lx, ly, !!o.evenodd) ? fillPaintAt(o, ff, lx, ly) : null;
+    return { color: p !== null ? paintAt(o, p, lx, ly) : "transparent" };
   },
 };
 
