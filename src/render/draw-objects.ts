@@ -221,11 +221,17 @@ export function drawPath(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       c.lineJoin = o.join ?? "round";
       c.lineCap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round"); // (a dot is a dash of no length: only round ends show it)
       c.miterLimit = MITER_LIMIT;
-      if (o.dash) c.setLineDash(dashPattern(o.dash, c.lineWidth));
+      if (o.dash) {
+        c.setLineDash(dashPattern(o.dash, c.lineWidth));
+        c.lineDashOffset = (o.dashOffset ?? 0) * c.lineWidth;
+      }
       c.beginPath();
       addOutlinePath(c, po, vp);
       c.stroke();
-      if (o.dash) c.setLineDash([]);
+      if (o.dash) {
+        c.setLineDash([]);
+        c.lineDashOffset = 0;
+      }
     }
   };
   if (!(o.fill !== null && o.stroke !== null && (o.opacity < 1 || o.blend))) return paint(ctx, o, () => body(ctx));
@@ -278,6 +284,7 @@ function drawAlignedOutline(c: CanvasRenderingContext2D, po: ProjectedObject, vp
     const unit = a.lineWidth / 2;
     const dash = Math.max(0, o.dash[0] * unit - (a.lineCap === "butt" ? 0 : unit));
     a.setLineDash([dash, (o.dash[0] + o.dash[1]) * unit - dash]);
+    a.lineDashOffset = (o.dashOffset ?? 0) * unit;
   }
   a.beginPath();
   addOutlinePath(a, po, vp);

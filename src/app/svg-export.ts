@@ -123,6 +123,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace): stri
       else a += ` stroke-linejoin="round"`;
       a += ` stroke-linecap="${o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round")}"`;
       if (o.dash) a += ` stroke-dasharray="${num(o.dash[0] * width)} ${num(o.dash[1] * width)}"`;
+      if (o.dash && o.dashOffset) a += ` stroke-dashoffset="${num(o.dashOffset * width)}"`;
     }
     if (o.opacity < 1) a += ` opacity="${num(o.opacity)}"`;
     if (o.blend) a += ` style="mix-blend-mode:${o.blend}"`;

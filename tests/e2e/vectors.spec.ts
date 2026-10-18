@@ -1999,10 +1999,21 @@ test("only a picked shape moves (a press-and-slide on another draws the selectio
   expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toEqual([3, 2]);
   await p.click('.outline-pop [data-dash="dotted"]');
   expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toEqual([0, 2]);
+  // dash numbers: length, gap and where the pattern starts, in widths of the outline
+  await p.click('.outline-pop [data-dash="dashed"]');
+  const dashed = async (): Promise<{ dash?: number[]; dashOffset?: number }> => (await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[]; dashOffset?: number };
+  await p.fill('.outline-pop [data-dash="len"]', "5");
+  await p.fill('.outline-pop [data-dash="gap"]', "1.5");
+  await p.fill('.outline-pop [data-dash="offset"]', "2");
+  await p.locator('.outline-pop [data-dash="offset"]').blur();
+  expect(await dashed()).toMatchObject({ dash: [5, 1.5], dashOffset: 2 });
+  await p.click('.outline-pop [data-dash="dashed"]');
+  expect((await dashed()).dashOffset, "a preset starts its own pattern at 0").toBeUndefined();
+  await p.click('.outline-pop [data-dash="solid"]');
+  expect((await dashed()).dash, "solid is no pattern").toBeUndefined();
   await key(app, "Escape");
   await key(app, "Control+z");
-  await key(app, "Control+z");
-  expect(((await objs(app)).find((o) => o.id === b.id) as unknown as { dash?: number[] }).dash).toBeUndefined();
+  expect((await dashed()).dash, "one undo brings the pattern back").toEqual([3, 2]);
 
   // node snapping: B's top-left node, dragged to 3 px beside A's right edge, lands exactly on it
   await click(app, 750, 350);

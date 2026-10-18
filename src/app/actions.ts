@@ -3,7 +3,7 @@ import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn } from "../doc/rounding";
 import type { AlignChoice, CapChoice, JoinChoice } from "../doc/stroke-look";
 import { alignChoice, capChoice, dashChoice, joinChoice, lookFromChoices } from "../doc/stroke-look";
-import type { DashChoice } from "../doc/stroke-look";
+import type { DashChoice, StrokeLook } from "../doc/stroke-look";
 import { normalizeTags } from "../assets/asset-catalog";
 import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { isCard } from "../assets/file-kind";
@@ -765,6 +765,29 @@ export function selectedOutline(doc: DocumentStore, editor: EditorState): { join
   return o ? { join: joinChoice(o), cap: capChoice(o), align: alignChoice(o), dash: dashChoice(o), closed: o.sub.length > 0 && o.sub.every((s) => s.closed) } : null;
 }
 
+/** Dash length, gap and start, in widths of the outline, of the first selected path (null: it has no dashes). */
+export function selectedDashNumbers(doc: DocumentStore, editor: EditorState): { len: number; gap: number; offset: number } | null {
+  const o = editablePaths(doc, editor)[0];
+  return o?.dash ? { len: o.dash[0], gap: o.dash[1], offset: o.dashOffset ?? 0 } : null;
+}
+
+/** Set the dash numbers of the selected dashed paths: one undo step. A pattern of no length and no gap is refused. */
+export function commitDashNumbers(doc: DocumentStore, editor: EditorState, n: { len?: number; gap?: number; offset?: number }): void {
+  const paths = editablePaths(doc, editor).filter((o) => o.dash);
+  if (!paths.length || editor.blockEdit()) return;
+  const next = paths.map((o): PathObject => {
+    const len = n.len ?? o.dash![0];
+    const gap = n.gap ?? o.dash![1];
+    const { dashOffset: _o, cap: _c, ...rest } = o;
+    const off = n.offset ?? o.dashOffset ?? 0;
+    if (!(len + gap > 0)) return o;
+    const look: StrokeLook = { dash: [len, gap], ...(off ? { dashOffset: off } : {}), ...(len !== 0 && o.cap ? { cap: o.cap } : {}) }; // (a dot needs round ends, which is no cap)
+    return { ...rest, ...look };
+  });
+  doc.commit(doc.transaction(paths.length === 1 ? "Dash pattern" : `Dash pattern of ${paths.length} paths`, next));
+  editor.changed();
+}
+
 export interface OutlinePatch {
   join?: JoinChoice;
   cap?: CapChoice;
@@ -777,10 +800,16 @@ export function commitOutline(doc: DocumentStore, editor: EditorState, patch: Ou
   const paths = editablePaths(doc, editor);
   if (!paths.length || editor.blockEdit()) return;
   const next = paths.map((o): PathObject => {
-    const { join: _j, cap: _c, align: _a, dash: _d, ...rest } = o;
+    const { join: _j, cap: _c, align: _a, dash: _d, dashOffset: _o, ...rest } = o;
     const dash = patch.dash ?? dashChoice(o);
     const look = lookFromChoices(patch.join ?? joinChoice(o), patch.dash === "dotted" ? "round" : patch.cap ?? capChoice(o), patch.align ?? alignChoice(o), undefined, dash);
-    return { ...rest, ...look };
+    // a changed preset starts its own pattern at 0; any other change keeps the numbers the user typed
+    const keep: StrokeLook = {};
+    if (patch.dash === undefined && o.dash) {
+      keep.dash = o.dash;
+      if (o.dashOffset) keep.dashOffset = o.dashOffset;
+    }
+    return { ...rest, ...look, ...keep };
   });
   const label = patch.align !== undefined ? "Outline position" : patch.dash !== undefined ? "Outline dashes" : patch.join !== undefined ? "Outline corners" : "Outline ends";
   doc.commit(doc.transaction(paths.length === 1 ? label : `${label} of ${paths.length} paths`, next));

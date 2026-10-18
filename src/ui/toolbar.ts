@@ -91,6 +91,9 @@ export interface ToolbarActions {
   /** Round the corners of the picked paths: one value, or one for every corner (four for a rectangle: top left, top right, bottom right, bottom left). */
   cornersSelected(px: number[], final?: boolean): void;
   /** Store a new corner style, end style or position on the selected paths' outlines (one undo step). */
+  /** Dash length, gap and start (in widths) of the first picked dashed path; null: none. */
+  selectedDashNumbers(): { len: number; gap: number; offset: number } | null;
+  setDashNumbers(n: { len?: number; gap?: number; offset?: number }): void;
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
 }
 
@@ -644,6 +647,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       cap: sel ? sel.cap : editor.shapeCap,
       align: sel ? sel.align : editor.shapeAlign,
       dash: sel ? sel.dash : editor.shapeDash,
+      dashNumbers: sel ? actions.selectedDashNumbers() ?? { len: 3, gap: 2, offset: 0 } : null,
+      onDashNumbers: (n) => actions.setDashNumbers(n),
       closed: sel ? sel.closed : editor.tool === "shape" && editor.shapeKind !== "line",
       onWidth: (px, final) => {
         if (sel) actions.setSelectedWidth(px, final);

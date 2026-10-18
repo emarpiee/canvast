@@ -2243,7 +2243,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .op-label { font: var(--font-meta); color: var(--hud-muted); }
 .op-choices { margin-bottom: 0; }
 .op-choices button[disabled] { opacity: 0.4; cursor: default; }
-.op-width { width: 5rem; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.op-width, .op-num { width: 5rem; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .op-unit { display: none; }
 .op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
 .paint-modes { display: flex; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }

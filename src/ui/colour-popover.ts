@@ -525,6 +525,9 @@ export interface OutlineOptions {
   /** The width changed: `final` false while it is being typed or dragged (show it), true once it is settled (store it). */
   onWidth(px: number, final: boolean): void;
   onStyle(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
+  /** Dash length, gap and start in widths of the outline (null: not a dashed selection, the fields are left out). */
+  dashNumbers?: { len: number; gap: number; offset: number } | null;
+  onDashNumbers?(n: { len?: number; gap?: number; offset?: number }): void;
   onClose?(): void;
 }
 
@@ -546,11 +549,13 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     choices("align", "Position", [["inside", "Inside", "Inside: the whole width is inside the edge"], ["centre", "Centre", "Centre: half on each side of the edge"], ["outside", "Outside", "Outside: the whole width is outside the edge"]] as const, o.align, !o.closed) +
     choices("join", "Corners", [["miter", "Sharp", "Sharp corners"], ["round", "Round", "Round corners"], ["bevel", "Cut", "Cut (bevelled) corners"]] as const, o.join) +
     choices("dash", "Line", [["solid", "Solid", "A solid line"], ["dashed", "Dashed", "Dashes (three widths long, two apart)"], ["dotted", "Dotted", "Dots (round ends)"]] as const, o.dash) +
+    (o.dashNumbers ? [["len", "Dash", o.dashNumbers.len, "0"], ["gap", "Gap", o.dashNumbers.gap, "0"], ["offset", "Start", o.dashNumbers.offset, ""]].map(([k, l, v, min]) => `<div class="op-row" data-dash-row${o.dash === "solid" ? " hidden" : ""}><label class="op-label" for="op-d-${k}">${l}</label><input id="op-d-${k}" class="op-num" data-dash="${k}" type="number"${min !== "" ? ` min="${min}"` : ""} step="0.25" inputmode="decimal" value="${Math.round(Number(v) * 1000) / 1000}"><span class="op-unit">widths</span></div>`).join("") : "") +
     choices("cap", "Ends", [["butt", "Flat", "Flat ends, cut at the last node"], ["round", "Round", "Round ends"], ["square", "Square", "Square ends, reaching half the width past the last node"]] as const, o.cap) +
     (o.closed ? "" : `<p class="op-note">An open line is always centred on its path.</p>`);
   scrubNumbers(pop);
   const width = pop.querySelector<HTMLInputElement>(".op-width")!;
   liveNumber(width, (v, final) => v >= 0 && o.onWidth(v, final));
+  for (const f of pop.querySelectorAll<HTMLInputElement>("[data-dash]")) liveNumber(f, (v, final) => final && o.onDashNumbers?.({ [f.dataset["dash"]!]: v }));
   pop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b || b.disabled) return;
@@ -560,7 +565,15 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
     if (d["align"]) o.onStyle({ align: d["align"] as AlignChoice });
     else if (d["join"]) o.onStyle({ join: d["join"] as JoinChoice });
     else if (d["cap"]) o.onStyle({ cap: d["cap"] as CapChoice });
-    else if (d["dash"]) o.onStyle({ dash: d["dash"] as DashChoice });
+    else if (d["dash"]) {
+      o.onStyle({ dash: d["dash"] as DashChoice });
+      const preset = d["dash"] === "dotted" ? [0, 2] : [3, 2];
+      for (const r of pop.querySelectorAll<HTMLElement>("[data-dash-row]")) r.hidden = d["dash"] === "solid";
+      for (const [i, k] of ["len", "gap", "offset"].entries()) {
+        const f = pop.querySelector<HTMLInputElement>(`[data-dash="${k}"]`);
+        if (f) f.value = String(preset[i] ?? 0);
+      }
+    }
   });
   document.body.appendChild(pop);
   place(pop, anchor);

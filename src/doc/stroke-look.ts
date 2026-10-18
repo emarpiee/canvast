@@ -20,6 +20,7 @@ export interface StrokeLook {
   cap?: Cap;
   align?: Align;
   dash?: Dash;
+  dashOffset?: number;
 }
 
 /** The fields of an object for these choices. `defaultJoin`: what a null join means (sharp corners for shapes with corners, round otherwise). */
