@@ -47,7 +47,7 @@ import { mountNavigator } from "../ui/navigator";
 import { mountStoragePanel } from "../ui/storage-panel";
 import { mountToolbar } from "../ui/toolbar";
 import { initColourPopover } from "../ui/colour-popover";
-import { mountLayersPanel } from "../ui/layers-panel";
+import { labelOf, mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
 import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
@@ -60,7 +60,9 @@ import { mountAssetsView } from "../ui/assets-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
 import { goHome, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
-import { setMenuAvoid } from "../ui/more-menu";
+import { closeMoreMenu, openMoreMenu, setMenuAvoid } from "../ui/more-menu";
+import type { MenuItem } from "../ui/more-menu";
+import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog } from "../ui/confirm";
@@ -601,6 +603,34 @@ async function start(): Promise<void> {
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
     openSearch: (prefix) => canvasSearch.open(prefix),
+    // A long press with a finger lists what is under it (ADR 0151): a row outlines its thing while touched and picks it when tapped; "Add to the pick" keeps what is picked.
+    revealList: (at, things, pick) => {
+      const box = canvas.getBoundingClientRect();
+      const anchor = document.createElement("div");
+      anchor.style.cssText = `position:fixed;left:${box.left + at.x}px;top:${box.top + at.y}px;width:0;height:0;pointer-events:none`;
+      document.body.appendChild(anchor);
+      let add = false;
+      const items = (): MenuItem[] => [
+        { id: "reveal-add", label: "Add to the pick", hint: "Tap to add or take out; tap outside when done", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        ...things.map((o): MenuItem => {
+          const l = labelOf(o, assetNames.map);
+          // ticked while picked; in "Add to the pick" a tap on a picked one takes it out again
+          return { id: o.id, label: l.text, icon: l.icon, checked: editor.selection.has(o.id), run: () => {
+            if (add && editor.selection.has(o.id)) editor.select([...editor.selection].filter((x) => x !== o.id));
+            else pick(o.id, add);
+            if (!add) closeMoreMenu();
+          } };
+        }),
+      ];
+      openMoreMenu(anchor, items(), "Under your finger", {
+        keepOpen: true,
+        consumeOutside: true,
+        needPress: true,
+        refresh: items,
+        onActive: (i) => { const o = i === null || i < 1 ? undefined : things[i - 1]; editor.revealIds = o ? new Set([o.id]) : null; editor.redraw(); },
+        onClose: () => { anchor.remove(); editor.revealIds = null; editor.redraw(); },
+      });
+    },
   });
   const side = document.createElement("div");
   side.id = "side-panels";
@@ -1282,6 +1312,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     markTab(v);
     markNav(v);
     host.inert = v !== "canvas";
+    closeMoreMenu(); // (a menu opened on the canvas, e.g. the long-press list, does not follow to another view)
     if (was === "assets") assetsView.hide();
     if (was === "settings") settingsView.hide();
     if (v === "assets") assetsView.show();
@@ -1473,7 +1504,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
   mountContextMenu(canvas, registry, {
-    active: () => appView === "canvas" && !textEditor.isOpen,
+    active: () => appView === "canvas" && !textEditor.isOpen && performance.now() - editor.fingerListAt > 1500,
     pickAt: (x, y) => {
       const hit = pickAll(visibleObjects(doc, index, null, view.frameCamera, view.viewport).filter((po) => !po.obj.hidden && !po.obj.locked), x, y)[0]?.obj;
       if (hit && !editor.selection.has(hit.id)) editor.select([hit.id]);

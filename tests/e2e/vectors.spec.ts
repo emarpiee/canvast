@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { alignWith, boolWith, expect, maskWith, pathWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -568,7 +568,7 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
     return Math.abs(c[0]! - fill[0]!) + Math.abs(c[1]! - fill[1]!) + Math.abs(c[2]! - fill[2]!) < 12;
   };
   const menu = async (item: string) => {
-    await p.locator(`[data-ctx="op"][data-op="${item.toLowerCase()}"]`).click();
+    await boolWith(p, `op:${item.toLowerCase()}`);
     await app.frame();
   };
   type G = Obj & { result?: string; groups?: string[]; boolOps?: Record<string, string> };
@@ -579,9 +579,9 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
   await drag(app, [500, 300], [700, 400]); // at the back
   await drag(app, [600, 350], [800, 450]); // in front, overlapping its bottom right
   await key(app, "v");
-  await expect(p.locator('[data-ctx="op"]').first()).toBeHidden(); // nothing selected yet
+  await expect(p.locator('[data-ctx="boolmenu"]')).toBeHidden(); // nothing selected yet
   await p.keyboard.press("Control+a");
-  await expect(p.locator('[data-ctx="op"]').first()).toBeVisible();
+  await expect(p.locator('[data-ctx="boolmenu"]')).toBeVisible();
 
   await menu("Union");
   let list = await all();
@@ -598,18 +598,20 @@ test("Booleans (non-destructive boolean groups): the four operations from the se
   expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBe(3);
 
   // the operation changes later, with the current one ticked
-  await expect(p.locator('[data-ctx="op"][data-op="union"]')).toHaveAttribute("aria-pressed", "true");
-  await p.locator('[data-ctx="op"][data-op="intersect"]').click();
+  await p.locator('[data-ctx="boolmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="op:union"]')).toHaveAttribute("aria-checked", "true");
+  await p.keyboard.press("Escape");
+  await boolWith(p, "op:intersect");
   await app.frame();
   expect(await filled(650, 375)).toBe(true);
   expect(await filled(550, 350)).toBe(false);
   expect(await filled(750, 430)).toBe(false);
   expect((await all())).toHaveLength(3); // the same objects, a different result
-  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
+  await boolWith(p, "op:subtract");
   await app.frame();
   expect(await filled(550, 350)).toBe(true);
   expect(await filled(650, 375)).toBe(false);
-  await p.locator('[data-ctx="op"][data-op="exclude"]').click();
+  await boolWith(p, "op:exclude");
   await app.frame();
   expect(await filled(550, 350)).toBe(true);
   expect(await filled(650, 375)).toBe(false);
@@ -637,7 +639,7 @@ test("Boolean groups: enter one to edit its shapes, the result follows as you dr
   await drag(app, [600, 350], [800, 450]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const gid = (await res()).result!;
 
@@ -704,7 +706,7 @@ test("Boolean groups: enter one to edit its shapes, the result follows as you dr
 
   // release: the two shapes come back as separate, plain shapes where they were
   await click(app, 750, 430);
-  await p.locator('[data-ctx="release"]').click();
+  await boolWith(p, "release");
   await app.frame();
   list = await all();
   expect(list).toHaveLength(2);
@@ -722,7 +724,7 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
   await drag(app, [600, 350], [800, 450]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
+  await boolWith(p, "op:subtract");
   await app.frame();
   const first = (await all()).find((o) => o.result !== undefined)!;
 
@@ -750,7 +752,7 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
   await key(app, "v");
   await p.keyboard.press("Control+a");
   await app.frame();
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const nested = await all();
   expect(nested).toHaveLength(5); // the first group (two shapes and its result), the new shape, and the outer group's result
@@ -855,7 +857,7 @@ test("a boolean group's gradient is moved with its handles on the canvas, picked
   await drag(app, [640, 340], [900, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await p.mouse.move(300, 650); // (a button under the pointer names itself in the hint line)
   await app.frame();
   const r = await result();
@@ -990,7 +992,7 @@ test("corner radius on every kind of shape: one value or four on a rectangle, an
   await key(app, "v");
   await click(app, 720, 540);
   await click(app, 920, 640, ["Shift"]);
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const before = (await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!;
   expect(await nodes(before)).toBe(8);
@@ -1147,7 +1149,7 @@ test("a boolean group turns with its shapes: its box stays turned instead of sna
   await drag(app, [600, 360], [800, 480]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const turn = async (deg: number) => {
     const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
@@ -1184,14 +1186,14 @@ test("nested boolean groups: a group inside a group; moving, turning, rounding a
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   // a third shape, subtracted from the group as a whole
   await key(app, "u");
   await drag(app, [560, 380], [660, 440]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
+  await boolWith(p, "op:subtract");
   await app.frame();
   expect(await all()).toHaveLength(5); // three shapes and two results
   const rs = await results();
@@ -1240,7 +1242,7 @@ test("selection colours: the colours of several picked shapes as chips; one chan
   type G = { type: string; x0: number; y0: number; x1: number; y1: number; stops: Array<{ c: string }> };
   const fills = async () => (await objs(app)).map((o) => o.fill as unknown as string | G);
   await key(app, "u");
-  await drag(app, [300, 300], [420, 380]);
+  await drag(app, [300, 330], [420, 410]); // (below the dev panel, which is taller in Firefox)
   await drag(app, [500, 300], [620, 380]);
   await drag(app, [700, 300], [820, 380]);
   await key(app, "v");
@@ -1395,7 +1397,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
     await pop.locator("[data-hex]").fill(hex);
     await pop.locator("[data-hex]").press("Enter");
     await key(app, "Escape");
-    await drag(app, [300 + n * 90, 300], [370 + n * 90, 360]);
+    await drag(app, [300 + n * 90, 330], [370 + n * 90, 390]);
   }
   await key(app, "v");
   await p.keyboard.press("Control+a");
@@ -1512,14 +1514,14 @@ test("a boolean group takes more shapes and gives them back: Add to the group, T
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   await key(app, "u");
-  await drag(app, [300, 300], [440, 420]); // a third shape, apart from the group
+  await drag(app, [300, 330], [440, 450]); // a third shape, apart from the group (below the dev panel, which is taller in Firefox)
   await key(app, "v");
   await click(app, 560, 330); // the group
-  await click(app, 370, 360, ["Shift"]); // and the shape beside it
-  await p.locator('[data-ctx="addgroup"]').click();
+  await click(app, 370, 390, ["Shift"]); // and the shape beside it
+  await boolWith(p, "addgroup");
   await app.frame();
   let list = await all();
   const third = list.find((o) => o.result === undefined && size(o).w === 140)!;
@@ -1530,7 +1532,7 @@ test("a boolean group takes more shapes and gives them back: Add to the group, T
   await p.mouse.dblclick(560, 330);
   await app.frame();
   await click(app, 370, 360);
-  await p.locator('[data-ctx="takeout"]').click();
+  await boolWith(p, "takeout");
   await app.frame();
   list = await all();
   expect(list.find((o) => o.id === third.id)!.groups).toBeUndefined();
@@ -1586,7 +1588,7 @@ test("a boolean group's corner radius updates live while it is dragged, like a p
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const corner = await px(507, 307); // (inside the sharp corner)
   const lb = (await p.locator('[data-scrub="radius"]').boundingBox())!;
@@ -1610,7 +1612,7 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const members = async () => ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
   const centreX = (o: G) => (o.sub[0]!.n[0]! + o.sub[0]!.n[6]!) / 2 * 2 ** o.unit + parseFloat(o.ax.replace("p", "e")) * 0; // (local, in the object's own units)
@@ -1623,7 +1625,7 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
   const xs = f.corners.map((c) => c[0]), ys = f.corners.map((c) => c[1]);
   const overlaps = bar.x < Math.max(...xs) && bar.x + bar.width > Math.min(...xs) && bar.y < Math.max(...ys) && bar.y + bar.height > Math.min(...ys);
   expect(overlaps, "the bar is off the selected shapes").toBe(false);
-  await p.locator('[data-ctx="layout"][data-layout="align:centre"]').click();
+  await alignWith(p, "align:centre");
   await app.frame();
   const after = await members();
   // each member now has its middle at the same x on the screen
@@ -1658,7 +1660,7 @@ test("Shift snaps a turned boolean group to steps of 15 degrees of its whole tur
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const turn = async (to: number, shift: boolean) => {
     // grab the rotate handle and move the pointer round the middle until the box shows about `to` degrees
@@ -1699,7 +1701,7 @@ test("a boolean group goes through the ordinary edits as one shape: stretch (tur
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const widthOf = async () => { const f = await frame(); return Math.hypot(f.corners[1]![0] - f.corners[0]![0], f.corners[1]![1] - f.corners[0]![1]); };
   const w0 = await widthOf();
@@ -1750,7 +1752,7 @@ test("one shape inside a group aligns with the group, as in any design tool", as
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   const shapes = ((await objs(app)) as unknown as G[]).filter((o) => o.result === undefined);
   const [a, b] = shapes;
@@ -1759,7 +1761,7 @@ test("one shape inside a group aligns with the group, as in any design tool", as
   await click(app, 800, 440); // the back/front shape's own area: one shape picked
   const sel = await p.evaluate(() => window.__canvastDebug.selection());
   expect(sel).toHaveLength(1);
-  await p.locator('[data-ctx="layout"][data-layout="align:left"]').click(); // the align buttons are there for a single shape in a group
+  await alignWith(p, "align:left"); // the align buttons are there for a single shape in a group
   await app.frame();
   const left = async (id: string) => (await screenBox(app, id)).minX;
   const moved = sel[0]!;
@@ -1786,7 +1788,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await drag(app, [640, 340], [840, 460]);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   await menu(/^Set initial shape/); // the group picked whole
   const saved = await gap();
@@ -1803,7 +1805,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await key(app, "Escape");
   await key(app, "Escape");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
+  await boolWith(p, "op:subtract");
   await app.frame();
   await p.locator("[data-sel-radius]").fill("12");
   await p.locator("[data-sel-radius]").press("Enter");
@@ -1856,16 +1858,23 @@ test("the line under the tool options says what to do: per tool, with a shape pi
   expect(await tool(app)).toBe("select");
   // a boolean group, and inside it
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await p.mouse.move(300, 650); // (a button under the pointer names itself in the hint line)
   await app.frame();
   await expect(hint).toContainText("Boolean group");
-  await expect(p.locator('[data-ctx="flatten"]')).toBeVisible(); // Flatten is on the bar, not only in the menu
+  await p.locator('[data-ctx="boolmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="flatten"]')).toBeVisible(); // Flatten is in the Shapes menu, not only in the palette
+  await p.keyboard.press("Escape");
   await p.mouse.dblclick(560, 330);
   await app.frame();
   await expect(hint).toContainText("Inside a boolean group");
   await key(app, "Escape");
   await expect(hint).not.toContainText("Inside a boolean group");
+  // the line belongs to the canvas: it does not stay over the Settings view
+  await p.mouse.move(300, 650);
+  await expect(hint).toBeVisible();
+  await p.getByTestId("view-settings").click();
+  await expect(hint).toBeHidden();
 });
 
 test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a big one, subtracts as a hole of its own size, however small", async ({ app }) => {
@@ -1887,7 +1896,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   expect(await objs(app)).toHaveLength(2);
   await key(app, "v");
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="subtract"]').click();
+  await boolWith(p, "op:subtract");
   await app.frame();
   let list = await all();
   expect(list).toHaveLength(3);
@@ -1907,7 +1916,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   await p.keyboard.press("Control+z");
   expect(await all()).toHaveLength(2);
   await p.keyboard.press("Control+a");
-  await p.locator('[data-ctx="op"][data-op="union"]').click();
+  await boolWith(p, "op:union");
   await app.frame();
   list = await all();
   expect(list.find((o) => o.result !== undefined)!.sub).toHaveLength(1); // a union with a shape inside it is the big one alone
@@ -2080,7 +2089,7 @@ test("Simplify: a path of six collinear nodes becomes two; a pen stroke becomes 
   await key(app, "v");
   await click(app, 550, 300);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([path.id]);
-  await p.click('[data-ctx="simplify"]', { timeout: 5000 });
+  await pathWith(p, "simplify");
   expect((await last(app)).sub[0]!.n.length / 6, "collinear nodes are all but the ends").toBe(2);
   await key(app, "Control+z");
   expect((await last(app)).sub[0]!.n.length / 6).toBe(6);
@@ -2095,7 +2104,7 @@ test("Simplify: a path of six collinear nodes becomes two; a pen stroke becomes 
   expect(stroke.kind).toBe("stroke");
   await key(app, "v");
   await drag(app, [380, 420], [740, 600]); // a selection box round the stroke
-  await p.click('[data-ctx="strokepath"]', { timeout: 5000 });
+  await pathWith(p, "strokepath");
   const made = await last(app);
   expect(made).toMatchObject({ kind: "path", fill: null, id: stroke.id });
   expect(made.sub[0]!.n.length / 6, "a few nodes, not sixty").toBeLessThan(20);
@@ -2197,7 +2206,7 @@ test("Outline stroke makes the line a shape of its own; a shape with a fill keep
   const line = await last(app);
   await key(app, "v");
   await click(app, 550, 400);
-  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
+  await pathWith(p, "outlinestroke");
   const o = (await last(app)) as unknown as Obj & { stroke: string | null; fill: string };
   expect(o).toMatchObject({ id: line.id, kind: "path", stroke: null, fill: line.stroke });
   expect(o.sub.length, "the pieces of the stroke").toBeGreaterThan(1);
@@ -2206,9 +2215,9 @@ test("Outline stroke makes the line a shape of its own; a shape with a fill keep
   // Taper: full in the middle, thin at the end
   await key(app, "v");
   await click(app, 550, 400);
-  await p.click('[data-ctx="taper"]', { timeout: 5000 });
+  await pathWith(p, "taper");
   expect(await last(app), "Taper stays live: the path is kept with a profile").toMatchObject({ id: line.id, profile: "taper", stroke: line.stroke });
-  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
+  await pathWith(p, "outlinestroke");
   const t = await last(app);
   expect(t, "Outline stroke bakes it").not.toHaveProperty("profile");
   const ys = (x: number) => t.sub.flatMap((s) => s.n.filter((_, i) => i % 6 === 0).map((v, k) => [v, s.n[k * 6 + 1]!] as const)).filter(([vx]) => Math.abs(vx - x) < 3).map(([, y]) => Math.abs(y));
@@ -2220,7 +2229,7 @@ test("Outline stroke makes the line a shape of its own; a shape with a fill keep
   const rect = await last(app);
   await key(app, "v");
   await click(app, 480, 540);
-  await p.click('[data-ctx="outlinestroke"]', { timeout: 5000 });
+  await pathWith(p, "outlinestroke");
   const all = await objs(app);
   expect(all.find((x) => x.id === rect.id)).toMatchObject({ stroke: null, fill: rect.fill });
   expect(all.length).toBe(all.filter((x) => x.kind === "path").length);
@@ -2344,14 +2353,14 @@ test("Divide cuts overlapping shapes into their regions; the Shape builder merge
   await drag(app, [500, 340], [660, 460]); // B
   await key(app, "v");
   await key(app, "Control+a");
-  await p.click('[data-ctx="divide"]', { timeout: 5000 });
+  await pathWith(p, "divide");
   const parts = await objs(app);
   expect(parts.filter((o) => o.kind === "path")).toHaveLength(3);
   await key(app, "Control+z");
   expect(await objs(app)).toHaveLength(2);
   // the Shape builder: a stroke from the left region over the middle to the right one merges all three into one shape
   await key(app, "Control+a");
-  await p.click('[data-ctx="shapebuilder"]', { timeout: 5000 });
+  await pathWith(p, "shapebuilder");
   await drag(app, [420, 360], [640, 440]);
   await key(app, "Enter");
   const merged = await objs(app);
@@ -2362,7 +2371,7 @@ test("Divide cuts overlapping shapes into their regions; the Shape builder merge
   expect(await objs(app)).toHaveLength(2);
   // Alt-drag over the overlap deletes it; the two others stay
   await key(app, "Control+a");
-  await p.click('[data-ctx="shapebuilder"]', { timeout: 5000 });
+  await pathWith(p, "shapebuilder");
   await p.keyboard.down("Alt");
   await drag(app, [525, 380], [535, 390]);
   await p.keyboard.up("Alt");
@@ -2383,7 +2392,7 @@ test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts
   const blue = await px(410, 310);
   const bg = await px(100, 650);
   expect(blue).not.toEqual(bg);
-  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await maskWith(p, "clipmask");
   await click(app, 120, 650);
   await app.frame();
   expect(await px(410, 310), "outside the ellipse the rectangle is cut away").toEqual(bg);
@@ -2393,7 +2402,7 @@ test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts
   expect(await px(410, 310)).toEqual(blue);
   // by opacity
   await key(app, "Control+a");
-  await p.click('[data-ctx="maskalpha"]', { timeout: 5000 });
+  await maskWith(p, "maskalpha");
   await click(app, 120, 650);
   await app.frame();
   expect(await px(410, 310)).toEqual(bg);
@@ -2402,13 +2411,17 @@ test("Masks: a clipping mask cuts to the shape's outline; a mask by opacity cuts
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "where the mask cuts it away it cannot be picked").toHaveLength(0);
   await click(app, 550, 400);
   expect(await p.evaluate(() => window.__canvastDebug.selection()).then((a) => a.length), "where it shows it can").toBeGreaterThan(0);
-  await p.click('[data-ctx="invertmask"]', { timeout: 5000 });
+  await p.locator('[data-ctx="maskmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="releasemask"]')).toBeVisible();
+  await expect(p.locator('.pop-menu [data-id="clipmask"]'), "what is masked is offered no new mask").toHaveCount(0);
+  await p.keyboard.press("Escape");
+  await maskWith(p, "invertmask");
   await click(app, 120, 650);
   await app.frame();
   expect(await px(410, 310), "inverted: what was cut shows").toEqual(blue);
   expect(await px(530, 375), "and the middle is gone").toEqual(bg);
   await click(app, 410, 310);
-  await p.click('[data-ctx="releasemask"]', { timeout: 5000 });
+  await maskWith(p, "releasemask");
   await click(app, 120, 650);
   await app.frame();
   expect(await px(410, 310), "released: the rectangle is whole").toEqual(blue);
@@ -2425,7 +2438,7 @@ test("Vector network: two rectangles that share a side become one network with a
   const bg = await px(100, 650);
   await key(app, "v");
   await key(app, "Control+a");
-  await p.click('[data-ctx="makenet"]', { timeout: 5000 });
+  await pathWith(p, "makenet");
   const net = (await objs(app)) as unknown as Array<Obj & { net?: boolean }>;
   expect(net).toHaveLength(1);
   expect(net[0]!.net).toBe(true);
@@ -2458,7 +2471,7 @@ test("Vector network: two rectangles that share a side become one network with a
   // Release: an ordinary path again, with the same edges
   await key(app, "v");
   await click(app, 480, 360);
-  await p.click('[data-ctx="releasenet"]', { timeout: 5000 });
+  await pathWith(p, "releasenet");
   const back = ((await objs(app)) as unknown as Array<Obj & { net?: boolean }>)[0]!;
   expect(back.net).toBeUndefined();
   expect(back.sub).toHaveLength(7);
@@ -2501,7 +2514,7 @@ test("Clipping mask as one unit: a click on its output picks the whole mask (and
   await drag(app, [500, 340], [600, 460]);
   await key(app, "v");
   await key(app, "Control+a");
-  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await maskWith(p, "clipmask");
   await click(app, 120, 650);
   const all = (await objs(app)) as unknown as Array<Obj & { container?: { mask?: boolean }; parent?: string }>;
   const sheet = all.find((o) => o.container)!;
@@ -2548,12 +2561,12 @@ test("Releasing a clipping mask gives the shape back as an ordinary shape, with 
   const ellipse = (await objs(app)).at(-1)! as Obj & { fill: unknown; stroke: unknown };
   await key(app, "v");
   await key(app, "Control+a");
-  await p.click('[data-ctx="clipmask"]', { timeout: 5000 });
+  await maskWith(p, "clipmask");
   await click(app, 120, 650);
   const made = (await objs(app)) as unknown as Array<Obj & { container?: unknown; fill: unknown; stroke: unknown }>;
   expect(made.find((o) => o.container)!.fill, "the mask has no fill of its own").toBeNull();
   await click(app, 550, 400);
-  await p.click('[data-ctx="releasemask"]', { timeout: 5000 });
+  await maskWith(p, "releasemask");
   await click(app, 120, 650);
   const back = (await objs(app)) as unknown as Array<Obj & { container?: unknown; parent?: string; fill: unknown; stroke: unknown }>;
   expect(back, "nothing was lost").toHaveLength(2);
@@ -2563,4 +2576,222 @@ test("Releasing a clipping mask gives the shape back as an ordinary shape, with 
   expect(shape.fill, "the fill it had").toEqual(ellipse.fill);
   expect(shape.stroke).toEqual(ellipse.stroke);
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("a long press with a finger lists everything under it; tapping a row picks that thing, the first row adds to the pick (ADR 0151)", async ({ app, browserName }) => {
+  test.skip(browserName !== "chromium", "a held touch is sent through the DevTools protocol");
+  const p = app.page;
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [700, 500]);
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 340], [600, 460]);
+  await key(app, "v");
+  await click(app, 120, 650);
+  const [back, front] = (await objs(app)).map((o) => o.id);
+  const hold = async (x: number, y: number) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await p.waitForTimeout(700);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+  await hold(550, 400);
+  const rows = p.locator('.pop-menu[aria-label="Under your finger"] [data-i]');
+  await expect(rows, "the pick-several row and the two things under the finger").toHaveCount(3);
+  await rows.nth(2).click(); // the one at the back
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([back]);
+  // pick several: the first row stays ticked, each tap adds
+  await click(app, 120, 650);
+  await hold(550, 400);
+  await p.locator('.pop-menu [data-id="reveal-add"]').click();
+  await rows.nth(1).click();
+  await rows.nth(2).click();
+  expect([...(await p.evaluate(() => window.__canvastDebug.selection()))].sort()).toEqual([back, front].sort());
+  await expect(rows.nth(1), "what is picked is ticked").toHaveAttribute("aria-checked", "true");
+  await rows.nth(1).click(); // a tap on a picked one takes it out
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([back]);
+  await rows.nth(1).click();
+  // a press outside ends the list and does nothing else: what was picked stays picked
+  await p.mouse.click(120, 650);
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  expect([...(await p.evaluate(() => window.__canvastDebug.selection()))].sort()).toEqual([back, front].sort());
+});
+
+test("a mixed pick has chips at the start of the Actions bar (All, Shapes, Strokes): a kind shows only its tools, All shows everything (ADR 0152)", async ({ app }) => {
+  const p = app.page;
+  const chips = p.locator("[data-kinds-bar]");
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [550, 400]);
+  await key(app, "v");
+  await expect(chips, "one kind: no chips").toBeHidden();
+  await key(app, "p");
+  await drag(app, [600, 300], [760, 420]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await expect(chips.locator("button")).toHaveText(["All", "Shapes", "Strokes"]);
+  const bool = p.locator('[data-ctx="boolmenu"]');
+  await expect(bool, "All: everything").not.toHaveAttribute("data-off", "");
+  await chips.locator('[data-kindsel="stroke"]').click();
+  await expect(bool, "Strokes: the shapes' tools are off").toHaveAttribute("data-off", "");
+  await expect(chips.locator('[data-kindsel="stroke"]')).toHaveAttribute("aria-pressed", "true");
+  await chips.locator('[data-kindsel="all"]').click();
+  await expect(bool).not.toHaveAttribute("data-off", "");
+});
+
+test("touch: a quick two-finger tap is undo and a three-finger tap is redo (the view stays); a finger held still while resizing is Shift; a second finger resting is Alt (ADR 0152)", async ({ app, browserName }) => {
+  test.skip(browserName !== "chromium", "touch is sent through the DevTools protocol");
+  const p = app.page;
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", pts: Array<[number, number]>) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 300], [600, 400]);
+  expect(await objs(app)).toHaveLength(1);
+  const cam = await p.evaluate(() => JSON.stringify(window.__canvastDebug.camera()));
+  await touch("touchStart", [[700, 500], [760, 520]]);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length, { message: "two fingers: undo" }).toBe(0);
+  await touch("touchStart", [[700, 500], [760, 520], [820, 540]]);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length, { message: "three fingers: redo" }).toBe(1);
+  expect(await p.evaluate(() => JSON.stringify(window.__canvastDebug.camera())), "a tap does not move or zoom the view").toBe(cam);
+  // after the view has been panned and zoomed with two fingers (undo, then move the view, then redo)
+  await touch("touchStart", [[700, 500], [760, 520]]);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length).toBe(0);
+  await touch("touchStart", [[600, 500], [700, 500]]);
+  await touch("touchMove", [[560, 460], [760, 540]]);
+  await touch("touchMove", [[500, 420], [820, 580]]);
+  await touch("touchEnd", []);
+  expect(await p.evaluate(() => JSON.stringify(window.__canvastDebug.camera()))).not.toBe(cam);
+  await touch("touchStart", [[700, 500], [760, 520], [820, 540]]);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length, { message: "redo after a pan and zoom" }).toBe(1);
+  await p.evaluate((c) => window.__canvastDebug.setCamera(JSON.parse(c)), cam);
+  // fingers land and lift one after the other, as a hand does: three take longer than two
+  await touch("touchStart", [[700, 500], [760, 520]]);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length).toBe(0);
+  await touch("touchStart", [[700, 500]]);
+  await p.waitForTimeout(150);
+  await touch("touchStart", [[700, 500], [760, 520]]);
+  await p.waitForTimeout(150);
+  await touch("touchStart", [[700, 500], [760, 520], [820, 540]]);
+  await p.waitForTimeout(100);
+  await touch("touchEnd", []);
+  await expect.poll(async () => (await objs(app)).length, { message: "redo with fingers landing one by one" }).toBe(1);
+  for (let i = 0; i < 3; i++) {
+    // and again and again: no tap leaves a finger behind that spoils the next
+    await touch("touchStart", [[700, 500], [760, 520]]);
+    await touch("touchEnd", []);
+    await expect.poll(async () => (await objs(app)).length, { message: `undo again (${i})` }).toBe(0);
+    await touch("touchStart", [[700, 500], [760, 520], [820, 540]]);
+    await touch("touchEnd", []);
+    await expect.poll(async () => (await objs(app)).length, { message: `redo again (${i})` }).toBe(1);
+  }
+  // Shift and Alt are fingers: while one finger drags a corner, one more finger resting is Shift (the proportions are kept), two more are Alt (from the centre)
+  await key(app, "v");
+  await click(app, 500, 350);
+  const id = (await last(app)).id;
+  const b = await screenBox(app, id);
+  const w0 = b.maxX - b.minX, h0 = b.maxY - b.minY;
+  const ratio = async () => { const x = await screenBox(app, id); return [(x.maxX - x.minX) / (x.maxY - x.minY), x] as const; };
+  await p.waitForTimeout(450); // (a lone finger right after a tap waits for a second one)
+  await touch("touchStart", [[b.maxX, b.maxY]]);
+  await touch("touchMove", [[b.maxX + 120, b.maxY + 10]]);
+  await touch("touchMove", [[b.maxX + 120, b.maxY + 10], [200, 600]]); // (a second finger comes down away from the shape)
+  await p.waitForTimeout(500);
+  expect((await ratio())[0], "one resting finger: Shift keeps the shape's proportions").toBeCloseTo(w0 / h0, 1);
+  await touch("touchMove", [[b.maxX + 120, b.maxY + 10], [200, 600], [260, 600]]);
+  await p.waitForTimeout(500);
+  const [, mid] = await ratio();
+  expect((mid.minX + mid.maxX) / 2, "two resting fingers: Alt resizes about the centre").toBeCloseTo((b.minX + b.maxX) / 2, 0);
+  await touch("touchEnd", []);
+  expect((await ratio())[1].maxX - b.minX, "the corner followed the finger").toBeGreaterThan(w0 + 20);
+  // the same keys while a shape is drawn: a rectangle dragged out with one finger and a second resting comes out square
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await p.waitForTimeout(450);
+  await touch("touchStart", [[700, 450]]);
+  await touch("touchMove", [[860, 520]]);
+  await touch("touchMove", [[860, 520], [200, 650]]);
+  await p.waitForTimeout(500);
+  await touch("touchEnd", []);
+  const made = size(await last(app));
+  expect(made.w / made.h, "Shift while drawing: square").toBeCloseTo(1, 1);
+});
+
+test("while a handle is dragged the turn shows in degrees and the size as a ratio (1 : 1, 16 : 9) beside the pointer, and both go when it is let go", async ({ app }) => {
+  const p = app.page;
+  const label = () => p.evaluate(() => window.__canvastDebug.handleLabel());
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 400], [600, 500]);
+  await key(app, "v");
+  const id = (await last(app)).id;
+  await click(app, 500, 450);
+  const b = await screenBox(app, id);
+  // resize the corner so the box is 2 : 1 then 1 : 1 (without Shift a rectangle is free)
+  await p.mouse.move(b.maxX, b.maxY);
+  await p.mouse.down();
+  await p.mouse.move(b.minX + 300, b.minY + 150, { steps: 4 });
+  expect(await label()).toBe("2 : 1");
+  await p.mouse.move(b.minX + 150, b.minY + 150, { steps: 4 });
+  expect(await label()).toBe("1 : 1");
+  await p.mouse.up();
+  expect(await label(), "gone with the drag").toBeNull();
+  // turn it: the label is the angle in degrees
+  const c = await screenBox(app, id);
+  const cx = (c.minX + c.maxX) / 2, cy = (c.minY + c.maxY) / 2;
+  await p.mouse.move(c.maxX + 12, c.maxY + 12);
+  await p.mouse.down();
+  await p.mouse.move(cx - 80, cy + 150, { steps: 6 });
+  expect(await label()).toMatch(/^-?\d+(\.\d)?°$/);
+  await p.mouse.up();
+  expect(await label()).toBeNull();
+});
+
+test("touch undo and redo on the pen tool: lines drawn, then undo undo redo redo undo redo redo undo each step by one (a tap leaves no stroke behind)", async ({ app, browserName }) => {
+  test.skip(browserName !== "chromium", "touch is sent through the DevTools protocol");
+  const p = app.page;
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", pts: Array<[number, number]>) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+  const count = async () => (await objs(app)).length;
+  await key(app, "p");
+  for (const y of [300, 360, 420, 480]) await drag(app, [450, y], [700, y + 20]);
+  expect(await count()).toBe(4);
+  const tap = async (fingers: 2 | 3) => {
+    // as a hand taps: the fingers land one after the other and lift one after the other
+    const pts: Array<[number, number]> = [[900, 500], [960, 520], [1020, 540]];
+    for (let i = 1; i <= fingers; i++) {
+      await touch("touchStart", pts.slice(0, i));
+      await p.waitForTimeout(70);
+    }
+    for (let i = fingers - 1; i >= 0; i--) {
+      await touch("touchEnd", pts.slice(0, i));
+      await p.waitForTimeout(50);
+    }
+    await p.waitForTimeout(100);
+  };
+  let n = 4;
+  for (const step of ["u", "u", "r", "u", "r", "r", "u", "u", "u", "r", "r", "r"] as const) {
+    await tap(step === "u" ? 2 : 3);
+    n += step === "u" ? -1 : 1;
+    expect(await count(), `after ${step}`).toBe(n);
+  }
+  // a finger that lands right after a tap (a stray one, as a hand makes) draws no dot with the pen: it would be an edit, and an edit clears redo
+  await tap(2);
+  n -= 1;
+  await touch("touchStart", [[1000, 300]]);
+  await p.waitForTimeout(40);
+  await touch("touchEnd", []);
+  await p.waitForTimeout(300);
+  expect(await count(), "no stray stroke").toBe(n);
+  await tap(3);
+  expect(await count(), "and redo still has its step").toBe(n + 1);
 });

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, recordMetric, test } from "./harness";
+import { APP_URL, expect, pathWith, recordMetric, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
 
@@ -429,13 +429,17 @@ test("convert text to path (Ctrl+E and the selection bar): the same pixels, the 
   await app.frame();
 
   // the selection bar offers it only for text
-  await expect(p.locator('[data-ctx="outline"]')).toBeVisible();
+  await p.locator('[data-ctx="pathmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="outline"]')).toBeVisible();
+  await p.keyboard.press("Escape");
   await p.keyboard.press("Control+e");
   await app.frame();
   const [o] = await objects(p);
   expect(o).toMatchObject({ id: t!.id, kind: "path", fill: "#1f2329", stroke: null, name: "Hello" });
   expect((o as unknown as { sub: unknown[] }).sub.length).toBeGreaterThan(4); // H, e and its eye, l, l, o and its counter
-  await expect(p.locator('[data-ctx="outline"]')).toBeHidden(); // nothing left to convert
+  await p.locator('[data-ctx="pathmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="outline"]'), "nothing left to convert").toHaveCount(0);
+  await p.keyboard.press("Escape");
   await p.keyboard.press("Escape");
   await p.mouse.click(1000, 600);
   const after = await picture();
@@ -465,7 +469,7 @@ test("convert text to path (Ctrl+E and the selection bar): the same pixels, the 
   expect(back).toMatchObject({ id: t!.id, kind: "text", md: t!.md });
   // and the bar's button does the same
   await p.mouse.click(500, 380);
-  await p.locator('[data-ctx="outline"]').click();
+  await pathWith(p, "outline");
   expect((await objects(p))[0]!.kind).toBe("path");
 });
 
@@ -775,7 +779,7 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   await p.mouse.click(430, 400);
   await p.keyboard.up("Shift");
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(2);
-  await p.getByRole("button", { name: "Set the text along the picked path (pick the text and the path)" }).click();
+  await pathWith(p, "onpath");
   await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { n: number[] } | undefined)?.n.length).toBeGreaterThanOrEqual(12);
   const along = await box();
   expect(along.maxY - along.minY).toBeGreaterThan(60); // the words climb down the diagonal
@@ -793,7 +797,7 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   expect(onLine).toBeGreaterThan(30);
 
   // Taking it off sets it straight again, and undo puts it back on.
-  await p.getByRole("button", { name: "Take the text off its path: it is set straight again" }).click();
+  await pathWith(p, "offpath");
   await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeUndefined();
   const back = await box();
   expect(back.maxY - back.minY).toBeLessThan(40);

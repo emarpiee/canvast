@@ -17,6 +17,10 @@ export interface MenuItem {
   checked?: boolean;
   /** The accessible name when the visible label is not enough (default: the label). */
   aria?: string;
+  /** A short line of what it does, under the label (the menu is then a list to read, not only to pick from). */
+  hint?: string;
+  /** Names the item for tests and scripts (`data-id`). */
+  id?: string;
   run(): void;
 }
 
@@ -25,13 +29,14 @@ export function moreButton(label: string, attrs = ""): string {
   return `<button type="button" class="more-btn" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(label)}" title="More" ${attrs}>${ICONS.ellipsis}</button>`;
 }
 
-let open: { menu: HTMLElement; anchor: HTMLElement } | null = null;
+let open: { menu: HTMLElement; anchor: HTMLElement; onClose?: (() => void) | undefined } | null = null;
 
 export function closeMoreMenu(refocus = false): void {
   if (!open) return;
-  const { menu, anchor } = open;
+  const { menu, anchor, onClose } = open;
   open = null;
   menu.remove();
+  onClose?.();
   anchor.setAttribute("aria-expanded", "false");
   if (refocus && anchor.isConnected) anchor.focus();
 }
@@ -80,25 +85,68 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   menu.style.top = `${Math.round(top - origin.top)}px`;
 }
 
-/** Open the menu of `items` under `anchor` (the ⋯ button); a second press on the button closes it. */
-export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], label: string): void {
+export interface MenuOptions {
+  /** A menu that groups tools (Align): choosing an item does not close it; it closes on Escape or a press outside, and is placed again after each choice so it stays off what is picked. */
+  keepOpen?: boolean;
+  /** The items again, after a choice, when it changes what the menu shows (a ticked item moves). */
+  refresh?(): readonly MenuItem[];
+  /** The item under the finger or the focus (null: none), e.g. to outline it on the canvas. */
+  onActive?(index: number | null): void;
+  /** The menu closed, by whatever means. */
+  onClose?(): void;
+  /** A press outside closes the menu and does nothing else (the canvas under it is not clicked, so a pick is not cleared by the press that ends the menu). Default: on for a menu that stays open (`keepOpen`). */
+  consumeOutside?: boolean;
+  /** The menu opened under a finger that is still down: the click that comes when it lifts is not a choice; only a press on the menu itself arms it. */
+  needPress?: boolean;
+}
+
+/** Open the menu of `items` under `anchor` (the ⋯ button, or a button that groups several tools); a second press on the button closes it. */
+export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], label: string, opts: MenuOptions = {}): void {
   if (open && open.anchor === anchor) return closeMoreMenu(true);
   closeMoreMenu();
   const menu = document.createElement("div");
   menu.className = "pop-menu";
+  if (opts.keepOpen) menu.dataset["keep"] = "true";
+  if (opts.consumeOutside ?? opts.keepOpen) menu.dataset["consume"] = "true"; // (a menu that stays open for several tries: the press that ends it is only that, so the pick it worked on stays)
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);
-  menu.innerHTML = items
-    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}" class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}<span>${esc(it.label)}</span>${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
+  let current = items;
+  const render = (): void => {
+    menu.innerHTML = current
+    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
     .join("");
+  };
+  render();
   document.body.appendChild(menu);
   placeMenu(menu, anchor);
   anchor.setAttribute("aria-expanded", "true");
-  open = { menu, anchor };
+  open = { menu, anchor, onClose: opts.onClose };
+  if (opts.onActive) {
+    const at = (e: Event): number | null => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-i]"); return b ? Number(b.dataset["i"]) : null; };
+    menu.addEventListener("pointerover", (e) => opts.onActive!(at(e)));
+    menu.addEventListener("pointerleave", () => opts.onActive!(null));
+    menu.addEventListener("focusin", (e) => opts.onActive!(at(e)));
+  }
+  let armed = !opts.needPress;
+  menu.addEventListener("pointerdown", () => { armed = true; });
   menu.addEventListener("click", (e) => {
+    if (!armed) return;
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
     if (!b || b.disabled) return;
-    const item = items[Number(b.dataset["i"])]!;
+    const index = Number(b.dataset["i"]);
+    const item = current[index]!;
+    if (opts.keepOpen) {
+      item.run();
+      if (open?.menu !== menu) return; // (the choice closed it)
+      if (opts.refresh) {
+        current = opts.refresh(); // (what is ticked or offered has changed)
+        if (!current.length) return closeMoreMenu(); // (nothing applies any more: the button is gone too)
+        render();
+        (menu.querySelector<HTMLElement>(`[data-i="${index}"]:not(:disabled)`) ?? menu.querySelector<HTMLElement>("button:not(:disabled)"))?.focus(); // (so Escape still reaches the menu)
+      }
+      requestAnimationFrame(() => open?.menu === menu && placeMenu(menu, anchor)); // (the selection may have moved)
+      return;
+    }
     closeMoreMenu();
     item.run();
   });
@@ -112,7 +160,15 @@ export function installMenuKeys(): void {
   installed = true;
   document.addEventListener("keydown", (e) => {
     const inMenu = (e.target as HTMLElement | null)?.closest?.(".pop-menu, .side-menu, .nav-actions");
-    if (!inMenu) return;
+    if (!inMenu) {
+      // a menu that stays open (grouped tools) closes on Escape wherever the focus is
+      if (e.key === "Escape" && open?.menu.dataset["keep"] === "true") {
+        closeMoreMenu(false);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
     const items = [...inMenu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
     const i = items.indexOf(e.target as HTMLButtonElement);
     let to: number | null = null;
@@ -126,6 +182,14 @@ export function installMenuKeys(): void {
       e.stopPropagation();
     } else if (e.key === "Escape" && open && inMenu === open.menu) {
       closeMoreMenu(true);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+  document.addEventListener("pointerdown", (e) => {
+    // (capture: before the canvas sees the press)
+    if (open?.menu.dataset["consume"] === "true" && !(e.target as HTMLElement).closest(".pop-menu") && !open.anchor.contains(e.target as Node)) {
+      closeMoreMenu();
       e.preventDefault();
       e.stopPropagation();
     }

@@ -43,7 +43,8 @@ import { projectObject } from "../render/projection";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
-import { TURN, angleFromRadians, radiansFromAngle } from "../core/angle";
+import { TURN, angleFromRadians, normAngle, radiansFromAngle } from "../core/angle";
+import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
 import { finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
@@ -196,6 +197,8 @@ type Gesture =
       /** The box's own axes on screen (its turn): the factors of a resize are along them. */
       axes: { c: number; s: number };
       snap: SnapContext | null;
+      /** The box's width and height on screen before the gesture, for the ratio shown while it is resized. */
+      size0: { w: number; h: number };
     }
   | {
       kind: "rotate";
@@ -228,6 +231,8 @@ export interface ToolHooks {
   labels(): readonly ItemLabel[];
   /** "#" or "@": search the canvas by name, tag or bookmark (ADR 0060). */
   openSearch(prefix: string): void;
+  /** A long press with a finger (no hover, no Ctrl): everything under it, top first, to choose from; `pick` picks one (additive: added to or taken from the pick). */
+  revealList(at: ScreenPoint, things: readonly CanvasObject[], pick: (id: ObjectId, additive: boolean) => void): void;
 }
 
 export function attachTools(
@@ -243,7 +248,38 @@ export function attachTools(
   let spaceDown = false;
   let cycleIndex = 0;
   /** Last position of every pointer that is down, for handing touches to navigation. */
-  const active = new Map<number, { p: ScreenPoint; touch: boolean }>();
+  const active = new Map<number, { p: ScreenPoint; touch: boolean; s0: ScreenPoint }>();
+  // Touch gestures (ADR 0152): a quick tap with two fingers is undo and with three is redo (the view is put back where it was: a tap may jiggle the pan and zoom).
+  // While one finger drags a handle (resize, rotate), the other fingers are the keys: one more finger held down is Shift, two more are Alt.
+  let tap: { t: number; last: number; count: number; moved: boolean; cam: typeof view.camera } | null = null;
+  const extras = new Set<number>();
+  /** When the last touch with more than one finger ended: a finger that comes down right after it is a tap left over, not a pen stroke or a click. */
+  let multiEndAt = -Infinity;
+  const AFTER_MULTI_MS = 350;
+  let touchShift = false;
+  let touchAlt = false;
+  let modTimer = 0;
+  let lastMove: PointerEvent | null = null;
+  /** A tap: the last finger down and up again within TAP_MS, the whole touch within TAP_ALL_MS (fingers land one after the other: three take longer than two). */
+  const TAP_MS = 400;
+  const TAP_ALL_MS = 1000;
+  const TAP_SLOP_PX = 24;
+  const KEY_HOLD_MS = 250;
+  /** The drags that read Shift and Alt as they go (resize, rotate, drawing a shape, moving a node): a finger resting beside the dragging one is the key for them. */
+  const keyedGesture = (): boolean => {
+    if (g.kind === "scale" || g.kind === "rotate") return true; // (a handle is taken on purpose)
+    if (g.kind !== "shape" && g.kind !== "text" && g.kind !== "node") return false;
+    // a shape or box being drawn, a node being moved: once the finger has travelled (before that a second finger is a two-finger tap or a pinch)
+    const a = active.get(g.pointerId);
+    return !!a && Math.hypot(a.p.x - a.s0.x, a.p.y - a.s0.y) > TAP_SLOP_PX;
+  };
+  /** Shift and Alt of an event, or of the fingers resting beside the dragging one (one place for all the drags). */
+  const keys = (e: { shiftKey: boolean; altKey: boolean }): { shift: boolean; alt: boolean } => ({ shift: e.shiftKey || touchShift, alt: e.altKey || touchAlt });
+  const touchFlash = (text: string): void => {
+    navigator.vibrate?.(12);
+    editor.message = text;
+    editor.changed();
+  };
 
   /** Where the pointer was last (canvas px): where a move lets go, to find the frame it lands in. */
   let pointer: ScreenPoint = { x: 0, y: 0 };
@@ -555,7 +591,7 @@ export function attachTools(
     const d = editor.shapeDraft;
     if (!d) return;
     const l = localIn(d.frame, d.anchor, d.unit, s);
-    editor.shapeDraft = { ...d, ...shapeBox(d.kind, l.x, l.y, e.shiftKey, e.altKey) };
+    editor.shapeDraft = { ...d, ...shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt) };
     editor.changed();
   };
 
@@ -1020,6 +1056,7 @@ export function attachTools(
 
   // ---- select -------------------------------------------------------------
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
+    const before = [...editor.selection]; // (a finger's press may pick on its way down: a long press gives that back)
     // Attach (ADR 0109): the next press names the object the picked ones follow.
     if (editor.attachMode) {
       editor.attachMode = false;
@@ -1102,6 +1139,7 @@ export function attachTools(
           free,
           axes: { c: Math.cos(sel.frame.angle), s: Math.sin(sel.frame.angle) },
           snap: editor.snap ? snapContext(ids, view.frame) : null,
+          size0: { w: Math.hypot(sel.frame.corners[1][0] - sel.frame.corners[0][0], sel.frame.corners[1][1] - sel.frame.corners[0][1]), h: Math.hypot(sel.frame.corners[2][0] - sel.frame.corners[1][0], sel.frame.corners[2][1] - sel.frame.corners[1][1]) },
         };
         return;
       }
@@ -1143,6 +1181,26 @@ export function attachTools(
       cycleIndex = 0;
     }
     g = { kind: "press", pointerId: e.pointerId, start: s, target, additive: e.shiftKey, ...(click ? { click } : {}), ...(deep ? { exact: true } : {}) };
+    if (e.pointerType === "touch") {
+      // A finger cannot hover or hold Ctrl: held still, it lists everything under it to choose from (the same shapes Ctrl+hover outlines)
+      const held = g;
+      window.setTimeout(() => {
+        if (g !== held) return; // (it moved, lifted or became a pinch)
+        const all = revealHits(visible(), s.x, s.y);
+        if (!all.length) return;
+        g = { kind: "none" };
+        if (before.length !== editor.selection.size || before.some((id) => !editor.selection.has(id))) editor.select(before);
+        editor.fingerListAt = performance.now();
+        navigator.vibrate?.(10);
+        hooks.revealList(s, all.map((h) => h.obj), (id, additive) => {
+          const o = doc.get(id);
+          if (!o) return;
+          editor.entered = [...(o.groups ?? [])];
+          editor.openMask = maskAbove(o)?.id ?? null;
+          pick([id], additive);
+        });
+      }, LONG_PRESS_MS);
+    }
   };
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
@@ -1370,8 +1428,40 @@ export function attachTools(
     // A gesture whose pointer is gone (its release was lost) must not block this press, nor undo and redo.
     if ("pointerId" in g && g.pointerId !== e.pointerId && !active.has(g.pointerId)) cancelGesture();
     const touch = e.pointerType === "touch";
-    active.set(e.pointerId, { p: s, touch });
+    // The first finger of a touch (isPrimary: the browser says no other is down) starts afresh: a finger whose lift was lost, or that the system took for
+    // its own gesture (three fingers), must not count as one more, or a tap is never seen as a tap and a single finger pans.
+    if (touch && e.isPrimary) {
+      for (const [id, a] of [...active]) if (a.touch && id !== e.pointerId) { active.delete(id); pan.remove(id); }
+      extras.clear();
+      window.clearTimeout(modTimer);
+      touchShift = false;
+      touchAlt = false;
+      tap = null;
+      if (g.kind === "pan") {
+        g = { kind: "none" };
+        el.classList.remove("is-panning");
+      }
+    }
+    active.set(e.pointerId, { p: s, touch, s0: s });
     const touchesDown = [...active.values()].filter((a) => a.touch).length;
+    if (touch) {
+      if (touchesDown === 1) {
+        tap = { t: performance.now(), last: performance.now(), count: 1, moved: false, cam: view.camera };
+        // right after the lift of a tap or pinch a lone finger starts nothing yet (a pen would draw a dot, and an edit clears redo): it waits for a second finger
+        if (performance.now() - multiEndAt < AFTER_MULTI_MS) return;
+      } else if (tap) {
+        tap.count = Math.max(tap.count, touchesDown);
+        tap.last = performance.now();
+      }
+      // While a handle is dragged, the fingers that come after it are keys (see above), not a pinch.
+      if (touchesDown >= 2 && keyedGesture() && "pointerId" in g && g.pointerId !== e.pointerId) {
+        extras.add(e.pointerId);
+        tap = null;
+        window.clearTimeout(modTimer);
+        modTimer = window.setTimeout(applyKeys, KEY_HOLD_MS); // (held a moment: a brush of a finger is not a key)
+        return;
+      }
+    }
     // A second finger turns any one-finger tool gesture into navigation: the
     // tool gesture is discarded and every finger joins the pan/pinch.
     if (touch && touchesDown >= 2 && g.kind !== "pan") {
@@ -1470,10 +1560,24 @@ export function attachTools(
     }
   };
 
+  /** The fingers resting beside the one on the handle are Shift (one) and Alt (two); the canvas redraws the drag as the keys change. */
+  const applyKeys = (): void => {
+    const shift = extras.size === 1;
+    const alt = extras.size >= 2;
+    if (shift === touchShift && alt === touchAlt) return;
+    touchShift = shift;
+    touchAlt = alt;
+    touchFlash(alt ? "Alt on while two fingers rest" : shift ? "Shift on while a finger rests" : "Keys off");
+    if (keyedGesture() && lastMove) onPointerMove(lastMove);
+  };
+
   const onPointerMove = (e: PointerEvent): void => {
     let boxLabel: string | null = null;
     const a = active.get(e.pointerId);
     if (a) a.p = local(e);
+    if (extras.has(e.pointerId)) return; // (a resting finger is a key, it does not steer anything)
+    if (a && a.touch && tap && Math.hypot(a.p.x - a.s0.x, a.p.y - a.s0.y) > TAP_SLOP_PX) tap.moved = true;
+    if (a?.touch && keyedGesture() && "pointerId" in g && g.pointerId === e.pointerId) lastMove = e;
     if (pan.has(e.pointerId)) {
       pan.move(e.pointerId, local(e));
       return;
@@ -1585,12 +1689,15 @@ export function attachTools(
         break;
       case "rotate": {
         let delta = angleFromRadians(Math.atan2(s.y - g.centre.y, s.x - g.centre.x) - g.start);
-        if (e.shiftKey) {
+        if (keys(e).shift) {
           // Whole 15 degree steps: of the stroke's own angle when one is selected, else of the turn.
           // (A step is TURN / 24, not a whole number; the angle stored must be one.)
           delta = Math.round(Math.round((g.rot0 + delta) / ANGLE_STEP) * ANGLE_STEP) - g.rot0;
         }
         editor.preview = { kind: "rotate", ids: g.ids, frame: g.frame, about: g.about, delta };
+        // the turn the box has now, in degrees, beside the finger or pointer
+        const deg = (normAngle(g.rot0 + delta) / TURN) * 360;
+        editor.handleLabel = { x: s.x, y: s.y, text: `${Number(deg.toFixed(1))}°` };
         editor.changed();
         break;
       }
@@ -1616,7 +1723,7 @@ export function attachTools(
         if (g.dragging) dragPathHandle(s);
         break;
       case "node":
-        updateNode(s, e.altKey);
+        updateNode(s, keys(e).alt);
         break;
       case "crop": {
         const dx = (s.x - g.start.x) / g.ppu, dy = (s.y - g.start.y) / g.ppu; // (local units: an upright picture's box is aligned with the screen)
@@ -1627,7 +1734,9 @@ export function attachTools(
         break;
       }
       case "scale": {
-        const { kx, ky, fixed } = scaleFactors(g, s, { shift: e.shiftKey, alt: e.altKey, noSnap: e.ctrlKey || e.metaKey });
+        const { kx, ky, fixed } = scaleFactors(g, s, { shift: keys(e).shift, alt: keys(e).alt, noSnap: e.ctrlKey || e.metaKey });
+        // the shape of the box as it is resized, as a ratio (width : height), beside the finger or pointer
+        if (g.size0.w > 0 && g.size0.h > 0 && kx > 0 && ky > 0) editor.handleLabel = { x: s.x, y: s.y, text: formatRatio((g.size0.w * kx) / (g.size0.h * ky)) };
         if (g.sheets) {
           const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
           editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
@@ -1640,7 +1749,37 @@ export function attachTools(
   };
 
   const onPointerUp = (e: PointerEvent): void => {
+    const wasTouch = active.get(e.pointerId)?.touch === true;
     active.delete(e.pointerId);
+    if (extras.delete(e.pointerId)) {
+      window.clearTimeout(modTimer);
+      applyKeys(); // (a key lifted: off at once)
+      return;
+    }
+    if (wasTouch && [...active.values()].filter((a) => a.touch).length === 0) {
+      if (tap && tap.count >= 2) multiEndAt = performance.now();
+      window.clearTimeout(modTimer);
+      extras.clear();
+      touchShift = false;
+      touchAlt = false;
+      const t = tap;
+      tap = null;
+      if (t && e.type === "pointerup" && !t.moved && t.count >= 2 && t.count <= 3 && performance.now() - t.last < TAP_MS && performance.now() - t.t < TAP_ALL_MS) {
+        // A quick tap of two or three fingers: undo or redo, and the view as it was before the fingers jiggled it
+        pan.remove(e.pointerId);
+        view.setCamera(t.cam);
+        el.classList.remove("is-panning");
+        cancelGesture();
+        const had = t.count === 2 ? doc.canUndo : doc.canRedo;
+        if (t.count === 2) undo(doc, editor);
+        else redo(doc, editor);
+        navigator.vibrate?.(had ? 10 : [10, 40, 10]);
+        editor.message = had ? (t.count === 2 ? "Undo" : "Redo") : t.count === 2 ? "Nothing to undo" : "Nothing to redo (an edit after an undo clears redo)";
+        multiEndAt = performance.now();
+        editor.changed();
+        return;
+      }
+    }
     if (pan.has(e.pointerId)) {
       pan.remove(e.pointerId);
       if (pan.size === 0) {
@@ -1652,6 +1791,7 @@ export function attachTools(
     if (!("pointerId" in g) || g.pointerId !== e.pointerId) return;
     const cancelled = e.type === "pointercancel";
     const s = local(e);
+    if (g.kind === "scale" || g.kind === "rotate") editor.handleLabel = null; // (the number beside the pointer goes with the drag)
     switch (g.kind) {
       case "erase": {
         if (editor.eraseParts) {
@@ -1806,6 +1946,7 @@ export function attachTools(
   };
 
   const onDoubleClick = (e: MouseEvent): void => {
+    if (performance.now() - editor.fingerListAt < 1500) return; // (the lift of a long press is not the second click of a double-click)
     if (effectiveTool() === "path" && editor.pathDraft) {
       // The two presses of the double-click each placed a node on the same spot: keep one, and end the path.
       const d = editor.pathDraft;

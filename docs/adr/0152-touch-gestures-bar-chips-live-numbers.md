@@ -1,0 +1,7 @@
+# ADR 0152 — Touch gestures, kind chips on the Actions bar, live turn and ratio
+
+- Status: accepted (v0.19.1)
+
+- **Touch gestures** (`interaction/tools.ts`). A quick tap (under 0.4 s, each finger moving under 14 px) with **two fingers is undo, with three is redo**; the view is put back where it was (a tap may jiggle the pinch and pan). While **one finger drags a handle** (resize or rotate) the fingers that come after it are keys: **one more finger resting 0.25 s is Shift**, **two more are Alt**, for as long as they stay down. A press first drops any touch the page no longer holds (a lost lift), so it cannot count as an extra finger (it made a single finger pan and left the pick stuck). A long press (0.45 s) on Select lists what is under the finger (ADR 0151).
+- **Chips on the Actions bar** (`ui/context-bar.ts`). With two or more kinds picked (pictures, media, shapes, strokes, texts), a group of chips at the start (All, then each kind) shows only the tools of one kind; All shows everything. Tools for some kinds only carry `data-for` (a list of kinds); the others show for any. The filter goes back to All when one kind is left. It filters what is shown, not what a tool acts on.
+- **Live turn and ratio.** While a rotate handle is dragged, the box's turn is shown in degrees beside the pointer, and while a resize handle is dragged, its shape as a ratio (`formatRatio`: `16 : 9`, `1 : 1`), the same label as the corner radius (`editor.handleLabel`). Both go when the pointer is let go.

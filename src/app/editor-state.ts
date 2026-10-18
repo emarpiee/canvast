@@ -212,6 +212,8 @@ export class EditorState {
   message = "";
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
+  /** When a finger's long press last opened the "under your finger" list (performance.now): the context menu the browser sends with the same long press is not wanted then. */
+  fingerListAt = -Infinity;
   /** The things a Layers row (hovered or focused) stands for: they show their outline on the canvas (see `interaction/reveal.ts`). */
   revealIds: ReadonlySet<string> | null = null;
   /** A clipping mask (a sheet) that has been gone into by a double click: what is on it is picked one by one, as in an entered group. */

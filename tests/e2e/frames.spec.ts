@@ -1,4 +1,4 @@
-import { expect, recordMetric, test } from "./harness";
+import { alignWith, arrangeWith, expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
@@ -1578,19 +1578,30 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   await p.keyboard.press("v");
   const LAYOUT_ID: Record<string, string> = { Left: "align:left", "In stacking order": "grid:stack" };
   const menuItem = async (name: string): Promise<void> => {
-    await p.locator(`[data-ctx="layout"][data-layout="${LAYOUT_ID[name]}"]`).click();
+    if (LAYOUT_ID[name]!.startsWith("align")) await alignWith(p, LAYOUT_ID[name]!);
+    else await arrangeWith(p, LAYOUT_ID[name]!);
   };
   // The align buttons are in the Actions bar and only with two or more selected; two cannot be distributed, and the message says so.
   await p.mouse.click(450, 280);
-  await expect(p.locator('[data-ctx="layout"][data-layout="align:left"]')).toBeHidden();
+  await expect(p.locator('[data-ctx="alignmenu"]')).toBeHidden();
   await p.keyboard.down("Shift");
   await p.mouse.click(590, 420);
   await p.keyboard.up("Shift");
-  await expect(p.locator('[data-ctx="layout"][data-layout="align:left"]')).toBeVisible();
-  await expect(p.locator('[data-ctx="layout"][data-layout="distribute:x"]'), "two cannot be distributed: the button is not offered").toBeHidden();
+  await expect(p.locator('[data-ctx="alignmenu"]')).toBeVisible();
+  await p.locator('[data-ctx="alignmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="distribute:x"]'), "two cannot be distributed: the item is not offered").toBeDisabled();
+  await expect(p.locator('.pop-menu .menu-hint').first(), "each item says what it does").not.toBeEmpty();
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".pop-menu"), "Escape closes it").toHaveCount(0);
   await p.keyboard.press("Control+a");
   const before = await boxes();
-  await menuItem("Left");
+  await alignWith(p, "align:left", true);
+  await expect(p.locator(".pop-menu"), "the menu stays open after a choice").toHaveCount(1);
+  const sel = () => p.evaluate(() => [...window.__canvastDebug.selection()].sort());
+  const picked = await sel();
+  await p.mouse.click(120, 650); // a press outside closes it and does nothing else: the pick is still there to look at
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  expect(await sel(), "the press that closes the menu does not deselect").toEqual(picked);
   const left = await boxes();
   expect(new Set(left.map((b) => Math.round(b.minX))).size, "every left edge is the same").toBe(1);
   expect(left.map((b) => Math.round(b.minY)), "vertical positions are untouched").toEqual(before.map((b) => Math.round(b.minY)));
@@ -1608,7 +1619,7 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
     return Math.max(...bs.map((b) => b.maxX)) - Math.min(...bs.map((b) => b.minX));
   };
   const setGap = async (name: string): Promise<void> => {
-    await p.locator(`[data-ctx="gap"][data-gap="${name.toLowerCase()}"]`).click();
+    await arrangeWith(p, `gap:${name.toLowerCase()}`);
   };
   await menuItem("In stacking order");
   const normal = await extent();
@@ -1616,7 +1627,9 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   expect(await extent()).toBeGreaterThan(normal + 20);
   await setGap("None");
   expect(await extent()).toBeLessThan(normal - 5);
-  await expect(p.locator('[data-ctx="gap"][data-gap="none"]')).toHaveAttribute("aria-pressed", "true");
+  await p.locator('[data-ctx="arrangemenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="gap:none"]')).toHaveAttribute("aria-checked", "true");
+  await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });
 

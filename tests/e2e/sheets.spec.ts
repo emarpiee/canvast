@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { expect, test } from "./harness";
+import { alignWith, expect, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -561,12 +561,12 @@ test("one thing on a sheet is aligned with its sheet (its parent), by the align 
   expect(await selection(app)).toEqual([rect.id]);
   const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
   const r0 = await box(rect.id);
-  await p.locator('[data-ctx="layout"][data-layout="align:centre"]').click();
+  await alignWith(p, "align:centre");
   await app.frame();
   const [s, r] = [await box(sheet.id), await box(rect.id)];
   expect((r.minX + r.maxX) / 2, "centred across the sheet").toBeCloseTo((s.minX + s.maxX) / 2, 0);
   expect(r.minY, "and not moved up or down").toBeCloseTo(r0.minY, 0);
-  await p.locator('[data-ctx="layout"][data-layout="align:right"]').click();
+  await alignWith(p, "align:right");
   await app.frame();
   expect((await box(rect.id)).maxX, "the right edge on the sheet's").toBeCloseTo(s.maxX, 0);
   await key(app, "Control+z");

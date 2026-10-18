@@ -21,7 +21,8 @@ export const LIMITS = {
   renderP95Ms: 8,
 };
 
-export const APP_URL = pathToFileURL(resolve("dist/canvast.html")).href + "#debug";
+/** The build the tests open: `dist/` by default; `npm run test:snap` points CANVAST_BUILD_DIR at a snapshot of its own, so `dist/` can be rebuilt while it runs. */
+export const APP_URL = pathToFileURL(resolve(process.env["CANVAST_BUILD_DIR"] ?? "dist", "canvast.html")).href + "#debug";
 
 /**
  * Quick vs full suites (docs/testing/README.md). Every test runs in both;
@@ -67,7 +68,7 @@ async function assertCanvasAt(page: Page, x: number, y: number): Promise<void> {
   let seen = checkedPoints.get(page);
   if (!seen) checkedPoints.set(page, (seen = new Set()));
   if (seen.has(key)) return; // overlays are static during a test
-  const id = await page.evaluate(([a, b]) => document.elementFromPoint(a!, b!)?.id ?? "", [x, y]);
+  const id = await page.evaluate(([a, b]) => { const e = document.elementFromPoint(a!, b!); return e?.id === "canvas" ? "canvas" : `${e?.tagName ?? "nothing"}.${e?.className ?? ""} in ${e?.closest("[class]")?.className ?? ""}`; }, [x, y]);
   expect(id, `input at (${x}, ${y}) must land on the canvas, not an overlay`).toBe("canvas");
   seen.add(key);
 }
@@ -165,3 +166,24 @@ export async function rowAction(page: Page, kind: "board" | "canvas", name: stri
   await openActions(page, kind, name);
   await page.getByRole("menuitem", { name: `${action} ${kind} ${name}` }).click();
 }
+
+type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu";
+/**
+ * Choose an item (e.g. "align:left") in a grouped-tools menu of the Actions bar. The menu stays open after a choice, so it is opened only when
+ * it is not; it is closed again (Escape) unless `keepOpen`, so later input does not land on it.
+ */
+export async function chooseInMenu(page: Page, button: GroupMenu, id: string, keepOpen = false): Promise<void> {
+  const b = page.locator(`[data-ctx="${button}"]`);
+  if ((await b.getAttribute("aria-expanded")) !== "true") await b.click({ timeout: 5000 });
+  await page.locator(`.pop-menu [data-id="${id}"]`).click();
+  if (!keepOpen && (await b.getAttribute("aria-expanded")) === "true") {
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".pop-menu")).toHaveCount(0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the focus went back to the bar's button, whose name the hint line would show)
+  }
+}
+export const alignWith = (page: Page, id: string, keepOpen = false): Promise<void> => chooseInMenu(page, "alignmenu", id, keepOpen);
+export const arrangeWith = (page: Page, id: string, keepOpen = false): Promise<void> => chooseInMenu(page, "arrangemenu", id, keepOpen);
+export const boolWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "boolmenu", id);
+export const maskWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "maskmenu", id);
+export const pathWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "pathmenu", id);

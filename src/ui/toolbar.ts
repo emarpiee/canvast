@@ -143,7 +143,7 @@ const SHAPE_MENU: Array<{ id: ShapeKind; label: string; title: string; icon: str
 ];
 void SHAPE_KINDS;
 
-export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string }> }> = [
+export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string; hint?: string }> }> = [
   {
     head: "Arrange in a grid",
     items: [
@@ -158,19 +158,19 @@ export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label
   {
     head: "Align",
     items: [
-      { id: "align:left", label: "Left", icon: ICONS.alignHStart },
-      { id: "align:centre", label: "Centre", icon: ICONS.alignHCenter },
-      { id: "align:right", label: "Right", icon: ICONS.alignHEnd },
-      { id: "align:top", label: "Top", icon: ICONS.alignVStart },
-      { id: "align:middle", label: "Middle", icon: ICONS.alignVCenter },
-      { id: "align:bottom", label: "Bottom", icon: ICONS.alignVEnd },
+      { id: "align:left", hint: "Line up the left edges", label: "Left", icon: ICONS.alignHStart },
+      { id: "align:centre", hint: "Line up the centres, left to right", label: "Centre", icon: ICONS.alignHCenter },
+      { id: "align:right", hint: "Line up the right edges", label: "Right", icon: ICONS.alignHEnd },
+      { id: "align:top", hint: "Line up the top edges", label: "Top", icon: ICONS.alignVStart },
+      { id: "align:middle", hint: "Line up the centres, top to bottom", label: "Middle", icon: ICONS.alignVCenter },
+      { id: "align:bottom", hint: "Line up the bottom edges", label: "Bottom", icon: ICONS.alignVEnd },
     ],
   },
   {
     head: "Distribute (3 or more)",
     items: [
-      { id: "distribute:x", label: "Horizontally", icon: ICONS.distH },
-      { id: "distribute:y", label: "Vertically", icon: ICONS.distV },
+      { id: "distribute:x", hint: "Even gaps from side to side", label: "Horizontally", icon: ICONS.distH },
+      { id: "distribute:y", hint: "Even gaps from top to bottom", label: "Vertically", icon: ICONS.distV },
     ],
   },
 ];

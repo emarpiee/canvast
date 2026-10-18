@@ -1,10 +1,13 @@
 // Builds the single self-contained HTML file. No runtime fetches, no dev server.
-//   node scripts/build.mjs   -> dist/canvast.html  (the only file; developer tools are a setting: Settings > Develop, or #debug)
+//   node scripts/build.mjs [--out <dir>]  -> <dir>/canvast.html (default dist/) and <dir>/build.json: what it was made from (source hash, git head), to compare builds
+//   (developer tools are a setting: Settings > Develop, or #debug)
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { sourceHash } from "./lib/source-hash.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
@@ -43,8 +46,12 @@ const html = template
   .replace("/*__CANVAST_SCRIPT__*/", () => script)
   .replace("<html", () => `${notices}<html`);
 
-const out = resolve(root, "dist", "canvast.html");
+const outDir = resolve(root, process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : "dist");
+const out = resolve(outDir, "canvast.html");
 await mkdir(dirname(out), { recursive: true });
 await writeFile(out, html);
 const digest = createHash("sha256").update(html).digest("hex");
+const git = (c) => { try { return execSync(`git ${c}`, { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } };
+const src = await sourceHash(root);
+await writeFile(resolve(outDir, "build.json"), JSON.stringify({ version: pkg.version, builtAt: new Date().toISOString(), gitHead: git("rev-parse --short HEAD"), dirty: git("status --porcelain -- src package.json") !== "", srcHash: src.srcHash, htmlSha256: digest, files: src.files }, null, 1));
 console.log(`${out.slice(root.length + 1)}  ${(html.length / 1024).toFixed(1)} KiB  sha256 ${digest}`);

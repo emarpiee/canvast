@@ -9,14 +9,14 @@ The repo sits inside an Obsidian vault synced by Syncthing; the parent vault's C
 ## Testing
 
 Which suite when (see `docs/testing/README.md` for commands and durations):
-- `npm test` after ordinary changes and before committing a slice/milestone.
-- `npm run test:full` **only** when a whole phase is complete; record results in `docs/testing/phase-*.md`.
-- E2E runs against the built `dist/canvast.html`, so rebuild before Playwright. **Never rebuild `dist/` while a suite is running** (each test reloads the file).
+- While working, run only the specs a change touches (`npm run test:snap -- <files or -g>`, below); `npm test` (the quick suite) before committing a slice/milestone. When you start a run, say its estimated finish time.
+- `npm run test:full` **only** when a whole phase is complete; record results (suite and per-test times) in `docs/testing/` and in the commit message.
+- **Run tests from a snapshot: `npm run test:snap -- <playwright args>`.** It builds a copy into `test-builds/<time>-<source hash>/` (with `build.json`: what it was made from, and `run.json`: the run and its result) and points the tests at it (`CANVAST_BUILD_DIR`, read by `tests/e2e/harness.ts`), so `dist/` (the owner's build) can be rebuilt and work can go on while the tests run. Run it in the background. `npm run test:status` lists the snapshots with their result and how far each is behind the source and `dist/` (by source hash and changed files); a result belongs to the source it was built from, so re-run what changed after later edits. `dist/` also has a `build.json`. Only the plain `playwright test` / `npm test` read `dist/`: never rebuild `dist/` while one of those runs.
 
 ## Test rules
 
-- E2E opens `dist/canvast.html#debug` from `file://` and fails on any request other than `file:`/`data:`/`blob:`. Tests drive the app through `window.__canvastDebug` (`src/app/debug-hook.ts`, enabled by `#debug`).
-- Firefox is the owner's main browser: it is a first-class E2E project, not an afterthought. The projects are `chromium`, `chromium-cpu`, `chromium-dpr2` and `firefox`.
+- E2E opens `canvast.html#debug` (from `dist/`, or from the snapshot in `CANVAST_BUILD_DIR`) from `file://` and fails on any request other than `file:`/`data:`/`blob:`. Tests drive the app through `window.__canvastDebug` (`src/app/debug-hook.ts`, enabled by `#debug`).
+- Firefox is a supported E2E project, not an afterthought (the owner's main browser; they asked on 2026-10-16 to put Chromium first for now): new features get their tests run in it too. The projects are `chromium`, `chromium-cpu`, `chromium-dpr2` and `firefox`.
 - `LIMITS` in `tests/e2e/harness.ts` were fixed before runs and are **never loosened** to make a test pass.
 - Write loop counts with `reps(full, quick)` from the harness. Don't assume a fixed zoom depth from wheel notches (DPR-dependent); use keyboard steps or measured values.
 - `app.drag` / `app.wheel` assert input starts on the canvas.
@@ -29,6 +29,9 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 ## UI rules
 
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
+
+- **Group tools in menus, do not add a row of icons (ADR 0151).** A family of tools on the Actions bar (`ui/context-bar.ts`) is one button that opens `openMoreMenu(anchor, items, label, { keepOpen: true, refresh })`: an icon, a label and a hint per item, placed off the picked things, closing only on Escape or a press outside. List only what applies to the pick and hide the button when nothing does. The button carries `aria-haspopup="menu"` (it gets the corner mark from CSS). Reuse this menu for any new group; E2E chooses in it with `chooseInMenu` / `alignWith` / `boolWith` / `maskWith` / `pathWith` in `tests/e2e/harness.ts`.
+- The dev panel (`.hud-dev`, `#debug` only) must end before x = 370: tests start drags at x 378 to 380.
 
 - **Layers.** Floating elements use the `--z-*` tokens in `:root` (ADR 0096), never a number: `--z-item` and `--z-item-bar`/`--z-item-pop` for what belongs to a canvas item (a player's picture and bar, the selection bar), `--z-edge` for the bars and panels on the edges, which are always above anything on the canvas.
 
@@ -45,5 +48,6 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 
 ## Workflow
 
+- Work on `main`. Ask before pushing. After a slice, build `dist/` (`npm run build`) so the owner can test it; never `pkill -f` (it kills the shell); `rm` and `cp` are interactive aliases here (use `\rm -f`, `\cp -f`).
 - Work happens in phases/slices (see `docs/status.md`); a finished slice bumps `package.json` version, updates `CHANGELOG.md`, `docs/status.md`, README and its test log, and is committed as `feat(<area>): ... (vX.Y.Z)`.
 - **Use emojis for readability in replies and summaries.** Status: ✅ done and verified (visibly green), ❌ failed, ⚠️ done with a caveat or a risk, ⏳ running or waiting, 🔜 next. Use a few more to mark kinds of content when it helps scanning (🧪 tests, 📝 docs, 🚀 push or release, ⏱️ times, 🐛 bug), one per row or heading, not decoration. Never mark something ✅ that was not verified.

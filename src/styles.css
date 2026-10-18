@@ -78,6 +78,7 @@
   --font-meta: var(--weight-regular) var(--text-xs)/1.3 var(--font-ui);
   --font-value: var(--weight-medium) var(--text-sm)/1.3 var(--font-ui);
   /* Space scale (padding, margin, gap) */
+  --mark-opacity: 0.55;
   --sp-1: 2px;
   --sp-2: 4px;
   --sp-3: 6px;
@@ -202,6 +203,9 @@ html, body {
   position: fixed;
   inset: 0;
 }
+
+/* A finger that drags a slider or a number's name must not scroll the bar or page under it: the drag is the control's (otherwise the browser takes it and cancels it) */
+input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-scrub-input] { touch-action: none; }
 
 #canvas {
   display: block;
@@ -565,6 +569,8 @@ html, body {
 .view-switch button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 
 body[data-view="assets"] #canvas-host, body[data-view="settings"] #canvas-host { visibility: hidden; }
+/* what belongs to the canvas and floats on <body> goes with it (the hint line) */
+body[data-view="assets"] .hint-float, body[data-view="settings"] .hint-float { display: none; }
 
 
 /* ---- confirmation dialog --------------------------------------------- */
@@ -832,6 +838,10 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .ctx-bar .tb-group { flex: none; }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
+/* A button that opens a menu of tools wears a small corner mark (bottom right), so it reads as a group without changing the bar's size. */
+.ctx-bar button[aria-haspopup="menu"] { position: relative; }
+.ctx-bar button[aria-haspopup="menu"]::after { content: ""; position: absolute; right: var(--sp-2); bottom: var(--sp-2); width: var(--sp-3); height: var(--sp-3); background: currentColor; clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: var(--mark-opacity); pointer-events: none; }
+.ctx-bar button[aria-haspopup="menu"][aria-expanded="true"]::after { opacity: 1; }
 .ctx-bar button[data-ctx="delete"]:hover { color: var(--canvas-danger); }
 .ctx-bar button:hover:not(:disabled) { background: var(--hud-hover); }
 .ctx-bar button:disabled { opacity: 0.35; cursor: default; }
@@ -2268,6 +2278,9 @@ input[data-scrub-input]:focus { cursor: text; }
 
 /* A ticked choice in a menu (the current operation of a boolean group). */
 .pop-menu .menu-tick { margin-left: auto; display: inline-flex; }
+.pop-menu .menu-gap { display: inline-flex; justify-content: center; width: 16px; font-size: var(--text-sm); color: var(--hud-muted); }
+.pop-menu .menu-text { display: grid; gap: 1px; padding: var(--sp-2) 0; }
+.pop-menu .menu-hint { font-size: var(--text-sm); color: var(--hud-muted); }
 .pop-menu button.is-checked { background: var(--hud-hover); }
 .pop-menu .menu-tick svg { color: var(--hud-accent); }
 

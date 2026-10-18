@@ -536,6 +536,7 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await expectSlow(bar).toBeVisible();
   // The scrubber has the room: it takes the bar's whole top row but for the time.
   const barBox = (await bar.boundingBox())!;
+  expect(await bar.locator(".media-scrub").evaluate((e) => getComputedStyle(e).touchAction), "a finger drags the slider, the page does not scroll").toBe("none");
   const scrubBox = (await bar.locator(".media-scrub").boundingBox())!;
   expect(scrubBox.width, "the player's scrubber is wide").toBeGreaterThan(barBox.width * 0.7);
   await expectSlow(bar.locator(".media-time")).toHaveText(/^0:00 \/ 0:0[1-9]$/);

@@ -64,6 +64,12 @@ One icon per function: two buttons that do different things never share an icon,
 | `palette` | Styles panel: Palettes tab |
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `pipette` | Styles panel: Edit a colour (menu item) |
+| `listChecks` | Under your finger menu (long press): Add to the pick |
+| `pathMenu` | Actions bar: Path tools (simplify, outline stroke, taper, network, divide, shape builder, text to path) |
+| `boolMenu` | Actions bar: Shapes (the boolean operations and their group) |
+| `maskMenu` | Actions bar: Masks (make, pick, invert, release) |
+| `arrangeMenu` | Actions bar: Arrange in a grid (opens the menu of orders and spaces) |
+| `alignMenu` | Actions bar: Align and distribute (opens the menu of the eight) |
 | `paintBucket` | Navigation bar: Canvas background colour (hold to go back to the default) |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |

@@ -170,6 +170,12 @@ import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
 import paintBucketSvg from "lucide-static/icons/paint-bucket.svg";
+import alignMenuSvg from "lucide-static/icons/align-horizontal-space-around.svg";
+import arrangeMenuSvg from "lucide-static/icons/layout-dashboard.svg";
+import boolMenuSvg from "lucide-static/icons/combine.svg";
+import maskMenuSvg from "lucide-static/icons/drama.svg";
+import pathMenuSvg from "lucide-static/icons/workflow.svg";
+import listChecksSvg from "lucide-static/icons/list-checks.svg";
 import pipetteSvg from "lucide-static/icons/pipette.svg";
 import slidersHorizontalSvg from "lucide-static/icons/sliders-horizontal.svg";
 import blendSvg from "lucide-static/icons/blend.svg";
@@ -375,6 +381,12 @@ export const ICONS = {
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
   pipette: clean(pipetteSvg),
+  listChecks: clean(listChecksSvg),
+  pathMenu: clean(pathMenuSvg),
+  boolMenu: clean(boolMenuSvg),
+  maskMenu: clean(maskMenuSvg),
+  arrangeMenu: clean(arrangeMenuSvg),
+  alignMenu: clean(alignMenuSvg),
   paintBucket: clean(paintBucketSvg),
   bookmark: clean(bookmark),
   bookmarkPlus: clean(bookmarkPlus),

@@ -471,6 +471,14 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.19.1 — grouped menus, touch gestures, test snapshots (2026-10-19)
+
+- **Implemented:** ADR 0151 and 0152 (grouped Actions-bar menus, kind chips, long-press list, two/three-finger undo/redo, held-finger Shift/Alt, live rotate/ratio labels), `test:snap` and `test:status`.
+- **Tested:** unit 495/495, `check:tokens`, `check:names`; E2E (chromium + firefox; vectors, frames, sheets, text, styles, settings, assets) 396 passed, 14 failed, 6 skipped in 22.0 min. Touch is tested with emulated touch only; the owner confirmed on a phone that the earlier touch bugs are fixed.
+- **Known failures:** 14 Firefox tests (13 in `text.spec.ts`, `styles.spec.ts:146`): the text editor is not focused after a click in Firefox; they fail on `a0e5227` too.
+- **Unverified:** full suite for v0.19.1; phone-width look at the bars and Export.
+- **Next bounded task:** the Firefox text-editor focus failure.
+
 ## Phase 1, slice 8 — text objects
 
 **Implemented** ([ADR 0013](adr/0013-text-objects.md))

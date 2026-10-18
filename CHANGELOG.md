@@ -2,6 +2,9 @@
 
 ## 0.19.1 — Gaps closed and the bars moved (2026-10-18)
 
+- **Grouped Actions-bar menus** (ADR 0151): Align (+Distribute), Arrange, Shapes (boolean ops), Masks and Path tools are one button each that opens a menu which stays open until Escape or a press outside; kind chips (All, Pictures, Media, Shapes, Strokes, Texts) at the start of the bar for a mixed pick.
+- **Touch** (ADR 0151, 0152): a long press on Select lists what is under the finger; a two-finger tap is undo, three is redo; a finger resting while one drags is Shift, two is Alt; live degrees while rotating and a ratio while resizing.
+- **Test snapshots**: `npm run test:snap` runs the E2E suite against its own build in `test-builds/`, so `dist/` can be rebuilt meanwhile; `npm run test:status` compares them with the source.
 - **Masks** now cut what you can pick (an object is picked only where its mask shape is, or is not when inverted) and **Export as SVG** writes them as `<mask>` (ADR 0144).
 - **Outline stroke inside or outside** the edge of a closed shape (ADR 0143), instead of always centred.
 - **Vector networks** are cut where two edges cross when they are made (ADR 0146).
