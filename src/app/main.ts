@@ -1512,6 +1512,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     e.preventDefault();
     receive(files);
   });
+  // Where the pointer is on the canvas: what is pasted lands under it (the middle of the view when it is elsewhere).
+  const trackPointer = (e: PointerEvent): void => {
+    const r = canvas.getBoundingClientRect();
+    editor.pointerAt = { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  canvas.addEventListener("pointermove", trackPointer);
+  canvas.addEventListener("pointerdown", trackPointer);
+  canvas.addEventListener("pointerleave", () => { editor.pointerAt = null; });
   window.addEventListener("paste", (e) => {
     const files = [...(e.clipboardData?.files ?? [])];
     if (files.length) {

@@ -5,7 +5,7 @@ import type { App } from "./harness";
  * Sheets (ADR 0108): fixed areas of the canvas that hold what is drawn or moved onto them and cut it at their edge. Real mouse and
  * keyboard input; assertions read the stored objects and the painted pixels.
  */
-type Obj = { id: string; kind: string; parent?: string; name?: string; container?: { clip: boolean }; fill: unknown; stroke: unknown };
+type Obj = { id: string; kind: string; parent?: string; name?: string; container?: { clip: boolean; scale?: boolean }; fill: unknown; stroke: unknown };
 const objs = async (app: App): Promise<Obj[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Obj[];
 const key = (app: App, k: string) => app.page.keyboard.press(k);
 const drag = async (app: App, a: [number, number], b: [number, number]) => {

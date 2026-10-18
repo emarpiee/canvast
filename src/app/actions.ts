@@ -240,8 +240,8 @@ function readClipboard(systemText: string | null): ClipboardPayload | null {
 export const canPaste = (systemText: string | null): boolean => readClipboard(systemText) !== null;
 
 /**
- * Paste the copied objects centred on the middle of the view, at the size they had on screen when copied (as one
- * undo step); each repeat shifts them a little. They become the selection. Returns false if there is nothing to paste.
+ * Paste the copied objects centred under the pointer (on the middle of the view when the pointer is not on the canvas, each repeat
+ * shifting them a little), at the size they had on screen when copied (as one undo step). They become the selection. Returns false if there is nothing to paste.
  */
 export function pasteObjects(doc: DocumentStore, editor: EditorState, view: ViewState, systemText: string | null = null, inPlaceOffset = true): boolean {
   if (editor.blockEdit()) return false;
@@ -250,7 +250,8 @@ export function pasteObjects(doc: DocumentStore, editor: EditorState, view: View
   const cam = view.camera;
   const vp = view.viewport;
   const shift = PASTE_STEP_PX * pastes;
-  const at = screenToWorld(cam, vp, { x: vp.width / 2 + (inPlaceOffset ? shift : 0), y: vp.height / 2 + (inPlaceOffset ? shift : 0) });
+  const p = editor.pointerAt;
+  const at = screenToWorld(cam, vp, p ?? { x: vp.width / 2 + (inPlaceOffset ? shift : 0), y: vp.height / 2 + (inPlaceOffset ? shift : 0) });
   const depth = depthOf(view.frameCamera);
   try {
     const { objects, moved } = instantiate(payload, doc.space, doc.topZ(), { frame: view.frame, at, depth: Number(depth.levels) + depth.frac });
@@ -1457,7 +1458,7 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
   }
   const cam = view.camera;
   const vp = view.viewport;
-  const at = screenToWorld(cam, vp, { x: vp.width / 2, y: vp.height / 2 });
+  const at = screenToWorld(cam, vp, editor.pointerAt ?? { x: vp.width / 2, y: vp.height / 2 }); // (under the pointer, else the middle)
   const k = (0.5 * Math.min(vp.width, vp.height)) / 2 ** cam.zf / Math.max(svg.box.w, svg.box.h);
   const cx = svg.box.x + svg.box.w / 2, cy = svg.box.y + svg.box.h / 2;
   const z0 = doc.topZ();

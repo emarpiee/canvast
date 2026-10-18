@@ -1691,12 +1691,14 @@ test("copy, cut, paste and duplicate: Ctrl+C/X/V/D on the selection, pasted at t
     window.__canvastDebug.setCamera({ ...c, zi: c.zi + 2, pz: Math.max(c.pz, c.zi + 2) });
   });
   await app.frame();
+  await p.mouse.move(900, 500);
   await p.keyboard.press("Control+v");
   const pasted = (await strokes()).find((o) => o.id !== orig!.id)!;
   const pb = await boxOf(pasted.id);
   expect(Math.abs(pb.maxX - pb.minX - (ob.maxX - ob.minX))).toBeLessThan(1.5);
-  const vp = await p.evaluate(() => ({ w: innerWidth, h: innerHeight }));
-  expect(Math.abs((pb.minX + pb.maxX) / 2 - vp.w / 2)).toBeLessThan(4);
+  // it lands under the pointer
+  expect(Math.abs((pb.minX + pb.maxX) / 2 - 900)).toBeLessThan(4);
+  expect(Math.abs((pb.minY + pb.maxY) / 2 - 500)).toBeLessThan(4);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([pasted.id]);
   await p.keyboard.press("Control+z");
   expect(await strokes()).toHaveLength(1);
