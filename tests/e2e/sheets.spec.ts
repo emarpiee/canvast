@@ -257,6 +257,31 @@ test("a sheet takes a paper or screen size from the presets, and Scale contents 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a sheet resized with its handle takes what is on it along when deep in a zoom, where near objects are filed in different frames (Scale contents)", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: 16, zf: 0, pz: 16 }));
+  await app.frame();
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 600, 450);
+  await p.locator("[data-sheet-scale]").click();
+  const width = async () => {
+    const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), rect.id))!.box;
+    return b.maxX - b.minX;
+  };
+  const w0 = await width();
+  await drag(app, [700, 400], [800, 400]);
+  expect(Math.abs((await width()) - (w0 * 4) / 3)).toBeLessThan(3);
+  await key(app, "Control+z");
+  await app.frame();
+  expect(await width()).toBeCloseTo(w0, 1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("an object on a sheet shows where it is from the sheet's corner, and X, Y, W and H change it in px (ADR 0133)", async ({ app }) => {
   const p = app.page;
   await key(app, "c");

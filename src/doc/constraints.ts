@@ -5,9 +5,11 @@
  */
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
+import type { FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId } from "./model";
 import { isContainer } from "./containers";
 import { scaleAbout, translate, worldBounds } from "./edit-ops";
+import { expressObjectIn, homeObject } from "./model";
 
 export type HConstraint = "left" | "right" | "both" | "center" | "scale";
 export type VConstraint = "top" | "bottom" | "both" | "center" | "scale";
@@ -52,8 +54,8 @@ export function constrainSpan(kind: HConstraint | VConstraint, L0: number, L1: n
 /**
  * The new state of everything in `objs` when their top ones are scaled about `fixed`: the sheets and plain objects among them are scaled,
  * what is on a sheet is moved (and stretched) by its constraint to the sheet's old and new box, level by level (`scaleContents`: all of it
- * scales with the sheet, whatever its pins say). Objects in another space
- * than their sheet are left where they are.
+ * scales with the sheet, whatever its pins say). An object homed in another frame than its sheet (deep in a zoom, near objects can be filed in
+ * different frames) is expressed in the sheet's frame, scaled there, and homed again.
  */
 export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean, scaleContents = false): Map<ObjectId, CanvasObject> {
   const byId = new Map(objs.map((o) => [o.id, o]));
@@ -63,6 +65,7 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
     if (o.parent !== undefined && byId.has(o.parent)) (kids.get(o.parent) ?? kids.set(o.parent, []).get(o.parent)!).push(o);
     else out.set(o.id, scaleAbout(o, fixed, kx, o.kind === "image" || o.kind === "path" ? ky : kx, keepWidth, keepRadius));
   }
+  const rehomed = new Map<ObjectId, FrameSpace>();
   const queue = [...out.keys()];
   for (let q = 0; q < queue.length; q++) {
     const pid = queue[q]!;
@@ -76,12 +79,15 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
     const rel = (a: D.Dyadic, from: D.Dyadic): number => D.toNumber(D.shift(D.sub(a, from), -u));
     const Lx0 = rel(ob.max.x, ob.min.x), Ly0 = rel(ob.max.y, ob.min.y);
     const Lx1 = rel(nb.max.x, nb.min.x), Ly1 = rel(nb.max.y, nb.min.y);
-    for (const c of list) {
-      queue.push(c.id);
+    for (const c0 of list) {
+      let c = c0;
       if (c.frame !== old.frame) {
-        out.set(c.id, c);
-        continue;
+        const space = (c.frame ?? old.frame)!.space;
+        c = expressObjectIn(c, old.frame ?? space.world);
+        byId.set(c.id, c); // (its own contents are then taken in the same frame)
+        rehomed.set(c.id, space);
       }
+      queue.push(c.id);
       const cb = worldBounds(c);
       const x0 = rel(cb.min.x, ob.min.x), x1 = rel(cb.max.x, ob.min.x);
       const y0 = rel(cb.min.y, ob.min.y), y1 = rel(cb.max.y, ob.min.y);
@@ -105,5 +111,6 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
       out.set(c.id, translate(scaled, D.sub(at(nx0, "x"), cb.min.x), D.sub(at(ny0, "y"), cb.min.y)));
     }
   }
+  for (const [id, space] of rehomed) out.set(id, homeObject(out.get(id)!, space));
   return out;
 }
