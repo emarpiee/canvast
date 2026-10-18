@@ -4,6 +4,8 @@ import { STYLE_KINDS, gradientCss } from "../assets/styles";
 import type { TextLook } from "../text/text-style";
 import { parseGgr, serializeGgr } from "../assets/ggr";
 import { MAX_PALETTE, parseGpl, serializeGpl } from "../assets/gpl";
+import { parseAse, serializeAse } from "../assets/ase";
+import { parseAco, serializeAco } from "../assets/aco";
 import type { PaletteColour } from "../assets/gpl";
 import { harmonies, parseHex, rgbToHex } from "../colour-picker/index";
 import type { Harmony } from "../colour-picker/colour";
@@ -74,7 +76,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.multiple = true;
-  fileInput.accept = ".ggr,.gpl";
+  fileInput.accept = ".ggr,.gpl,.ase,.aco";
   fileInput.hidden = true;
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
@@ -155,12 +157,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const empty =
       all.length === 0
         ? k.id === "palette"
-          ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a picked picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a .gpl file</button></div></div>`
+          ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a picked picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a palette file (.gpl, .ase, .aco)</button></div></div>`
           : `<p class="styles-guide">${esc(GUIDE[k.id] ?? k.empty)}</p>`
         : "";
     panel.innerHTML = `
       <header><h2>Styles <span class="layers-count">${total}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr) and palettes (.gpl)">${ICONS.fileUp}</button><button type="button" class="layer-btn" data-close aria-label="Hide the Styles panel" title="Hide the Styles panel">${ICONS.x}</button></span></header>
+        <span class="layers-tools"><button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr), GIMP palettes (.gpl) and Adobe swatches (.ase, .aco)">${ICONS.fileUp}</button><button type="button" class="layer-btn" data-close aria-label="Hide the Styles panel" title="Hide the Styles panel">${ICONS.x}</button></span></header>
       <div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div>
       <div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>
       <div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
@@ -201,12 +203,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   };
 
   // ---- Export and import (GIMP files) -----------------------------------------------------------------------------------------
-  const exportItems = async (kind: "gradient" | "palette", items: readonly StyleItem[]): Promise<void> => {
+  const exportItems = async (kind: "gradient" | "palette", items: readonly StyleItem[], format: "gpl" | "ase" | "aco" = "gpl"): Promise<void> => {
     if (!items.length) return;
-    const ext = kind === "gradient" ? "ggr" : "gpl";
-    const text = (s: StyleItem): string => (kind === "gradient" ? serializeGgr(s.name, dataOf<Gradient>(s)) : serializeGpl(s.name, dataOf<PaletteData>(s).colours));
+    const ext = kind === "gradient" ? "ggr" : format;
+    const text = (s: StyleItem): BlobPart => (kind === "gradient" ? serializeGgr(s.name, dataOf<Gradient>(s)) : format === "ase" ? (serializeAse(s.name, dataOf<PaletteData>(s).colours) as BlobPart) : format === "aco" ? (serializeAco(dataOf<PaletteData>(s).colours) as BlobPart) : serializeGpl(s.name, dataOf<PaletteData>(s).colours));
     if (items.length === 1) {
-      saveFile(`${slug(items[0]!.name, kind)}.${ext}`, new Blob([text(items[0]!)], { type: "text/plain" }));
+      saveFile(`${slug(items[0]!.name, kind)}.${ext}`, new Blob([text(items[0]!)], { type: format === "gpl" || kind === "gradient" ? "text/plain" : "application/octet-stream" }));
       return deps.notify(`Saved ${slug(items[0]!.name, kind)}.${ext}`);
     }
     const used = new Set<string>();
@@ -215,7 +217,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       const base = n;
       while (used.has(n)) n = `${base}_${i++}`;
       used.add(n);
-      return { name: `${n}.${ext}`, data: new Blob([text(s)], { type: "text/plain" }) };
+      return { name: `${n}.${ext}`, data: new Blob([text(s)], { type: format === "gpl" || kind === "gradient" ? "text/plain" : "application/octet-stream" }) };
     });
     saveFile(`${kind === "gradient" ? "gradients" : "palettes"}.zip`, await writeZip(entries));
     deps.notify(`Saved ${items.length} ${kind === "gradient" ? "gradients" : "palettes"} as ${ext} files in a ZIP.`);
@@ -227,10 +229,25 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     for (const f of files) {
       const base = f.name.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim();
       let text = "";
+      let bytes = new Uint8Array(0);
       try {
-        text = await f.text();
+        if (/\.(ase|aco)$/i.test(f.name)) bytes = new Uint8Array(await f.arrayBuffer());
+        else text = await f.text();
       } catch {
         skipped++;
+        continue;
+      }
+      if (/\.ase$/i.test(f.name)) {
+        // an Adobe swatch file may hold several palettes
+        const ps = parseAse(bytes, base);
+        if (!ps) skipped++;
+        for (const q of ps ?? []) if (await styles.add("palette", q.name.slice(0, 60), { colours: q.colours })) palettes++;
+        continue;
+      }
+      const aco = /\.aco$/i.test(f.name) ? parseAco(bytes, base) : null;
+      if (/\.aco$/i.test(f.name)) {
+        if (aco && (await styles.add("palette", aco.name.slice(0, 60), { colours: aco.colours }))) palettes++;
+        else skipped++;
         continue;
       }
       const g = /\.ggr$/i.test(f.name) ? parseGgr(text, base) : null;
@@ -242,7 +259,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       else skipped++;
     }
     const said = [gradients ? `${gradients} gradient${gradients === 1 ? "" : "s"}` : "", palettes ? `${palettes} palette${palettes === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ");
-    deps.notify(said ? `Imported ${said}${skipped ? `; ${skipped} file${skipped === 1 ? " was" : "s were"} not a GIMP gradient or palette` : ""}${notes.size ? ` (${[...notes].join("; ")})` : ""}.` : "Nothing imported: pick GIMP gradient (.ggr) or palette (.gpl) files.");
+    deps.notify(said ? `Imported ${said}${skipped ? `; ${skipped} file${skipped === 1 ? " was" : "s were"} not a gradient or palette file` : ""}${notes.size ? ` (${[...notes].join("; ")})` : ""}.` : "Nothing imported: pick GIMP gradient (.ggr), GIMP palette (.gpl), Adobe swatch (.ase) or Adobe colour (.aco) files.");
   };
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
@@ -292,6 +309,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         { label: "Copy as CSS variables", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyText(`:root {\n${cols.map((c, i) => `  --${slug(item.name, "palette")}-${slug(c.name ?? "", String(i + 1))}: ${c.c};`).join("\n")}\n}`, "the CSS variables") },
         ...common(item),
         { label: "Export as .gpl", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, run: () => void exportItems("palette", [item]) },
+        { label: "Export as .ase", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, run: () => void exportItems("palette", [item], "ase") },
+        { label: "Export as .aco", icon: ICONS.download, aria: `Export ${item.name} as an Adobe colour file`, run: () => void exportItems("palette", [item], "aco") },
         del,
       ];
     }

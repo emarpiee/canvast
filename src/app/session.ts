@@ -11,7 +11,7 @@ import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
-import { applyImport, archiveFileName, buildArchive, readArchive } from "../storage/archive";
+import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
 import { buildFilesZip } from "../storage/files-zip";
 import { idbGet } from "../storage/idb";
@@ -41,8 +41,10 @@ export interface AssetPlace {
   ids: ObjectId[];
 }
 
-/** The last full (workspace) backup, stored in meta["backup"]. */
+/** The last backup of the whole workspace (full or incremental), stored in meta["backup"]. */
 export interface BackupRecord {
+  /** Full when absent (records made before incremental backups). An incremental one goes on from the one made at its `since`. */
+  kind?: "full" | "incremental";
   at: number;
   bytes: number;
   fileName: string;
@@ -622,6 +624,7 @@ export class Session {
     const fileName = archiveFileName(label, new Date(r.manifest.exportedAt));
     if (scope.kind === "workspace" && !this.readOnly) {
       const rec: BackupRecord = {
+        kind: scope.since !== undefined ? "incremental" : "full",
         at: r.manifest.exportedAt,
         bytes: r.blob.size,
         fileName,
@@ -645,9 +648,9 @@ export class Session {
     return this.repo ? ((await idbGet<BackupRecord>(this.repo.db, "meta", "backup")) ?? null) : null;
   }
 
-  /** Validate an archive without writing anything. */
-  readArchive(file: Blob): Promise<ImportPlan> {
-    return readArchive(file);
+  /** Validate an archive, or a chain of backups (a full one and the incremental ones after it), without writing anything. */
+  readArchive(files: Blob | readonly Blob[]): Promise<ImportPlan> {
+    return Array.isArray(files) ? readArchiveChain(files as readonly Blob[]) : readArchive(files as Blob);
   }
 
   /** Write a validated archive into this workspace, then open its first canvas. */

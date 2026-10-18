@@ -4,6 +4,7 @@ One icon per function: two buttons that do different things never share an icon,
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `expand` | Scale contents with the sheet (the sheet's size field) |
 | `route` | Set the picked text along the picked path (Actions bar) |
 | `route-off` | Take a text off its path (Actions bar) |
 | `case-sensitive` | Font options of a text (kerning, features, axes) |

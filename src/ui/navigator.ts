@@ -109,7 +109,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.hardDriveDownload}<span>Export a backup (.canvast)</span></button>
          <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
          <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.fileInput}<span>Import a file…</span></button>
-         <input type="file" accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
+         <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
        </section>`;
     // The row's actions float over the page like every other menu, kept inside the window.
     const pop = menu.querySelector<HTMLElement>(".nav-actions");
@@ -168,11 +168,11 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   menu.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
     if (input.dataset["testid"] !== "nav-import-input") return;
-    const f = input.files?.[0];
+    const files = [...(input.files ?? [])];
     input.value = "";
-    if (!f) return;
+    if (!files.length) return;
     setOpen(false);
-    void runImport(session, f);
+    void runImport(session, files);
   });
   menu.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest("button");

@@ -38,9 +38,11 @@ export async function runExport(session: Session, scope: ExportScope): Promise<v
     const r = await session.exportArchive(scope);
     download(r.blob, r.fileName);
     const missing = r.manifest.missingAssets.length;
+    const inc = r.manifest.incremental;
+    const kept = r.manifest.assets.filter((a) => a.file).length;
     tell(
       session,
-      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "original")}; checked before saving).` +
+      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${inc ? `only what changed since ${new Date(inc.since).toLocaleString()}: ` : ""}${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(inc ? kept : r.manifest.assets.length, "original")}; checked before saving).` + (inc ? " Keep it with the full backup and the incremental ones before it: restoring takes them all together." : "") +
         (missing ? ` ${plural(missing, "original")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
     );
   } catch (e) {
@@ -71,12 +73,22 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
   }
 }
 
-/** Validate an archive, show what it contains, and import it only after confirmation. */
-export async function runImport(session: Session, file: File): Promise<void> {
+/** Export the changes since the last backup of the workspace (an incremental backup), or tell why that cannot be. */
+export async function runExportChanges(session: Session): Promise<void> {
+  const last = await session.lastBackup();
+  if (!last) return tell(session, "There is no backup to go on from yet: make a full backup first.");
+  await runExport(session, { kind: "workspace", since: last.at });
+}
+
+/** Validate an archive (or a chain of backups: a full one and the incremental ones after it), show what it contains, and import it only after confirmation. */
+export async function runImport(session: Session, picked: File | readonly File[]): Promise<void> {
   if (session.editor.blockEdit()) return;
+  const files = Array.isArray(picked) ? (picked as readonly File[]) : [picked as File];
+  if (!files.length) return;
+  const file = files.length === 1 ? files[0]! : { name: `${files.length} backup files` };
   let plan;
   try {
-    plan = await session.readArchive(file);
+    plan = await session.readArchive(files.length === 1 ? files[0]! : files);
   } catch (e) {
     tell(session, `Cannot import ${file.name}: ${e instanceof ArchiveError ? e.message : (e as Error).message}`);
     return;
@@ -87,7 +99,8 @@ export async function runImport(session: Session, file: File): Promise<void> {
     : plan.scope === "assets" ? "The originals will be added to the Assets library."
     : `It will be added as ${plural(plan.boards.length, "new board")}; nothing existing is replaced.`;
   const lines = [
-    `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”.`,
+    `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”${plan.files > 1 ? `, put together from ${plan.files} files of a backup chain` : ""}.`,
+    ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
     `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
   ];
@@ -104,6 +117,7 @@ export async function runImport(session: Session, file: File): Promise<void> {
     tell(
       session,
       `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
+        (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
         (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
     );
   } catch (e) {

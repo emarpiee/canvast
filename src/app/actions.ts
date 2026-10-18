@@ -1428,7 +1428,8 @@ export function sheetSize(doc: DocumentStore, editor: EditorState): { w: number;
 
 /**
  * Give the picked sheet a size in px (ADR 0121), its top-left corner fixed. Only the sheet changes size: what is on it follows its own
- * pin (left/top by default, so it stays as it is; "Scale" makes it grow with the sheet). One undo step.
+ * pin (left/top by default, so it stays as it is; "Scale" makes it grow with the sheet), unless the editor is set to scale the contents,
+ * which makes all of it grow with the sheet. One undo step.
  */
 export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, h: number, final = true): void {
   const s = pickedSheet(doc, editor);
@@ -1443,7 +1444,7 @@ export function resizeSheet(doc: DocumentStore, editor: EditorState, w: number, 
     return;
   }
   const group = [s, ...descendantsOf(doc.all(), new Set([s.id])).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o)];
-  const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
+  const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false, editor.scaleSheetContents);
   if (!final) return showReplaced(editor, [...plan.values()]);
   editor.preview = { kind: "none" };
   doc.commit(doc.transaction("Resize sheet", [...plan.values()]));
@@ -1699,5 +1700,65 @@ export function takeTextOffPath(doc: DocumentStore, editor: EditorState): void {
   });
   if (!next.length || editor.blockEdit()) return;
   doc.commit(doc.transaction(next.length === 1 ? "Take text off path" : `Take ${next.length} texts off paths`, next));
+  editor.changed();
+}
+
+// ---- Position and size on a sheet (ADR 0133) ------------------------------------------------------------------------------------
+
+/** The one picked object that sits on a sheet, with its sheet (null when none or several are picked). */
+function pickedOnSheet(doc: DocumentStore, editor: EditorState): { o: CanvasObject; sheet: CanvasObject } | null {
+  const sel = selected(doc, editor);
+  if (sel.length !== 1) return null;
+  const o = sel[0]!;
+  const sheet = o.parent !== undefined ? doc.get(o.parent) : undefined;
+  return sheet && isContainer(sheet) && !o.locked && (o.frame ?? doc.space.world) === (sheet.frame ?? doc.space.world) ? { o, sheet } : null;
+}
+
+/**
+ * Where the one picked object on a sheet is, in px from the sheet's top-left corner, and how big it is; `resizable`: it may be given
+ * another width and height of its own (strokes and text only scale as a whole).
+ */
+export function boxOnSheet(doc: DocumentStore, editor: EditorState): { x: number; y: number; w: number; h: number; resizable: boolean } | null {
+  const t = pickedOnSheet(doc, editor);
+  if (!t) return null;
+  const b = worldBounds(t.o), sb = worldBounds(t.sheet);
+  const x = D.toNumber(D.sub(b.min.x, sb.min.x)), y = D.toNumber(D.sub(b.min.y, sb.min.y));
+  const w = D.toNumber(D.sub(b.max.x, b.min.x)), h = D.toNumber(D.sub(b.max.y, b.min.y));
+  return Number.isFinite(x + y + w + h) ? { x, y, w, h, resizable: !t.o.rot && (t.o.kind === "path" || t.o.kind === "image") } : null;
+}
+
+/** Put the picked object on a sheet at (x, y) px from the sheet's corner: one undo step (shown only while `final` is false). */
+export function moveOnSheet(doc: DocumentStore, editor: EditorState, x: number, y: number, final = true): void {
+  const now = boxOnSheet(doc, editor);
+  const t = pickedOnSheet(doc, editor);
+  if (!now || !t || editor.blockEdit() || !Number.isFinite(x + y)) return;
+  const dx = D.fromNumber(x - now.x), dy = D.fromNumber(y - now.y);
+  if (dx.m === 0n && dy.m === 0n) {
+    if (final) {
+      editor.preview = { kind: "none" };
+      editor.changed();
+    }
+    return;
+  }
+  editor.preview = { kind: "move", ids: [t.o.id], frame: doc.space.world, dx, dy };
+  if (!final) return editor.changed();
+  const n = editor.previewed(t.o);
+  editor.preview = { kind: "none" };
+  if (n) doc.commit(doc.transaction("Move", [homeObject(n, doc.space)]));
+  editor.changed();
+}
+
+/** Give the picked object on a sheet this width and height in px (its top-left corner stays): one undo step (shown only while `final` is false). */
+export function resizeOnSheet(doc: DocumentStore, editor: EditorState, w: number, h: number, final = true): void {
+  const now = boxOnSheet(doc, editor);
+  const t = pickedOnSheet(doc, editor);
+  if (!now || !t || !now.resizable || editor.blockEdit() || !(w > 0 && h > 0 && Number.isFinite(w + h))) return;
+  const kx = w / now.w, ky = h / now.h;
+  if (Math.abs(kx - 1) < 1e-9 && Math.abs(ky - 1) < 1e-9) return;
+  const group = [t.o, ...descendantsOf(doc.all(), new Set([t.o.id])).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o)];
+  const plan = planSheetScale(group, worldBounds(t.o).min, kx, ky, false, false);
+  if (!final) return showReplaced(editor, [...plan.values()]);
+  editor.preview = { kind: "none" };
+  doc.commit(doc.transaction("Resize", [...plan.values()]));
   editor.changed();
 }

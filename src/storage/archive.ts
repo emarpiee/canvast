@@ -11,6 +11,8 @@ import type { CatalogEntry } from "../assets/asset-catalog";
 import type { AssetFolder } from "../assets/asset-catalog";
 import { entryFromRecord, folderPath, meta, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
+import type { StyleItem } from "../assets/styles";
+import { cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
@@ -39,11 +41,12 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * Originals are deduplicated by hash.
  */
 export const ARCHIVE_FORMAT = "canvast-archive";
-export const ARCHIVE_VERSION = 3;
+export const ARCHIVE_VERSION = 4;
 export const ARCHIVE_EXTENSION = ".canvast";
 
 export type ExportScope =
-  | { kind: "workspace" }
+  /** `since`: an incremental backup, with only what changed after that time (the `at` of the backup it goes on from). */
+  | { kind: "workspace"; since?: number }
   | { kind: "board"; boardId: string }
   | { kind: "canvas"; canvasId: string }
   | { kind: "assets"; hashes: string[] };
@@ -52,7 +55,8 @@ interface ManifestCanvas {
   id: string;
   name: string;
   objectCount: number;
-  file: string;
+  /** Absent in an incremental archive for a canvas that did not change: its content is in an earlier file of the chain. */
+  file?: string;
 }
 
 interface ManifestBoard {
@@ -69,7 +73,9 @@ interface ManifestAsset {
   pixelW: number;
   pixelH: number;
   importedAt: number;
-  file: string;
+  /** Absent in an incremental archive for an original that was already in the earlier files of the chain. */
+  file?: string;
+  card?: boolean;
   /** Organization (optional; archives from v0.3–v0.5 have none). Folders travel as name paths. */
   tags?: string[];
   favorite?: boolean;
@@ -94,6 +100,10 @@ export interface Manifest {
   assets: ManifestAsset[];
   /** Hashes referenced by exported instances whose originals were not stored. */
   missingAssets: string[];
+  /** The saved styles of the workspace (version 4; a workspace archive only). */
+  styles?: unknown[];
+  /** Present for an incremental backup: what it goes on from. A chain is read oldest first, each file starting where the one before ended. */
+  incremental?: { since: number };
 }
 
 export interface ExportResult {
@@ -116,6 +126,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const boards: ManifestBoard[] = [];
   const canvasFiles: Array<{ file: string; json: string }> = [];
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
+  const since = scope.kind === "workspace" ? scope.since : undefined;
   let objects = 0;
 
   const boardIds = scope.kind === "workspace" ? ws.boardIds : scope.kind === "board" ? [scope.boardId] : [];
@@ -134,6 +145,15 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       if (canvasFilter && cid !== canvasFilter) continue;
       const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
       if (!c) continue;
+      if (since !== undefined && c.updatedAt <= since) {
+        // an incremental backup does not repeat a canvas that has not changed since the backup it goes on from
+        mb.canvases.push({ id: c.id, name: c.name, objectCount: c.objectCount });
+        for (const r of await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>)) {
+          const a = storedAssetOf(r.data);
+          if (a) hashes.add(a);
+        }
+        continue;
+      }
       const records = await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>);
       const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
       const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
@@ -164,6 +184,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       continue;
     }
     const file = `assets/${hash}`;
+    const known = since !== undefined && r.importedAt <= since; // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
     const m = entry ? meta(entry) : { tags: [], favorite: false, folderIds: [] };
     folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
@@ -177,12 +198,12 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       pixelH: r.pixelH,
       importedAt: r.importedAt,
       ...(r.card ? { card: true } : {}),
-      file,
+      ...(known ? {} : { file }),
       tags: m.tags,
       favorite: m.favorite,
       folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
     });
-    assetBlobs.push({ name: file, data: r.blob });
+    if (!known) assetBlobs.push({ name: file, data: r.blob });
   }
 
   const manifest: Manifest = {
@@ -195,6 +216,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     boards,
     assets,
     missingAssets,
+    ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
+    ...(since !== undefined ? { incremental: { since } } : {}),
   };
   const json = (s: string): Blob => new Blob([s], { type: "application/json" });
   const blob = await writeZip([
@@ -237,6 +260,12 @@ export interface ImportPlan {
   /** Everything skipped, with reasons. Nothing is silently repaired. */
   problems: string[];
   objects: number;
+  /** The saved styles the archive carries (version 4), checked: they are added to the library on import (the ones it has already are kept). */
+  styles: StyleItem[];
+  /** How many archive files this was made from (more than one: a chain of incremental backups). */
+  files: number;
+  /** This one file is an incremental backup on its own: what did not change is in the files before it, which were not added. */
+  incrementalOnly: boolean;
 }
 
 export interface ImportResult {
@@ -249,6 +278,8 @@ export interface ImportResult {
   stillMissing: number;
   /** The first canvas created (null for an assets-only archive). */
   firstCanvasId: string | null;
+  /** Saved styles added to the library. */
+  stylesAdded: number;
 }
 
 /** Largest JSON part accepted, to fail fast instead of exhausting memory. */
@@ -270,8 +301,13 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 const str = (v: unknown, fallback: string): string => (typeof v === "string" ? v.slice(0, 500) : fallback);
 const posInt = (v: unknown): boolean => Number.isSafeInteger(v) && (v as number) > 0;
 
-/** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
-export async function readArchive(file: Blob): Promise<ImportPlan> {
+interface Part {
+  m: Record<string, unknown>;
+  entries: Map<string, ZipEntry>;
+}
+
+/** Open one archive file and check its manifest (the canvases and originals are read, and checked, when a plan is made of it). */
+async function readPart(file: Blob): Promise<Part> {
   let entries: Map<string, ZipEntry>;
   try {
     entries = await readZip(file);
@@ -285,7 +321,39 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
   const scope = m["scope"];
   if (scope !== "workspace" && scope !== "board" && scope !== "canvas" && scope !== "assets") throw new ArchiveError("the archive has an unknown scope");
   if (!Array.isArray(m["boards"]) || !Array.isArray(m["assets"])) throw new ArchiveError("the archive manifest is damaged");
+  return { m, entries };
+}
 
+const sinceOf = (p: Part): number | null => (isObj(p.m["incremental"]) && Number.isFinite(p.m["incremental"]["since"]) ? (p.m["incremental"]["since"] as number) : null);
+const exportedAtOf = (p: Part): number => (typeof p.m["exportedAt"] === "number" ? p.m["exportedAt"] : 0);
+
+/** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
+export async function readArchive(file: Blob): Promise<ImportPlan> {
+  return planOf([await readPart(file)]);
+}
+
+/**
+ * Read a chain of archives as one: a full backup and the incremental backups that go on from it, in any order (they are sorted by the
+ * time they were made, and each must start where the one before ended). A canvas or an original is taken from the newest file that has it.
+ */
+export async function readArchiveChain(files: readonly Blob[]): Promise<ImportPlan> {
+  if (files.length === 1) return readArchive(files[0]!);
+  const parts = (await Promise.all(files.map(readPart))).sort((a, b) => exportedAtOf(a) - exportedAtOf(b));
+  if (sinceOf(parts[0]!) !== null) throw new ArchiveError("the earliest of these files is an incremental backup: add the full backup it goes on from");
+  for (let i = 1; i < parts.length; i++) {
+    const since = sinceOf(parts[i]!);
+    if (since === null) throw new ArchiveError("only the first file of a chain can be a full backup: these files are not one chain");
+    if (since !== exportedAtOf(parts[i - 1]!)) throw new ArchiveError(`a file is missing from the chain: the backup of ${new Date(exportedAtOf(parts[i]!)).toLocaleString()} goes on from one made at ${new Date(since).toLocaleString()}`);
+  }
+  if (parts.some((p) => p.m["scope"] !== "workspace")) throw new ArchiveError("a chain is made of backups of the whole workspace");
+  return planOf(parts);
+}
+
+/** The plan to import from the parts of a chain (one part for an ordinary archive). The newest manifest says what there is; the files hold it. */
+async function planOf(parts: Part[]): Promise<ImportPlan> {
+  const latest = parts[parts.length - 1]!;
+  const m = latest.m;
+  const scope = m["scope"] as ExportScope["kind"];
   const problems: string[] = [];
   const plan: ImportPlan = {
     scope,
@@ -297,15 +365,36 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
     unresolved: [],
     problems,
     objects: 0,
+    styles: [],
+    files: parts.length,
+    incrementalOnly: parts.length === 1 && sinceOf(latest) !== null,
+  };
+  // where a canvas is: in the newest file that has its content
+  const canvasAt = (id: string): { entries: Map<string, ZipEntry>; file: string } | null => {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      for (const b of parts[i]!.m["boards"] as unknown[]) {
+        if (!isObj(b) || !Array.isArray(b["canvases"])) continue;
+        for (const c of b["canvases"] as unknown[]) if (isObj(c) && c["id"] === id && typeof c["file"] === "string") return { entries: parts[i]!.entries, file: c["file"] };
+      }
+    }
+    return null;
   };
   const referenced = new Set<string>();
   for (const b of m["boards"] as unknown[]) {
     if (!isObj(b) || !Array.isArray(b["canvases"])) throw new ArchiveError("the archive manifest is damaged");
     const board = { name: str(b["name"], "Imported board"), canvases: [] as PlannedCanvas[] };
     for (const c of b["canvases"] as unknown[]) {
-      if (!isObj(c) || typeof c["file"] !== "string") throw new ArchiveError("the archive manifest is damaged");
+      if (!isObj(c)) throw new ArchiveError("the archive manifest is damaged");
       const name = str(c["name"], "Imported canvas");
-      const data = await readJson(entries, c["file"]);
+      const where = typeof c["file"] === "string" ? { entries: latest.entries, file: c["file"] } : typeof c["id"] === "string" ? canvasAt(c["id"]) : null;
+      if (!where) {
+        if (c["file"] === undefined) {
+          problems.push(`“${name}” did not change since the backup this one goes on from, and that file was not added: it is not imported.`);
+          continue;
+        }
+        throw new ArchiveError("the archive manifest is damaged");
+      }
+      const data = await readJson(where.entries, where.file);
       if (!isObj(data) || !Array.isArray(data["objects"])) throw new ArchiveError(`canvas "${name}" is damaged`);
       const objects: CanvasObject[] = [];
       const seen = new Set<string>();
@@ -363,17 +452,28 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
   }
   if (scope !== "assets" && plan.boards.length === 0) throw new ArchiveError("the archive contains no canvases");
 
+  // the originals: each one's list entry from the newest file, its bytes from the newest file that holds them
+  const listed = new Map<string, { a: Record<string, unknown>; at: { entries: Map<string, ZipEntry>; file: string } | null }>();
+  for (const part of parts) {
+    for (const a of part.m["assets"] as unknown[]) {
+      if (!isObj(a)) throw new ArchiveError("the archive manifest is damaged");
+      const hash = String(a["hash"]);
+      const prev = listed.get(hash);
+      listed.set(hash, { a, at: typeof a["file"] === "string" ? { entries: part.entries, file: a["file"] } : (prev?.at ?? null) });
+    }
+  }
   const valid = new Set<string>();
-  for (const a of m["assets"] as unknown[]) {
-    if (!isObj(a)) throw new ArchiveError("the archive manifest is damaged");
+  const seenHash = new Set<string>();
+  for (const { a, at } of listed.values()) {
     const hash = String(a["hash"]);
     const label = str(a["name"], "") || hash.slice(0, 12);
-    const e = typeof a["file"] === "string" ? entries.get(a["file"]) : undefined;
+    const e = at ? at.entries.get(at.file) : undefined;
     const type = str(a["type"], "") || "application/octet-stream";
-    if (!HASH_RE.test(hash) || valid.has(hash)) {
+    if (!HASH_RE.test(hash) || seenHash.has(hash)) {
       problems.push(`Asset “${label}” has an invalid or repeated content hash and was skipped.`);
       continue;
     }
+    seenHash.add(hash);
     if (!e || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
       problems.push(`Asset “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
@@ -399,6 +499,11 @@ export async function readArchive(file: Blob): Promise<ImportPlan> {
     if (org) plan.organization.set(hash, org);
   }
   plan.unresolved = [...referenced].filter((h) => !valid.has(h)).sort();
+  // the saved styles (version 4): the newest file's list is the list
+  for (let i = parts.length - 1; i >= 0 && plan.styles.length === 0; i--) {
+    const raw = parts[i]!.m["styles"];
+    if (Array.isArray(raw)) plan.styles = cleanStyles(raw);
+  }
   return plan;
 }
 
@@ -430,7 +535,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
 export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
-  const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null };
+  const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
   try {
     const now = Date.now();
     const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
@@ -483,6 +588,16 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }
     if (folders) tx.objectStore("meta").put(folders, "assetFolders");
+    if (plan.styles.length) {
+      // the saved styles: the ones the library does not have yet are added (by id), none is replaced
+      const have = cleanStyles(await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>));
+      const ids = new Set(have.map((x) => x.id));
+      const added = plan.styles.filter((x) => !ids.has(x.id));
+      if (added.length) {
+        tx.objectStore("meta").put([...have, ...added], "styles");
+        result.stylesAdded = added.length;
+      }
+    }
     for (const h of plan.unresolved) if ((await req(tx.objectStore("assets").count(h))) === 0) result.stillMissing++;
     await committed;
     return result;

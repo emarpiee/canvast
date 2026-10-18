@@ -123,6 +123,7 @@ import pencilLine from "lucide-static/icons/pencil-line.svg";
 import penLine from "lucide-static/icons/pen-line.svg";
 import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
+import expandSvg from "lucide-static/icons/expand.svg";
 import routeSvg from "lucide-static/icons/route.svg";
 import routeOffSvg from "lucide-static/icons/route-off.svg";
 import caseSensitiveSvg from "lucide-static/icons/case-sensitive.svg";
@@ -301,6 +302,7 @@ export const ICONS = {
   textBox: clean(rows3Svg),
   textLink: clean(link2Svg),
   fontOptions: clean(caseSensitiveSvg),
+  sheetScale: clean(expandSvg),
   route: clean(routeSvg),
   routeOff: clean(routeOffSvg),
   underline: clean(underlineSvg),

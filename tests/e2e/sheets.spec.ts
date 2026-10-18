@@ -213,3 +213,83 @@ test("a picked sheet shows its size in px, in, mm and cm; typing another size ch
   expect(Number(await w.inputValue())).toBeCloseTo(w0, 0);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a sheet takes a paper or screen size from the presets, and Scale contents makes what is on it grow with it, whatever its pins say (ADR 0133)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 600, 450);
+  const w = p.locator("[data-sheet-w]"), h = p.locator("[data-sheet-h]");
+  await expect(w).toBeVisible();
+  const width = async () => {
+    const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), rect.id))!.box;
+    return b.maxX - b.minX;
+  };
+  const w0 = await width();
+  // a preset: the sheet takes the size (its own units are px), what is on it keeps its size
+  await p.locator("[data-sheet-preset]").selectOption({ label: "A4 (794 × 1123)" });
+  await app.frame();
+  expect(Number(await w.inputValue())).toBeCloseTo(794, 0);
+  expect(Number(await h.inputValue())).toBeCloseTo(1123, 0);
+  expect(await p.locator("[data-sheet-preset]").inputValue()).toBe(""); // (ready for the next pick)
+  expect(await width()).toBeCloseTo(w0, 1);
+  await key(app, "Control+z");
+  await app.frame();
+  // Scale contents: the same change to the size grows what is on the sheet in the same proportion
+  const sheetW = Number(await w.inputValue());
+  await p.locator("[data-sheet-scale]").click();
+  await expect(p.locator("[data-sheet-scale]")).toHaveAttribute("aria-pressed", "true");
+  await w.fill(String(sheetW * 2));
+  await w.blur();
+  await app.frame();
+  expect(Math.abs((await width()) - w0 * 2)).toBeLessThan(3); // (the outline of the shape keeps its own width)
+  await key(app, "Control+z");
+  await app.frame();
+  expect(await width()).toBeCloseTo(w0, 1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("an object on a sheet shows where it is from the sheet's corner, and X, Y, W and H change it in px (ADR 0133)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [800, 560]);
+  const sheet = (await objs(app)).at(-1)!;
+  await key(app, "u");
+  await drag(app, [440, 340], [540, 400]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 490, 370);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([rect.id]);
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const [sb, rb] = [await box(sheet.id), await box(rect.id)];
+  const x = p.locator("[data-on-x]"), y = p.locator("[data-on-y]"), w = p.locator("[data-on-w]"), h = p.locator("[data-on-h]");
+  await expect(x).toBeVisible();
+  expect(Number(await x.inputValue())).toBeCloseTo(rb.minX - sb.minX, 0);
+  expect(Number(await y.inputValue())).toBeCloseTo(rb.minY - sb.minY, 0);
+  expect(Number(await w.inputValue())).toBeCloseTo(rb.maxX - rb.minX, 0);
+  // X moves it (one undo step), W and H resize it about its corner
+  await x.fill("100");
+  await x.press("Enter");
+  await app.frame();
+  expect((await box(rect.id)).minX - sb.minX).toBeCloseTo(100, 0);
+  expect((await box(rect.id)).minY).toBeCloseTo(rb.minY, 0);
+  await w.fill("160");
+  await w.press("Enter");
+  await w.blur();
+  await app.frame();
+  const after = await box(rect.id);
+  expect(Math.abs(after.maxX - after.minX - 160)).toBeLessThan(2); // (the box includes the outline)
+  expect(after.minX - sb.minX).toBeCloseTo(100, 0);
+  await key(app, "Control+z");
+  await key(app, "Control+z");
+  await app.frame();
+  expect((await box(rect.id)).minX).toBeCloseTo(rb.minX, 0);
+  // a sheet itself, or an object that is on none, has no such fields
+  await click(app, 700, 520);
+  await expect(x).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});

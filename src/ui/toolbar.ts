@@ -65,6 +65,10 @@ export interface ToolbarActions {
   /** Size in px of the one picked sheet, and giving it another (ADR 0121). */
   sheetSize(): { w: number; h: number } | null;
   resizeSheet(w: number, h: number, final?: boolean): void;
+  /** Where the one picked object on a sheet is and how big, in px from the sheet's corner (null: none is), and moving or resizing it. */
+  boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
+  moveOnSheet(x: number, y: number, final?: boolean): void;
+  resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
   cropped(): boolean;
@@ -165,6 +169,13 @@ const KIND_LABEL: Record<string, string> = { sheet: "Sheet", shape: "Shape", tex
 /** The kind of picked item the Properties bar sorts its controls by. */
 const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
 
+/** Paper and screen sizes for a sheet, in px at 96 to the inch (ADR 0121 left them out; ADR 0133). */
+const SHEET_PRESETS: ReadonlyArray<{ group: string; items: ReadonlyArray<{ name: string; w: number; h: number }> }> = [
+  { group: "Paper", items: [{ name: "A5", w: 559, h: 794 }, { name: "A4", w: 794, h: 1123 }, { name: "A4 landscape", w: 1123, h: 794 }, { name: "A3", w: 1123, h: 1587 }, { name: "A3 landscape", w: 1587, h: 1123 }, { name: "A2", w: 1587, h: 2245 }, { name: "Letter", w: 816, h: 1056 }, { name: "Letter landscape", w: 1056, h: 816 }, { name: "Legal", w: 816, h: 1344 }, { name: "Tabloid", w: 1056, h: 1632 }] },
+  { group: "Screen", items: [{ name: "HD 720p", w: 1280, h: 720 }, { name: "Full HD", w: 1920, h: 1080 }, { name: "4K", w: 3840, h: 2160 }, { name: "Phone portrait", w: 390, h: 844 }, { name: "Tablet", w: 1024, h: 768 }, { name: "Desktop", w: 1440, h: 900 }] },
+  { group: "Social", items: [{ name: "Square post", w: 1080, h: 1080 }, { name: "Story", w: 1080, h: 1920 }, { name: "Link preview", w: 1200, h: 630 }, { name: "Banner", w: 1500, h: 500 }, { name: "Icon", w: 512, h: 512 }] },
+];
+
 /** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
 const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
 
@@ -216,9 +227,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-kind="picture" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
+        <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in px from the sheet's top-left corner">On sheet
+          X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (px)"> Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (px)">
+          <span data-on-size>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (px)"> H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (px)"></span></span>
         <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="Size of the sheet; only the sheet changes, what is on it follows its pin">Size
           <input type="number" data-sheet-w min="0" step="any" inputmode="decimal" aria-label="Sheet width"> × <input type="number" data-sheet-h min="0" step="any" inputmode="decimal" aria-label="Sheet height">
-          <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select></span>
+          <select data-sheet-unit aria-label="Unit of the sheet size"><option value="1">px</option><option value="96">in</option><option value="3.7795275590551185">mm</option><option value="37.795275590551185">cm</option></select>
+          <select data-sheet-preset aria-label="Sheet size preset" title="A paper or screen size: the sheet takes it (its top-left corner stays)"><option value="">Preset…</option>${SHEET_PRESETS.map((g) => `<optgroup label="${g.group}">${g.items.map((i) => `<option value="${i.w},${i.h}">${i.name} (${i.w} × ${i.h})</option>`).join("")}</optgroup>`).join("")}</select>
+          <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents: when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the name left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text select node" data-kind="text">
@@ -495,7 +511,20 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (w > 0 && h > 0) actions.resizeSheet(w, h, final);
   };
   for (const f of ["[data-sheet-w]", "[data-sheet-h]"]) liveNumber(sheetField(f), (_v, final) => sheetApply(final));
+  const onSheet = (sel: string): HTMLInputElement => root.querySelector<HTMLInputElement>(sel)!;
+  for (const f of ["[data-on-x]", "[data-on-y]"]) liveNumber(onSheet(f), (_v, final) => actions.moveOnSheet(Number(onSheet("[data-on-x]").value), Number(onSheet("[data-on-y]").value), final));
+  for (const f of ["[data-on-w]", "[data-on-h]"]) liveNumber(onSheet(f), (_v, final) => actions.resizeOnSheet(Number(onSheet("[data-on-w]").value), Number(onSheet("[data-on-h]").value), final));
   sheetField("[data-sheet-unit]").addEventListener("change", () => editor.changed()); // (the same size, said in another unit)
+  sheetField("[data-sheet-preset]").addEventListener("change", (e) => {
+    const sel = e.target as HTMLSelectElement;
+    const [w, h] = sel.value.split(",").map(Number);
+    sel.value = "";
+    if (w && h) actions.resizeSheet(w, h, true);
+  });
+  root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", (e) => {
+    editor.scaleSheetContents = !editor.scaleSheetContents;
+    (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(editor.scaleSheetContents));
+  });
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
     editor.cropId = editor.cropId ? null : (id ?? null);
@@ -823,6 +852,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     adjustBtn.classList.toggle("is-applied", adjusted);
     adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
     root.querySelector<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
+    const on = pick && still ? actions.boxOnSheet() : null;
+    root.querySelector<HTMLElement>("[data-on-sheet]")!.hidden = !on;
+    if (on) {
+      root.querySelector<HTMLElement>("[data-on-size]")!.hidden = !on.resizable;
+      for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
+        const el = onSheet(f);
+        if (document.activeElement !== el) el.value = String(Math.round(v * 100) / 100);
+      }
+    }
     const sz = pick && still ? actions.sheetSize() : null;
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = !sz;
     if (sz) {

@@ -218,7 +218,17 @@ function controlHtml(row: Row, id: string): string {
 }
 
 /** Mount the view into `root`; returns what main needs to show and hide it. */
-export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void): { show(tab?: string): void; hide(): void } {
+/** What the Storage tab needs to make and read backups (the same ones the workspace menu and the storage popover have). */
+export interface BackupHooks {
+  last(): Promise<{ at: number; kind: "full" | "incremental"; fileName: string; bytes: number } | null>;
+  exportFull(): Promise<void>;
+  exportChanges(): Promise<void>;
+  exportFiles(): Promise<void>;
+  importFiles(files: File[]): Promise<void>;
+  readOnly(): boolean;
+}
+
+export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}<span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
     ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.map((id) => tabButton(SETTINGS_TABS.find((t) => t.id === id)!)).join("")}`,
@@ -244,7 +254,17 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
            <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
       : t.id === "storage"
         ? `<div class="set-info set-card" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
-           <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Use an export from the workspace menu to keep a copy.</p></div>`
+           <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy below.</p></div>
+           <div class="set-info set-card" data-backup><h3>Backup</h3>
+             <p data-testid="set-last-backup" data-last-backup>…</p>
+             <div class="storage-actions">
+               <button type="button" data-backup-action="full" data-testid="set-export-full">Export a backup (.canvast)</button>
+               <button type="button" data-backup-action="changes" data-testid="set-export-changes" title="Only what changed since the last backup. Keep it with the full backup and the earlier incremental ones: restoring takes them all together.">Export the changes since the last backup</button>
+               <button type="button" data-backup-action="files" data-testid="set-export-files">Export all files as ZIP</button>
+               <button type="button" data-backup-action="import" data-testid="set-import">Import backup files…</button>
+               <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
+             </div>
+             <p class="set-help">A backup is one file you can keep anywhere. After a full one, an incremental backup holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>`
         : t.id === "collaboration"
           ? `<div class="set-info set-card"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
            <p>When it is added it will be opt-in for each workspace, with named roles, and everything will keep working offline. Until then, share work with an export from the workspace menu.</p></div>`
@@ -351,7 +371,30 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       set("[data-quota]", "unknown");
       set("[data-persisted]", "unknown");
     }
+    if (backup) {
+      const last = await backup.last();
+      set("[data-last-backup]", last ? `Last backup: ${new Date(last.at).toLocaleString()} (${last.kind === "incremental" ? "incremental" : "full"}), ${last.fileName}, ${mb(last.bytes)}.` : "No backup made yet.");
+      const ro = backup.readOnly();
+      for (const b of root.querySelectorAll<HTMLButtonElement>("[data-backup-action]")) {
+        const a = b.dataset["backupAction"];
+        b.disabled = (ro && a === "import") || (!last && a === "changes"); // (changes go on from a backup: none yet, none to go on from)
+      }
+    }
   };
+  root.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-backup-action]");
+    if (!b || !backup) return;
+    const a = b.dataset["backupAction"];
+    if (a === "import") root.querySelector<HTMLInputElement>("[data-testid=set-import-input]")!.click();
+    else void (a === "full" ? backup.exportFull() : a === "changes" ? backup.exportChanges() : backup.exportFiles()).then(() => storage());
+  });
+  root.addEventListener("change", (e) => {
+    const input = e.target as HTMLInputElement;
+    if (input.dataset["testid"] !== "set-import-input" || !backup) return;
+    const files = [...(input.files ?? [])];
+    input.value = "";
+    if (files.length) void backup.importFiles(files).then(() => storage());
+  });
 
   /** The key being changed, waiting for a letter. */
   let capturing: SettingKey | null = null;

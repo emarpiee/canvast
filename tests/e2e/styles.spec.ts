@@ -1,6 +1,8 @@
 import { expect, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
+import { serializeAco } from "../../src/assets/aco";
+import { serializeAse } from "../../src/assets/ase";
 
 /**
  * Styles of the canvas (ADR 0122): gradients and palettes saved, applied (asking when several shapes are picked), edited, and read and
@@ -81,7 +83,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   expect(file.suggestedFilename()).toBe("gradient_1.ggr");
   await p.getByTestId("styles-import").setInputFiles([{ name: "sunset.ggr", mimeType: "text/plain", buffer: Buffer.from(SUNSET) }, { name: "junk.ggr", mimeType: "text/plain", buffer: Buffer.from("nope") }]);
   await expect(card("Sunset")).toContainText("Linear · 2 stops");
-  await expect(p.getByTestId("toast").getByText(/not a GIMP/)).toBeVisible();
+  await expect(p.getByTestId("toast").getByText(/not a gradient or palette file/)).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -124,6 +126,20 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   expect(file.suggestedFilename()).toBe("palette_1.gpl");
   await p.getByTestId("styles-import").setInputFiles({ name: "brand.gpl", mimeType: "text/plain", buffer: Buffer.from("GIMP Palette\nName: Brand\nColumns: 2\n#\n255 136   0\tOrange\n 16  32  48\n") });
   await expect(panel.locator(".style-card", { hasText: "Brand" })).toContainText("2 colours");
+  // Adobe swatch files: a .ase (its group's name) and a .aco (the file's name) are read, and a palette is written as both
+  await p.getByTestId("styles-import").setInputFiles([
+    { name: "swatches.ase", mimeType: "application/octet-stream", buffer: Buffer.from(serializeAse("Warm", [{ c: "#ff8800", name: "Orange" }, { c: "#aa0000" }, { c: "#ffcc00" }])) },
+    { name: "autumn.aco", mimeType: "application/octet-stream", buffer: Buffer.from(serializeAco([{ c: "#884400" }, { c: "#cc6600" }])) },
+  ]);
+  await expect(panel.locator(".style-card", { hasText: "Warm" })).toContainText("3 colours");
+  await expect(panel.locator(".style-card", { hasText: "autumn" })).toContainText("2 colours");
+  for (const [ext, what] of [["ase", "an Adobe swatch file"], ["aco", "an Adobe colour file"]] as const) {
+    const [out] = await Promise.all([p.waitForEvent("download"), (async () => {
+      await card.getByRole("button", { name: /^More actions for style Palette 1/ }).click();
+      await p.getByRole("menuitem", { name: new RegExp(`Export Palette 1 as ${what}`) }).click();
+    })()]);
+    expect(out.suggestedFilename()).toBe(`palette_1.${ext}`);
+  }
   expect(app.consoleErrors).toEqual([]);
 });
 

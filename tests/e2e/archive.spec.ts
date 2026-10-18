@@ -370,3 +370,108 @@ test("a version 1 archive (absolute positions, no frames) still imports, convert
   expect((await p.evaluate(() => window.__canvastDebug.objectFrames())).filter((o) => o.level !== "0")).toHaveLength(2);
   expect((await dump(p, imported.id)).view).toMatchObject({ cx: "5p0", cy: "-3p0", zi: 2 });
 });
+
+test("an incremental backup holds only what changed, a chain of backups restores as one, and the saved styles travel with a workspace backup (ADR 0133)", async ({ app, browser }) => {
+  const p = app.page;
+  await buildWorkspace(p);
+  // a saved style: an empty palette
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  const panel = p.getByTestId("styles-panel");
+  await panel.getByRole("tab", { name: /^Palettes/ }).click();
+  await panel.locator('[data-new-from="empty"]').click();
+  await expect(panel.locator(".style-card", { hasText: "Palette 1" })).toBeVisible();
+  await p.getByRole("button", { name: "Hide the Styles panel" }).click();
+
+  await openPanel(p);
+  // no backup yet: there is nothing to go on from
+  await p.getByTestId("export-changes").click();
+  await expect(p.getByTestId("toast")).toContainText("make a full backup first");
+  const full = await download(p, () => p.getByTestId("export-workspace").click());
+  const fullM = await manifestOf(full.bytes);
+  expect(fullM["incremental"]).toBeUndefined();
+  expect((fullM["styles"] as unknown[]).length).toBe(1);
+
+  // one canvas changes (a stroke on the open one) and one original is added
+  const before = (await sess(p)).current!.canvasId;
+  await stroke(p, 700, 300);
+  await p.getByTestId("view-assets").click();
+  const NEW = makePng(5, 5, () => [200, 40, 40, 255]);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "red.png", mimeType: "image/png", buffer: NEW });
+  await p.getByTestId("view-canvas").click();
+  await saved(p);
+
+  await openPanel(p);
+  const inc = await download(p, () => p.getByTestId("export-changes").click());
+  const m = await manifestOf(inc.bytes);
+  expect(m["incremental"]).toEqual({ since: fullM["exportedAt"] });
+  const canvases = m.boards.flatMap((b) => b.canvases) as unknown as Array<{ id: string; file?: string }>;
+  expect(canvases).toHaveLength(3); // every canvas is listed (the structure) ...
+  expect(canvases.filter((c) => c.file).map((c) => c.id)).toEqual([before]); // ... but only the one that changed has its content
+  const withFile = (m.assets as unknown as Array<{ hash: string; file?: string }>).filter((a) => a.file);
+  expect(withFile).toHaveLength(1); // the new original only
+  const z = await readZip(new Blob([new Uint8Array(inc.bytes)]));
+  expect(z.size).toBe(1 + 1 + 1);
+  expect(inc.bytes.length).toBeLessThan(full.bytes.length);
+  await expect(p.getByTestId("storage-backup")).toContainText(inc.name);
+
+  // a chain restores as one, in whichever order the files are picked
+  const srcTree = (await sess(p)).tree!;
+  const srcDumps = await Promise.all(srcTree.flatMap((b) => b.canvases.map((c) => dump(p, c.id))));
+  const other = await freshProfile(browser);
+  const q = other.page;
+  await openPanel(q);
+  await q.getByTestId("import-archive-input").setInputFiles([
+    { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
+    { name: full.name, mimeType: "application/zip", buffer: full.bytes },
+  ]);
+  const dlg = q.getByTestId("confirm-dialog");
+  await expect(dlg).toBeVisible();
+  expect((await dlg.textContent()) ?? "").toContain("put together from 2 files");
+  await q.getByTestId("confirm-ok").click();
+  await expect(dlg).toHaveCount(0);
+  await expect(q.getByTestId("toast")).toContainText(/Imported 3 canvases/);
+  await expect(q.getByTestId("toast")).toContainText("1 saved style added");
+  const tree = (await sess(q)).tree!;
+  const dst = await Promise.all(tree.slice(1).flatMap((b) => b.canvases.map((c) => dump(q, c.id))));
+  expect(dst).toEqual(srcDumps); // the changed canvas as it is now, the others as they were
+  expect((await stored(q)).length).toBe(3); // the library: the two originals of the full backup and the new one
+
+  // the incremental file alone says what it is; two of them without the full one are refused
+  await openPanel(q);
+  await q.getByTestId("import-archive-input").setInputFiles({ name: inc.name, mimeType: "application/zip", buffer: inc.bytes });
+  await expect(dlg).toBeVisible();
+  const alone = (await dlg.textContent()) ?? "";
+  expect(alone).toContain("incremental backup on its own");
+  await q.getByTestId("confirm-cancel").click();
+  await expect(dlg).toHaveCount(0);
+  await q.getByTestId("toast").evaluate((t) => (t.textContent = ""));
+  await openPanel(q);
+  await q.getByTestId("import-archive-input").setInputFiles([
+    { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
+    { name: "again.canvast", mimeType: "application/zip", buffer: inc.bytes },
+  ]);
+  await expect(q.getByTestId("toast")).toContainText(/Cannot import 2 backup files/);
+  await other.context.close();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Settings > Storage holds the backup: the last backup, a full export, the changes only (once there is a backup to go on from), the files as ZIP and the import (ADR 0133)", async ({ app }) => {
+  const p = app.page;
+  await importImage(p);
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Storage" }).click();
+  await expect(p.getByTestId("set-last-backup")).toHaveText("No backup made yet.");
+  await expect(p.getByTestId("set-export-changes")).toBeDisabled();
+  const full = await download(p, () => p.getByTestId("set-export-full").click());
+  expect(full.name).toMatch(/\.canvast$/);
+  await expect(p.getByTestId("set-last-backup")).toContainText("(full)");
+  await expect(p.getByTestId("set-last-backup")).toContainText(full.name);
+  await expect(p.getByTestId("set-export-changes")).toBeEnabled();
+  const inc = await download(p, () => p.getByTestId("set-export-changes").click());
+  await expect(p.getByTestId("set-last-backup")).toContainText("(incremental)");
+  expect(((await manifestOf(inc.bytes))["incremental"] as { since: number }).since).toBe((await manifestOf(full.bytes))["exportedAt"]);
+  await p.getByTestId("set-import-input").setInputFiles({ name: full.name, mimeType: "application/zip", buffer: full.bytes });
+  await expect(p.getByTestId("confirm-dialog")).toBeVisible();
+  await p.getByTestId("confirm-cancel").click();
+  expect(app.consoleErrors).toEqual([]);
+});
