@@ -24,6 +24,12 @@ test("panels stack on the two sides in the order they were last used; a title ba
   expect((await item(app, "tags").boundingBox())!.height, "only the bar is left").toBeLessThan(60);
   await titleOf(app, "tags").click();
   await expect(item(app, "tags")).not.toHaveAttribute("data-folded", "");
+  // the title bar by keyboard: Tab reaches it, Enter folds, Space unfolds
+  await titleOf(app, "tags").locator("xpath=..").focus();
+  await app.page.keyboard.press("Enter");
+  await expect(item(app, "tags")).toHaveAttribute("data-folded", "");
+  await app.page.keyboard.press("Space");
+  await expect(item(app, "tags")).not.toHaveAttribute("data-folded", "");
   // unfolding counts as use: Tags is now above Bookmarks
   expect((await item(app, "tags").boundingBox())!.y).toBeLessThan((await item(app, "bookmarks").boundingBox())!.y);
   expect(app.consoleErrors).toEqual([]);

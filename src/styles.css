@@ -276,7 +276,7 @@ html, body {
 
 .hud-debug {
   left: 12px;
-  top: 60px;
+  bottom: 12px; /* (the dock's left stack starts at the top: the debug text stays clear of it) */
   margin: 0;
   padding: var(--sp-4) var(--sp-5);
   font: var(--text-xs)/1.4 var(--font-mono);
@@ -284,6 +284,7 @@ html, body {
 }
 
 .hud-debug[hidden] { display: none; }
+.dock-item header:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 
 /* The tools sit to the right of the view tabs and the workspace menu (--nav-w, measured in main.ts), centred in what is left. */
 #toolbar { position: absolute; z-index: var(--z-edge); flex-direction: column; align-items: center; gap: var(--sp-3); top: 12px; left: calc((var(--nav-w, 0px) + 12px) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + 24px) / var(--ui-scale, 1)); display: flex; justify-content: center; pointer-events: none; }

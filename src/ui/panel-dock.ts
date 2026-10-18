@@ -127,6 +127,20 @@ export class PanelDock {
       if (!el.hidden) this.used(spec.id, true); // shown again: opened, last used
     }).observe(el, { attributes: true, attributeFilter: ["hidden"] });
     box.addEventListener("pointerdown", (e) => this.press(item, e));
+    // the title bar by keyboard: Tab reaches it, Enter or Space folds or unfolds (a header the panel redrew is made reachable again)
+    const reach = (): void => {
+      const head = el.querySelector("header");
+      if (head && head.getAttribute("tabindex") !== "0") head.setAttribute("tabindex", "0");
+    };
+    reach();
+    new MutationObserver(reach).observe(el, { childList: true, subtree: true });
+    box.addEventListener("keydown", (e) => {
+      const head = (e.target as HTMLElement).closest("header");
+      if (e.target !== head || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      this.fold(spec.id, !this.state.get(spec.id)!.c);
+      if (!this.state.get(spec.id)!.c) this.used(spec.id);
+    });
     grip.addEventListener("pointerdown", (e) => this.resize(item, e));
     this.layout();
   }
