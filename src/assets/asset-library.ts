@@ -8,7 +8,8 @@ import { makeThumb } from "./thumb";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
-import { FILE_CARD_H, FILE_CARD_W, makeCard, makeFileCard } from "./card";
+import { makeFileCardFrom } from "./adapters";
+import { FILE_CARD_H, FILE_CARD_W, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
 /**
@@ -208,7 +209,7 @@ export class AssetLibrary {
     let carded = false;
     const asCard = async (): Promise<void> => {
       carded = true;
-      img = await makeFileCard(describeFile(file.name ?? "", type).chip);
+      img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, new Uint8Array(bytes));
       size = { w: FILE_CARD_W, h: FILE_CARD_H };
       duration = undefined;
     };
@@ -409,7 +410,7 @@ export class AssetLibrary {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
-      const card = (): Promise<ImageBitmap> => makeFileCard(describeFile(rec.name, rec.type).chip);
+      const card = async (): Promise<ImageBitmap> => makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()));
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
