@@ -15,7 +15,7 @@ import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../
 import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
-import { FALLBACK_FAMILY, familyFor } from "../text/fonts";
+import { FALLBACK_FAMILY, faceStyleOf, familyFor } from "../text/fonts";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
@@ -154,6 +154,13 @@ export function mountTextEditor(
     box.style.flexDirection = target.h !== undefined ? "column" : "";
     box.style.justifyContent = target.valign === "middle" ? "center" : target.valign === "bottom" ? "flex-end" : "";
     box.style.fontFamily = `${familyFor(target.assetId)}, ${FALLBACK_FAMILY}`;
+    // The face the text is set in (its weight and slant), the axes, the features and the kerning: the browser then draws what the layout sets.
+    const face = faceStyleOf(target.assetId);
+    box.style.fontWeight = String(face.weight);
+    box.style.fontStyle = face.italic ? "italic" : "normal";
+    box.style.fontVariationSettings = target.axes ? Object.entries(target.axes).map(([k, v]) => `"${k}" ${v}`).join(", ") : "";
+    box.style.fontFeatureSettings = (target.features ?? []).map((t) => `"${t}" 1`).concat(['"calt" 0', '"liga" 0'].filter((x) => !(target!.features ?? []).includes(x.slice(1, 5)))).join(", ");
+    box.style.fontKerning = target.kerning ? "normal" : "none";
     box.style.lineHeight = String(target.lineHeight ?? 1.3);
     box.style.letterSpacing = `${target.tracking ?? 0}em`;
     bar.style.left = `${Math.max(4, s.x)}px`;
@@ -352,6 +359,8 @@ export function mountTextEditor(
     else document.execCommand("formatBlock", false, `<${cmd === "p" ? "div" : cmd}>`);
   });
   box.addEventListener("keydown", (e) => {
+    // A key that belongs to an input method (choosing or cancelling a candidate) is the method's, not a command of the editor.
+    if (e.isComposing || e.keyCode === 229) return;
     const k = e.key.toLowerCase();
     // Handled here: not every browser binds these in editable content.
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (k === "b" || k === "i" || k === "u")) {
@@ -485,6 +494,8 @@ export function domToBlocks(root: HTMLElement): Block[] {
     return isLinkUrl(href) ? href : undefined;
   };
   const rootColor = getComputedStyle(root).color;
+  const rootWeight = Number(getComputedStyle(root).fontWeight);
+  const rootStyle = getComputedStyle(root).fontStyle;
   const rootPx = parseFloat(getComputedStyle(root).fontSize);
   /** Whether an element, or one it sits in (up to the box), is decorated with `line` (underline, line-through). */
   const decorated = (el: HTMLElement | null, line: string): boolean => {
@@ -503,8 +514,8 @@ export function domToBlocks(root: HTMLElement): Block[] {
       const link = linkOf(el);
       cur!.spans.push({
         text,
-        bold: Number(cs.fontWeight) >= 600,
-        italic: cs.fontStyle !== "normal",
+        bold: Number(cs.fontWeight) >= 600 && Number(cs.fontWeight) > rootWeight,
+        italic: cs.fontStyle !== rootStyle,
         ...(decorated(el, "underline") ? { underline: true } : {}),
         ...(decorated(el, "line-through") ? { strike: true } : {}),
         ...(cs.color !== rootColor ? { color: hexOfCss(cs.color) } : {}),

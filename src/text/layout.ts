@@ -1,8 +1,10 @@
 import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
+import { arabicForms, bidiLevels, hasRtl, joiningOf, mirrored, visualOrder } from "./bidi";
 import { listNumbers, parse } from "./markdown";
-import { fontFor, onFontsChange, setBundledFont } from "./fonts";
+import { fontFor, onFontsChange, setBundledFont, variantOf } from "./fonts";
+import type { Axes } from "./fonts";
 
 /**
  * Text layout, independent of the browser: greedy word wrap with advances
@@ -32,6 +34,10 @@ export interface PlacedGlyph {
   readonly strike?: true;
   /** Where the glyph links to (its words were a link); links are underlined. */
   readonly link?: string;
+  /** The font file the glyph is in when it is not the text's own (a bold or italic file of the same family; ADR 0132). */
+  readonly face?: string;
+  /** The glyph is one a font feature substituted (a ligature, small capital...): the browser cannot draw it from its character, only from its outline. */
+  readonly sub?: true;
 }
 
 /** A line under or through a run of glyphs, in em of the body size from the object's left, with the size and colour of the run. */
@@ -83,6 +89,12 @@ export interface TextStyle {
   readonly caps?: "upper" | "lower" | "title" | "small";
   /** At most this many lines; the last ends in "…" when words were cut. */
   readonly maxLines?: number;
+  /** Kerning of the font between letters (off unless asked: the layout of older texts must not change). */
+  readonly kerning?: boolean;
+  /** OpenType features that are on (their `GSUB` tags: `liga`, `smcp`, `tnum`...). */
+  readonly features?: readonly string[];
+  /** The values of a variable font's axes. */
+  readonly axes?: Axes;
 }
 
 export const LINE_HEIGHT = 1.3;
@@ -117,12 +129,12 @@ export function textFont(): Font {
 }
 
 export function layoutText(md: string, wrapEm: number, style: TextStyle = {}): TextLayout {
-  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId, paraGap = BLOCK_GAP, indent = 0, caps, maxLines } = style;
-  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${paraGap}|${indent}|${caps ?? ""}|${maxLines ?? ""}|${md}`;
+  const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId, paraGap = BLOCK_GAP, indent = 0, caps, maxLines, kerning = false, features = [], axes } = style;
+  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${paraGap}|${indent}|${caps ?? ""}|${maxLines ?? ""}|${kerning ? 1 : 0}|${features.join(",")}|${axes ? JSON.stringify(axes) : ""}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm, { lineHeight, tracking, align, assetId, paraGap, indent, caps, maxLines });
+    l = compute(md, wrapEm, { lineHeight, tracking, align, assetId, paraGap, indent, caps, maxLines, kerning, features, axes });
     cache.set(key, l);
   }
   return l;
@@ -160,6 +172,17 @@ interface Ch {
   under: boolean;
   strike: boolean;
   link: string | undefined;
+  /** The font file this letter is set in when it is not the text's own, and whether its bold and italic are made by the outline. */
+  face: string | undefined;
+}
+
+/** A letter set: its glyph in its font, its advance in em before the size of its range, and whether a feature put the glyph there. */
+interface Item extends Ch {
+  gid: number;
+  adv: number;
+  sub: boolean;
+  /** The embedding level of the letter (0 left to right, 1 right to left, 2 a number in right to left text): see bidi.ts. */
+  level: number;
 }
 
 /** The characters a letter becomes under a change of case (a few letters become two), and the size a small capital has. */
@@ -176,13 +199,53 @@ function caseOf(cp: number, caps: TextStyle["caps"], wordStart: boolean): { cps:
   return { cps: [cp], k: 1 };
 }
 
-function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "lineHeight" | "tracking" | "align" | "paraGap" | "indent">> & { assetId: string | undefined; caps: TextStyle["caps"] | undefined; maxLines: number | undefined }): TextLayout {
-  const { lineHeight, tracking, align, assetId, paraGap, indent: firstIndent, caps, maxLines } = style;
-  const f = fontFor(assetId);
+function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "lineHeight" | "tracking" | "align" | "paraGap" | "indent" | "kerning" | "features">> & { assetId: string | undefined; caps: TextStyle["caps"] | undefined; maxLines: number | undefined; axes: Axes | undefined }): TextLayout {
+  const { lineHeight, tracking, align, assetId, paraGap, indent: firstIndent, caps, maxLines, kerning, features, axes } = style;
+  const f = fontFor(assetId, axes);
   const upm = f.unitsPerEm;
-  const advance = (cp: number): { gid: number; adv: number } => {
-    const gid = f.glyphId(cp);
-    return { gid, adv: (gid ? f.glyph(gid).advance / upm : fallbackAdvance(cp)) + tracking };
+  const advance = (cp: number, ref: string | undefined = assetId): { gid: number; adv: number } => {
+    const font = fontFor(ref, axes);
+    const gid = font.glyphId(cp);
+    return { gid, adv: (gid ? font.glyph(gid).advance / font.unitsPerEm : fallbackAdvance(cp)) + tracking };
+  };
+  /** The letters of a block as glyphs: features turn letters into others (ligatures...) and kerning moves neighbours, within a run of one font and look. */
+  const setItems = (chars: readonly Ch[]): Item[] => {
+    const out: Item[] = [];
+    const sameRun = (a: Ch, b: Ch): boolean => a.face === b.face && a.bold === b.bold && a.italic === b.italic && a.k === b.k && a.color === b.color && a.under === b.under && a.strike === b.strike && a.link === b.link;
+    for (let i = 0; i < chars.length; ) {
+      const c = chars[i]!;
+      if (c.cp < 32) {
+        i++;
+        continue;
+      }
+      const font = fontFor(c.face ?? assetId, axes);
+      const joins = joiningOf(c.cp) !== "U";
+      const shape = (kerning || features.length > 0 || joins) && c.cp !== 32 && font.glyphId(c.cp) !== 0;
+      if (!shape) {
+        const a = advance(c.cp, c.face);
+        out.push({ ...c, gid: a.gid, adv: a.adv, sub: false, level: 0 });
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < chars.length && chars[j]!.cp > 32 && font.glyphId(chars[j]!.cp) !== 0 && sameRun(c, chars[j]!)) j++;
+      const run = chars.slice(i, j);
+      // Arabic letters take the forms their neighbours give them, and the joined ligatures the font requires
+      const arabic = run.some((r) => joiningOf(r.cp) !== "U");
+      const tags = arabic ? [...new Set([...features, "rlig", "liga"])] : features;
+      const shaped = tags.length ? font.shape(run.map((r) => font.glyphId(r.cp)), tags, arabic ? arabicForms(run.map((r) => r.cp)) : undefined) : run.map((r) => ({ gid: font.glyphId(r.cp), n: 1 }));
+      const first = out.length;
+      let at = 0;
+      for (const g of shaped) {
+        const src = run[Math.min(at, run.length - 1)]!;
+        const plain = font.glyphId(src.cp);
+        out.push({ ...src, gid: g.gid, adv: font.glyph(g.gid).advance / font.unitsPerEm + tracking, sub: g.gid !== plain || g.n !== 1, level: 0 });
+        at += g.n;
+      }
+      if (kerning) for (let k = first; k + 1 < out.length; k++) out[k]!.adv += font.kern(out[k]!.gid, out[k + 1]!.gid) / font.unitsPerEm;
+      i = j;
+    }
+    return out;
   };
   const lines: Line[] = [];
   let width = Number.isFinite(wrapEm) ? wrapEm : 0;
@@ -202,10 +265,30 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
       for (const c of sp.text) {
         const { cps, k } = caseOf(c.codePointAt(0)!, caps, wordStart);
         wordStart = c === " ";
-        for (const cp of cps) chars.push({ cp, bold: sp.bold, italic: sp.italic, k: (sp.scale ?? 1) * k, color: sp.color, under: sp.underline === true || sp.link !== undefined, strike: sp.strike === true, link: sp.link });
+        for (const cp of cps) {
+          // bold and italic words: the family's own bold or italic file when the library has one, else made from the outline
+          const v = variantOf(assetId, sp.bold, sp.italic);
+          chars.push({ cp, bold: v.fakeBold, italic: v.fakeItalic, k: (sp.scale ?? 1) * k, color: sp.color, under: sp.underline === true || sp.link !== undefined, strike: sp.strike === true, link: sp.link, face: v.ref !== assetId ? v.ref : undefined });
+        }
       }
     }
-    let line: Array<Ch & { gid: number; adv: number }> = [];
+    const items = setItems(chars);
+    // Hebrew and Arabic: the order each line is read in, and brackets that turn round in right to left runs
+    if (hasRtl(items.map((it) => it.cp))) {
+      const { levels } = bidiLevels(items.map((it) => it.cp));
+      items.forEach((it, k) => {
+        it.level = levels[k]!;
+        const m = it.level & 1 ? mirrored(it.cp) : null;
+        if (m !== null) {
+          const a = advance(m, it.face);
+          if (a.gid) {
+            it.cp = m;
+            it.gid = a.gid;
+          }
+        }
+      });
+    }
+    let line: Item[] = [];
     let first = true;
     const emit = (glyphs: typeof line, last = false): void => {
       // A line is as tall as its biggest range (a line of small text is small); an empty line is the block's.
@@ -221,8 +304,10 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
         }
       }
       let x = indent + (first ? startIn : 0);
-      for (const g of glyphs) {
-        placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}), ...(g.link ? { link: g.link } : {}) });
+      // set in the order the line is read in (the letters were kept in the order they are typed)
+      const set = glyphs.some((g) => g.level) ? visualOrder(glyphs.map((g) => g.level), 0, glyphs.length).map((k) => glyphs[k]!) : glyphs;
+      for (const g of set) {
+        placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}), ...(g.link ? { link: g.link } : {}), ...(g.face ? { face: g.face } : {}), ...(g.sub ? { sub: true as const } : {}) });
         x += g.adv * s;
       }
       if (align === "justify" && !last && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), wrapEm);
@@ -234,9 +319,8 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     };
     let x = startIn;
     let lastSpace = -1;
-    for (const c of chars) {
-      if (c.cp < 32) continue;
-      const a = advance(c.cp);
+    for (const c of items) {
+      const a = { gid: c.gid, adv: c.adv };
       const adv = a.adv * c.k * s;
       if (c.cp !== 32 && x + adv > avail && line.some((g) => g.cp !== 32)) {
         const carry = lastSpace >= 0 ? line.slice(lastSpace + 1) : [];
@@ -246,7 +330,7 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
         lastSpace = -1;
       }
       if (c.cp === 32) lastSpace = line.length;
-      line.push({ ...c, gid: a.gid, adv: a.adv * c.k });
+      line.push({ ...c, adv: a.adv * c.k });
       x += adv;
     }
     emit(line, true);

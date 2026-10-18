@@ -58,8 +58,8 @@ describe("font files (ADR 0127)", () => {
       expect(unpacked.glyph(unpacked.glyphId(cp)).contours.length).toBe(font.glyph(font.glyphId(cp)).contours.length);
     }
     const head = (tag: string): Uint8Array => { const b = new Uint8Array(64); b.set([...tag].map((c) => c.charCodeAt(0))); return b; };
-    await expect(sfntOf(head("OTTO"))).rejects.toThrow(/PostScript/);
-    await expect(sfntOf(head("wOF2"))).rejects.toThrow(/WOFF2/);
+    expect(() => parseFont(head("OTTO"))).toThrow(FontError); // (an OpenType header with no tables in it)
+    await expect(sfntOf(head("wOF2"))).rejects.toThrow(FontError); // (a WOFF2 header with nothing after it: damaged)
     await expect(sfntOf(head("ttcf"))).rejects.toThrow(/collection/);
     await expect(sfntOf(head("JUNK"))).rejects.toThrow(FontError);
   });

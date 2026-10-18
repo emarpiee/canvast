@@ -13,7 +13,7 @@ import { glyphScale, layoutOf } from "../text/layout";
 import type { Line } from "../text/layout";
 
 const lineBigOf = (line: Line): number => line.glyphs.reduce((m, g) => Math.max(m, g.k ?? 1), 1);
-import { fontFor } from "../text/fonts";
+import { fontFor, glyphFont } from "../text/fonts";
 import { distToSegment } from "./geometry2d";
 
 /**
@@ -255,15 +255,13 @@ const FLATTEN = 10;
 
 const textSampler: CoarseSampler<TextObject> = {
   classify(o, { lx, ly, m }) {
-    let font;
     try {
-      font = fontFor(o.assetId);
+      fontFor(o.assetId, o.axes);
     } catch {
       return "exact"; // the font is not loaded yet
     }
     if (o.onPath) return "exact"; // (the letters sit on a curve: no outline of the straight layout to test)
     const lay = layoutOf(o);
-    const upm = font.unitsPerEm;
     let inside = false;
     for (const line of lay.lines) {
       const mg = m + 0.004 * o.size * line.scale * lineBigOf(line); // flattening error of the curves
@@ -273,7 +271,8 @@ const textSampler: CoarseSampler<TextObject> = {
         if (lx < (g.x - 0.3) * o.size - mg || lx > (g.x + g.adv * line.scale + 0.3) * o.size + mg) continue;
         if (!g.gid) return "exact"; // a character the bundled font lacks (drawn by the system font): no outline to test
         const gs = glyphScale(line, g);
-        const c = (o.size * gs) / upm;
+        const font = glyphFont(o, g);
+        const c = (o.size * gs) / font.unitsPerEm;
         const shifts = g.bold ? [0, BOLD_SHIFT_EM * gs] : [0];
         for (const sh of shifts) {
           const ox = (g.x + sh) * o.size;

@@ -1,9 +1,10 @@
 /**
  * Font files we can set text in (ADR 0127). The reader (font.ts) knows TrueType outlines, so a file is accepted when it holds them: a
- * plain `.ttf` (or an `.otf` with TrueType outlines) as it is, a `.woff` unpacked into the same thing. PostScript (CFF) outlines, WOFF2 and
- * collections are refused with a sentence that says what to use instead.
+ * plain `.ttf` or `.otf` as it is, a `.woff` or `.woff2` unpacked into the same thing. Collections are refused with a sentence that says
+ * what to use instead (CFF outlines are read by cff.ts, ADR 0132).
  */
 import { FontError } from "./font";
+import { sfntOfWoff2 } from "./woff2";
 
 const tag = (v: DataView, o: number): string => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
 
@@ -15,15 +16,14 @@ export async function sfntOf(bytes: Uint8Array): Promise<Uint8Array> {
   if (bytes.length < 12) throw new FontError("This is not a font file.");
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const t = tag(v, 0);
-  if (t === "OTTO") throw new FontError("This font has PostScript (CFF) outlines. Use a TrueType font (.ttf).");
   if (t === "ttcf") throw new FontError("This is a font collection. Use one of its fonts as a .ttf file.");
-  if (t === "wOF2") throw new FontError("WOFF2 fonts cannot be read. Use a .ttf or .woff file.");
+  if (t === "wOF2") return sfntOfWoff2(bytes);
   if (t !== "wOFF") {
-    if (v.getUint32(0) === 0x00010000 || t === "true") return bytes;
+    if (v.getUint32(0) === 0x00010000 || t === "true" || t === "OTTO") return bytes;
     throw new FontError("This is not a font file.");
   }
   const flavor = v.getUint32(4);
-  if (flavor !== 0x00010000 && tag(v, 4) !== "true") throw new FontError("This font has PostScript (CFF) outlines. Use a TrueType font (.ttf).");
+  if (flavor !== 0x00010000 && tag(v, 4) !== "true" && tag(v, 4) !== "OTTO") throw new FontError("This is not a font file.");
   const n = v.getUint16(12);
   if (bytes.length < 44 + 20 * n) throw new FontError("This font file is damaged.");
   const tables: Array<{ tag: string; data: Uint8Array; sum: number }> = [];

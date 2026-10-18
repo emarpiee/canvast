@@ -12,6 +12,12 @@
 export type Segment = readonly number[];
 export type Contour = readonly Segment[];
 
+import { cffReader } from "./cff";
+import { nameReader, readKerning, readNames, readSubstitution } from "./opentype";
+import type { FontNames, Shaped } from "./opentype";
+import { hvarAdvance, normalise, readAvar, readAxes, readGvar, readVarStore } from "./variations";
+import type { Axis } from "./variations";
+
 export interface Glyph {
   readonly advance: number;
   readonly contours: readonly Contour[];
@@ -30,77 +36,178 @@ export interface Font {
   /** Glyph id for a code point, or 0 (.notdef) when the font lacks it. */
   glyphId(cp: number): number;
   glyph(gid: number): Glyph;
+  /** Family, style, weight and slant as the font says them. */
+  readonly names: FontNames;
+  /** The axes of a variable font (none for a static one). */
+  readonly axes: readonly Axis[];
+  /** The same font set at values of its axes (a missing axis is at its default); a static font is itself. */
+  instance(values: Readonly<Record<string, number>>): Font;
+  /** The kerning of a pair of glyphs in font units, to add to the advance of the first. */
+  kern(a: number, b: number): number;
+  /** The `GSUB` feature tags the font has (ligatures `liga`, small capitals `smcp`, numerals `tnum`, and so on). */
+  features(): readonly string[];
+  /** The glyphs after the substitutions of these features, each with how many of the glyphs given it stands for. */
+  shape(gids: readonly number[], tags: readonly string[], forms?: ReadonlyArray<string | null>): readonly Shaped[];
 }
 
 export class FontError extends Error {}
 
+type Raw =
+  | { kind: "simple"; ends: number[]; xs: number[]; ys: number[]; on: boolean[] }
+  | { kind: "composite"; comps: Comp[] };
+interface Comp {
+  gid: number;
+  dx: number;
+  dy: number;
+  xy: boolean;
+  m: [number, number, number, number];
+}
+
 export function parseFont(bytes: Uint8Array): Font {
   const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const tables = new Map<string, number>();
+  const tables = new Map<string, { o: number; len: number }>();
   const n = v.getUint16(4);
   for (let i = 0; i < n; i++) {
     const o = 12 + 16 * i;
-    tables.set(String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3)), v.getUint32(o + 8));
+    tables.set(String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3)), { o: v.getUint32(o + 8), len: v.getUint32(o + 12) });
   }
   const table = (tag: string): number => {
-    const o = tables.get(tag);
-    if (o === undefined) throw new FontError(`font has no ${tag} table`);
-    return o;
+    const t = tables.get(tag);
+    if (!t) throw new FontError(`font has no ${tag} table`);
+    return t.o;
   };
   const head = table("head");
   const hhea = table("hhea");
   const hmtx = table("hmtx");
-  const loca = table("loca");
-  const glyf = table("glyf");
   const numGlyphs = v.getUint16(table("maxp") + 4);
   const numHMetrics = v.getUint16(hhea + 34);
-  const longLoca = v.getInt16(head + 50) === 1;
   const cmap = readCmap(v, table("cmap"));
+  const hasGlyf = tables.has("glyf");
+  const cffTag = tables.has("CFF2") ? "CFF2" : tables.has("CFF ") ? "CFF " : null;
+  if (!hasGlyf && !cffTag) throw new FontError("This font has no outlines this reader knows (TrueType or PostScript).");
+  const loca = hasGlyf ? table("loca") : 0;
+  const glyf = hasGlyf ? table("glyf") : 0;
+  const longLoca = v.getInt16(head + 50) === 1;
+  const cff = !hasGlyf && cffTag ? cffReader(bytes.subarray(tables.get(cffTag)!.o, tables.get(cffTag)!.o + tables.get(cffTag)!.len), cffTag === "CFF2" ? 2 : 1) : null;
 
-  const advance = (gid: number): number => v.getUint16(hmtx + 4 * Math.min(gid, numHMetrics - 1));
+  const advanceOf = (gid: number): number => v.getUint16(hmtx + 4 * Math.min(gid, numHMetrics - 1));
   const offset = (gid: number): number => (longLoca ? v.getUint32(loca + 4 * gid) : 2 * v.getUint16(loca + 2 * gid));
 
-  const outline = (gid: number, depth: number): Contour[] => {
-    if (gid >= numGlyphs || depth > 8) return [];
-    const start = offset(gid);
-    if (offset(gid + 1) === start) return [];
-    const g = glyf + start;
-    const nc = v.getInt16(g);
-    return nc >= 0 ? simpleOutline(v, g, nc) : compositeOutline(v, g + 10, (c) => outline(c, depth + 1));
-  };
+  // names, axes, variations
+  const nameStr = nameReader(v, tables);
+  const names = readNames(v, tables, nameStr);
+  const axes = tables.has("fvar") ? readAxes(v, table("fvar"), nameStr) : [];
+  const avar = axes.length && tables.has("avar") ? readAvar(v, table("avar"), axes.length) : null;
+  const gvar = axes.length && hasGlyf && tables.has("gvar") ? readGvar(v, table("gvar")) : null;
+  const hvar = axes.length && tables.has("HVAR") ? table("HVAR") : -1;
+  const hvarStore = hvar >= 0 ? readVarStore(v, hvar + v.getUint32(hvar + 4)) : null;
+  const kern = readKerning(v, tables);
+  const subst = readSubstitution(v, tables);
 
-  const cache = new Map<number, Glyph>();
-  return {
-    unitsPerEm: v.getUint16(head + 18),
-    ascender: v.getInt16(hhea + 4),
-    descender: v.getInt16(hhea + 6),
-    lineGap: v.getInt16(hhea + 8),
-    glyphId: (cp) => cmap(cp),
-    glyph: (gid) => {
-      let gl = cache.get(gid);
-      if (!gl) {
-        const contours = outline(gid, 0);
-        let xMin = Infinity;
-        let yMin = Infinity;
-        let xMax = -Infinity;
-        let yMax = -Infinity;
-        for (const c of contours) {
-          for (const s of c) {
-            for (let i = 0; i < s.length; i += 2) {
-              xMin = Math.min(xMin, s[i]!);
-              xMax = Math.max(xMax, s[i]!);
-              yMin = Math.min(yMin, s[i + 1]!);
-              yMax = Math.max(yMax, s[i + 1]!);
+  // the points of a glyph as the file has them (shared by every instance of the font)
+  const raws = new Map<number, Raw | null>();
+  const rawOf = (gid: number): Raw | null => {
+    if (gid < 0 || gid >= numGlyphs) return null;
+    let r = raws.get(gid);
+    if (r === undefined) {
+      const start = offset(gid);
+      if (offset(gid + 1) === start) r = null;
+      else {
+        const g = glyf + start;
+        const nc = v.getInt16(g);
+        r = nc >= 0 ? simplePoints(v, g, nc) : { kind: "composite", comps: compositeParts(v, g + 10) };
+      }
+      raws.set(gid, r);
+    }
+    return r;
+  };
+  const pointCount = (r: Raw): number => (r.kind === "simple" ? r.xs.length : r.comps.length);
+
+  const make = (coords: readonly number[] | null, values: Readonly<Record<string, number>>): Font => {
+    const cache = new Map<number, Glyph>();
+    const deltaCache = new Map<number, ReturnType<NonNullable<typeof gvar>["deltas"]>>();
+    const deltasOf = (gid: number, r: Raw): ReturnType<NonNullable<typeof gvar>["deltas"]> => {
+      if (!gvar || !coords) return null;
+      let d = deltaCache.get(gid);
+      if (d === undefined) {
+        d = gvar.deltas(gid, coords, r.kind === "simple" ? { xs: r.xs, ys: r.ys, ends: r.ends } : null, pointCount(r) + 4);
+        deltaCache.set(gid, d);
+      }
+      return d;
+    };
+    const outline = (gid: number, depth: number): Contour[] => {
+      if (cff) return cff.outline(gid, coords ?? undefined);
+      const r = rawOf(gid);
+      if (!r || depth > 8) return [];
+      const d = deltasOf(gid, r);
+      if (r.kind === "simple") return pointsToContours(r.ends, d ? r.xs.map((x, i) => x + d.dx[i]!) : r.xs, d ? r.ys.map((y, i) => y + d.dy[i]!) : r.ys, r.on);
+      return compose(r.comps, d, (c) => outline(c, depth + 1));
+    };
+    const advance = (gid: number): number => {
+      const base = advanceOf(gid);
+      if (!coords) return base;
+      if (hvarStore) return Math.max(0, base + hvarAdvance(v, hvar, hvarStore, gid, coords));
+      const r = hasGlyf ? rawOf(gid) : null;
+      const d = r ? deltasOf(gid, r) : null;
+      if (!r || !d) return base;
+      const np = pointCount(r);
+      return Math.max(0, base + d.dx[np + 1]! - d.dx[np]!);
+    };
+    const font: Font = {
+      unitsPerEm: v.getUint16(head + 18),
+      ascender: v.getInt16(hhea + 4),
+      descender: v.getInt16(hhea + 6),
+      lineGap: v.getInt16(hhea + 8),
+      glyphId: (cp) => cmap(cp),
+      names,
+      axes,
+      kern,
+      features: () => subst.features(),
+      shape: (gids, tags, forms) => subst.shape(gids, tags, forms),
+      glyph: (gid) => {
+        let gl = cache.get(gid);
+        if (!gl) {
+          const contours = outline(gid, 0);
+          let xMin = Infinity;
+          let yMin = Infinity;
+          let xMax = -Infinity;
+          let yMax = -Infinity;
+          for (const c of contours) {
+            for (const s of c) {
+              for (let i = 0; i < s.length; i += 2) {
+                xMin = Math.min(xMin, s[i]!);
+                xMax = Math.max(xMax, s[i]!);
+                yMin = Math.min(yMin, s[i + 1]!);
+                yMax = Math.max(yMax, s[i + 1]!);
+              }
             }
           }
+          if (!contours.length) xMin = yMin = xMax = yMax = 0;
+          gl = { advance: advance(gid), contours, xMin, yMin, xMax, yMax };
+          cache.set(gid, gl);
         }
-        if (!contours.length) xMin = yMin = xMax = yMax = 0;
-        gl = { advance: advance(gid), contours, xMin, yMin, xMax, yMax };
-        cache.set(gid, gl);
-      }
-      return gl;
-    },
+        return gl;
+      },
+      instance: (vals) => instanceOf(vals),
+    };
+    return font;
   };
+  const instances = new Map<string, Font>();
+  const base = make(null, {});
+  const instanceOf = (vals: Readonly<Record<string, number>>): Font => {
+    if (!axes.length) return base;
+    const coords = normalise(axes, avar, vals);
+    if (coords.every((c) => c === 0)) return base;
+    const key = coords.map((c) => c.toFixed(5)).join(",");
+    let f = instances.get(key);
+    if (!f) {
+      if (instances.size >= 24) instances.delete(instances.keys().next().value!);
+      f = make(coords, vals);
+      instances.set(key, f);
+    }
+    return f;
+  };
+  return base;
 }
 
 /** Code point → glyph id, from a format 12 (preferred) or format 4 Unicode subtable. */
@@ -154,10 +261,10 @@ function readCmap(v: DataView, cmap: number): (cp: number) => number {
   };
 }
 
-function simpleOutline(v: DataView, g: number, nc: number): Contour[] {
-  const endPts: number[] = [];
-  for (let i = 0; i < nc; i++) endPts.push(v.getUint16(g + 10 + 2 * i));
-  const np = nc ? endPts[nc - 1]! + 1 : 0;
+function simplePoints(v: DataView, g: number, nc: number): Raw {
+  const ends: number[] = [];
+  for (let i = 0; i < nc; i++) ends.push(v.getUint16(g + 10 + 2 * i));
+  const np = nc ? ends[nc - 1]! + 1 : 0;
   let p = g + 10 + 2 * nc;
   p += 2 + v.getUint16(p); // skip instructions
   const flags: number[] = [];
@@ -183,11 +290,16 @@ function simpleOutline(v: DataView, g: number, nc: number): Contour[] {
   };
   const xs = coords(2, 16);
   const ys = coords(4, 32);
+  return { kind: "simple", ends, xs, ys, on: flags.map((f) => (f & 1) === 1) };
+}
+
+/** The contours of a simple glyph from its points (which may have been moved by a variation). */
+function pointsToContours(ends: readonly number[], xs: readonly number[], ys: readonly number[], on: readonly boolean[]): Contour[] {
   const contours: Contour[] = [];
   let first = 0;
-  for (const last of endPts) {
+  for (const last of ends) {
     const pts: Array<[number, number, boolean]> = [];
-    for (let i = first; i <= last; i++) pts.push([xs[i]!, ys[i]!, (flags[i]! & 1) === 1]);
+    for (let i = first; i <= last; i++) pts.push([xs[i]!, ys[i]!, on[i]!]);
     first = last + 1;
     if (pts.length) contours.push(quadContour(pts));
   }
@@ -233,8 +345,9 @@ function quadContour(pts: Array<[number, number, boolean]>): Contour {
   return segs;
 }
 
-function compositeOutline(v: DataView, p: number, child: (gid: number) => Contour[]): Contour[] {
-  const out: Contour[] = [];
+/** The components of a composite glyph: which glyph, where, and the 2 × 2 matrix. */
+function compositeParts(v: DataView, p: number): Comp[] {
+  const out: Comp[] = [];
   const f2dot14 = (o: number): number => v.getInt16(o) / 16384;
   for (;;) {
     const flags = v.getUint16(p);
@@ -251,36 +364,43 @@ function compositeOutline(v: DataView, p: number, child: (gid: number) => Contou
       dy = v.getInt8(p + 1);
       p += 2;
     }
-    // Point-matched placement (flag 2 clear) is not used by the bundled font; treat as no offset.
-    if (!(flags & 2)) dx = dy = 0;
-    let a = 1;
-    let b = 0;
-    let c = 0;
-    let d = 1;
+    const m: [number, number, number, number] = [1, 0, 0, 1];
     if (flags & 8) {
-      a = d = f2dot14(p);
+      m[0] = m[3] = f2dot14(p);
       p += 2;
     } else if (flags & 0x40) {
-      a = f2dot14(p);
-      d = f2dot14(p + 2);
+      m[0] = f2dot14(p);
+      m[3] = f2dot14(p + 2);
       p += 4;
     } else if (flags & 0x80) {
-      a = f2dot14(p);
-      b = f2dot14(p + 2);
-      c = f2dot14(p + 4);
-      d = f2dot14(p + 6);
+      m[0] = f2dot14(p);
+      m[1] = f2dot14(p + 2);
+      m[2] = f2dot14(p + 4);
+      m[3] = f2dot14(p + 6);
       p += 8;
     }
-    for (const contour of child(gid)) {
+    // Point-matched placement (flag 2 clear) is not used by the fonts met so far; treated as no offset.
+    out.push({ gid, dx: flags & 2 ? dx : 0, dy: flags & 2 ? dy : 0, xy: (flags & 2) !== 0, m });
+    if (!(flags & 0x20)) break;
+  }
+  return out;
+}
+
+function compose(comps: readonly Comp[], d: { dx: Float64Array; dy: Float64Array } | null, child: (gid: number) => Contour[]): Contour[] {
+  const out: Contour[] = [];
+  comps.forEach((c, k) => {
+    const [a, b, cc, dd] = c.m;
+    const dx = c.dx + (d && c.xy ? d.dx[k]! : 0);
+    const dy = c.dy + (d && c.xy ? d.dy[k]! : 0);
+    for (const contour of child(c.gid)) {
       out.push(
         contour.map((s) => {
           const t: number[] = [];
-          for (let i = 0; i < s.length; i += 2) t.push(a * s[i]! + c * s[i + 1]! + dx, b * s[i]! + d * s[i + 1]! + dy);
+          for (let i = 0; i < s.length; i += 2) t.push(a * s[i]! + cc * s[i + 1]! + dx, b * s[i]! + dd * s[i + 1]! + dy);
           return t;
         }),
       );
     }
-    if (!(flags & 0x20)) break;
-  }
+  });
   return out;
 }

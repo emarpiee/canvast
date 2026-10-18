@@ -34,8 +34,8 @@ import type { DensityLayer } from "../render/density";
 import type { CatalogEntry, CatalogListing, GcReport, ThumbRecord } from "../assets/asset-catalog";
 import { done, req } from "../storage/idb";
 import { lastCopiedText } from "../ui/text-editor";
-import { layoutOf } from "../text/layout";
-import { fontFor } from "../text/fonts";
+import { glyphScale, layoutOf } from "../text/layout";
+import { glyphFont } from "../text/fonts";
 import type { PlacedGlyph, Line } from "../text/layout";
 import type { TextObject } from "../doc/model";
 import { localToWorld } from "../doc/edit-ops";
@@ -529,8 +529,8 @@ export function installDebugHook(
     },
     lastCopied: lastCopiedText,
     textGlyph: (id, n) => {
-      const { g } = glyphOf(id, n);
-      const f = fontFor(glyphOf(id, n).o.assetId);
+      const { o, g } = glyphOf(id, n);
+      const f = glyphFont(o, g);
       const gl = f.glyph(g.gid);
       return { cp: g.cp, gid: g.gid, xMin: gl.xMin, yMin: gl.yMin, xMax: gl.xMax, yMax: gl.yMax, upm: f.unitsPerEm };
     },
@@ -538,7 +538,7 @@ export function installDebugHook(
       const { o, line, g } = glyphOf(id, n);
       // Same exact arithmetic as draw-text.ts (upright, unshifted).
       const SIZE = D.fromNumber(o.size);
-      const C = D.mul(SIZE, D.fromNumber(line.scale / fontFor(o.assetId).unitsPerEm));
+      const C = D.mul(SIZE, D.fromNumber(glyphScale(line, g) / glyphFont(o, g).unitsPerEm));
       const lx = D.add(D.mul(D.fromNumber(g.x), SIZE), D.mul(D.fromNumber(fx), C));
       const ly = D.sub(D.mul(D.fromNumber(line.baseline), SIZE), D.mul(D.fromNumber(fy), C));
       const at = localToWorld(o, 0, 0);

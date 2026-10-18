@@ -5,7 +5,7 @@ import type { ImageObject, PathObject, TextObject } from "../doc/model";
 import { TEXT_PAD_EM } from "../doc/model";
 import type { Deco, Line, PlacedGlyph } from "../text/layout";
 import { DECO, LINE_HEIGHT, glyphScale, layoutOf } from "../text/layout";
-import { FALLBACK_FAMILY, faceReady, familyFor, fontFor } from "../text/fonts";
+import { FALLBACK_FAMILY, faceReady, faceStyleOf, familyFor, glyphFont } from "../text/fonts";
 import type { ProjectedObject, Projection } from "./projection";
 import { exactX, exactY, projX, projY, toPx } from "./projection";
 import type { RasterSource } from "./draw-objects";
@@ -108,8 +108,10 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
           } else if (deep) {
             for (const d of shifts) addGlyphExact(path, o, line, g, d);
             filled = true;
-          } else if (opaque && faceReady(o.assetId) && !o.onPath) {
-            setFont(`${linePx}px ${familyFor(o.assetId)}`);
+          } else if (opaque && faceReady(o.assetId) && !o.onPath && !o.axes && !g.face && !g.sub) {
+            // (the browser draws it from the character: only when the glyph is the plain one of the text's own face)
+            const st = faceStyleOf(o.assetId);
+            setFont(`${st.italic ? "italic " : ""}${st.weight} ${linePx}px ${familyFor(o.assetId)}`);
             for (const d of shifts) glyphText(String.fromCodePoint(g.cp), sx(g.x + d), sy(line.baseline), g.italic);
           } else {
             for (const d of shifts) addGlyphFast(ctx, p, o, line, g, d);
@@ -185,7 +187,7 @@ function addDeco(ctx: CanvasRenderingContext2D, path: ExactPath, o: TextObject, 
 
 /** Glyph outline in doubles (bounded sizes only). */
 function addGlyphFast(ctx: CanvasRenderingContext2D, p: Projection, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
-  const f = fontFor(o.assetId);
+  const f = glyphFont(o, g);
   const c = (o.size * glyphScale(line, g)) / f.unitsPerEm;
   const ox = (g.x + shiftEm) * o.size;
   const oy = line.baseline * o.size;
@@ -225,7 +227,7 @@ interface Pt {
 }
 
 function addGlyphExact(path: ExactPath, o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): void {
-  const f = fontFor(o.assetId);
+  const f = glyphFont(o, g);
   const SIZE = D.fromNumber(o.size);
   const C = D.mul(SIZE, D.fromNumber(glyphScale(line, g) / f.unitsPerEm));
   const ox = D.mul(D.fromNumber(g.x + shiftEm), SIZE);

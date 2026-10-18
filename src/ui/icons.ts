@@ -125,6 +125,7 @@ import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
 import routeSvg from "lucide-static/icons/route.svg";
 import routeOffSvg from "lucide-static/icons/route-off.svg";
+import caseSensitiveSvg from "lucide-static/icons/case-sensitive.svg";
 import link2Svg from "lucide-static/icons/link-2.svg";
 import rows3Svg from "lucide-static/icons/rows-3.svg";
 import underlineSvg from "lucide-static/icons/underline.svg";
@@ -299,6 +300,7 @@ export const ICONS = {
   bold: clean(bold),
   textBox: clean(rows3Svg),
   textLink: clean(link2Svg),
+  fontOptions: clean(caseSensitiveSvg),
   route: clean(routeSvg),
   routeOff: clean(routeOffSvg),
   underline: clean(underlineSvg),

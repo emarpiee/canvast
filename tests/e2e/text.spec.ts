@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, recordMetric, test } from "./harness";
 import type { App } from "./harness";
@@ -800,5 +800,93 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   await p.keyboard.press(`${mod}+z`);
   await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeDefined();
   expect(line.kind).toBe("path");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+const SYSTEM_FONTS = {
+  woff2: "/usr/share/cockpit/static/fonts/RedHatDisplay-Medium.woff2",
+  cff: "/usr/share/fonts/aajohan-comfortaa-fonts/Comfortaa-Regular.otf",
+  vf: "/usr/share/fonts/google-noto-vf/NotoSans[wght].ttf",
+};
+
+test("WOFF2, PostScript (OpenType) and variable fonts can be imported and used; the font options set kerning, features and the axes of a variable font (ADR 0132)", async ({ app }) => {
+  test.skip(!Object.values(SYSTEM_FONTS).every((f) => existsSync(f)), "needs the system fonts the test imports");
+  const p = app.page;
+  const width = async (id: string): Promise<number> => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return b.maxX - b.minX;
+  };
+  await newText(p, 300, 300);
+  await p.keyboard.type("Hamburg AVA 123");
+  await finish(p);
+  const [t] = await textObjects(p);
+  const plain = await width(t!.id);
+  await p.keyboard.press("v");
+  await p.mouse.click(310, 308);
+  const set = async (file: string, name: string): Promise<void> => {
+    await p.getByTestId("font-input").setInputFiles({ name, mimeType: "font/ttf", buffer: readFileSync(file) });
+    await expect(p.getByRole("combobox", { name: "Font" }).locator("option:checked")).toHaveText(name.replace(/\.[a-z0-9]+$/, ""));
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+  };
+  const inkNow = () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  // WOFF2 and OpenType with PostScript outlines: each is another face, with the width of its own letters, drawn.
+  await set(SYSTEM_FONTS.woff2, "RedHatDisplay-Medium.woff2");
+  const wWoff2 = await width(t!.id);
+  expect(Math.abs(wWoff2 - plain)).toBeGreaterThan(2);
+  expect(await inkNow()).toBeGreaterThan(300);
+  await set(SYSTEM_FONTS.cff, "Comfortaa-Regular.otf");
+  const wCff = await width(t!.id);
+  expect(Math.abs(wCff - wWoff2)).toBeGreaterThan(2);
+  expect(await inkNow()).toBeGreaterThan(300);
+
+  // A variable font: its axis is in the font options, and a weight makes the text wider.
+  await set(SYSTEM_FONTS.vf, "NotoSans[wght].ttf");
+  const wVar = await width(t!.id);
+  await p.getByRole("button", { name: "Font options" }).click();
+  const pop = p.locator(".font-pop");
+  await expect(pop).toContainText("Noto Sans");
+  await pop.locator('input[data-axis="wght"]').fill("700");
+  await pop.locator('input[data-axis="wght"]').press("Enter");
+  await expect.poll(async () => (await textObjects(p))[0]!["axes"]).toEqual({ wght: 700 });
+  await expect.poll(async () => width(t!.id)).toBeGreaterThan(wVar * 1.02);
+
+  // Kerning moves a close pair in; the layout (and so the box) is narrower.
+  const unkerned = await width(t!.id);
+  await pop.locator("input[data-kerning]").check();
+  await expect.poll(async () => (await textObjects(p))[0]!["kerning"]).toBe(true);
+  await expect.poll(async () => width(t!.id)).toBeLessThan(unkerned);
+  // The default weight again takes the axis away.
+  await pop.locator('input[data-axis="wght"]').fill("400");
+  await pop.locator('input[data-axis="wght"]').press("Enter");
+  await expect.poll(async () => (await textObjects(p))[0]!["axes"]).toBeUndefined();
+  await p.keyboard.press("Escape");
+
+  // Saved with the text, and the same after a reload.
+  const saved = (await textObjects(p))[0]!;
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect((await textObjects(p))[0]).toMatchObject({ kerning: true, assetId: saved["assetId"] });
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("an input method (Japanese, say) composes into the text: the composition is shown, Escape in it does not end the edit, and the committed words (with Hebrew among them) are stored and drawn (ADR 0132)", async ({ app, browserName, context }) => {
+  test.skip(browserName !== "chromium", "the input method is driven through the DevTools protocol");
+  const p = app.page;
+  await newText(p, 300, 300);
+  await p.keyboard.type("go ");
+  const cdp = await context.newCDPSession(p);
+  await cdp.send("Input.imeSetComposition", { text: "にほん", selectionStart: 3, selectionEnd: 3 });
+  await expect(p.getByTestId("text-editor")).toContainText("にほん");
+  await p.keyboard.press("Escape"); // belongs to the method: the edit stays open
+  await expect(p.getByTestId("text-editor")).toBeVisible();
+  await cdp.send("Input.imeSetComposition", { text: "日本", selectionStart: 2, selectionEnd: 2 });
+  await cdp.send("Input.insertText", { text: "日本" });
+  await p.keyboard.type(" אבג");
+  await finish(p);
+  const [t] = await textObjects(p);
+  expect(t!.md).toBe("go 日本 אבג");
+  expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2))).toBeGreaterThan(100);
   expect(app.consoleErrors).toEqual([]);
 });

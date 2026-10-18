@@ -43,10 +43,13 @@ export class FontLoader {
       if (!blob) throw new FontError("The font file is not in the library.");
       const sfnt = await sfntOf(new Uint8Array(await blob.arrayBuffer()));
       const font = parseFont(sfnt);
-      const family = `canvast-font-${hash.slice(0, 16)}`;
+      // One CSS family for every file of a family, each with its weight and slant, so the page picks the bold or italic file by itself.
+      const names = font.names;
+      const family = `canvast-fam-${names.family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || hash.slice(0, 8)}`;
+      const wght = font.axes.find((a) => a.tag === "wght");
       let face = false;
       try {
-        const f = new FontFace(family, sfnt as BufferSource);
+        const f = new FontFace(family, sfnt as BufferSource, { weight: wght ? `${wght.min} ${wght.max}` : String(names.weight), style: names.italic ? "italic" : "normal" });
         document.fonts.add(f);
         await f.load();
         face = true;

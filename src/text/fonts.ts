@@ -1,5 +1,5 @@
 /**
- * The fonts a text can be set in (ADR 0127): the bundled one, and any TrueType font file the person imported (a library asset, named by
+ * The fonts a text can be set in (ADR 0127, 0132): the bundled one, and any font file the person imported (TrueType, OpenType, WOFF, WOFF2) (a library asset, named by
  * its content hash). Layout, drawing, outlines and the editor ask here by the hash a text carries (`undefined` = the bundled font), so no
  * code has to know which font a text uses. A font not loaded (yet, or any more) is the bundled one: text is never left without letters.
  */
@@ -40,11 +40,64 @@ export function onFontsChange(fn: () => void): void {
 
 export const hasFont = (hash: string): boolean => loaded.has(hash);
 
-export function fontFor(ref?: string): Font {
+/** The values of the axes of a variable font a text is set at (axis tag → value in the axis's own units). */
+export type Axes = Readonly<Record<string, number>>;
+
+/** The font a text (or one letter of it) is set in, at the values of its axes when it has them. */
+export function fontFor(ref?: string, axes?: Axes): Font {
   const e = ref ? loaded.get(ref) : undefined;
-  if (e) return e.font;
-  if (!bundled) throw new Error("text font not loaded");
-  return bundled;
+  const f = e?.font ?? bundled;
+  if (!f) throw new Error("text font not loaded");
+  return axes && f.axes.length ? f.instance(axes) : f;
+}
+
+/** The font of one placed letter of a text: its own face (a bold or italic file of the family) or the text's. */
+export const glyphFont = (o: { assetId?: string | undefined; axes?: Axes | undefined }, g: { face?: string | undefined }): Font => fontFor(g.face ?? o.assetId, o.axes);
+
+/** A font of a family looked up by what is wanted of it (see `variantOf`). */
+export interface Variant {
+  /** The font file to set the letters in (a library hash); the text's own when it already is the one. */
+  readonly ref: string | undefined;
+  /** The weight is not in the file: draw it bold by thickening the outline (and likewise slanting for italic). */
+  readonly fakeBold: boolean;
+  readonly fakeItalic: boolean;
+}
+
+const familyKey = (f: Font): string => f.names.family.trim().toLowerCase();
+
+/**
+ * Which file to set bold or italic words in: another file of the same family when the library has one (a real bold, a real italic),
+ * else the text's own font with the bold made by thickening and the italic by slanting. A text set in a face that is already bold or
+ * italic keeps it. The bundled font has no family in the library, so it is always made bold and slanted by the outline.
+ */
+export function variantOf(ref: string | undefined, bold: boolean, italic: boolean): Variant {
+  const plain: Variant = { ref, fakeBold: bold, fakeItalic: italic };
+  if ((!bold && !italic) || !ref) return plain;
+  const base = loaded.get(ref);
+  if (!base) return plain;
+  const wantBold = bold && base.font.names.weight < 600;
+  const wantItalic = italic && !base.font.names.italic;
+  if (!wantBold && !wantItalic) return { ref, fakeBold: false, fakeItalic: false };
+  const key = familyKey(base.font);
+  let best: { hash: string; score: number } | null = null;
+  for (const [hash, e] of loaded) {
+    if (familyKey(e.font) !== key) continue;
+    const n = e.font.names;
+    if (wantItalic && !n.italic) continue;
+    if (!wantItalic && n.italic !== base.font.names.italic) continue;
+    if (wantBold && n.weight < 600) continue;
+    const score = Math.abs(n.weight - (wantBold ? 700 : base.font.names.weight));
+    if (!best || score < best.score) best = { hash, score };
+  }
+  if (!best) return plain;
+  const found = loaded.get(best.hash)!.font.names;
+  return { ref: best.hash === ref ? ref : best.hash, fakeBold: bold && found.weight < 600, fakeItalic: italic && !found.italic };
+}
+
+/** The weight and slant of a font as its file says them (for the editor, which asks the browser for the same face). */
+export function faceStyleOf(ref?: string): { weight: number; italic: boolean } {
+  const e = ref ? loaded.get(ref) : undefined;
+  return e ? { weight: e.font.names.weight, italic: e.font.names.italic } : { weight: 400, italic: false };
 }
 
 /** The CSS family to draw or edit a text with (the bundled one while its own font is not usable). */

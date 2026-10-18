@@ -7,7 +7,7 @@ import { rotateSubs } from "../doc/path";
 import { BOLD_SHIFT_EM } from "../render/draw-text";
 import { glyphMap } from "./glyph-space";
 import { DECO, glyphScale, layoutOf } from "./layout";
-import { fontFor } from "./fonts";
+import { glyphFont } from "./fonts";
 
 /**
  * A text object as vector outlines (ADR 0102): every glyph of the layout (text/layout.ts) as closed sub-paths in the object's own local
@@ -23,7 +23,6 @@ export interface TextOutline {
 }
 
 export function textOutline(o: TextObject): TextOutline {
-  const f = fontFor(o.assetId);
   const lay = layoutOf(o);
   const subs: SubPath[] = [];
   let missing = 0;
@@ -32,6 +31,7 @@ export function textOutline(o: TextObject): TextOutline {
     for (const g of line.glyphs) {
       if (g.cp === 32) continue;
       const gs = glyphScale(line, g);
+      const f = glyphFont(o, g);
       if (!g.gid) {
         missing++;
         continue;

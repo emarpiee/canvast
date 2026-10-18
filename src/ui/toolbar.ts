@@ -14,7 +14,8 @@ import type { Paint } from "../doc/paint";
 import { paintCss } from "../doc/paint";
 import type { ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
-import { openColourPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
+import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
+import { fontFor } from "../text/fonts";
 import type { Adjust } from "../doc/adjust";
 import { setAdjustPreviewing } from "../render/adjust-image";
 import type { DocumentStore } from "../doc/document-store";
@@ -164,6 +165,9 @@ const KIND_LABEL: Record<string, string> = { sheet: "Sheet", shape: "Shape", tex
 /** The kind of picked item the Properties bar sorts its controls by. */
 const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
 
+/** The features of a font worth offering, with the words that name them (a font only shows the ones it has). */
+const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discretionary ligatures", smcp: "Small capitals", c2sc: "Capitals to small capitals", tnum: "Tabular numbers", pnum: "Proportional numbers", onum: "Old-style numbers", lnum: "Lining numbers", frac: "Fractions", zero: "Slashed zero", case: "Case-sensitive forms", sups: "Superscript", subs: "Subscript", titl: "Titling forms", swsh: "Swashes", salt: "Stylistic alternates", ordn: "Ordinals" };
+
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
     <div class="rail" data-cmd-group="Tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
@@ -220,7 +224,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="text select node" data-kind="text">
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
-        <input type="file" hidden accept=".ttf,.otf,.woff" data-testid="font-input">
+        <button type="button" data-text-font-options data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Font options" title="Font options: kerning, the features of the font (ligatures, small capitals, numerals...) and the axes of a variable font">${ICONS.fontOptions}</button>
+        <input type="file" hidden accept=".ttf,.otf,.woff,.woff2" data-testid="font-input">
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the name to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
         <button type="button" class="swatch swatch-paint" data-text-outline data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text outline" title="Text outline: the colour of the line round the letters (none to take it away)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Outline width, in px at this zoom (0: none)">Outline <input type="number" data-text-outline-w min="0" max="2000" step="any" inputmode="decimal" aria-label="Text outline width (px at this zoom)"></label>
@@ -455,6 +460,21 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   liveNumber(root.querySelector<HTMLInputElement>("[data-text-outline-w]")!, (v, final) => {
     const t = actions.selectedTextStyle();
     actions.setTextStyle({ outline: v > 0 ? { c: t?.outline?.c ?? t?.color ?? "#000000", w: outlineWidthEm(v) } : null }, final);
+  });
+  root.querySelector<HTMLElement>("[data-text-font-options]")!.addEventListener("click", (e) => {
+    const t = actions.selectedTextStyle();
+    if (!t) return;
+    const font = fontFor(t.assetId ?? undefined);
+    const have = new Set(font.features());
+    const offered = [...have].filter((tag) => FONT_FEATURES[tag] || /^ss(0[1-9]|1\d|20)$/.test(tag) || /^cv\d\d$/.test(tag));
+    openFontOptionsPopover(e.currentTarget as HTMLElement, {
+      family: font.names.family,
+      style: font.names.style,
+      kerning: t.kerning,
+      features: offered.map((tag) => ({ tag, label: FONT_FEATURES[tag] ?? (tag.startsWith("ss") ? `Stylistic set ${Number(tag.slice(2))}` : `Character variant ${Number(tag.slice(2))}`), on: t.features.includes(tag) })),
+      axes: font.axes.map((a) => ({ ...a, value: t.axes?.[a.tag] ?? a.def })),
+      onChange: (patch, final) => actions.setTextStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
+    });
   });
   root.querySelector<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();

@@ -2,7 +2,7 @@ import type { TextObject } from "../doc/model";
 import { NODE } from "../doc/path";
 import type { Line, PlacedGlyph } from "./layout";
 import { glyphScale, layoutOf } from "./layout";
-import { fontFor } from "./fonts";
+import { fontFor, glyphFont } from "./fonts";
 
 /**
  * Where a point of a glyph goes (ADR 0131): the one map from a glyph's own coordinates (font units, y up) to the text's local units. A
@@ -82,7 +82,7 @@ export interface GlyphMap {
 const here = { x: 0, y: 0, tx: 1, ty: 0 };
 
 export function glyphMap(o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): GlyphMap {
-  const f = fontFor(o.assetId);
+  const f = glyphFont(o, g);
   const c = (o.size * glyphScale(line, g)) / f.unitsPerEm;
   const ox = (g.x + shiftEm) * o.size;
   const oy = line.baseline * o.size;
@@ -113,15 +113,16 @@ export function glyphMap(o: TextObject, line: Line, g: PlacedGlyph, shiftEm: num
 
 /** The box of a text on a path in its local units: the corners of every glyph's advance and height, put on the curve. */
 export function pathTextBounds(o: TextObject): { minX: number; minY: number; maxX: number; maxY: number } {
-  const f = fontFor(o.assetId);
+  const f = fontFor(o.assetId, o.axes);
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const lay = layoutOf(o);
   for (const line of lay.lines) {
     for (const g of line.glyphs) {
       const m = glyphMap(o, line, g, 0);
       const gs = glyphScale(line, g);
-      const top = f.ascender, bottom = f.descender;
-      const w = (g.adv * o.size) / ((o.size * gs) / f.unitsPerEm);
+      const gf = glyphFont(o, g);
+      const top = gf.ascender, bottom = gf.descender;
+      const w = (g.adv * o.size) / ((o.size * gs) / gf.unitsPerEm);
       for (const [fx, fy] of [[0, top], [w, top], [0, bottom], [w, bottom]] as const) {
         m.at(fx, fy);
         minX = Math.min(minX, m.x); maxX = Math.max(maxX, m.x);

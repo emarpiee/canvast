@@ -631,6 +631,74 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
   pop.querySelector<HTMLElement>("input")!.focus();
 }
 
+// ---- Font options of a text (ADR 0132) --------------------------------------------------------------------------------------------
+
+export interface FontOptions {
+  /** The font's name and style, for the heading. */
+  family: string;
+  style: string;
+  kerning: boolean;
+  /** The features of the font that can be offered, with the words that name them, and which are on. */
+  features: ReadonlyArray<{ tag: string; label: string; on: boolean }>;
+  /** The axes of a variable font, each with its value now. */
+  axes: ReadonlyArray<{ tag: string; name: string; min: number; def: number; max: number; value: number }>;
+  onChange(patch: { kerning?: boolean; features?: string[]; axes?: Record<string, number> | null }, final: boolean): void;
+  onClose?(): void;
+}
+
+/** Kerning, OpenType features and the axes of a variable font. */
+export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  const pop = document.createElement("div");
+  pop.className = "colour-pop outline-pop font-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Font options");
+  const on = new Set(o.features.filter((f) => f.on).map((f) => f.tag));
+  const values = Object.fromEntries(o.axes.map((a) => [a.tag, a.value]));
+  pop.innerHTML =
+    `<p class="op-note">${esc(o.family)} ${esc(o.style)}</p>` +
+    `<label class="op-row font-switch"><span class="op-label">Kerning</span><input type="checkbox" data-kerning${o.kerning ? " checked" : ""} aria-label="Kerning: the font's own spacing of letter pairs"></label>` +
+    o.features.map((f) => `<label class="op-row font-switch"><span class="op-label">${esc(f.label)}</span><input type="checkbox" data-feature="${esc(f.tag)}"${f.on ? " checked" : ""} aria-label="${esc(f.label)}"></label>`).join("") +
+    o.axes.map((a) => `<div class="op-row"><label class="op-label" for="fo-${esc(a.tag)}">${esc(a.name)}</label><input id="fo-${esc(a.tag)}" class="op-width" data-axis="${esc(a.tag)}" type="number" min="${a.min}" max="${a.max}" step="any" inputmode="decimal" value="${Math.round(a.value * 100) / 100}"><input type="range" data-axis-range="${esc(a.tag)}" min="${a.min}" max="${a.max}" step="any" value="${a.value}" aria-label="${esc(a.name)} slider"></div>`).join("") +
+    (o.axes.length === 0 && o.features.length === 0 ? `<p class="op-note">This font has no features or axes to set beyond kerning.</p>` : "");
+  const axesNow = (): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const a of o.axes) if (values[a.tag] !== a.def) out[a.tag] = values[a.tag]!;
+    return out;
+  };
+  pop.addEventListener("change", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.dataset["kerning"] !== undefined) o.onChange({ kerning: t.checked }, true);
+    else if (t.dataset["feature"]) {
+      if (t.checked) on.add(t.dataset["feature"]);
+      else on.delete(t.dataset["feature"]);
+      o.onChange({ features: [...on] }, true);
+    }
+  });
+  for (const a of o.axes) {
+    const num = pop.querySelector<HTMLInputElement>(`input[data-axis="${a.tag}"]`)!;
+    const range = pop.querySelector<HTMLInputElement>(`input[data-axis-range="${a.tag}"]`)!;
+    const set = (v: number, final: boolean): void => {
+      values[a.tag] = Math.min(a.max, Math.max(a.min, v));
+      range.value = String(values[a.tag]);
+      o.onChange({ axes: axesNow() }, final);
+    };
+    liveNumber(num, (v, final) => set(v, final));
+    range.addEventListener("input", () => {
+      num.value = String(Math.round(Number(range.value) * 100) / 100);
+      set(Number(range.value), false);
+    });
+    range.addEventListener("change", () => set(Number(range.value), true));
+  }
+  document.body.appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
+  pop.querySelector<HTMLElement>("input")!.focus();
+}
+
 // ---- Adjust: the non-destructive adjustments of a picture (ADR 0118) -------------------------------------------------------------
 
 export interface AdjustOptions {
