@@ -902,7 +902,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); }
 /* Settings: the last control of the top right, a bar of its own (so it is there in every view). */
-.view-settings { position: fixed; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
+.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
