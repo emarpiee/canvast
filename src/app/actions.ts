@@ -148,7 +148,18 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
     const date = first.kind === "image" ? names.get(first.assetId)?.date : undefined;
     return { objects, name: nameOf(first), ...(date !== undefined ? { date } : {}) };
   });
-  return { units, within: around.length ? unionBounds(around) : null, homed };
+  // One item with no group around it but on a sheet is lined up with the sheet (its parent, whatever it holds).
+  let within = around.length ? unionBounds(around) : null;
+  const parent = units.length === 1 ? objs[0]?.parent : undefined;
+  const sheet = parent !== undefined ? doc.get(parent) : undefined;
+  if (!within && sheet) {
+    try {
+      within = worldBounds(expressObjectIn(sheet, f0));
+    } catch {
+      return "That item is too far from its sheet in size to line it up with it.";
+    }
+  }
+  return { units, within, homed };
 }
 
 /**
@@ -165,10 +176,10 @@ export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: La
   }
   const { units, within, homed } = laid;
   const need = "distribute" in cmd ? 3 : 2;
-  // One item can still be aligned: with the group it is in (the group being worked in, or the boolean group it is a shape of).
+  // One item can still be aligned: with what holds it (the group being worked in, the boolean group it is a shape of, or its sheet).
   const alone = "align" in cmd && units.length === 1 && within !== null;
   if (units.length < need && !alone) {
-    editor.message = `Select at least ${need} items to ${"distribute" in cmd ? "distribute" : "grid" in cmd ? "arrange" : "align"}${"align" in cmd ? ", or one inside a group to line it up with the group" : ""}.`;
+    editor.message = `Select at least ${need} items to ${"distribute" in cmd ? "distribute" : "grid" in cmd ? "arrange" : "align"}${"align" in cmd ? ", or one inside a group or on a sheet to line it up with it" : ""}.`;
     editor.changed();
     return;
   }

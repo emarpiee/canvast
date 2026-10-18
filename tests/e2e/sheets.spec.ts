@@ -544,3 +544,32 @@ test("Alt+drag of a picked thing on a sheet drags a copy (the sheet under it is 
   expect(await selection(app), "the copy was picked; Alt+click goes down to the sheet under it").not.toEqual([rect.id]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("one thing on a sheet is aligned with its sheet (its parent), by the align buttons", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  const sheet = (await objs(app)).at(-1)!;
+  await key(app, "u");
+  await drag(app, [420, 320], [500, 380]);
+  const rect = (await objs(app)).at(-1)!;
+  await key(app, "v");
+  await click(app, 150, 650);
+  await click(app, 460, 350);
+  expect(await selection(app)).toEqual([rect.id]);
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const r0 = await box(rect.id);
+  await p.locator('[data-ctx="layout"][data-layout="align:centre"]').click();
+  await app.frame();
+  const [s, r] = [await box(sheet.id), await box(rect.id)];
+  expect((r.minX + r.maxX) / 2, "centred across the sheet").toBeCloseTo((s.minX + s.maxX) / 2, 0);
+  expect(r.minY, "and not moved up or down").toBeCloseTo(r0.minY, 0);
+  await p.locator('[data-ctx="layout"][data-layout="align:right"]').click();
+  await app.frame();
+  expect((await box(rect.id)).maxX, "the right edge on the sheet's").toBeCloseTo(s.maxX, 0);
+  await key(app, "Control+z");
+  await key(app, "Control+z");
+  await app.frame();
+  expect((await box(rect.id)).minX, "two undos: where it was").toBeCloseTo(r0.minX, 0);
+  expect(app.consoleErrors).toEqual([]);
+});

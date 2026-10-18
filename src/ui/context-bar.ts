@@ -252,7 +252,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const many = sel.length >= 2;
     q("group").hidden = !many || sel.every((o) => (o!.groups?.length ?? 0) > 0 && new Set(sel.map((x) => x!.groups?.[0])).size === 1);
     q("ungroup").hidden = !sel.some((o) => o!.groups?.length);
-    const lined = many || (sel.length === 1 && (sel[0]!.groups?.length ?? 0) > 0); // (one shape inside a group is lined up with the group)
+    const lined = many || (sel.length === 1 && ((sel[0]!.groups?.length ?? 0) > 0 || sel[0]!.parent !== undefined)); // (one thing inside a group or on a sheet is lined up with it)
     each("layout", (b) => {
       const kind = b.dataset["layout"]!.split(":")[0];
       b.hidden = kind === "grid" ? !many : kind === "distribute" ? sel.length < 3 : !lined;
