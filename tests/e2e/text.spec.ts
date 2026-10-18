@@ -177,6 +177,18 @@ test("a click makes a text as wide as its words, a dragged box one of that width
   await p.mouse.click(310, 308);
   const size = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
   await expect(size).toHaveValue("16");
+  // Dragging on the field itself scrubs it, like dragging its name; a press that does not move goes into it.
+  const sb = (await size.boundingBox())!;
+  await p.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(sb.x + sb.width / 2 + 40, sb.y + sb.height / 2, { steps: 5 });
+  await p.mouse.up();
+  await expect.poll(async () => Number(await size.inputValue())).toBeGreaterThan(16);
+  await expect(size).not.toBeFocused();
+  await p.mouse.click(sb.x + sb.width / 2, sb.y + sb.height / 2);
+  await expect(size).toBeFocused();
+  await size.fill("16");
+  await size.press("Enter");
   const before = await width(a!.id);
   await size.fill("32");
   await size.press("Enter");

@@ -468,8 +468,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   let scrub: { label: HTMLElement; input: HTMLInputElement; key: string; start: number; x: number; moved: boolean; last: number } | null = null;
   root.addEventListener("pointerdown", (e) => {
     const label = (e.target as HTMLElement).closest<HTMLElement>("[data-scrub]");
-    if (!label || (e.target as HTMLElement).tagName === "INPUT" || e.button !== 0) return;
+    if (!label || e.button !== 0) return;
     const input = label.querySelector<HTMLInputElement>("input")!;
+    if ((e.target as HTMLElement).tagName === "INPUT" && document.activeElement === input) return; // (being typed in)
     scrub = { label, input, key: label.dataset["scrub"]!, start: parseFloat(input.value) || 0, x: e.clientX, moved: false, last: NaN };
     label.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -490,7 +491,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     scrub = null;
     if (!sc) return;
     if (sc.label.hasPointerCapture(e.pointerId)) sc.label.releasePointerCapture(e.pointerId);
-    if (!sc.moved) return sc.input.focus(); // a plain click on the name goes to the field
+    if (!sc.moved) {
+      sc.input.focus(); // a plain click goes to the field
+      sc.input.select();
+      return;
+    }
     if (cancelled || Number.isNaN(sc.last)) {
       editor.preview = { kind: "none" };
       editor.changed();

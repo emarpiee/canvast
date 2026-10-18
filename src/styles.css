@@ -2206,8 +2206,10 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .tb-count[hidden] { display: none; }
 .toolbar .tb-count select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .toolbar .tb-count[data-scrub], label[data-scrubbable] { cursor: ew-resize; user-select: none; }
-label[data-scrubbable] input { cursor: text; user-select: text; }
-.toolbar .tb-count[data-scrub] input { cursor: text; }
+label[data-scrubbable] input { cursor: ew-resize; user-select: text; }
+label[data-scrubbable] input:focus { cursor: text; }
+.toolbar .tb-count[data-scrub] input { cursor: ew-resize; }
+.toolbar .tb-count[data-scrub] input:focus { cursor: text; }
 .toolbar .tb-count input { width: calc(var(--sp-14) + var(--sp-6)); height: var(--sp-11); padding: 0 var(--sp-3); font: var(--font-value); text-align: right; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 /* The paint chooser: none, a colour, a linear or a radial gradient. */
 .outline-pop { display: grid; gap: var(--sp-4); min-width: 0; }

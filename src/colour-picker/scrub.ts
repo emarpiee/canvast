@@ -1,7 +1,7 @@
 /**
  * Drag a number's name left or right to change it (the quick way to a value, as in a design tool): every `<label>` of one
  * `<input type="number">` (wrapped or by `for`) inside `root` becomes draggable. The field gets `input` events while dragging and one `change` on release
- * (so one undo step); a plain click on the name focuses the field. Shift moves ten times faster. Labels with `data-scrub` do their own thing.
+ * (so one undo step); a plain click on the name focuses the field. The field scrubs as well until it has the focus (a press on it that does not move goes into it). Shift moves ten times faster. Labels with `data-scrub` do their own thing.
  */
 export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or right to change it"): void {
   let drag: { label: HTMLElement; input: HTMLInputElement; start: number; x: number; moved: boolean; id: number } | null = null;
@@ -26,9 +26,11 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
   root.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
     const label = mark(t.closest<HTMLElement>("label")) ?? t.closest<HTMLElement>("label[data-scrubbable]");
-    if (!label || t.tagName === "INPUT" || e.button !== 0 || label.closest("[data-scrub-root]") !== root) return; // (a nested root handles its own)
+    if (!label || e.button !== 0 || label.closest("[data-scrub-root]") !== root) return; // (a nested root handles its own)
     const input = numberOf(label)!;
     if (input.disabled || input.readOnly) return;
+    // The field itself scrubs too, until it is being typed in: a press that does not move goes into it (see `end`).
+    if (t.tagName === "INPUT" && document.activeElement === input) return;
     drag = { label, input, start: parseFloat(input.value) || 0, x: e.clientX, moved: false, id: e.pointerId };
     label.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -59,7 +61,11 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
     if (!d || e.pointerId !== d.id) return;
     drag = null;
     if (d.label.hasPointerCapture(e.pointerId)) d.label.releasePointerCapture(e.pointerId);
-    if (!d.moved) return d.input.focus();
+    if (!d.moved) {
+      d.input.focus();
+      d.input.select();
+      return;
+    }
     if (cancelled) d.input.value = String(d.start);
     d.input.dispatchEvent(new Event("change", { bubbles: true }));
   };
