@@ -98,16 +98,19 @@ test("the Adjust panel is a dock panel: it follows the picked picture and can be
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("stacked panels on both sides share one width; a panel let go keeps that width and then has its own; moving and resizing redraw nothing in the page", async ({ app }) => {
+test("stacked panels share one width per side (the other side keeps its own); a panel let go keeps that width and then has its own; moving and resizing redraw nothing in the page", async ({ app }) => {
   const p = app.page;
   await open(app, "Layers panel");
   await open(app, "Tags panel");
   await open(app, "Bookmarks panel");
   const width = async (id: string) => (await item(app, id).boundingBox())!.width;
   const w0 = await width("tags");
+  const sideOf = (id: string) => item(app, id).getAttribute("data-side");
+  expect(await sideOf("layers"), "layers and tags are on different sides").not.toBe(await sideOf("tags"));
+  expect(await sideOf("bookmarks")).toBe(await sideOf("tags"));
   expect(await width("bookmarks")).toBeCloseTo(w0, 0);
   expect(await width("layers")).toBeCloseTo(w0, 0);
-  // widen one stacked panel: all of them follow, on both sides
+  // widen one stacked panel: the panels of its side follow, the other side does not
   const grip = (await item(app, "tags").locator(".dock-grip").boundingBox())!;
   await p.mouse.move(grip.x + 2, grip.y + 40);
   await p.mouse.down();
@@ -116,7 +119,7 @@ test("stacked panels on both sides share one width; a panel let go keeps that wi
   const w1 = await width("tags");
   expect(w1).toBeGreaterThan(w0 + 40);
   expect(await width("bookmarks")).toBeCloseTo(w1, 0);
-  expect(await width("layers")).toBeCloseTo(w1, 0);
+  expect(await width("layers"), "the other side is not resized").toBeCloseTo(w0, 0);
   // let go of one: it keeps the shared width, and then resizes on its own
   const hb = (await titleOf(app, "tags").boundingBox())!;
   await p.mouse.move(hb.x + 20, hb.y + hb.height / 2);

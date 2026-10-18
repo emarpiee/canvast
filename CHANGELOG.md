@@ -8,6 +8,7 @@
 - **Screenshot**: it takes the selection, or the whole view when nothing is picked (the Area setting is gone); the notice has a View button that opens the picture in Assets; the button's tooltip says so.
 - **Bars**: Undo, Redo, Search and Import are at the foot of the tool rail after a separator; the Settings button is the last button of the bottom-right bar on the canvas (it stays at the top right in the Assets and Settings views); the tool rail has the same gap under the Assets bar as the panels have under the top right bar.
 - The dev panel is at most 20 rem wide (it covered the start of drags the tests make).
+- **Docked panels**: each side has its own width, so resizing the left stack no longer resizes the right one (older saved layouts give both sides their saved width). In the tool rail, Undo and Redo are now the last two buttons.
 
 ## 0.19.0 — Vectors II, masks and vector networks (2026-10-18)
 

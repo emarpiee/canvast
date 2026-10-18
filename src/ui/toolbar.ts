@@ -204,10 +204,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <span class="rail-sep" role="separator"></span>
       <div class="rail-tools" role="group" aria-label="History, search and import">
-        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
-        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
         <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
+        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
+        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
       </div>
       <input type="file" multiple hidden data-testid="import-input">
     </div>

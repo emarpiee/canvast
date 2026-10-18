@@ -68,8 +68,8 @@ export class PanelDock {
   private readonly layer: HTMLElement;
   private readonly zones: [HTMLElement, HTMLElement];
   private saveTimer = 0;
-  /** The one width every stacked panel has; a panel that is let go takes it along and then has its own. */
-  private sideW = DEFAULT_WIDTH;
+  /** The width every stacked panel of a side has (each side its own); a panel that is let go takes it along and then has its own. */
+  private sideW = { left: DEFAULT_WIDTH, right: DEFAULT_WIDTH };
 
   constructor(left: HTMLElement, right: HTMLElement, private readonly opts: DockOptions) {
     this.left = left;
@@ -90,8 +90,10 @@ export class PanelDock {
 
   private load(json: string): void {
     try {
-      const raw = JSON.parse(json || "{}") as { panels?: Record<string, Partial<PanelState>>; order?: unknown; sw?: unknown };
-      if (typeof raw.sw === "number") this.sideW = clamp(raw.sw, MIN_WIDTH, MAX_WIDTH);
+      const raw = JSON.parse(json || "{}") as { panels?: Record<string, Partial<PanelState>>; order?: unknown; sw?: unknown; swl?: unknown; swr?: unknown };
+      if (typeof raw.sw === "number") this.sideW = { left: clamp(raw.sw, MIN_WIDTH, MAX_WIDTH), right: clamp(raw.sw, MIN_WIDTH, MAX_WIDTH) }; // (saved before the sides had their own)
+      if (typeof raw.swl === "number") this.sideW.left = clamp(raw.swl, MIN_WIDTH, MAX_WIDTH);
+      if (typeof raw.swr === "number") this.sideW.right = clamp(raw.swr, MIN_WIDTH, MAX_WIDTH);
       for (const [id, p] of Object.entries(raw.panels ?? {})) {
         if (p && (p.s === "left" || p.s === "right" || p.s === "float")) this.state.set(id, { s: p.s, w: clamp(Number(p.w) || 268, MIN_WIDTH, MAX_WIDTH), x: Number(p.x) || 0, y: Number(p.y) || 0, c: p.c === true });
       }
@@ -103,7 +105,7 @@ export class PanelDock {
 
   private save(): void {
     window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => this.opts.persist(JSON.stringify({ panels: Object.fromEntries(this.state), order: this.order, sw: this.sideW })), SAVE_MS);
+    this.saveTimer = window.setTimeout(() => this.opts.persist(JSON.stringify({ panels: Object.fromEntries(this.state), order: this.order, swl: this.sideW.left, swr: this.sideW.right })), SAVE_MS);
   }
 
   /** Put a panel in the dock. Its `hidden` attribute says whether it is shown. */
@@ -118,7 +120,7 @@ export class PanelDock {
     box.append(el, grip);
     const item: Item = { spec, el, box };
     this.items.set(spec.id, item);
-    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.side, w: clamp(spec.width ?? this.sideW, MIN_WIDTH, MAX_WIDTH), x: 80, y: 120, c: false });
+    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, MAX_WIDTH), x: 80, y: 120, c: false });
     if (!this.order.includes(spec.id)) this.order.push(spec.id);
     box.hidden = el.hidden;
     new MutationObserver(() => {
@@ -184,10 +186,11 @@ export class PanelDock {
   move(id: string, side: DockSide): void {
     const s = this.state.get(id);
     if (!s) return;
+    const from = this.effective(s);
     s.s = side;
     s.c = false;
     if (side === "float") {
-      s.w = this.sideW;
+      if (from !== "float") s.w = this.sideW[from];
       const r = this.items.get(id)?.box.getBoundingClientRect();
       if (r && r.width) {
         s.x = r.left - 24;
@@ -207,7 +210,7 @@ export class PanelDock {
 
   /** Put every panel back where it started and unfold it. */
   reset(): void {
-    this.sideW = DEFAULT_WIDTH;
+    this.sideW = { left: DEFAULT_WIDTH, right: DEFAULT_WIDTH };
     for (const [id, it] of this.items) this.state.set(id, { s: it.spec.side, w: DEFAULT_WIDTH, x: 80, y: 120, c: false });
     this.layout();
     this.save();
@@ -246,7 +249,7 @@ export class PanelDock {
       want.get(side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
       it.box.dataset["side"] = side;
       it.box.toggleAttribute("data-folded", s.c);
-      const w = side === "float" ? s.w : this.sideW;
+      const w = side === "float" ? s.w : this.sideW[side];
       it.box.style.width = `${w}px`;
       if (side === "float") {
         it.box.style.left = `${clamp(s.x, 96 - w, window.innerWidth - 96)}px`;
@@ -290,7 +293,8 @@ export class PanelDock {
       if (!dragging) {
         dragging = true;
         item.box.classList.add("is-dragging");
-        if (s.s !== "float") s.w = this.sideW; // lifted out of its stack: it keeps the width it had
+        const from = this.effective(s);
+        if (from !== "float") s.w = this.sideW[from]; // lifted out of its stack: it keeps the width it had
         s.s = "float";
       }
       s.x = m.clientX - grab.x;
@@ -331,13 +335,13 @@ export class PanelDock {
     e.stopPropagation();
     const s = this.state.get(item.spec.id)!;
     const side = this.effective(s);
-    const startX = e.clientX, startW = side === "float" ? s.w : this.sideW;
+    const startX = e.clientX, startW = side === "float" ? s.w : this.sideW[side];
     const grows = side === "right" ? -1 : 1; // the grip is on the edge towards the canvas
     item.box.classList.add("is-resizing");
     const move = (m: PointerEvent): void => {
       const w = clamp(startW + grows * (m.clientX - startX), MIN_WIDTH, MAX_WIDTH);
       if (side === "float") s.w = w;
-      else this.sideW = w; // stacked panels share one width
+      else this.sideW[side] = w; // the stacked panels of this side share one width
       this.layout();
     };
     const up = (): void => {
