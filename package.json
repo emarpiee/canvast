@@ -20,6 +20,7 @@
     "test": "npm run typecheck && npm run test:unit && npm run test:e2e && npm run check:tokens && npm run check:picker",
     "test:full": "npm run typecheck && npm run test:unit && npm run test:e2e:full && npm run check:tokens && npm run check:picker",
     "bench": "node scripts/test-snap.mjs -c playwright.bench.config.ts",
+    "check:repro": "node scripts/check-repro.mjs",
     "check:picker": "node scripts/check-picker.mjs",
     "build:picker": "node scripts/build-picker.mjs",
     "bench:picker": "node scripts/bench-picker.mjs"
