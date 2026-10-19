@@ -41,8 +41,9 @@ export const takeTexturePending = (): boolean => {
   return v;
 };
 
-/** How deep tiles are made from tiles (a pattern whose source holds a pattern): one level, so a shape that is its own source cannot loop. */
-let depth = 0;
+/** The shapes whose tile is being drawn (a pattern whose source holds a pattern): a shape already in it, or a fourth level, is its average colour, so a cycle cannot loop. */
+const drawing: string[] = [];
+const MAX_NESTING = 3;
 
 /** The smallest tile, in px, that is drawn as itself; smaller is the average colour (it would only be noise). */
 const MIN_TILE_PX = 2;
@@ -54,17 +55,77 @@ const pow2 = (v: number): number => 2 ** Math.ceil(Math.log2(Math.max(1, v)));
 
 /** The colour of a source on average, "#rrggbb": it is drawn into one pixel. */
 export function averageColour(source: CanvasImageSource): string {
+  const N = 16;
   const c = document.createElement("canvas");
-  c.width = c.height = 1;
-  const g = c.getContext("2d");
+  c.width = c.height = N;
+  const g = c.getContext("2d", { willReadFrequently: true });
   if (!g) return "#808080";
   g.imageSmoothingEnabled = true;
   g.imageSmoothingQuality = "high";
-  g.drawImage(source, 0, 0, 1, 1);
-  const d = g.getImageData(0, 0, 1, 1).data;
-  const a = d[3]! / 255;
-  const mix = (v: number): number => Math.round(a > 0 ? v / a : 128);
-  return `#${[mix(d[0]!), mix(d[1]!), mix(d[2]!)].map((v) => Math.min(255, v).toString(16).padStart(2, "0")).join("")}`;
+  g.drawImage(source, 0, 0, N, N);
+  const d = g.getImageData(0, 0, N, N).data;
+  // The colour of what is there, each pixel by its alpha (getImageData is not premultiplied). A 1 x 1 reduction is rounded to 8 bits at its own tiny alpha,
+  // so a sparse source, a few small shapes in clear space, came out pale or white.
+  let r = 0, gr = 0, b = 0, a = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const w = d[i + 3]!;
+    r += d[i]! * w;
+    gr += d[i + 1]! * w;
+    b += d[i + 2]! * w;
+    a += w;
+  }
+  return a > 0 ? `#${[r, gr, b].map((v) => Math.round(v / a).toString(16).padStart(2, "0")).join("")}` : "#808080";
+}
+
+/** The flat colour of a texture: its stored average, but for objects the live one (documents made before the average was fixed hold pale values). Not while a tile is drawn, so a cycle cannot recurse. */
+const flats = new Map<string, string>();
+let measuring = false;
+function flat(t: TexturePaint): string {
+  if (!host || t.src.kind !== "objects" || measuring || drawing.length) return t.avg;
+  measuring = true;
+  try {
+    const tile = host.objects(t.src.ids, 16);
+    if (!tile || tile.version.endsWith("p")) return t.avg;
+    const key = `${t.src.ids.join(",")}|${tile.version}`;
+    let v = flats.get(key);
+    if (v === undefined) {
+      v = averageColour(tile.canvas);
+      flats.set(key, v);
+      if (flats.size > 64) flats.delete(flats.keys().next().value!);
+    }
+    return v;
+  } finally {
+    measuring = false;
+  }
+}
+
+/** A pattern fill as what an SVG `<pattern>` needs (ADR 0154): the cell and its tiles, the matrix from the cell to the SVG's units, and the tile as a PNG. Null for a picture (an average colour is written) or a tile not ready. */
+export interface SvgTexture {
+  readonly cw: number;
+  readonly ch: number;
+  readonly tw: number;
+  readonly th: number;
+  readonly tiles: ReadonlyArray<readonly [number, number]>;
+  readonly matrix: readonly [number, number, number, number, number, number];
+  readonly href: string;
+}
+export function svgTexture(o: PathObject, t: TexturePaint, toSvg: (x: number, y: number) => [number, number], withTile = true): SvgTexture | null {
+  if (!host || t.src.kind !== "objects") return null;
+  const box = geometryBounds(o.base ?? o.sub);
+  const [bw, bh] = [box.maxX - box.minX, box.maxY - box.minY];
+  const aspect = host.aspect(t.src.ids);
+  if (!(bw > 0 && bh > 0) || aspect === null) return null;
+  const lay = layoutOf(t, { w: bw, h: bh }, aspect);
+  if (!lay.repeat) return null;
+  // local units to the SVG's: from where three local points go
+  const [x0, y0] = toSvg(0, 0), [x1, y1] = toSvg(1, 0), [x2, y2] = toSvg(0, 1);
+  const tilePx = Math.max(lay.tw, lay.th) * Math.hypot(x1 - x0, y1 - y0);
+  const tile = withTile ? host.objects(t.src.ids, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
+  if (withTile && (!tile || tile.version.endsWith("p"))) return null;
+  const [mx, my] = boxToLocal(o, 0.5, 0.5);
+  const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
+  const m = new DOMMatrix([x1 - x0, y1 - y0, x2 - x0, y2 - y0, x0, y0]).translateSelf(mx, my).rotateSelf((theta * 180) / Math.PI).translateSelf(lay.ox, lay.oy);
+  return { cw: lay.cw, ch: lay.ch, tw: lay.tw, th: lay.th, tiles: lay.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: tile ? (tile.canvas as HTMLCanvasElement).toDataURL("image/png") : "" };
 }
 
 const samples = new Map<string, ImageData | null>();
@@ -97,20 +158,20 @@ function pixelsOf(key: string, source: CanvasImageSource, w: number, h: number):
  * colour of the texture right there, not the average of the whole. "transparent" where a tile has a gap or a placed picture does not reach.
  */
 export function textureColourAt(o: PathObject, t: TexturePaint, x: number, y: number): string {
-  if (!host) return t.avg;
+  if (!host) return flat(t);
   const box = geometryBounds(o.base ?? o.sub);
   const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
-  if (!(bw > 0 && bh > 0)) return t.avg;
+  if (!(bw > 0 && bh > 0)) return flat(t);
   let source: CanvasImageSource;
   let sw: number, sh: number, key: string;
   if (t.src.kind === "asset") {
     const pic = host.picture(t.src.hash, 64);
-    if (!pic) return t.avg;
+    if (!pic) return flat(t);
     [source, sw, sh, key] = [pic.source, pic.w, pic.h, t.src.hash];
   } else {
     const a = host.aspect(t.src.ids);
     const tile = a === null ? null : host.objects(t.src.ids, 64);
-    if (a === null || !tile) return t.avg;
+    if (a === null || !tile) return flat(t);
     [source, sw, sh, key] = [tile.canvas, a >= 1 ? 64 : 64 * a, a >= 1 ? 64 / a : 64, `${t.src.ids.join(",")}|${tile.version}`];
   }
   const [mx, my] = boxToLocal(o, 0.5, 0.5);
@@ -126,7 +187,7 @@ export function textureColourAt(o: PathObject, t: TexturePaint, x: number, y: nu
   const at = lay.tiles.find(([tx, ty]) => pu >= tx && pu < tx + lay.tw && pv >= ty && pv < ty + lay.th);
   if (!at) return "transparent";
   const px = pixelsOf(key, source, sw, sh);
-  if (!px) return t.avg;
+  if (!px) return flat(t);
   const i = Math.min(px.width - 1, Math.max(0, Math.floor(((pu - at[0]) / lay.tw) * px.width)));
   const j = Math.min(px.height - 1, Math.max(0, Math.floor(((pv - at[1]) / lay.th) * px.height)));
   const d = px.data, n = (j * px.width + i) * 4;
@@ -171,11 +232,11 @@ function cellCanvas(key: string, l: Layout, k: number, tile: CanvasImageSource):
  * or the texture's average colour where it cannot be drawn (not decoded yet, tiles too small to see, deeper than doubles can tell).
  */
 export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePaint, p: Projection, vp: Viewport): CanvasPattern | string {
-  if (!host || depth > 0) return t.avg;
+  if (!host || drawing.includes(o.id) || drawing.length >= MAX_NESTING) return flat(t);
   const box = geometryBounds(o.base ?? o.sub);
   const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
   const ppu = p.ppu;
-  if (!(bw > 0 && bh > 0 && ppu > 0 && Number.isFinite(ppu))) return t.avg;
+  if (!(bw > 0 && bh > 0 && ppu > 0 && Number.isFinite(ppu))) return flat(t);
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   // The source: a picture, or the objects drawn as one.
   let pendingTile = false;
@@ -185,18 +246,18 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
     pic = host.picture(t.src.hash, Math.min(bw, bh) * ppu * t.scale);
     if (!pic) {
       notReady = true;
-      return lastPattern.get(o.id) ?? t.avg;
+      return lastPattern.get(o.id) ?? flat(t);
     }
     aspect = pic.w / pic.h;
   } else {
     const a = host.aspect(t.src.ids);
-    if (a === null) return t.avg;
+    if (a === null) return flat(t);
     aspect = a;
   }
   const lay0 = layoutOf(t, { w: bw, h: bh }, aspect);
   const tilePx = Math.max(lay0.tw, lay0.th) * ppu;
-  if (!(tilePx >= MIN_TILE_PX) && lay0.repeat) return t.avg;
-  if (!Number.isFinite(tilePx)) return t.avg;
+  if (!(tilePx >= MIN_TILE_PX) && lay0.repeat) return flat(t);
+  if (!Number.isFinite(tilePx)) return flat(t);
   // The box's own frame: the origin at its middle, turned by the shape's turn and the texture's.
   const [mx, my] = boxToLocal(o, 0.5, 0.5);
   const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
@@ -217,19 +278,19 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
     } else {
       const k = Math.min(pow2(tilePx * dpr), 2048) / Math.max(lay.tw, lay.th);
       const made = cellCanvas(`${t.src.hash}|${Math.round(k * 1e6)}|${t.tile}|${t.spacing}|${t.align}|${lay.tw}`, lay, k, px.source);
-      if (!made) return lastPattern.get(o.id) ?? t.avg;
+      if (!made) return lastPattern.get(o.id) ?? flat(t);
       [cell, cw, ch] = [made, made.width, made.height];
     }
   } else {
     const res = Math.min(pow2(tilePx * dpr), 2048);
-    depth++;
+    drawing.push(o.id);
     let tile: ReturnType<TextureHost["objects"]>;
     try {
       tile = host.objects(t.src.ids, res);
     } finally {
-      depth--;
+      drawing.pop();
     }
-    if (!tile) return lastPattern.get(o.id) ?? t.avg;
+    if (!tile) return lastPattern.get(o.id) ?? flat(t);
     if (tile.version.endsWith("p")) {
       notReady = true; // (its pictures are still being decoded)
       pendingTile = true;
@@ -241,12 +302,12 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
       ch = (tile.canvas as HTMLCanvasElement).height;
     } else {
       const made = cellCanvas(`${t.src.ids.join(",")}|${tile.version}|${res}|${t.tile}|${t.spacing}|${t.align}|${lay.tw}`, lay, k, tile.canvas);
-      if (!made) return t.avg;
+      if (!made) return flat(t);
       [cell, cw, ch] = [made, made.width, made.height];
     }
   }
   const pat = ctx.createPattern(cell, lay.repeat ? "repeat" : "no-repeat");
-  if (!pat) return lastPattern.get(o.id) ?? t.avg;
+  if (!pat) return lastPattern.get(o.id) ?? flat(t);
   // a pattern still waiting for its pictures is not kept as the one to show later (a half-drawn tile would stay)
   if (!pendingTile) {
     lastPattern.delete(o.id);

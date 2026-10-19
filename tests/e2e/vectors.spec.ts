@@ -2807,3 +2807,26 @@ test("touch undo and redo on the pen tool: lines drawn, then undo undo redo redo
   await tap(3);
   expect(await count(), "and redo still has its step").toBe(n + 1);
 });
+
+test("pasted SVG with a clip-path becomes a clipping mask holding what it cuts: nothing is drawn outside the clip", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "a synthetic paste event carries no data in Firefox");
+  const p = app.page;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><defs><rect id="r" width="100" height="100" fill="#ff0000"/><clipPath id="c"><circle cx="50" cy="50" r="20"/></clipPath></defs><g clip-path="url(#c)"><use xlink:href="#r"/></g></svg>';
+  await p.evaluate((text) => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", text);
+    document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, svg);
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
+  const all = (await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ id: string; parent?: string; container?: { mask?: boolean } }>;
+  const mask = all.find((o) => o.container?.mask)!;
+  expect(mask, "a clipping mask").toBeTruthy();
+  expect(all.find((o) => !o.container)!.parent, "holds the rectangle").toBe(mask.id);
+  await key(app, "Escape");
+  await app.frame();
+  const vp = p.viewportSize()!;
+  const [cx, cy, side] = [Math.round(vp.width / 2), Math.round(vp.height / 2), 0.5 * Math.min(vp.width, vp.height)];
+  const red = (c: number[]) => c[0]! > 200 && c[1]! < 60 && c[2]! < 60;
+  expect(red(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [cx, cy] as const)), "inside the circle: the rectangle").toBe(true);
+  expect(red(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [Math.round(cx - side * 0.45), Math.round(cy - side * 0.45)] as const)), "inside the rectangle but outside the circle: cut").toBe(false);
+});

@@ -11,6 +11,8 @@ import type { PathObject } from "../doc/model";
 import { expressObjectIn, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
+import { isTexture } from "../doc/texture";
+import { svgTexture } from "../render/texture";
 import { regionSplit } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
 import type { Arrow } from "../doc/path";
@@ -110,15 +112,69 @@ export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, eve
 }
 
 /** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
-export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskOf: (by: string) => readonly PathObject[] = () => [], size?: { w: string; h: string }): string | null {
-  const lay = layoutPaths(paths, space);
+/** More tile images than this in one fill: a <pattern> instead (the file would be very long). */
+const MAX_TILE_USES = 2500;
+
+export function exportSvg(
+  paths: readonly PathObject[],
+  space: FrameSpace,
+  maskOf: (by: string) => readonly PathObject[] = () => [],
+  size?: { w: string; h: string },
+  /** The shapes a pattern of objects repeats (null: not all shapes, a picture of the tile is written instead). */
+  sourceOf?: (ids: readonly string[]) => readonly PathObject[] | null,
+  evenPad = false,
+  depth = 0,
+): string | null {
+  const lay = layoutPaths(paths, space, evenPad);
   if (!lay) return null;
   const { placed, place, minX, minY, sc, w, h } = lay;
   const defs: string[] = [];
-  const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null): string => {
+  let usesXlink = false;
+  let cover = ""; // (what a path's fill needs drawn before it: a pattern's images)
+  const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null, d?: string): string => {
     if (paint === null) return ` ${which}="none"`;
+    if (isTexture(paint) && which === "fill") {
+      // a pattern of objects: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
+      // left for very many tiles: viewers that read Qt's SVG or import into design tools leave a <pattern> empty); a picture fill is its average colour
+      const src = paint.src.kind === "objects" && sourceOf && depth < 2 ? sourceOf(paint.src.ids) : null;
+      const inner = src?.length ? exportSvg(src, space, maskOf, undefined, sourceOf, true, depth + 1) : null;
+      const box = inner ? /viewBox="0 0 ([\d.e+-]+) ([\d.e+-]+)"/.exec(inner) : null;
+      const tex = svgTexture(p.o, paint, (x, y) => { const [px, py] = p.at(x, y); return [(px - minX) * sc, (py - minY) * sc]; }, !inner);
+      if (tex) {
+        usesXlink = true;
+        const id = `t${defs.length}`;
+        // the shapes of the source, written once (their own gradients and masks with them) and scaled to the tile; a picture of the tile when they are not all shapes
+        let img = `<image id="${id}i" xlink:href="${tex.href}" width="${num(tex.tw)}" height="${num(tex.th)}" preserveAspectRatio="none"/>`;
+        if (inner && box) {
+          const pre = `${id}_`;
+          const rename = (t: string): string => t.replace(/\bid="([^"]+)"/g, `id="${pre}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${pre}$1)`).replace(/href="#([^"]+)"/g, `href="#${pre}$1"`);
+          const innerDefs = /<defs>([\s\S]*?)<\/defs>/.exec(inner)?.[1] ?? "";
+          const content = inner.slice(inner.indexOf(">") + 1, inner.lastIndexOf("</svg>")).replace(/<defs>[\s\S]*?<\/defs>/, "");
+          if (inner.includes("xmlns:xlink")) usesXlink = true;
+          img = rename(innerDefs) + `<g id="${id}i" transform="scale(${num(tex.tw / Number(box[1]))} ${num(tex.th / Number(box[2]))})">${rename(content)}</g>`;
+        }
+        const m = new DOMMatrix([...tex.matrix]);
+        const inv = m.inverse();
+        const corners = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => inv.transformPoint(new DOMPoint(x, y)));
+        const [u0, u1] = [Math.min(...corners.map((c) => c.x)), Math.max(...corners.map((c) => c.x))];
+        const [v0, v1] = [Math.min(...corners.map((c) => c.y)), Math.max(...corners.map((c) => c.y))];
+        const [i0, i1, j0, j1] = [Math.floor(u0 / tex.cw) - 1, Math.ceil(u1 / tex.cw), Math.floor(v0 / tex.ch) - 1, Math.ceil(v1 / tex.ch)];
+        const count = (i1 - i0 + 1) * (j1 - j0 + 1) * tex.tiles.length;
+        if (d !== undefined && count <= MAX_TILE_USES) {
+          const mat = `matrix(${tex.matrix.map(num).join(" ")})`;
+          const uses: string[] = [];
+          for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (const [tx, ty] of tex.tiles) uses.push(`<use xlink:href="#${id}i" transform="${mat} translate(${num(tx + i * tex.cw)} ${num(ty + j * tex.ch)})"/>`);
+          defs.push(img, `<clipPath id="${id}c"><path d="${d}"${p.o.evenodd ? ' clip-rule="evenodd"' : ""}/></clipPath>`);
+          cover += `  <g clip-path="url(#${id}c)">${uses.join("")}</g>\n`;
+          return ` fill="none"`;
+        }
+        const cells = tex.tiles.flatMap(([tx, ty]) => [-1, 0, 1].flatMap((i) => [-1, 0, 1].map((j) => `<use xlink:href="#${id}i" x="${num(tx + i * tex.cw)}" y="${num(ty + j * tex.ch)}"/>`)));
+        defs.push(`<pattern id="${id}" patternUnits="userSpaceOnUse" width="${num(tex.cw)}" height="${num(tex.ch)}" patternTransform="matrix(${tex.matrix.map(num).join(" ")})">${img}${cells.join("")}</pattern>`);
+        return ` fill="url(#${id})"`;
+      }
+    }
     if (!isGradient(paint)) {
-      const c = colour(solidOf(paint)); // (a texture is its average colour: SVG has no such fill here)
+      const c = colour(solidOf(paint)); // (a picture fill is its average colour: SVG has no such fill here)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;
@@ -197,7 +253,9 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     const live = !!o.profile && !o.net && o.stroke !== null;
     const split = o.net ? regionSplit({ sub: p.subs, regions: o.regions }) : null;
     const regions = split ? map(split.base) : null;
-    let a = ` d="${pathData(subs)}"` + (split ? ' fill="none"' : paintAttr(p, "fill", o.fill)) + (live ? "" : paintAttr(p, "stroke", o.stroke));
+    cover = "";
+    const d = pathData(subs);
+    let a = ` d="${d}"` + (split ? ' fill="none"' : paintAttr(p, "fill", o.fill, live ? undefined : d)) + (live ? "" : paintAttr(p, "stroke", o.stroke));
     if (!split && o.fill !== null && o.evenodd) a += ` fill-rule="evenodd"`;
     if (o.stroke !== null && !live) {
       a += ` stroke-width="${num(width)}"`;
@@ -222,7 +280,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
       const common2 = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}`;
       return (o.fill !== null ? `  <path${a}/>\n` : "") + `  <path d="${pathData(shape)}"${paintAttr(p, "fill", o.stroke)}${common2}/>`;
     }
-    return fillPart + `  <path${a}/>` + arrowsSvg(p, subs, width);
+    return fillPart + (cover ? cover.replace(/<g clip-path/, `<g${common} clip-path`) : "") + `  <path${a}/>` + arrowsSvg(p, subs, width);
   };
   // Masks (ADR 0144): the mask group's paths become an SVG <mask>; an inverted one is turned by a filter. A mask that cannot be placed is left out.
   const maskIds = new Map<string, string | null>();
@@ -252,5 +310,5 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
     const out = render(p);
     return m ? `  <g mask="url(#${m})">\n${out}\n  </g>` : out;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(w)} ${num(h)}" width="${size ? esc(size.w) : num(w)}" height="${size ? esc(size.h) : num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg"${usesXlink ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ""} viewBox="0 0 ${num(w)} ${num(h)}" width="${size ? esc(size.w) : num(w)}" height="${size ? esc(size.h) : num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

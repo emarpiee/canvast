@@ -1595,9 +1595,15 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
   return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original };
 }
 
+/** The shapes a pattern of objects repeats, hidden ones too (hiding the source is the usual way to use it), for the SVG; null when any is not a shape. */
+const sourceShapes = (doc: DocumentStore) => (ids: readonly string[]): PathObject[] | null => {
+  const os = ids.map((id) => doc.get(id));
+  return os.length && os.every((o): o is PathObject => o?.kind === "path") ? os.map((o) => ({ ...o, hidden: false })) : null;
+};
+
 /** The picked vectors as SVG text with the width and height the export asks for (any unit SVG knows), or null when it cannot. */
 export function svgOfTarget(doc: DocumentStore, t: ExportTarget, size: { w: string; h: string }): string | null {
-  return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size) : null;
+  return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size, sourceShapes(doc)) : null;
 }
 
 /** The picked vectors as a PDF page of this size in points (ADR 0153), or null when the target is not all plain vectors or needs a picture. */
@@ -1609,7 +1615,7 @@ const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => sele
 export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean => svgPaths(doc, editor).length > 0;
 
 /** The picked paths as SVG text (ADR 0107), or null when none is picked or they cannot be placed together. */
-export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"));
+export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), undefined, sourceShapes(doc));
 
 /**
  * Put the shapes of SVG text on the canvas (ADR 0107): centred in the view, the longer side half of the shorter side of the view, grouped
@@ -1629,16 +1635,24 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
   const k = (0.5 * Math.min(vp.width, vp.height)) / 2 ** cam.zf / Math.max(svg.box.w, svg.box.h);
   const cx = svg.box.x + svg.box.w / 2, cy = svg.box.y + svg.box.h / 2;
   const z0 = doc.topZ();
+  const base = { ...(view.frame === doc.space.world ? {} : { frame: view.frame }), anchor: at, unit: -cam.zi, attachmentTargetId: null };
+  const toLocal = (sub: readonly SubPath[]): SubPath[] => sub.map((p) => ({ n: p.n.map((v, j) => (v - (j % 2 === 0 ? cx : cy)) * k), closed: p.closed }));
+  // a clip-path of the drawing is a clipping mask (a sheet of the clip's shape, ADR 0108, 0144) that holds what it cuts, behind it
+  const masks = svg.clips.map((c, ci) => {
+    const first = svg.shapes.findIndex((s) => s.clip === ci);
+    return first < 0 ? null : homeObject(normalizeUnit({
+      ...base, id: newObjectId(), kind: "path", z: z0 + first + 0.5 - 1, opacity: 1, sub: toLocal(c.sub), fill: null, stroke: null, width: 1e-9,
+      container: { clip: true, mask: true, was: { fill: null, stroke: null } }, name: `Clip ${ci + 1}`,
+    } as PathObject), doc.space) as PathObject;
+  });
   let objs: CanvasObject[] = svg.shapes.map((s, i): PathObject => homeObject(normalizeUnit({
+    ...base,
     id: newObjectId(),
     kind: "path",
-    ...(view.frame === doc.space.world ? {} : { frame: view.frame }),
-    anchor: at,
-    unit: -cam.zi,
     z: z0 + 1 + i,
     opacity: s.opacity,
-    attachmentTargetId: null,
-    sub: s.sub.map((p) => ({ n: p.n.map((v, j) => (v - (j % 2 === 0 ? cx : cy)) * k), closed: p.closed })),
+    ...(s.clip !== undefined && masks[s.clip] ? { parent: masks[s.clip]!.id } : {}),
+    sub: toLocal(s.sub),
     fill: s.fill,
     stroke: s.stroke,
     width: s.width * k,
@@ -1648,6 +1662,7 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
     ...(s.evenodd ? { evenodd: true as const } : {}),
     ...(s.name ? { name: s.name } : {}),
   } as PathObject), doc.space) as PathObject);
+  objs = [...masks.filter((m): m is PathObject => m !== null), ...objs];
   if (objs.length > 1) objs = groupObjects(objs, 0);
   doc.commit(doc.transaction(`Import SVG (${objs.length} ${objs.length === 1 ? "shape" : "shapes"})`, objs));
   editor.select(objs.map((o) => o.id));

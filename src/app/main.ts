@@ -219,7 +219,13 @@ async function start(): Promise<void> {
   doc.subscribe((_source, changed) => {
     // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
     const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
-    const more = changed && patternUsers.size ? [...patternUsers].filter(([, src]) => src.some((i) => changed.has(i))).map(([id]) => id) : [];
+    // (a pattern of a pattern follows too, down the chain; a cycle ends because an id is added once)
+    const hit = new Set(changed);
+    for (let grew = changed !== null && patternUsers.size > 0; grew; ) {
+      grew = false;
+      for (const [id, src] of patternUsers) if (!hit.has(id) && src.some((i) => hit.has(i))) (hit.add(id), (grew = true));
+    }
+    const more = changed ? [...hit].filter((id) => !changed.has(id)) : [];
     tiles.invalidate(sheets.length || more.length ? new Set([...changed!, ...more, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
   });
   // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.

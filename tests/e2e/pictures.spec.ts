@@ -887,3 +887,140 @@ test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas,
   await app.frame();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a pattern of a pattern shows the inner pattern, follows a change of the innermost source, and a cycle or itself as the source cannot hang or error", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 950, y: 320 }, { x: 1010, y: 380 }, 6); // S: the source
+  const s = (await objs(app)).at(-1)!;
+  const t = await pickedRect(app, [400, 320], [700, 470]);
+  const setPattern = async (target: [number, number], source: [number, number]) => {
+    // (the chooser of the step before may still be open over the shape, or be closed by this Fill: press away, pick the shape, try again until the chooser is open)
+    await expect(async () => {
+      await p.keyboard.press("Escape");
+      await p.mouse.click(60, 650);
+      await p.mouse.click(...target);
+      await p.click('[data-paint="fill"]', { timeout: 1500 });
+      await expect(pop).toBeVisible({ timeout: 1500 }); // (Fill on an open chooser closes it: then try again)
+    }).toPass({ timeout: 20000 });
+    await pop.locator('[data-mode="pattern"]').click();
+    await pop.locator("[data-tex-pick]").click();
+    await p.mouse.click(...source);
+    await p.keyboard.press("Escape");
+    await p.mouse.click(60, 650);
+    await app.frame();
+  };
+  // the share of a region's pixels that are the colour of S's middle, and of the ground (a flat average has neither a grid nor gaps)
+  const [blue, ground] = [(await px(app, 980, 350)).join(), (await px(app, 60, 650)).join()]; // (before S loses its fill)
+  const share = async (x0: number, y0: number, w: number, h: number) => {
+    let [nb, ng, n] = [0, 0, 0];
+    for (let y = y0 + 4; y < y0 + h; y += 8) for (let x = x0 + 4; x < x0 + w; x += 8, n++) {
+      const c = (await px(app, x, y)).join();
+      if (c === blue) nb++;
+      else if (c === ground) ng++;
+    }
+    return { blue: nb / n, ground: ng / n };
+  };
+  await setPattern([670, 440], [980, 350]); // T <- S (clicks on the right of the shapes: the chooser of the step before may still cover their middle)
+  await pickedRect(app, [400, 520], [700, 670]); // Q
+  await setPattern([670, 640], [670, 440]); // Q <- T
+  const inner = await share(400, 520, 300, 150);
+  expect(inner.blue, "Q shows the ellipses of T's pattern").toBeGreaterThan(0.1);
+  expect(inner.ground, "and the gaps between them (not one flat colour)").toBeGreaterThan(0.1);
+  // the innermost source loses its fill: Q, two patterns away, follows
+  await p.mouse.click(60, 650);
+  await p.mouse.click(980, 350);
+  await p.click('[data-paint="fill"]');
+  await pop.locator(".colour-none").click();
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  expect((await share(400, 520, 300, 150)).blue, "Q follows the change of S").toBeLessThan(inner.blue / 4);
+  // a cycle (S uses T, T uses S) and a shape that is its own source: drawn, no error
+  await p.keyboard.press("Control+z"); // (S has its fill again, so it can be clicked)
+  await setPattern([980, 350], [670, 440]);
+  await setPattern([670, 440], [670, 440]);
+  await app.wheel(550, 395, -3000);
+  await app.frame();
+  expect(app.consoleErrors).toEqual([]);
+  expect(s.id).not.toBe(t.id);
+});
+
+test("a sparse pattern (small shapes far apart) far out is the colour of its shapes, not pale or white", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 900, y: 300 }, { x: 960, y: 360 }, 6);
+  const rect = await pickedRect(app, [400, 450], [700, 600]);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  await p.mouse.click(930, 330);
+  for (const [k, v] of [["sx", "300"], ["sy", "300"], ["scale", "10"]]) await pop.locator(`[data-tex-num="${k}"]`).fill(v!);
+  await pop.locator('[data-tex-num="scale"]').press("Enter");
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { spacing?: number[] } | undefined)?.spacing).toEqual([3, 3]);
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { scale?: number } | undefined)?.scale).toBeCloseTo(0.1, 5);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  // far out the tiles are below 2 px and the shape is one flat colour: that of the ellipses (blue), whatever little of the tile they cover
+  await app.wheel(550, 525, 4500);
+  await app.frame();
+  const seen = new Set<string>();
+  for (let y = 505; y <= 545; y += 4) for (let x = 530; x <= 570; x += 4) seen.add((await px(app, x, y)).join());
+  const flat = [...seen].filter((c) => { const [r, , b] = c.split(",").map(Number); return b! > r! + 60; }); // blue, not the grey-green ground
+  expect(flat.length, "the shape is still blue far out").toBeGreaterThan(0);
+  for (const c of flat) {
+    const [r, g, b] = c.split(",").map(Number) as [number, number, number];
+    // between the ellipse's outline (31,35,41) and its fill (37,99,235): an average cannot be brighter than anything it averages
+    expect([r <= 40 && r >= 28, g <= 102 && g >= 32, b <= 238 && b >= 38].every(Boolean), `${c} lies between the outline and the fill of the ellipses`).toBe(true);
+  }
+});
+
+test("an SVG export of a pattern fill is the tile put where the canvas puts it (as images cut to the shape), not one flat colour", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 900, y: 300 }, { x: 960, y: 360 }, 6);
+  const rect = await pickedRect(app, [400, 450], [700, 600]);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  await p.mouse.click(930, 330);
+  await pop.locator('[data-tex-sel="tile"]').selectOption("hex-h");
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { tile?: string } | undefined)?.tile).toBe("hex-h");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(670, 580);
+  await exportWith(p, "exportpic");
+  const dlg = p.getByTestId("export-dialog");
+  await dlg.locator('[data-format="svg"]').click();
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+  expect(svg, "the tile, put where the canvas puts it, cut to the shape (no <pattern>: Qt's SVG leaves it empty)").toMatch(/<g clip-path="url\(#t\d+c\)"><use xlink:href="#t\d+i"/);
+  expect(svg).not.toContain("<pattern");
+  expect(svg, "the shapes of the source as vectors (one group, used for each tile), not a picture of them").not.toContain("<image");
+  expect(svg).toMatch(/<g id="t\d+i" transform="scale\([^)]+\)">\s*<path /);
+  // drawn: the blue ellipses and the clear gaps between them are both there (a flat fill has one or the other)
+  const share = await p.evaluate(async (text) => {
+    const img = new Image();
+    img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = c.height = 400;
+    const g = c.getContext("2d")!;
+    g.drawImage(img, 0, 0, 400, 400);
+    const d = g.getImageData(0, 0, 400, 400).data;
+    let [blue, clear] = [0, 0];
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3]! === 0) clear++;
+      else if (d[i + 2]! > 180 && d[i]! < 90) blue++;
+    }
+    return { blue: blue / (d.length / 4), clear: clear / (d.length / 4) };
+  }, svg);
+  expect(share.blue, "ellipses of the tile").toBeGreaterThan(0.05);
+  expect(share.clear, "gaps between them").toBeGreaterThan(0.05);
+});

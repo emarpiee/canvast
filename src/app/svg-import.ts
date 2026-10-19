@@ -2,7 +2,7 @@
  * Read an SVG as vector shapes (ADR 0107): paths, rectangles (with rounded corners), circles, ellipses, lines, polylines and polygons, in
  * groups and with transforms (matrix, translate, scale, rotate, skew), each with its fill, outline, width, ends, corners, dashes, fill rule
  * and opacity, and linear and radial gradients. Everything is turned into paths in SVG units; nothing is run (the text is parsed as an
- * image document, never inserted in the page). Left out: text, images, filters, masks, clips, patterns, markers and `<use>`.
+ * image document, never inserted in the page). A `clip-path` is read as a clipping mask (the clip's shapes, in the outermost clip only). Left out: text, images, filters, masks, patterns, markers.
  */
 import type { Dash } from "../doc/stroke-look";
 import type { Gradient, Paint } from "../doc/paint";
@@ -22,10 +22,14 @@ export interface SvgShape {
   evenodd: boolean;
   opacity: number;
   name?: string;
+  /** The clip (an index of `SvgImport.clips`) that cuts this shape, if any. */
+  clip?: number;
 }
 
 export interface SvgImport {
   shapes: SvgShape[];
+  /** The shapes of each `clip-path` used (in SVG units): one clipping mask for each. */
+  clips: Array<{ sub: SubPath[] }>;
   /** The drawing's own box (its viewBox, else the box of the shapes). */
   box: { x: number; y: number; w: number; h: number };
 }
@@ -170,6 +174,9 @@ export function parseSvg(text: string): SvgImport | null {
   const gradients = new Map<string, Element>();
   for (const g of docEl.querySelectorAll("linearGradient, radialGradient")) if (g.id) gradients.set(g.id, g);
   const shapes: SvgShape[] = [];
+  const clips: Array<{ sub: SubPath[] }> = [];
+  const clipOf = new Map<string, number>(); // (a clip with its matrix: one mask for each place it is used)
+  let activeClip: number | undefined;
   const stopsOf = (g: Element): Array<{ o: number; c: string }> => {
     let src: Element | undefined = g;
     for (let hops = 0; src && !src.querySelector("stop") && hops < 5; hops++) {
@@ -246,6 +253,7 @@ export function parseSvg(text: string): SvgImport | null {
     const id = el.getAttribute("id");
     shapes.push({
       sub, fill, stroke, width, evenodd: st.evenodd, opacity: Math.min(1, Math.max(0.01, alpha)),
+      ...(activeClip !== undefined ? { clip: activeClip } : {}),
       ...(st.join ? { join: st.join } : {}), ...(st.cap ? { cap: st.cap } : {}), ...(dash ? { dash } : {}), ...(id ? { name: id.slice(0, 80) } : {}),
     });
   };
@@ -253,8 +261,25 @@ export function parseSvg(text: string): SvgImport | null {
   const byId = new Map<string, Element>();
   for (const e of docEl.querySelectorAll("[id]")) if (!byId.has(e.id)) byId.set(e.id, e);
   let useDepth = 0;
+  // The outline of one clip shape, in its own units (a path, rectangle, circle, ellipse or polygon).
+  const geomOf = (el: Element, vw: number, vh: number): SubPath[] | null => {
+    const f = (k: string, of = 0): number => len(el.getAttribute(k), of);
+    switch (el.localName) {
+      case "path": return parsePathData(el.getAttribute("d") ?? "");
+      case "rect": { const w = f("width", vw), h = f("height", vh); return w > 0 && h > 0 ? roundedRect(f("x", vw), f("y", vh), w, h, f("rx", vw), f("ry", vh)) : null; }
+      case "circle": { const r = f("r", Math.hypot(vw, vh) / Math.SQRT2); return r > 0 ? [ellipseData(f("cx", vw), f("cy", vh), r, r)] : null; }
+      case "ellipse": { const rx = f("rx", vw), ry = f("ry", vh); return rx > 0 && ry > 0 ? [ellipseData(f("cx", vw), f("cy", vh), rx, ry)] : null; }
+      case "polygon": {
+        const p = points(el.getAttribute("points"));
+        const n: number[] = [];
+        for (let i = 0; i + 1 < p.length; i += 2) n.push(p[i]!, p[i + 1]!, p[i]!, p[i + 1]!, p[i]!, p[i + 1]!);
+        return n.length >= 2 * NODE ? [{ n, closed: true }] : null;
+      }
+      default: return null;
+    }
+  };
   const SKIP = new Set(["defs", "clipPath", "mask", "pattern", "marker", "symbol", "style", "script", "title", "desc", "metadata", "linearGradient", "radialGradient", "foreignObject", "text"]);
-  const walk = (el: Element, parent: Style, pm: Matrix, alpha: number, vw: number, vh: number): void => {
+  const walk = (el: Element, parent: Style, pm: Matrix, alpha: number, vw: number, vh: number, clipDone = false): void => {
     if (shapes.length > 20000) return;
     const name = el.localName;
     if (SKIP.has(name) || el.getAttribute("display") === "none" || /display:\s*none/.test(el.getAttribute("style") ?? "")) return;
@@ -262,6 +287,24 @@ export function parseSvg(text: string): SvgImport | null {
     const m = mul(pm, parseTransform(el.getAttribute("transform")));
     const a = alpha * st.opacity;
     const f = (k: string, of = 0): number => len(el.getAttribute(k), of);
+    // clip-path="url(#id)": the clip's shapes (in the user space of this element) become a clipping mask for what is inside; the outermost one counts
+    const clipRef = /url\(\s*['"]?#([^'")\s]+)/.exec(el.getAttribute("clip-path") ?? /clip-path:\s*([^;]+)/.exec(el.getAttribute("style") ?? "")?.[1] ?? "");
+    const clipEl = clipRef ? byId.get(clipRef[1]!) : undefined;
+    if (!clipDone && clipEl?.localName === "clipPath" && activeClip === undefined && (name === "g" || name === "use" || name === "svg" || name === "a")) {
+      const subs: SubPath[] = [];
+      for (const c of clipEl.children) {
+        const cm = mul(m, parseTransform(c.getAttribute("transform")));
+        const g = c.localName === "use" ? null : geomOf(c, vw, vh);
+        if (g) subs.push(...mapSubs(g, (x, y) => [cm[0] * x + cm[2] * y + cm[4], cm[1] * x + cm[3] * y + cm[5]]).map((q) => ({ ...q, closed: true })));
+      }
+      if (subs.length) {
+        const key = `${clipRef![1]}/${m.join(",")}`;
+        if (!clipOf.has(key)) { clipOf.set(key, clips.length); clips.push({ sub: subs }); }
+        activeClip = clipOf.get(key);
+        try { walk(el, parent, pm, alpha, vw, vh, true); } finally { activeClip = undefined; }
+        return;
+      }
+    }
     switch (name) {
       case "svg": case "g": case "a": case "switch":
         for (const c of el.children) walk(c, st, m, a, vw, vh);
@@ -305,6 +348,6 @@ export function parseSvg(text: string): SvgImport | null {
     const b = geometryBounds(shapes.flatMap((s) => s.sub));
     box = { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY };
   }
-  return { shapes, box };
+  return { shapes, clips, box };
 }
 
