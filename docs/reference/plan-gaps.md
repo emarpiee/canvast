@@ -81,7 +81,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Sorting, file-type filters, usage filter, Boolean search, suggestions | Done | ADR 0069, 0071, 0082, 0083, 0091. |
 | Bulk tagging, folders, favourites, rename; direct placement; usage to instance navigation | Done | ADR 0058, 0077, 0085. |
 | Metadata inspector | Done (ADR 0138) | Name, size, pixels, type, usage, tags, folder, and what the file says: EXIF, colour profile, PNG text, codec. |
-| Search at large scale | Partial | A linear filter over the in-memory list; to be measured in Phase 8. |
+| Search at large scale | Done (measured) | One key: 43 ms at 100,000 objects and 384 ms at 1,000,000 (a word no object has, Chromium); Firefox 81 ms at 100,000. [`docs/testing/phase-8.md`](../testing/phase-8.md). |
 | Independent collections | Decided against | One folder per asset plus tags (ADR 0057). |
 | Dynamic smart folders | Decided against | Built (ADR 0035), then replaced by file types (ADR 0082). The plan still lists them. |
 | Saved searches | Decided against | Left out (owner, 2026-10-17); recent searches that found something exist (ADR 0071). |
@@ -104,7 +104,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Streaming export and import without the whole archive in memory | Partial (ADR 0115) | Built from Blob slices and verified by streaming; not measured at multi-GB sizes. |
 | Hundreds of gigabytes, chunked or desktop-assisted fallback | **Gap** | Not offered. |
 | Incremental backup chain; last verified backup shown | Done (ADR 0133) | A chain of files restores as one; the status is shown. |
-| Update-safe origin for a replaced HTML file | **Gap** | Phase 8. The Storage tab explains it; there is no upgrade test. |
+| Update-safe origin for a replaced HTML file | Done (ADR 0155) | `upgrade.spec.ts`: same path keeps the data in Chromium and Firefox; another path is the browser's choice and is recorded ([reference](storage-origin.md)). WebKit untested. |
 
 ## §8 Performance
 
@@ -116,8 +116,8 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Web workers | Decided against | Cooperative scheduling on the main thread instead (ADR 0029). |
 | GPU or WebGL backend | Decided against | CPU-first Canvas 2D (ADR 0002). |
 | 60 FPS on a reference device, 120 FPS | Unverified | Measured on the author's machine only; no hardware tiers. |
-| Cold and warm startup benchmarks | **Gap** | Not recorded. |
-| Software-render and low-memory test tier | Partial | A `chromium-cpu` test project exists; no low-memory tier. |
+| Cold and warm startup benchmarks | Done (measured) | Cold 182 ms (Chromium) and 321 ms (Firefox) to the first frame; warm with 50,000 stored objects: loaded 1.0 s, index complete 2.4 s in both. [`docs/testing/phase-8.md`](../testing/phase-8.md). |
+| Software-render and low-memory test tier | Done | A `chromium-cpu` test project; a memory tier by `deviceMemory` (128, 256 or 384 MB of decoded pictures) tested in `lowmem.spec.ts`. No measurement on a real low-memory device. |
 
 ## §9 UI, Settings and accessibility
 
@@ -178,6 +178,6 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | 1 | PDF page rendering and other 3D formats | A renderer to ship offline (its size in the single file is the cost) |
 | 2 | Phase 8 (large projects, search at scale, qualification matrix, update-safe origin) and Phase 9 (clean-machine test, reproducible build) | Each is a phase of its own in `docs/status.md` |
 | 3 | Hundreds of gigabytes; streaming archives measured at multi-GB sizes | Not offered; the browser's Blob size is the ceiling |
-| 4 | 60 and 120 FPS on reference devices; cold and warm startup benchmarks; a low-memory tier | Need devices and a recorded method |
+| 4 | 60 and 120 FPS on reference devices; a low-memory device | Need devices and a recorded method |
 | 5 | Networks: split edges where they cross, a fill per region | Needs curve intersection on edges; ADR 0146 |
 | 6 | A layer clipped to the layer below (a toggle on a Layers row); the clipping mask of ADR 0144 works the other way round (the top shape cuts what is below) | Asked for 2026-10-18; needs a marker on the layer and the clip following moves and reordering |
