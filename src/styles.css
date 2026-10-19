@@ -1,4 +1,5 @@
 :root {
+  --dev-panel-max-h: 6.5rem;
   color-scheme: light dark;
   /* The two dials of the colour system (Settings > Appearance): the hue every tint is built on, and how much colour it carries.
      Lightness is fixed in each token below, so turning either dial never changes contrast (ADR 0052). */
@@ -391,6 +392,8 @@ input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-s
   position: absolute;
   left: 50px; /* (clear of the tool rail, which is 8 to 46 px from the left) */
   top: 180px;
+  max-height: var(--dev-panel-max-h); /* ends before y = 290 in every browser (Firefox's text is taller: it scrolls); tests draw from y = 300 */
+  overflow-y: auto;
   max-width: 20rem; /* ends before x = 370: tests and hands start drags around (380, 240..260), so it must not reach there */
   pointer-events: auto;
   display: flex;
