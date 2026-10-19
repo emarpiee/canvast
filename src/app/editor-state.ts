@@ -212,6 +212,8 @@ export class EditorState {
   message = "";
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
+  /** A texture fill is waiting for its source (ADR 0154): the next press on the canvas gives what is under it to `take` instead of picking it. */
+  sourcePick: { readonly kind: "image" | "pattern"; take(objs: readonly CanvasObject[]): void } | null = null;
   /** The words Reveal says for a screen reader (the hint line speaks them): what is under the pointer; null when nothing is revealed. */
   revealText: string | null = null;
   /** When a finger's long press last opened the "under your finger" list (performance.now): the context menu the browser sends with the same long press is not wanted then. */

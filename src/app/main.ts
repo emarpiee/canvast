@@ -29,6 +29,9 @@ import { TileCache } from "../render/tile-cache";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { hiddenInView, visibleObjects } from "../render/scene-view";
+import { setTextureHost } from "../render/texture";
+import { isTexture } from "../doc/texture";
+import { createTextureHost } from "./texture-host";
 import { pickAll } from "../render/hit-test";
 import { dimHits, revealHits } from "../interaction/reveal";
 import { mountContextMenu } from "../ui/context-menu";
@@ -92,6 +95,8 @@ import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
 import { ADJUSTMENT_KIND } from "../assets/styles";
 import { setColourStyles } from "../ui/colour-popover";
+import { setTextureHooks } from "../ui/texture-editor";
+import { createTextureHooks } from "./texture-actions";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
@@ -192,10 +197,24 @@ async function start(): Promise<void> {
       else labelIds.delete(id);
     }
   });
+  // Shapes filled with a pattern of objects (ADR 0154) look different when those objects change.
+  const patternUsers = new Map<string, readonly string[]>();
+  const sourcesOf = (o: CanvasObject | undefined): readonly string[] | null => (o?.kind === "path" && isTexture(o.fill) && o.fill.src.kind === "objects" ? o.fill.src.ids : null);
+  doc.subscribe((_source, changed) => {
+    if (!changed) {
+      patternUsers.clear();
+      for (const o of doc.all()) if (sourcesOf(o)) patternUsers.set(o.id, sourcesOf(o)!);
+    } else for (const id of changed) {
+      const ids = sourcesOf(doc.get(id));
+      if (ids) patternUsers.set(id, ids);
+      else patternUsers.delete(id);
+    }
+  });
   doc.subscribe((_source, changed) => {
     // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
     const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
-    tiles.invalidate(sheets.length ? new Set([...changed!, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
+    const more = changed && patternUsers.size ? [...patternUsers].filter(([, src]) => src.some((i) => changed.has(i))).map(([id]) => id) : [];
+    tiles.invalidate(sheets.length || more.length ? new Set([...changed!, ...more, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
   });
   // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.
   const blended = new Set<string>();
@@ -367,6 +386,8 @@ async function start(): Promise<void> {
     invalidate();
   });
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
+  const textureHost = createTextureHost({ doc, index, assets, theme: () => theme });
+  setTextureHost(textureHost); // (texture fills, ADR 0154)
   applyHeldQuality();
   // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
   const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
@@ -1024,6 +1045,29 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
   };
 
+  // Texture fills (ADR 0154): the chooser's Image and Pattern take their source from the canvas or a file.
+  setTextureHooks(createTextureHooks({
+    editor,
+    host: textureHost,
+    nameOf: (hash) => assetNames.get(hash),
+    say: (text) => { editor.message = text; editor.changed(); },
+    importPicture: async (file) => {
+      try {
+        const { record } = await assets.importFileDetailed(file, false);
+        if (!record.type.startsWith("image/") || record.card) {
+          editor.message = "That file is not a picture.";
+          editor.changed();
+          return null;
+        }
+        if (session.catalog) await fileInLibrary(session, record.hash, "Fills", ["fill"]);
+        return record.hash;
+      } catch (err) {
+        editor.message = `Could not take that picture: ${err instanceof Error ? err.message : String(err)}`;
+        editor.changed();
+        return null;
+      }
+    },
+  }));
   setColourStyles({
     gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, gradient: s.data as Gradient })),
     saveGradient: (g) => void session.styles.add("gradient", "", g).then((made) => made && ((editor.message = "Saved the gradient to the Styles."), editor.changed())),

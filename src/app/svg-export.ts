@@ -10,7 +10,7 @@ import * as D from "../core/dyadic";
 import type { PathObject } from "../doc/model";
 import { expressObjectIn, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
-import { isGradient } from "../doc/paint";
+import { isGradient, solidOf } from "../doc/paint";
 import { regionSplit } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
 import type { Arrow } from "../doc/path";
@@ -118,7 +118,7 @@ export function exportSvg(paths: readonly PathObject[], space: FrameSpace, maskO
   const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null): string => {
     if (paint === null) return ` ${which}="none"`;
     if (!isGradient(paint)) {
-      const c = colour(paint);
+      const c = colour(solidOf(paint)); // (a texture is its average colour: SVG has no such fill here)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;

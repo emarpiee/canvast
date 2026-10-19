@@ -471,6 +471,14 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.20.0 — texture fills (2026-10-19)
+
+- **Implemented:** [ADR 0154](adr/0154-texture-fills.md): `TexturePaint` (a picture or objects as a fill), one drawing path through `canvasPaint`, the Image and Pattern modes of the paint chooser, library references, tile-cache invalidation for patterns.
+- **Tested:** unit (layout, validation, storage, average colour, SVG and PDF fallbacks), E2E in `pictures.spec.ts` (picture fill: pick, Fill, Tile, space, undo, reload, file; pattern: pick, grid, brick rows, source change, deep zoom in and out).
+- **Known failures:** the Firefox text-editor failures of v0.19.1.
+- **Unverified:** Firefox for the texture tests (see the commit); a very large picture as a tile; patterns across paste between canvases.
+- **Next bounded task:** the "Not done" list of ADR 0154 (outline and text textures, adjustments on an image fill, handles on the canvas).
+
 ## v0.19.2 — picture, reveal and export gaps (2026-10-19)
 
 - **Implemented:** [ADR 0153](adr/0153-picture-and-reveal-gaps-vector-pdf.md): gradient outline, radius dots and rounded picking for pictures; reveal of locked, hidden and mask parts, on Edit nodes and Lasso, spoken through the hint line; vector PDF; WebP resolution.

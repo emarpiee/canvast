@@ -13,6 +13,7 @@ import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStrok
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
 import { shapeHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
+import { takeTexturePending } from "./texture";
 import { rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
@@ -132,8 +133,10 @@ export function drawObjects(
       drawCover(c, po, vp, src, theme.imagePlaceholder);
     } else if (po.obj.kind === "stroke") drawStroke(c, po, vp);
     else if (po.obj.kind === "text") drawText(c, po, vp, dpr);
-    else if (po.obj.kind === "path") drawPath(c, po, vp);
-    else {
+    else if (po.obj.kind === "path") {
+      drawPath(c, po, vp);
+      if (takeTexturePending()) pending = true; // (a texture fill whose picture was not decoded yet)
+    } else {
       const shown = shownEdge(po);
       const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
       const key = rasterKey(po.obj);

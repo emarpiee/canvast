@@ -15,8 +15,11 @@ import type { DocumentStore } from "../doc/document-store";
 import type { ObjectId, PathObject } from "../doc/model";
 import { drawObjects } from "../render/scene-renderer";
 import type { SceneTheme } from "../render/scene-renderer";
+import { projectObject } from "../render/projection";
+import type { ProjectedObject } from "../render/projection";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
+import { cameraIn } from "../scene/frame-index";
 import { MAX_AREA, MAX_SIDE } from "./export-size";
 
 export interface ExportTarget {
@@ -59,6 +62,33 @@ export function exportCamera(t: ExportTarget, w: number, h: number): ReturnType<
 const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * One drawing of the target on `ctx` (`w` × `h` px, the camera fitted to its box). True while something is still being decoded, so the
+ * drawing is not final. The one place a target is drawn: Export waits for it (`renderExport`), a texture tile (`render/texture.ts`) takes it once.
+ */
+export function paintExport(deps: RenderDeps, t: ExportTarget, ctx: CanvasRenderingContext2D, w: number, h: number, bg: Background, withHidden = false): boolean {
+  const fc = exportCamera(t, w, h);
+  const vp: Viewport = { width: w, height: h };
+  ctx.clearRect(0, 0, w, h);
+  if (bg !== "transparent") {
+    ctx.fillStyle = bg === "white" ? "#ffffff" : "#000000";
+    ctx.fillRect(0, 0, w, h);
+  }
+  let list = visibleObjects(deps.doc, deps.index, null, fc, vp).filter((po) => t.ids.has(po.obj.id) && !po.obj.hidden);
+  if (withHidden) {
+    // (a texture's tile may be made of objects that are hidden: they are in no index, so they are projected on their own, and put in paint order)
+    const extra: ProjectedObject[] = [];
+    for (const id of t.ids) {
+      const o = deps.doc.get(id);
+      const cam = o?.hidden && !o.isMask ? cameraIn(fc, o.frame ?? deps.doc.space.world) : null;
+      const po = o && cam ? projectObject(o, cam, vp, { keepTiny: true }) : null;
+      if (po) extra.push(po);
+    }
+    if (extra.length) list = [...list, ...extra].sort((a, b) => a.obj.z - b.obj.z);
+  }
+  return drawObjects(ctx, list, deps.assets, vp, 1, deps.theme);
+}
+
+/**
  * The target drawn on a new canvas of `w` × `h` px (more than the limits is refused). Pictures that are still being decoded are waited
  * for (up to about three seconds), so the file is not left with a blurry stand-in.
  */
@@ -71,17 +101,8 @@ export async function renderExport(deps: RenderDeps, t: ExportTarget, w: number,
   canvas.height = h;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("the browser could not make a picture this size");
-  const fc = exportCamera(t, w, h);
-  const vp: Viewport = { width: w, height: h };
   for (let i = 0; i < 60; i++) {
-    ctx.clearRect(0, 0, w, h);
-    if (bg !== "transparent") {
-      ctx.fillStyle = bg === "white" ? "#ffffff" : "#000000";
-      ctx.fillRect(0, 0, w, h);
-    }
-    const list = visibleObjects(deps.doc, deps.index, null, fc, vp).filter((po) => t.ids.has(po.obj.id) && !po.obj.hidden);
-    const pending = drawObjects(ctx, list, deps.assets, vp, 1, deps.theme);
-    if (!pending) break;
+    if (!paintExport(deps, t, ctx, w, h, bg)) break;
     await pause(50);
   }
   return canvas;

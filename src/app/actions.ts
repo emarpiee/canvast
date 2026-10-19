@@ -15,6 +15,7 @@ import { fitWidth, withLook, lookOf, sameLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
+import { isGradient, solidOf } from "../doc/paint";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
@@ -737,7 +738,7 @@ export function selectionColours(doc: DocumentStore, editor: EditorState): strin
 }
 
 /** The first colour of a paint: a gradient on a thing that has one colour only (a pen stroke) gives its start. */
-const firstColour = (p: Paint): string => (typeof p === "string" ? p : p.stops[0]!.c);
+const firstColour = solidOf;
 
 /** `o` with a fill and outline patch applied the way its kind takes it: a shape has both; a text fills its letters and outlines them; a stroke has one colour. */
 function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch): PathObject | TextObject | StrokeObject | ImageObject {
@@ -755,7 +756,7 @@ function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, pa
   let t: TextObject = o;
   if (patch.fill) {
     const { gradient: _g, ...rest } = t;
-    t = typeof patch.fill === "string" ? { ...rest, color: patch.fill } : { ...t, gradient: patch.fill };
+    t = typeof patch.fill === "string" ? { ...rest, color: patch.fill } : isGradient(patch.fill) ? { ...t, gradient: patch.fill } : t;
   }
   if (patch.stroke === null) {
     const { outline: _o, ...rest } = t;
@@ -1558,7 +1559,7 @@ export function exportTargets(doc: DocumentStore, editor: EditorState): ExportTa
   return one ? [one] : [];
 }
 
-function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sheet: CanvasObject | null): ExportTarget | null {
+export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sheet: CanvasObject | null): ExportTarget | null {
   const ids = new Set<ObjectId>([...sel.map((o) => o.id)]);
   for (const id of descendantsOf(doc.all(), new Set(ids))) ids.add(id);
   const all = [...ids].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.hidden && !isMaskObject(o));

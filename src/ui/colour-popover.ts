@@ -4,7 +4,10 @@ import type { Arrow } from "../doc/path";
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
 import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
 import type { Gradient, Paint } from "../doc/paint";
-import { angleOf, asKind, gradientFrom, isGradient, linearAt } from "../doc/paint";
+import { angleOf, asKind, gradientFrom, isGradient, linearAt, solidOf } from "../doc/paint";
+import { isTexture, newTexture, withSource } from "../doc/texture";
+import type { TexturePaint } from "../doc/texture";
+import { createTextureEditor, textureHooks } from "./texture-editor";
 import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { esc } from "./format";
 import { gradientCss } from "../assets/styles";
@@ -79,6 +82,14 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
     pop.style.maxHeight = `${window.innerHeight - top - 8}px`;
   }
 }
+
+/** A texture's source is being picked on the canvas (ADR 0154): a press there is the pick, not a press outside, so the chooser stays. */
+let picking = false;
+export const holdColourPopover = (on: boolean): void => {
+  // (released a moment later: the press that ended the pick is still on its way to the document, and is not a press outside)
+  if (on) picking = true;
+  else setTimeout(() => (picking = false));
+};
 
 let open: { pop: HTMLElement; anchor: HTMLElement; picker: { destroy(): void }; onClose: (() => void) | undefined } | null = null;
 
@@ -234,11 +245,12 @@ function installCloseRules(): void {
   installed = true;
   document.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
-    if (open && !t.closest(".colour-pop") && !open.anchor.contains(t)) closeColourPopover();
+    if (open && !picking && !t.closest(".colour-pop") && !open.anchor.contains(t)) closeColourPopover();
   });
   document.addEventListener(
     "keydown",
     (e) => {
+      if (e.key === "Escape" && picking) return; // (the pick takes it: it ends the pick, not the chooser)
       if (e.key === "Escape" && child) {
         e.preventDefault();
         e.stopPropagation();
@@ -397,10 +409,11 @@ export interface PaintPopoverOptions {
   onChange(paint: Paint | null): void;
   onClose?(): void;
   /** The kinds of paint offered (default: all four). A text's fill has no None; a text's outline has only None and Colour. */
-  modes?: ReadonlyArray<"none" | "solid" | "linear" | "radial" | "angular">;
+  modes?: ReadonlyArray<Mode>;
 }
 
-type Mode = "none" | "solid" | "linear" | "radial" | "angular";
+/** `image` and `pattern` are the textures of a fill (ADR 0154); offered only where the list says so. */
+type Mode = "none" | "solid" | "linear" | "radial" | "angular" | "image" | "pattern";
 
 /** Open the paint chooser under `anchor`: None, Solid, Linear or Radial, with the colour picker or the gradient editor below. */
 export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): void {
@@ -413,8 +426,10 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     committed = JSON.stringify(p);
     o.onChange(p);
   };
-  let solid = typeof paint === "string" ? paint : isGradient(paint) ? paint.stops[0]!.c : "#2563eb";
-  const modeOf = (): Mode => (paint === null ? "none" : isGradient(paint) ? paint.type : "solid");
+  let solid = paint === null ? "#2563eb" : solidOf(paint);
+  /** Image or Pattern chosen before a source is: the controls show, the paint stays what it was until there is a source. */
+  let draft: "image" | "pattern" | null = null;
+  const modeOf = (): Mode => (draft ? draft : paint === null ? "none" : isTexture(paint) ? (paint.src.kind === "asset" ? "image" : "pattern") : isGradient(paint) ? paint.type : "solid");
   const groups = swatchGroups;
   const pickerOptions = {
     model: store?.get("colour.model") ?? "okhsv",
@@ -438,8 +453,8 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.className = "paint-modes";
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
-  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial", angular: "Angular" };
-  const offered = o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const);
+  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial", angular: "Angular", image: "Image", pattern: "Pattern" };
+  const offered = (o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const)).filter((m) => (m !== "image" && m !== "pattern") || textureHooks());
   modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
   const body = document.createElement("div");
   body.className = "paint-body";
@@ -452,7 +467,26 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     current = null;
     body.replaceChildren();
     for (const b of modes.querySelectorAll<HTMLElement>("[data-mode]")) b.setAttribute("aria-checked", String(b.dataset["mode"] === modeOf()));
-    if (paint === null) {
+    if (draft || isTexture(paint)) {
+      const kind = draft ?? (modeOf() as "image" | "pattern");
+      const ed = createTextureEditor({
+        kind,
+        value: isTexture(paint) && (paint.src.kind === "asset") === (kind === "image") ? paint : null,
+        onSource: (src, avg) => {
+          const tex = isTexture(paint) && (paint.src.kind === "asset") === (kind === "image") ? withSource(paint, src, avg) : newTexture(src, avg);
+          draft = null;
+          o.onInput((paint = tex));
+          settle(paint);
+          mount();
+          place(pop, anchor);
+        },
+        onInput: (t: TexturePaint) => o.onInput((paint = t)),
+        onChange: (t: TexturePaint) => settle((paint = t)),
+        onResize: () => place(pop, anchor),
+      });
+      body.append(ed.el);
+      current = ed;
+    } else if (paint === null) {
       const note = document.createElement("div");
       note.className = "paint-none";
       note.textContent = o.noneLabel;
@@ -477,7 +511,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     } else {
       const picker = createColourPicker({
         ...pickerOptions,
-        value: paint,
+        value: solid,
         alpha: true,
         onInput: (hex) => o.onInput((paint = solid = hex)),
         onChange: (hex) => {
@@ -496,7 +530,15 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-mode]");
     if (!b || b.dataset["mode"] === modeOf()) return;
     const m = b.dataset["mode"] as Mode;
-    if (isGradient(paint)) solid = paint.stops[0]!.c;
+    if (m === "image" || m === "pattern") {
+      // (no source yet: the controls show, and the paint is what it was until one is chosen)
+      draft = m;
+      mount();
+      place(pop, anchor);
+      return;
+    }
+    draft = null;
+    if (paint !== null) solid = solidOf(paint);
     paint = m === "none" ? null : m === "solid" ? solid : isGradient(paint) ? asKind(paint, m) : gradientFrom(solid, m);
     mount();
     place(pop, anchor);

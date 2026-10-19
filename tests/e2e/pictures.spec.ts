@@ -572,3 +572,143 @@ test("a curve's points are dragged with the mouse: a point added by a click, an 
   expect((await master())![0]![1], "one undo step").toBe(0);
   expect(app.consoleErrors).toEqual([]);
 });
+
+/** A rectangle drawn with the Shape tool, then the Select tool and the rectangle picked: ready for its Fill to be opened. */
+async function pickedRect(app: App, from: readonly [number, number], to: readonly [number, number]): Promise<Pic & { fill?: unknown }> {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }, 6);
+  const rect = (await objs(app)).at(-1)!;
+  await p.keyboard.press("v");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(Math.round((from[0] + to[0]) / 2), Math.round((from[1] + to[1]) / 2));
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([rect.id]);
+  return rect;
+}
+const fillOf = async (app: App, id: string) => (await objs(app)).find((o) => o.id === id) as unknown as { fill?: { type?: string; src?: { kind: string; hash?: string; ids?: string[] }; mode?: string; spacing?: number[] } | string | null };
+const is = (c: number[] | undefined, r: number, g: number, b: number): boolean => !!c && Math.abs(c[0]! - r) < 12 && Math.abs(c[1]! - g) < 12 && Math.abs(c[2]! - b) < 12;
+
+test("a picture fills a shape (ADR 0154): picked on the canvas, Fill covers it, Tile repeats it, space opens gaps; one undo step, kept after a reload", async ({ app }) => {
+  const p = app.page;
+  const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
+  const rect = await pickedRect(app, [400, 450], [600, 550]); // 200 × 100, below the picture
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  await expect(pop.locator("[data-tex-note]")).toContainText("Choose a picture");
+  await pop.locator("[data-tex-pick]").click();
+  // a click on something that is not a picture is not a source; the chooser stays open, and Esc ends the pick
+  await p.mouse.click(500, 500);
+  await expect(pop, "the chooser stays while a source is being picked").toBeVisible();
+  expect(typeof (await fillOf(app, rect.id)).fill, "still its own fill").toBe("string");
+  const pb = await boxOf(app, picture.id);
+  await p.mouse.click(Math.round((pb.minX + pb.maxX) / 2), Math.round((pb.minY + pb.maxY) / 2));
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { type?: string } | undefined)?.type).toBe("texture");
+  const t = (await fillOf(app, rect.id)).fill as { src: { kind: string; hash: string }; mode: string };
+  expect([t.src.kind, t.mode]).toEqual(["asset", "fill"]);
+  await expect(pop.locator("[data-tex-note]")).toContainText("Picture");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  // Fill: the picture covers the shape, its red half on the left and its blue half on the right
+  expect(is(await px(app, 430, 500), 255, 0, 0), "left: red").toBe(true);
+  expect(is(await px(app, 570, 500), 0, 0, 255), "right: blue").toBe(true);
+  // Tile: a repeat a quarter of the longer side across (50 px): red, blue, red again 50 px on
+  await p.mouse.click(500, 500);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-tex-sel="mode"]').selectOption("tile");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  expect([is(await px(app, 410, 470), 255, 0, 0), is(await px(app, 435, 470), 0, 0, 255), is(await px(app, 460, 470), 255, 0, 0), is(await px(app, 485, 470), 0, 0, 255)], "red, blue, red, blue").toEqual([true, true, true, true]);
+  // a tile of space across: the tiles are 50 px in cells of 100, so the first 25 px of each cell is the ground
+  await p.mouse.click(500, 500);
+  await p.click('[data-paint="fill"]');
+  const space = pop.locator('[data-tex-num="sx"]');
+  await space.fill("100");
+  await space.press("Enter");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  const ground = await px(app, 60, 650);
+  expect([await px(app, 410, 470), is(await px(app, 435, 470), 255, 0, 0), is(await px(app, 460, 470), 0, 0, 255)], "ground, then the tile").toEqual([ground, true, true]);
+  // one undo step each, and it all survives a reload
+  await p.mouse.click(500, 500);
+  await p.keyboard.press("Control+z");
+  expect(((await fillOf(app, rect.id)).fill as { spacing: number[] }).spacing).toEqual([0, 0]);
+  await p.keyboard.press("Control+y");
+  await app.frame();
+  await expect(p.getByTestId("save-status")).toContainText("Saved");
+  await p.reload();
+  await p.waitForFunction(() => window.__canvastDebug !== undefined);
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
+  await app.frame();
+  const again = (await fillOf(app, rect.id)).fill as { src: { hash: string }; spacing: number[] };
+  expect([again.src.hash, again.spacing]).toEqual([t.src.hash, [1, 0]]);
+  await expect.poll(async () => is(await px(app, 435, 470), 255, 0, 0)).toBe(true);
+  // a picture file chosen in the chooser goes into the library and becomes the source; the placement stays
+  await p.mouse.click(500, 500);
+  await p.click('[data-paint="fill"]');
+  await p.locator(".colour-pop [data-tex-input]").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: makePng(8, 8, () => [0, 200, 0, 255]) });
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { src: { hash: string } }).src.hash).not.toBe(t.src.hash);
+  expect(((await fillOf(app, rect.id)).fill as { spacing: number[] }).spacing, "the placement is kept").toEqual([1, 0]);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await expect.poll(async () => is(await px(app, 435, 470), 0, 200, 0)).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas, the grid and its rows, and a change to the source changes the pattern", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 900, y: 300 }, { x: 960, y: 360 }, 6); // the source: a 60 px ellipse
+  const src = (await objs(app)).at(-1)!;
+  const rect = await pickedRect(app, [400, 450], [700, 600]); // 300 × 150: the tile is 75 px
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  await p.mouse.click(930, 330);
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { src?: { kind: string; ids: string[] } } | undefined)?.src?.ids).toEqual([src.id]);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  const ground = await px(app, 60, 650);
+  const blue = await px(app, 930, 330); // the source's own fill
+  // the middle of a tile has the ellipse's fill, the corner of it is the ground, and the next tile is the same
+  expect([await px(app, 437, 487), await px(app, 512, 487), await px(app, 403, 453)]).toEqual([blue, blue, ground]);
+  // brick rows: the second row is half a tile across, so the middle of its first tile is under the seam of the first row
+  await p.mouse.click(550, 525);
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-tex-sel="tile"]').selectOption("hex-h");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  expect([await px(app, 437, 487), await px(app, 475, 562)], "row one at 37, row two half a tile across").toEqual([blue, blue]);
+  // the source is hidden (the usual way to use a shape as a tile): the pattern still shows it
+  await p.mouse.click(930, 330);
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  await p.getByTestId("layers-panel").locator('[data-do="hide"]').click();
+  await p.mouse.click(60, 650);
+  await app.frame();
+  expect(await px(app, 930, 330), "the source itself is gone from the canvas").toEqual(ground);
+  expect(await px(app, 437, 487), "and the pattern still has it").toEqual(blue);
+  await p.keyboard.press("Control+z"); // (shown again)
+  await app.frame();
+  // the source changes (its fill is taken away): the pattern follows
+  await p.mouse.click(930, 330);
+  await p.click('[data-paint="fill"]');
+  await pop.locator(".colour-none").click();
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  expect(await px(app, 437, 487), "the pattern shows the change").not.toEqual(blue);
+  // deep in and far out: tiles as big as the screen, then too small to see (their average colour), without a fault
+  await app.wheel(550, 525, -6000);
+  await app.frame();
+  await app.wheel(550, 525, 20000);
+  await app.frame();
+  expect(app.consoleErrors).toEqual([]);
+});

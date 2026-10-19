@@ -12,7 +12,8 @@ import { PEN_WIDTHS } from "../app/editor-state";
 import type { PaintPatch } from "../app/actions";
 import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
-import { paintCss } from "../doc/paint";
+import { isGradient, paintCss } from "../doc/paint";
+import { isTexture } from "../doc/texture";
 import type { Arrow, ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
 import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
@@ -397,6 +398,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       name: which === "fill" ? "Fill" : "Outline",
       paint: paintNow(which),
       noneLabel: which === "fill" ? "No fill" : "No outline",
+      // a picture or a pattern fills the picked shapes (ADR 0154)
+      ...(which === "fill" && editsSelection() ? { modes: ["none", "solid", "linear", "radial", "angular", "image", "pattern"] as const } : {}),
       onInput: (p) => setPaint(which, p, false),
       onChange: (p) => setPaint(which, p, true),
       onClose: () => {
@@ -478,8 +481,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       paint: actions.selectedTextStyle()?.gradient ?? actions.selectedTextStyle()?.color ?? null,
       noneLabel: "No colour",
       modes: ["solid", "linear", "radial"],
-      onInput: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : { gradient: p }, false),
-      onChange: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : { gradient: p }),
+      onInput: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}, false),
+      onChange: (p) => p !== null && actions.setTextStyle(typeof p === "string" ? { color: p, gradient: null } : isGradient(p) ? { gradient: p } : {}),
     });
   });
   // The line round the letters: its colour here, its width beside it (px at this zoom, kept as a share of the size).
@@ -653,7 +656,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   // Every colour of the selection has its chip (the row scrolls when there are many): none is kept in a menu.
   const SEL_CHIPS = Infinity;
   const chipPaint = (p: Paint): string => (typeof p === "string" ? `linear-gradient(${swatchBackground(p)}, ${swatchBackground(p)})` : paintCss(p));
-  const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : "Gradient");
+  const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : isTexture(p) ? (p.src.kind === "asset" ? "Picture" : "Pattern") : "Gradient");
   const usage = (it: { fills: number; strokes: number }): string =>
     [it.fills ? `${it.fills} ${it.fills === 1 ? "fill" : "fills"}` : "", it.strokes ? `${it.strokes} ${it.strokes === 1 ? "outline" : "outlines"}` : ""].filter(Boolean).join(" and ");
   // Change a colour everywhere the picked shapes use it: the paint chooser, shown on the colour's chip.

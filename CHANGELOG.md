@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0 — Texture fills: a picture or a pattern as the fill of a shape (2026-10-19)
+
+- **Image fill**: Fill, Fit, Crop or Tile a picture of the library in a shape, with Scale, free Rotation, Offset, and for a repeat Grid (rows, brick rows or columns), Align and Space; the picture is picked on the canvas or chosen as a file.
+- **Pattern fill**: any objects of the canvas repeat over a shape on the same grids; the pattern follows when the objects change (ADR 0154).
+- The picture of a fill is kept by the library while a shape uses it, and travels in archives.
+
 ## 0.19.2 — Picture, reveal and export gaps (2026-10-19)
 
 - **Pictures**: the outline can be a gradient (with handles on the canvas); a picked picture has the radius dots on the canvas (also turned); a click in a cut corner does not pick it (ADR 0153).

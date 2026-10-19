@@ -2269,7 +2269,12 @@ input[data-scrub-input]:focus { cursor: text; }
 .op-width, .op-num { width: 5rem; padding: var(--sp-2) var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .op-unit { display: none; }
 .op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
-.paint-modes { display: flex; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }
+.tex-editor { display: grid; gap: var(--sp-4); min-width: 15rem; }
+.tex-source { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
+.tex-fields { display: grid; gap: var(--sp-3); }
+.tex-fields[hidden] { display: none; }
+.tex-fields select { width: 100%; min-width: 0; padding: var(--sp-2); font: var(--font-meta); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.paint-modes { display: flex; flex-wrap: wrap; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }
 .paint-modes button { flex: 1; padding: var(--sp-2) var(--sp-3); font: var(--font-meta); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; }
 .paint-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }
 .paint-modes button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }

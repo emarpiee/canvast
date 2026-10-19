@@ -1431,6 +1431,12 @@ export function attachTools(
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
     el.focus({ preventScroll: true });
+    if (editor.sourcePick) {
+      // choosing the source of a texture fill: what is under the press is given to it, nothing is picked or started
+      const top = pickAll(visible(), s.x, s.y)[0]?.obj;
+      editor.sourcePick.take(top ? expandToUnits(doc.ordered(), [top], editor.entered).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o) : []);
+      return;
+    }
     // A gesture whose pointer is gone (its release was lost) must not block this press, nor undo and redo.
     if ("pointerId" in g && g.pointerId !== e.pointerId && !active.has(g.pointerId)) cancelGesture();
     const touch = e.pointerType === "touch";

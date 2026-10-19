@@ -160,11 +160,17 @@ export interface ImageObject extends ObjectBase {
   readonly miterAngle?: number;
 }
 
-/** The library asset an object uses: a picture's file, or the font file a text is set in (undefined: none). */
-export const assetOf = (o: CanvasObject): string | undefined => (o.kind === "image" || o.kind === "text" ? o.assetId : undefined);
+/** The picture a shape's texture fill is made of (ADR 0154), read off a fill as stored or as it is in memory. */
+const textureAsset = (fill: unknown): string | undefined => {
+  const s = (fill as { type?: string; src?: { kind?: string; hash?: string } } | null | undefined);
+  return s && s.type === "texture" && s.src?.kind === "asset" ? s.src.hash : undefined;
+};
+
+/** The library asset an object uses: a picture's file, the font file a text is set in, or the picture a shape is filled with (undefined: none). */
+export const assetOf = (o: CanvasObject): string | undefined => (o.kind === "image" || o.kind === "text" ? o.assetId : o.kind === "path" ? textureAsset(o.fill) : undefined);
 
 /** The same read off a stored record (`data`). */
-export const storedAssetOf = (d: Readonly<Record<string, unknown>>): string | undefined => (d["kind"] === "image" || d["kind"] === "text" ? (d["assetId"] as string | undefined) : undefined);
+export const storedAssetOf = (d: Readonly<Record<string, unknown>>): string | undefined => (d["kind"] === "image" || d["kind"] === "text" ? (d["assetId"] as string | undefined) : d["kind"] === "path" ? textureAsset(d["fill"]) : undefined);
 
 /** Key of the decoded picture an image object draws: the poster of a video at its paused time, a GIF at its paused frame (an audio file always shows its waveform), else the asset itself. */
 export function rasterKey(o: ImageObject): string {
@@ -538,7 +544,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
       s.n.forEach((v: number, i: number) => finite(v, `node[${i}]`));
     }
     if (nodes > MAX_PATH_NODES) throw new InvalidObjectError("too many nodes");
-    for (const [what, v] of [["fill", o.fill], ["stroke", o.stroke]] as const) if (v !== null && !isPaint(v)) throw new InvalidObjectError(`bad ${what} ${JSON.stringify(v)}`);
+    if (o.fill !== null && !isPaint(o.fill, true)) throw new InvalidObjectError(`bad fill ${JSON.stringify(o.fill)}`); // (a texture is for the fill only)
+    if (o.stroke !== null && !isPaint(o.stroke)) throw new InvalidObjectError(`bad stroke ${JSON.stringify(o.stroke)}`);
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
@@ -627,6 +634,8 @@ export function serializeObject(o: CanvasObject): SerializedObject {
   // `unit + 0` turns -0 (from negating zoom level 0) into 0, so stored and JSON forms agree.
   const s = { ...rest, unit: o.unit + 0, points: o.kind === "stroke" ? [...o.points] : undefined, sub: o.kind === "path" ? o.sub.map((p) => ({ n: [...p.n], closed: p.closed })) : undefined, ...(o.kind === "path" && o.base ? { base: o.base.map((p) => ({ n: [...p.n], closed: p.closed })) } : {}), ax: D.toString(anchor.x), ay: D.toString(anchor.y) } as SerializedObject;
   if (frame && frame !== frame.space.world) s["frame"] = frame.space.uidOf(frame);
+  const tex = o.kind === "path" ? textureAsset(o.fill) : undefined;
+  if (tex) (s as Record<string, unknown>)["assetId"] = tex; // (the "assetId" index of the store is what tells the library the picture is still used)
   return s;
 }
 

@@ -5,6 +5,9 @@
  * shape keeps its gradient when its nodes are edited. Stops are offsets from 0 to 1, in order, with a colour each (transparency
  * allowed), and the colour before the first stop and after the last is theirs.
  */
+import type { TexturePaint } from "./texture";
+import { isTexture, isTextureValid } from "./texture";
+
 export interface GradientStop {
   readonly o: number;
   readonly c: string;
@@ -41,20 +44,22 @@ export interface AngularGradient {
 
 export type Gradient = LinearGradient | RadialGradient | AngularGradient;
 export type GradientKind = Gradient["type"];
-export type Paint = string | Gradient;
+/** A colour, a gradient, or (on a fill) a texture: a picture or objects repeated over the shape (ADR 0154, doc/texture.ts). */
+export type Paint = string | Gradient | TexturePaint;
 
 export const MAX_STOPS = 32;
 const COLOUR = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 
-export const isGradient = (p: Paint | null | undefined): p is Gradient => typeof p === "object" && p !== null;
+export const isGradient = (p: Paint | null | undefined): p is Gradient => typeof p === "object" && p !== null && p.type !== "texture";
 export const isColour = (v: unknown): v is string => typeof v === "string" && COLOUR.test(v);
 
 const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 1e6;
 
-/** Whether `v` is a paint the document accepts. */
-export function isPaint(v: unknown): v is Paint {
+/** Whether `v` is a paint the document accepts; a texture only where `texture` says (the fill of a shape). */
+export function isPaint(v: unknown, texture = false): v is Paint {
   if (typeof v === "string") return COLOUR.test(v);
   if (typeof v !== "object" || v === null) return false;
+  if (isTexture(v)) return texture && isTextureValid(v);
   const g = v as Record<string, unknown>;
   const stops = g["stops"];
   if (!Array.isArray(stops) || stops.length < 2 || stops.length > MAX_STOPS) return false;
@@ -110,6 +115,7 @@ export function sliceStops(stops: readonly GradientStop[], t0: number, t1: numbe
 
 /** A solid colour standing for a paint where one is needed (the density preview, the layers list): "#rrggbb" and its opacity. */
 export function inkOfPaint(p: Paint): { rgb: string; alpha: number } {
+  if (isTexture(p)) return { rgb: p.avg, alpha: 1 };
   if (!isGradient(p)) return { rgb: p.slice(0, 7), alpha: p.length === 9 ? parseInt(p.slice(7), 16) / 255 : 1 };
   // The average over the stops, each weighted by the stretch of the gradient it covers.
   const s = p.stops;
@@ -127,12 +133,15 @@ export function inkOfPaint(p: Paint): { rgb: string; alpha: number } {
   return a > 0 ? { rgb: hexOf([r / a, g / a, b / a, 1]), alpha: a } : { rgb: "#000000", alpha: 0 };
 }
 
-/** The colour of a paint at box offset `t` along its gradient (a solid colour is itself). */
-export const colourOfPaintAt = (p: Paint, t: number): string => (isGradient(p) ? hexOf(stopsAt(p.stops, t)) : p);
+/** One colour standing for a paint where only one fits: a colour is itself, a gradient gives its first stop, a texture its average. */
+export const solidOf = (p: Paint): string => (typeof p === "string" ? p : isTexture(p) ? p.avg : p.stops[0]!.c);
+
+/** The colour of a paint at box offset `t` along its gradient (a solid colour is itself, a texture its average). */
+export const colourOfPaintAt = (p: Paint, t: number): string => (isGradient(p) ? hexOf(stopsAt(p.stops, t)) : solidOf(p));
 
 /** A CSS background for a chip or a bar showing the paint: the gradient as it runs across a unit square. */
 export function paintCss(p: Paint): string {
-  if (!isGradient(p)) return p;
+  if (!isGradient(p)) return solidOf(p);
   const list = p.stops.map((s) => `${s.c} ${Math.round(s.o * 1000) / 10}%`).join(", ");
   if (p.type === "angular") return `conic-gradient(from ${Math.round(p.angle + 90)}deg at ${Math.round(p.cx * 100)}% ${Math.round(p.cy * 100)}%, ${list})`; // (CSS starts upward, ours to the right)
   if (p.type === "radial") return `radial-gradient(circle at ${Math.round(p.cx * 100)}% ${Math.round(p.cy * 100)}%, ${list})`;
@@ -166,7 +175,7 @@ export function linearAt(deg: number, stops: readonly GradientStop[]): LinearGra
 }
 
 /** The paint as JSON text, and back (undefined when the text is not a paint): for settings. */
-export const paintToText = (p: Paint | null): string => (p === null ? "none" : isGradient(p) ? JSON.stringify(p) : p);
+export const paintToText = (p: Paint | null): string => (p === null ? "none" : typeof p === "string" ? p : JSON.stringify(p));
 export function paintFromText(t: string): Paint | null | undefined {
   if (t === "none") return null;
   if (t.startsWith("{")) {
