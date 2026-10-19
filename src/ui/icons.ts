@@ -82,6 +82,7 @@ import leafIcon from "lucide-static/icons/leaf.svg";
 import imageDownIcon from "lucide-static/icons/image-down.svg";
 import externalLinkIcon from "lucide-static/icons/external-link.svg";
 import bellIcon from "lucide-static/icons/bell.svg";
+import bookDownIcon from "lucide-static/icons/book-down.svg";
 import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
@@ -297,6 +298,7 @@ export const ICONS = {
   externalLink: clean(externalLinkIcon),
   bell: clean(bellIcon),
   library: clean(libraryIcon),
+  bookDown: clean(bookDownIcon),
   panelBottomClose: clean(panelBottomCloseIcon),
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),

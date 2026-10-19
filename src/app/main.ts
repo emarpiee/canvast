@@ -1216,6 +1216,24 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     saveFile("canvast-shapes.svg", new Blob([text], { type: "image/svg+xml" }));
   };
+  /** Save the picked paths as an SVG picture in the library (the same file "Save as SVG" writes). */
+  const saveSvgToLibrary = async (): Promise<void> => {
+    const text = svgOfSelection(doc, editor);
+    if (text === null) {
+      editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
+      editor.changed();
+      return;
+    }
+    try {
+      const name = "canvast-shapes.svg";
+      const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
+      editor.message = `Saved “${name}” in the library.`;
+      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+    } catch (e) {
+      editor.message = `Could not save to the library: ${(e as Error).message}`;
+    }
+    editor.changed();
+  };
   const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
@@ -1327,6 +1345,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       canExportSvg: () => canExportSvg(doc, editor),
       exportSvg: () => saveSelectionSvg(),
+      saveSvgToLibrary: () => void saveSvgToLibrary(),
       canExport: () => exportTarget(doc, editor) !== null,
       exportPicture: () => openExport(),
       canDownload: () => pickedFiles(doc, editor).length > 0,
@@ -1592,6 +1611,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Path", title: "Width: even", words: "variable width taper remove", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, null) },
       { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
       { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
+      { group: "Export", title: "Save the selection to the library as SVG", words: "vector assets", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => void saveSvgToLibrary() },
       { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },

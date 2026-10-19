@@ -109,6 +109,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `eye-off` | Hide the selection; Hide selection |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-code` | Save the shapes as an SVG file |
+| `book-down` | Save the shapes to the library as an SVG picture |
 | `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |

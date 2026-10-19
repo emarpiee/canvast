@@ -1,4 +1,4 @@
-import { alignWith, boolWith, expect, maskWith, pathWith, test } from "./harness";
+import { alignWith, boolWith, expect, exportWith, maskWith, pathWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -2829,4 +2829,16 @@ test("pasted SVG with a clip-path becomes a clipping mask holding what it cuts: 
   const red = (c: number[]) => c[0]! > 200 && c[1]! < 60 && c[2]! < 60;
   expect(red(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [cx, cy] as const)), "inside the circle: the rectangle").toBe(true);
   expect(red(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), [Math.round(cx - side * 0.45), Math.round(cy - side * 0.45)] as const)), "inside the rectangle but outside the circle: cut").toBe(false);
+});
+
+test("Save to library puts the picked shapes in the library as an SVG picture", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 400]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await exportWith(p, "svglibrary");
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await expect(p.getByTestId("asset-card")).toContainText("canvast-shapes");
 });

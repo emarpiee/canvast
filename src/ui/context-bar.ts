@@ -54,6 +54,7 @@ export interface ContextActions {
   /** Picked paths can be saved as an SVG file. */
   canExportSvg(): boolean;
   exportSvg(): void;
+  saveSvgToLibrary(): void;
   /** Export…: choose a size (from the shape) and save a sheet, a picture or shapes as a picture file (ADR 0147). */
   canExport(): boolean;
   exportPicture(): void;
@@ -208,6 +209,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "Choose a size and save it as a picture (PNG, WebP, JPEG, SVG or PDF)", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
           ...(actions.canDownload() ? [{ id: "download", label: "Download the original", hint: "The original file (several files: one ZIP; an edited picture comes with its original)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
           ...(actions.canExportSvg() ? [{ id: "exportsvg", label: "Save as SVG", hint: "The shapes as an SVG file", icon: ICONS.fileCode, run: () => actions.exportSvg() }] : []),
+          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "The shapes as an SVG picture in the library, to place again", icon: ICONS.bookDown, run: () => actions.saveSvgToLibrary() }] : []),
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the picked text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
         openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
