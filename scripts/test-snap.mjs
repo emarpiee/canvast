@@ -1,4 +1,5 @@
-// Run Playwright against a build of its own, so `dist/` can be rebuilt and work can go on while the tests run.
+// Every test run goes through here (`npm test`, `test:e2e`, `test:full`, `bench`, `qualify`): Playwright runs against a build of its own, never `dist/`
+// (the owner's build, in development), so `dist/` can be rebuilt and worked on while the tests run. The build is also checked here: offline and names.
 //   npm run test:snap -- [playwright arguments]      e.g.  npm run test:snap -- --project=chromium tests/e2e/vectors.spec.ts
 // A snapshot is test-builds/<time>-<source hash>/ : canvast.html + build.json (what it was made from) + run.json (the run and its result)
 // + report.json + results/. `npm run test:status` compares every snapshot with the source and with `dist/`.
@@ -20,6 +21,11 @@ if (built.status !== 0) process.exit(built.status ?? 1);
 const pickerDir = resolve(dir, "picker");
 const builtPicker = spawnSync("node", ["scripts/build-picker.mjs", "--out", pickerDir], { cwd: root, stdio: "inherit" });
 if (builtPicker.status !== 0) process.exit(builtPicker.status ?? 1);
+
+for (const script of ["check-offline", "check-names"]) {
+  const checked = spawnSync("node", [`scripts/${script}.mjs`, resolve(dir, "canvast.html")], { cwd: root, stdio: "inherit" });
+  if (checked.status !== 0) process.exit(checked.status ?? 1);
+}
 
 const args = process.argv.slice(2);
 const run = { args, startedAt: new Date().toISOString(), status: "running" };

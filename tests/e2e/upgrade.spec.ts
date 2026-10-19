@@ -2,13 +2,14 @@ import { expect, test } from "@playwright/test";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { buildDir } from "./build-dir";
 
 /**
  * An update-safe origin for a replaced HTML file (Phase 8, docs/reference/storage-origin.md). The app is one file the owner replaces with a newer
  * one: what was saved must still be there. The page's storage belongs to the browser's origin for that file, so a file put back at the same
  * path is the same place for the data; a copy at another path is whatever the browser makes of it (it is not asserted here, only recorded).
  */
-const BUILD = resolve(process.env["CANVAST_BUILD_DIR"] ?? "dist", "canvast.html");
+const BUILD = resolve(buildDir(), "canvast.html");
 
 test("a newer file put at the same path finds the canvas saved by the older one, and a camera, and keeps saving", async ({ page }, info) => {
   const dir = info.outputPath("app");

@@ -6,11 +6,11 @@ test runs in both; only the length of the stress loops differs (for example
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox), offline and naming checks | ~16 min (E2E 15.6 min with Firefox, v0.3.1) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
+| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox) from a snapshot build, offline and naming checks (run on that snapshot), tokens and picker checks | ~16 min (E2E 15.6 min with Firefox, v0.3.1) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
 | `npm run test:full` | The same, with the **full** E2E stress loops | ~50 min (estimate with Firefox; 34.5 min for Chromium only at v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
-| `npm run test:snap -- <args>` | Playwright against a snapshot build of its own in `test-builds/` (the same tests; `dist/` stays free to rebuild). `npm run test:status` shows each snapshot against the source and `dist/` | as the tests chosen | **Whenever work goes on while tests run** (the default way to run E2E during a session) |
+| `npm run test:snap -- <args>` | Playwright against a snapshot build of its own in `test-builds/` (the same tests; every suite goes through it, so no test reads `dist/`). `npm run test:status` shows each snapshot against the source and `dist/` | as the tests chosen | **Whenever work goes on while tests run** (the default way to run E2E during a session) |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
-| `npx playwright test -g "<name>"` | Selected quick E2E tests | seconds | While developing a specific feature |
+| `npm run test:snap -- -g "<name>"` | Selected quick E2E tests (a bare `npx playwright test` fails on purpose: it has no snapshot) | seconds + build | While developing a specific feature |
 | `npm run bench` | Scale benchmarks, 1K–1M objects, plus tile-cache benchmarks (tiles on/off; pan, still, pan+zoom) in Chromium, Chromium CPU-only and Firefox. Not a pass/fail gate | ~15–25 min (not yet timed with Firefox; tile benchmarks alone 2.2 min) | After rendering or performance changes; compare with `metrics/bench-*.json`, `metrics/tiles-*.json`, docs/testing/phase-0c.md and phase-1d.md |
 
 ## Rules
@@ -22,9 +22,11 @@ test runs in both; only the length of the stress loops differs (for example
    is the record that the spec's "hundreds of successive gestures"
    requirements hold. (Decided with the project owner, 2026-10-13. Slices 1a
    and 1b ran it as well; from 1c on they do not.)
-2. **Never rebuild `dist/` while any suite is running.** The tests load the
-   built `dist/canvast.html` at the start of each test, so a rebuild mid-run
-   mixes two versions in one result.
+2. **Tests never use `dist/`.** Every suite builds a snapshot of its own in
+   `test-builds/` (`scripts/test-snap.mjs`) and opens that, so `dist/` (the
+   owner's build, in development) can be rebuilt at any time and a rebuild
+   cannot mix two versions in one result. `tests/e2e/build-dir.ts` refuses to
+   run without a snapshot.
 3. **Thresholds are not loosened to pass.** The `LIMITS` in
    `tests/e2e/harness.ts` are the same for both lengths. Only loop counts
    differ, plus a few assertions that depend on how far a loop travelled

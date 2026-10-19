@@ -3,6 +3,7 @@ import type { Page, TestInfo } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { buildDir } from "./build-dir";
 import type { DebugHook } from "../../src/app/debug-hook";
 import type { SerializedCamera } from "../../src/core/camera";
 
@@ -21,8 +22,8 @@ export const LIMITS = {
   renderP95Ms: 8,
 };
 
-/** The build the tests open: `dist/` by default; `npm run test:snap` points CANVAST_BUILD_DIR at a snapshot of its own, so `dist/` can be rebuilt while it runs. */
-export const APP_URL = pathToFileURL(resolve(process.env["CANVAST_BUILD_DIR"] ?? "dist", "canvast.html")).href + "#debug";
+/** The build the tests open: the snapshot `npm run test:snap` made (CANVAST_BUILD_DIR), never `dist/` (see build-dir.ts). */
+export const APP_URL = pathToFileURL(resolve(buildDir(), "canvast.html")).href + "#debug";
 
 /**
  * Quick vs full suites (docs/testing/README.md). Every test runs in both;

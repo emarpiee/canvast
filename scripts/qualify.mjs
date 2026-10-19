@@ -40,10 +40,9 @@ const browserVersion = async (name) => {
 const versions = Object.fromEntries(await Promise.all(projects.map(async (p) => [p, await browserVersion(p)])));
 const runnable = projects.filter((p) => versions[p]);
 
-// The checks that need no browser.
+// The checks that need no browser (offline and names run on the snapshot below, in test-snap.mjs).
 const checks = [];
-sh("npm", ["run", "build"]); // (the checks read dist/ and must see this commit)
-for (const [name, cmd] of [["typecheck", "typecheck"], ["unit", "test:unit"], ["tokens", "check:tokens"], ["names", "check:names"], ["offline", "check:offline"], ["picker", "check:picker"]]) {
+for (const [name, cmd] of [["typecheck", "typecheck"], ["unit", "test:unit"], ["tokens", "check:tokens"], ["picker", "check:picker"]]) {
   const t0 = Date.now();
   const r = sh("npm", ["run", cmd]);
   checks.push({ name, ok: r.status === 0, seconds: Math.round((Date.now() - t0) / 1000) });
