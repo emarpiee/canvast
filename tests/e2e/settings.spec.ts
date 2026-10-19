@@ -139,7 +139,7 @@ test("shortcuts: tool keys can be changed and are refused when taken; the list o
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("appearance: interface size, contrast and motion apply at once, persist, and the tools never sit under the view tabs (ADR 0050)", async ({ app }) => {
+test("appearance: motion, density and corners apply at once, persist, and the tools never sit under the view tabs (ADR 0050)", async ({ app }) => {
   const p = app.page;
   const panel = p.locator("#settings-view");
   const root = p.locator("html");
@@ -150,8 +150,6 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   expect(await clear(), "100%: the tools are clear of the view tabs").toBe(true);
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  await panel.getByLabel("Interface size", { exact: true }).selectOption("150");
-  await panel.getByLabel("Contrast", { exact: true }).selectOption("high");
   await panel.getByRole("tab", { name: "Performance" }).click();
   await panel.getByLabel("Animation", { exact: true }).selectOption("reduce");
   await panel.getByRole("tab", { name: "Appearance" }).click();
@@ -173,21 +171,14 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await panel.getByLabel("Density", { exact: true }).selectOption("comfortable");
   await expect(root).toHaveAttribute("data-density", "comfortable");
   expect(await dockHeight(), "comfortable: a larger dock").toBeGreaterThan(compact);
-  await expect(root).toHaveAttribute("data-contrast", "high");
   await expect(root).toHaveAttribute("data-motion", "reduce");
-  expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
-  // The whole view grows (the tab list is wider than at 100%).
-  expect((await panel.locator(".set-tabs").boundingBox())!.width).toBeGreaterThan(250);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  await expect(root).toHaveAttribute("data-contrast", "high");
   await expect(root).toHaveAttribute("data-density", "comfortable"); // kept over the reload
-  expect(await root.evaluate((e) => e.style.getPropertyValue("--ui-scale"))).toBe("1.5");
-  expect(await clear(), "150% and comfortable: the tools are clear of the view tabs").toBe(true);
+  expect(await clear(), "comfortable: the tools are clear of the view tabs").toBe(true);
   // Back to the defaults leaves no attribute behind.
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  for (const key of ["ui.textScale", "ui.contrast"]) await panel.getByRole("button", { name: new RegExp(`Reset ${{ "ui.textScale": "Interface size", "ui.contrast": "Contrast" }[key]} `) }).click();
   await panel.getByRole("tab", { name: "Performance" }).click();
   await panel.getByRole("button", { name: /Reset Animation /i }).first().click();
   await expect(root).not.toHaveAttribute("data-motion", /.*/);
@@ -199,10 +190,9 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   await panel.getByRole("button", { name: /Reset Animation /i }).first().click();
   await panel.getByRole("button", { name: /Reset Animation speed/ }).click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  expect(await clear(), "comfortable and 100%: the tools are clear of the view tabs").toBe(true);
+  expect(await clear(), "comfortable: the tools are clear of the view tabs").toBe(true);
   await panel.getByRole("button", { name: /Reset Density/ }).click();
   await expect(root).not.toHaveAttribute("data-density", /.*/);
-  await expect(root).not.toHaveAttribute("data-contrast", /.*/);
   await expect(root).not.toHaveAttribute("data-motion", /.*/);
   expect(app.consoleErrors).toEqual([]);
 });

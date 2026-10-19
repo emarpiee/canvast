@@ -857,14 +857,7 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .set-keys dl { grid-template-columns: 240px 1fr; }
 .set-note { min-height: 1.4em; opacity: 0.85; }
 
-/* Appearance (Settings > Appearance): interface size, contrast, motion. */
-#nav, #hud, #toolbar, #assets-view, #settings-view { zoom: var(--ui-scale, 1); }
-:root[data-contrast="high"] { --hud-fg: oklch(0 0 0); --hud-bg: oklch(1 0 0); --hud-border: oklch(0 0 0 / 0.75); --hud-muted: oklch(0.3 0.01 175); --hud-accent: oklch(0.4 0.09 178); --hud-accent-fg: oklch(1 0 0); --canvas-grid: oklch(0.26 0.01 250); }
-@media (prefers-color-scheme: dark) {
-  :root[data-contrast="high"]:not([data-theme="light"]) { --hud-fg: oklch(1 0 0); --hud-bg: oklch(0 0 0); --hud-border: oklch(1 0 0 / 0.8); --hud-muted: oklch(0.85 0.01 175); --hud-accent: oklch(0.9 0.07 175); --hud-accent-fg: oklch(0 0 0); --canvas-grid: oklch(0.93 0.01 175); }
-}
-:root[data-contrast="high"][data-theme="dark"] { --hud-fg: oklch(1 0 0); --hud-bg: oklch(0 0 0); --hud-border: oklch(1 0 0 / 0.8); --hud-muted: oklch(0.85 0.01 175); --hud-accent: oklch(0.9 0.07 175); --hud-accent-fg: oklch(0 0 0); --canvas-grid: oklch(0.93 0.01 175); }
-:root[data-contrast="high"] .view-switch button[aria-selected="true"], :root[data-contrast="high"] .set-tabs button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); outline: 2px solid var(--hud-fg); }
+/* Appearance (Settings > Appearance): motion. */
 :root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }

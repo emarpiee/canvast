@@ -313,7 +313,7 @@ async function start(): Promise<void> {
     if (t === "system") delete document.documentElement.dataset["theme"];
     else document.documentElement.dataset["theme"] = t;
   };
-  // Interface size, contrast and motion (Settings > Appearance): attributes and a variable on the root, read by the stylesheet.
+  // Appearance (Settings > Appearance): attributes and variables on the root, read by the stylesheet.
   // Zen mode (ui.zen): an attribute on the root, read by the stylesheet, and the pressed state of the button beside Home.
   const applyZen = (): void => {
     const on = settings.get("ui.zen");
@@ -323,7 +323,6 @@ async function start(): Promise<void> {
   };
   const applyAppearance = (): void => {
     const root = document.documentElement;
-    root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
     const bg = settings.get("ui.background");
     // Adaptive theme colour: the hue of the canvas background colour (a grey one has none: the hue set by hand stays). --hue-adaptive is that hue
     // whether or not it is on, for the chip in Settings.
@@ -344,8 +343,6 @@ async function start(): Promise<void> {
     const density = settings.get("ui.density");
     if (density !== "compact") root.dataset["density"] = density;
     else delete root.dataset["density"]; // compact is the default
-    if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
-    else delete root.dataset["contrast"];
     const m = settings.get("ui.motion");
     if (m === "system") delete root.dataset["motion"];
     else root.dataset["motion"] = m;
@@ -1510,9 +1507,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "quality.auto": quality.pinned = !settings.get("quality.auto") || debug; if (settings.get("quality.auto")) quality.force(0); else applyHeldQuality(); break;
       case "quality.level": applyHeldQuality(); break;
       case "cache.decodedMb": assets?.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20); break;
-      case "ui.textScale":
       case "ui.density":
-      case "ui.contrast":
       case "ui.motion":
       case "ui.animSpeed":
         applyAppearance();

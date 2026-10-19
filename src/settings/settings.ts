@@ -124,8 +124,6 @@ export const SETTINGS = {
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.slideSeconds": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 120 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
-  "ui.textScale": { scope: "device", default: "100", validate: oneOf("90", "100", "115", "130", "150"), effect: "immediate" } as Def<"90" | "100" | "115" | "130" | "150">,
-  "ui.contrast": { scope: "device", default: "normal", validate: oneOf("normal", "high"), effect: "immediate" } as Def<"normal" | "high">,
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "subtle", "full"), effect: "immediate" } as Def<"system" | "reduce" | "subtle" | "full">,
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
