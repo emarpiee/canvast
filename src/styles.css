@@ -1361,11 +1361,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* List rows read as text on the page, not as the white text of a picture overlay. */
 .assets-body.is-list .asset-info { color: var(--hud-fg); }
 
-/* Immersive viewer: with the controls hidden the view tabs at the top fade out, and come back when the pointer is near the top edge or they have the keyboard. */
-body[data-immersive] #nav { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
-body[data-immersive] #nav:hover, body[data-immersive] #nav:focus-within { opacity: 1; }
-body[data-immersive] #nav::before { content: ""; position: fixed; left: 0; right: 0; top: 0; height: calc(var(--ctl) + 2 * var(--pad) + var(--edge) + 14px); pointer-events: auto; }
-@media (prefers-reduced-motion: reduce) { body[data-immersive] #nav { transition: none; } }
+/* The gallery viewer (Assets) owns the whole screen: the view tabs, the workspace menu and the Settings button are away until it is closed. */
+body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* Viewer, third pass: the picture is centred in the stage whatever its size, and the caption is always in the same place (bottom centre, over the stage). */
 .viewer-stage { position: relative; display: block; padding: 0; overflow: hidden; }

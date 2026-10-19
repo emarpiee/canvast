@@ -290,15 +290,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // blocked: kept for this session
     }
   };
-  /** With the viewer open and its controls hidden the page is only the picture: the view tabs at the top fade away too (they come back near the top edge). */
-  const syncImmersive = (): void => {
-    document.body.toggleAttribute("data-immersive", visible && !viewer.hidden && !ui.bar);
+  /** With the viewer open the page is only the picture and its own bar: the view tabs, the workspace menu and the Settings button are away (styles.css). */
+  const syncViewing = (): void => {
+    document.body.toggleAttribute("data-viewing", visible && !viewer.hidden);
   };
   const applyUi = (): void => {
     body.classList.toggle("no-details", !ui.details);
     viewer.classList.toggle("no-bar", !ui.bar);
     root.classList.toggle("no-controls", !ui.bar);
-    syncImmersive();
+    syncViewing();
     body.classList.toggle("is-list", ui.layout === "list");
     root.classList.toggle("is-list", ui.layout === "list");
     for (const b of root.querySelectorAll<HTMLElement>("[data-layout]")) b.setAttribute("aria-pressed", String(b.dataset["layout"] === ui.layout));
@@ -705,7 +705,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     body.classList.add("is-viewing");
     root.classList.add("is-viewing");
     viewer.hidden = false;
-    syncImmersive();
+    syncViewing();
     viewer.focus();
     // The details beside the viewer describe the open asset (a picked set stays picked while a slideshow plays through it).
     selected = hash;
@@ -821,7 +821,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     viewer.hidden = true;
     body.classList.remove("is-viewing");
     root.classList.remove("is-viewing");
-    syncImmersive();
+    syncViewing();
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
     unloadMedia();
@@ -2420,7 +2420,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       visible = true;
       root.hidden = false;
       status.textContent = "";
-      syncImmersive();
+      syncViewing();
       void refresh();
       // The search box takes the focus only on Ctrl+Shift+F (focusSearch); opening the library leaves the focus where it is.
       if (!viewer.hidden) viewer.focus();
@@ -2466,7 +2466,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       eng?.pause();
       stopShow();
       root.hidden = true;
-      syncImmersive();
+      syncViewing();
     },
     async importFiles(files) {
       if (session.editor.blockEdit()) return;

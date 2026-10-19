@@ -1126,26 +1126,21 @@ test("a drag that starts inside the app is never imported as a file; a file drop
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("viewer with the controls hidden: the view tabs fade away and return near the top edge (ADR 0054)", async ({ app }) => {
+test("gallery viewer: the view tabs, the workspace menu and the Settings button are hidden while it is open and come back when it closes", async ({ app }) => {
   const p = app.page;
   await toAssets(p);
   await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
+  const away = [p.locator("#nav"), p.getByTestId("view-settings")];
+  for (const el of away) await expect(el, "shown in the gallery").toBeVisible();
   await p.getByTestId("asset-card").first().dblclick();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
-  const nav = p.locator("#nav");
-  const opacity = () => nav.evaluate((e) => getComputedStyle(e).opacity);
-  expect(await opacity(), "shown while the controls are").toBe("1");
-  await p.keyboard.press("f");
-  await expect.poll(opacity).toBe("0");
-  await p.mouse.move(300, 24); // near the top edge: back
-  await expect.poll(opacity).toBe("1");
-  await p.mouse.move(640, 400);
-  await expect.poll(opacity).toBe("0");
-  // Closing the viewer brings them back for good.
+  for (const el of away) await expect(el, "hidden in the viewer").toBeHidden();
+  await p.keyboard.press("f"); // (with its own controls hidden too)
+  for (const el of away) await expect(el).toBeHidden();
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
-  await expect.poll(opacity).toBe("1");
+  for (const el of away) await expect(el, "back when it closes").toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
 
