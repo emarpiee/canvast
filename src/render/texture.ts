@@ -99,7 +99,7 @@ function flat(t: TexturePaint): string {
   }
 }
 
-/** A pattern fill as what an SVG `<pattern>` needs (ADR 0154): the cell and its tiles, the matrix from the cell to the SVG's units, and the tile as a PNG. Null for a picture (an average colour is written) or a tile not ready. */
+/** A pattern fill as what an SVG `<pattern>` needs (ADR 0154): the cell and its tiles, the matrix from the cell to the SVG's units, and the tile as a PNG. Null for a picture or tile not ready (an average colour is written then). */
 export interface SvgTexture {
   readonly cw: number;
   readonly ch: number;
@@ -108,25 +108,41 @@ export interface SvgTexture {
   readonly tiles: ReadonlyArray<readonly [number, number]>;
   readonly matrix: readonly [number, number, number, number, number, number];
   readonly href: string;
+  /** False for a picture that fits or covers the shape once (one cell, no repeat). */
+  readonly repeat: boolean;
 }
 export function svgTexture(o: PathObject, t: TexturePaint, toSvg: (x: number, y: number) => [number, number], withTile = true): SvgTexture | null {
-  if (!host || t.src.kind !== "objects") return null;
+  if (!host) return null;
   const box = geometryBounds(o.base ?? o.sub);
   const [bw, bh] = [box.maxX - box.minX, box.maxY - box.minY];
-  const aspect = host.aspect(t.src.ids);
+  // a picture: its decoded copy (null while it is still being decoded: the average is written, and the next export has it), as a PNG of at most 2048 px
+  const pic = t.src.kind === "asset" ? host.picture(t.src.hash, SVG_PICTURE_PX) : null;
+  const aspect = t.src.kind === "asset" ? (pic ? pic.w / pic.h : null) : host.aspect(t.src.ids);
   if (!(bw > 0 && bh > 0) || aspect === null) return null;
   const lay = layoutOf(t, { w: bw, h: bh }, aspect);
-  if (!lay.repeat) return null;
   // local units to the SVG's: from where three local points go
   const [x0, y0] = toSvg(0, 0), [x1, y1] = toSvg(1, 0), [x2, y2] = toSvg(0, 1);
   const tilePx = Math.max(lay.tw, lay.th) * Math.hypot(x1 - x0, y1 - y0);
-  const tile = withTile ? host.objects(t.src.ids, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
-  if (withTile && (!tile || tile.version.endsWith("p"))) return null;
+  const tile = withTile && t.src.kind === "objects" ? host.objects(t.src.ids, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
+  if (withTile && t.src.kind === "objects" && (!tile || tile.version.endsWith("p"))) return null;
+  let href = tile ? (tile.canvas as HTMLCanvasElement).toDataURL("image/png") : "";
+  if (pic) {
+    const k = Math.min(1, SVG_PICTURE_PX / Math.max(pic.w, pic.h));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(pic.w * k));
+    c.height = Math.max(1, Math.round(pic.h * k));
+    const g = c.getContext("2d");
+    if (!g) return null;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(pic.source, 0, 0, c.width, c.height);
+    href = c.toDataURL("image/png");
+  }
   const [mx, my] = boxToLocal(o, 0.5, 0.5);
   const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
   const m = new DOMMatrix([x1 - x0, y1 - y0, x2 - x0, y2 - y0, x0, y0]).translateSelf(mx, my).rotateSelf((theta * 180) / Math.PI).translateSelf(lay.ox, lay.oy);
-  return { cw: lay.cw, ch: lay.ch, tw: lay.tw, th: lay.th, tiles: lay.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: tile ? (tile.canvas as HTMLCanvasElement).toDataURL("image/png") : "" };
+  return { cw: lay.cw, ch: lay.ch, tw: lay.tw, th: lay.th, tiles: lay.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href, repeat: lay.repeat };
 }
+const SVG_PICTURE_PX = 2048;
 
 const samples = new Map<string, ImageData | null>();
 

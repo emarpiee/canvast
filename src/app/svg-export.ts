@@ -135,7 +135,7 @@ export function exportSvg(
     if (paint === null) return ` ${which}="none"`;
     if (isTexture(paint) && which === "fill") {
       // a pattern of objects: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
-      // left for very many tiles: viewers that read Qt's SVG or import into design tools leave a <pattern> empty); a picture fill is its average colour
+      // left for very many tiles: viewers that read Qt's SVG or import into design tools leave a <pattern> empty); a picture is one image of it, the same way
       const src = paint.src.kind === "objects" && sourceOf && depth < 2 ? sourceOf(paint.src.ids) : null;
       const inner = src?.length ? exportSvg(src, space, maskOf, undefined, sourceOf, true, depth + 1) : null;
       const box = inner ? /viewBox="0 0 ([\d.e+-]+) ([\d.e+-]+)"/.exec(inner) : null;
@@ -158,7 +158,7 @@ export function exportSvg(
         const corners = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => inv.transformPoint(new DOMPoint(x, y)));
         const [u0, u1] = [Math.min(...corners.map((c) => c.x)), Math.max(...corners.map((c) => c.x))];
         const [v0, v1] = [Math.min(...corners.map((c) => c.y)), Math.max(...corners.map((c) => c.y))];
-        const [i0, i1, j0, j1] = [Math.floor(u0 / tex.cw) - 1, Math.ceil(u1 / tex.cw), Math.floor(v0 / tex.ch) - 1, Math.ceil(v1 / tex.ch)];
+        const [i0, i1, j0, j1] = tex.repeat ? [Math.floor(u0 / tex.cw) - 1, Math.ceil(u1 / tex.cw), Math.floor(v0 / tex.ch) - 1, Math.ceil(v1 / tex.ch)] : [0, 0, 0, 0];
         const count = (i1 - i0 + 1) * (j1 - j0 + 1) * tex.tiles.length;
         if (d !== undefined && count <= MAX_TILE_USES) {
           const mat = `matrix(${tex.matrix.map(num).join(" ")})`;
@@ -174,7 +174,7 @@ export function exportSvg(
       }
     }
     if (!isGradient(paint)) {
-      const c = colour(solidOf(paint)); // (a picture fill is its average colour: SVG has no such fill here)
+      const c = colour(solidOf(paint)); // (a picture still being decoded, or a pattern not ready: its average colour)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;

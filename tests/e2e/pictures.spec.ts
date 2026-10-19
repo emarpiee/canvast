@@ -1024,3 +1024,40 @@ test("an SVG export of a pattern fill is the tile put where the canvas puts it (
   expect(share.blue, "ellipses of the tile").toBeGreaterThan(0.05);
   expect(share.clear, "gaps between them").toBeGreaterThan(0.05);
 });
+
+test("an SVG export of a picture fill is the picture itself, put where the canvas puts it and cut to the shape (not its average colour)", async ({ app }) => {
+  const p = app.page;
+  const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
+  const rect = await pickedRect(app, [400, 450], [600, 550]);
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  const pb = await boxOf(app, picture.id);
+  await p.mouse.click(Math.round((pb.minX + pb.maxX) / 2), Math.round((pb.minY + pb.maxY) / 2));
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { type?: string } | undefined)?.type).toBe("texture");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(500, 500);
+  await exportWith(p, "exportpic");
+  const dlg = p.getByTestId("export-dialog");
+  await dlg.locator('[data-format="svg"]').click();
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+  expect(svg).toMatch(/<g clip-path="url\(#t\d+c\)"><use xlink:href="#t\d+i"/);
+  expect(svg).toMatch(/<image id="t\d+i" xlink:href="data:image\/png;base64,/);
+  expect(svg, "design tools leave a <pattern> empty").not.toContain("<pattern");
+  const side = await p.evaluate(async (text) => {
+    const img = new Image();
+    img.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = c.height = 200;
+    const g = c.getContext("2d")!;
+    g.drawImage(img, 0, 0, 200, 200);
+    const at = (x: number, y: number) => [...g.getImageData(x, y, 1, 1).data];
+    return { left: at(30, 100), right: at(170, 100) };
+  }, svg);
+  expect(is(side.left as never, 255, 0, 0), `left half red (${side.left})`).toBe(true);
+  expect(is(side.right as never, 0, 0, 255), `right half blue (${side.right})`).toBe(true);
+});
