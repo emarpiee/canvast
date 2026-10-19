@@ -37,5 +37,24 @@ A full read of one million objects in a key press takes about 0.4 s in Chromium,
 | Item | State |
 | --- | --- |
 | 60 and 120 FPS on reference devices | Needs devices and a recorded method |
-| Qualification matrix (`npm run qualify`) | Written, not run |
+| Qualification matrix (`npm run qualify`) | Run 2026-10-19 (see below) |
 | Low-memory tier | Tested (`lowmem.spec.ts`), no device measurement |
+
+## Full suite and qualification, 2026-10-19 (source `5ab1374` + the `files.spec` Download fix)
+
+| Run | Result | Time |
+| --- | --- | --- |
+| `npm run qualify` (quick, 4 projects, 1106 tests) | 1087 passed, 14 skipped, 5 failed | 1.1 h |
+| Full E2E suite (`playwright.full.config.ts`, 4 projects, 1106 tests) | 1092 passed, 13 skipped, 1 failed | 1.1 h |
+
+Sum of test times per project (full): chromium 19.4 min, firefox 27.3 min, chromium-cpu 9.9 min, chromium-dpr2 11.3 min. Slowest: Firefox "zooming deep into a curvy stroke never shows holes or spill" 309 s, Chromium "very long wheel zoom: 2,000 notches in, then 2,000 out" 200 s, Firefox "opacity: a self-crossing stroke is painted once" 108 s.
+
+Failures and what they were:
+
+| Test | Cause | State |
+| --- | --- | --- |
+| `files.spec` "any file imports: a 3D model ..." (4 projects, quick) | The test looked for a "Download the original file" button; Download is in the Export menu (ADR 0151) and the Export button's tooltip matched the name. Test only. | Fixed (`exportWith`), passes in Chromium and Firefox |
+| `text.spec:87` double-click on big text (Firefox, quick) | Zoom ratio 0.9 where more than 1 was expected, once; passed on re-run | Unexplained flake, watch it |
+| `files.spec:153` rename assets (chromium-dpr2, full) | A 5 s predicate timed out under load; 3 of 3 passed alone | Unexplained flake, watch it |
+
+WebKit is out of scope (decision 2026-10-19). The qualification report is `qualification-2026-10-19-5ab1374.md`.

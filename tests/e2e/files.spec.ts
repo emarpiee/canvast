@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { exportWith, expect, test } from "./harness";
 import { readFileSync } from "node:fs";
 import { blockyFixture } from "./png";
 
@@ -37,10 +37,10 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   // Selected, the bar offers to download the original (a 3D model cannot be opened in a tab).
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");
-  await expect(p.getByRole("button", { name: "Download the original file" })).toBeVisible();
+  await expect(p.locator('[data-ctx="exportmenu"]')).toBeVisible();
   await expect(p.getByRole("button", { name: "Open in a new tab" })).toBeHidden();
   const dl = p.waitForEvent("download");
-  await p.getByRole("button", { name: "Download the original file" }).click();
+  await exportWith(p, "download");
   const download = await dl;
   expect(download.suggestedFilename()).toBe("robot.glb");
   expect(readFileSync((await download.path())!).equals(GLB)).toBe(true);
@@ -52,7 +52,7 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await expect(p.getByRole("button", { name: "Open in a new tab" })).toBeHidden(); // two selected: opening is for one
   // two selected: Download brings both originals in one ZIP
   const zipDl = p.waitForEvent("download");
-  await p.getByRole("button", { name: "Download the original file" }).click();
+  await exportWith(p, "download");
   const zip = await zipDl;
   expect(zip.suggestedFilename()).toMatch(/^canvast-files-\d{8}-\d{4}\.zip$/);
   const zbytes = readFileSync((await zip.path())!).toString("latin1");
