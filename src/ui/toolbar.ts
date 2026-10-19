@@ -336,6 +336,23 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
   const outlineHome = outlineBtn.parentElement!;
   root.querySelector(".toolbar")!.after(colourBar.el);
+  // Snap, the axis-aligned box and the fill-pick guard are a bar of their own at the bottom right, above the navigation controls (not in the options bar).
+  const pickBar = createBar("Selection options", "Selection");
+  pickBar.el.classList.add("tb-pick");
+  pickBar.row.append(root.querySelector('.tb-group[aria-label="Selection options"]')!);
+  colourBar.el.after(pickBar.el);
+  // The navigation controls sit above or below the readout strip: the bar is measured from their top edge, wherever it is.
+  let watched = false;
+  const placePick = (): void => {
+    const nav = document.querySelector(".hud-controls");
+    if (!nav) return; // (the HUD is mounted after this bar: the first update after it finds it)
+    pickBar.el.style.setProperty("--pick-bottom", `${window.innerHeight - nav.getBoundingClientRect().top}px`);
+    if (!watched) {
+      watched = true;
+      new ResizeObserver(placePick).observe(nav.parentElement!);
+    }
+  };
+  window.addEventListener("resize", placePick);
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
@@ -1052,6 +1069,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(colourBar.row);
+    syncGroups(pickBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
+    pickBar.el.hidden = ![...pickBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
+    placePick();
   };
   editor.subscribe(update);
   doc.subscribe(update);

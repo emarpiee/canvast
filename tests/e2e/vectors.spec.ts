@@ -1419,6 +1419,12 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await click(app, 300, 650); // (nothing picked)
   await expect(p.getByRole("button", { name: "Show all hidden" }), "Show all and Unlock all are in the context menu, not the bar").toHaveCount(0);
   await expect(p.getByRole("button", { name: /^Axis-aligned selection box/ })).toBeVisible();
+  // they are a bar of their own at the bottom right, just above the navigation controls (not in the options bar at the top)
+  const pick = (await p.getByRole("toolbar", { name: "Selection options" }).boundingBox())!;
+  const nav = (await p.getByRole("toolbar", { name: "Navigation" }).boundingBox())!;
+  expect(pick.y + pick.height, "above the navigation controls").toBeLessThanOrEqual(nav.y);
+  expect(Math.abs(pick.x + pick.width - (nav.x + nav.width)), "at their right edge").toBeLessThan(4);
+  expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name: /^Axis-aligned selection box/ }).count(), "not in the options bar").toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
   await p.getByTestId("view-settings").click();

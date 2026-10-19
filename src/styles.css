@@ -282,6 +282,9 @@ input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-s
   text-overflow: ellipsis;
 }
 
+/* The selection options (snap, axis box, ignore fill) sit above the navigation controls at the bottom right. */
+#toolbar > .toolbar.tb-pick { position: fixed; right: var(--edge); bottom: calc(var(--pick-bottom, var(--edge) + var(--bar-h)) + var(--near)); z-index: var(--z-edge); pointer-events: auto; } /* (--pick-bottom: the top of the navigation controls, measured in toolbar.ts: they sit above or below the readout) */
+
 .hud-controls {
   right: 12px;
   bottom: 12px;
