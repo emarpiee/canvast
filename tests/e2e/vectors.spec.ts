@@ -1,4 +1,4 @@
-import { alignWith, boolWith, expect, exportWith, maskWith, pathWith, test } from "./harness";
+import { stateWith, alignWith, boolWith, expect, exportWith, maskWith, pathWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -1445,10 +1445,12 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   await key(app, "v");
   await click(app, 620, 420);
   // nothing saved yet: only "Set initial shape" is there (the update and reset buttons come once a shape is saved)
-  await expect(p.locator("[data-initial-set]")).toBeVisible();
-  await expect(p.locator("[data-initial-reset]")).toBeHidden();
-  await expect(p.locator("[data-initial-update]")).toBeHidden();
-  await menu(/^Set initial state/);
+  await p.locator('[data-ctx="statemenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="stateset"]')).toBeVisible();
+  await expect(p.locator('.pop-menu [data-id="statereset"]')).toHaveCount(0);
+  await expect(p.locator('.pop-menu [data-id="stateupdate"]')).toHaveCount(0);
+  await key(app, "Escape");
+  await stateWith(p, "stateset");
   const first = world(await lastP());
   expect((await lastP()).initial).toBeDefined();
   // change it: ratio, points, radius, a move and a resize
@@ -1475,7 +1477,7 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
     return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
   };
   const m0 = await middle();
-  await menu(/^Reset to initial state/);
+  await stateWith(p, "statereset");
   const back = await lastP();
   expect(world(back).w / first.w).toBeCloseTo(1, 6);
   expect(back.params!.tips).toBe(5);
@@ -1490,9 +1492,9 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   await key(app, "Control+Shift+z");
   // update it to something else, change again, reset: to the updated one
   await set("[data-sel-tips]", "7");
-  await menu(/^Update initial state/);
+  await stateWith(p, "stateupdate");
   await set("[data-sel-tips]", "12");
-  await menu(/^Reset to initial state/);
+  await stateWith(p, "statereset");
   expect(((await lastP()) as P).params!.tips).toBe(7);
 });
 
@@ -1794,7 +1796,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await p.keyboard.press("Control+a");
   await boolWith(p, "op:union");
   await app.frame();
-  await menu(/^Set initial state/); // the group picked whole
+  await stateWith(p, "stateset"); // the group picked whole
   const saved = await gap();
   // change it: one shape moved inside the group, another operation, a radius
   await p.mouse.dblclick(560, 330);
@@ -1818,7 +1820,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await reload(app);
   await p.keyboard.press("Control+a");
   await app.frame();
-  await menu(/^Reset to initial state/);
+  await stateWith(p, "statereset");
   const back = await gap();
   expect(Math.abs(back[0]! - saved[0]!)).toBeLessThan(1.5);
   expect(Math.abs(back[1]! - saved[1]!)).toBeLessThan(1.5);
@@ -2857,7 +2859,7 @@ test("initial shape with the setting on keeps the fill and outline, and Reset pu
   await key(app, "Escape");
   const before = await last(app);
   expect(typeof before.fill).toBe("object");
-  await p.getByRole("button", { name: /^Set initial state/ }).click();
+  await stateWith(p, "stateset");
   await reload(app); // what was saved survives a reload
   await key(app, "Control+a");
   expect(((await last(app)) as Obj & { initial?: { paint?: unknown } }).initial?.paint).toBeDefined();
@@ -2866,7 +2868,7 @@ test("initial shape with the setting on keeps the fill and outline, and Reset pu
   await pop.locator("[data-hex]").press("Enter");
   await key(app, "Escape");
   expect((await last(app)).fill).not.toEqual(before.fill);
-  await p.getByRole("button", { name: /^Reset to initial state/ }).click();
+  await stateWith(p, "statereset");
   await app.frame();
   const back = await last(app);
   expect(back.fill).toEqual(before.fill);

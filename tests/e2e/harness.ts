@@ -167,7 +167,7 @@ export async function rowAction(page: Page, kind: "board" | "canvas", name: stri
   await page.getByRole("menuitem", { name: `${action} ${kind} ${name}` }).click();
 }
 
-type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu";
+type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu" | "statemenu";
 
 /** Give the pen a colour through the colour picker of the Properties bar (it has no row of colours any more): type the hex, close the picker. */
 export async function setPenColour(page: Page, hex: string): Promise<void> {
@@ -197,6 +197,7 @@ export const arrangeWith = (page: Page, id: string, keepOpen = false): Promise<v
 export const boolWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "boolmenu", id);
 export const maskWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "maskmenu", id);
 export const sheetWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "sheetmenu", id);
+export const stateWith = (page: Page, id: "stateset" | "stateupdate" | "statereset"): Promise<void> => chooseInMenu(page, "statemenu", id);
 export const exportWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "exportmenu", id);
 /** Right-click empty canvas at (x, y) and choose a row of the context menu by its name (what the Properties bar's Show all and Unlock all buttons became). */
 export async function contextChoose(page: Page, x: number, y: number, name: string): Promise<void> {

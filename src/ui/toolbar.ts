@@ -47,11 +47,6 @@ export interface ToolbarActions {
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
   selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; dash: DashChoice; closed: boolean; widthPx: number | null } | null;
-  /** The picked shapes that have a shape of their own to save, and how many of them have an initial state saved (null: none can). */
-  initialShapeState(): { count: number; saved: number } | null;
-  /** Save the picked shapes' shape as their initial one (or replace it), and put them back to it. */
-  setInitialShape(onlyMissing?: boolean): void;
-  resetToInitialShape(): void;
   /** The paints the picked shapes use (each once, gradients included) and how many shapes are picked. */
   selectionPaints(): { count: number; items: Array<{ paint: Paint; fills: number; strokes: number; ids: string[] }> };
   /** Change one paint to another everywhere the picked shapes use it. */
@@ -289,11 +284,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text width">
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
-      </div>
-      <div class="tb-group tb-options" data-for="select node" data-kind="shape" role="group" aria-label="Initial state">
-        <button type="button" data-initial-set hidden aria-label="Set initial state: save the shape as it is now" title="Set initial state: save the shape as it is now, to come back to it later">${ICONS.pin}</button>
-        <button type="button" data-initial-update hidden aria-label="Update initial state: replace the saved shape with the shape as it is now" title="Update initial state: replace the saved shape with the shape as it is now">${ICONS.save}</button>
-        <button type="button" data-initial-reset hidden aria-label="Reset to initial state: put the shape back as it was saved" title="Reset to initial state: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet picture">
@@ -826,12 +816,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["eraseGroups"] !== undefined) {
       editor.eraseWholeGroups = !editor.eraseWholeGroups;
       editor.changed();
-    } else if (d["initialSet"] !== undefined) {
-      actions.setInitialShape(true);
-    } else if (d["initialUpdate"] !== undefined) {
-      actions.setInitialShape(false);
-    } else if (d["initialReset"] !== undefined) {
-      actions.resetToInitialShape();
     } else if (d["boxAxis"] !== undefined) {
       editor.alignBox = !editor.alignBox;
       editor.changed();
@@ -991,10 +975,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
     const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;
     if (editor.preview.kind === "none") {
-      const st = (editor.tool === "select" || editor.tool === "node") ? actions.initialShapeState() : null;
-      root.querySelector<HTMLElement>("[data-initial-set]")!.hidden = !st || st.saved >= st.count;
-      root.querySelector<HTMLElement>("[data-initial-update]")!.hidden = !st || st.saved === 0;
-      root.querySelector<HTMLElement>("[data-initial-reset]")!.hidden = !st || st.saved === 0;
     }
     const outlineAt = several ? root.querySelector<HTMLElement>("[data-sel-colours]")! : outlineHome;
     if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineBtn);

@@ -54,6 +54,10 @@ export interface ContextActions {
   /** Picked paths can be saved as an SVG file. */
   canExportSvg(): boolean;
   saveSvgToLibrary(): void;
+  /** The picked shapes that have a shape to save, and how many have an initial state saved (null: none can). Set (only where missing), Update (all) and Reset (ADR 0106). */
+  initialState(): { count: number; saved: number } | null;
+  setInitialState(onlyMissing: boolean): void;
+  resetInitialState(): void;
   /** Export…: choose a size (from the shape) and save a sheet, a picture or shapes as a picture file (ADR 0147). */
   canExport(): boolean;
   exportPicture(): void;
@@ -155,14 +159,14 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
     group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one picked", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the picked shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the picked things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
     group("Attach",
       btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +
     group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
   host.appendChild(bar);
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
-  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path" };
+  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
   // With a mixed pick the kind chosen in the Properties bar (`editor.subject`, its chips: All, Picture, Shape ...) also chooses which tools show here: one set of chips, not two.
   const BAR_KINDS: Record<string, readonly string[]> = { picture: ["image", "media"], shape: ["path"], stroke: ["stroke"], text: ["text"], sheet: [] };
@@ -211,6 +215,19 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the picked text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
         openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
+        break;
+      }
+      case "statemenu": {
+        // Save, replace or go back to the picked shapes' initial state (ADR 0106): one menu that stays open; only what applies is listed
+        const items = (): MenuItem[] => {
+          const st = actions.initialState();
+          if (!st) return [];
+          return [
+            ...(st.saved < st.count ? [{ id: "stateset", label: "Set initial state", hint: "Save the shape as it is now, to come back to it later", icon: ICONS.stateSet, run: () => actions.setInitialState(true) }] : []),
+            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Replace the saved state with the shape as it is now", icon: ICONS.stateUpdate, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Put the shape back as it was saved (its middle stays where it is)", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
+          ];
+        };
+        openMoreMenu(b, items(), "Initial state", { keepOpen: true, refresh: items });
         break;
       }
       case "boolmenu": {
@@ -381,6 +398,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("copypng").hidden = !pic?.still;
     q("bake").hidden = !pic?.still;
     q("exportmenu").hidden = !(actions.canExport() || actions.canDownload() || actions.canExportSvg() || sel.some((o) => o!.kind === "text"));
+    q("statemenu").hidden = !actions.initialState();
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
     // with two or more kinds picked, the kind chosen in the Properties bar shows only its tools (All, or none chosen: everything)

@@ -8,7 +8,7 @@ A vector shape can keep a copy of its own shape, to come back to. The copy is st
 
 **What is saved:** everything that makes the shape and nothing about where it is or how it looks: the sub-paths, the sharp outline and radius under a rounded one, the parameters of a rectangle, polygon or star (box, sides, points, ratio), the turn, and the unit they are in. Not saved: position, paint, outline, opacity, layer, name, tags.
 
-**Three actions**, in one menu on the options bar of Select and Edit nodes (a pin button, shown when a shape is picked, lit when an initial shape is saved):
+**Three actions**, in one grouped menu on the Actions bar (ADR 0151), before Bring to front (a map-pinned button, shown when a shape is picked; icons map-pin-plus, map-pin-check, map-pin-house); they used to be three loose buttons on the options bar:
 - *Set initial shape*: saves the shape as it is now (for the picked shapes that have none).
 - *Update initial shape*: replaces the saved one with the shape as it is now.
 - *Reset to initial shape*: puts the shape back as saved, **about where its middle is now** (so a shape that was moved or resized comes back at its place, at its saved size, with its saved points, ratio and radius, turned as it was); paint and everything else stay. One undo step.

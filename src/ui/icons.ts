@@ -17,7 +17,6 @@ import replaceIcon from "lucide-static/icons/replace.svg";
 import mergeIcon from "lucide-static/icons/merge.svg";
 import squarePlusSvg from "lucide-static/icons/square-plus.svg";
 import squareOutSvg from "lucide-static/icons/square-arrow-out-up-left.svg";
-import pinIcon from "lucide-static/icons/pin.svg";
 import listRestartSvg from "lucide-static/icons/list-restart.svg";
 import clipboardListSvg from "lucide-static/icons/clipboard-list.svg";
 import clipboardPasteSvg from "lucide-static/icons/clipboard-paste.svg";
@@ -86,8 +85,10 @@ import libraryIcon from "lucide-static/icons/library.svg";
 import panelBottomCloseIcon from "lucide-static/icons/panel-bottom-close.svg";
 import panelBottomOpenIcon from "lucide-static/icons/panel-bottom-open.svg";
 import textCursorInputIcon from "lucide-static/icons/text-cursor-input.svg";
-import saveIconSvg from "lucide-static/icons/save.svg";
-import resetShapeSvg from "lucide-static/icons/rotate-ccw-square.svg";
+import stateSetSvg from "lucide-static/icons/map-pin-plus.svg";
+import stateUpdateSvg from "lucide-static/icons/map-pin-check.svg";
+import stateResetSvg from "lucide-static/icons/map-pin-house.svg";
+import stateMenuSvg from "lucide-static/icons/map-pinned.svg";
 import textStyleIcon from "lucide-static/icons/a-large-small.svg";
 import textAlignLeftIcon from "lucide-static/icons/align-left.svg";
 import textAlignCenterIcon from "lucide-static/icons/align-center.svg";
@@ -302,8 +303,10 @@ export const ICONS = {
   panelBottomOpen: clean(panelBottomOpenIcon),
   textCursorInput: clean(textCursorInputIcon),
   textStyle: clean(textStyleIcon),
-  save: clean(saveIconSvg),
-  resetShape: clean(resetShapeSvg),
+  stateSet: clean(stateSetSvg),
+  stateUpdate: clean(stateUpdateSvg),
+  stateReset: clean(stateResetSvg),
+  stateMenu: clean(stateMenuSvg),
   textAlignLeft: clean(textAlignLeftIcon),
   textAlignCenter: clean(textAlignCenterIcon),
   textAlignRight: clean(textAlignRightIcon),
@@ -487,7 +490,6 @@ export const ICONS = {
   merge: clean(mergeIcon),
   squarePlus: clean(squarePlusSvg),
   squareOut: clean(squareOutSvg),
-  pin: clean(pinIcon),
   listRestart: clean(listRestartSvg),
   clipboardList: clean(clipboardListSvg),
   clipboardPaste: clean(clipboardPasteSvg),

@@ -177,9 +177,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `clipboard` | Copy a picture to the clipboard as it looks |
 | `copy-plus` | Make a new picture of it as it looks |
 | `list-restart` | Reset the adjustments of a picture |
-| `pin` | Set initial shape |
-| `save` | Update initial shape |
-| `rotate-ccw-square` | Reset to initial shape |
+| `map-pinned` | Actions bar: Initial state (set, update, reset) |
+| `map-pin-plus` | Set initial state |
+| `map-pin-check` | Update initial state |
+| `map-pin-house` | Reset to initial state |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
 | `pentagon` | Shape tool |
