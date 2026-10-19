@@ -1424,7 +1424,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   const nav = (await p.getByRole("toolbar", { name: "Navigation" }).boundingBox())!;
   expect(pick.y + pick.height, "above the navigation controls").toBeLessThanOrEqual(nav.y);
   expect(Math.abs(pick.x + pick.width - (nav.x + nav.width)), "at their right edge").toBeLessThan(4);
-  expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name: /^Axis-aligned selection box/ }).count(), "not in the options bar").toBe(0);
+  for (const name of [/^Axis-aligned selection box/, /^Snap to other objects/, /^Lock corner radius/]) expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name }).count(), `${name} is not in the options bar`).toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
   await p.getByTestId("view-settings").click();

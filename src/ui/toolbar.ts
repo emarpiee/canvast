@@ -336,10 +336,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
   const outlineHome = outlineBtn.parentElement!;
   root.querySelector(".toolbar")!.after(colourBar.el);
-  // Snap, the axis-aligned box and the fill-pick guard are a bar of their own at the bottom right, above the navigation controls (not in the options bar).
+  // The corner-radius lock, snap, the axis-aligned box and the fill-pick guard are a bar of their own at the bottom right, above the navigation controls (not in the options bar).
   const pickBar = createBar("Selection options", "Selection");
   pickBar.el.classList.add("tb-pick");
-  pickBar.row.append(root.querySelector('.tb-group[aria-label="Selection options"]')!);
+  const pickGroup = root.querySelector<HTMLElement>('.tb-group[aria-label="Selection options"]')!;
+  pickGroup.prepend(root.querySelector("[data-lock-radius]")!); // (the lock of the corner radius is one of them: it is about how a shape resizes)
+  pickBar.row.append(pickGroup);
   colourBar.el.after(pickBar.el);
   // The navigation controls sit above or below the readout strip: the bar is measured from their top edge, wherever it is.
   let watched = false;
