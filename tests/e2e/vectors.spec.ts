@@ -927,7 +927,7 @@ test("shapes stay editable after drawing: a polygon's sides, a star's points and
   await p.locator(".colour-pop .colour-none").click();
   await key(app, "Escape");
   await set("[data-sel-radius]", "30");
-  await click(app, 900, 700); // look at the shape alone
+  await click(app, 900, 300); // look at the shape alone (empty canvas; the selection options stand beside the Actions bar at the bottom)
   expect(await px(304, 524)).not.toEqual([37, 99, 235]); // the corner is gone
   expect(await px(330, 550)).toEqual([37, 99, 235]); // the middle is not
 
@@ -1374,6 +1374,9 @@ test("polygon and star: a triangle handle on the shape sets how many; a label sa
   await p.mouse.move(...at(60), { steps: 6 }); // 360 / 60 = 6 points
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.handleLabel())).toBe("Count 6");
+  const arc = (await p.evaluate(() => window.__canvastDebug.handleGuide()))?.arc; // the way it slides is drawn, as the radius and ratio handles do: an arc round the middle
+  expect(arc, "the count handle shows the arc it goes along").toBeTruthy();
+  expect(arc!.a1 - arc!.a0, "from 24 corners to 3").toBeCloseTo((2 * Math.PI) / 3 - (2 * Math.PI) / 24, 5);
   await p.mouse.up();
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
@@ -1419,11 +1422,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await click(app, 300, 650); // (nothing picked)
   await expect(p.getByRole("button", { name: "Show all hidden" }), "Show all and Unlock all are in the context menu, not the bar").toHaveCount(0);
   await expect(p.getByRole("button", { name: /^Axis-aligned selection box/ })).toBeVisible();
-  // they are a bar of their own at the bottom right, just above the navigation controls (not in the options bar at the top)
-  const pick = (await p.getByRole("toolbar", { name: "Selection options" }).boundingBox())!;
-  const nav = (await p.getByRole("toolbar", { name: "Navigation" }).boundingBox())!;
-  expect(pick.y + pick.height, "above the navigation controls").toBeLessThanOrEqual(nav.y);
-  expect(Math.abs(pick.x + pick.width - (nav.x + nav.width)), "at their right edge").toBeLessThan(4);
+  // they are a bar of their own, not in the options bar at the top
   for (const name of [/^Axis-aligned selection box/, /^Snap to other objects/, /^Lock corner radius/]) expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name }).count(), `${name} is not in the options bar`).toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
@@ -2880,4 +2879,34 @@ test("initial shape with the setting on keeps the fill and outline, and Reset pu
   expect(back.fill).toEqual(before.fill);
   expect(back.stroke).toEqual(before.stroke);
   expect(back.width).toBe(before.width);
+});
+
+test("the selection options (radius lock, snap, axis box) stand right beside the Actions bar, on its right and on its line, and follow it", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 500, y: 300 }, { x: 640, y: 400 }, 6);
+  await p.keyboard.press("v");
+  const ctx = p.locator(".ctx-bar:not([hidden])");
+  await expect(ctx).toBeVisible();
+  const pick = p.getByRole("toolbar", { name: "Selection options" });
+  const beside = async () => {
+    const [a, b] = [(await ctx.boundingBox())!, (await pick.boundingBox())!];
+    return { gap: b.x - (a.x + a.width), dy: Math.abs(b.y + b.height / 2 - (a.y + a.height / 2)) };
+  };
+  await expect.poll(async () => (await beside()).gap).toBeGreaterThanOrEqual(0);
+  const at = await beside();
+  expect(at.gap, "close to the Actions bar").toBeLessThan(24);
+  await expect.poll(async () => (await beside()).dy, "on its line").toBeLessThan(4);
+  // Settings > Actions bar: follows the selection; the options stay beside it
+  await p.getByTestId("view-settings").click();
+  await p.locator("#settings-view").getByRole("tab", { name: "Appearance" }).click();
+  await p.locator("#settings-view").getByLabel("Actions bar", { exact: true }).selectOption("follow");
+  await p.getByTestId("view-canvas").click();
+  await expect(ctx).toHaveClass(/is-following/);
+  await expect.poll(async () => (await beside()).gap).toBeGreaterThanOrEqual(0);
+  const moved = await beside();
+  expect(moved.gap, "close to it, where it follows").toBeLessThan(24);
+  await expect.poll(async () => (await beside()).dy, "still on its line").toBeLessThan(4);
+  expect(app.consoleErrors).toEqual([]);
 });

@@ -485,20 +485,26 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
   }
   if (editor.handleLabel?.guide) {
     // The line the handle slides along, with an arrowhead at each end: the way it moves is shown before and while it is dragged.
-    const { x0, y0, x1, y1 } = editor.handleLabel.guide;
-    const len = Math.hypot(x1 - x0, y1 - y0);
+    const { x0, y0, x1, y1, arc } = editor.handleLabel.guide;
+    const len = arc ? arc.r * (arc.a1 - arc.a0) : Math.hypot(x1 - x0, y1 - y0);
     if (len > 4) {
-      const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+      // (the way it points at each end: along the line, or along the circle)
+      const u0 = arc ? [-Math.sin(arc.a0), Math.cos(arc.a0)] : [(x1 - x0) / len, (y1 - y0) / len];
+      const u1 = arc ? [-Math.sin(arc.a1), Math.cos(arc.a1)] : u0;
       ctx.strokeStyle = theme.selection;
       ctx.fillStyle = theme.selection;
       ctx.lineWidth = 1.25;
       ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(x0, y0);
-      ctx.lineTo(x1, y1);
+      if (arc) ctx.arc(arc.cx, arc.cy, arc.r, arc.a0, arc.a1);
+      else {
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
-      for (const [x, y, d] of [[x0, y0, -1], [x1, y1, 1]] as const) {
+      for (const [x, y, d, u] of [[x0, y0, -1, u0], [x1, y1, 1, u1]] as const) {
+        const [ux, uy] = u as [number, number];
         const tx = x + ux * 5 * d, ty = y + uy * 5 * d;
         ctx.beginPath();
         ctx.moveTo(tx, ty);

@@ -144,7 +144,7 @@ export interface DebugHook {
   /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
   pickedNodes(): Array<[string, number]>;
   /** The line the hovered or dragged radius or ratio handle slides along (screen px), or null. */
-  handleGuide(): { x0: number; y0: number; x1: number; y1: number } | null;
+  handleGuide(): { x0: number; y0: number; x1: number; y1: number; arc?: { cx: number; cy: number; r: number; a0: number; a1: number } } | null;
   /** Adaptive quality level now (0 full, 1, 2), and set it by hand (ADR 0028). */
   qualityLevel(): number;
   setQualityLevel(level: 0 | 1 | 2): void;

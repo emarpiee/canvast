@@ -409,7 +409,14 @@ export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { g
  * (ends included): a corner's dot along the bisector of its corner from the smallest to the biggest radius, the main dot of opened-out
  * corners sideways (a px of radius for a px moved), a star's ratio handle along the line from the middle through it.
  */
-export function handleGuide(h: CornerHandles, pick: CornerPick, open: boolean): { x0: number; y0: number; x1: number; y1: number } | null {
+export function handleGuide(h: CornerHandles, pick: CornerPick, open: boolean): { x0: number; y0: number; x1: number; y1: number; arc?: { cx: number; cy: number; r: number; a0: number; a1: number } } | null {
+  if (pick.what === "count" && h.count) {
+    // The count handle goes round the middle: from a turn of 24 corners (the least) to a third of a turn (3).
+    const q = h.count;
+    const r = Math.hypot(q.x - q.cx, q.y - q.cy);
+    const [a0, a1] = [q.a0 + (2 * Math.PI) / 24, q.a0 + (2 * Math.PI) / 3];
+    return { x0: q.cx + r * Math.cos(a0), y0: q.cy + r * Math.sin(a0), x1: q.cx + r * Math.cos(a1), y1: q.cy + r * Math.sin(a1), arc: { cx: q.cx, cy: q.cy, r, a0, a1 } };
+  }
   if (pick.what === "ratio" && h.ratio) {
     const q = h.ratio;
     const len = Math.max(1e-6, Math.hypot(q.x - q.cx, q.y - q.cy));

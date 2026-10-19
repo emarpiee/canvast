@@ -12,6 +12,11 @@ test("the Screenshot button saves the view to the library: webp, in the Screensh
   const p = app.page;
   await p.keyboard.press("p");
   await app.drag({ x: 500, y: 400 }, { x: 640, y: 460 }, 6);
+  // it is in the left tool rail, right above Search
+  const [cam, find] = await Promise.all([p.getByRole("button", { name: "Screenshot", exact: true }).boundingBox(), p.getByRole("button", { name: /^Search the canvas/ }).boundingBox()]);
+  expect(cam!.y + cam!.height, "above Search").toBeLessThanOrEqual(find!.y + 1);
+  expect(Math.abs(cam!.x - find!.x), "in the same column").toBeLessThan(2);
+  expect(cam!.x, "in the left rail").toBeLessThan(60);
   await p.getByRole("button", { name: "Screenshot", exact: true }).click();
   await expect(p.getByTestId("toast")).toContainText("Screenshot saved");
   await expect.poll(async () => (await names(p)).length).toBe(1);

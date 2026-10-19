@@ -173,7 +173,7 @@ export class EditorState {
   /** The resize handles of the selection box as last drawn (screen px): the corners, then the middles of the sides when they fit. */
   drawnHandles: Array<[number, number]> = [];
   /** A few words beside a handle that is being dragged ("Radius 12", "Count 8"). */
-  handleLabel: { x: number; y: number; text: string; /** The line the handle slides along (screen px), drawn with it. */ guide?: { x0: number; y0: number; x1: number; y1: number } | null } | null = null;
+  handleLabel: { x: number; y: number; text: string; /** The line the handle slides along (screen px), drawn with it. */ guide?: { x0: number; y0: number; x1: number; y1: number; /** A handle that slides round a circle (the point count): the arc, in screen px and radians. */ arc?: { cx: number; cy: number; r: number; a0: number; a1: number } } | null } | null = null;
   cornersOpen: ObjectId | null = null;
   gradientFocus: "fill" | "stroke" | null = null;
   /** The outline's corners, ends and place on the edge for the next shape (null join: the tool's own, sharp for shapes with corners). */

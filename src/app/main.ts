@@ -844,6 +844,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
+    screenshot: () => void takeScreenshot(),
     undo: () => undo(doc, editor),
     redo: () => redo(doc, editor),
     clearFlag: (flag) => clearFlag(doc, editor, flag),
@@ -1162,7 +1163,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     subscribeCamera: (fn) => history.subscribe(fn),
     hasSelection: () => editor.selection.size > 0,
     toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
-    screenshot: () => void takeScreenshot(),
     randomView: () => goRandomView(),
     subscribeSelection: (fn) => void editor.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),

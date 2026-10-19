@@ -803,7 +803,7 @@ export function attachTools(
       const turn = (Math.atan2(s.y - q.cy, s.x - q.cx) - q.a0 + 4 * Math.PI) % (2 * Math.PI);
       const n = turn < (2 * Math.PI) / 24 ? 24 : Math.max(3, Math.min(24, Math.round((2 * Math.PI) / turn)));
       commitShapeNumbers(doc, editor, { sides: n, tips: n }, final);
-      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Count ${n}` };
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Count ${n}`, guide: handleGuide(h, { what: "count" }, open) };
       return;
     }
     const which = g.index;

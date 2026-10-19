@@ -166,6 +166,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
+              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.presentation}</button>
               <button type="button" class="vbtn" data-act="next" aria-label="Next" title="Next (Right arrow)">${ICONS.chevronRight}</button>
               <span class="viewer-pos"></span>
             </div>
@@ -176,7 +177,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <button type="button" data-zoom="reset" class="viewer-zoom-pct" aria-label="Zoom level" title="Fit the picture, or show it at 100% (double-click the picture too)">Fit</button>
               <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
             </div>
-              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.presentation}<span>Slideshow</span></button>
               <button type="button" class="vbtn" data-act="fullscreen" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
               <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
               <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
@@ -872,7 +872,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     playBtn.setAttribute("aria-pressed", String(on));
     playBtn.setAttribute("aria-label", on ? "Pause the slideshow" : "Start the slideshow");
     playBtn.title = on ? "Pause the slideshow (Space)" : "Start the slideshow (Space)";
-    playBtn.innerHTML = `${on ? ICONS.pause : ICONS.presentation}<span>${on ? "Pause" : "Slideshow"}</span>`;
+    playBtn.innerHTML = on ? ICONS.pause : ICONS.presentation;
     if (on) {
       if (eng === avEng) avEng.play();
       armShow();

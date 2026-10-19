@@ -32,6 +32,8 @@ import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
 export interface ToolbarActions {
   importFiles(files: File[]): void;
+  /** Save a screenshot of the canvas to the library (ADR 0080). */
+  screenshot(): void;
   /** Open the canvas search (ADR 0060). */
   openSearch(prefix?: string): void;
   undo(): void;
@@ -214,7 +216,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ).join("")}
       </div>
       <span class="rail-sep" role="separator"></span>
-      <div class="rail-tools" role="group" aria-label="Search">
+      <div class="rail-tools" role="group" aria-label="Screenshot and search">
+        <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save the selection to the library, or the whole view when nothing is selected (format, folder and tags in Settings > Screenshot)">${ICONS.camera}</button>
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
       </div>
       <input type="file" multiple hidden data-testid="import-input">
@@ -343,15 +346,23 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   pickGroup.prepend(root.querySelector("[data-lock-radius]")!); // (the lock of the corner radius is one of them: it is about how a shape resizes)
   pickBar.row.append(pickGroup);
   colourBar.el.after(pickBar.el);
-  // The navigation controls sit above or below the readout strip: the bar is measured from their top edge, wherever it is.
-  let watched = false;
+  // They stand right beside the Actions bar, on its right, wherever it is (at the bottom or following the selection); with no Actions bar they take its place.
+  let watched: HTMLElement | null = null;
   const placePick = (): void => {
-    const nav = document.querySelector(".hud-controls");
-    if (!nav) return; // (the HUD is mounted after this bar: the first update after it finds it)
-    pickBar.el.style.setProperty("--pick-bottom", `${window.innerHeight - nav.getBoundingClientRect().top}px`);
-    if (!watched) {
-      watched = true;
-      new ResizeObserver(placePick).observe(nav.parentElement!);
+    const ctx = document.querySelector<HTMLElement>(".ctx-bar"); // (mounted after this bar: the first update after it finds it)
+    if (!ctx) return;
+    if (watched !== ctx) {
+      watched = ctx;
+      new MutationObserver(placePick).observe(ctx, { attributes: true, attributeFilter: ["style", "hidden", "class"] });
+      new ResizeObserver(placePick).observe(ctx);
+      ctx.addEventListener("animationend", placePick); // (it slides in: the place it settles at is the one to stand beside)
+    }
+    const r = ctx.getBoundingClientRect();
+    const beside = !ctx.hidden && r.width > 0;
+    pickBar.el.classList.toggle("is-beside", beside);
+    if (beside) {
+      pickBar.el.style.setProperty("--pick-left", `${r.right}px`);
+      pickBar.el.style.setProperty("--pick-top", `${r.top + r.height / 2}px`);
     }
   };
   window.addEventListener("resize", placePick);
@@ -858,6 +869,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["action"] === "import") input.click();
     else if (d["action"] === "search") actions.openSearch("");
+    else if (d["action"] === "screenshot") actions.screenshot();
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
   });

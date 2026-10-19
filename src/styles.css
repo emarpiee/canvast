@@ -282,8 +282,9 @@ input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-s
   text-overflow: ellipsis;
 }
 
-/* The selection options (snap, axis box, ignore fill) sit above the navigation controls at the bottom right. */
-#toolbar > .toolbar.tb-pick { position: fixed; right: var(--edge); bottom: calc(var(--pick-bottom, var(--edge) + var(--bar-h)) + var(--near)); z-index: var(--z-edge); pointer-events: auto; } /* (--pick-bottom: the top of the navigation controls, measured in toolbar.ts: they sit above or below the readout) */
+/* The selection options (corner-radius lock, snap, axis box, ignore fill) stand beside the Actions bar, on its right (measured in toolbar.ts); with no Actions bar, where it would be. */
+#toolbar > .toolbar.tb-pick { position: fixed; left: 50%; bottom: calc(2 * var(--sp-14) + var(--sp-6)); transform: translateX(-50%); z-index: var(--z-edge); pointer-events: auto; }
+#toolbar > .toolbar.tb-pick.is-beside { left: calc(var(--pick-left) + var(--near)); top: var(--pick-top); bottom: auto; transform: translateY(-50%); } /* (--pick-top: the middle of the Actions bar) */
 
 .hud-controls {
   right: 12px;
@@ -1315,9 +1316,9 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). */
 @media (max-width: 1180px) { .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
 
-/* In the viewer the library bar is not needed (it keeps its row so the viewer starts below the view tabs); with the controls hidden too, the picture gets the whole page. */
-#assets-view.is-viewing .assets-bar { visibility: hidden; }
-#assets-view.is-viewing.no-controls .assets-bar { display: none; visibility: visible; }
+/* In the viewer the library bar is not needed and the view tabs are away (body[data-viewing]): the viewer gets the whole page. */
+#assets-view.is-viewing .assets-bar { display: none; }
+#assets-view.is-viewing { padding: 0; }
 
 /* Hidden controls: the way back fades out and returns when the pointer or the keyboard is near it; while a slideshow plays a pause button stays beside it. */
 .viewer-handle { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; gap: var(--sp-3); width: 240px; height: 72px; padding: 0 0 var(--sp-4); background: none; border: 0; opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
