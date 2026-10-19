@@ -84,7 +84,7 @@ export interface ToolbarActions {
   uncrop(): void;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
   /** The saved adjustments, and saving the numbers as one (ADR 0120). */
-  adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }>; saveGradient(stops: readonly GradientStop[]): Promise<void> };
+  adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
   previewAdjust(a: Adjust): void;
   commitAdjust(a: Adjust, label: string): void;
   copyAdjust(): void;

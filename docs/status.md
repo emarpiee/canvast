@@ -476,7 +476,7 @@ visible strokes). Alternatives:
 - **Implemented:** the items of the changelog entry 0.21.0; [ADR 0156](adr/0156-panel-shape.md) (one shape for every panel) and [ADR 0157](adr/0157-linked-styles.md) (objects follow the saved colour, gradient or adjustment they got).
 - **Tested:** quick suite on the affected specs in Chromium and Firefox (530 passed, 2 failed, 6 skipped; both failures fixed after it); unit 512 passed.
 - **Known failures:** none. The two failures of the run were both fixed: a pixel read right after an undo now waits for the frame, and the Firefox video-adjustments test (failing 3 runs in 12) was a real race: a number typed into the Adjust panel in the same frame as the render of a commit before it was lost when the panel was built again. The first change of a burst now previews at once (15 of 15 pass).
-- **Unverified:** the full suite on this source; the Phase 8 benches (written, not run); WebKit.
+- **Unverified:** the full suite on this source; the Phase 8 benches (written, not run).
 - **Next bounded task:** run the two benches and the qualification matrix and record them in `docs/testing/phase-8.md`; ADR 0155 and `docs/reference/storage-origin.md`.
 
 ## v0.20.0 — texture fills (2026-10-19)

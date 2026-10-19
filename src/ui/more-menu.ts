@@ -88,10 +88,13 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   // A menu inside a blurred or transformed panel is placed against that panel, not the window: measure where (0, 0) really is and correct for it.
   menu.style.left = "0px";
   menu.style.top = "0px";
-  const opening = menu.getAnimations().length > 0; // (a pop-in still running moves the box: measure without it, then let it play)
-  if (opening) menu.style.animation = "none";
+  // A pop-in that is still playing moves the box: measure where it ends up, then put it back where it was (the animation goes on, it is never started again:
+  // a menu placed again at every change, like a fill's options, would otherwise blink).
+  const playing = menu.getAnimations().filter((a) => a.playState === "running");
+  const was = playing.map((a) => a.currentTime);
+  for (const a of playing) a.currentTime = Number(a.effect?.getComputedTiming().endTime ?? 0);
   const origin = menu.getBoundingClientRect();
-  if (opening) menu.style.animation = "";
+  playing.forEach((a, i) => (a.currentTime = was[i] ?? 0));
   menu.style.left = `${Math.round(left - origin.left)}px`;
   menu.style.top = `${Math.round(top - origin.top)}px`;
 }

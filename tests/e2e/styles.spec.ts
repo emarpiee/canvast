@@ -77,6 +77,9 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.click('[data-paint="fill"]');
   await pop.locator('[data-mode="linear"]').click();
   await pop.locator("[data-save-gradient]").click();
+  await expect(pop.locator("[data-saved]"), "the picker lists the gradient it just saved").toHaveCount(1);
+  await pop.locator("[data-save-gradient]").click();
+  await expect(pop.locator("[data-saved]")).toHaveCount(2);
 
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
@@ -255,6 +258,14 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   await pop.locator("[data-adj-map]").selectOption({ label: "Make a custom gradient…" });
   await expect(p.locator(".colour-pop").filter({ hasText: "Save gradient" }).locator(".cg")).toBeVisible();
   await expect(pop.locator(".cg"), "not inside the Adjust panel").toHaveCount(0);
+  // the floating editor has the same saved gradients and saves as the chooser of a fill; what it saves is in the map's list and in the Styles
+  const floating = p.locator(".colour-pop:has([data-save-gradient])");
+  const [chips, options] = [await floating.locator("[data-saved]").count(), await pop.locator("[data-adj-map] option").count()];
+  expect(chips, "it lists the saved gradients (Sunset)").toBeGreaterThan(0);
+  await floating.locator("[data-save-gradient]").click();
+  await expect(floating.locator("[data-saved]")).toHaveCount(chips + 1);
+  await expect(pop.locator("[data-adj-map] option")).toHaveCount(options + 1);
+  await expect(floating.getByRole("button", { name: "Save colour of this stop" })).toBeVisible();
   await expect.poll(async () => (await objs(app))[0]!.adjust?.map?.stops.map((s) => s.c)).toEqual(["#1e1b4b", "#f59e0b"]);
   expect(app.consoleErrors).toEqual([]);
 });

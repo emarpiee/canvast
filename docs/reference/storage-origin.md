@@ -17,7 +17,6 @@ canvast is one HTML file opened from `file://`. Everything saved (IndexedDB `can
 
 - **Another path is the browser's choice.** The test records what each browser does and asserts nothing about it. A browser can give each `file://` path its own origin (Firefox has a setting for it), and then a copy at another path starts empty.
 - **Another browser or another profile never sees the data.** Moving the file to another computer does not move what was saved.
-- **WebKit is not tested** (it is not installed in the test environment).
 - **Clearing site data removes it.**
 
 ## What to do

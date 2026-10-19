@@ -801,11 +801,6 @@ async function start(): Promise<void> {
   });
   const adjustStylesApi = () => ({
       gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
-      saveGradient: async (stops: readonly GradientStop[]) => {
-        await session.styles.add("gradient", "", { type: "linear", x0: 0, y0: 0.5, x1: 1, y1: 0.5, stops });
-        editor.message = "Saved the gradient to the Styles.";
-        editor.changed();
-      },
       save: async (name: string, a: Adjust) => {
         if (!(await session.styles.add("adjustment", name, a))) {
           editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
@@ -1114,14 +1109,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   }));
   setColourStyles({
     gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, gradient: s.data as Gradient })),
-    saveGradient: (g) => void session.styles.add("gradient", "", g).then((made) => made && ((editor.message = "Saved the gradient to the Styles."), editor.changed())),
+    saveGradient: (g) => session.styles.add("gradient", "", g).then((made) => { if (made) { editor.message = "Saved the gradient to the Styles."; editor.changed(); } }),
     showGradients: () => {
       editor.stylesTab = "gradient";
       editor.stylesOpen = true;
       editor.changed();
     },
     colours: () => session.styles.of("colour").map((s) => String(s.data)),
-    save: (hex) => void session.styles.add("colour", "", hex).then((made) => made && ((editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`), editor.changed())),
+    save: (hex) => session.styles.add("colour", "", hex).then((made) => { if (made) { editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`; editor.changed(); } }),
   });
   const history = new CameraHistory(view);
   // Fresh pictures for the bookmarks (ADR 0124): the canvas visits each place, one at a time, and comes back.

@@ -3,7 +3,7 @@
 //   npm run qualify                          quick suite, the four projects of playwright.config.ts
 //   npm run qualify -- --suite full          the full stress loops
 //   npm run qualify -- --projects chromium,firefox
-// A project whose browser is not installed (webkit, until `npx playwright install webkit`) is listed as "not run", not as passed.
+// A project whose browser is not installed is listed as "not run", not as passed.
 import { spawn, spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { cpus, platform, release, totalmem } from "node:os";
@@ -27,7 +27,7 @@ const version = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")
 // What each browser is, as the browser says it.
 const pw = await import("@playwright/test");
 const browserVersion = async (name) => {
-  const type = { chromium: pw.chromium, "chromium-cpu": pw.chromium, "chromium-dpr2": pw.chromium, firefox: pw.firefox, webkit: pw.webkit }[name];
+  const type = { chromium: pw.chromium, "chromium-cpu": pw.chromium, "chromium-dpr2": pw.chromium, firefox: pw.firefox }[name];
   try {
     const b = await type.launch();
     const v = b.version();

@@ -169,4 +169,9 @@ test("gradient editor in the package: stops by bar, handle, field and key; kinds
   await page.keyboard.press("ArrowRight");
   expect((await value()).stops[0]!.offset).toBeCloseTo(0.01, 6);
   expect(await page.evaluate(() => (window as unknown as { gradientEvents: number }).gradientEvents)).toBeGreaterThan(8);
+  // Randomize: every stop gets a new, fully opaque colour; the ends are at 0 and 100 %
+  await ed.locator("[data-random]").click();
+  const r = await value();
+  expect(r.stops.every((s) => /^#[0-9a-f]{6}$/.test(s.colour)), "no transparency in a random gradient").toBe(true);
+  expect([r.stops[0]!.offset, r.stops[r.stops.length - 1]!.offset]).toEqual([0, 1]);
 });

@@ -134,7 +134,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
     </div>
     <div class="cg-barrow">
       <button type="button" class="cp-tool cg-text" data-reverse title="${esc(L.reverse)}" aria-label="${esc(L.reverse)}">⇄</button>
-      <button type="button" class="cp-tool" data-random title="${esc(L.randomize)}" aria-label="${esc(L.randomize)}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg></button>
+      <button type="button" class="cp-tool" data-random title="${esc(L.randomize)}" aria-label="${esc(L.randomize)}"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg></button>
       <div class="cg-bar" data-bar aria-label="${esc(L.bar)}"><div class="cg-track" data-track></div></div>
       <button type="button" class="cp-tool cg-text" data-remove title="${esc(L.remove)}" aria-label="${esc(L.remove)}">−</button>
     </div>
@@ -307,15 +307,14 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
     change();
   });
 
-  // Randomize: any colours (no fixed hue, brightness or contrast; each stop keeps its own transparency), positions drawn for as many stops as there
+  // Randomize: any colours (no fixed hue, brightness or contrast; always fully opaque), positions drawn for as many stops as there
   // are (the first at 0 and the last at 100 %), and a new angle, or centre and radius.
   q("[data-random]").addEventListener("click", () => {
     const n = v.stops.length;
     const cuts = Array.from({ length: n }, () => Math.random()).sort((a, b) => a - b);
     const span = cuts[n - 1]! - cuts[0]! || 1;
     const hex2 = (): string => Math.floor(Math.random() * 256).toString(16).padStart(2, "0");
-    const was = v.stops;
-    v.stops = cuts.map((c, i) => ({ offset: (c - cuts[0]!) / span, colour: `#${hex2()}${hex2()}${hex2()}${was[i]!.colour.slice(7)}` }));
+    v.stops = cuts.map((c) => ({ offset: (c - cuts[0]!) / span, colour: `#${hex2()}${hex2()}${hex2()}` })); // (always fully opaque)
     v.angle = Math.floor(Math.random() * 360);
     v.cx = 0.1 + Math.random() * 0.8;
     v.cy = 0.1 + Math.random() * 0.8;

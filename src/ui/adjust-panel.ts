@@ -16,7 +16,7 @@ export interface AdjustPanelActions {
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
   previewAdjust(a: Adjust): void;
   commitAdjust(a: Adjust, label: string): void;
-  adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }>; saveGradient(stops: readonly GradientStop[]): Promise<void> };
+  adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
 }
 
 export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions: AdjustPanelActions): void {

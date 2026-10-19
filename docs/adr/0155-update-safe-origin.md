@@ -14,4 +14,3 @@ canvast ships as one HTML file that its owner replaces with a newer build. What 
 
 - Nothing in the app reads its own location.
 - The result for another path (shared in both browsers tested) can change with a browser update; the reference page [`storage-origin.md`](../reference/storage-origin.md) says what is known and what is not.
-- WebKit is untested until it is installed in the test environment.

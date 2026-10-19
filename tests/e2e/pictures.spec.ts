@@ -674,6 +674,42 @@ async function pickedRect(app: App, from: readonly [number, number], to: readonl
 const fillOf = async (app: App, id: string) => (await objs(app)).find((o) => o.id === id) as unknown as { fill?: { type?: string; src?: { kind: string; hash?: string; ids?: string[] }; mode?: string; spacing?: number[] } | string | null };
 const is = (c: number[] | undefined, r: number, g: number, b: number): boolean => !!c && Math.abs(c[0]! - r) < 12 && Math.abs(c[1]! - g) < 12 && Math.abs(c[2]! - b) < 12;
 
+test("a number changed in the fill options never makes the chooser blink: it stays fully shown while the value is changed again and again", async ({ app }) => {
+  const p = app.page;
+  const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
+  const rect = await pickedRect(app, [400, 450], [600, 550]);
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  const pb = await boxOf(app, picture.id);
+  await p.mouse.click(Math.round((pb.minX + pb.maxX) / 2), Math.round((pb.minY + pb.maxY) / 2));
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { type?: string } | undefined)?.type).toBe("texture");
+  await p.waitForTimeout(500); // (the chooser has finished appearing)
+  const dips = await p.evaluate(async () => {
+    const pop = document.querySelector<HTMLElement>(".colour-pop")!;
+    const num = document.querySelector<HTMLInputElement>('[data-tex-num="scale"]')!;
+    const seen: number[] = [];
+    for (let v = 30; v <= 90; v += 6) {
+      num.value = String(v);
+      num.dispatchEvent(new Event("input", { bubbles: true }));
+      for (let i = 0; i < 3; i++) {
+        await new Promise((r) => requestAnimationFrame(() => r(0)));
+        seen.push(Number(getComputedStyle(pop).opacity));
+      }
+    }
+    return seen.filter((o) => o < 0.99);
+  });
+  expect(dips, "the chooser's opacity never drops").toEqual([]);
+  // Randomize: another set of options, in one undo step
+  const before = JSON.stringify((await fillOf(app, rect.id)).fill);
+  await pop.locator("[data-tex-random]").click();
+  await expect.poll(async () => JSON.stringify((await fillOf(app, rect.id)).fill)).not.toBe(before);
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Control+z");
+  expect(JSON.stringify((await fillOf(app, rect.id)).fill), "one undo step").toBe(before);
+});
+
 test("picture and pattern fills still show their own colour far inside the shape, where they are no longer drawn as patterns (not their average)", async ({ app }) => {
   const p = app.page;
   const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));

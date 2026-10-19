@@ -96,4 +96,4 @@ The old counts are kept here for reference.
 
 ## WebKit (Safari)
 
-Not tested, by decision of the project owner (2026-10-14): it would add about 10 to 15 minutes to the full suite (estimated; never run here) and is planned for after production, with the Phase 8 compatibility work (a `webkit` Playwright project, ideally with a run on real Safari). Until then Safari and every iPhone browser are unverified.
+Out of scope, by decision of the project owner (2026-10-19): WebKit is not installed, not planned, and not a Playwright project. Safari and every iPhone browser are unsupported and unverified.

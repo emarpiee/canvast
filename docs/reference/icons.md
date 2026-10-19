@@ -168,6 +168,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `dices` | Random empty view (bottom-right controls) |
+| `shuffle` | Randomize: the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |
 | `arrow-right-left` | Turn the sheet on its side (sheet bar) |
 | `image-up` | Export… (Actions bar, sheet bar, command palette) |
 | `projector` | Play the bookmarks as a tour |

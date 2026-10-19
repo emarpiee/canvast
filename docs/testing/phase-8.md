@@ -37,6 +37,5 @@ A full read of one million objects in a key press takes about 0.4 s in Chromium,
 | Item | State |
 | --- | --- |
 | 60 and 120 FPS on reference devices | Needs devices and a recorded method |
-| WebKit | Not installed in this environment |
 | Qualification matrix (`npm run qualify`) | Written, not run |
 | Low-memory tier | Tested (`lowmem.spec.ts`), no device measurement |

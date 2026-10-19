@@ -104,7 +104,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Streaming export and import without the whole archive in memory | Partial (ADR 0115) | Built from Blob slices and verified by streaming; not measured at multi-GB sizes. |
 | Hundreds of gigabytes, chunked or desktop-assisted fallback | **Gap** | Not offered. |
 | Incremental backup chain; last verified backup shown | Done (ADR 0133) | A chain of files restores as one; the status is shown. |
-| Update-safe origin for a replaced HTML file | Done (ADR 0155) | `upgrade.spec.ts`: same path keeps the data in Chromium and Firefox; another path is the browser's choice and is recorded ([reference](storage-origin.md)). WebKit untested. |
+| Update-safe origin for a replaced HTML file | Done (ADR 0155) | `upgrade.spec.ts`: same path keeps the data in Chromium and Firefox; another path is the browser's choice and is recorded ([reference](storage-origin.md)). |
 
 ## §8 Performance
 

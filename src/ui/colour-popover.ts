@@ -114,9 +114,9 @@ export function closeColourPopover(refocus = false): void {
 /** The saved colours of the library's Styles (ADR 0120): the colours now, and saving one. Set by the app. */
 export interface ColourStyleHooks {
   colours(): string[];
-  save(hex: string): void;
+  save(hex: string): Promise<void>;
   gradients(): Array<{ name: string; gradient: Gradient }>;
-  saveGradient(g: Gradient): void;
+  saveGradient(g: Gradient): Promise<void>;
   /** Open the Gradients of the Styles panel (all the saved ones, with their names). */
   showGradients(): void;
 }
@@ -140,31 +140,42 @@ function saveColourButton(hex: () => string, after: () => void): HTMLButtonEleme
   b.textContent = "Save colour";
   b.title = "Keep this colour in the Styles of the library";
   b.addEventListener("click", () => {
-    styleHooks?.save(hex());
-    after();
+    void Promise.resolve(styleHooks?.save(hex())).then(after); // (the list is drawn again once the colour is in it)
   });
   return b;
 }
 
 /** Under a gradient editor: the saved gradients as bars to pick one, and a button to save this one (Styles, ADR 0122). */
-function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: () => string): HTMLElement {
+function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: () => string, after?: () => void): HTMLElement {
   const box = document.createElement("div");
   box.className = "gradient-styles";
-  const saved = styleHooks?.gradients() ?? [];
-  box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the picked stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
+  let saved = styleHooks?.gradients() ?? [];
+  const render = (): void => {
+    saved = styleHooks?.gradients() ?? [];
+    box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the picked stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
+  };
+  render();
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");
     if (t.closest("[data-save-stop]")) {
-      styleHooks?.save(stop().slice(0, 7));
-      t.closest<HTMLElement>("[data-save-stop]")!.textContent = "Saved";
+      void Promise.resolve(styleHooks?.save(stop().slice(0, 7))).then(() => {
+        render();
+        box.querySelector<HTMLElement>("[data-save-stop]")!.textContent = "Saved";
+        after?.();
+      });
     } else if (t.closest("[data-show-gradients]")) styleHooks?.showGradients();
     else if (chip) {
       const g = saved[Number(chip.dataset["saved"])]?.gradient;
       if (g) use(g);
     } else if (t.closest("[data-save-gradient]")) {
-      styleHooks?.saveGradient(now());
-      t.closest<HTMLElement>("[data-save-gradient]")!.textContent = "Saved";
+      void Promise.resolve(styleHooks?.saveGradient(now())).then(() => {
+        render(); // (the new one is in the list of saved gradients, at its end: shown)
+        box.querySelector<HTMLElement>("[data-save-gradient]")!.textContent = "Saved";
+        const list = box.querySelector<HTMLElement>(".gradient-chips");
+        if (list) list.scrollTop = list.scrollHeight;
+        after?.();
+      });
     }
   });
   return box;
@@ -345,8 +356,8 @@ export interface ChildGradientOptions {
   stops: readonly GradientStop[];
   onInput(stops: readonly GradientStop[]): void;
   onChange(stops: readonly GradientStop[]): void;
-  /** Keep this gradient in the Styles. */
-  onSave(stops: readonly GradientStop[]): void;
+  /** A gradient or a colour was saved to the Styles from the editor (the lists that show the saved gradients are made again). */
+  onSaved?(): void;
 }
 
 /** The floating gradient editor beside the open popover `parent`: the same picker panel as everywhere, not a copy inside another panel. */
@@ -370,16 +381,22 @@ function openChildGradient(parent: HTMLElement, o: ChildGradientOptions): void {
       o.onChange(g.stops);
     },
   });
-  const save = document.createElement("button");
-  save.type = "button";
-  save.className = "colour-save";
-  save.textContent = "Save gradient";
-  save.title = "Keep this gradient in the Styles";
-  save.addEventListener("click", () => {
-    o.onSave(g.stops);
-    save.textContent = "Saved";
-  });
-  pop.append(ed.el, save);
+  // the same saved gradients, "Show all", Save gradient and Save colour of this stop as the chooser of a fill has
+  const gradientNow = (): Gradient => ({ ...g, stops: g.stops });
+  pop.append(
+    ed.el,
+    gradientStyles(
+      gradientNow,
+      (chosen) => {
+        g = { ...g, stops: chosen.stops };
+        ed.setValue(gradientToValue(g));
+        o.onInput(g.stops);
+        o.onChange(g.stops);
+      },
+      () => ed.selectedColour,
+      () => o.onSaved?.(),
+    ),
+  );
   document.body.appendChild(pop);
   const put = (): void => {
     const p = parent.getBoundingClientRect();
@@ -804,7 +821,7 @@ export interface AdjustOptions {
   /** Every step of a slider: the adjustments to show now (not stored). */
   onInput(a: Adjust): void;
   /** The saved adjustments (Styles in the library, ADR 0120): the list now, and saving the numbers as a new one. */
-  styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }>; saveGradient(stops: readonly GradientStop[]): Promise<void> };
+  styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
   /** Open the Styles panel, where saved adjustments are applied. */
   onStyles(): void;
   /** A slider is let go, a number typed, or Reset pressed: store them. */
@@ -850,15 +867,16 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   ];
   const row = (s: (typeof rows)[number]): string =>
     `<div class="adj-row${cur[s.key] ? " is-changed" : ""}" data-adj-row="${s.key}"><label class="adj-label" for="adj-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
-  const saved = o.styles.gradients();
+  let saved = o.styles.gradients();
   const sameStops = (a: readonly GradientStop[], b: readonly GradientStop[]): boolean => JSON.stringify(a) === JSON.stringify(b);
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
+  const mapOptions = (): string => saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("");
   const mapSection = (): string =>
-    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("")}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
+    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${mapOptions()}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
   const CH: Array<[Channel, string]> = [["master", "All"], ["r", "Red"], ["g", "Green"], ["b", "Blue"]];
   const chSelect = (name: string): string => `<select data-${name} aria-label="${name === "lv-ch" ? "Levels" : "Curve"}: which channel">${CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
   const layerTabs = `<div class="adj-layers" role="group" aria-label="Layers of adjustments">${layers.map((_, i) => `<button type="button" data-layer="${i}" aria-pressed="${i === idx}">${i + 1}</button>`).join("")}${layers.length < MAX_LAYERS ? `<button type="button" data-layer-add aria-label="Add a layer of adjustments after this one" title="Add a layer: its numbers are applied to the result of the one before">+</button>` : ""}${layers.length > 1 ? `<button type="button" data-layer-del aria-label="Remove this layer" title="Remove this layer">${ICONS.x}</button>` : ""}</div>`;
-  const levelsSection = `<section class="adj-group" aria-label="Levels"><h4>Levels</h4><div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label">Black</label><input type="number" class="adj-num" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label">White</label><input type="number" class="adj-num" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label">Gamma</label><input type="number" class="adj-num" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
+  const levelsSection = `<section class="adj-group" aria-label="Levels"><h4>Levels</h4><div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label">Black point</label><input type="number" class="adj-num" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label">White point</label><input type="number" class="adj-num" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label">Gamma</label><input type="number" class="adj-num" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
   const curvesSection = `<section class="adj-group" aria-label="Curves"><h4>Curves</h4><div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
     layerTabs +
@@ -892,7 +910,13 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
         cancelPreview();
         emitChange("Adjust picture");
       },
-      onSave: (stops) => void o.styles.saveGradient(stops),
+      onSaved: () => {
+        // a gradient was saved from the floating editor: the list of this select has it too (and the map is that gradient)
+        saved = o.styles.gradients();
+        for (const opt of [...mapSelect.options].filter((x) => /^\d+$/.test(x.value))) opt.remove();
+        mapSelect.insertAdjacentHTML("beforeend", mapOptions());
+        mapSelect.value = mapIndex();
+      },
     });
   };
   const syncMap = (): void => {

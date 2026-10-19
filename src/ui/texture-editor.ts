@@ -5,6 +5,7 @@
  */
 import { esc } from "./format";
 import { scrubNumbers } from "../colour-picker/scrub";
+import { ICONS } from "./icons";
 import type { TextureMode, TextureSource, TexturePaint, TileAlign, TileType } from "../doc/texture";
 import { MAX_SCALE, MAX_SPACING, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYPES } from "../doc/texture";
 
@@ -84,6 +85,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
       <p class="op-note" data-tex-note role="status"></p>
     </div>
     <div class="tex-fields">
+      <div class="tex-random"><button type="button" class="colour-save" data-tex-random title="Randomize the options: scale, turn, place, space and grid">${ICONS.shuffle}<span>Randomize</span></button></div>
       ${o.kind === "image" ? select("mode", "Mode", TEXTURE_MODES.map((m) => [m, LABEL[m]] as const)) : ""}
       ${rows}
       ${select("tile", "Grid", TILE_TYPES.map((m) => [m, TILE_LABEL[m]] as const))}
@@ -123,6 +125,27 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     const f = file.files?.[0];
     if (f) void take(hooks!.importFile(f));
     file.value = "";
+  });
+  // Randomize: any mode (a picture), scale, turn, place, space, grid and align; one undo step.
+  const pickOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
+  const between = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
+  q("[data-tex-random]").addEventListener("click", () => {
+    if (!t) return;
+    const mode: TextureMode = o.kind === "image" ? pickOf(TEXTURE_MODES) : "tile";
+    const tiled = mode === "tile";
+    change(
+      {
+        ...t,
+        mode,
+        scale: clamp(Math.round(between(tiled ? 0.2 : 1, tiled ? 2.5 : 2) * 100) / 100, MIN_SCALE, MAX_SCALE),
+        rotation: Math.round(between(-180, 180)),
+        offset: [Math.round(between(-0.5, 0.5) * 100) / 100, Math.round(between(-0.5, 0.5) * 100) / 100],
+        tile: tiled ? pickOf(TILE_TYPES) : t.tile,
+        spacing: tiled ? [Math.round(between(0, 0.6) * 100) / 100, Math.round(between(0, 0.6) * 100) / 100] : t.spacing,
+        align: tiled ? pickOf(TILE_ALIGNS) : t.align,
+      },
+      true,
+    );
   });
   const change = (next: TexturePaint, final: boolean): void => {
     t = next;

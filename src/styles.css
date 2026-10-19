@@ -2336,6 +2336,9 @@ input[data-scrub-input]:focus { cursor: text; }
 .tex-source { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
 .tex-fields { display: grid; gap: var(--sp-3); }
 .tex-fields[hidden] { display: none; }
+.tex-random { display: flex; justify-content: flex-end; }
+.tex-random button { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.tex-random svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
 .tex-fields .adj-row > select { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .paint-modes { display: flex; overflow-x: auto; scrollbar-width: thin; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }
@@ -2617,3 +2620,9 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .lib-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); }
 .tex-source .is-first { color: var(--hud-accent-fg); background: var(--hud-accent); }
+
+/* Levels: the black and white points on one line and the gamma under them, each a label and a number, the numbers in the one column on the right (as every number of the panel);
+   the channel choice and Reset curve sit at the two ends of their line, the button on one line. */
+.adj-row[data-lv-row] { grid-template-columns: minmax(0, 1fr) 3.75rem; row-gap: var(--sp-3); }
+.adj-group > .adj-row:has(> select) { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
+.adj-group > .adj-row:has(> select) button { flex: none; white-space: nowrap; }
