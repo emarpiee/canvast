@@ -41,6 +41,7 @@ interface Tab {
 const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "pen.kind": "Drawing",
   "lasso.filter": "Selecting and arranging",
+  "shape.initialPaint": "Shapes",
   "eraser.diameterPx": "Eraser",
   "assets.edgeWidth": "The asset viewer",
   "media.volume": "Players",
@@ -97,6 +98,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "select.alignBox", label: "Align to the selection box", help: "Align and distribute against the selection's box, not each item's own bounds.", control: { kind: "toggle" } },
       { key: "arrange.gap", label: "Space between items in a grid", help: "How far apart Arrange in a grid puts the items, as a part of the largest item. Also in the Arrange menu.", control: { kind: "select", options: [["none", "None"], ["tight", "Tight"], ["normal", "Normal"], ["wide", "Wide"], ["wider", "Wider"]] } },
       { key: "snap.enabled", label: "Snap and guides", help: "A moving selection snaps to the edges and centres of other objects.", control: { kind: "toggle" } },
+      { key: "shape.initialPaint", label: "Initial state keeps the fill and outline", help: "When you Set or Update a shape's initial state, its fill, outline and its options, opacity and blend are saved with it (the shape, its size, rotation, points, ratio, radius and smoothing always are), and Reset puts them back. Off: only the geometry is saved and Reset leaves the paint as it is. A state saved while this was off has no paint until you Update it.", control: { kind: "toggle" } },
       { key: "eraser.diameterPx", label: "Eraser size", control: { kind: "range", min: 4, max: 128, step: 1, unit: "px" } },
       { key: "eraser.wholeGroups", label: "Eraser takes whole groups", control: { kind: "toggle" } },
     ],

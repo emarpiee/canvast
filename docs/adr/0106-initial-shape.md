@@ -18,7 +18,10 @@ Each is one undo step and works on all the picked shapes (several at once). **A 
 **Units.** The saved shape is in its own unit (`initial.unit`). Wherever the object's unit is renamed by moving it to another frame (`inFrame`) or by pasting it at another depth (`instantiate`), the saved one's unit moves with it; renaming for size (normalisation) changes only the object's own unit and leaves the saved shape alone. Reset sets the object back to the saved unit and places it by its middle, exactly (dyadic).
 
 ## Not done
-A thumbnail of the saved shape, saving several, naming them, and saving paint with the shape.
+A thumbnail of the saved shape, saving several, and naming them.
+
+## Paint (setting)
+Setting `shape.initialPaint` (Settings, Drawing, Shapes; on by default). The buttons are named “initial state” makes Set and Update also save `initial.paint`: fill, outline, width, join, cap, dash, dash offset, miter angle, align, arrows, opacity, blend, even-odd and width profile. Smoothing is saved with the shape (always), like size, rotation, points, ratio and radius. Reset then puts that look back whole (an option the saved look did not have is cleared). Off, or a shape saved while it was off: paint stays as it is. A boolean group's result keeps no paint (its look is derived). Test: "initial shape with the setting on keeps the fill and outline".
 
 ## Tests
 `tests/unit/shape-params.test.ts` (saved and read back, malformed refused, unit follows a frame change), `tests/e2e/vectors.spec.ts` ("initial shape": the menu's states, set, change ratio, points, radius, move and resize, reload, reset to size, points, ratio, no radius, middle kept, paint kept; undo; update then reset to the updated one; Chromium and Firefox).

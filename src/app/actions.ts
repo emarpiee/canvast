@@ -11,7 +11,7 @@ import { isCard } from "../assets/file-kind";
 import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
-import type { BlendMode, CanvasObject, ImageObject, InitialShape, MediaState, PathObject, StrokeObject, TextObject } from "../doc/model";
+import type { BlendMode, CanvasObject, ImageObject, InitialPaint, InitialShape, MediaState, PathObject, StrokeObject, TextObject } from "../doc/model";
 import { fitWidth, withLook, lookOf, sameLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
@@ -1113,7 +1113,7 @@ export function commitSmoothing(doc: DocumentStore, editor: EditorState, pct: nu
   editor.changed();
 }
 
-// ---- The initial shape (ADR 0106) -----------------------------------------------------------------------------------
+// ---- The initial state (ADR 0106) -----------------------------------------------------------------------------------
 
 /** The boolean group picked whole (its result and every object in it, nested groups too), if the selection is one. */
 function pickedGroup(doc: DocumentStore, editor: EditorState): { top: PathObject; objs: PathObject[] } | null {
@@ -1131,12 +1131,16 @@ function centreIn(o: CanvasObject, f: ReturnType<typeof expressObjectIn>["frame"
 }
 
 /** The shape an object is saved as: its geometry in its own unit. */
-const snapshotOf = (o: PathObject): InitialShape => ({ sub: o.base ?? o.sub, ...(o.base ? { base: o.base, sub: o.sub } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.params ? { params: o.params } : {}), ...(o.rot ? { rot: o.rot } : {}), unit: o.unit });
+const paintOf = (o: PathObject): InitialPaint => ({ fill: o.fill, stroke: o.stroke, width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}), ...(o.dash ? { dash: o.dash } : {}), ...(o.dashOffset ? { dashOffset: o.dashOffset } : {}), ...(o.miterAngle !== undefined ? { miterAngle: o.miterAngle } : {}), ...(o.align ? { align: o.align } : {}), ...(o.arrowStart ? { arrowStart: o.arrowStart } : {}), ...(o.arrowEnd ? { arrowEnd: o.arrowEnd } : {}), opacity: o.opacity, ...(o.blend ? { blend: o.blend } : {}), ...(o.evenodd ? { evenodd: true as const } : {}), ...(o.profile ? { profile: o.profile } : {}) });
+const snapshotOf = (o: PathObject, withPaint = false): InitialShape => ({ ...(withPaint ? { paint: paintOf(o) } : {}), sub: o.base ?? o.sub, ...(o.base ? { base: o.base, sub: o.sub } : {}), ...(o.radius !== undefined ? { radius: o.radius } : {}), ...(o.smoothing !== undefined ? { smoothing: o.smoothing } : {}), ...(o.params ? { params: o.params } : {}), ...(o.rot ? { rot: o.rot } : {}), unit: o.unit });
 
 /** The object with its saved shape put back, its middle at `centre` (the same frame as the object). */
 function shapeBack(o: PathObject, init: InitialShape, centre: { x: D.Dyadic; y: D.Dyadic }): PathObject {
-  const { rot: _r, radius: _rad, base: _b, params: _p, ...rest } = o;
-  const back: PathObject = { ...rest, sub: init.sub, unit: init.unit, ...(init.base ? { base: init.base } : {}), ...(init.radius !== undefined ? { radius: init.radius } : {}), ...(init.params ? { params: init.params } : {}), ...(init.rot ? { rot: init.rot } : {}) };
+  const { rot: _r, radius: _rad, smoothing: _sm, base: _b, params: _p, ...bare } = o;
+  // a saved look replaces the current one whole (an option it did not have is cleared)
+  const { join: _j, cap: _c, dash: _d, dashOffset: _do, miterAngle: _m, align: _al, arrowStart: _as, arrowEnd: _ae, blend: _bl, evenodd: _eo, profile: _pr, ...unpainted } = bare;
+  const rest: typeof bare = init.paint ? { ...unpainted, ...init.paint } : bare;
+  const back: PathObject = { ...rest, sub: init.sub, unit: init.unit, ...(init.base ? { base: init.base } : {}), ...(init.radius !== undefined ? { radius: init.radius } : {}), ...(init.smoothing !== undefined ? { smoothing: init.smoothing } : {}), ...(init.params ? { params: init.params } : {}), ...(init.rot ? { rot: init.rot } : {}) };
   const then = localBounds(back);
   return { ...back, anchor: { x: D.sub(centre.x, D.shift(D.fromNumber((then.minX + then.maxX) / 2), init.unit)), y: D.sub(centre.y, D.shift(D.fromNumber((then.minY + then.maxY) / 2), init.unit)) } };
 }
@@ -1153,7 +1157,7 @@ export function initialShapeState(doc: DocumentStore, editor: EditorState): { co
 }
 
 /** Save the picked shapes' shape (or the picked boolean group, as a whole) as their initial one ("Set" where there is none, "Update" to replace it): kept with the objects. One undo step. */
-export function setInitialShape(doc: DocumentStore, editor: EditorState, onlyMissing = false): void {
+export function setInitialShape(doc: DocumentStore, editor: EditorState, onlyMissing = false, withPaint = false): void {
   if (editor.blockEdit()) return;
   const g = pickedGroup(doc, editor);
   if (g) {
@@ -1161,25 +1165,25 @@ export function setInitialShape(doc: DocumentStore, editor: EditorState, onlyMis
     const f0 = g.top.frame ?? doc.space.world;
     const centre = centreIn(g.top, f0);
     const next = g.objs.map((o): PathObject => {
-      if (o.result !== undefined) return { ...o, initial: { ...snapshotOf(o), op: o.boolOps?.[o.result] ?? "union" } };
+      if (o.result !== undefined) return { ...o, initial: { ...snapshotOf(o, withPaint), op: o.boolOps?.[o.result] ?? "union" } };
       const e = expressObjectIn(o, f0) as PathObject;
       const c = centreIn(o, f0);
-      return { ...o, initial: { ...snapshotOf(o), offset: { x: D.toNumber(D.shift(D.sub(c.x, centre.x), -e.unit)), y: D.toNumber(D.shift(D.sub(c.y, centre.y), -e.unit)) } } };
+      return { ...o, initial: { ...snapshotOf(o, withPaint), offset: { x: D.toNumber(D.shift(D.sub(c.x, centre.x), -e.unit)), y: D.toNumber(D.shift(D.sub(c.y, centre.y), -e.unit)) } } };
     });
-    doc.commit(doc.transaction(g.top.initial ? "Update initial shape of the group" : "Set initial shape of the group", next));
+    doc.commit(doc.transaction(g.top.initial ? "Update initial state of the group" : "Set initial state of the group", next));
     editor.changed();
     return;
   }
   const paths = editablePaths(doc, editor).filter((o) => o.result === undefined && !(onlyMissing && o.initial));
   if (!paths.length) return;
-  const next = paths.map((o): PathObject => ({ ...o, initial: snapshotOf(o) }));
+  const next = paths.map((o): PathObject => ({ ...o, initial: snapshotOf(o, withPaint) }));
   const updating = paths.every((o) => o.initial);
-  doc.commit(doc.transaction(updating ? (paths.length === 1 ? "Update initial shape" : `Update initial shape of ${paths.length} shapes`) : paths.length === 1 ? "Set initial shape" : `Set initial shape of ${paths.length} shapes`, next));
+  doc.commit(doc.transaction(updating ? (paths.length === 1 ? "Update initial state" : `Update initial state of ${paths.length} shapes`) : paths.length === 1 ? "Set initial state" : `Set initial state of ${paths.length} shapes`, next));
   editor.changed();
 }
 
 /**
- * Put the picked shapes back to their initial shape, about where their middle is now (paint, place and layer are as they are); or, with a
+ * Put the picked shapes back to their initial state, about where their middle is now (paint, place and layer are as they are); or, with a
  * boolean group picked whole, the group back as it was saved: each shape of it as saved and where it was in the group (about the group's
  * middle now), its operation and its radius. Shapes added to the group since, or taken from it, are not touched. One undo step.
  */
@@ -1214,7 +1218,7 @@ export function resetToInitialShape(doc: DocumentStore, editor: EditorState): vo
       }
     }
     if (!out.size) return;
-    doc.commit(doc.transaction("Reset to initial shape of the group", [...out.values()]));
+    doc.commit(doc.transaction("Reset to initial state of the group", [...out.values()]));
     editor.changed();
     return;
   }
@@ -1224,7 +1228,7 @@ export function resetToInitialShape(doc: DocumentStore, editor: EditorState): vo
     next.push(homeObject(normalizeUnit(shapeBack(o, o.initial, centreIn(o, o.frame ?? doc.space.world))), doc.space) as PathObject);
   }
   if (!next.length) return;
-  doc.commit(doc.transaction(next.length === 1 ? "Reset to initial shape" : `Reset ${next.length} shapes to their initial shape`, next));
+  doc.commit(doc.transaction(next.length === 1 ? "Reset to initial state" : `Reset ${next.length} shapes to their initial state`, next));
   editor.changed();
 }
 

@@ -47,7 +47,7 @@ export interface ToolbarActions {
   paintSelected(patch: PaintPatch, final: boolean): void;
   /** The corners, ends and place of the first selected path's outline and its width in px at this zoom; null when no path is selected. */
   selectedOutline(): { join: JoinChoice; cap: CapChoice; align: AlignChoice; dash: DashChoice; closed: boolean; widthPx: number | null } | null;
-  /** The picked shapes that have a shape of their own to save, and how many of them have an initial shape saved (null: none can). */
+  /** The picked shapes that have a shape of their own to save, and how many of them have an initial state saved (null: none can). */
   initialShapeState(): { count: number; saved: number } | null;
   /** Save the picked shapes' shape as their initial one (or replace it), and put them back to it. */
   setInitialShape(onlyMissing?: boolean): void;
@@ -290,10 +290,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text" role="radiogroup" aria-label="Text width">
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
-      <div class="tb-group tb-options" data-for="select node" data-kind="shape" role="group" aria-label="Initial shape">
-        <button type="button" data-initial-set hidden aria-label="Set initial shape: save the shape as it is now" title="Set initial shape: save the shape as it is now, to come back to it later">${ICONS.pin}</button>
-        <button type="button" data-initial-update hidden aria-label="Update initial shape: replace the saved shape with the shape as it is now" title="Update initial shape: replace the saved shape with the shape as it is now">${ICONS.save}</button>
-        <button type="button" data-initial-reset hidden aria-label="Reset to initial shape: put the shape back as it was saved" title="Reset to initial shape: put the shape back as it was saved">${ICONS.resetShape}</button>
+      <div class="tb-group tb-options" data-for="select node" data-kind="shape" role="group" aria-label="Initial state">
+        <button type="button" data-initial-set hidden aria-label="Set initial state: save the shape as it is now" title="Set initial state: save the shape as it is now, to come back to it later">${ICONS.pin}</button>
+        <button type="button" data-initial-update hidden aria-label="Update initial state: replace the saved shape with the shape as it is now" title="Update initial state: replace the saved shape with the shape as it is now">${ICONS.save}</button>
+        <button type="button" data-initial-reset hidden aria-label="Reset to initial state: put the shape back as it was saved" title="Reset to initial state: put the shape back as it was saved">${ICONS.resetShape}</button>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet picture">

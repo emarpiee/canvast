@@ -66,6 +66,7 @@ export const SETTINGS = {
   "shape.join": { scope: "device", default: "default", validate: oneOf("default", "miter", "round", "bevel"), effect: "immediate" } as Def<"default" | "miter" | "round" | "bevel">,
   "shape.cap": { scope: "device", default: "round", validate: oneOf("butt", "round", "square"), effect: "immediate" } as Def<"butt" | "round" | "square">,
   "shape.dash": { scope: "device", default: "solid", validate: oneOf("solid", "dashed", "dotted"), effect: "immediate" } as Def<"solid" | "dashed" | "dotted">,
+  "shape.initialPaint": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shape.lockRadius": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shape.align": { scope: "device", default: "centre", validate: oneOf("inside", "centre", "outside"), effect: "immediate" } as Def<"inside" | "centre" | "outside">,
   "shape.sides": { scope: "device", default: 6, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

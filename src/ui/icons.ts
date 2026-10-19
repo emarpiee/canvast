@@ -44,7 +44,6 @@ import cropSvg from "lucide-static/icons/crop.svg";
 import scanFrameSvg from "lucide-static/icons/scan.svg";
 import squareDashedSvg from "lucide-static/icons/square-dashed.svg";
 import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
-import fileCodeSvg from "lucide-static/icons/file-code.svg";
 import vectorPolygonSvg from "lucide-static/icons/vector-polygon.svg";
 import squareRoundCornerSvg from "lucide-static/icons/square-round-corner.svg";
 import outlineOptionsSvg from "lucide-static/icons/line-style.svg";
@@ -515,7 +514,6 @@ export const ICONS = {
   sheetTool: clean(scanFrameSvg),
   sheetSelection: clean(squareDashedSvg),
   releaseSheet: clean(squareDashedXSvg),
-  fileCode: clean(fileCodeSvg),
   vectorPolygon: clean(vectorPolygonSvg),
   squareRoundCorner: clean(squareRoundCornerSvg),
   outlineOptions: clean(outlineOptionsSvg),

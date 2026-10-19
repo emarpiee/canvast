@@ -889,7 +889,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectedArrows: () => selectedArrows(doc, editor),
     setArrows: (patch) => commitArrows(doc, editor, patch),
     initialShapeState: () => initialShapeState(doc, editor),
-    setInitialShape: (onlyMissing) => setInitialShape(doc, editor, onlyMissing),
+    setInitialShape: (onlyMissing) => setInitialShape(doc, editor, onlyMissing, settings.get("shape.initialPaint")),
     resetToInitialShape: () => resetToInitialShape(doc, editor),
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
@@ -1206,16 +1206,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
 
-  /** Save the picked paths as an SVG file (ADR 0107). */
-  const saveSelectionSvg = (): void => {
-    const text = svgOfSelection(doc, editor);
-    if (text === null) {
-      editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
-      editor.changed();
-      return;
-    }
-    saveFile("canvast-shapes.svg", new Blob([text], { type: "image/svg+xml" }));
-  };
   /** Save the picked paths as an SVG picture in the library (the same file "Save as SVG" writes). */
   const saveSvgToLibrary = async (): Promise<void> => {
     const text = svgOfSelection(doc, editor);
@@ -1344,7 +1334,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         });
       },
       canExportSvg: () => canExportSvg(doc, editor),
-      exportSvg: () => saveSelectionSvg(),
       saveSvgToLibrary: () => void saveSvgToLibrary(),
       canExport: () => exportTarget(doc, editor) !== null,
       exportPicture: () => openExport(),
@@ -1612,7 +1601,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
       { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
       { group: "Export", title: "Save the selection to the library as SVG", words: "vector assets", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => void saveSvgToLibrary() },
-      { group: "Export", title: "Save the selection as SVG", words: "vector", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => saveSelectionSvg() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },
       { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },

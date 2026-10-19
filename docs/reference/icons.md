@@ -81,7 +81,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `markdown` | Copy Markdown (the text format bar, the Export menu) |
 | `selectAll` | Context menu: Select everything |
 | `paste` | Context menu: Paste |
-| `exportMenu` | Actions bar: Export and copy out (Export…, Save as SVG, Copy Markdown) |
+| `exportMenu` | Actions bar: Export and copy out (Export…, Save to library, Copy Markdown) |
 | `sheetMenu` | Actions bar: Sheets (put on a sheet, release, fit to contents) |
 | `arrangeMenu` | Actions bar: Arrange in a grid (opens the menu of orders and spaces) |
 | `alignMenu` | Actions bar: Align and distribute (opens the menu of the eight) |
@@ -108,7 +108,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
-| `file-code` | Save the shapes as an SVG file |
 | `book-down` | Save the shapes to the library as an SVG picture |
 | `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |

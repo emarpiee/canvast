@@ -1448,7 +1448,7 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   await expect(p.locator("[data-initial-set]")).toBeVisible();
   await expect(p.locator("[data-initial-reset]")).toBeHidden();
   await expect(p.locator("[data-initial-update]")).toBeHidden();
-  await menu(/^Set initial shape/);
+  await menu(/^Set initial state/);
   const first = world(await lastP());
   expect((await lastP()).initial).toBeDefined();
   // change it: ratio, points, radius, a move and a resize
@@ -1475,7 +1475,7 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
     return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
   };
   const m0 = await middle();
-  await menu(/^Reset to initial shape/);
+  await menu(/^Reset to initial state/);
   const back = await lastP();
   expect(world(back).w / first.w).toBeCloseTo(1, 6);
   expect(back.params!.tips).toBe(5);
@@ -1490,9 +1490,9 @@ test("initial shape: set it, change the shape any way, reset to it (after a relo
   await key(app, "Control+Shift+z");
   // update it to something else, change again, reset: to the updated one
   await set("[data-sel-tips]", "7");
-  await menu(/^Update initial shape/);
+  await menu(/^Update initial state/);
   await set("[data-sel-tips]", "12");
-  await menu(/^Reset to initial shape/);
+  await menu(/^Reset to initial state/);
   expect(((await lastP()) as P).params!.tips).toBe(7);
 });
 
@@ -1794,7 +1794,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await p.keyboard.press("Control+a");
   await boolWith(p, "op:union");
   await app.frame();
-  await menu(/^Set initial shape/); // the group picked whole
+  await menu(/^Set initial state/); // the group picked whole
   const saved = await gap();
   // change it: one shape moved inside the group, another operation, a radius
   await p.mouse.dblclick(560, 330);
@@ -1818,7 +1818,7 @@ test("initial shape of a boolean group: its shapes, where each is in it, its ope
   await reload(app);
   await p.keyboard.press("Control+a");
   await app.frame();
-  await menu(/^Reset to initial shape/);
+  await menu(/^Reset to initial state/);
   const back = await gap();
   expect(Math.abs(back[0]! - saved[0]!)).toBeLessThan(1.5);
   expect(Math.abs(back[1]! - saved[1]!)).toBeLessThan(1.5);
@@ -2841,4 +2841,35 @@ test("Save to library puts the picked shapes in the library as an SVG picture", 
   await p.getByTestId("view-assets").click();
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
   await expect(p.getByTestId("asset-card")).toContainText("canvast-shapes");
+});
+
+test("initial shape with the setting on keeps the fill and outline, and Reset puts them back", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "shape.initialPaint": true })));
+  await reload(app);
+  await key(app, "u");
+  await drag(app, [500, 300], [740, 440]);
+  await key(app, "v");
+  await click(app, 620, 370);
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="radial"]').click();
+  await key(app, "Escape");
+  const before = await last(app);
+  expect(typeof before.fill).toBe("object");
+  await p.getByRole("button", { name: /^Set initial state/ }).click();
+  await reload(app); // what was saved survives a reload
+  await key(app, "Control+a");
+  expect(((await last(app)) as Obj & { initial?: { paint?: unknown } }).initial?.paint).toBeDefined();
+  await p.click('[data-paint="fill"]');
+  await pop.locator("[data-hex]").fill("e11d48");
+  await pop.locator("[data-hex]").press("Enter");
+  await key(app, "Escape");
+  expect((await last(app)).fill).not.toEqual(before.fill);
+  await p.getByRole("button", { name: /^Reset to initial state/ }).click();
+  await app.frame();
+  const back = await last(app);
+  expect(back.fill).toEqual(before.fill);
+  expect(back.stroke).toEqual(before.stroke);
+  expect(back.width).toBe(before.width);
 });

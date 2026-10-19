@@ -4,13 +4,13 @@ import type { MenuItem } from "./more-menu";
 import { ICONS } from "./icons";
 
 /** What a right click on the canvas offers, by command title: on something picked, and on empty canvas. Each is a command of the registry, so it is the same action as everywhere else. */
-const ON_ITEMS = ["Copy", "Cut", "Paste", "Duplicate", "Group", "Ungroup", "Bring to front", "Send to back", "Put the selection on a sheet", "Detach from what it follows", "Save the selection as SVG", "Delete the selection"];
+const ON_ITEMS = ["Copy", "Cut", "Paste", "Duplicate", "Group", "Ungroup", "Bring to front", "Send to back", "Put the selection on a sheet", "Detach from what it follows", "Save the selection to the library as SVG", "Delete the selection"];
 const ON_EMPTY = ["Paste", "Select everything", "Show all hidden", "Unlock all", "Fit everything in view", "Return to the origin"];
 /** The icon of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
 const ICON: Record<string, string> = {
   Copy: ICONS.clipboardCopy, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
   "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
-  "Save the selection as SVG": ICONS.fileCode, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
+  "Save the selection to the library as SVG": ICONS.bookDown, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
   "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house,
 };
 const MENU_W = 240;

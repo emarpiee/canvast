@@ -327,11 +327,31 @@ export function editSubs(o: PathObject): readonly SubPath[] {
   return r;
 }
 
-/** A path's geometry as saved by "Set initial shape": everything that makes its shape, in its own units (`unit`), without where it is or how it is painted. */
+/** The look saved with an initial shape when the setting asks for it (ADR 0106): fill, outline and its options, in the saved unit. */
+export interface InitialPaint {
+  readonly fill: Paint | null;
+  readonly stroke: Paint | null;
+  readonly width: number;
+  readonly join?: Join;
+  readonly cap?: Cap;
+  readonly dash?: Dash;
+  readonly dashOffset?: number;
+  readonly miterAngle?: number;
+  readonly align?: Align;
+  readonly arrowStart?: Arrow;
+  readonly arrowEnd?: Arrow;
+  readonly opacity?: number;
+  readonly blend?: BlendMode;
+  readonly evenodd?: true;
+  readonly profile?: WidthProfile;
+}
+
+/** A path's geometry as saved by "Set initial shape": everything that makes its shape, in its own units (`unit`), without where it is; how it is painted only when `paint` was asked for. */
 export interface InitialShape {
   readonly sub: readonly SubPath[];
   readonly base?: readonly SubPath[];
   readonly radius?: Radius;
+  readonly smoothing?: number;
   readonly params?: ShapeParams;
   readonly rot?: number;
   readonly unit: number;
@@ -339,6 +359,8 @@ export interface InitialShape {
   readonly op?: string;
   /** A shape of a boolean group saved with the group: where its middle was from the middle of the group, in multiples of 2^unit. */
   readonly offset?: { readonly x: number; readonly y: number };
+  /** Saved only when the setting "Save the fill and outline with the initial shape" was on; Reset then puts them back too. */
+  readonly paint?: InitialPaint;
 }
 
 /** Margin around a text box (em) for italic overhang, bold and descenders past the line box. */
@@ -581,6 +603,10 @@ export function validateObject(o: CanvasObject): CanvasObject {
           b.n.forEach((v: number, i: number) => finite(v, `initial[${i}]`));
         }
       }
+    }
+    if (o.initial?.paint !== undefined) {
+      const q = o.initial.paint;
+      if (!(q.fill === null || isPaint(q.fill, true)) || !(q.stroke === null || isPaint(q.stroke)) || !Number.isFinite(q.width) || q.width <= 0) throw new InvalidObjectError("bad initial paint");
     }
     if (o.evenodd !== undefined && o.evenodd !== true) throw new InvalidObjectError("evenodd is true or absent");
     if (o.shape !== undefined && !SHAPE_KINDS.includes(o.shape)) throw new InvalidObjectError("bad shape");
