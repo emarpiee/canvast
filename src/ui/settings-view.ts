@@ -108,7 +108,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next asset (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
       { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each asset stays in the Assets slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
-      { key: "media.volume", label: "Volume", help: "Shared by every player.", control: { kind: "range", min: 0, max: 100, step: 1, unit: "%" } },
+      { key: "media.volume", label: "Starting volume", help: "Where each player starts. A player's own volume slider changes only that player.", control: { kind: "range", min: 0, max: 100, step: 1, unit: "%" } },
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.gif", label: "GIF step", help: "Frames the step buttons move an animated GIF.", control: { kind: "range", min: 1, max: 100, step: 1, unit: "frames" } },

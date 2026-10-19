@@ -308,6 +308,8 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const extractBtn = $<HTMLButtonElement>('[data-cmd="extract"]');
 
   const players = new Map<string, Player>();
+  /** The volume each item was last set to (a paused player unloads when it is left, and starts again from this, not from the setting). Kept while the app is open. */
+  const ownVolume = new Map<string, number>();
   /** The player the bar controls: that of the one selected media instance. */
   let sel: Player | null = null;
   const videoOf = (p: Player): HTMLVideoElement | null => (p.eng.el instanceof HTMLVideoElement ? p.eng.el : null);
@@ -340,7 +342,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     const muted = videoOf(sel)?.muted ?? false;
     muteBtn.setAttribute("aria-pressed", String(muted));
     muteBtn.innerHTML = muted ? ICONS.volumeOff : ICONS.volume;
-    if (document.activeElement !== volume) volume.value = String(muted ? 0 : settings.get("media.volume"));
+    if (document.activeElement !== volume) volume.value = String(muted ? 0 : Math.round((videoOf(sel)?.volume ?? 1) * 100)); // (each player has its own volume)
   };
 
   /** Stop and unload a player, writing its position unless it never finished loading or its object is gone. */
@@ -424,7 +426,7 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       v.className = "media-video";
       v.playsInline = true;
       v.preload = "auto";
-      v.volume = settings.get("media.volume") / 100;
+      v.volume = (ownVolume.get(o.id) ?? settings.get("media.volume")) / 100;
       eng = avEngine(v);
       eng.visual = o.media!.kind !== "audio"; // audio has no picture to lay over the waveform
     }
@@ -534,16 +536,14 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   scrub.addEventListener("change", () => {
     if (sel && !sel.eng.playing()) actions.setMedia(sel.o.id, { t: sel.eng.pos() }, "Seek media");
   });
-  // Volume is a device setting (0 to 100) shared by all players; sliding it to 0 mutes, anything above unmutes.
+  // Volume is the selected player's own (0 to 100; the device setting is only where a new player starts); sliding it to 0 mutes, anything above unmutes.
   volume.addEventListener("input", () => {
     const n = Number(volume.value);
-    settings.set("media.volume", n);
-    for (const p of players.values()) {
-      const v = videoOf(p);
-      if (v) {
-        v.muted = n === 0;
-        v.volume = n / 100;
-      }
+    const v = sel ? videoOf(sel) : null;
+    if (sel) ownVolume.set(sel.o.id, n);
+    if (v) {
+      v.muted = n === 0;
+      v.volume = n / 100;
     }
   });
   // Steps are device settings: a bad value is refused and the field shows the current one again.

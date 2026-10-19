@@ -684,6 +684,27 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   expectSlow(app.consoleErrors).toEqual([]);
 });
 
+test("each player has its own volume: setting one leaves the other, and a new one starts at the Settings volume", async ({ app }) => {
+  const p = app.page;
+  for (const name of ["a.wav", "b.wav"]) await p.getByTestId("import-input").setInputFiles({ name, mimeType: "audio/wav", buffer: makeWav(2) });
+  await expect.poll(async () => (await objects(p)).length).toBe(2);
+  await saved(p);
+  const [first, second] = await objects(p);
+  await p.keyboard.press("v");
+  await p.getByRole("button", { name: "Layers panel" }).click();
+  const row = (id: string) => p.getByTestId("layers-panel").locator(`li.layer[data-key="${id}"]`);
+  const bar = p.getByTestId("media-bar");
+  await row(first!.id).click();
+  await expect(bar.getByLabel("Volume")).toHaveValue("100");
+  await bar.getByLabel("Volume").fill("30");
+  await row(second!.id).click();
+  await expect(bar.getByLabel("Volume"), "the other player is not at 30").toHaveValue("100");
+  await bar.getByLabel("Volume").fill("60");
+  await row(first!.id).click();
+  await expect(bar.getByLabel("Volume"), "the first kept its own").toHaveValue("30");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("audio is placed as its waveform; its player steps 1 s and keeps the paused position (ADR 0041)", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("import-input").setInputFiles({ name: "tone.wav", mimeType: "audio/wav", buffer: makeWav(3) });

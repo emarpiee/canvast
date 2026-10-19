@@ -57,7 +57,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
     const muted = video()?.muted ?? false;
     muteBtn.setAttribute("aria-pressed", String(muted));
     muteBtn.innerHTML = muted ? ICONS.volumeOff : ICONS.volume;
-    if (document.activeElement !== volume) volume.value = String(muted ? 0 : settings.get("media.volume"));
+    if (document.activeElement !== volume) volume.value = String(muted ? 0 : Math.round((video()?.volume ?? 1) * 100));
   };
 
   scrub.addEventListener("input", () => {
@@ -66,8 +66,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
     refresh();
   });
   volume.addEventListener("input", () => {
-    const n = Number(volume.value);
-    settings.set("media.volume", n);
+    const n = Number(volume.value); // (this player's own: the setting is only where a player starts)
     const v = video();
     if (v) {
       v.muted = n === 0;
