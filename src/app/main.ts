@@ -1087,6 +1087,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     editor,
     host: textureHost,
     nameOf: (hash) => assetNames.get(hash),
+    libraryPictures: async () => {
+      const list = await session.catalog?.list().catch(() => undefined);
+      return (list?.entries ?? [])
+        .filter((e) => e.type.startsWith("image/") && !e.card && e.present)
+        .sort((a, b) => b.importedAt - a.importedAt)
+        .map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
+    },
     say: (text) => { editor.message = text; editor.changed(); },
     importPicture: async (file) => {
       try {
@@ -1108,6 +1115,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   setColourStyles({
     gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, gradient: s.data as Gradient })),
     saveGradient: (g) => void session.styles.add("gradient", "", g).then((made) => made && ((editor.message = "Saved the gradient to the Styles."), editor.changed())),
+    showGradients: () => {
+      editor.stylesTab = "gradient";
+      editor.stylesOpen = true;
+      editor.changed();
+    },
     colours: () => session.styles.of("colour").map((s) => String(s.data)),
     save: (hex) => void session.styles.add("colour", "", hex).then((made) => made && ((editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`), editor.changed())),
   });

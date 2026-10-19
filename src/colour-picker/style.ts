@@ -107,7 +107,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .cp-groups { display: flex; flex-direction: column; gap: var(--cp-gap-sm); }
 .cp-groups:empty { display: none; }
 .cp-group-h { color: var(--cp-muted); font-size: var(--cp-text-sm); margin-bottom: 3px; }
-.cp-swatches { display: flex; flex-wrap: wrap; gap: var(--cp-gap-sm); }
+.cp-swatches { display: flex; flex-wrap: wrap; gap: var(--cp-gap-sm); width: 0; min-width: 100%; max-height: calc(4 * var(--cp-swatch) + 3 * var(--cp-gap-sm) + 4px); overflow-y: auto; padding: 2px; margin: -2px; } /* (a long list wraps in the width of the picker and scrolls after four rows: it never makes the picker wider) */
 .cp-swatch { width: var(--cp-swatch); height: var(--cp-swatch); padding: 0; border-radius: var(--cp-dot, 50%); border: 0; box-shadow: 0 0 0 1px var(--cp-border); cursor: pointer; }
 .cp-swatch:hover { box-shadow: 0 0 0 2px var(--cp-fg); }
 .cp-swatch.is-on { box-shadow: 0 0 0 2px var(--cp-bg), 0 0 0 4px var(--cp-accent); }

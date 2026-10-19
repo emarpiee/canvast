@@ -130,6 +130,10 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     scheduled = false;
     panel.hidden = !editor.stylesOpen;
     if (!editor.stylesOpen) return;
+    if (editor.stylesTab) {
+      tab = editor.stylesTab;
+      editor.stylesTab = null;
+    }
     const active = document.activeElement as HTMLInputElement | null;
     if (active && panel.contains(active) && active.matches("[data-rename], [data-colour-name]")) return; // (a name being typed is not redrawn under the cursor)
     const typing = !!active && panel.contains(active) && active.matches("[data-styles-filter]");

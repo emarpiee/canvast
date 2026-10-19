@@ -1,8 +1,10 @@
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
 /** The colour picker as a package (src/colour-picker/README.md): its demo page, built on its own, with every option on. No canvast code is loaded. */
-const DEMO = `file://${fileURLToPath(new URL("../../dist-picker/demo.html", import.meta.url))}`;
+// the picker's demo page: the snapshot's own copy (`npm run test:snap`, CANVAST_PICKER_DIR), else `dist-picker/` (`npm run build:picker`)
+const DEMO = `file://${process.env["CANVAST_PICKER_DIR"] ? resolve(process.env["CANVAST_PICKER_DIR"], "demo.html") : fileURLToPath(new URL("../../dist-picker/demo.html", import.meta.url))}`;
 
 test("colour picker package: four layouts, plane, transparency, text formats, contrast, harmonies, and a drag stays fast", async ({ page }) => {
   const errors: string[] = [];

@@ -9,12 +9,16 @@ import type { TextureHost } from "../render/texture";
 import type { EditorState } from "./editor-state";
 import { holdColourPopover } from "../ui/colour-popover";
 import type { TextureHooks } from "../ui/texture-editor";
+import { openLibraryPicker } from "../ui/library-picker";
+import type { LibraryPicture } from "../ui/library-picker";
 
 export function createTextureHooks(deps: {
   editor: EditorState;
   host: TextureHost;
   /** A picture file into the library: its hash, or null when it is not a picture. */
   importPicture(file: File): Promise<string | null>;
+  /** The pictures of the library (still pictures that can be shown), for the chooser. */
+  libraryPictures(): Promise<LibraryPicture[]>;
   nameOf(hash: string): string | undefined;
   /** A message for the person (empty: take the message away). */
   say(text: string): void;
@@ -61,6 +65,10 @@ export function createTextureHooks(deps: {
         };
         deps.say(kind === "image" ? "Click a picture on the canvas (Esc cancels)." : "Click what to repeat over the shape (Esc cancels).");
       }),
+    async chooseFromLibrary(anchor) {
+      const hash = await openLibraryPicker(anchor, await deps.libraryPictures());
+      return hash ? { kind: "asset", hash } : null;
+    },
     async importFile(file) {
       const hash = await deps.importPicture(file);
       return hash ? { kind: "asset", hash } : null;

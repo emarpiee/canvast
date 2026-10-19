@@ -117,6 +117,8 @@ export interface ColourStyleHooks {
   save(hex: string): void;
   gradients(): Array<{ name: string; gradient: Gradient }>;
   saveGradient(g: Gradient): void;
+  /** Open the Gradients of the Styles panel (all the saved ones, with their names). */
+  showGradients(): void;
 }
 let styleHooks: ColourStyleHooks | null = null;
 export function setColourStyles(h: ColourStyleHooks | null): void {
@@ -145,15 +147,19 @@ function saveColourButton(hex: () => string, after: () => void): HTMLButtonEleme
 }
 
 /** Under a gradient editor: the saved gradients as bars to pick one, and a button to save this one (Styles, ADR 0122). */
-function gradientStyles(now: () => Gradient, use: (g: Gradient) => void): HTMLElement {
+function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: () => string): HTMLElement {
   const box = document.createElement("div");
   box.className = "gradient-styles";
   const saved = styleHooks?.gradients() ?? [];
-  box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients</div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
+  box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the picked stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");
-    if (chip) {
+    if (t.closest("[data-save-stop]")) {
+      styleHooks?.save(stop().slice(0, 7));
+      t.closest<HTMLElement>("[data-save-stop]")!.textContent = "Saved";
+    } else if (t.closest("[data-show-gradients]")) styleHooks?.showGradients();
+    else if (chip) {
       const g = saved[Number(chip.dataset["saved"])]?.gradient;
       if (g) use(g);
     } else if (t.closest("[data-save-gradient]")) {
@@ -500,7 +506,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
         settle(paint);
         mount();
         place(pop, anchor);
-      }));
+      }, () => ed.selectedColour));
       current = ed;
     } else {
       const picker = createColourPicker({

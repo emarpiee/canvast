@@ -135,6 +135,8 @@ export class EditorState {
   tagsOpen = false;
   /** The Styles panel is shown (ui/styles-panel.ts). */
   stylesOpen = false;
+  /** The tab of the Styles panel to show next ("gradient"): set by what sends the person there, taken by the panel. */
+  stylesTab: string | null = null;
   /** The Adjust panel is shown (ui/adjust-panel.ts). */
   adjustOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */

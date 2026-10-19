@@ -43,3 +43,9 @@ Fill, on a picked shape: the paint chooser offers **Image** and **Pattern** afte
 ## Not done
 
 Textures on outlines and text; the image adjustments (exposure, contrast and the rest) on an image fill; handles on the canvas for the offset and the tile; a pattern that keeps its tile when its source is deleted (it falls back to its average colour); sources that are on another canvas (after a paste, the ids point at nothing there); a live pattern while its source is being dragged (it follows when the move ends); a vector tile sharper than 2048 px.
+
+## Update (v0.21.0, 2026-10-19)
+
+- An image fill is first chosen **from the library** (`ui/library-picker.ts`), then from the canvas, then from a file.
+- Where the texture is too deep to be drawn as a pattern (the coarse view), the shape shows the colour of the texture at that point (`textureColourAt`, sampled from a small copy of the source), no longer the average of the whole.
+- A shape keeps showing its last pattern while the next is being made (a picture decoded at a new size), so a fill does not blink to its average.

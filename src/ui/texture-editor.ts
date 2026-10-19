@@ -4,6 +4,7 @@
  * differences. The fields are one table, so each is made and read the same way.
  */
 import { esc } from "./format";
+import { scrubNumbers } from "../colour-picker/scrub";
 import type { TextureMode, TextureSource, TexturePaint, TileAlign, TileType } from "../doc/texture";
 import { MAX_SCALE, MAX_SPACING, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYPES } from "../doc/texture";
 
@@ -11,6 +12,8 @@ import { MAX_SCALE, MAX_SPACING, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYP
 export interface TextureHooks {
   /** Wait for a click on the canvas: a picture (`image`) or the objects under the pointer (`pattern`). null: cancelled. */
   pickSource(kind: "image" | "pattern"): Promise<TextureSource | null>;
+  /** Choose one of the pictures already in the library (a panel beside `anchor`). null: none was chosen. */
+  chooseFromLibrary(anchor: HTMLElement): Promise<TextureSource | null>;
   /** A picture file put in the library. null: it could not be. */
   importFile(file: File): Promise<TextureSource | null>;
   /** The average colour of a source (for the swatches and the density preview). */
@@ -75,6 +78,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     `<div class="adj-row" data-tex-row="${key}"${key === "mode" ? "" : " data-tiled"}><label class="adj-label" for="tex-${key}">${label}</label><select id="tex-${key}" data-tex-sel="${key}" aria-label="${label}">${items.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select><span></span></div>`;
   el.innerHTML = `
     <div class="tex-source">
+      ${o.kind === "image" ? `<button type="button" class="colour-save is-first" data-tex-lib>Choose from the library…</button>` : ""}
       <button type="button" class="colour-save" data-tex-pick>${o.kind === "image" ? "Pick a picture on the canvas" : "Pick the objects on the canvas"}</button>
       ${o.kind === "image" ? `<button type="button" class="colour-save" data-tex-file>Choose a file…</button><input type="file" accept="image/*" hidden data-tex-input>` : ""}
       <p class="op-note" data-tex-note role="status"></p>
@@ -86,6 +90,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
       ${select("align", "Align", TILE_ALIGNS.map((m) => [m, ALIGN_LABEL[m]] as const))}
     </div>`;
   const q = <T extends HTMLElement>(s: string): T => el.querySelector<T>(s)!;
+  scrubNumbers(el); // (drag a name to change its number, as everywhere)
   const note = q("[data-tex-note]");
   const sync = (): void => {
     q(".tex-fields").hidden = !t;
@@ -111,6 +116,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
     o.onSource(src, avg);
   };
   q("[data-tex-pick]").addEventListener("click", () => void take(hooks!.pickSource(o.kind)));
+  el.querySelector<HTMLElement>("[data-tex-lib]")?.addEventListener("click", (e) => void take(hooks!.chooseFromLibrary(e.currentTarget as HTMLElement)));
   const file = el.querySelector<HTMLInputElement>("[data-tex-input]");
   el.querySelector("[data-tex-file]")?.addEventListener("click", () => file!.click());
   file?.addEventListener("change", () => {

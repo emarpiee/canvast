@@ -784,7 +784,10 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .toolbar button.is-applied::after { content: ""; position: absolute; top: var(--sp-2); right: var(--sp-2); width: var(--sp-4); height: var(--sp-4); border-radius: var(--r-pill); background: var(--hud-accent); border: 1px solid var(--hud-bg); }
 .gradient-styles { display: grid; gap: var(--sp-3); margin-top: var(--sp-4); }
 .gradient-styles .cp-group-h { color: var(--hud-muted); font-size: var(--text-xs); margin-bottom: var(--sp-2); }
-.gradient-chips { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.gradient-chips { display: flex; flex-wrap: wrap; gap: var(--sp-3); width: 0; min-width: 100%; max-height: calc(3 * var(--sp-9) + 2 * var(--sp-3) + var(--sp-2)); overflow-y: auto; padding: 1px; margin: -1px; } /* (many saved gradients wrap in the width of the picker and scroll after three rows) */
+.gradient-styles .cp-group-h { display: flex; align-items: center; justify-content: space-between; }
+.gradient-show { height: var(--field-h); padding: 0 var(--sp-4); font: var(--font-meta); color: var(--hud-muted); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.gradient-show:hover { color: var(--hud-fg); background: var(--hud-hover); }
 .gradient-chip { width: var(--sp-15); height: var(--sp-9); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; padding: 0; }
 .gradient-chip:hover, .gradient-chip:focus-visible { border-color: var(--hud-accent); outline: 0; }
 .colour-save { margin-top: var(--sp-4); height: var(--field-h); padding: 0 var(--sp-5); background: var(--hud-bg); color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
@@ -2333,7 +2336,8 @@ input[data-scrub-input]:focus { cursor: text; }
 .tex-source { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
 .tex-fields { display: grid; gap: var(--sp-3); }
 .tex-fields[hidden] { display: none; }
-.tex-fields select { width: 100%; min-width: 0; padding: var(--sp-2); font: var(--font-meta); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+/* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
+.tex-fields .adj-row > select { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .paint-modes { display: flex; overflow-x: auto; scrollbar-width: thin; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }
 .paint-modes button { flex: 1 0 auto; display: grid; place-items: center; padding: var(--sp-2) var(--sp-3); font: var(--font-meta); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; }
 .paint-modes button svg { width: var(--icon-md); height: var(--icon-md); }
@@ -2603,3 +2607,13 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 
 /* Corners (Settings > Appearance): sharp makes every radius of the interface square, so it is last: it wins over the radii the density sets. */
 :root[data-corners="sharp"] { --r-2xs: 0; --r-xs: 0; --r-sm: 0; --r-md: 0; --r-lg: 0; --r-pill: 0; --r-dot: 0; --ctl-r: 0; }
+
+/* The pictures of the library, to give a fill its picture (ui/library-picker.ts) */
+.lib-pick { position: fixed; z-index: var(--z-pop); display: grid; gap: var(--sp-4); width: min(26rem, calc(100vw - var(--sp-8))); max-height: min(34rem, calc(100dvh - var(--sp-8))); overflow: hidden auto; padding: var(--sp-5); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sp-15) + var(--sp-8)), 1fr)); gap: var(--sp-3); }
+.lib-item { display: grid; gap: var(--sp-2); min-width: 0; padding: var(--sp-2); color: inherit; font: var(--font-meta); text-align: left; background: none; border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer; }
+.lib-item:hover, .lib-item:focus-visible { background: var(--hud-hover); border-color: var(--hud-border); outline: 0; }
+.lib-thumb { display: block; aspect-ratio: 1; overflow: hidden; background: var(--hud-hover); border-radius: var(--r-xs); }
+.lib-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); }
+.tex-source .is-first { color: var(--hud-accent-fg); background: var(--hud-accent); }

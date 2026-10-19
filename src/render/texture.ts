@@ -29,6 +29,8 @@ let host: TextureHost | null = null;
 export const setTextureHost = (h: TextureHost | null): void => {
   host = h;
   cells.clear();
+  samples.clear();
+  lastPattern.clear();
 };
 
 /** Set when a texture was drawn as its average colour because its picture or tile was not ready; `drawObjects` reads it, so the drawing is not kept as final. */
@@ -63,6 +65,73 @@ export function averageColour(source: CanvasImageSource): string {
   const a = d[3]! / 255;
   const mix = (v: number): number => Math.round(a > 0 ? v / a : 128);
   return `#${[mix(d[0]!), mix(d[1]!), mix(d[2]!)].map((v) => Math.min(255, v).toString(16).padStart(2, "0")).join("")}`;
+}
+
+const samples = new Map<string, ImageData | null>();
+
+/** The last pattern made for each shape: shown instead of the flat average while the next one is not ready (a picture still being decoded at a new size), so a fill never blinks. */
+const lastPattern = new Map<string, CanvasPattern>();
+const KEEP_PATTERNS = 64;
+
+/** The pixels of a source at a small size, kept (a picture by its hash; objects by their ids and the document's revision, which `version` tells). */
+function pixelsOf(key: string, source: CanvasImageSource, w: number, h: number): ImageData | null {
+  const hit = samples.get(key);
+  if (hit !== undefined) return hit;
+  const c = document.createElement("canvas");
+  const k = 64 / Math.max(w, h, 1);
+  c.width = Math.max(1, Math.round(w * k));
+  c.height = Math.max(1, Math.round(h * k));
+  const g = c.getContext("2d", { willReadFrequently: true });
+  let data: ImageData | null = null;
+  if (g) {
+    g.drawImage(source, 0, 0, c.width, c.height);
+    data = g.getImageData(0, 0, c.width, c.height);
+  }
+  samples.set(key, data);
+  if (samples.size > 32) samples.delete(samples.keys().next().value!);
+  return data;
+}
+
+/**
+ * The colour a texture has at a point of its shape, in the shape's own units, for the places too deep to draw it (the coarse view): the
+ * colour of the texture right there, not the average of the whole. "transparent" where a tile has a gap or a placed picture does not reach.
+ */
+export function textureColourAt(o: PathObject, t: TexturePaint, x: number, y: number): string {
+  if (!host) return t.avg;
+  const box = geometryBounds(o.base ?? o.sub);
+  const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
+  if (!(bw > 0 && bh > 0)) return t.avg;
+  let source: CanvasImageSource;
+  let sw: number, sh: number, key: string;
+  if (t.src.kind === "asset") {
+    const pic = host.picture(t.src.hash, 64);
+    if (!pic) return t.avg;
+    [source, sw, sh, key] = [pic.source, pic.w, pic.h, t.src.hash];
+  } else {
+    const a = host.aspect(t.src.ids);
+    const tile = a === null ? null : host.objects(t.src.ids, 64);
+    if (a === null || !tile) return t.avg;
+    [source, sw, sh, key] = [tile.canvas, a >= 1 ? 64 : 64 * a, a >= 1 ? 64 / a : 64, `${t.src.ids.join(",")}|${tile.version}`];
+  }
+  const [mx, my] = boxToLocal(o, 0.5, 0.5);
+  const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
+  const c = Math.cos(theta), s = Math.sin(theta);
+  const u = c * (x - mx) + s * (y - my), v = -s * (x - mx) + c * (y - my);
+  const lay = nearOrigin(layoutOf(t, { w: bw, h: bh }, sw / sh), u, v);
+  let pu = u - lay.ox, pv = v - lay.oy;
+  if (lay.repeat) {
+    pu -= Math.floor(pu / lay.cw) * lay.cw;
+    pv -= Math.floor(pv / lay.ch) * lay.ch;
+  }
+  const at = lay.tiles.find(([tx, ty]) => pu >= tx && pu < tx + lay.tw && pv >= ty && pv < ty + lay.th);
+  if (!at) return "transparent";
+  const px = pixelsOf(key, source, sw, sh);
+  if (!px) return t.avg;
+  const i = Math.min(px.width - 1, Math.max(0, Math.floor(((pu - at[0]) / lay.tw) * px.width)));
+  const j = Math.min(px.height - 1, Math.max(0, Math.floor(((pv - at[1]) / lay.th) * px.height)));
+  const d = px.data, n = (j * px.width + i) * 4;
+  if (d[n + 3]! < 8) return "transparent";
+  return `#${[d[n]!, d[n + 1]!, d[n + 2]!].map((q) => q.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**
@@ -109,13 +178,14 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
   if (!(bw > 0 && bh > 0 && ppu > 0 && Number.isFinite(ppu))) return t.avg;
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   // The source: a picture, or the objects drawn as one.
+  let pendingTile = false;
   let aspect: number;
   let pic: ReturnType<TextureHost["picture"]> = null;
   if (t.src.kind === "asset") {
     pic = host.picture(t.src.hash, Math.min(bw, bh) * ppu * t.scale);
     if (!pic) {
       notReady = true;
-      return t.avg;
+      return lastPattern.get(o.id) ?? t.avg;
     }
     aspect = pic.w / pic.h;
   } else {
@@ -147,7 +217,7 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
     } else {
       const k = Math.min(pow2(tilePx * dpr), 2048) / Math.max(lay.tw, lay.th);
       const made = cellCanvas(`${t.src.hash}|${Math.round(k * 1e6)}|${t.tile}|${t.spacing}|${t.align}|${lay.tw}`, lay, k, px.source);
-      if (!made) return t.avg;
+      if (!made) return lastPattern.get(o.id) ?? t.avg;
       [cell, cw, ch] = [made, made.width, made.height];
     }
   } else {
@@ -159,8 +229,11 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
     } finally {
       depth--;
     }
-    if (!tile) return t.avg;
-    if (tile.version.endsWith("p")) notReady = true; // (its pictures are still being decoded)
+    if (!tile) return lastPattern.get(o.id) ?? t.avg;
+    if (tile.version.endsWith("p")) {
+      notReady = true; // (its pictures are still being decoded)
+      pendingTile = true;
+    }
     const k = res / Math.max(lay.tw, lay.th);
     if (plain) {
       cell = tile.canvas;
@@ -173,7 +246,13 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
     }
   }
   const pat = ctx.createPattern(cell, lay.repeat ? "repeat" : "no-repeat");
-  if (!pat) return t.avg;
+  if (!pat) return lastPattern.get(o.id) ?? t.avg;
+  // a pattern still waiting for its pictures is not kept as the one to show later (a half-drawn tile would stay)
+  if (!pendingTile) {
+    lastPattern.delete(o.id);
+    lastPattern.set(o.id, pat);
+    if (lastPattern.size > KEEP_PATTERNS) lastPattern.delete(lastPattern.keys().next().value!);
+  }
   // local units → screen px (the view's middle is `p.lx`, `p.ly`), then the box's frame, then the cell's own pixels.
   const sx = p.cx, sy = p.cy;
   pat.setTransform(

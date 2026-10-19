@@ -4,6 +4,7 @@
  * a story, the picture's own pixels …), or type a width or a height; the preview shows the shape with its measures, and the file is
  * made at exactly that size. PNG, WebP and JPEG; SVG too when everything is vector.
  */
+import { scrubNumbers } from "../colour-picker/scrub";
 import type { Background, ExportTarget } from "../app/export-render";
 import { DPIS, MAX_AREA, MAX_SIDE, UNITS, clampSize, formatRatio, fromPx, presetOf, sizeSuggestions, toPx } from "../app/export-size";
 import type { Unit } from "../app/export-size";
@@ -140,6 +141,7 @@ export function openExportDialog(deps: ExportDeps): void {
   document.body.appendChild(dlg);
 
   const q = <T extends HTMLElement>(sel: string): T => dlg.querySelector<T>(sel)!;
+  scrubNumbers(dlg);
   const wIn = q<HTMLInputElement>('[data-ex="w"]'), hIn = q<HTMLInputElement>('[data-ex="h"]');
   const dpiSel = q<HTMLSelectElement>('[data-ex="dpi"]'), qIn = q<HTMLInputElement>('[data-ex="q"]'), nameIn = q<HTMLInputElement>('[data-ex="name"]');
   const note = q<HTMLElement>("[data-ex-note]"), readout = q<HTMLElement>("[data-ex-readout]"), chips = q<HTMLElement>("[data-ex-chips]");

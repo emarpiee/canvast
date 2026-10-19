@@ -16,6 +16,10 @@ const dir = resolve(root, "test-builds", `${stamp}-${srcHash.slice(0, 8)}`);
 await mkdir(dir, { recursive: true });
 const built = spawnSync("node", ["scripts/build.mjs", "--out", dir], { cwd: root, stdio: "inherit" });
 if (built.status !== 0) process.exit(built.status ?? 1);
+// the colour picker's own demo page is part of what the tests open: a copy built from the same source goes in the snapshot (never a stale dist-picker/)
+const pickerDir = resolve(dir, "picker");
+const builtPicker = spawnSync("node", ["scripts/build-picker.mjs", "--out", pickerDir], { cwd: root, stdio: "inherit" });
+if (builtPicker.status !== 0) process.exit(builtPicker.status ?? 1);
 
 const args = process.argv.slice(2);
 const run = { args, startedAt: new Date().toISOString(), status: "running" };
@@ -25,7 +29,7 @@ console.log(`snapshot ${dir.slice(root.length + 1)}  (dist/ is free to rebuild)`
 const child = spawn("npx", ["playwright", "test", "--output", resolve(dir, "results"), "--reporter=line,json", ...args], {
   cwd: root,
   stdio: "inherit",
-  env: { ...process.env, CANVAST_BUILD_DIR: dir, PLAYWRIGHT_JSON_OUTPUT_NAME: resolve(dir, "report.json") },
+  env: { ...process.env, CANVAST_BUILD_DIR: dir, CANVAST_PICKER_DIR: pickerDir, PLAYWRIGHT_JSON_OUTPUT_NAME: resolve(dir, "report.json") },
 });
 child.on("exit", async (code) => {
   run.finishedAt = new Date().toISOString();

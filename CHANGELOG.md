@@ -9,6 +9,7 @@
 - **Phones and small screens:** scroll cues (fade and arrow) on every bar that scrolls, the library bar wraps with a thumbnail slider, the Settings tabs scroll, the tool options share the top row on medium screens, panel spacing follows density.
 - **Colour picker:** no preset colours (only recent and saved), a real eyedropper icon, a wider ring, and the gradient editor's numbers in one column.
 - **Menus** keep one gap from their bar and no longer start a few pixels off while they open.
+- **Fills and the colour picker:** an image fill takes its picture from the library first (a panel with search and thumbnails), then from the canvas, then from a file; a picture or pattern fill keeps showing its own colour where it is too deep to be drawn as a pattern (it showed the flat average); the last pattern stays on screen while the next one is being made; Grid, Align and Mode end at the right edge; every number field has the drag-by-name scrub (the texture editor and the export dialog had none); saved gradients, recent and saved colours wrap and scroll instead of widening the picker, with a "Show all" button that opens the Gradients of the Styles panel; the gradient editor has a randomize button, and a stop's colour can be saved.
 - **Phase 8 groundwork:** startup marks, a cheaper search, a low-memory tier, an upgrade test for a replaced HTML file, a qualification script.
 
 ## 0.20.0 — Texture fills: a picture or a pattern as the fill of a shape (2026-10-19)

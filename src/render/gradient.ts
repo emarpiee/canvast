@@ -8,7 +8,7 @@ import { hexOf, isGradient, sliceStops, solidOf, stopsAt } from "../doc/paint";
 import { geometryBounds, paintBounds, rectSubs } from "../doc/path";
 import { isTexture } from "../doc/texture";
 import { paintColor } from "./ink";
-import { texturePaint } from "./texture";
+import { texturePaint, textureColourAt } from "./texture";
 import type { Projection } from "./projection";
 
 /**
@@ -89,7 +89,7 @@ export function offsetAt(l: LocalGradient, x: number, y: number): number {
 
 /** The colour a paint has at a local point (a solid colour is itself). */
 export function paintAt(o: PathObject, paint: Paint, x: number, y: number): string {
-  return isGradient(paint) ? hexOf(stopsAt(paint.stops, offsetAt(localGradient(o, paint), x, y))) : solidOf(paint);
+  return isTexture(paint) ? textureColourAt(o, paint, x, y) : isGradient(paint) ? hexOf(stopsAt(paint.stops, offsetAt(localGradient(o, paint), x, y))) : solidOf(paint);
 }
 
 /** What to set as `fillStyle` or `strokeStyle` for a paint, in the view described by `p` and `vp` (see the head of this file). */

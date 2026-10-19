@@ -674,6 +674,60 @@ async function pickedRect(app: App, from: readonly [number, number], to: readonl
 const fillOf = async (app: App, id: string) => (await objs(app)).find((o) => o.id === id) as unknown as { fill?: { type?: string; src?: { kind: string; hash?: string; ids?: string[] }; mode?: string; spacing?: number[] } | string | null };
 const is = (c: number[] | undefined, r: number, g: number, b: number): boolean => !!c && Math.abs(c[0]! - r) < 12 && Math.abs(c[1]! - g) < 12 && Math.abs(c[2]! - b) < 12;
 
+test("picture and pattern fills still show their own colour far inside the shape, where they are no longer drawn as patterns (not their average)", async ({ app }) => {
+  const p = app.page;
+  const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
+  const vp = p.viewportSize()!;
+  const [cx, cy] = [Math.round(vp.width / 2), Math.round(vp.height / 2)];
+  const rect = await pickedRect(app, [cx + 160, cy - 60], [cx + 560, cy + 120]); // right of the picture; the view is moved over it below
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  const pb = await boxOf(app, picture.id);
+  await p.mouse.click(Math.round((pb.minX + pb.maxX) / 2), Math.round((pb.minY + pb.maxY) / 2));
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { type?: string } | undefined)?.type).toBe("texture");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  // move the view until its middle is in the left (red) quarter of the rectangle
+  const left = async () => (await boxOf(app, rect.id)).minX;
+  const before = await left();
+  await p.keyboard.press("ArrowRight");
+  await app.frame();
+  const key = (await left()) < before ? "ArrowRight" : "ArrowLeft";
+  for (let i = 0; i < 60 && (await left()) > cx - 60; i++) await p.keyboard.press(key);
+  await app.frame();
+  expect(is(await px(app, cx, cy), 255, 0, 0), "in the red half of the picture").toBe(true);
+  await p.evaluate(() => window.__canvastDebug.jump(20));
+  await app.frame();
+  const deep = await px(app, cx, cy);
+  expect(is(deep, 255, 0, 0), `deep inside the red half: red, not the purple average (${deep})`).toBe(true);
+  await p.evaluate(() => window.__canvastDebug.jump(-20));
+  await app.frame();
+  expect(is(await px(app, cx, cy), 255, 0, 0), "back out: the picture is drawn again").toBe(true);
+});
+
+test("a picture fill can take its picture from the library first: a panel of the library's pictures, searched by name, opens beside the chooser", async ({ app }) => {
+  const p = app.page;
+  await place(app, "alpha.png", makePng(40, 40, () => [255, 0, 0, 255]));
+  const beta = await place(app, "beta.png", makePng(40, 40, () => [0, 0, 255, 255]));
+  const rect = await pickedRect(app, [400, 450], [600, 550]);
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  const first = await pop.locator(".tex-source button").first().textContent();
+  expect(first, "the library is the first way").toContain("library");
+  await pop.locator("[data-tex-lib]").click();
+  const lib = p.locator(".lib-pick");
+  await expect(lib.locator(".lib-item")).toHaveCount(2);
+  await lib.locator("[data-lib-search]").fill("bet");
+  await expect(lib.locator(".lib-item")).toHaveCount(1);
+  await lib.locator(".lib-item").click();
+  await expect(lib).toBeHidden();
+  await expect(pop, "the chooser stays open").toBeVisible();
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { src?: { hash?: string } } | undefined)?.src?.hash).toBe((await objs(app)).find((o) => o.id === beta.id) && (await fillOf(app, beta.id) as unknown as { assetId: string }).assetId);
+});
+
 test("a picture fills a shape (ADR 0154): picked on the canvas, Fill covers it, Tile repeats it, space opens gaps; one undo step, kept after a reload", async ({ app }) => {
   const p = app.page;
   const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
