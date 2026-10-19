@@ -337,3 +337,11 @@ describe("text objects", () => {
     expect(() => scaleAbout(o, o.anchor, 2, 3)).toThrow();
   });
 });
+
+describe("names made from a text", () => {
+  it("are the words, not the Markdown: no tags of a sized or coloured span, no marks", async () => {
+    const { plainText } = await import("../../src/text/markdown");
+    expect(plainText('<span style="font-size:64%">test</span>')).toBe("test");
+    expect(plainText('# Title\n\nSome **bold** and <span style="color:#ff0000">red</span> words')).toBe("Title Some bold and red words");
+  });
+});

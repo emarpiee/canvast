@@ -13,7 +13,8 @@ import { hexOfCss } from "../ui/text-editor";
 export type InfoMode = "simple" | "more" | "technical" | "hidden";
 const MODES: readonly InfoMode[] = ["simple", "more", "technical", "hidden"];
 const MODE_LABEL: Record<InfoMode, string> = { simple: "Simple", more: "More", technical: "Technical", hidden: "Hidden" };
-const MODE_ICON: Record<InfoMode, string> = { simple: ICONS.info, more: ICONS.listPlus, technical: ICONS.activity, hidden: ICONS.circleOff };
+/** The small number in the corner of the button (1 to 3: how much is shown; 0: nothing), where the corner mark of a menu button sits. */
+const MODE_LEVEL: Record<InfoMode, string> = { simple: "1", more: "2", technical: "3", hidden: "0" };
 
 /** The zoom as a magnification a person reads: 1.33×, 250×, 10^300× (and 0.25× when zoomed out). */
 export function friendlyZoom(levels: bigint, frac: number): string {
@@ -248,8 +249,9 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     objEl.hidden = mode !== "more";
     fpsEl.hidden = mode !== "more" && mode !== "technical";
     diagEl.hidden = mode !== "technical";
-    infoButton.innerHTML = MODE_ICON[mode];
+    infoButton.innerHTML = ICONS.info; // (one icon: the number says how much is shown)
     infoButton.dataset["mode"] = mode;
+    infoButton.dataset["level"] = MODE_LEVEL[mode];
     infoButton.setAttribute("aria-label", `Information shown: ${MODE_LABEL[mode]}`);
     infoButton.title = `Information shown: ${MODE_LABEL[mode]}. Click for ${MODE_LABEL[next]}.`;
     cancelAnimationFrame(fpsRaf);

@@ -85,6 +85,8 @@ interface ObjectBase {
   readonly blend?: BlendMode;
   /** In-canvas tags (ADR 0062): labels of this instance, separate from an asset's library tags; absent = none. */
   readonly tags?: readonly string[];
+  /** The saved style (Styles panel) each part of this object follows, by part ("fill", "stroke", "adjust"): editing the style updates it; changing the part by hand unlinks it (doc/style-links.ts). Absent = none. */
+  readonly styles?: Readonly<Record<string, string>>;
   /** A mask (ADR 0144): the objects of the group `by` (those with `isMask`) hide or show this one, by their opacity (`alpha`) or their brightness (`luminance`); `invert` swaps hidden and shown. */
   readonly mask?: { readonly by: string; readonly mode: "alpha" | "luminance"; readonly invert?: true };
   /** This object is part of a mask (of the group `mask.by` of another object): it is not drawn or picked on its own, only used to cut that object. */
@@ -645,6 +647,9 @@ export function serializeWorld(o: CanvasObject): SerializedObject {
 }
 
 /** `space` resolves `frame` ids; without it only world-frame (absolute) records are accepted. */
+/** The links to saved styles read back: only text ids under the known parts; none left: absent. */
+const cleanStyleLinks = (raw: Record<string, unknown>): Record<string, string> => Object.fromEntries(["fill", "stroke", "adjust"].filter((k) => typeof raw[k] === "string" && (raw[k] as string).length > 0 && (raw[k] as string).length < 200).map((k) => [k, raw[k] as string]));
+
 export function deserializeObject(s: SerializedObject, space?: FrameSpace): CanvasObject {
   let frame: Frame | undefined;
   if (s["frame"] !== undefined) {
@@ -669,6 +674,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["boolOps"] !== undefined ? { boolOps: s["boolOps"] as Record<string, BoolOp> } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
     ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
+    ...(s["styles"] !== undefined && typeof s["styles"] === "object" && s["styles"] !== null ? { styles: cleanStyleLinks(s["styles"] as Record<string, unknown>) } : {}),
     ...(s["mask"] !== undefined ? { mask: { ...(s["mask"] as { by: string; mode: "alpha" }) } } : {}),
     ...(s["isMask"] === true ? { isMask: true as const } : {}),
     ...(s["hidden"] === true ? { hidden: true as const } : {}),

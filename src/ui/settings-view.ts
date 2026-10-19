@@ -6,6 +6,7 @@ import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
 import { esc } from "./format";
+import { syncScroll } from "./bar";
 declare const __CANVAST_VERSION__: string;
 import NOTICES from "../../THIRD_PARTY_NOTICES.md";
 import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } from "../app/diagnostics";
@@ -18,7 +19,7 @@ import { ICONS } from "./icons";
  */
 type Control =
   | { kind: "toggle" }
-  | { kind: "range"; min: number; max: number; step: number; unit?: string; /** A hue slider (rainbow track) with named presets, applied while dragging. */ hue?: ReadonlyArray<[name: string, degrees: number]>; /** Applied while dragging, not on release. */ live?: boolean }
+  | { kind: "range"; min: number; max: number; step: number; unit?: string; /** A hue slider (rainbow track) with named presets, applied while dragging. */ hue?: ReadonlyArray<[name: string, degrees: number]>; /** A setting that makes the hue follow the canvas background instead (one more chip after the presets). */ adaptive?: SettingKey; /** Applied while dragging, not on release. */ live?: boolean }
   | { kind: "select"; options: ReadonlyArray<[value: string, label: string]> }
   | { kind: "colour" }
   | { kind: "text"; max: number; placeholder?: string };
@@ -51,6 +52,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "ui.theme": "Colour",
   "ui.info": "Canvas and readout",
   "ui.density": "Size and comfort",
+  "ui.corners": "Size and comfort",
   "ui.zen": "Focus",
   "quality.auto": "Drawing quality",
   "ui.motion": "Animation",
@@ -82,7 +84,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Drawing and selection",
     rows: [
       { key: "pen.kind", label: "Pen", help: "The pen new strokes are drawn with.", control: { kind: "select", options: [["fine", "Fine"], ["pencil", "Pencil"], ["ink", "Ink"], ["marker", "Marker"]] } },
-      { key: "pen.color", label: "Pen colour", help: "Opens the colour picker. The colours you picked lately are in the toolbar.", control: { kind: "colour" } },
+      { key: "pen.color", label: "Pen colour", help: "Opens the colour picker. The colours you picked lately are under the picker.", control: { kind: "colour" } },
       { key: "colour.model", label: "Colour picker model", help: "OKHSL and OKHSV keep every slider inside the colours a screen can show; OKHCL sets lightness and chroma as OKLab does. All three are even to the eye: the same step looks like the same change of colour.", control: { kind: "select", options: [["okhsv", "OKHSV (hue, saturation, value)"], ["okhsl", "OKHSL (hue, saturation, lightness)"], ["okhcl", "OKHCL (hue, chroma, lightness)"]] } },
       { key: "colour.view", label: "Colour picker layout", help: "Ring and box; a plane with a hue bar; sliders; or the ring with sliders under it.", control: { kind: "select", options: [["wheel", "Ring and box"], ["plane", "Plane and bar"], ["sliders", "Sliders"], ["mixer", "Ring and sliders"]] } },
       { key: "colour.format", label: "Colour picker text", help: "How the colour is written in the picker's text field. Any of them can be typed or pasted.", control: { kind: "select", options: [["hex", "Hex (#2563eb)"], ["rgb", "RGB (rgb(37 99 235))"], ["oklch", "OKLCH (oklch(0.55 0.19 262))"]] } },
@@ -182,13 +184,15 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Appearance",
     rows: [
       { key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } },
-      { key: "ui.hue", label: "Theme colour", help: "The hue of the accent and of every tint. Brightness and contrast do not change with it.", control: { kind: "range", min: 0, max: 360, step: 1, unit: "°", live: true, hue: [["Viridian", 178], ["Ultramarine", 265], ["Violet", 310], ["Madder", 15], ["Ochre", 80]] } },
+      { key: "ui.hue", label: "Theme colour", help: "The hue of the accent and of every tint. Brightness and contrast do not change with it.", control: { kind: "range", min: 0, max: 360, step: 1, unit: "°", live: true, hue: [["Viridian", 178], ["Ultramarine", 265], ["Violet", 310], ["Madder", 15], ["Ochre", 80]], adaptive: "ui.hueAdaptive" } },
       { key: "ui.vivid", label: "Colourfulness", help: "From grey to vivid; brightness stays the same.", control: { kind: "range", min: 0, max: 150, step: 5, unit: "%", live: true } },
       { key: "ui.info", label: "Information shown", help: "The readout at the bottom left; the button at the bottom right cycles through these.", control: { kind: "select", options: [["simple", "Simple"], ["more", "Simple, with more"], ["technical", "Technical"], ["hidden", "Hidden"]] } },
       { key: "ui.hints", label: "Hints and tooltips", help: "The line at the bottom that says what the tool does and what each button is, and the browser's own tooltips. All: both. Line only: no browser tooltips. None: neither.", control: { kind: "select", options: [["all", "All"], ["bar", "Line only"], ["off", "None"]] } },
       { key: "ui.pattern", label: "Canvas pattern", help: "What is drawn behind your content. The button at the bottom right cycles through these.", control: { kind: "select", options: [["grid", "Grid"], ["dots", "Dots"], ["scale", "Multi-scale grid"], ["none", "None"]] } },
+      { key: "ui.actions", label: "Actions bar", help: "Where the bar of actions for the picked things sits. At the bottom: always in the same place. Follows the selection: just under the picked things (above them when there is no room below).", control: { kind: "select", options: [["bottom", "At the bottom"], ["follow", "Follows the selection"]] } },
       { key: "ui.names", label: "Item names", help: "The name above a sheet, picture or file card (and above any item that is picked). Always: every one. When picked: only the picked ones. Hidden: none. The button at the bottom right cycles through these.", control: { kind: "select", options: [["all", "Always"], ["picked", "When picked"], ["off", "Hidden"]] } },
-      { key: "ui.density", label: "Density", help: "Compact (the default): smaller controls and tighter spacing, so more of the canvas shows. Comfortable: larger, roomier controls.", control: { kind: "select", options: [["compact", "Compact"], ["comfortable", "Comfortable"]] } },
+      { key: "ui.corners", label: "Corners", help: "The shape of every corner of the interface: buttons, fields, panels, menus, chips and dots, in every view. Round (the default) or sharp.", control: { kind: "select", options: [["round", "Round"], ["sharp", "Sharp"]] } },
+      { key: "ui.density", label: "Density", help: "Compact (the default): smaller controls and tighter spacing, so more of the canvas shows. Dense: the smallest controls, fields, menus and spacing, for the most canvas. Comfortable: larger, roomier controls.", control: { kind: "select", options: [["dense", "Dense"], ["compact", "Compact"], ["comfortable", "Comfortable"]] } },
       { key: "ui.textScale", label: "Interface size", help: "Scales the toolbars, panels and views (not the canvas).", control: { kind: "select", options: [["90", "90%"], ["100", "100%"], ["115", "115%"], ["130", "130%"], ["150", "150%"]] } },
       { key: "ui.contrast", label: "Contrast", help: "High contrast: stronger text and borders in the interface.", control: { kind: "select", options: [["normal", "Normal"], ["high", "High"]] } },
       { key: "ui.zen", label: "Zen mode", help: "Fade the floating bars and panels out; each shows again while the pointer is over it. Also the leaf button beside Home, or the Zen key (Settings > Shortcuts).", control: { kind: "toggle" } },
@@ -218,7 +222,7 @@ function controlHtml(row: Row, id: string): string {
   if (c.kind === "colour") return `<button type="button" class="set-colour" id="${id}" data-set="${row.key}" data-colour="${row.key}" aria-haspopup="dialog" ${a}><span class="set-colour-dot"></span><span class="set-colour-hex"></span></button>`;
   if (c.kind === "text") return `<input type="text" class="set-text" id="${id}" data-set="${row.key}" maxlength="${c.max}" placeholder="${esc(c.placeholder ?? "")}" autocomplete="off" spellcheck="false" ${a}>`;
   if (c.kind === "select") return `<select id="${id}" data-set="${row.key}" ${a}>${c.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
-  const presets = c.hue ? `<span class="set-presets" role="group" aria-label="Theme colour presets">${c.hue.map(([n, d]) => `<button type="button" class="set-preset" data-preset="${row.key}" data-value="${d}" style="--p:${d}" aria-label="${esc(n)}" title="${esc(n)}"></button>`).join("")}</span>` : "";
+  const presets = c.hue ? `<span class="set-presets" role="group" aria-label="Theme colour presets">${c.hue.map(([n, d]) => `<button type="button" class="set-preset" data-preset="${row.key}" data-value="${d}" style="--p:${d}" aria-label="${esc(n)}" title="${esc(n)}"></button>`).join("")}${c.adaptive ? `<button type="button" class="set-preset set-adaptive" data-adaptive="${c.adaptive}" aria-pressed="false" aria-label="Adaptive" title="Adaptive: the theme colour takes the hue of the canvas background colour (it stays as set above while the background is the app's own or grey)">${ICONS.wandSparkles}</button>` : ""}</span>` : "";
   return `<input type="range" id="${id}" data-set="${row.key}" min="${c.min}" max="${c.max}" step="${c.step}" ${c.hue ? 'class="set-hue"' : ""} ${a}><output for="${id}"></output>${presets}`;
 }
 
@@ -464,6 +468,11 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       else el.value = String(v);
       const out = el.parentElement?.querySelector("output");
       if (out && r.control.kind === "range") out.textContent = `${fmt(Number(v))} ${r.control.unit ?? ""}`.trim();
+      if (r.control.kind === "range" && r.control.adaptive) {
+        const on = settings.get(r.control.adaptive) === true;
+        root.querySelector(`[data-adaptive="${r.control.adaptive}"]`)?.setAttribute("aria-pressed", String(on));
+        (el as HTMLInputElement).disabled = on;
+      }
       const reset = root.querySelector<HTMLButtonElement>(`[data-reset="${r.key}"]`);
       if (reset) reset.disabled = v === SETTINGS[r.key].default;
     }
@@ -504,6 +513,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
       const label = all.find((r) => r.key === key)?.label ?? "Colour";
       return openColourPopover(swatch, { name: label, value: String(settings.get(key)), onInput: (hex) => void settings.set(key, hex as never) });
     }
+    const adaptive = t.closest<HTMLElement>("[data-adaptive]");
+    if (adaptive) return void settings.set(adaptive.dataset["adaptive"] as SettingKey, !settings.get(adaptive.dataset["adaptive"] as SettingKey) as never);
     const preset = t.closest<HTMLElement>("[data-preset]");
     if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
     const change = t.closest<HTMLElement>("[data-change-key]");
@@ -576,12 +587,15 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
   settings.subscribe(refresh);
   select(current);
   refresh();
+  const tabRow = root.querySelector<HTMLElement>(".set-tabs")!;
+  window.addEventListener("resize", () => syncScroll(tabRow));
   return {
     show(tab?: string) {
       root.hidden = false;
       refresh();
       select(tab && tabs.some((t) => t.dataset["tab"] === tab) ? tab : current);
       root.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+      syncScroll(tabRow);
     },
     hide() {
       cancelCapture();

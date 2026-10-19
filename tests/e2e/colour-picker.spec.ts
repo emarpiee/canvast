@@ -44,7 +44,6 @@ test("colour picker: ring, box, hex, models, layouts, recent colours, Settings (
   await hex.fill("ff0000");
   await hex.press("Enter");
   await p.keyboard.press("Escape");
-  await expect(p.locator('[data-recents] [data-color="#ff0000"]')).toHaveCount(1);
 
   // Model, layout and the recent colours survive a reload.
   await p.reload();

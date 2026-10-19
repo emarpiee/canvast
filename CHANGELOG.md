@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0 — Settings for corners, density and theme; panels in one shape; linked styles; Phase 8 groundwork (2026-10-19)
+
+- **Settings (Appearance):** Corners (Round or Sharp, every radius and the handles on the canvas), a third density (Dense), Actions bar (at the bottom or following the selection), and an Adaptive theme colour that takes the hue of the canvas background.
+- **Panels** are built by one helper (ADR 0156): optional header, strip, scrolling body and footer. The Adjust panel keeps its layer row and its save row in place, with Reset beside the close button.
+- **Linked styles** (ADR 0157): an object painted with a saved colour or gradient (and a picture with a saved adjustment) follows it when it changes; a change by hand unlinks it.
+- **Media player** always sits right under its item; the Actions bar steps above the item or under the player.
+- **Phones and small screens:** scroll cues (fade and arrow) on every bar that scrolls, the library bar wraps with a thumbnail slider, the Settings tabs scroll, the tool options share the top row on medium screens, panel spacing follows density.
+- **Colour picker:** no preset colours (only recent and saved), a real eyedropper icon, a wider ring, and the gradient editor's numbers in one column.
+- **Menus** keep one gap from their bar and no longer start a few pixels off while they open.
+- **Phase 8 groundwork:** startup marks, a cheaper search, a low-memory tier, an upgrade test for a replaced HTML file, a qualification script.
+
 ## 0.20.0 — Texture fills: a picture or a pattern as the fill of a shape (2026-10-19)
 
 - **Image fill**: Fill, Fit, Crop or Tile a picture of the library in a shape, with Scale, free Rotation, Offset, and for a repeat Grid (rows, brick rows or columns), Align and Space; the picture is picked on the canvas or chosen as a file.

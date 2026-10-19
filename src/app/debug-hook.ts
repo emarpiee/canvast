@@ -112,6 +112,10 @@ export interface DebugHook {
   storedObjectIds(canvasId: string): Promise<string[]>;
   /** Signed px distance from a screen point to a stroke's outline (negative inside), computed exactly. */
   strokeEdgeDistance(id: string, x: number, y: number): number;
+  /** When each step of the startup finished, in ms since the page began to load (`loaded`, `indexed`, `first-frame`; a step not reached yet is absent). */
+  startupMarks(): Record<string, number>;
+  /** Put a generated benchmark scene in the document and in storage (in chunks, as edits), then wait until it is saved: the stored canvas a restart loads. */
+  benchStore(scene: BenchScene): Promise<{ objects: number; ms: number }>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
   benchLoad(scene: BenchScene): Promise<{ objects: number; generateMs: number; loadMs: number; heapMB: number | null }>;
   /**
@@ -393,6 +397,15 @@ export function installDebugHook(
       const cam = camFor(o);
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? exactStrokeEdgeDistancePx(po, x, y) : Infinity;
+    },
+    startupMarks: () => Object.fromEntries(performance.getEntriesByType("mark").filter((m) => m.name.startsWith("canvast:")).map((m) => [m.name.slice(8), m.startTime])),
+    benchStore: async (scene) => {
+      const t0 = performance.now();
+      const { objects } = generateBenchScene(scene);
+      const CHUNK = 2_000;
+      for (let i = 0; i < objects.length; i += CHUNK) doc.commit(doc.transaction("Seed", objects.slice(i, i + CHUNK)));
+      await session.persistence?.flush();
+      return { objects: objects.length, ms: performance.now() - t0 };
     },
     benchLoad: async (scene) => {
       const t0 = performance.now();

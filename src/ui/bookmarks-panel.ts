@@ -2,6 +2,7 @@ import type { EditorState } from "../app/editor-state";
 import type { BookmarkList } from "../app/bookmarks";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
 
 /**
@@ -47,13 +48,14 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       </li>`,
       )
       .join("");
-    panel.innerHTML = `
-      <header><h2>Bookmarks <span class="layers-count">${list.items.length}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
-        <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.galleryThumbnails}</button>
-        <button type="button" class="layer-btn" data-close aria-label="Hide the Bookmarks panel" title="Hide the Bookmarks panel">${ICONS.x}</button></span></header>
-      ${missing.length ? `<p class="bm-missing" data-testid="bm-missing"><span>${missing.length} bookmark${missing.length === 1 ? " has" : "s have"} no picture.</span><button type="button" data-fill>Fill in</button></p>` : ""}
-      <ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`;
+    panel.innerHTML = panelHtml({
+      title: "Bookmarks",
+      count: list.items.length,
+      tools: `<button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
+        <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.galleryThumbnails}</button>`,
+      sub: missing.length ? `<p class="bm-missing" data-testid="bm-missing"><span>${missing.length} bookmark${missing.length === 1 ? " has" : "s have"} no picture.</span><button type="button" data-fill>Fill in</button></p>` : "",
+      body: `<ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`,
+    });
   };
   const schedule = (): void => {
     if (!scheduled) {

@@ -57,17 +57,32 @@ One icon per function: two buttons that do different things never share an icon,
 | `bell` | Show a sample notice (developer tools) |
 | `blocks` | Arrange and align |
 | `swatchBook` | Styles panel |
+| `wandSparkles` | Settings > Appearance: Adaptive theme colour (the hue follows the canvas background) |
 | `galleryThumbnails` | Bookmarks panel: Update the pictures of the bookmarks |
 | `slidersHorizontal` | Styles panel: Adjustments tab |
 | `blend` | Styles panel: Gradients tab |
 | `droplet` | Styles panel: Colours tab |
 | `palette` | Styles panel: Palettes tab |
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
-| `pipette` | Styles panel: Edit a colour (menu item) |
+| `droplets` | Styles panel: Change colour (menu item) |
+| `rainbow` | Styles panel: New palette from a colour (harmony) |
+| `pipette` | Colour picker: pick a colour from the screen (the picker module draws its own copy, `src/colour-picker/picker.ts`) |
 | `listChecks` | Under your finger menu (long press): Add to the pick |
 | `pathMenu` | Actions bar: Path tools (simplify, outline stroke, taper, network, divide, shape builder, text to path) |
 | `boolMenu` | Actions bar: Shapes (the boolean operations and their group) |
 | `maskMenu` | Actions bar: Masks (make, pick, invert, release) |
+| `paintNone` | Paint chooser: No fill or outline |
+| `paintSolid` | Paint chooser: a colour |
+| `paintLinear` | Paint chooser: a linear gradient |
+| `paintRadial` | Paint chooser: a radial gradient |
+| `paintAngular` | Paint chooser: an angular gradient |
+| `paintImage` | Paint chooser: a picture as the fill (Image) |
+| `paintPattern` | Paint chooser: objects repeated over the shape (Pattern) |
+| `markdown` | Copy Markdown (the text format bar, the Export menu) |
+| `selectAll` | Context menu: Select everything |
+| `paste` | Context menu: Paste |
+| `exportMenu` | Actions bar: Export and copy out (Export…, Save as SVG, Copy Markdown) |
+| `sheetMenu` | Actions bar: Sheets (put on a sheet, release, fit to contents) |
 | `arrangeMenu` | Actions bar: Arrange in a grid (opens the menu of orders and spaces) |
 | `alignMenu` | Actions bar: Align and distribute (opens the menu of the eight) |
 | `paintBucket` | Navigation bar: Canvas background colour (hold to go back to the default) |
@@ -112,7 +127,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `image-plus` | Import image |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |
-| `info` | Information shown: Simple |
+| `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much) |
 | `lasso` | Lasso |
 | `layers` | Layers panel |
 | `layout-grid` | Thumbnails |
@@ -142,7 +157,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `scissors-line-dashed` | Clip content of a sheet (Layers) |
 | `crop` | Crop the picture |
 | `fullscreen` | Show the whole picture (remove the crop) |
-| `sliders-vertical` | Adjust the picture |
+| `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |
 | `unlink` | Detach the picked objects |

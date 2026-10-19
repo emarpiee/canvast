@@ -1,3 +1,4 @@
+import type { Adjust } from "../doc/adjust";
 import type { EditorState } from "../app/editor-state";
 import type { StyleItem, StyleLibrary, PaletteData } from "../assets/styles";
 import { STYLE_KINDS, gradientCss } from "../assets/styles";
@@ -16,6 +17,7 @@ import { chooseDialog, confirmDialog } from "./confirm";
 import { saveFile } from "./file-actions";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 
@@ -29,12 +31,13 @@ import type { MenuItem } from "./more-menu";
  */
 export interface StylesDeps {
   /** Whether the selection can take an adjustment, and applying one. */
-  adjustment: { can(): boolean; apply(item: StyleItem): void };
+  adjustment: { can(): boolean; apply(item: StyleItem): void; /** The adjustments of the first picked picture (null: none picked). */ current(): Adjust | null };
   paint: {
     /** How many shapes are picked that a colour or gradient can go on. */
     count(): number;
     /** Put a colour or gradient on them: on `target` (the person's choice in the panel); with `ask`, and several shapes picked, the app asks which part first. */
-    apply(paint: Paint, label: string, target: "fill" | "stroke" | "both", ask: boolean): void;
+    /** `styleId`: the saved colour or gradient it comes from; what is painted then follows it when it changes (ADR 0157). */
+    apply(paint: Paint, label: string, target: "fill" | "stroke" | "both", ask: boolean, styleId?: string): void;
   };
   /** Pictures take a gradient as a gradient map: how many are picked, and putting one on them. */
   map: { count(): number; apply(stops: Gradient["stops"], label: string): void };
@@ -160,19 +163,20 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
           ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a picked picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a palette file (.gpl, .ase, .aco)</button></div></div>`
           : `<p class="styles-guide">${esc(GUIDE[k.id] ?? k.empty)}</p>`
         : "";
-    panel.innerHTML = `
-      <header><h2>Styles <span class="layers-count">${total}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr), GIMP palettes (.gpl) and Adobe swatches (.ase, .aco)">${ICONS.fileUp}</button><button type="button" class="layer-btn" data-close aria-label="Hide the Styles panel" title="Hide the Styles panel">${ICONS.x}</button></span></header>
-      <div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div>
-      <div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>
-      <div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
+    panel.innerHTML = panelHtml({
+      title: "Styles",
+      count: total,
+      tools: `<button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr), GIMP palettes (.gpl) and Adobe swatches (.ase, .aco)">${ICONS.fileUp}</button>`,
+      sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div><div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>`,
+      body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the picked shapes")}${seg("stroke", "Outline", "Colours go on the outline of the picked shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
         ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
-      </div>`;
+      </div>`,
+    });
     panel.appendChild(fileInput);
     if (typing) {
       const el = panel.querySelector<HTMLInputElement>("[data-styles-filter]");
@@ -281,8 +285,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const del: MenuItem = { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
     if (item.kind === "gradient")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
         { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
         ...common(item),
         { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
@@ -290,9 +294,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       ];
     if (item.kind === "colour")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false) },
-        { label: "Change colour", icon: ICONS.pipette, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
+        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
+        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
+        { label: "Change colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
         { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyText(String(item.data).toUpperCase(), String(item.data).toUpperCase()) },
         ...common(item),
         del,
@@ -314,6 +318,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         del,
       ];
     }
+    if (item.kind === "adjustment")
+      return [
+        { label: "Update from the picked picture", icon: ICONS.replace, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the picked picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        ...common(item),
+        del,
+      ];
     return [...common(item), del];
   };
 
@@ -349,7 +359,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   /** A colour or gradient goes on the picked shapes; a gradient also goes on the picked pictures, as a gradient map. */
   const applyPaint = (item: StyleItem): void => {
     if (item.kind === "gradient" && deps.map.count() > 0) deps.map.apply((item.data as Gradient).stops, item.name);
-    if (deps.paint.count() > 0) deps.paint.apply(item.data as Paint, item.name, target, true);
+    if (deps.paint.count() > 0) deps.paint.apply(item.data as Paint, item.name, target, true, item.id);
   };
 
   panel.addEventListener("click", (e) => {
@@ -414,7 +424,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
           { label: "Empty palette", icon: ICONS.palette, aria: "New empty palette", run: () => void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); }) },
           { label: "From the selection's colours", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", run: () => void addPalette(styles.nextName("palette"), sel) },
           { label: "From the picked picture", icon: ICONS.imagePlus, aria: "New palette from the picked picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Pick one picture first."))) },
-          { label: "From a colour (harmony)", icon: ICONS.pipette, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
+          { label: "From a colour (harmony)", icon: ICONS.rainbow, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
         ],
         "New style",
       );

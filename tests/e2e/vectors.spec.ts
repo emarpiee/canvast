@@ -1402,9 +1402,13 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await key(app, "v");
   await p.keyboard.press("Control+a");
   await app.frame();
-  // a chip for every colour, none in a menu: the seven fills and the dark outline are eight colours
-  await expect(p.locator("[data-sel-colour]")).toHaveCount(8);
-  await expect(p.locator("[data-sel-colour-more]")).toHaveCount(0);
+  // seven chips, and the others in one button that opens them as a list: the seven fills and the dark outline are eight colours
+  await expect(p.locator("[data-sel-colour]")).toHaveCount(7);
+  await expect(p.locator("[data-sel-more]")).toHaveText("+1");
+  await p.locator("[data-sel-more]").click();
+  await expect(p.getByRole("menuitem")).toHaveCount(1);
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
   // dividers between the groups of the selection bar, a button names itself in the hint
   expect(await p.locator(".ctx-bar .tb-group:not([hidden])").count()).toBeGreaterThan(1);
   await p.hover('[data-ctx="duplicate"]');
@@ -1413,7 +1417,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   // the options of the Select tool are buttons of the Properties bar, none in a menu
   await key(app, "Escape");
   await click(app, 300, 650); // (nothing picked)
-  await expect(p.getByRole("button", { name: "Show all hidden" })).toBeVisible();
+  await expect(p.getByRole("button", { name: "Show all hidden" }), "Show all and Unlock all are in the context menu, not the bar").toHaveCount(0);
   await expect(p.getByRole("button", { name: /^Axis-aligned selection box/ })).toBeVisible();
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
@@ -2625,26 +2629,28 @@ test("a long press with a finger lists everything under it; tapping a row picks 
   expect([...(await p.evaluate(() => window.__canvastDebug.selection()))].sort()).toEqual([back, front].sort());
 });
 
-test("a mixed pick has chips at the start of the Actions bar (All, Shapes, Strokes): a kind shows only its tools, All shows everything (ADR 0152)", async ({ app }) => {
+test("a mixed pick has one set of chips, at the start of the Properties bar (All, Shape, Stroke): a kind shows only its tools in both bars, All shows everything (ADR 0152)", async ({ app }) => {
   const p = app.page;
-  const chips = p.locator("[data-kinds-bar]");
+  const chips = p.locator(".tb-subject");
   await key(app, "u");
   await p.click('[data-shape-kind="rect"]');
   await drag(app, [400, 300], [550, 400]);
   await key(app, "v");
   await expect(chips, "one kind: no chips").toBeHidden();
+  await expect(p.locator("[data-kinds-bar]"), "and none in the Actions bar: the chips are only at the top").toHaveCount(0);
   await key(app, "p");
   await drag(app, [600, 300], [760, 420]);
   await key(app, "v");
   await key(app, "Control+a");
-  await expect(chips.locator("button")).toHaveText(["All", "Shapes", "Strokes"]);
+  await expect(chips.locator("button")).toHaveText(["All", "Shape", "Stroke"]);
   const bool = p.locator('[data-ctx="boolmenu"]');
-  await expect(bool, "All: everything").not.toHaveAttribute("data-off", "");
-  await chips.locator('[data-kindsel="stroke"]').click();
-  await expect(bool, "Strokes: the shapes' tools are off").toHaveAttribute("data-off", "");
-  await expect(chips.locator('[data-kindsel="stroke"]')).toHaveAttribute("aria-pressed", "true");
-  await chips.locator('[data-kindsel="all"]').click();
+  await expect(bool, "none chosen: every tool").not.toHaveAttribute("data-off", "");
+  await chips.locator('[data-subject="stroke"]').click();
+  await expect(bool, "Stroke: the shapes' tools are off").toHaveAttribute("data-off", "");
+  await expect(chips.locator('[data-subject="stroke"]')).toHaveAttribute("aria-checked", "true");
+  await chips.locator('[data-subject="all"]').click();
   await expect(bool).not.toHaveAttribute("data-off", "");
+  await expect(chips.locator('[data-subject="all"]')).toHaveAttribute("aria-checked", "true");
 });
 
 test("touch: a quick two-finger tap is undo and a three-finger tap is redo (the view stays); a finger held still while resizing is Shift; a second finger resting is Alt (ADR 0152)", async ({ app, browserName }) => {

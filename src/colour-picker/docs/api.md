@@ -2,7 +2,7 @@
 
 ## `createColourPicker(options?) → ColourPicker`
 
-Makes a picker. Append `picker.el` where you want it. The picker is `size` px wide in every layout (default 208).
+Makes a picker. Append `picker.el` where you want it. The picker is `size` px wide in every layout (default 232).
 
 ### Options
 
@@ -18,7 +18,7 @@ Makes a picker. Append `picker.el` where you want it. The picker is `size` px wi
 | `contrast` | string | none | A colour to compare against; the picker shows the WCAG 2 ratio and grade (AAA, AA, AA large, Fail). A transparent colour is mixed over it first. |
 | `harmony` | `Harmony[]` | none | Show swatches of the colour with its hue turned: `complementary`, `split`, `triad`, `analogous`, `tetrad`. They follow the colour as it moves. |
 | `groups` | `{ label, colours[] }[]` | none | Swatch rows under the picker (your recent colours, a palette). Choosing one sets the colour. |
-| `size` | number | `208` | Side of the ring in CSS px. |
+| `size` | number | `232` | Side of the ring in CSS px. |
 | `labels` | `Partial<Labels>` | English | Every word the picker shows; see `Labels` in `picker.ts`. |
 | `display` | `(value) => css` | identity | The CSS colour to draw a stored value as. For a host that draws one value differently, for example a theme's ink. |
 | `onInput` | `(value) => void` | none | Every step of a drag or key press. |

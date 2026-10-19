@@ -12,6 +12,7 @@ import type { BoolOp } from "../doc/boolean";
 import { plainText } from "../text/markdown";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { panelHtml } from "./panel";
 import { swatchBackground } from "../render/ink";
 
 /**
@@ -246,18 +247,15 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
           .map((o): Node => ({ id: o.id, group: false, members: [o], children: [], z: o.z }))
       : tree;
     const list = shownTree.map((n) => row(n, 0, false, [])).join("");
-    panel.innerHTML = `
-      <header><h2>Layers <span class="layers-count">${all.length}</span></h2>
-        <span class="layers-tools">
-          <button type="button" class="layer-btn" data-sort-toggle aria-pressed="${sortOpen}" aria-expanded="${sortOpen}" aria-label="Sort the layers by name" title="Sort the layers by name">${ICONS.arrowDownAZ}</button>
-          <button type="button" class="layer-btn" data-fold-all aria-label="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}" title="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}">${tree.some((n) => n.group && !open.has(n.id)) ? ICONS.chevronsUpDown : ICONS.chevronsDownUp}</button>
-          <button type="button" class="layer-btn" data-close aria-label="Hide the Layers panel" title="Hide the Layers panel">${ICONS.x}</button>
-        </span></header>
-      ${all.length > 12 || filter ? `<div class="layers-filter"><input type="search" data-layers-filter placeholder="Filter ${all.length} layers by name" aria-label="Filter the layers by name" autocomplete="off" value="${esc(filter)}"></div>` : ""}
-      ${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}
-      <ul role="tree" aria-label="Objects, front to back">${list || `<li class="layers-empty">${q ? "No layer has that name." : "Nothing on this canvas yet."}</li>`}${rows >= limit ? `<li class="layers-more-row"><button type="button" data-more>Show ${MAX_ROWS} more rows</button></li>` : ""}</ul>
-      ${footer()}
-`;
+    panel.innerHTML = panelHtml({
+      title: "Layers",
+      count: all.length,
+      tools: `<button type="button" class="layer-btn" data-sort-toggle aria-pressed="${sortOpen}" aria-expanded="${sortOpen}" aria-label="Sort the layers by name" title="Sort the layers by name">${ICONS.arrowDownAZ}</button>
+          <button type="button" class="layer-btn" data-fold-all aria-label="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}" title="${tree.some((n) => n.group && !open.has(n.id)) ? "Expand all groups" : "Collapse all groups"}">${tree.some((n) => n.group && !open.has(n.id)) ? ICONS.chevronsUpDown : ICONS.chevronsDownUp}</button>`,
+      sub: `${all.length > 12 || filter ? `<div class="layers-filter"><input type="search" data-layers-filter placeholder="Filter ${all.length} layers by name" aria-label="Filter the layers by name" autocomplete="off" value="${esc(filter)}"></div>` : ""}${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}`,
+      body: `<ul role="tree" aria-label="Objects, front to back">${list || `<li class="layers-empty">${q ? "No layer has that name." : "Nothing on this canvas yet."}</li>`}${rows >= limit ? `<li class="layers-more-row"><button type="button" data-more>Show ${MAX_ROWS} more rows</button></li>` : ""}</ul>`,
+      foot: footer(),
+    });
     if (refocusFilter) {
       refocusFilter = false;
       const f = panel.querySelector<HTMLInputElement>("[data-layers-filter]");

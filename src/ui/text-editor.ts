@@ -15,7 +15,7 @@ import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../
 import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, NOTE_CARD, NOTE_INK, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
-import { FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
+import { BUNDLED_FONT_NAME, FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
 import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
@@ -31,9 +31,13 @@ import { promptDialog } from "./confirm";
  */
 
 /** Size of new text, in CSS px at the zoom where it is created. */
-/** Editing happens at a readable size: outside this range the camera zooms to NEW_TEXT_PX first. */
+/**
+ * Editing happens at a readable size: a text too small to read (under MIN_EDIT_PX) is zoomed to NEW_TEXT_PX first. One that is already big is
+ * left where it is: a person who zoomed in to read it should not be zoomed out by a double-click. Only a size the browser cannot lay out as
+ * text (MAX_EDIT_PX, thousands of px) brings the view back.
+ */
 const MIN_EDIT_PX = 9;
-const MAX_EDIT_PX = 72;
+const MAX_EDIT_PX = 4000;
 
 let lastCopied = "";
 
@@ -73,7 +77,7 @@ const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
   { cmd: "p", icon: ICONS.pilcrow, label: "Body text" },
   { cmd: "ul", icon: ICONS.list, label: "Bulleted list" },
   { cmd: "ol", icon: ICONS.listOrdered, label: "Numbered list" },
-  { cmd: "copy", icon: ICONS.clipboardCopy, label: "Copy Markdown" },
+  { cmd: "copy", icon: ICONS.markdown, label: "Copy Markdown" },
   { cmd: "done", icon: ICONS.check, label: "Done (Esc)" },
 ];
 
@@ -174,8 +178,6 @@ export function mountTextEditor(
     box.style.fontKerning = target.kerning ? "normal" : "none";
     box.style.lineHeight = String(target.lineHeight ?? 1.3);
     box.style.letterSpacing = `${target.tracking ?? 0}em`;
-    bar.style.left = `${Math.max(4, s.x)}px`;
-    bar.style.top = `${Math.max(4, s.y - 48)}px`;
   };
 
   /** Zoom so the text is at a readable size, with its top-left corner in view. */
@@ -198,6 +200,7 @@ export function mountTextEditor(
   const close = (): void => {
     target = null; // first: hiding the focused box fires focusout (and commit) synchronously
     box.hidden = bar.hidden = true;
+    editor.editingText = false;
     box.innerHTML = "";
     if (editor.preview.kind === "edit") editor.preview = { kind: "none" };
     editor.changed();
@@ -254,6 +257,7 @@ export function mountTextEditor(
     }
     box.innerHTML = blocksToHtml(parse(target.md));
     box.hidden = bar.hidden = false;
+    editor.editingText = true;
     position();
     box.focus({ preventScroll: true });
     // Caret at the end of the last text, inside its block (formatting applies to that block).
@@ -353,23 +357,46 @@ export function mountTextEditor(
   };
 
   /** The fonts of the library for the words selected, filled when an edit starts (a font added meanwhile shows at the next one). */
+  let fontList: Array<{ hash: string; name: string; unusable: string }> = [];
   const fillFonts = (): void => {
     void fonts().then((list) => {
-      fontSelect.innerHTML = `<option value="">Font of the text</option>` + list.filter((f) => !f.unusable).map((f) => `<option value="${esc(f.hash)}">${esc(f.name)}</option>`).join("");
+      fontList = list;
       fontSelect.hidden = list.every((f) => f.unusable);
+      paintFont();
     });
+  };
+  /**
+   * The select says the font the caret (or the selected words) is set in, by name: the text's own font is the first choice (choosing it puts the
+   * words back in it), then the other fonts of the library. It is a list to choose from and a readout in one, so it never says "font of the text".
+   */
+  const paintFont = (): void => {
+    if (!target || document.activeElement === fontSelect) return; // (a list being used is not rebuilt under the pointer)
+    const own = target.assetId;
+    const ownName = own ? (fontList.find((f) => f.hash === own)?.name ?? "A font that is not in this library") : BUNDLED_FONT_NAME;
+    const html = `<option value="">${esc(ownName)}</option>` + fontList.filter((f) => !f.unusable && f.hash !== own).map((f) => `<option value="${esc(f.hash)}">${esc(f.name)}</option>`).join("");
+    if (fontSelect.dataset["html"] !== html) {
+      fontSelect.dataset["html"] = html;
+      fontSelect.innerHTML = html;
+    }
+    const a = getSelection()?.anchorNode ?? null;
+    const el = a instanceof HTMLElement ? a : (a?.parentElement ?? null);
+    const hash = el && box.contains(el) ? hashOfFamily((getComputedStyle(el).fontFamily.split(",")[0] ?? "").trim().replace(/^["']|["']$/g, "")) : undefined;
+    fontSelect.value = hash && hash !== own && fontList.some((f) => f.hash === hash) ? hash : "";
   };
   let wordsRange: Range | null = null;
   document.addEventListener("selectionchange", () => {
     const r = selectedRange();
     if (r) wordsRange = r.cloneRange(); // (the list takes the focus: the words are found again from here)
     else if (box.contains(getSelection()?.anchorNode ?? null)) wordsRange = null; // a caret in the box: no words are selected
+    paintFont();
   });
   fontSelect.addEventListener("change", () => {
     const hash = fontSelect.value;
     const r = selectedRange()?.cloneRange() ?? wordsRange; // (the selection as it is now, else the last one seen)
-    fontSelect.value = "";
-    if (!r) return needWords();
+    if (!r) {
+      paintFont();
+      return needWords();
+    }
     box.focus({ preventScroll: true });
     const sel = getSelection();
     sel?.removeAllRanges();

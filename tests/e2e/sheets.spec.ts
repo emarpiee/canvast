@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { alignWith, expect, test } from "./harness";
+import { alignWith, exportWith, expect, sheetWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -87,7 +87,7 @@ test("moving onto and off a sheet changes what holds it; Ctrl+Alt+G puts picked 
   expect(all.find((o) => o.id === a.id)!.parent).toBe(made.id);
   // releasing (the new sheet and what is on it are picked) keeps the object and takes the sheet away
   expect(await selection(app)).toContain(made.id);
-  await p.locator('[data-ctx="unsheet"]').click();
+  await sheetWith(p, "unsheet");
   const after = await objs(app);
   expect(after.length).toBe(n0);
   expect(after.find((o) => o.id === a.id)!.parent).toBeUndefined();
@@ -150,7 +150,7 @@ test("resizing a sheet moves and stretches what is on it by its pin; Fit to cont
 
   // fit: the sheet shrinks to what is on it
   await pickSheet(app);
-  await p.locator('[data-ctx=\"fitsheet\"]').click();
+  await sheetWith(p, "fitsheet");
   await app.frame();
   const fit = await box(sheet.id);
   const [ba, bb] = [await box(a.id), await box(b.id)];
@@ -502,7 +502,7 @@ test("Export… of picked shapes uses their box (with the outline) as the shape,
   await key(app, "Escape");
   // the rectangle alone: its own box, SVG offered
   await click(app, 450, 350);
-  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  await exportWith(p, "exportpic");
   await expect(dlg).toBeVisible();
   await expect(dlg.locator('[data-format="svg"]')).toBeVisible();
   const shape = await p.getByTestId("export-shape").innerText();
@@ -595,7 +595,7 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   await drag(app, [800, 300], [1000, 700]); // 1 : 2
   await key(app, "v");
   await key(app, "Control+a");
-  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  await exportWith(p, "exportpic");
   const dlg = p.getByTestId("export-dialog");
   await expect(dlg).toBeVisible();
   await expect(dlg.locator(".ex-what")).toHaveText("2 sheets");
@@ -659,7 +659,7 @@ test("Export… of many sheets lists every one of them for ordering, each with a
   for (let i = 0; i < 26; i++) await drag(app, [420 + (i % 13) * 50, 300 + Math.floor(i / 13) * 120], [450 + (i % 13) * 50, 380 + Math.floor(i / 13) * 120]);
   await key(app, "v");
   await key(app, "Control+a");
-  await p.getByRole("button", { name: /^Export…/ }).first().click();
+  await exportWith(p, "exportpic");
   const dlg = p.getByTestId("export-dialog");
   await expect(dlg.locator("[data-mini]")).toHaveCount(26);
   await expect(dlg.locator("[data-ex-thumb]"), "a picture for every one").toHaveCount(26);

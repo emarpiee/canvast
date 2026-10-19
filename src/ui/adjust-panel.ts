@@ -5,6 +5,7 @@ import type { EditorState } from "../app/editor-state";
 import { setAdjustPreviewing } from "../render/adjust-image";
 import { buildAdjustPanel, closeAdjustChild } from "./colour-popover";
 import { ICONS } from "./icons";
+import { panelHtml } from "./panel";
 
 /**
  * The Adjust panel (ADR 0118, 0123): the non-destructive adjustments of the picked pictures, as a panel of the dock instead of a popover,
@@ -24,10 +25,20 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   panel.setAttribute("aria-label", "Adjust");
   panel.dataset["testid"] = "adjust-panel";
   panel.hidden = true;
-  panel.innerHTML = `<header><h2>Adjust</h2><span class="layers-tools"><button type="button" class="layer-btn" data-close aria-label="Hide the Adjust panel" title="Hide the Adjust panel">${ICONS.x}</button></span></header><div class="adjust-body"></div>`;
+  panel.innerHTML = panelHtml({
+    title: "Adjust",
+    tools: `<button type="button" class="layer-btn" data-reset aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>`,
+    sub: `<div data-adj-sub></div>`,
+    body: `<div class="adjust-body"></div>`,
+    foot: `<div data-adj-foot></div>`,
+  });
   host.appendChild(panel);
   const body = panel.querySelector<HTMLElement>(".adjust-body")!;
-  let shown: { ids: string; handle: { current(): Adjust } | null } | null = null;
+  const subHost = panel.querySelector<HTMLElement>("[data-adj-sub]")!;
+  const footHost = panel.querySelector<HTMLElement>("[data-adj-foot]")!;
+  const strips = [subHost.parentElement!, footHost.parentElement!]; // (the panel's strip under the header and its footer: there only while a picture is being adjusted)
+  let shown: { ids: string; handle: { current(): Adjust; reset(): void } | null } | null = null;
+  const resetBtn = panel.querySelector<HTMLElement>("[data-reset]")!;
   let scheduled = false;
 
   /** An unfinished slider is not kept, and the picture is drawn in full again. */
@@ -51,6 +62,8 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
     }
     if (panel.hidden) return;
     const sel = actions.selectedAdjust();
+    resetBtn.hidden = !sel;
+    for (const e of strips) e.hidden = !sel;
     const ids = [...editor.selection].sort().join(",");
     if (!sel) {
       if (shown?.ids !== "none") {
@@ -68,6 +81,8 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
     if (shown?.ids !== ids) settle();
     const handle = buildAdjustPanel(body, {
       ...sel,
+      subHost,
+      footHost,
       styles: actions.adjustStyles(),
       onInput: (a) => actions.previewAdjust(a),
       onChange: (a, label) => actions.commitAdjust(a, label),
@@ -88,6 +103,7 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   render();
 
   panel.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest("[data-reset]")) return shown?.handle?.reset();
     if (!(e.target as HTMLElement).closest("[data-close]")) return;
     editor.adjustOpen = false;
     editor.changed();

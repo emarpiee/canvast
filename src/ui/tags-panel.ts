@@ -2,6 +2,7 @@ import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import { esc } from "./format";
 import { ICONS } from "./icons";
+import { panelHtml } from "./panel";
 import { moreButton, openMoreMenu } from "./more-menu";
 
 /**
@@ -80,10 +81,10 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
           : `<li class="tag-row"><button type="button" class="tag-row-main" data-select-tag="${esc(k)}" aria-label="Select the ${e.ids.length} item${e.ids.length === 1 ? "" : "s"} tagged ${esc(e.label)}" title="Select the items with this tag (Shift: add them to the selection)"><span class="tag-row-name">#${esc(e.label)}</span><span class="tag-row-n">${e.ids.length}</span></button>${moreButton(`More actions for tag ${e.label}`, `data-tag-more="${esc(e.label)}"`)}</li>`,
       )
       .join("");
-    panel.innerHTML = `
-      <header><h2>Tags <span class="layers-count">${tags.size}</span></h2>
-        <span class="layers-tools"><button type="button" class="layer-btn" data-close aria-label="Hide the Tags panel" title="Hide the Tags panel">${ICONS.x}</button></span></header>
-      <div class="tags-body">
+    panel.innerHTML = panelHtml({
+      title: "Tags",
+      count: tags.size,
+      body: `<div class="tags-body">
         <section class="layers-tags" data-testid="canvas-tags" aria-label="Tags of the selection">
           <h3>${sel.length ? `On the selection <span class="tags-sub">${sel.length} item${sel.length === 1 ? "" : "s"}</span>` : "On the selection"}</h3>
           ${sel.length ? "" : `<p class="tags-hint">Select items on the canvas to tag them.</p>`}
@@ -96,7 +97,8 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
           ${tags.size > FILTER_FROM ? `<div class="layers-filter"><input data-tag-filter type="search" placeholder="Filter ${tags.size} tags" aria-label="Filter the tags of this canvas" autocomplete="off" value="${esc(filter)}"></div>` : ""}
           <ul aria-label="Tags on this canvas">${rows || `<li class="layers-empty">${tags.size ? "No tag matches." : "No tags yet. Select items and add one above."}</li>`}</ul>
         </section>
-      </div>`;
+      </div>`,
+    });
     if (refocus) {
       const el = panel.querySelector<HTMLInputElement>(`[${refocus}]`);
       el?.focus();

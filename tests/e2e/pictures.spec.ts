@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { exportWith, expect, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { makeWebm } from "./video";
@@ -115,7 +115,7 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   await p.mouse.click(60, 650);
   await p.mouse.click(...edge);
   await openAdjust(p);
-  await pop.getByRole("button", { name: "Reset", exact: true }).click();
+  await p.getByTestId("adjust-panel").getByRole("button", { name: "Reset the adjustments" }).click();
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
@@ -171,14 +171,14 @@ test("Download: an edited still comes with its original, named as edited picture
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
   // plain: the file as it is, under its own name
   const plain = p.waitForEvent("download");
-  await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
+  await exportWith(p, "download"); // (an entry of the Actions bar's Export menu)
   expect((await plain).suggestedFilename()).toBe("trip.png");
   // adjusted: the original and the edited picture, in one ZIP
   await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="contrast"]').fill("30");
   await p.locator('.adjust-pop [data-adj-num="contrast"]').blur();
   const both = p.waitForEvent("download");
-  await p.getByTestId("context-bar").getByRole("button", { name: /^Download the original file/ }).click();
+  await exportWith(p, "download"); // (an entry of the Actions bar's Export menu)
   const dl = await both;
   expect(dl.suggestedFilename()).toMatch(/\.zip$/);
   const text = (await import("node:fs")).readFileSync((await dl.path())!).toString("latin1");
@@ -193,7 +193,7 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
   await p.keyboard.press("v");
   const b = await boxOf(app, pic.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  const reset = p.getByRole("button", { name: "Reset the adjustments" });
+  const reset = p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name: "Reset the adjustments" });
   await expect(reset).toBeHidden();
   await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("25");
@@ -204,6 +204,78 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
   await expect(reset).toBeHidden();
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === pic.id)!.adjust).toEqual({ exposure: 25 });
+});
+
+test("the player stays right under its video, whatever else is on screen; the Actions bar (set to follow) goes above the video, or under the player when there is no room above", async ({ app }) => {
+  const slow = expect.configure({ timeout: 20_000 });
+  const p = app.page;
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.actions": "follow" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: await makeWebm(p, 2) });
+  await slow.poll(async () => (await objs(app)).length).toBe(1);
+  const [v] = await objs(app);
+  await p.keyboard.press("v");
+  const rects = async () => {
+    const b = await boxOf(app, v!.id);
+    await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+    const player = (await p.getByTestId("media-bar").boundingBox())!;
+    const actions = (await p.getByTestId("context-bar").boundingBox())!;
+    return { b: await boxOf(app, v!.id), player, actions };
+  };
+  await slow(p.getByTestId("media-bar")).toBeHidden();
+  let r = await rects();
+  await slow(p.getByTestId("media-bar")).toBeVisible();
+  r = await rects();
+  expect(r.player.y, "the player is under the video").toBeGreaterThanOrEqual(r.b.maxY);
+  expect(r.player.y - r.b.maxY, "right under it").toBeLessThan(40);
+  expect(r.actions.y + r.actions.height, "the Actions bar is above the video when there is room").toBeLessThanOrEqual(r.b.minY);
+  // No room above: the video is moved to the top of the view; the Actions bar goes under the player, the player stays under the video.
+  const top = async () => (await boxOf(app, v!.id)).minY;
+  const y0 = await top();
+  await p.keyboard.press("ArrowUp");
+  await app.frame();
+  const toTop = (await top()) < y0 ? "ArrowUp" : "ArrowDown";
+  for (let i = 0; i < 80 && (await top()) > 60; i++) await p.keyboard.press(toTop);
+  r = await rects();
+  expect(r.b.minY, "the video is at the top of the view").toBeLessThan(100);
+  expect(r.player.y - r.b.maxY, "the player is still right under the video").toBeLessThan(40);
+  expect(r.actions.y, "the Actions bar is under the player").toBeGreaterThanOrEqual(r.player.y + r.player.height);
+  // Worst case: the video fills the view (and goes past it). The player is pulled up to stay on screen, the Actions bar stays on screen and off the player.
+  const vh = p.viewportSize()!.height;
+  for (let i = 0; i < 30; i++) {
+    const b = await boxOf(app, v!.id);
+    if (b.maxY - b.minY > vh * 0.9) break;
+    await app.wheel(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2), -100);
+  }
+  r = await rects();
+  expect(r.player.y + r.player.height, "the player is inside the view").toBeLessThanOrEqual(vh);
+  expect(r.actions.y + r.actions.height, "the Actions bar is inside the view").toBeLessThanOrEqual(vh);
+  expect(r.actions.y, "the Actions bar is inside the view").toBeGreaterThanOrEqual(0);
+  expect(r.actions.y + r.actions.height <= r.player.y || r.actions.y >= r.player.y + r.player.height, "the two bars do not overlap").toBe(true);
+});
+
+test("Actions bar at the bottom (the default): when a low video brings its player down onto it, the bar stands above the player", async ({ app }) => {
+  const slow = expect.configure({ timeout: 20_000 });
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: await makeWebm(p, 2) });
+  await slow.poll(async () => (await objs(app)).length).toBe(1);
+  const [v] = await objs(app);
+  await p.keyboard.press("v");
+  const vh = p.viewportSize()!.height;
+  const bottom = async () => (await boxOf(app, v!.id)).maxY;
+  const y0 = await bottom();
+  await p.keyboard.press("ArrowUp");
+  await app.frame();
+  const toBottom = (await bottom()) > y0 ? "ArrowUp" : "ArrowDown";
+  for (let i = 0; i < 120 && (await bottom()) < vh - 110; i++) await p.keyboard.press(toBottom);
+  const b = await boxOf(app, v!.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await slow(p.getByTestId("media-bar")).toBeVisible();
+  const player = (await p.getByTestId("media-bar").boundingBox())!;
+  const actions = (await p.getByTestId("context-bar").boundingBox())!;
+  expect(player.y - (await bottom()), "the player is under the video").toBeLessThan(40);
+  expect(actions.y + actions.height <= player.y || actions.y >= player.y + player.height, "the two bars do not overlap").toBe(true);
 });
 
 test("a video has every adjustment: highlights, shadows, tint, sharpen and grain too, through a filter the player and the canvas share", async ({ app }) => {
@@ -251,9 +323,10 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   const pop = p.locator(".adjust-pop");
   await pop.locator('[data-adj-num="contrast"]').fill("30");
   await pop.locator('[data-adj-num="contrast"]').blur();
-  await pop.locator("[data-adj-name]").fill("Punchy");
-  await pop.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(pop.locator("[data-adj-name]")).toHaveAttribute("placeholder", /Saved/);
+  const foot = p.getByTestId("adjust-panel").locator(".panel-foot"); // (the save row stays under the numbers: ADR 0156)
+  await foot.locator("[data-adj-name]").fill("Punchy");
+  await foot.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(foot.locator("[data-adj-name]")).toHaveAttribute("placeholder", /Saved/);
   // double-clicking a name takes that one number off
   await pop.locator('[data-adj-row="contrast"] label').dblclick();
   await expect(pop.locator('[data-adj-num="contrast"]')).toHaveValue("0");
@@ -291,6 +364,17 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toBeUndefined();
+  // a picture that follows the style changes with it: the style is updated from the first picture, and the second one follows (ADR 0157)
+  await card("Punchy 2").click();
+  expect((await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 30 });
+  const fb = await boxOf(app, first.id);
+  await p.mouse.click(Math.round((fb.minX + fb.maxX) / 2), Math.round((fb.minY + fb.maxY) / 2));
+  await openAdjust(p);
+  await pop.locator('[data-adj-num="contrast"]').fill("50");
+  await pop.locator('[data-adj-num="contrast"]').blur();
+  await panel.getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
+  await p.getByRole("menuitem", { name: /^Replace Punchy 2 with the adjustments/ }).click();
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 50 });
   await panel.getByRole("tab", { name: /^Gradients/ }).click(); // another tab shows other styles
   await expect(card("Punchy 2")).toHaveCount(0);
 
@@ -310,7 +394,7 @@ test("Styles: a colour is saved from the colour picker, offered as Saved in the 
   await p.getByRole("button", { name: "Save colour" }).click();
   await p.keyboard.press("Escape");
   await p.locator("[data-colour-open]").click();
-  await expect(p.locator(".colour-pop").getByText("Saved", { exact: true })).toBeVisible();
+  await expect(p.locator(".colour-pop").getByText("Saved colours", { exact: true })).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -349,25 +433,26 @@ test("adjustments: red, green and blue, levels, a curve and a stack of layers ar
   expect(blue).toHaveLength(3);
   expect(blue[1]![1]).toBeLessThan(blue[1]![0]! - 5);
   // a second layer: its own numbers, applied to the result of the first
-  await pop.getByRole("button", { name: "Add a layer of adjustments after this one" }).click();
-  await expect(pop.locator("[data-layer]")).toHaveCount(2);
+  const layers = p.getByTestId("adjust-panel").locator(".panel-sub"); // (the layer row stays under the header: ADR 0156)
+  await layers.getByRole("button", { name: "Add a layer of adjustments after this one" }).click();
+  await expect(layers.locator("[data-layer]")).toHaveCount(2);
   await pop.locator('[data-adj-num="exposure"]').fill("30");
   await pop.locator('[data-adj-num="exposure"]').blur();
   const a2 = (await adjust())!;
   expect(a2["red"]).toBe(100);
   expect((a2["next"] as Record<string, unknown>)["exposure"]).toBe(30);
   // the first layer is still as it was, and the second is only what it has
-  await pop.locator('[data-layer="0"]').click();
+  await layers.locator('[data-layer="0"]').click();
   await expect(pop.locator('[data-adj-num="red"]')).toHaveValue("100");
   await expect(pop.locator('[data-adj-num="exposure"]')).toHaveValue("0");
-  await pop.locator('[data-layer="1"]').click();
+  await layers.locator('[data-layer="1"]').click();
   await expect(pop.locator('[data-adj-num="exposure"]')).toHaveValue("30");
   // removing the second layer leaves the first
-  await pop.getByRole("button", { name: "Remove this layer" }).click();
+  await layers.getByRole("button", { name: "Remove this layer" }).click();
   expect((await adjust())!["next"]).toBeUndefined();
   expect((await adjust())!["red"]).toBe(100);
   // reset takes everything off, one undo brings it back
-  await pop.getByRole("button", { name: "Reset", exact: true }).click();
+  await p.getByTestId("adjust-panel").getByRole("button", { name: "Reset the adjustments" }).click();
   expect(await adjust()).toBeUndefined();
   await p.keyboard.press("Escape");
   await p.mouse.click(60, 650);

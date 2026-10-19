@@ -86,7 +86,7 @@ export interface PickerOptions {
   contrast?: string;
   /** Show these colour harmonies of the current colour, as swatches that follow it. */
   harmony?: readonly Harmony[];
-  /** Side of the hue ring in CSS px (default 208); every layout is this wide. */
+  /** Side of the hue ring in CSS px (default 232); every layout is this wide. */
   size?: number;
   groups?: readonly SwatchGroup[];
   labels?: Partial<Labels>;
@@ -151,14 +151,14 @@ const PLANE_RATIO = 0.62; // its height as a fraction of its width
 const STOPS = 13;
 const RING_STEP = 4; // degrees between the ring's gradient stops
 
-const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 6l4 4"/><path d="M17 3l4 4-3 3-4-4z"/><path d="M13 7L4 16l-1 5 5-1 9-9"/></svg>';
+const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 9-8.414 8.414A2 2 0 0 0 3 18.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 3.828 21h1.344a2 2 0 0 0 1.414-.586L15 12"/><path d="m18 9 .4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4 3.4-3.4a1 1 0 1 1 3 3z"/><path d="m2 22 .414-.414"/></svg>';
 
 const grade = (r: number, fail: string): string => (r >= 7 ? "AAA" : r >= 4.5 ? "AA" : r >= 3 ? "AA large" : fail);
 
 export function createColourPicker(options: PickerOptions = {}): ColourPicker {
   if (options.injectStyles !== false) ensureStyles();
   const L: Labels = { ...DEFAULT_LABELS, ...options.labels };
-  const size = options.size ?? 208;
+  const size = options.size ?? 232;
   const display = options.display ?? ((h: string) => h);
   const useAlpha = options.alpha === true;
   const views = (options.views?.length ? options.views : VIEWS).filter((v) => VIEWS.includes(v));

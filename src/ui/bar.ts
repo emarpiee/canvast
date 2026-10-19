@@ -30,7 +30,17 @@ export function createBar(label: string, commandGroup: string): { el: HTMLElemen
   return { el, row };
 }
 
-/** Mark a row that is wider than its room, so its ends fade (CSS `[data-scroll]`). */
+/**
+ * Mark a row that is wider than its room, and which ends have more to show (CSS `[data-scroll-start]`, `[data-scroll-end]`: a fade and a small arrow
+ * at that end only). One cue for every row that scrolls; it follows the row's own scrolling.
+ */
 export function syncScroll(row: HTMLElement): void {
-  row.toggleAttribute("data-scroll", row.scrollWidth > row.clientWidth + 1);
+  const over = row.scrollWidth > row.clientWidth + 1;
+  row.toggleAttribute("data-scroll", over);
+  row.toggleAttribute("data-scroll-start", over && row.scrollLeft > 1);
+  row.toggleAttribute("data-scroll-end", over && row.scrollLeft + row.clientWidth < row.scrollWidth - 1);
+  if (!row.dataset["scrollBound"]) {
+    row.dataset["scrollBound"] = "1";
+    row.addEventListener("scroll", () => syncScroll(row), { passive: true });
+  }
 }

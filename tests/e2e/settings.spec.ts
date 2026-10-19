@@ -159,6 +159,17 @@ test("appearance: interface size, contrast and motion apply at once, persist, an
   const dockHeight = async () => (await p.locator("#toolbar > .dock").boundingBox())!.height;
   const compact = await dockHeight();
   await expect(root).not.toHaveAttribute("data-density", /.*/);
+  // Sharp corners: every radius token goes to zero (a button of the view, the dock, a round dot).
+  const radii = () => p.evaluate(() => [".set-tabs button", "#toolbar > .dock", ".set-colour-dot"].map((q) => (document.querySelector(q) ? getComputedStyle(document.querySelector(q)!).borderRadius : "none")));
+  expect((await radii())[0], "round by default").not.toBe("0px");
+  await panel.getByLabel("Corners", { exact: true }).selectOption("sharp");
+  await expect(root).toHaveAttribute("data-corners", "sharp");
+  expect((await radii()).filter((r) => r !== "none" && r !== "0px"), "no radius left").toEqual([]);
+  await panel.getByLabel("Corners", { exact: true }).selectOption("round");
+  await expect(root).not.toHaveAttribute("data-corners", /.*/);
+  await panel.getByLabel("Density", { exact: true }).selectOption("dense");
+  await expect(root).toHaveAttribute("data-density", "dense");
+  expect(await dockHeight(), "dense: a smaller dock").toBeLessThan(compact);
   await panel.getByLabel("Density", { exact: true }).selectOption("comfortable");
   await expect(root).toHaveAttribute("data-density", "comfortable");
   expect(await dockHeight(), "comfortable: a larger dock").toBeGreaterThan(compact);
@@ -375,4 +386,45 @@ test("Settings > Performance holds the quality held when adaptive quality is off
   await expect(p.getByTestId("about-errors")).toContainText("none");
   app.consoleErrors.length = 0; // (the error above was made on purpose)
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("Adaptive theme colour: the hue follows the canvas background colour, and the hue set by hand comes back when it is off", async ({ app }) => {
+  const p = app.page;
+  const hue = () => p.evaluate(() => document.documentElement.style.getPropertyValue("--hue"));
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.hue": 40, "ui.background": "#2a6fdb", "ui.hueAdaptive": true })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  const adaptive = Number(await hue());
+  expect(adaptive, "the hue of a blue background (OKLCH about 260), not the 40 set by hand").toBeGreaterThan(240);
+  expect(adaptive).toBeLessThan(280);
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Appearance" }).click();
+  await p.getByRole("button", { name: "Adaptive" }).click();
+  expect(await hue()).toBe("40");
+});
+
+test("the Information button keeps one icon and says how much is shown with a number (0 to 3)", async ({ app }) => {
+  const p = app.page;
+  const button = p.locator('[data-action="info"]');
+  const levels: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    levels.push((await button.getAttribute("data-level"))!);
+    await button.click();
+  }
+  expect([...levels].sort()).toEqual(["0", "1", "2", "3"]);
+  expect(await button.getAttribute("data-level"), "back to where it started").toBe(levels[0]);
+});
+
+test("a custom canvas background is what the canvas draws, and the grid and the marks on it follow it", async ({ app }) => {
+  const p = app.page;
+  const grid = () => p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--canvas-grid").trim());
+  const plain = await grid();
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.background": "#d98c5f" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(p.locator("html")).toHaveAttribute("data-custom-bg", "");
+  expect(await p.evaluate(() => document.documentElement.style.getPropertyValue("--canvas-bg"))).toBe("#d98c5f");
+  expect(await grid(), "the grid is made from the background").not.toBe(plain);
+  const [r, g, b] = await p.evaluate(() => window.__canvastDebug.pixelAt(5, 5)); // (an empty corner away from the grid lines)
+  expect(Math.abs(r! - 0xd9) + Math.abs(g! - 0x8c) + Math.abs(b! - 0x5f), "the canvas is the colour").toBeLessThan(40);
 });

@@ -167,7 +167,17 @@ export async function rowAction(page: Page, kind: "board" | "canvas", name: stri
   await page.getByRole("menuitem", { name: `${action} ${kind} ${name}` }).click();
 }
 
-type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu";
+type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu";
+
+/** Give the pen a colour through the colour picker of the Properties bar (it has no row of colours any more): type the hex, close the picker. */
+export async function setPenColour(page: Page, hex: string): Promise<void> {
+  await page.locator("[data-colour-open]").click();
+  const field = page.locator(".colour-pop [data-hex]");
+  await field.fill(hex.replace("#", ""));
+  await field.press("Enter");
+  await page.keyboard.press("Escape");
+}
+
 /**
  * Choose an item (e.g. "align:left") in a grouped-tools menu of the Actions bar. The menu stays open after a choice, so it is opened only when
  * it is not; it is closed again (Escape) unless `keepOpen`, so later input does not land on it.
@@ -186,4 +196,11 @@ export const alignWith = (page: Page, id: string, keepOpen = false): Promise<voi
 export const arrangeWith = (page: Page, id: string, keepOpen = false): Promise<void> => chooseInMenu(page, "arrangemenu", id, keepOpen);
 export const boolWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "boolmenu", id);
 export const maskWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "maskmenu", id);
+export const sheetWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "sheetmenu", id);
+export const exportWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "exportmenu", id);
+/** Right-click empty canvas at (x, y) and choose a row of the context menu by its name (what the Properties bar's Show all and Unlock all buttons became). */
+export async function contextChoose(page: Page, x: number, y: number, name: string): Promise<void> {
+  await page.mouse.click(x, y, { button: "right" });
+  await page.getByRole("menuitem", { name }).click();
+}
 export const pathWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "pathmenu", id);

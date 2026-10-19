@@ -1,6 +1,8 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
+import { openMoreMenu } from "./more-menu";
+import type { MenuItem } from "./more-menu";
 import { createBar, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
@@ -16,8 +18,8 @@ import { isGradient, paintCss } from "../doc/paint";
 import { isTexture } from "../doc/texture";
 import type { Arrow, ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
-import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, recentColours } from "./colour-popover";
-import { fontFor } from "../text/fonts";
+import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover } from "./colour-popover";
+import { BUNDLED_FONT_NAME, fontFor } from "../text/fonts";
 import type { Adjust } from "../doc/adjust";
 import { setAdjustPreviewing } from "../render/adjust-image";
 import type { DocumentStore } from "../doc/document-store";
@@ -187,7 +189,7 @@ const TEXT_FITS = [
   { id: "fixed", label: "Fixed width", title: "Fixed width: the words wrap at the box's width (drag a box to make one)", icon: ICONS.textFixedWidth },
 ] as const;
 
-const KIND_LABEL: Record<string, string> = { sheet: "Sheet", shape: "Shape", text: "Text", picture: "Picture", stroke: "Stroke" };
+const KIND_LABEL: Record<string, string> = { all: "All", sheet: "Sheet", shape: "Shape", text: "Text", picture: "Picture", stroke: "Stroke" };
 /** The kind of picked item the Properties bar sorts its controls by. */
 const kindOf = (o: CanvasObject): string => (isContainer(o) ? "sheet" : o.kind === "path" ? "shape" : o.kind === "image" ? "picture" : o.kind);
 
@@ -197,22 +199,34 @@ const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discre
 export function mountToolbar(root: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ToolbarActions): void {
   root.innerHTML = `
     <div class="rail" data-cmd-group="Tools">
+      <!-- What a tool with kinds offers while it is the tool: beside its button, not in the Properties bar -->
+      <div class="rail-fly" data-fly="shape" hidden role="radiogroup" aria-label="Shape or path">
+        ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
+        <button type="button" role="radio" class="shape-kind" data-tool="path" aria-label="Path (curves)" title="Path (curves): click corners, drag for a curve, click the first node to close (B)">${ICONS.pathTool}</button>
+      </div>
+      <div class="rail-fly" data-fly="pen" hidden role="radiogroup" aria-label="Pen">
+        ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
+      </div>
+      <div class="rail-tools" role="group" aria-label="History">
+        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
+        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
+      </div>
+      <span class="rail-sep" role="separator"></span>
       <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
-        (t) => `<button type="button" role="radio" data-tool="${t.tool}" aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>`,
+        // (Import sits with the tools that put something on the canvas: after the Note tool)
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>` : ""}`,
       ).join("")}
       </div>
       <span class="rail-sep" role="separator"></span>
-      <div class="rail-tools" role="group" aria-label="History, search and import">
+      <div class="rail-tools" role="group" aria-label="Search">
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
-        <button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>
-        <button type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
-        <button type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
       </div>
       <input type="file" multiple hidden data-testid="import-input">
     </div>
     <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="Panels">
       <div class="tb-group">
+        <button type="button" class="layers-toggle" data-adjust-panel aria-pressed="false" aria-label="Adjust panel" title="Adjust: show or hide the panel for the exposure, contrast, colour and more of the picked pictures">${ICONS.slidersVertical}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
@@ -228,12 +242,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
       </div>
       <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
-        <span class="tb-recents" data-recents data-no-command role="group" aria-label="Recent colours"></span>
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
-      </div>
-      <div class="tb-group tb-options" data-for="shape path" role="radiogroup" aria-label="Shape or path">
-        ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
-        <button type="button" role="radio" class="shape-kind" data-tool="path" aria-label="Path (curves)" title="Path (curves): click corners, drag for a curve, click the first node to close (B)">${ICONS.pathTool}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -296,9 +305,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom)">
         <span class="size-out" data-shape-out></span>
       </div>
-      <div class="tb-group tb-options" data-for="pen" role="radiogroup" aria-label="Pen">
-        ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
-      </div>
       <div class="tb-group tb-options" data-for="pen select" data-kind="stroke tool" role="group" aria-label="Size">
         ${PEN_WIDTHS.map(
           (w) => `<button type="button" class="width" data-pen-only data-width="${w}" aria-label="Pen width ${w} px" title="Pen width ${w} px"><span style="height:${Math.max(2, w)}px"></span></button>`,
@@ -319,8 +325,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="snap" data-kind="any" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="snap" data-kind="any" data-box-axis aria-pressed="false" aria-label="Axis-aligned selection box" title="Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation">${ICONS.boxSelect}</button>
         <button type="button" class="snap" data-kind="tool" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: zoomed far into an object it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
-        <button type="button" data-kind="tool" data-action="show-all" aria-label="Show all hidden" title="Show all hidden objects">${ICONS.eye}</button>
-        <button type="button" data-kind="tool" data-action="unlock-all" aria-label="Unlock all" title="Unlock all locked objects">${ICONS.lockKeyholeOpen}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser" role="group" aria-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
@@ -431,7 +435,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const paintFonts = (): void => {
     const now = actions.selectedTextStyle()?.assetId ?? "";
     const known = new Set(fontList.map((f) => f.hash));
-    const html = [`<option value="">Inter (built in)</option>`]
+    const html = [`<option value="">${BUNDLED_FONT_NAME}</option>`]
       .concat(fontList.map((f) => `<option value="${f.hash}"${f.unusable ? " disabled" : ""}>${esc(f.name)}${f.unusable ? " (cannot be read)" : ""}</option>`))
       .concat(now && !known.has(now) ? [`<option value="${now}">A font that is not in this library</option>`] : [])
       .concat([`<option value="__import">Add a font file…</option>`])
@@ -652,9 +656,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
+  /** The tool whose kinds were closed by pressing its own button (until the tool changes). */
+  let flyShut: "shape" | "pen" | null = null;
   let colourEditing = false;
-  // Every colour of the selection has its chip (the row scrolls when there are many): none is kept in a menu.
-  const SEL_CHIPS = Infinity;
+  // The first colours of the selection have a chip each; the others are one button, "+N", that opens them as a list (so the row stays short, and none is lost).
+  const SEL_CHIPS = 7;
   const chipPaint = (p: Paint): string => (typeof p === "string" ? `linear-gradient(${swatchBackground(p)}, ${swatchBackground(p)})` : paintCss(p));
   const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : isTexture(p) ? (p.src.kind === "asset" ? "Picture" : "Pattern") : "Gradient");
   const usage = (it: { fills: number; strokes: number }): string =>
@@ -757,8 +763,15 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["penKind"]) {
       editor.penKind = d["penKind"] as PenKind;
       editor.changed();
-    } else if (d["tool"]) editor.setTool(d["tool"] as Tool);
-    else if (d["color"]) {
+    } else if (d["tool"]) {
+      // the button of a tool with kinds (Shape, Pen), pressed while it is the tool, closes its kinds; pressed again, opens them
+      const t = d["tool"] as Tool;
+      const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : null;
+      const same = fam !== null && !!b.closest(".rail") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : editor.tool === "pen");
+      flyShut = same ? (flyShut === fam ? null : fam) : null;
+      editor.setTool(t);
+      editor.changed();
+    } else if (d["color"]) {
       editor.penColor = d["color"];
       editor.changed();
     } else if (d["shapeKind"]) {
@@ -767,6 +780,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["selColour"] !== undefined) {
       editColour(b, Number(d["selColour"]));
+    } else if (d["selMore"] !== undefined) {
+      // the colours past the chips, as a list: each opens the paint chooser, on this button
+      const rest = actions.selectionPaints().items.slice(SEL_CHIPS);
+      openMoreMenu(b, rest.map((it, j): MenuItem => ({ label: paintName(it.paint), hint: usage(it), icon: `<span class="menu-swatch" style="--paint:${chipPaint(it.paint)}"></span>`, aria: `${paintName(it.paint)}, used by ${usage(it)}: change it`, run: () => editColour(b, SEL_CHIPS + j) })), "More colours of the selection", { compact: true });
     } else if (d["outlineOptions"] !== undefined) {
       openOutline(b);
     } else if (d["paint"]) {
@@ -799,6 +816,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["layers"] !== undefined) {
       editor.layersOpen = !editor.layersOpen;
+      editor.changed();
+    } else if (d["adjustPanel"] !== undefined) {
+      editor.adjustOpen = !editor.adjustOpen;
       editor.changed();
     } else if (d["eraseParts"] !== undefined) {
       editor.eraseParts = !editor.eraseParts;
@@ -837,8 +857,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "search") actions.openSearch("");
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
-    else if (d["action"] === "show-all") actions.clearFlag("hidden");
-    else if (d["action"] === "unlock-all") actions.clearFlag("locked");
   });
 
   const update = (): void => {
@@ -847,16 +865,22 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options"));
       b.setAttribute("aria-checked", String(on));
     }
+    // The tools with kinds: their kinds open beside the button while the tool is active, and the button wears the icon of the kind in use.
+    const flyAt = (name: "shape" | "pen", tool: string, on: boolean, icon: string): void => {
+      const fly = root.querySelector<HTMLElement>(`[data-fly="${name}"]`)!;
+      const btn = root.querySelector<HTMLElement>(`.rail [data-tool="${tool}"]`)!;
+      if (!on && flyShut === name) flyShut = null; // (another tool: the kinds open again next time)
+      fly.hidden = !on || flyShut === name;
+      if (!fly.hidden) fly.style.top = `${btn.offsetTop + (btn.offsetHeight - fly.offsetHeight) / 2}px`; // (centred on its button, whatever the bar's own padding)
+      btn.setAttribute("aria-expanded", String(!fly.hidden)); // (the same state a menu button reports)
+      if (btn.dataset["icon"] !== icon) {
+        btn.dataset["icon"] = icon;
+        btn.innerHTML = icon;
+      }
+    };
+    flyAt("shape", "shape", editor.tool === "shape" || editor.tool === "path", editor.tool === "path" ? ICONS.pathTool : (SHAPE_MENU.find((k) => k.id === editor.shapeKind)?.icon ?? ICONS.shapeTool));
+    flyAt("pen", "pen", editor.tool === "pen", PEN_MENU.find((k) => k.id === editor.penKind)?.icon ?? ICONS.pencil);
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
-    const recent = recentColours();
-    const recents = root.querySelector<HTMLElement>("[data-recents]")!;
-    if (recents.dataset["list"] !== recent.join()) {
-      recents.dataset["list"] = recent.join();
-      recents.innerHTML = recent
-        .map((c) => `<button type="button" class="swatch" data-color="${c}" aria-label="Pen colour ${c.toUpperCase()}" title="${c.toUpperCase()}"><span style="background:${swatchBackground(c)}"></span></button>`)
-        .join("");
-    }
-    for (const b of root.querySelectorAll<HTMLElement>("[data-color]")) b.classList.toggle("is-on", (b.dataset["color"] ?? "").toLowerCase() === editor.penColor.toLowerCase());
     root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = swatchBackground(editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));
     const sides = root.querySelector<HTMLInputElement>("[data-sides]")!;
@@ -878,7 +902,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
-    const txt = (pick && still) || editor.tool === "text" || editor.tool === "note" ? actions.selectedTextStyle() : null;
+    const txt = (pick && still) || editor.editingText || editor.tool === "text" || editor.tool === "note" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
       wantFonts(txt.assetId ?? "");
@@ -957,7 +981,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
             .map((it, i) => {
               return `<button type="button" class="swatch swatch-paint" data-sel-colour="${i}"${it.fills ? "" : " data-ring"} aria-haspopup="dialog" aria-expanded="false" aria-label="${paintName(it.paint)}, used by ${usage(it)}" title="${paintName(it.paint)}: used by ${usage(it)}; change it everywhere in the selection"><span data-paint-chip style="--paint:${chipPaint(it.paint)}"></span></button>`;
             })
-            .join("");
+            .join("") + (all.length > items.length ? `<button type="button" class="tb-chip" data-sel-more aria-haspopup="menu" aria-expanded="false" aria-label="${all.length - items.length} more colours of the selection" title="${all.length - items.length} more colours of the selection: choose one to change it">+${all.length - items.length}</button>` : "");
       }
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
@@ -998,6 +1022,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-erase-parts]")!.setAttribute("aria-pressed", String(editor.eraseParts));
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
+    root.querySelector<HTMLElement>("[data-adjust-panel]")!.setAttribute("aria-pressed", String(editor.adjustOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
     root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
     root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
@@ -1021,9 +1046,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // properties the row shows; what is for another kind is switched off, never moved into a menu.
     const picking = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none";
     const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
-    const chosen = kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
+    // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
+    const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
     const chips = root.querySelector<HTMLElement>(".tb-subject")!;
-    const chipHtml = kinds.length > 1 ? kinds.map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection">${KIND_LABEL[k]}</button>`).join("") : "";
+    const chipHtml = kinds.length > 1 ? ["all", ...kinds].map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="${k === "all" ? "Everything picked: the tools for all of it" : `Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection`}">${KIND_LABEL[k]}</button>`).join("") : "";
     if (chips.dataset["html"] !== chipHtml) {
       chips.dataset["html"] = chipHtml;
       chips.innerHTML = chipHtml;
@@ -1039,10 +1065,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const row = root.querySelector<HTMLElement>(".tb-options-row")!;
     root.querySelector<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
     for (const b of root.querySelectorAll<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
-    syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
+    const rowTool = editor.editingText ? "text" : editor.tool; // (while a text is typed in, the bar offers the text's options, whatever tool is active)
+    syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     root.querySelector<HTMLElement>(".toolbar")!.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(row);
-    syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(editor.tool));
+    syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(colourBar.row);
   };

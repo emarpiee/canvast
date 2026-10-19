@@ -23,6 +23,7 @@ import { folderPath, folderSubtree, meta } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
+import { clearRect, MENU_GAP } from "./more-menu";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
@@ -1282,7 +1283,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const r = anchor.getBoundingClientRect();
       const w = pop.offsetWidth;
       pop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
-      pop.style.top = `${Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 2)}px`;
+      pop.style.top = `${Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + MENU_GAP)}px`;
     }
     const input = side.querySelector<HTMLInputElement>(".side-name");
     if (input) {
@@ -1921,7 +1922,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const w = placeMenu.offsetWidth;
     const h = placeMenu.offsetHeight;
     placeMenu.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
-    placeMenu.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, r.bottom + 4))}px`;
+    placeMenu.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, r.bottom + MENU_GAP))}px`;
     placeMenu.querySelector<HTMLElement>("button")?.focus();
   };
   placeMenu.addEventListener("click", (e) => {
@@ -2238,7 +2239,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const openColumns = (): void => {
     renderColumns();
     const r = colBtn.getBoundingClientRect();
-    colPop.style.top = `${Math.round(r.bottom + 6)}px`;
+    colPop.style.top = `${Math.round(clearRect(colBtn).bottom + MENU_GAP)}px`;
     colPop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
     colPop.hidden = false;
     colBtn.setAttribute("aria-expanded", "true");

@@ -51,14 +51,22 @@ export const setMenuAvoid = (f: typeof avoidBox): void => {
  * Keep a menu inside the window, under its button (above it when there is no room), right edges aligned; and not over the selected items:
  * if that is where it would land it goes beside them instead (right, then left), or as far from them as the window allows.
  */
+/** The room a menu keeps clear: a button inside a bar of the app (a horizontal one) stands for the whole bar, so the menu clears the bar's edge, not only the button's. */
+export function clearRect(anchor: HTMLElement): DOMRect {
+  return (anchor.closest(".toolbar, .ctx-bar, .dock, .hud-controls, .assets-bar") ?? anchor).getBoundingClientRect();
+}
+
+export const MENU_GAP = 8; // (the space between a bar or button and the menu it opens; the same for every menu and popover)
+
 export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const r = anchor.getBoundingClientRect();
+  const c = clearRect(anchor);
   const w = menu.offsetWidth;
   const h = menu.offsetHeight;
   const gap = 8;
   const left0 = Math.max(gap, Math.min(window.innerWidth - w - gap, r.right - w));
-  let top = r.bottom + 4;
-  if (top + h > window.innerHeight - gap) top = Math.max(gap, r.top - 4 - h);
+  let top = c.bottom + MENU_GAP;
+  if (top + h > window.innerHeight - gap) top = Math.max(gap, c.top - MENU_GAP - h);
   let left = left0;
   const avoid = avoidBox();
   if (avoid) {
@@ -66,8 +74,8 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
     const fit = (l: number, t: number): { l: number; t: number } => ({ l: Math.max(gap, Math.min(window.innerWidth - w - gap, l)), t: Math.max(gap, Math.min(window.innerHeight - h - gap, t)) });
     const options = [
       { l: left0, t: top },
-      fit(left0, r.top - 4 - h),
-      fit(left0, r.bottom + 4),
+      fit(left0, c.top - MENU_GAP - h),
+      fit(left0, c.bottom + MENU_GAP),
       fit(avoid.right + gap * 2, top),
       fit(avoid.left - gap * 2 - w, top),
       fit(avoid.right + gap * 2, avoid.top),
@@ -80,7 +88,10 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   // A menu inside a blurred or transformed panel is placed against that panel, not the window: measure where (0, 0) really is and correct for it.
   menu.style.left = "0px";
   menu.style.top = "0px";
+  const opening = menu.getAnimations().length > 0; // (a pop-in still running moves the box: measure without it, then let it play)
+  if (opening) menu.style.animation = "none";
   const origin = menu.getBoundingClientRect();
+  if (opening) menu.style.animation = "";
   menu.style.left = `${Math.round(left - origin.left)}px`;
   menu.style.top = `${Math.round(top - origin.top)}px`;
 }
@@ -96,6 +107,8 @@ export interface MenuOptions {
   onClose?(): void;
   /** A press outside closes the menu and does nothing else (the canvas under it is not clicked, so a pick is not cleared by the press that ends the menu). Default: on for a menu that stays open (`keepOpen`). */
   consumeOutside?: boolean;
+  /** Closer rows, one line each (a long list to choose from: the colours of a selection). */
+  compact?: boolean;
   /** The menu opened under a finger that is still down: the click that comes when it lifts is not a choice; only a press on the menu itself arms it. */
   needPress?: boolean;
 }
@@ -107,6 +120,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   const menu = document.createElement("div");
   menu.className = "pop-menu";
   if (opts.keepOpen) menu.dataset["keep"] = "true";
+  if (opts.compact) menu.classList.add("is-compact");
   if (opts.consumeOutside ?? opts.keepOpen) menu.dataset["consume"] = "true"; // (a menu that stays open for several tries: the press that ends it is only that, so the pick it worked on stays)
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);

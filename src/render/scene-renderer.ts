@@ -28,6 +28,8 @@ export interface SceneTheme {
   /** The names of sheets, and of landmarks. */
   landmarkLabel: string;
   handleFill: string;
+  /** Sharp corners (Settings > Appearance): the round handles are drawn square. */
+  sharp: boolean;
   lasso: string;
   imagePlaceholder: string;
   /** Eraser brush and its touched boxes. */
@@ -38,6 +40,12 @@ export interface SceneTheme {
 }
 
 export const HANDLE_SIZE_PX = 9;
+
+/** The outline of a round handle (a square one in sharp corners) of radius `r` about (x, y), to fill or stroke. */
+const dot = (ctx: CanvasRenderingContext2D, theme: SceneTheme, x: number, y: number, r: number): void => {
+  if (theme.sharp) ctx.rect(x - r, y - r, 2 * r, 2 * r);
+  else ctx.arc(x, y, r, 0, Math.PI * 2);
+};
 
 /**
  * Batch runs over a whole paint-ordered list: consecutive opaque fast-path
@@ -386,7 +394,7 @@ function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, edito
       ctx.lineTo(h[0], h[1]);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(h[0], h[1], half - 1, 0, Math.PI * 2);
+      dot(ctx, theme, h[0], h[1], half - 1);
       ctx.fill();
       ctx.stroke();
     }
@@ -417,7 +425,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     for (const d of h.corners) {
       ctx.fillStyle = theme.handleFill;
       ctx.beginPath();
-      ctx.arc(d.x, d.y, HANDLE_SIZE_PX / 2 - 1, 0, Math.PI * 2);
+      dot(ctx, theme, d.x, d.y, HANDLE_SIZE_PX / 2 - 1);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = theme.selection;
@@ -430,7 +438,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     // The one that sets them all: bigger than the rest, filled, with a ring round it.
     ctx.fillStyle = theme.selection;
     ctx.beginPath();
-    ctx.arc(h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 3, 0, Math.PI * 2);
+    dot(ctx, theme, h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 3);
     ctx.fill();
     ctx.strokeStyle = theme.handleFill;
     ctx.lineWidth = 2;
@@ -438,7 +446,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.strokeStyle = theme.selection;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 6, 0, Math.PI * 2);
+    dot(ctx, theme, h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 6);
     ctx.stroke();
   }
   const r = HANDLE_SIZE_PX / 2 + 1;
@@ -563,7 +571,7 @@ function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly P
       // a stop on the axis, in its own colour
       ctx.fillStyle = s.c;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, HANDLE_SIZE_PX / 3, 0, Math.PI * 2);
+      dot(ctx, theme, s.x, s.y, HANDLE_SIZE_PX / 3);
       ctx.fill();
       ctx.stroke();
     }
@@ -571,7 +579,7 @@ function drawGradientHandles(ctx: CanvasRenderingContext2D, selected: readonly P
   }
   for (const q of h.pts) {
     ctx.beginPath();
-    ctx.arc(q.x, q.y, HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
+    dot(ctx, theme, q.x, q.y, HANDLE_SIZE_PX / 2 + 1);
     ctx.fill();
     ctx.stroke();
   }
@@ -684,7 +692,7 @@ function drawSelection(
       ctx.lineTo(top[0], top[1]);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(handle[0], handle[1], HANDLE_SIZE_PX / 2 + 1, 0, Math.PI * 2);
+      dot(ctx, theme, handle[0], handle[1], HANDLE_SIZE_PX / 2 + 1);
       ctx.fill();
       ctx.stroke();
     }

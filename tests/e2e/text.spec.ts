@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, pathWith, recordMetric, test } from "./harness";
+import { APP_URL, exportWith, expect, pathWith, recordMetric, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
 
@@ -66,11 +66,11 @@ test("type, format, save, reload and copy a text object as Markdown", async ({ a
   await p.keyboard.press(`${mod}+Shift+z`);
   expect((await textObjects(p))[0]?.md).toBe(t!.md);
 
-  // Copy Markdown from the toolbar for the selected text.
+  // Copy Markdown from the Export menu of the Actions bar for the selected text.
   await p.keyboard.press("v");
   await p.mouse.click(box.minX + 20, box.minY + 20);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([t!.id]);
-  await p.getByRole("button", { name: "Copy Markdown" }).click();
+  await exportWith(p, "copymd");
   expect(await p.evaluate(() => window.__canvastDebug.lastCopied())).toBe(t!.md);
 
   // Saved and reloaded unchanged, and drawn again.
@@ -82,6 +82,43 @@ test("type, format, save, reload and copy a text object as Markdown", async ({ a
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.inkedPixels(2))).toBeGreaterThan(ink * 0.8);
   expect(app.consoleErrors).toEqual([]);
   expect(app.externalRequests).toEqual([]);
+});
+
+test("a double-click on a text that is already big on screen edits it where it is, and one too small to read is zoomed to a readable size", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 400, 360);
+  await p.keyboard.type("Big");
+  await finish(p);
+  const [t] = await textObjects(p);
+  const mid = async () => {
+    const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), t!.id))!.box;
+    return { x: Math.round((b.minX + b.maxX) / 2), y: Math.round((b.minY + b.maxY) / 2), h: b.maxY - b.minY };
+  };
+  // zoom in until the letters are far bigger than the old 72 px limit, with the text under the pointer
+  let at = await mid();
+  for (let i = 0; i < 12 && at.h < 150; i++) {
+    await app.wheel(at.x, at.y, -400);
+    at = await mid();
+  }
+  expect(at.h, "zoomed in").toBeGreaterThan(100);
+  const before = JSON.stringify(await app.camera());
+  await p.mouse.dblclick(at.x, at.y);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  expect(JSON.stringify(await app.camera()), "the view stays where the person put it").toBe(before);
+  await finish(p);
+  // far out: too small to read, so the view goes to a readable size
+  for (let i = 0; i < 80 && at.h > 6; i++) {
+    await app.wheel(at.x, at.y, 400);
+    at = await mid();
+  }
+  expect(at.h, "zoomed out until the letters are too small to read, still big enough to point at").toBeLessThan(8);
+  expect(at.h).toBeGreaterThan(1);
+  const small = JSON.stringify(await app.camera());
+  await p.mouse.dblclick(at.x, at.y);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  expect(JSON.stringify(await app.camera())).not.toBe(small);
+  await finish(p);
+  expect(app.consoleErrors).toEqual([]);
 });
 
 test("double-click edits a text; lists and pasted text become Markdown; emptying deletes it", async ({ app }) => {
@@ -920,7 +957,10 @@ test("words of their own font: chosen in the text's format bar, stored as a span
   await p.mouse.dblclick(310, 308);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await p.keyboard.press("Control+a");
-  await p.locator("[data-font-of-words]").selectOption({ label: "RedHatDisplay-Medium" });
+  const wordsFont = p.locator("[data-font-of-words]");
+  await expect(wordsFont.locator("option:checked"), "it names the font the words are in: the text's own").toHaveText("Comfortaa-Regular");
+  await wordsFont.selectOption({ label: "RedHatDisplay-Medium" });
+  await expect(wordsFont.locator("option:checked"), "and the new one once the words have it").toHaveText("RedHatDisplay-Medium");
   await finish(p);
   expect((await textObjects(p))[0]!.md).toContain(`font-family:${redHat}`);
   await expect.poll(async () => Math.abs((await width(t!.id)) - own)).toBeGreaterThan(2);
@@ -933,7 +973,7 @@ test("words of their own font: chosen in the text's format bar, stored as a span
   // back to the text's font: the span goes away
   await p.mouse.dblclick(310, 308);
   await p.keyboard.press("Control+a");
-  await p.locator("[data-font-of-words]").selectOption({ label: "Font of the text" });
+  await p.locator("[data-font-of-words]").selectOption({ label: "Comfortaa-Regular" });
   await finish(p);
   expect((await textObjects(p))[0]!.md).toBe("Hamburg AVA 123");
 });

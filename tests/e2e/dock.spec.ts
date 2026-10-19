@@ -176,3 +176,17 @@ test("Settings > Panels: minimize all inactive panels keeps only the active one 
   expect(await folded("styles")).toBe("");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("the kinds of the Pen and Shape tools open beside their rail button, centred on it, in every density", async ({ app }) => {
+  const p = app.page;
+  for (const density of ["dense", "compact", "comfortable"]) {
+    await p.evaluate((d) => (d === "compact" ? delete document.documentElement.dataset["density"] : (document.documentElement.dataset["density"] = d)), density);
+    for (const [tool, fly] of [["pen", "pen"], ["shape", "shape"]] as const) {
+      await p.locator(`.rail [data-tool="${tool}"]`).click();
+      const a = (await p.locator(`.rail-fly[data-fly="${fly}"]`).boundingBox())!;
+      const b = (await p.locator(`.rail [data-tool="${tool}"]`).boundingBox())!;
+      expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2)), `${tool} in ${density}: centred on its button`).toBeLessThan(1.5);
+      expect(a.x, `${tool} in ${density}: beside it, not over it`).toBeGreaterThanOrEqual(b.x + b.width);
+    }
+  }
+});

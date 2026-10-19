@@ -91,8 +91,11 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
         out.push({ key: `b:${b.id}`, icon: ICONS.bookmark, label: b.name, note: "Bookmark", bookmark: b.id });
       }
     } else {
-      const objs = [...deps.doc.ordered()].filter((o) => !o.hidden).sort((a, b) => b.z - a.z);
-      for (const o of objs) {
+      // Top first: the document's own paint order, walked backwards (no copy and no sort: this runs on every key, at a million objects).
+      const list = deps.doc.ordered();
+      for (let i = list.length - 1; i >= 0; i--) {
+        const o = list[i]!;
+        if (o.hidden) continue;
         const lab = labelOf(o, names);
         if (mode === "all") {
           // Every kind at once: a word matches the name, a group's name, the kind, or any tag; `#word` matches tags only.

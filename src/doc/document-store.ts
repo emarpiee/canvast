@@ -105,6 +105,17 @@ export class DocumentStore {
     this.emit("do", new Set(tx.after.keys()));
   }
 
+  /**
+   * Change objects without a step to undo (what a saved style they follow now says, right after a canvas was opened): only while there is
+   * no history, because a step recorded earlier would no longer find the objects as it left them.
+   */
+  refit(next: readonly CanvasObject[]): void {
+    if (this.undoStack.length || this.redoStack.length) throw new Error("refit needs an empty history");
+    const after = new Map<ObjectId, CanvasObject | null>(next.map((o) => [o.id, o]));
+    this.applyStates(after, new Map(next.map((o) => [o.id, this.objects.get(o.id) ?? null])));
+    this.emit("do", new Set(after.keys()));
+  }
+
   undo(): Transaction | null {
     const tx = this.undoStack.pop();
     if (!tx) return null;

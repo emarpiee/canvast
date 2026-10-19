@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, distance, expect, recordMetric, reps, test } from "./harness";
+import { LIMITS, distance, expect, recordMetric, reps, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture } from "./png";
 
@@ -344,6 +344,27 @@ test("delete, undo delete, and invalid imports are reported without corrupting t
   await expect(app.page.getByTestId("toast")).toContainText("no preview");
   expect((await objects(app)).map((o) => o.id)).toContain(s.id);
   expect((await objects(app)).length).toBe(2);
+});
+
+test("Actions bar set to follow the selection: it sits just under the picked thing, not at the bottom, and moves when the view pans", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.actions": "follow" })));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await key(app, "p");
+  await app.drag({ x: 500, y: 300 }, { x: 700, y: 320 }, 4);
+  await key(app, "v");
+  const [a] = await objects(app);
+  const s = (await screenOfObject(app, a!.id))!.box;
+  await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
+  const bar = p.getByTestId("context-bar");
+  await expect(bar).toBeVisible();
+  const bb = (await bar.boundingBox())!;
+  expect(bb.y, "under the picked thing").toBeGreaterThanOrEqual(s.maxY);
+  expect(bb.y - s.maxY, "close to it, not at the bottom edge").toBeLessThan(60);
+  await key(app, "ArrowUp");
+  await app.frame();
+  await expect.poll(async () => (await bar.boundingBox())!.y).not.toBe(bb.y);
 });
 
 test("selection action bar: follows the selection, hides while moving and for non-selecting tools, and acts (ADR 0051)", async ({ app }) => {
@@ -921,4 +942,22 @@ test("right click on the canvas opens a menu of what fits: on a shape it picks i
   await expect(p.getByRole("menuitem", { name: "Select everything" })).toBeVisible();
   await p.keyboard.press("Escape");
   await expect(menu).toBeHidden();
+});
+
+test("the colours of a big selection: seven chips, then one \"+N\" button that lists the others", async ({ app }) => {
+  const p = app.page;
+  const colours = ["#e11d48", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6"];
+  await key(app, "p");
+  for (const [i, c] of colours.entries()) {
+    await setPenColour(p, c);
+    await app.drag({ x: 400, y: 200 + i * 40 }, { x: 700, y: 210 + i * 40 }, 4);
+  }
+  await key(app, "v");
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  const row = p.locator("[data-sel-colours]");
+  await expect(row.locator("[data-sel-colour]")).toHaveCount(7);
+  await expect(row.locator("[data-sel-more]")).toHaveAccessibleName(/^2 more colours/);
+  await row.locator("[data-sel-more]").click();
+  await expect(p.locator(".pop-menu [role=menuitem]")).toHaveCount(2);
 });

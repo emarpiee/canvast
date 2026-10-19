@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { expect, percentile, recordMetric, reps, test } from "./harness";
+import { expect, percentile, recordMetric, reps, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -169,7 +169,7 @@ for (const item of ["stroke", "image"] as const) {
     let expectColor: number[];
     if (item === "stroke") {
       await app.page.keyboard.press("p"); // pen options are shown for the pen tool
-      await app.page.getByRole("button", { name: /Pen colour #dc2626/i }).click();
+      await setPenColour(app.page, "#dc2626");
       await app.page.getByRole("button", { name: "Pen width 8 px" }).click();
       await draw(app, [[500, 400], [780, 400]]);
       expectColor = [0xdc, 0x26, 0x26];

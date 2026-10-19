@@ -40,6 +40,15 @@ const colourList = (v: unknown): string | undefined => (typeof v === "string" &&
 /** A shape's fill or outline as text: "none", "#rrggbb" / "#rrggbbaa", or a gradient as JSON (doc/paint.ts). */
 const paint = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 4000 && paintFromText(v) !== undefined ? v : undefined);
 
+/**
+ * The memory tier (Phase 8, ADR 0155): how much decoded-picture memory a device gets by default, from the memory it says it has
+ * (`navigator.deviceMemory` in GB, Chromium only; elsewhere the usual 384 MB). A phone with 2 GB or less starts at 128 MB, one with 4 GB at 256 MB.
+ * Settings > Performance still changes it.
+ */
+export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
+  return gb !== undefined && gb <= 2 ? "128" : gb !== undefined && gb <= 4 ? "256" : "384";
+}
+
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
@@ -74,7 +83,7 @@ export const SETTINGS = {
   "ui.info": { scope: "device", default: "simple", validate: oneOf("simple", "more", "technical", "hidden"), effect: "immediate" } as Def<"simple" | "more" | "technical" | "hidden">,
   "quality.auto": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "quality.level": { scope: "device", default: "full", validate: oneOf("full", "balanced", "fast"), effect: "immediate" } as Def<"full" | "balanced" | "fast">,
-  "cache.decodedMb": { scope: "device", default: "384", validate: oneOf("128", "256", "384", "768", "1536"), effect: "immediate" } as Def<"128" | "256" | "384" | "768" | "1536">,
+  "cache.decodedMb": { scope: "device", default: decodedMbFor(typeof navigator === "undefined" ? undefined : (navigator as { deviceMemory?: number }).deviceMemory), validate: oneOf("128", "256", "384", "768", "1536"), effect: "immediate" } as Def<"128" | "256" | "384" | "768" | "1536">,
   "panel.autoFold": { scope: "device", default: "off", validate: oneOf("off", "all", "latest"), effect: "immediate" } as Def<"off" | "all" | "latest">,
   "panel.keep": { scope: "device", default: 2, validate: range(1, DOCK_PANEL_IDS.length), effect: "immediate" } as Def<number>,
   "ui.dock": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && v.length <= 8000 ? v : undefined), effect: "immediate" } as Def<string>,
@@ -104,12 +113,14 @@ export const SETTINGS = {
   "key.navLeft": { scope: "device", default: "a", validate: letter, effect: "immediate" } as Def<string>,
   "key.navDown": { scope: "device", default: "s", validate: letter, effect: "immediate" } as Def<string>,
   "key.navRight": { scope: "device", default: "d", validate: letter, effect: "immediate" } as Def<string>,
+  "ui.hueAdaptive": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.hue": { scope: "device", default: 178, validate: range(0, 360), effect: "immediate" } as Def<number>,
   "ui.vivid": { scope: "device", default: 100, validate: range(0, 150), effect: "immediate" } as Def<number>,
   "ui.pattern": { scope: "device", default: "grid", validate: oneOf("grid", "dots", "scale", "none"), effect: "immediate" } as Def<"grid" | "dots" | "scale" | "none">,
   /** The colour behind the canvas as #rrggbb; empty is the app's own (it follows the theme and the hue dials). */
   "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
-  "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact"), effect: "immediate" } as Def<"comfortable" | "compact">,
+  "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
+  "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.slideSeconds": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 120 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "ui.textScale": { scope: "device", default: "100", validate: oneOf("90", "100", "115", "130", "150"), effect: "immediate" } as Def<"90" | "100" | "115" | "130" | "150">,
@@ -117,6 +128,7 @@ export const SETTINGS = {
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "subtle", "full"), effect: "immediate" } as Def<"system" | "reduce" | "subtle" | "full">,
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
+  "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,

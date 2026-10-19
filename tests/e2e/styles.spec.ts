@@ -27,6 +27,44 @@ async function openAdjust(p: App["page"]): Promise<void> {
   await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
 }
 
+test("Styles: a shape painted with a saved colour follows it when the colour is changed; a colour set by hand unlinks it (ADR 0157)", async ({ app }) => {
+  const p = app.page;
+  const hexIn = async (hex: string) => {
+    const field = p.locator(".colour-pop [data-hex]");
+    await field.fill(hex);
+    await field.press("Enter");
+    await p.keyboard.press("Escape");
+  };
+  await p.keyboard.press("u");
+  await drag(app, [500, 300], [620, 380]);
+  const [a] = (await objs(app)).slice(-1) as [Obj];
+  const fill = async () => (await objs(app)).find((o) => o.id === a.id)!.fill;
+  await p.keyboard.press("v");
+  await p.mouse.click(...(await centre(app, a.id)));
+  await p.getByRole("button", { name: "Styles panel", exact: true }).click();
+  const panel = p.getByTestId("styles-panel");
+  await panel.getByRole("tab", { name: /^Colours/ }).click();
+  await panel.getByRole("button", { name: "Add a colour" }).click();
+  await hexIn("ff0000");
+  const card = panel.locator(".style-card", { hasText: "Colour 1" });
+  await card.click();
+  await expect.poll(fill).toBe("#ff0000");
+  // the saved colour changes: the shape follows it
+  await panel.getByRole("button", { name: "More actions for style Colour 1" }).click();
+  await p.getByRole("menuitem", { name: /^Change the colour/ }).click();
+  await hexIn("0000ff");
+  await expect.poll(fill).toBe("#0000ff");
+  // a colour set by hand unlinks the shape: the saved colour changes again and the shape stays
+  await p.click('[data-paint="fill"]');
+  await hexIn("00ff00");
+  await expect.poll(fill).toBe("#00ff00");
+  await panel.getByRole("button", { name: "More actions for style Colour 1" }).click();
+  await p.getByRole("menuitem", { name: /^Change the colour/ }).click();
+  await hexIn("ff00ff");
+  await expect(card).toContainText("#FF00FF");
+  expect(await fill()).toBe("#00ff00");
+});
+
 test("Styles: a gradient is saved from the fill picker, applied (the part asked when several are picked), exported and read back as .ggr", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");
@@ -197,8 +235,13 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   await p.keyboard.press("Escape");
   await p.mouse.click(1100, 700); // nothing picked: a selection paints over the pixels
   const [x, y] = await centre(app, pic.id);
-  const shown = await p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
-  expect(shown[0]! > 100 && shown[2]! > 100 && shown[1]! < 40, "mid grey on a red-to-blue map is purple").toBe(true);
+  // (the colour is read once the canvas has drawn the map: a pixel read right after the click can still be the one before)
+  const purple = async () => {
+    await app.frame();
+    const shown = await p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+    return shown[0]! > 100 && shown[2]! > 100 && shown[1]! < 40;
+  };
+  await expect.poll(purple, { message: "mid grey on a red-to-blue map is purple" }).toBe(true);
   await p.keyboard.press("Control+z");
   expect((await objs(app))[0]!.adjust).toBeUndefined();
   // a gradient style goes on a picked picture from the Styles panel, as a gradient map

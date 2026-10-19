@@ -55,3 +55,12 @@ describe("step keys W A S D (ADR 0072)", () => {
     expect(keyOwner(s, "w", "key.pen")).toBe("Step up");
   });
 });
+
+describe("memory tier (Phase 8)", () => {
+  it("gives a device with little memory a smaller default for decoded pictures, and the usual one where memory is not reported", async () => {
+    const { decodedMbFor } = await import("../../src/settings/settings");
+    expect([0.25, 1, 2].map(decodedMbFor)).toEqual(["128", "128", "128"]);
+    expect([3, 4].map(decodedMbFor)).toEqual(["256", "256"]);
+    expect([6, 8, undefined].map(decodedMbFor)).toEqual(["384", "384", "384"]);
+  });
+});

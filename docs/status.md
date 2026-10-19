@@ -471,6 +471,14 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.21.0 — settings, panels, linked styles, Phase 8 groundwork (2026-10-19)
+
+- **Implemented:** the items of the changelog entry 0.21.0; [ADR 0156](adr/0156-panel-shape.md) (one shape for every panel) and [ADR 0157](adr/0157-linked-styles.md) (objects follow the saved colour, gradient or adjustment they got).
+- **Tested:** quick suite on the affected specs in Chromium and Firefox (530 passed, 2 failed, 6 skipped: the failures were a pixel read right after an undo, made to wait for the frame, and the Firefox video-adjustments flake); unit 512 passed.
+- **Known failures:** the Firefox video-adjustments test fails about one run in three (`pictures.spec.ts`, "a video has every adjustment").
+- **Unverified:** the full suite on this source; the Phase 8 benches (written, not run); WebKit.
+- **Next bounded task:** run the two benches and the qualification matrix and record them in `docs/testing/phase-8.md`; ADR 0155 and `docs/reference/storage-origin.md`.
+
 ## v0.20.0 — texture fills (2026-10-19)
 
 - **Implemented:** [ADR 0154](adr/0154-texture-fills.md): `TexturePaint` (a picture or objects as a fill), one drawing path through `canvasPaint`, the Image and Pattern modes of the paint chooser, library references, tile-cache invalidation for patterns.

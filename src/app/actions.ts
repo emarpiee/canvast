@@ -1,3 +1,4 @@
+import { withStyleLinks } from "../doc/style-links";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn, roundCorners } from "../doc/rounding";
@@ -16,6 +17,7 @@ import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
+import { plainText } from "../text/markdown";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
@@ -145,7 +147,7 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
     const k = unitKey(o, level);
     (byUnit.get(k) ?? byUnit.set(k, []).get(k)!).push(o);
   }
-  const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId)?.name ?? "") : o.kind === "text" ? o.md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : "");
+  const nameOf = (o: CanvasObject): string => (o.kind === "image" ? (names.get(o.assetId)?.name ?? "") : o.kind === "text" ? plainText(o.md, 40).trim() : "");
   const units = [...byUnit.values()].map((objects) => {
     const first = objects[0]!;
     const date = first.kind === "image" ? names.get(first.assetId)?.date : undefined;
@@ -741,7 +743,13 @@ export function selectionColours(doc: DocumentStore, editor: EditorState): strin
 const firstColour = solidOf;
 
 /** `o` with a fill and outline patch applied the way its kind takes it: a shape has both; a text fills its letters and outlines them; a stroke has one colour. */
-function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch): PathObject | TextObject | StrokeObject | ImageObject {
+export function paintedWith(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch, link?: { fill?: string; stroke?: string }): PathObject | TextObject | StrokeObject | ImageObject {
+  // The parts the patch changes follow the style it came from (`link`), or none: changing a part by hand unlinks it.
+  return withStyleLinks(paintedWithRaw(o, patch), { ...(patch.fill !== undefined && o.kind !== "image" ? { fill: link?.fill ?? null } : {}), ...(patch.stroke !== undefined ? { stroke: link?.stroke ?? null } : {}) }); // (a picture has no fill to follow a style)
+}
+
+/** The paint of the patch put on `o`, its links to saved styles untouched (what keeps them in step with a style that changed). */
+export function paintedWithRaw(o: PathObject | TextObject | StrokeObject | ImageObject, patch: PaintPatch): PathObject | TextObject | StrokeObject | ImageObject {
   if (o.kind === "image") {
     // a picture has an outline only, a colour or a gradient; none takes the outline away (its width is kept for when it is turned on)
     if (patch.stroke === undefined) return o;
@@ -787,7 +795,7 @@ export function previewPaint(doc: DocumentStore, editor: EditorState, patch: Pai
 }
 
 /** Store a new fill or outline on the selected paths: one undo step. */
-export function commitPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
+export function commitPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch, link?: { fill?: string; stroke?: string }): void {
   editor.preview = { kind: "none" };
   const r = editor.region;
   const net = r ? doc.get(r.id) : undefined;
@@ -801,7 +809,7 @@ export function commitPaint(doc: DocumentStore, editor: EditorState, patch: Pain
     if (patch.stroke === undefined) { editor.changed(); return; }
     patch = { stroke: patch.stroke };
   }
-  const next = paintTargets(doc, editor).map((o) => [o, paintedWith(o, patch)] as const).filter(([o, n]) => JSON.stringify(paintsOf(o)) !== JSON.stringify(paintsOf(n))); // (the paints only: an object holds big numbers JSON cannot write)
+  const next = paintTargets(doc, editor).map((o) => [o, paintedWith(o, patch, link)] as const).filter(([o, n]) => JSON.stringify(paintsOf(o)) !== JSON.stringify(paintsOf(n)) || JSON.stringify(o.styles) !== JSON.stringify(n.styles)); // (the paints only: an object holds big numbers JSON cannot write)
   if (next.length && !editor.blockEdit()) {
     const what = patch.fill !== undefined && patch.stroke !== undefined ? "fill and outline" : patch.fill !== undefined ? "fill" : "outline";
     doc.commit(doc.transaction(next.length === 1 ? `Change ${what}` : `Change ${what} of ${next.length} objects`, next.map(([, n]) => n)));
@@ -1401,7 +1409,7 @@ export function convertTextToPath(doc: DocumentStore, editor: EditorState): void
     missing += m;
     if (!sub.length) continue;
     const { kind: _k, md, w: _w, size, color, rot: _r, lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, ...base } = o;
-    const plain = md.replace(/[#*_`>\\-]/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LENGTH);
+    const plain = plainText(md, MAX_NAME_LENGTH).replace(/\s+/g, " ").trim(); // (the words, not the Markdown: no tags, no marks)
     const path: PathObject = { ...base, kind: "path", sub, fill: color, stroke: null, width: Math.max(size * 0.05, Number.MIN_VALUE), ...(!base.name && plain ? { name: plain } : {}) };
     made.push(homeObject(normalizeUnit(path), doc.space));
   }
@@ -2264,18 +2272,19 @@ export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: A
 }
 
 /** Store the adjustments on the picked pictures: one undo step. */
-export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust | undefined, label = "Adjust picture"): void {
+export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust | undefined, label = "Adjust picture", styleId?: string): void {
   const ps = pictures(doc, editor);
   editor.preview = { kind: "none" };
   setAdjustPreviewing(false);
   if (!ps.length || editor.blockEdit()) return editor.changed();
   const clean = adjust ? cleanAdjust(adjust) : undefined;
+  // The pictures follow the saved adjustment it came from (`styleId`); any other way of changing them unlinks them (ADR 0157).
   const next = ps
-    .filter((p) => JSON.stringify(p.adjust ?? null) !== JSON.stringify(clean ?? null))
     .map((p): ImageObject => {
       const { adjust: _a, ...rest } = p;
-      return clean ? { ...rest, adjust: clean } : rest;
-    });
+      return withStyleLinks(clean ? { ...rest, adjust: clean } : rest, { adjust: styleId ?? null });
+    })
+    .filter((n, i) => JSON.stringify(ps[i]!.adjust ?? null) !== JSON.stringify(clean ?? null) || JSON.stringify(ps[i]!.styles) !== JSON.stringify(n.styles));
   if (next.length) doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
   editor.changed();
 }
@@ -2290,7 +2299,7 @@ export function applyGradientMap(doc: DocumentStore, editor: EditorState, stops:
   const next = ps.map((p): ImageObject => {
     const { adjust: _a, ...rest } = p;
     const clean = cleanAdjust({ ...p.adjust, map: { stops, amount: p.adjust?.map?.amount ?? 100 } });
-    return clean ? { ...rest, adjust: clean } : rest;
+    return withStyleLinks(clean ? { ...rest, adjust: clean } : rest, { adjust: null }); // (changed by hand: no longer follows a saved adjustment)
   });
   doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
   editor.changed();

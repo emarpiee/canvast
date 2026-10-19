@@ -34,6 +34,8 @@ import { isTexture } from "../doc/texture";
 import { createTextureHost } from "./texture-host";
 import { pickAll } from "../render/hit-test";
 import { dimHits, revealHits } from "../interaction/reveal";
+import { syncScroll } from "../ui/bar";
+import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { mountContextMenu } from "../ui/context-menu";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -72,6 +74,7 @@ import { chooseDialog, confirmDialog } from "../ui/confirm";
 import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
+import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
@@ -133,6 +136,7 @@ function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
     landmarkLabel: v("--canvas-landmark-label"),
     selection: v("--canvas-selection"),
     handleFill: v("--canvas-handle-fill"),
+    sharp: el.dataset["corners"] === "sharp",
     lasso: v("--canvas-lasso"),
     imagePlaceholder: v("--canvas-image-placeholder"),
     ink: v("--canvas-ink"),
@@ -167,6 +171,8 @@ async function start(): Promise<void> {
   const doc = new DocumentStore();
   const view = new ViewState(() => doc.space);
   const stats = new FrameStats();
+  /** A startup mark (read by the startup benchmark, `startupMarks` in the debug hook): defined first, the frame loop may run before the canvas is loaded. */
+  const mark = (name: string): void => void performance.mark(`canvast:${name}`);
   // The spatial index mirrors the document incrementally (changed ids only).
   const index = new FrameIndex(() => doc.space);
   const indexSync = syncIndex(doc, index, {
@@ -312,12 +318,25 @@ async function start(): Promise<void> {
   const applyAppearance = (): void => {
     const root = document.documentElement;
     root.style.setProperty("--ui-scale", String(Number(settings.get("ui.textScale")) / 100));
-    root.style.setProperty("--hue", String(settings.get("ui.hue")));
     const bg = settings.get("ui.background");
-    if (bg) root.style.setProperty("--canvas-bg", bg);
-    else root.style.removeProperty("--canvas-bg"); // the app's own, from the theme
+    // Adaptive theme colour: the hue of the canvas background colour (a grey one has none: the hue set by hand stays). --hue-adaptive is that hue
+    // whether or not it is on, for the chip in Settings.
+    const bgLch = bg ? rgbToOklch(parseHex(bg) ?? [0, 0, 0]) : null;
+    const adaptive = bgLch && bgLch.C > 0.01 ? Math.round(bgLch.h) : settings.get("ui.hue");
+    root.style.setProperty("--hue-adaptive", String(adaptive));
+    root.style.setProperty("--hue", String(settings.get("ui.hueAdaptive") ? adaptive : settings.get("ui.hue")));
+    if (bg) {
+      root.style.setProperty("--canvas-bg", bg);
+      root.dataset["customBg"] = ""; // the lines and marks on it are made from it (styles.css)
+    } else {
+      root.style.removeProperty("--canvas-bg"); // the app's own, from the theme
+      delete root.dataset["customBg"];
+    }
     root.style.setProperty("--vivid", String(settings.get("ui.vivid") / 100));
-    if (settings.get("ui.density") === "comfortable") root.dataset["density"] = "comfortable";
+    if (settings.get("ui.corners") === "sharp") root.dataset["corners"] = "sharp";
+    else delete root.dataset["corners"]; // round is the default
+    const density = settings.get("ui.density");
+    if (density !== "compact") root.dataset["density"] = density;
     else delete root.dataset["density"]; // compact is the default
     if (settings.get("ui.contrast") === "high") root.dataset["contrast"] = "high";
     else delete root.dataset["contrast"];
@@ -524,6 +543,7 @@ async function start(): Promise<void> {
     // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
     if (appView === "canvas") {
       const ms = renderNow().totalMs;
+      if (!performance.getEntriesByName("canvast:first-frame").length) mark("first-frame");
       stats.record(ms);
       quality.record(ms);
       contextUpdate();
@@ -534,6 +554,18 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor, assets);
+  // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
+  // step while there is history; right after opening there is none, so the change is quiet.
+  const followStyles = (): void => {
+    const next = linkedUpdates(doc, session.styles.items);
+    if (!next.length || editor.blockEdit()) return;
+    if (doc.canUndo || doc.canRedo) doc.commit(doc.transaction("Update from the saved style", next));
+    else doc.refit(next);
+  };
+  session.styles.subscribe(followStyles);
+  doc.subscribe((source, changed) => {
+    if (source === "load" && changed === null) followStyles();
+  });
   const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   assetNames.subscribe(() => invalidate());
   if (db) {
@@ -552,6 +584,9 @@ async function start(): Promise<void> {
     editor.message = `Storage unavailable (${storageError}); work will not be saved.`;
   }
   const persistence = session.persistence;
+  // Startup marks (docs/testing/phase-8.md): the canvas is loaded, the index is complete (the first frame is marked where it is drawn).
+  mark("loaded");
+  void indexSync.ready().then(() => mark("indexed"));
   session.onAssetsRenamed = () => {
     tiles.clear(); // cards drawn with the old name
     invalidate();
@@ -706,11 +741,12 @@ async function start(): Promise<void> {
     },
     adjustment: {
       can: () => !!selectedAdjust(doc, editor),
-      apply: (s) => commitAdjust(doc, editor, s.data as Adjust, `Apply the adjustment “${s.name}”`),
+      apply: (s) => commitAdjust(doc, editor, s.data as Adjust, `Apply the adjustment “${s.name}”`, s.id),
+      current: () => selectedAdjust(doc, editor)?.adjust ?? null,
     },
     paint: {
       count: () => paintTargetCount(doc, editor),
-      apply: (paint, label, target, ask) =>
+      apply: (paint, label, target, ask, styleId) =>
         void (async () => {
           let where: "fill" | "stroke" | "both" = target;
           const n = paintTargetCount(doc, editor);
@@ -729,7 +765,8 @@ async function start(): Promise<void> {
             if (!choice) return;
             where = choice as typeof where;
           }
-          commitPaint(doc, editor, where === "both" ? { fill: paint, stroke: paint } : where === "stroke" ? { stroke: paint } : { fill: paint });
+          const link = styleId === undefined ? undefined : where === "both" ? { fill: styleId, stroke: styleId } : where === "stroke" ? { stroke: styleId } : { fill: styleId };
+          commitPaint(doc, editor, where === "both" ? { fill: paint, stroke: paint } : where === "stroke" ? { stroke: paint } : { fill: paint }, link);
         })(),
     },
     map: { count: () => pictureCount(doc, editor), apply: (stops, label) => applyGradientMap(doc, editor, stops, `Gradient map “${label}”`) },
@@ -1318,6 +1355,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       deleteSelection: () => deleteSelection(doc, editor),
     },
     () => appView !== "canvas" || textEditor.isOpen,
+    () => settings.get("ui.actions"),
   );
   contextUpdate = contextBar.update;
 
@@ -1342,11 +1380,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     root.setProperty("--rail-right", `${Math.ceil(barBox.querySelector<HTMLElement>(".rail")?.getBoundingClientRect().right ?? 0)}px`);
     root.setProperty("--dock-h", `${Math.ceil(dockH)}px`);
     if (window.matchMedia("(max-width: 640px)").matches) {
-      const optsH = opts && !opts.hidden ? opts.getBoundingClientRect().height : 0;
+      const optsH = barBox.getBoundingClientRect().height; // the whole column: the Properties bar and the rows under it (colours of the selection)
       bottoms.push(navBottom + near + dockH + (optsH ? near + optsH : 0));
       bottoms.splice(0, 3, bottoms[3]!); // the rows' own places are not final until the stylesheet has used the numbers above
     }
     root.setProperty("--bar-bottom", `${Math.ceil(Math.max(...bottoms))}px`);
+    for (const el of [barBox.querySelector<HTMLElement>(".dock"), document.querySelector<HTMLElement>(".hud-controls")]) if (el) syncScroll(el);
   };
   new ResizeObserver(measureNav).observe(navBox);
   new ResizeObserver(measureNav).observe(barBox);
@@ -1357,6 +1396,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const optsEl = barBox.querySelector<HTMLElement>(".toolbar");
   if (optsEl) new ResizeObserver(measureNav).observe(optsEl);
   window.addEventListener("resize", measureNav);
+  const controlsEl = document.querySelector<HTMLElement>(".hud-controls");
+  if (controlsEl) new ResizeObserver(measureNav).observe(controlsEl);
   measureNav();
 
   // Top-level views. The canvas keeps its camera, selection and history while hidden.
@@ -1465,7 +1506,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "ui.names":
         invalidate();
         return;
+      case "ui.corners": // (the round handles drawn on the canvas turn square too)
       case "ui.hue":
+      case "ui.hueAdaptive":
       case "ui.background":
       case "ui.vivid":
         // The canvas colours follow the dials too: read them again and redraw.
@@ -1506,6 +1549,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
       { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
+      { group: "Edit", title: "Show all hidden", words: "unhide reveal eye", enabled: () => onCanvas && [...doc.all()].some((o) => o.hidden), run: () => clearFlag(doc, editor, "hidden") },
+      { group: "Edit", title: "Unlock all", words: "unlock locked", enabled: () => onCanvas && [...doc.all()].some((o) => o.locked), run: () => clearFlag(doc, editor, "locked") },
       { group: "Edit", title: "Select everything", keys: "Ctrl+A", words: "all", enabled: () => onCanvas, run: () => editor.select(doc.ordered().filter((o) => !o.hidden && !o.locked).map((o) => o.id)) },
       { group: "Arrange", title: "Group", keys: "Ctrl+G", enabled: () => onCanvas && sel, run: () => groupSelection(doc, editor) },
       { group: "Arrange", title: "Ungroup", keys: "Ctrl+Shift+G", enabled: () => onCanvas && sel, run: () => ungroupSelection(doc, editor) },
@@ -1546,6 +1591,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Zen mode", keys: key(settings.get("key.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
       { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
+      { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },

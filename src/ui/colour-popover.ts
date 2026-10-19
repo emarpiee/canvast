@@ -8,7 +8,6 @@ import { angleOf, asKind, gradientFrom, isGradient, linearAt, solidOf } from "..
 import { isTexture, newTexture, withSource } from "../doc/texture";
 import type { TexturePaint } from "../doc/texture";
 import { createTextureEditor, textureHooks } from "./texture-editor";
-import { rgbToHex, toRgb } from "../colour-picker/colour";
 import { esc } from "./format";
 import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
@@ -17,9 +16,9 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
 import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
-import { DEFAULT_INK, swatchBackground } from "../render/ink";
+import { swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
-import { placeMenu } from "./more-menu";
+import { clearRect, MENU_GAP, placeMenu } from "./more-menu";
 
 /**
  * The app's one colour picker (ADR 0098): the standalone picker in `src/colour-picker/`, in a popover under the button that opened it.
@@ -47,13 +46,6 @@ export function rememberColour(hex: string): void {
   store.set("colour.recent", [h, ...recentColours().filter((c) => c !== h)].slice(0, RECENT_MAX).join(","));
 }
 
-/** The palette offered under the picker: the theme's ink, twelve evenly spaced hues, then greys, all made with the picker's own model. */
-function presets(): string[] {
-  const hues = Array.from({ length: 12 }, (_, i) => rgbToHex(toRgb("okhsl", i * 30 + 15, 0.85, 0.62)));
-  const greys = [0.12, 0.3, 0.5, 0.72, 0.9, 1].map((l) => rgbToHex(toRgb("okhsl", 0, 0, l)));
-  return [DEFAULT_INK, ...hues, ...greys];
-}
-
 export interface ColourPopoverOptions {
   /** Names the popover for a screen reader ("Pen colour"). */
   name: string;
@@ -74,10 +66,10 @@ export interface ColourPopoverOptions {
 function place(pop: HTMLElement, anchor: HTMLElement): void {
   pop.style.maxHeight = "";
   placeMenu(pop, anchor);
-  const a = anchor.getBoundingClientRect();
+  const a = clearRect(anchor);
   const m = pop.getBoundingClientRect();
   if (m.top < a.bottom && m.bottom > a.top) {
-    const top = a.bottom + 4;
+    const top = a.bottom + MENU_GAP;
     pop.style.top = `${parseFloat(pop.style.top) + (top - m.top)}px`;
     pop.style.maxHeight = `${window.innerHeight - top - 8}px`;
   }
@@ -131,10 +123,10 @@ export function setColourStyles(h: ColourStyleHooks | null): void {
   styleHooks = h;
 }
 
-/** The swatches under a picker: the colours picked lately, the saved ones (when there are any), the presets. */
+/** The swatches under a picker: the colours picked lately and the saved ones (when there are any); nothing made up. */
 function swatchGroups(): SwatchGroup[] {
   const saved = styleHooks?.colours() ?? [];
-  return [{ label: "Recent", colours: recentColours() }, ...(saved.length ? [{ label: "Saved", colours: saved }] : []), { label: "Presets", colours: presets() }];
+  return [{ label: "Recent colours", colours: recentColours() }, ...(saved.length ? [{ label: "Saved colours", colours: saved }] : [])];
 }
 
 /** A small "Save colour" button: the colour as it is now goes to the Styles of the library. */
@@ -157,7 +149,7 @@ function gradientStyles(now: () => Gradient, use: (g: Gradient) => void): HTMLEl
   const box = document.createElement("div");
   box.className = "gradient-styles";
   const saved = styleHooks?.gradients() ?? [];
-  box.innerHTML = `${saved.length ? `<div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
+  box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients</div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button>`;
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");
@@ -453,9 +445,11 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.className = "paint-modes";
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
-  const label: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear", radial: "Radial", angular: "Angular", image: "Image", pattern: "Pattern" };
   const offered = (o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const)).filter((m) => (m !== "image" && m !== "pattern") || textureHooks());
-  modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""}>${label[m]}</button>`).join("");
+  const ICON: Record<Mode, string> = { none: ICONS.paintNone, solid: ICONS.paintSolid, linear: ICONS.paintLinear, radial: ICONS.paintRadial, angular: ICONS.paintAngular, image: ICONS.paintImage, pattern: ICONS.paintPattern };
+  const NAME: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear gradient", radial: "Radial gradient", angular: "Angular gradient", image: "Image", pattern: "Pattern" };
+  // icons, not words (the name is the tooltip and the accessible name); the row scrolls when there are more kinds than room
+  modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""} aria-label="${esc(NAME[m])}" title="${esc(NAME[m])}">${ICON[m]}</button>`).join("");
   const body = document.createElement("div");
   body.className = "paint-body";
   if (offered.length === 1) pop.append(body);
@@ -793,6 +787,9 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
 // ---- Adjust: the non-destructive adjustments of a picture (ADR 0118) -------------------------------------------------------------
 
 export interface AdjustOptions {
+  /** Where the layer tabs and the save row go when the panel keeps them in place above and below the numbers (ui/panel.ts); without them they stay in the list. */
+  subHost?: HTMLElement;
+  footHost?: HTMLElement;
   /** The numbers now (those of the first picked picture). */
   adjust: Adjust;
   /** Stills are adjusted pixel by pixel; video and GIF through a filter (every adjustment too, but sharpen and grain can slow playback of a big video). */
@@ -812,18 +809,18 @@ export interface AdjustOptions {
 const DEFAULT_MAP: readonly GradientStop[] = [{ o: 0, c: "#1e1b4b" }, { o: 1, c: "#f59e0b" }];
 
 /** Fill `host` (the body of the Adjust panel) with the adjustment controls for the picked pictures (ADR 0118; a dock panel, ADR 0123). Call again to show other pictures. */
-export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current(): Adjust } {
+export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current(): Adjust; reset(): void } {
   // The panel works on one layer of a stack at a time; changing layer builds it again for that layer.
-  let inner: { current(): Adjust } = buildAdjustLayer(host, o, 0, (adjust, layer) => {
+  let inner: { current(): Adjust; reset(): void } = buildAdjustLayer(host, o, 0, (adjust, layer) => {
     inner = buildAdjustLayer(host, { ...o, adjust }, layer, go);
   });
   const go = (adjust: Adjust, layer: number): void => {
     inner = buildAdjustLayer(host, { ...o, adjust }, layer, go);
   };
-  return { current: () => inner.current() };
+  return { current: () => inner.current(), reset: () => inner.reset() };
 }
 
-function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, go: (adjust: Adjust, layer: number) => void): { current(): Adjust } {
+function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, go: (adjust: Adjust, layer: number) => void): { current(): Adjust; reset(): void } {
   closeChild();
   const layers = layersOf(o.adjust).map((l) => {
     const { next: _n, ...one } = l;
@@ -859,7 +856,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const curvesSection = `<section class="adj-group" aria-label="Curves"><h4>Curves</h4><div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
     layerTabs +
-    `<header class="adj-head"><h3>Adjust</h3><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span><button type="button" class="adj-reset" data-adj-reset>Reset</button></header>` +
+    `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span></header>` +
     GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}</section>`).join("") +
     mapSection() +
     levelsSection +
@@ -867,6 +864,8 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     (o.stills ? "" : `<p class="op-note">Sharpen and grain can slow the playback of a big video.</p>`) +
     `<footer class="adj-foot"><div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save</button></div><button type="button" class="adj-open" data-adj-open>${ICONS.swatchBook}<span>Saved adjustments</span></button></footer>`;
   scrubNumbers(pop);
+  if (o.subHost) o.subHost.replaceChildren(pop.querySelector(".adj-layers")!);
+  if (o.footHost) o.footHost.replaceChildren(pop.querySelector(".adj-foot")!);
   const mapSelect = pop.querySelector<HTMLSelectElement>("[data-adj-map]")!;
   const mapBar = pop.querySelector<HTMLElement>("[data-map-bar]")!;
   const mapRow = pop.querySelector<HTMLElement>("[data-map-amount-row]")!;
@@ -974,24 +973,17 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       emitChange("Adjust picture");
     }
   });
-  pop.addEventListener("click", (e) => {
+  const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
     if (b.hasAttribute("data-adj-open")) {
       o.onStyles();
     } else if (b.hasAttribute("data-adj-save")) {
-      const name = pop.querySelector<HTMLInputElement>("[data-adj-name]")!;
+      const name = (o.footHost ?? pop).querySelector<HTMLInputElement>("[data-adj-name]")!;
       void o.styles.save(name.value, cur).then(() => {
         name.value = "";
         name.placeholder = "Saved. See it in Styles";
       });
-    } else if (b.hasAttribute("data-adj-reset")) {
-      for (const s of rows) set(s.key, 0);
-      cur = {};
-      syncMap();
-      syncLevels();
-      drawCurve();
-      emitChange("Reset adjustments");
     } else if (b.dataset["layer"] !== undefined) go(compose(cur), Number(b.dataset["layer"]));
     else if (b.hasAttribute("data-layer-add")) {
       // a new, empty layer after the last (kept only once it changes something)
@@ -1004,7 +996,8 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       o.onChange(whole, "Remove adjustment layer");
       go(whole, Math.max(0, idx - 1));
     }
-  });
+  };
+  for (const h of [pop, o.subHost, o.footHost]) if (h) h.onclick = onClick; // (replaced, not added, each time the layer is built again)
 
   // ---- levels (ADR 0136) -------------------------------------------------------------------------------------------------------
   let lvCh: Channel = "master";
@@ -1172,5 +1165,14 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     emitChange("Adjust picture");
   });
   drawCurve();
-  return { current: () => compose(cur) };
+  /** Every slider, the gradient map, the levels and the curves of this layer back to nothing (the panel's Reset button). */
+  const reset = (): void => {
+    for (const s of rows) set(s.key, 0);
+    cur = {};
+    syncMap();
+    syncLevels();
+    drawCurve();
+    emitChange("Reset adjustments");
+  };
+  return { current: () => compose(cur), reset };
 }

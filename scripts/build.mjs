@@ -18,7 +18,7 @@ const result = await build({
   format: "iife",
   target: ["es2020"],
   platform: "browser",
-  minify: true,
+  minify: !process.argv.includes("--no-minify"), // (--no-minify: readable names in an error, for finding one)
   sourcemap: false,
   legalComments: "eof",
   write: false,

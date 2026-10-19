@@ -6,8 +6,10 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
-import { syncGroups } from "./bar";
-import { closeMoreMenu, openMoreMenu } from "./more-menu";
+import { syncGroups, syncScroll } from "./bar";
+import { isContainer } from "../doc/containers";
+import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
+import { mediaBarTop } from "./media-player";
 import type { MenuItem } from "./more-menu";
 import type { BoolOp } from "../doc/boolean";
 
@@ -129,7 +131,7 @@ const OPS: Array<{ op: BoolOp; icon: string; label: string; aria: string }> = [
   { op: "exclude", icon: ICONS.squaresExclude, label: "Exclude overlap", aria: "Exclude overlap: keep everything but where the shapes overlap" },
 ];
 
-export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean): { update(): void } {
+export function mountContextBar(host: HTMLElement, editor: EditorState, doc: DocumentStore, actions: ContextActions, hidden: () => boolean, placement: () => "bottom" | "follow" = () => "bottom"): { update(): void } {
   const bar = document.createElement("div");
   bar.className = "ctx-bar";
   bar.dataset["testid"] = "context-bar";
@@ -142,54 +144,32 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const layoutButtons = (head: string): string =>
     LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => btn("layout", i.icon, head === "Align" ? `Align ${i.label.toLowerCase()}` : head === "Arrange" ? `Arrange in a grid: ${i.label.toLowerCase()}` : `Distribute ${i.label.toLowerCase()}`, `data-layout="${i.id}"`)).join("");
   bar.innerHTML =
-    `<div class="tb-group ctx-kinds" role="group" aria-label="Show the tools for" data-kinds-bar hidden></div>` +
-    group("Items", btn("duplicate", ICONS.copy, "Duplicate"), btn("group", ICONS.group, "Group"), btn("ungroup", ICONS.ungroup, "Ungroup"), btn("tag", ICONS.tag, "Tag the selection")) +
+    group("Items", btn("library", ICONS.library, "View in the library"), btn("duplicate", ICONS.copy, "Duplicate"), btn("group", ICONS.group, "Group"), btn("ungroup", ICONS.ungroup, "Ungroup"), btn("tag", ICONS.tag, "Tag the selection")) +
     group("Files",
-      btn("library", ICONS.library, "View in the library"),
-      btn("download", ICONS.download, "Download the original file (several files: one ZIP; an edited picture comes with its original)"),
+      btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the original file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
       btn("open", ICONS.externalLink, "Open in a new tab"),
       btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
       btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures"),
       btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
-      btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)"),
-      btn("exportpic", ICONS.imageUp, "Export…: choose a size and save it as a picture (PNG, WebP, JPEG or SVG)"),
-      btn("exportsvg", ICONS.fileCode, "Save the shapes as an SVG file"),
-      btn("copymd", ICONS.clipboardCopy, "Copy Markdown of the selected text")) +
-    group("Reset", btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
-    group("Path tools", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"')) +
+      btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
-    group("Mask", btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one picked", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Shapes", btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the picked shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Sheet and attach",
-      btn("puton", ICONS.sheetSelection, "Put the picked objects on a sheet (Ctrl+Alt+G)"),
-      btn("unsheet", ICONS.releaseSheet, "Release the sheet: keep what is on it, take the sheet away (a clipping mask goes back to being its shape)"),
-      btn("fitsheet", ICONS.shrink, "Fit the sheet to what is on it"),
+    group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one picked", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the picked shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the picked things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
+    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Attach",
       btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +
-    group("Align", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Grid", btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Order", btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back")) +
     group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
   host.appendChild(bar);
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
-  const FOR_KINDS: Record<string, string> = { library: "image", download: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportsvg: "path,stroke", copymd: "text", pathmenu: "path,stroke,text", boolmenu: "path" };
+  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
-  const KIND_LABEL: Record<string, string> = { image: "Pictures", media: "Media", path: "Shapes", stroke: "Strokes", text: "Texts" };
-  const kindOf = (k: string): string => (k === "video" || k === "gif" || k === "audio" ? "media" : k);
-  let kindFilter = "all";
-  let chipsFor = "";
-  const kindsBar = bar.querySelector<HTMLElement>("[data-kinds-bar]")!;
+  // With a mixed pick the kind chosen in the Properties bar (`editor.subject`, its chips: All, Picture, Shape ...) also chooses which tools show here: one set of chips, not two.
+  const BAR_KINDS: Record<string, readonly string[]> = { picture: ["image", "media"], shape: ["path"], stroke: ["stroke"], text: ["text"], sheet: [] };
   const q = (act: string, extra = ""): HTMLButtonElement => bar.querySelector<HTMLButtonElement>(`[data-ctx="${act}"]${extra}`)!;
   const each = (act: string, f: (b: HTMLButtonElement) => void): void => bar.querySelectorAll<HTMLButtonElement>(`[data-ctx="${act}"]`).forEach(f);
 
   bar.addEventListener("click", (e) => {
-    const chip = (e.target as HTMLElement).closest<HTMLElement>("[data-kindsel]");
-    if (chip) {
-      kindFilter = chip.dataset["kindsel"]!;
-      update();
-      return;
-    }
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ctx]");
     if (!b || (b as HTMLButtonElement).disabled) return;
     switch (b.dataset["ctx"]) {
@@ -210,6 +190,27 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...GAP_ORDER.map((g): MenuItem => ({ id: `gap:${g}`, label: `Space: ${GAP_LABEL[g].toLowerCase()}`, hint: GAP_HINT[g], icon: `<span class="menu-gap">${GAP_SHORT[g]}</span>`, checked: g === actions.gap(), run: () => { actions.setGap(g); update(); } })),
         ];
         openMoreMenu(b, items(), "Arrange in a grid", { keepOpen: true, refresh: items });
+        break;
+      }
+      case "sheetmenu": {
+        // Put on a sheet, release it, fit it to what is on it: one menu that stays open; only what applies to the pick is listed
+        const items = (): MenuItem[] => [
+          { id: "puton", label: "Put on a sheet", hint: "The picked objects go on a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
+          ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keep what is on it, take the sheet away (a clipping mask goes back to being its shape)", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
+          ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
+        ];
+        openMoreMenu(b, items(), "Sheets", { keepOpen: true, refresh: items });
+        break;
+      }
+      case "exportmenu": {
+        // What takes the picked things out of the canvas, in one menu that stays open: only what applies to the pick is listed
+        const items = (): MenuItem[] => [
+          ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "Choose a size and save it as a picture (PNG, WebP, JPEG, SVG or PDF)", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
+          ...(actions.canDownload() ? [{ id: "download", label: "Download the original", hint: "The original file (several files: one ZIP; an edited picture comes with its original)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
+          ...(actions.canExportSvg() ? [{ id: "exportsvg", label: "Save as SVG", hint: "The shapes as an SVG file", icon: ICONS.fileCode, run: () => actions.exportSvg() }] : []),
+          ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the picked text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
+        ];
+        openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
         break;
       }
       case "boolmenu": {
@@ -279,21 +280,14 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "buildercancel": actions.finishBuilder(false); break;
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
-      case "download": actions.downloadFile(); break;
       case "open": actions.openFile(); break;
-      case "puton": actions.putOnSheet(); break;
-      case "unsheet": actions.releaseSheet(); break;
-      case "fitsheet": actions.fitSheet(); break;
       case "attach": actions.attach(); break;
       case "detach": actions.detach(); break;
-      case "copymd": actions.copyMarkdown(); break;
       case "vectorise": actions.vectorise(); break;
       case "copyadj": actions.copyAdjust(); break;
       case "pasteadj": actions.pasteAdjust(); break;
       case "copypng": actions.copyRendered(); break;
       case "bake": actions.bake(); break;
-      case "exportsvg": actions.exportSvg(); break;
-      case "exportpic": actions.exportPicture(); break;
       case "unrotate": actions.resetRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
@@ -309,6 +303,49 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   // The bar must not start a drag or a selection change on the canvas below it.
   bar.addEventListener("pointerdown", (e) => e.stopPropagation());
 
+  // "Follows the selection": just under the selection box (above it when there is no room), kept inside the window; at the bottom (the default) the stylesheet places it.
+  const follow = (): void => {
+    const box = editor.selectionBoxOnScreen;
+    const on = placement() === "follow" && box !== null && !bar.hidden;
+    bar.classList.toggle("is-following", on);
+    if (!on) {
+      bar.style.left = bar.style.top = bar.style.bottom = "";
+      // At the bottom a media player may come down onto this bar (its picture is low): the bar then stands just above the player.
+      const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
+      if (box && playerEl && !bar.hidden) {
+        const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+        const home = host.getBoundingClientRect();
+        const room = home.height / k;
+        const playerTop = mediaBarTop(Math.max(...box.frame.corners.map((c) => c[1] / k)), playerEl.offsetHeight, room);
+        const mine = bar.getBoundingClientRect();
+        const [top, bottom] = [(mine.top - home.top) / k, (mine.bottom - home.top) / k];
+        if (bottom > playerTop - MENU_GAP && top < playerTop + playerEl.offsetHeight + MENU_GAP) bar.style.bottom = `${Math.round(room - playerTop + MENU_GAP)}px`;
+      }
+      return;
+    }
+    bar.style.bottom = "";
+    const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1; // (the bars are drawn zoomed by the interface size)
+    const xs = box.frame.corners.map((c) => c[0] / k);
+    const ys = box.frame.corners.map((c) => c[1] / k);
+    const home = host.getBoundingClientRect();
+    const [w, h, room] = [bar.offsetWidth, bar.offsetHeight, home.height / k];
+    const edge = MENU_GAP;
+    // A media player stands right under its picture and never moves from there (ui/media-player.ts): this bar goes above the picture; with no room
+    // above, under the player; with no room there either (a picture that fills the view), just above the player, over the picture.
+    const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
+    const above = Math.min(...ys) - MENU_GAP - h;
+    const below = Math.max(...ys) + MENU_GAP;
+    let top: number;
+    if (playerEl) {
+      const playerTop = mediaBarTop(Math.max(...ys), playerEl.offsetHeight, room); // (worked out here, not read from the page: it is never a frame behind)
+      const handle = 3 * MENU_GAP; // (clear of the picture's name and turn handle)
+      const under = playerTop + playerEl.offsetHeight + MENU_GAP;
+      top = above - handle >= edge ? above - handle : under + h <= room - edge ? under : Math.max(edge, playerTop - MENU_GAP - h);
+    } else top = below + h <= room - edge ? below : above >= edge ? above : Math.max(edge, room - h - edge); // (no room either side: the bottom edge)
+    const left = Math.max(edge, Math.min(home.width / k - w - edge, (Math.min(...xs) + Math.max(...xs)) / 2 - w / 2));
+    bar.style.left = `${Math.round(left)}px`;
+    bar.style.top = `${Math.round(top)}px`;
+  };
   const update = (): void => {
     const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "node" || editor.tool === "lasso") && editor.preview.kind === "none";
     if (!show) {
@@ -332,15 +369,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const reset = actions.resettable();
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();
-    q("download").hidden = !actions.canDownload();
     q("open").hidden = !file?.open;
-    q("unsheet").hidden = !actions.canReleaseSheet();
-    q("puton").hidden = false;
-    q("fitsheet").hidden = !actions.canFitSheet();
     q("attach").hidden = false;
     q("attach").setAttribute("aria-pressed", String(editor.attachMode));
     q("detach").hidden = !actions.canDetach();
-    q("copymd").hidden = !sel.some((o) => o!.kind === "text");
     q("vectorise").hidden = !actions.svgPicture();
     const pic = actions.pictureTools();
     q("copyadj").hidden = !pic;
@@ -348,23 +380,17 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("pasteadj").disabled = !pic?.canPaste;
     q("copypng").hidden = !pic?.still;
     q("bake").hidden = !pic?.still;
-    q("exportsvg").hidden = !actions.canExportSvg();
-    q("exportpic").hidden = !actions.canExport();
+    q("exportmenu").hidden = !(actions.canExport() || actions.canDownload() || actions.canExportSvg() || sel.some((o) => o!.kind === "text"));
     q("unrotate").hidden = !reset.turned;
     q("unstretch").hidden = !reset.stretched;
-    // the chips: only with two or more kinds picked; a kind no longer picked goes back to All
-    const kinds = [...new Set(sel.map((o) => kindOf(o!.kind)))].sort((a, b) => Object.keys(KIND_LABEL).indexOf(a) - Object.keys(KIND_LABEL).indexOf(b));
-    if (kinds.length < 2 || !kinds.includes(kindFilter)) kindFilter = "all";
-    const chipsKey = kinds.length < 2 ? "" : `${kinds.join(",")}|${kindFilter}`;
-    if (chipsKey !== chipsFor) {
-      chipsFor = chipsKey;
-      kindsBar.innerHTML = chipsKey ? ["all", ...kinds].map((k) => `<button type="button" class="ctx-gap" data-kindsel="${k}" aria-pressed="${k === kindFilter}" aria-label="Show the tools for ${k === "all" ? "everything picked" : KIND_LABEL[k]!.toLowerCase()}" title="Tools for ${k === "all" ? "everything picked" : KIND_LABEL[k]!.toLowerCase()}">${k === "all" ? "All" : KIND_LABEL[k]}</button>`).join("") : "";
-    }
-    kindsBar.hidden = !chipsKey;
-    for (const el of bar.querySelectorAll<HTMLElement>("[data-for]")) el.toggleAttribute("data-off", kindFilter !== "all" && !el.dataset["for"]!.split(",").includes(kindFilter));
+    // with two or more kinds picked, the kind chosen in the Properties bar shows only its tools (All, or none chosen: everything)
+    const kinds = new Set(sel.map((o) => (isContainer(o) ? "sheet" : o!.kind === "path" ? "shape" : o!.kind === "image" ? "picture" : o!.kind))); // (as the Properties bar tells them apart)
+    const only = kinds.size > 1 && editor.subject && editor.subject !== "all" ? (BAR_KINDS[editor.subject] ?? null) : null;
+    for (const el of bar.querySelectorAll<HTMLElement>("[data-for]")) el.toggleAttribute("data-off", only !== null && !el.dataset["for"]!.split(",").some((k) => only.includes(k)));
     bar.hidden = false;
-    syncGroups(bar, (g) => !g.hasAttribute("data-kinds-bar") || !g.hidden);
-    bar.toggleAttribute("data-scroll", bar.scrollWidth > bar.clientWidth + 1);
+    syncGroups(bar, () => true);
+    syncScroll(bar);
+    follow();
   };
   editor.subscribe(update);
   return { update };

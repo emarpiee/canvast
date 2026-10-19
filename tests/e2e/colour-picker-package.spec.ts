@@ -109,6 +109,12 @@ test("gradient editor in the package: stops by bar, handle, field and key; kinds
   const box = (await bar.boundingBox())!;
   expect((await value()).stops).toHaveLength(2);
 
+  // the numbers of the editor sit in one column, as wide as three digits, at the right edge (the same as the numbers of the sliders)
+  const posBox = (await ed.locator("[data-pos]").boundingBox())!;
+  const angBox = (await ed.locator("[data-angle]").boundingBox())!;
+  expect(Math.abs(posBox.x + posBox.width - (angBox.x + angBox.width)), "Position and Angle end at the same place").toBeLessThan(1.5);
+  expect(posBox.width, "a box for three digits, not the whole row").toBeLessThan(80);
+
   // a click on the bar adds a stop there, in the colour the gradient has at that offset, and selects it
   await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
   let v = await value();

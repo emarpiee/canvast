@@ -116,7 +116,7 @@ export class EditorState {
   /** Tool restored when a temporary hand (space) ends. */
   heldTool: Tool | null = null;
   selection = new Set<ObjectId>();
-  /** The kind of picked item the Properties bar shows when the selection mixes kinds (a chip chooses it; ADR 0128). */
+  /** The kind of picked item the Properties bar shows when the selection mixes kinds (a chip chooses it; ADR 0128), or `all`: the tools of everything picked. The Actions bar follows it (ADR 0152). */
   subject: string | null = null;
   lassoFilter: LassoFilter = "strokes";
   penColor: string = PEN_COLORS[0];
@@ -212,6 +212,8 @@ export class EditorState {
   message = "";
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
+  /** A text is being typed in (ui/text-editor.ts): the Properties bar shows the text's options, not the active tool's. */
+  editingText = false;
   /** A texture fill is waiting for its source (ADR 0154): the next press on the canvas gives what is under it to `take` instead of picking it. */
   sourcePick: { readonly kind: "image" | "pattern"; take(objs: readonly CanvasObject[]): void } | null = null;
   /** The words Reveal says for a screen reader (the hint line speaks them): what is under the pointer; null when nothing is revealed. */

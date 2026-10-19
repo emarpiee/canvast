@@ -106,6 +106,9 @@ export function familyFor(ref?: string): string {
   return e?.face ? e.family : BUNDLED_FAMILY;
 }
 
+/** What the bundled font is called in the font lists. */
+export const BUNDLED_FONT_NAME = "Inter (built in)";
+
 /** The font a CSS family name stands for: the regular file of that family (the editor reads the families of the words back as fonts). */
 export function hashOfFamily(css: string): string | undefined {
   let best: { hash: string; score: number } | undefined;

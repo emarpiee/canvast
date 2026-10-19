@@ -72,6 +72,9 @@ export interface Engine {
   onEnded: () => void;
 }
 
+/** Where the player's top edge goes: 12 px under its picture, or as low as the view lets it when the picture's bottom is at the edge (the Actions bar works from this too). */
+export const mediaBarTop = (pictureBottom: number, barHeight: number, viewHeight: number): number => Math.max(0, Math.min(pictureBottom + 12, viewHeight - barHeight - 8));
+
 export function avEngine(v: HTMLVideoElement): Engine {
   let url = "";
   let file: Blob | null = null;
@@ -399,19 +402,12 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
     if (p !== sel) return;
     bar.style.display = transforming(o.id) ? "none" : ""; // the bar would stay behind a moving instance
-    // The bar stays outside the picture's bounds (rotated ones too): below it, else above its turn handle, else pinned to the bottom of the view.
+    // The player always sits right under its picture (rotated ones too: under the box that holds it), the one thing that never moves from there;
+    // the Actions bar steps aside for it (ui/context-bar.ts). Only a picture at the very bottom of the view pulls it up, to stay on screen.
     const barH = bar.offsetHeight || 96;
     const cx = Math.min(Math.max((bb.minX + bb.maxX) / 2, 210), vp.width - 210);
-    const below = bb.maxY + 12;
-    const above = bb.minY - 44 - barH;
-    // ...and clear of the Actions bar (ADR 0128), which has a fixed place along the bottom.
-    const ab = document.querySelector<HTMLElement>(".ctx-bar:not([hidden])")?.getBoundingClientRect();
-    const hb = bar.parentElement?.getBoundingClientRect();
-    const avoid = ab && hb ? { top: ab.top - hb.top, bottom: ab.bottom - hb.top } : null;
-    const clear = (t: number): boolean => !avoid || t + barH + 4 <= avoid.top || t >= avoid.bottom + 4;
-    const spots = [below, above, vp.height - barH - 8, avoid ? avoid.top - barH - 8 : 0];
     bar.style.left = `${cx}px`;
-    bar.style.top = `${spots.find((t, i) => (i === 1 ? t >= 56 : t >= 0) && t + barH <= vp.height - 8 && clear(t)) ?? spots[3]!}px`;
+    bar.style.top = `${mediaBarTop(bb.maxY, barH, vp.height)}px`;
   };
   const positionAll = (): void => {
     for (const p of [...players.values()]) position(p);

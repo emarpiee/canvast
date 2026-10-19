@@ -122,17 +122,19 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
   root.className = "cp cg";
   root.dataset["type"] = v.type;
   // As wide as the picker below it (a host that only embeds the editor gets the same width).
-  root.style.setProperty("--cp-size", `${options.picker?.size ?? 208}px`);
+  root.style.setProperty("--cp-size", `${options.picker?.size ?? 232}px`);
   root.innerHTML = `
     <div class="cp-seg" role="radiogroup" data-typeswitch aria-label="${esc(L.linear)} / ${esc(L.radial)}">
       <button type="button" role="radio" data-gtype="linear">${esc(L.linear)}</button>
       <button type="button" role="radio" data-gtype="radial">${esc(L.radial)}</button>
     </div>
-    <div class="cg-bar" data-bar aria-label="${esc(L.bar)}"><div class="cg-track" data-track></div></div>
+    <div class="cg-barrow">
+      <button type="button" class="cp-tool cg-text" data-reverse title="${esc(L.reverse)}" aria-label="${esc(L.reverse)}">⇄</button>
+      <div class="cg-bar" data-bar aria-label="${esc(L.bar)}"><div class="cg-track" data-track></div></div>
+      <button type="button" class="cp-tool cg-text" data-remove title="${esc(L.remove)}" aria-label="${esc(L.remove)}">−</button>
+    </div>
     <div class="cg-row">
       <label class="cg-field">${esc(L.position)} <input type="number" class="cp-num" data-pos min="0" max="100" step="1" inputmode="numeric" aria-label="${esc(L.position)} %"></label>
-      <button type="button" class="cp-tool cg-text" data-reverse title="${esc(L.reverse)}" aria-label="${esc(L.reverse)}">⇄</button>
-      <button type="button" class="cp-tool cg-text" data-remove title="${esc(L.remove)}" aria-label="${esc(L.remove)}">−</button>
     </div>
     <div class="cg-row cg-linear"><label class="cg-field">${esc(L.angle)} <input type="number" class="cp-num" data-angle min="0" max="360" step="1" inputmode="numeric" aria-label="${esc(L.angle)}"></label></div>
     <div class="cg-row cg-radial">

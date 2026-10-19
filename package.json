@@ -1,6 +1,6 @@
 {
   "name": "canvast",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
@@ -11,6 +11,7 @@
     "test:unit": "vitest run",
     "test:snap": "node scripts/test-snap.mjs",
     "test:status": "node scripts/test-status.mjs",
+    "qualify": "node scripts/qualify.mjs",
     "test:e2e": "npm run build && npm run build:picker && playwright test",
     "test:e2e:full": "npm run build && npm run build:picker && playwright test -c playwright.full.config.ts",
     "check:offline": "node scripts/check-offline.mjs dist/canvast.html",

@@ -1,4 +1,4 @@
-import { alignWith, arrangeWith, expect, recordMetric, test } from "./harness";
+import { alignWith, arrangeWith, contextChoose, expect, recordMetric, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
@@ -609,7 +609,7 @@ test("colour at depth: zoomed 10^6, 10^9 and 10^12 levels into an image or a let
   await p.keyboard.press("Control+a");
   await p.keyboard.press("Delete");
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen colour #dc2626" }).click(); // (new text takes the pen colour until it is given its own)
+  await setPenColour(p, "#dc2626"); // (new text takes the pen colour until it is given its own)
   await p.keyboard.press("t");
   await p.mouse.click(600, 400);
   await expect(p.getByTestId("text-editor")).toBeFocused();
@@ -745,13 +745,13 @@ test("size slider on Select sets the thickness of the selected strokes in one un
 test("pen and select options come back after a reload (device settings, ADR 0017)", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen colour #2563eb" }).click();
+  await setPenColour(p, "#2563eb");
   await p.getByRole("button", { name: "Pen width 8 px" }).click();
   await p.getByRole("button", { name: "Stabilizer", exact: true }).click();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.keyboard.press("p");
-  await expect(p.getByRole("button", { name: "Pen colour #2563eb" })).toHaveClass(/is-on/);
+  expect(await p.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!)["pen.color"])).toBe("#2563eb");
   await expect(p.getByRole("button", { name: "Pen width 8 px" })).toHaveClass(/is-on/);
   await expect(p.getByRole("button", { name: "Stabilizer", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
@@ -950,7 +950,7 @@ test("groups: picking one member picks the group, it moves as one, nests, enters
   expect((await sel()).sort()).toEqual([a, b, c].sort());
 });
 
-test("hide and lock: a hidden object is not drawn or picked, a locked one is drawn but cannot be picked; both undo, save, and come back with the Show all and Unlock all buttons (ADR 0021)", async ({ app }) => {
+test("hide and lock: a hidden object is not drawn or picked, a locked one is drawn but cannot be picked; both undo, save, and come back with Show all hidden and Unlock all of the context menu (ADR 0021)", async ({ app }) => {
   const p = app.page;
   const sel = () => p.evaluate(() => window.__canvastDebug.selection());
   // One pixel in the middle of the stroke: drawn or not (a count of all inked pixels moves with tile and direct drawing).
@@ -979,7 +979,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await app.frame();
   await expect.poll(ink, { message: "still hidden after a reload (the canvas is painted again once the saved canvas has loaded)" }).toBe(none);
-  await p.getByRole("button", { name: "Show all hidden" }).click();
+  await contextChoose(p, 900, 600, "Show all hidden"); // (a right click on empty canvas)
   await app.frame();
   expect(await ink()).toBe(drawn);
   // Locked: drawn, but a click, a box and select-all all miss it.
@@ -992,7 +992,7 @@ test("hide and lock: a hidden object is not drawn or picked, a locked one is dra
   await p.keyboard.press("Control+a");
   expect(await sel(), "select all skips it").toEqual([]);
   expect(await ink(), "still drawn").toBe(drawn);
-  await p.getByRole("button", { name: /^Unlock all/ }).click();
+  await contextChoose(p, 900, 600, "Unlock all");
   await p.mouse.click(600, 300);
   expect((await sel()).length).toBe(1);
 });
@@ -1752,7 +1752,7 @@ test("phone layout (360 px wide): the bars stack in rows, the tools sit below th
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("medium screen (800 px wide): the tool options get their own row under the tabs and the dock, and nothing overlaps (ADR 0061)", async ({ app }) => {
+test("medium screen (800 px wide): the tool options share the top row between the tabs and the dock (they scroll when they do not fit), and nothing overlaps (ADR 0061)", async ({ app }) => {
   const p = app.page;
   await p.setViewportSize({ width: 800, height: 600 });
   await p.keyboard.press("v");
@@ -1764,7 +1764,9 @@ test("medium screen (800 px wide): the tool options get their own row under the 
   const rail = (await rect("#toolbar > .rail"))!;
   const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   for (const [name, a, b] of [["nav/dock", nav, dock], ["nav/options", nav, options], ["dock/options", dock, options], ["options/rail", options, rail]] as const) expect(overlap(a, b), `${name} overlap`).toBe(false);
-  expect(options.y, "the options are on the second row").toBeGreaterThanOrEqual(nav.y + nav.height - 1);
+  expect(options.y, "the options are on the top row, beside the tabs").toBeLessThan(nav.y + nav.height);
+  expect(options.x, "between the tabs and the dock").toBeGreaterThanOrEqual(nav.x + nav.width - 1);
+  expect(options.x + options.width, "between the tabs and the dock").toBeLessThanOrEqual(dock.x + 1);
   expect(options.height, "one row, not a tall box").toBeLessThan(70);
   expect(options.x + options.width).toBeLessThanOrEqual(800);
   expect(app.consoleErrors).toEqual([]);

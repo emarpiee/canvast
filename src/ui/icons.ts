@@ -174,13 +174,27 @@ import alignMenuSvg from "lucide-static/icons/align-horizontal-space-around.svg"
 import arrangeMenuSvg from "lucide-static/icons/layout-dashboard.svg";
 import boolMenuSvg from "lucide-static/icons/combine.svg";
 import maskMenuSvg from "lucide-static/icons/drama.svg";
+import selectAllSvg from "lucide-static/icons/square-dashed-mouse-pointer.svg";
+import pasteSvg from "lucide-static/icons/clipboard.svg";
+import exportMenuSvg from "lucide-static/icons/share.svg";
+import sheetMenuSvg from "lucide-static/icons/layout-panel-top.svg";
 import pathMenuSvg from "lucide-static/icons/workflow.svg";
 import listChecksSvg from "lucide-static/icons/list-checks.svg";
 import pipetteSvg from "lucide-static/icons/pipette.svg";
 import slidersHorizontalSvg from "lucide-static/icons/sliders-horizontal.svg";
 import blendSvg from "lucide-static/icons/blend.svg";
+import paintNoneSvg from "lucide-static/icons/ban.svg";
+import paintSolidSvg from "lucide-static/icons/diamond.svg";
+import paintLinearSvg from "lucide-static/icons/blinds.svg";
+import paintRadialSvg from "lucide-static/icons/target.svg";
+import paintAngularSvg from "lucide-static/icons/chart-pie.svg";
+import paintImageSvg from "lucide-static/icons/mountain.svg";
+import paintPatternSvg from "lucide-static/icons/brick-wall.svg";
 import dropletSvg from "lucide-static/icons/droplet.svg";
 import galleryThumbnailsSvg from "lucide-static/icons/gallery-thumbnails.svg";
+import dropletsSvg from "lucide-static/icons/droplets.svg";
+import rainbowSvg from "lucide-static/icons/rainbow.svg";
+import wandSparklesSvg from "lucide-static/icons/wand-sparkles.svg";
 import swatchBookSvg from "lucide-static/icons/swatch-book.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
@@ -374,9 +388,19 @@ export const ICONS = {
   activity: clean(activity),
   boxSelect: clean(boxSelect),
   swatchBook: clean(swatchBookSvg),
+  wandSparkles: clean(wandSparklesSvg),
+  droplets: clean(dropletsSvg),
+  rainbow: clean(rainbowSvg),
   galleryThumbnails: clean(galleryThumbnailsSvg),
   slidersHorizontal: clean(slidersHorizontalSvg),
   blend: clean(blendSvg),
+  paintNone: clean(paintNoneSvg),
+  paintSolid: clean(paintSolidSvg),
+  paintLinear: clean(paintLinearSvg),
+  paintRadial: clean(paintRadialSvg),
+  paintAngular: clean(paintAngularSvg),
+  paintImage: clean(paintImageSvg),
+  paintPattern: clean(paintPatternSvg),
   droplet: clean(dropletSvg),
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
@@ -385,6 +409,12 @@ export const ICONS = {
   pathMenu: clean(pathMenuSvg),
   boolMenu: clean(boolMenuSvg),
   maskMenu: clean(maskMenuSvg),
+  sheetMenu: clean(sheetMenuSvg),
+  exportMenu: clean(exportMenuSvg),
+  selectAll: clean(selectAllSvg),
+  paste: clean(pasteSvg),
+  // The Markdown mark (a box, an M and a down arrow), drawn like the Lucide set: Lucide has no icon for it.
+  markdown: clean('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l3 3 3-3v6"/><path d="M17 9v6"/><path d="m15 13 2 2 2-2"/></svg>'),
   arrangeMenu: clean(arrangeMenuSvg),
   alignMenu: clean(alignMenuSvg),
   paintBucket: clean(paintBucketSvg),

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./harness";
+import { expect, setPenColour, test } from "./harness";
 
 /**
  * Density preview (ADR 0010): content too small to draw object by object
@@ -24,7 +24,7 @@ const FARTHER = "1234567891p180";
 async function drawCluster(p: Page, level: number, n: number, at = FAR): Promise<void> {
   await p.evaluate(([c, z]) => window.__canvastDebug.setCamera({ cx: c as string, cy: c as string, zi: z as number, zf: 0, pz: z as number }), [at, level] as const);
   await p.keyboard.press("p");
-  await p.getByRole("button", { name: "Pen colour #dc2626" }).click(); // red: far from the background in every channel
+  await setPenColour(p, "#dc2626"); // red: far from the background in every channel
   for (let i = 0; i < n; i++) {
     const x = 560 + (i % 5) * 40;
     const y = 340 + Math.floor(i / 5) * 30;

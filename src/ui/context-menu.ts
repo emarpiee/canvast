@@ -1,10 +1,18 @@
 import type { CommandRegistry } from "../commands/registry";
 import { installMenuKeys, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
+import { ICONS } from "./icons";
 
 /** What a right click on the canvas offers, by command title: on something picked, and on empty canvas. Each is a command of the registry, so it is the same action as everywhere else. */
 const ON_ITEMS = ["Copy", "Cut", "Paste", "Duplicate", "Group", "Ungroup", "Bring to front", "Send to back", "Put the selection on a sheet", "Detach from what it follows", "Save the selection as SVG", "Delete the selection"];
-const ON_EMPTY = ["Paste", "Select everything", "Fit everything in view", "Return to the origin"];
+const ON_EMPTY = ["Paste", "Select everything", "Show all hidden", "Unlock all", "Fit everything in view", "Return to the origin"];
+/** The icon of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
+const ICON: Record<string, string> = {
+  Copy: ICONS.clipboardCopy, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
+  "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
+  "Save the selection as SVG": ICONS.fileCode, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
+  "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house,
+};
 const MENU_W = 240;
 
 export interface ContextMenuHooks {
@@ -27,7 +35,7 @@ export function mountContextMenu(canvas: HTMLElement, registry: CommandRegistry,
     const items: MenuItem[] = (picked ? ON_ITEMS : ON_EMPTY).flatMap((title): MenuItem[] => {
       const c = all.find((x) => x.title === title && x.group !== "Tool");
       if (!c || (c.enabled && !c.enabled())) return [];
-      return [{ label: title, danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
+      return [{ label: title, ...(ICON[title] ? { icon: ICON[title] } : {}), danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
     });
     if (!items.length) return;
     // An invisible anchor where the pointer is: the menu opens from it, to the right and down (or where there is room).
