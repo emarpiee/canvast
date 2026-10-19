@@ -878,16 +878,12 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       onInput: (stops) => {
         cur = { ...cur, map: { stops, amount: cur.map?.amount ?? 100 } };
         mapBar.style.backgroundImage = gradientCss({ type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops });
-        if (!frame) frame = requestAnimationFrame(() => {
-          frame = 0;
-          emitInput();
-        });
+        schedulePreview();
       },
       onChange: (stops) => {
         cur = { ...cur, map: { stops, amount: cur.map?.amount ?? 100 } };
         mapSelect.value = mapIndex();
-        if (frame) cancelAnimationFrame(frame);
-        frame = 0;
+        cancelPreview();
         emitChange("Adjust picture");
       },
       onSave: (stops) => void o.styles.saveGradient(stops),
@@ -905,6 +901,27 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   mapEdit.addEventListener("click", openEditor);
   syncMap();
   let frame = 0;
+  let pending = false;
+  /** Preview the numbers now (the first change of a burst must not wait: a panel built again in that frame would lose it), then at most once a frame with the latest. */
+  const schedulePreview = (): void => {
+    if (frame) {
+      pending = true;
+      return;
+    }
+    emitInput();
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (pending) {
+        pending = false;
+        emitInput();
+      }
+    });
+  };
+  const cancelPreview = (): void => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    pending = false;
+  };
   const set = (key: AdjustKey, v: number): void => {
     cur = { ...cur, [key]: v };
     const r = pop.querySelector<HTMLInputElement>(`[data-adj="${key}"]`)!, n = pop.querySelector<HTMLInputElement>(`[data-adj-num="${key}"]`)!;
@@ -918,10 +935,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     if (!key || t.value === "" || !Number.isFinite(Number(t.value))) return;
     set(key, Number(t.value));
     // one preview a frame, the latest numbers (a fast drag makes many more input events than a screen can show)
-    if (!frame) frame = requestAnimationFrame(() => {
-      frame = 0;
-      emitInput();
-    });
+    schedulePreview();
   });
   const setMap = (m: Adjust["map"]): void => {
     const { map: _m, ...rest } = cur;
@@ -947,14 +961,10 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     if (!cur.map) return;
     setMap({ stops: cur.map.stops, amount: Number(mapAmount.value) });
     mapOut.textContent = mapAmount.value;
-    if (!frame) frame = requestAnimationFrame(() => {
-      frame = 0;
-      emitInput();
-    });
+    schedulePreview();
   });
   mapAmount.addEventListener("change", () => {
-    if (frame) cancelAnimationFrame(frame);
-    frame = 0;
+    cancelPreview();
     emitChange("Adjust picture");
   });
   pop.addEventListener("dblclick", (e) => {
@@ -968,8 +978,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.dataset["adj"] || t.dataset["adjNum"]) {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
+      cancelPreview();
       emitChange("Adjust picture");
     }
   });
@@ -1017,14 +1026,10 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       const v = Number(lvInput(k).value);
       if (!Number.isFinite(v) || lvInput(k).value === "") return;
       cur = { ...cur, levels: { ...cur.levels, [lvCh]: { ...cur.levels?.[lvCh], [k]: v } } };
-      if (!frame) frame = requestAnimationFrame(() => {
-        frame = 0;
-        emitInput();
-      });
+      schedulePreview();
     });
     lvInput(k).addEventListener("change", () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
+      cancelPreview();
       emitChange("Adjust picture");
       const clean = cleanAdjust(cur);
       cur = { ...cur, ...(clean?.levels ? { levels: clean.levels } : { levels: undefined }) } as Adjust;
@@ -1085,10 +1090,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     return [((e.clientX - r.left) / r.width) * SIZE, ((e.clientY - r.top) / r.height) * SIZE];
   };
   const curveInput = (): void => {
-    if (!frame) frame = requestAnimationFrame(() => {
-      frame = 0;
-      emitInput();
-    });
+    schedulePreview();
   };
   cv.addEventListener("pointerdown", (e) => {
     const [px, py] = local(e);
@@ -1119,8 +1121,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   });
   cv.addEventListener("pointerup", () => {
     if (picked < 0) return;
-    if (frame) cancelAnimationFrame(frame);
-    frame = 0;
+    cancelPreview();
     emitChange("Adjust picture");
   });
   cv.addEventListener("dblclick", (e) => {
