@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.9 — Ctrl+C reaches other apps (2026-10-21)
+
+- **Implemented:** copy writes SVG text (shapes) and a PNG (`copyPicture` in main.ts); the paste handler checks its own objects first; `copiedText`, `plain` argument of `copySelection`.
+- **Tested:** `vectors.spec` clipboard test (Chromium); the copy/paste specs of vectors, frames, text and pictures pass in Chromium and Firefox.
+- **Unverified:** Firefox writing the picture (the API needs a user gesture there; the text always stays); audio, video and other files cannot go on the clipboard.
+
 ## v0.25.8 — Picker: copy swatches, # in the hex field (2026-10-21)
 
 - **Implemented:** `colour-picker/press.ts` (long press, copy), hex field copy/paste, `onCopy`; saved-gradient chips and Styles cards copy by long press.

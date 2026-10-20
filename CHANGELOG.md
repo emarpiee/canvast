@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.9 — Ctrl+C reaches other apps (2026-10-21)
+
+- **Copy** puts the shapes' SVG as text and a PNG picture of a copied sheet, picture or shapes on the system clipboard, next to the objects canvast keeps for pasting back. A paste in canvast checks for its own objects first, so a copy comes back as the objects themselves, not as an SVG import or a picture; anything copied elsewhere still imports as before. Cut stays text only.
+
 ## 0.25.8 — Picker: copy swatches, # in the hex field (2026-10-21)
 
 - **Colour picker package:** copying the whole hex field puts `#RRGGBB` on the clipboard and pasting `#RRGGBB` drops the `#`; a swatch is copied (not chosen) by a long press, a right click or Ctrl/Cmd+C, with `onCopy`, `onLongPress`, `copyToClipboard` and `flashCopied` exported.

@@ -208,19 +208,19 @@ let pastes = 0;
 /** CSS px each repeated paste (or duplicate) is moved down and right, so copies do not hide each other. */
 const PASTE_STEP_PX = 24;
 
-/** What other apps see on the clipboard: the Markdown of copied texts, else a short description. */
+/** What other apps see on the clipboard as text: the Markdown of copied texts, the SVG of copied shapes (given to copySelection), else a short description. */
 const clipboardText = (objs: readonly CanvasObject[]): string => {
   const md = objs.flatMap((o) => (o.kind === "text" ? [o.md] : []));
   return md.length ? md.join("\n\n") : `canvast: ${objs.length} object${objs.length === 1 ? "" : "s"}`;
 };
 
 /** Put the selection on the clipboard (the event's, when copying from a copy or cut event). Returns false when nothing is selected. */
-export function copySelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent): boolean {
+export function copySelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string): boolean {
   const objs = selected(doc, editor).filter((o) => !o.locked);
   if (!objs.length) return false;
   const depth = depthOf(view.frameCamera);
   const payload = buildPayload(objs, view.frame, Number(depth.levels) + depth.frac);
-  const text = clipboardText(objs);
+  const text = plain ?? clipboardText(objs);
   inMemory = { payload, text };
   pastes = 0;
   try {
@@ -235,9 +235,12 @@ export function copySelection(doc: DocumentStore, editor: EditorState, view: Vie
   return true;
 }
 
+/** The text copySelection put on the system clipboard (what a paste must find there to know the copy is still ours). */
+export const copiedText = (): string | null => inMemory?.text ?? null;
+
 /** Copy the selection and delete it, as one undo step for the delete. */
-export function cutSelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent): boolean {
-  if (editor.blockEdit() || !copySelection(doc, editor, view, e)) return false;
+export function cutSelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string): boolean {
+  if (editor.blockEdit() || !copySelection(doc, editor, view, e, plain)) return false;
   deleteSelection(doc, editor);
   return true;
 }
