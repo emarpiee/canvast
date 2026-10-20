@@ -1157,8 +1157,16 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   for (const el of away) await expect(el, "hidden in the viewer").toBeHidden();
+  // the way back and the details toggle share the top row of the viewer (left and right); they go when the controls are hidden
+  const back = viewer.locator(".viewer-back");
+  const details = viewer.locator(".viewer-details");
+  const [bb, db] = [(await back.boundingBox())!, (await details.boundingBox())!];
+  expect(Math.abs(bb.y - db.y), "on one line").toBeLessThan(2);
+  expect(db.x, "details at the right, back at the left").toBeGreaterThan(bb.x + 200);
   await p.keyboard.press("f"); // (with its own controls hidden too)
   for (const el of away) await expect(el).toBeHidden();
+  await expect(back).toBeHidden();
+  await expect(details).toBeHidden();
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   for (const el of away) await expect(el, "back when it closes").toBeVisible();

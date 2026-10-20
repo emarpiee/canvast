@@ -1153,7 +1153,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.no-bar .viewer-bar { display: none; }
 .viewer-nav, .viewer-tools { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
 .viewer-pos { min-width: 72px; padding: 0 var(--sp-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
-.vbtn.viewer-back { color: var(--media-fg); position: absolute; top: var(--sp-6); left: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.vbtn.viewer-back, .vbtn.viewer-details { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.vbtn.viewer-back { left: var(--sp-6); }
+.vbtn.viewer-details { right: var(--sp-6); }
+/* with the controls hidden the two at the top go too (the handle brings the controls back) */
+.viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details { display: none; }
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-5); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
 .vbtn:hover:not(:disabled) { background: var(--white-a12); }
