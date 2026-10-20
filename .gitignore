@@ -9,3 +9,6 @@ dist-spike/
 dist-picker/
 dist-preview/
 test-builds/
+
+# Rendered video, too big to commit for now
+docs/media/
