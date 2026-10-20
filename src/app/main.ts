@@ -1,3 +1,4 @@
+import { externalFolder, externalHashes } from "../storage/external-folder";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -392,6 +393,7 @@ async function start(): Promise<void> {
         editor.changed();
       },
     });
+    await externalFolder.load(db); // (before anything is drawn: an await later in this function lets a frame run early)
   } catch (e) {
     storageError = (e as Error).message;
   }
@@ -410,6 +412,15 @@ async function start(): Promise<void> {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
+  // The library folder (ADR 0159): a restart asks permission again, which needs a click in the storage panel.
+  externalFolder.subscribe(() => assets.retryAll());
+  if (db && externalFolder.state === "needs-permission") {
+    void externalHashes(db).then((h) => {
+      if (!h.length) return;
+      editor.message = "The library folder needs your permission again: open the storage panel and press Reconnect folder.";
+      editor.changed();
+    });
+  }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
   const textureHost = createTextureHost({ doc, index, assets, theme: () => theme });

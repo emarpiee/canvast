@@ -1,3 +1,4 @@
+import { externalFolder } from "./external-folder";
 import type { SerializedCamera } from "../core/camera";
 import { plural, were } from "../doc/plural";
 import { deserializeCamera } from "../core/camera";
@@ -176,6 +177,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];
+  const kept: Array<{ input: ZipInput; hash: string; size: number }> = [];
   let folders: AssetFolder[] | undefined;
   for (const hash of [...hashes].sort()) {
     const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
@@ -193,7 +195,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       hash,
       name: entry?.name ?? r.name,
       type: r.type,
-      size: r.blob.size,
+      size: r.ext ? r.size : r.blob.size,
       pixelW: r.pixelW,
       pixelH: r.pixelH,
       importedAt: r.importedAt,
@@ -203,9 +205,12 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       favorite: m.favorite,
       folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
     });
-    if (!known) assetBlobs.push({ name: file, data: r.blob });
+    if (!known) {
+      const input: ZipInput = { name: file, data: r.blob };
+      assetBlobs.push(input);
+      if (r.ext) kept.push({ input, hash, size: r.size });
+    }
   }
-
   const manifest: Manifest = {
     format: ARCHIVE_FORMAT,
     version: ARCHIVE_VERSION,
@@ -219,6 +224,14 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
   };
+  // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
+  // cannot hold one says so and stops: it never leaves an original out.
+  for (const k of kept) {
+    const blob = await externalFolder.read(k.hash, k.size);
+    if (!blob) throw new ArchiveError("a file of the library folder is missing or not reachable: reconnect the folder in the storage panel, then export again");
+    k.input.data = blob;
+  }
+
   const json = (s: string): Blob => new Blob([s], { type: "application/json" });
   const blob = await writeZip([
     { name: "manifest.json", data: json(JSON.stringify(manifest, null, 1)) },

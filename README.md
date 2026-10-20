@@ -184,7 +184,8 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Rename** one item or many at once, with a preview: number them, replace text, add text or change the extension.
 - **Export** items as a `.canvast` archive, download originals, or export all files as a plain ZIP sorted by file type or by folder.
 - **Safe deletion:** an item in use cannot be deleted from the library. An original is erased only when nothing, including undo, can bring it back.
-- **Missing originals** (for example after clearing site data) are flagged with their usage; importing the same file again restores every instance.
+- **Missing originals** (for example after clearing site data, or a file taken out of the library folder) are flagged with their usage; importing the same file again restores every instance.
+- **Library folder** (Chromium): in the storage panel, *Choose library folder…* keeps your files as plain files in a folder of your disk, named by their content, instead of in the browser's storage, so the library is limited by your disk and not by the browser. *Move browser files into the folder* and *Move files back into the browser* move what is already there. After a restart the browser asks permission once more: press *Reconnect folder*. Do not move, rename or edit the files in that folder; backups (`.canvast`) hold their bytes as always.
 
 | | |
 | --- | --- |
@@ -296,7 +297,7 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. All files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used |
+| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. Files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used. In Chromium a *library folder* removes the limit (see Library); Firefox cannot offer one |
 | What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete from library* to free space |
 
 **Content**
@@ -329,7 +330,7 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB. When it is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
+| Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB (a Chromium library folder is not counted). With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
 | Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
@@ -373,7 +374,7 @@ Every object is validated before it enters the document or is loaded: finite num
 
 ### Storage
 
-Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 9) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection.
+Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 10) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection. With a library folder an original is a file named by its SHA-256 (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
 
 A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas and each original once under `assets/<sha256>`, with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files). Import is verified completely before one transaction writes it.
 

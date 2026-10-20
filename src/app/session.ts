@@ -666,7 +666,7 @@ export class Session {
     return r;
   }
 
-  private tell(message: string): void {
+  tell(message: string): void {
     this.editor.message = message;
     this.editor.changed();
   }

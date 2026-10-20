@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22.0 — Library folder (2026-10-20)
+
+- **Library folder** (Chromium, ADR 0159): pick a folder in the storage panel and new originals are kept there as plain files named by their SHA-256, outside the browser's storage limit. Each file is written, read back and compared before the browser keeps a stub of it. *Move browser files into the folder* and *Move files back into the browser* move what exists; *Reconnect folder* after a restart; files missing from the folder are flagged like missing originals; backups read the folder's files and refuse to leave one out; erasing an original removes its file.
+- Schema 10: an index on the stubs. Nothing is converted.
+
 ## 0.21.1 — Full storage is reported, not silent (2026-10-20)
 
 - An import that does not fit the browser's storage is refused in plain words (export a backup, delete unused files) and stores nothing half-way; it was the browser's raw error.

@@ -1,3 +1,4 @@
+import { externalFolder } from "../storage/external-folder";
 import type { ObjectId } from "../doc/model";
 import { plural } from "../doc/plural";
 import { cleanFileName } from "../doc/rename-rules";
@@ -252,6 +253,7 @@ export class AssetCatalog {
     const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const blobKeys = new Set((await req(tx.objectStore("assets").getAllKeys())) as string[]);
+    const extKeys = (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
     const usage = new Map<string, { instances: number; canvases: Set<string> }>();
     await new Promise<void>((resolve, reject) => {
       const cur = tx.objectStore("objects").index("assetId").openKeyCursor();
@@ -269,6 +271,9 @@ export class AssetCatalog {
       };
     });
     const known = new Set(entries.map((e) => e.hash));
+    // An original kept in the library folder is present only while its file is (ADR 0159).
+    const sizes = new Map(entries.map((e) => [e.hash, e.size]));
+    for (const h of extKeys) if (!(await externalFolder.has(h, sizes.get(h) ?? -1))) blobKeys.delete(h);
     return {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: blobKeys.has(e.hash) })),
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
@@ -499,6 +504,7 @@ export class AssetCatalog {
       }
     }
     await committed;
+    for (const h of report.swept) await externalFolder.remove(h); // a file of the library folder goes with its original
     return report;
   }
 }

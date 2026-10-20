@@ -4,6 +4,7 @@ import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { folderPath, meta } from "../assets/asset-catalog";
 import { storedAssetOf } from "../doc/model";
 import { req } from "./idb";
+import { externalFolder } from "./external-folder";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
 import type { ExportScope } from "./archive";
 import type { ZipInput } from "./zip";
@@ -96,6 +97,16 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
       continue;
     }
     rows.push({ hash, rec, entry: await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>) });
+  }
+  // Originals kept in the library folder are read now, after the last read of the database (ADR 0159).
+  for (const [i, r] of [...rows.entries()].reverse()) {
+    if (!r.rec.ext) continue;
+    const blob = await externalFolder.read(r.hash, r.rec.size);
+    if (blob) r.rec = { ...r.rec, blob };
+    else {
+      rows.splice(i, 1);
+      missing++;
+    }
   }
   for (const r of rows) if (r.entry && r.entry.name !== r.rec.name) r.rec = { ...r.rec, name: r.entry.name }; // the catalog holds the current name
   rows.sort((a, b) => a.rec.name.localeCompare(b.rec.name) || a.hash.localeCompare(b.hash));

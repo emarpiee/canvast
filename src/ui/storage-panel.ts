@@ -2,6 +2,8 @@ import type { Session } from "../app/session";
 import { plural } from "../doc/plural";
 import { esc, fmtBytes } from "./format";
 import { ARCHIVE_ACCEPT, runExport, runExportChanges, runImport } from "./archive-ui";
+import { externalFolder, externalHashes, folderSupported } from "../storage/external-folder";
+import { moveFromFolder, moveToFolder } from "../storage/folder-move";
 
 /**
  * Storage status popover (opened from the HUD save indicator). It states
@@ -40,6 +42,8 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         // leave unknown
       }
     }
+    const db = session.repo?.db ?? null;
+    const folder = db ? await folderRow(db, session.readOnly) : "";
     const backup = await session.lastBackup();
     const backupText = backup
       ? `${new Date(backup.at).toLocaleString()} — ${esc(backup.fileName)}, ${fmtBytes(backup.bytes)} (${plural(backup.canvases, "canvas", "canvases")}, ${plural(backup.objects, "object")}, ${plural(backup.assets, "original")}); checked before saving. The browser does not report whether the download finished, so keep the file somewhere safe.`
@@ -53,6 +57,7 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         <dt>This tab</dt><dd data-testid="storage-role">${session.readOnly ? "read-only (another tab is editing)" : "editing (writer)"} · lease via ${session.lease.mechanism}</dd>
         <dt>Space</dt><dd>${quota}</dd>
         <dt>Persistence</dt><dd>${persisted}${typeof sm?.persist === "function" ? ` <button type="button" data-action="persist">Request persistent storage</button>` : ""}</dd>
+        ${folder}
         <dt>Last backup</dt><dd data-testid="storage-backup">${backupText}</dd>
         ${mig ? `<dt>Upgrade</dt><dd>Migrated ${mig.copied} of ${plural(mig.sourceObjects, "object")} from the previous format${mig.verified ? " (verified)" : ` — verification failed: ${esc(mig.verifyError ?? "unknown")}`}. The old data was kept unchanged.</dd>` : ""}
       </dl>
@@ -63,6 +68,22 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
         <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="import-archive-input">
       </div>
       <p class="storage-note">Data lives in this browser profile's storage for local files. Another browser, profile or private window will not see it, and clearing site data deletes it.</p>`;
+  };
+
+  /** The library folder row (ADR 0159): where originals are kept, and the moves between it and the browser. */
+  const folderRow = async (db: IDBDatabase, readOnly: boolean): Promise<string> => {
+    const st = externalFolder.state;
+    if (st === "none" && !folderSupported()) return `<dt>Library folder</dt><dd data-testid="storage-folder">Not available in this browser (it needs Chromium). Files stay in the browser's storage.</dd>`;
+    const inFolder = (await externalHashes(db)).length;
+    const dis = readOnly ? ' disabled title="Read-only: another tab is editing"' : "";
+    const btn = (action: string, label: string, extra = ""): string => `<button type="button" data-action="${action}"${dis}${extra}>${label}</button>`;
+    const pick = folderSupported() ? btn("folder-choose", st === "none" ? "Choose library folder…" : "Choose another folder…") : "";
+    const where = esc(externalFolder.name);
+    if (st === "none") return `<dt>Library folder</dt><dd data-testid="storage-folder">Not set. Files are kept in the browser's storage, which has a size limit. A folder on your disk has none. ${pick}</dd>`;
+    if (st === "needs-permission") return `<dt>Library folder</dt><dd data-testid="storage-folder"><strong>${where}</strong> needs your permission again after a restart. ${inFolder} files from it show as missing until then. ${btn("folder-reconnect", "Reconnect folder")}</dd>`;
+    if (st === "unavailable") return `<dt>Library folder</dt><dd data-testid="storage-folder"><strong>${where}</strong> cannot be used right now. ${btn("folder-reconnect", "Try again")}</dd>`;
+    return `<dt>Library folder</dt><dd data-testid="storage-folder"><strong>${where}</strong>: new files are stored there (${plural(inFolder, "file")} so far). Do not move or edit the files in it; they are named by their content.
+      <span class="storage-actions">${btn("folder-in", "Move browser files into the folder")}${inFolder ? btn("folder-out", "Move files back into the browser") : btn("folder-forget", "Stop using this folder")}${pick}</span></dd>`;
   };
 
   const toggle = (): void => {
@@ -81,6 +102,26 @@ export function mountStoragePanel(root: HTMLElement, session: Session, opener: H
       void render();
     } else if (b?.dataset["action"] === "import") {
       panel.querySelector<HTMLInputElement>('[data-testid="import-archive-input"]')!.click();
+    }
+    const act = b?.dataset["action"] ?? "";
+    const db = session.repo?.db;
+    if (db && act.startsWith("folder-")) {
+      const say = (t: string): void => {
+        const el = panel.querySelector<HTMLElement>('[data-testid="storage-folder"]');
+        if (el) el.textContent = t;
+      };
+      try {
+        if (act === "folder-choose") await externalFolder.choose(db);
+        else if (act === "folder-reconnect") await externalFolder.reconnect();
+        else if (act === "folder-forget") await externalFolder.forget(db);
+        else {
+          const r = await (act === "folder-in" ? moveToFolder : moveFromFolder)(db, (d, n) => say(`Moving files… ${d} of ${n}`));
+          session.tell(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") session.tell(`Library folder: ${(e as Error).message}`); // (closing the picker is not an error)
+      }
+      void render();
     }
     if (b?.dataset["action"] === "persist") {
       const sm = (navigator as Navigator & { storage?: StorageManager }).storage;

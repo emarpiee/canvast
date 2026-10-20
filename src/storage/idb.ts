@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 9 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 10 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -13,7 +13,7 @@
  * *                                                             multi-entry index "tags" on data.tags: in-canvas tags, ADR 0062; v8;
  *                                                             v9 dropped the mention indexes "refs" and "kind" and the `refs` field)
  *   canvasViews  key canvasId      → SerializedCamera         (per-device view state; no revision)
- *   assets       key sha256        → AssetRecord              (original bytes, stored once)
+ *   assets       key sha256        → AssetRecord              (original bytes, stored once; index "ext" on the stubs of originals kept in the library folder, ADR 0159; v10)
  *   assetCatalog keyPath "hash"    → CatalogEntry             (metadata only, no bytes; v3)
  *   thumbs       keyPath "hash"    → ThumbRecord              (lower-quality WebP thumbnail of an asset, derived data, v6)
  *   bookmarks    keyPath "canvasId" → { canvasId, items: Bookmark[] }  (named saved views, ADR 0025; v5)
@@ -30,7 +30,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 9;
+export const DB_VERSION = 10;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -51,6 +51,9 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       const has = (s: string): boolean => db.objectStoreNames.contains(s);
       if (!has("snapshots")) db.createObjectStore("snapshots"); // legacy v1, kept for migration
       if (!has("assets")) db.createObjectStore("assets");
+      // v10: originals kept in the library folder are stubs with ext = 1 (ADR 0159); the index lists them.
+      const assetsStore = req.transaction!.objectStore("assets");
+      if (!assetsStore.indexNames.contains("ext")) assetsStore.createIndex("ext", "ext");
       if (!has("meta")) db.createObjectStore("meta");
       if (!has("workspaces")) db.createObjectStore("workspaces", { keyPath: "id" });
       if (!has("boards")) db.createObjectStore("boards", { keyPath: "id" });

@@ -1,3 +1,36 @@
+import { externalFolder } from "../storage/external-folder";
+import type { Dir } from "../storage/external-folder";
+
+/** A stand-in for the folder the picker gives (the native picker cannot be driven): files kept in a database of their own, so they outlive a reload. */
+function testDb(name: string): Promise<IDBDatabase> {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(`canvast-test-folder-${name}`, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("f");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function testDirKeys(name: string): Promise<string[]> {
+  const db = await testDb(name);
+  return (await req(db.transaction("f").objectStore("f").getAllKeys())) as string[];
+}
+function testDir(name: string): Dir {
+  const run = async <T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> => req(fn((await testDb(name)).transaction("f", mode).objectStore("f")));
+  return {
+    name,
+    getFileHandle: async (n, o) => {
+      if (!(await run("readonly", (s) => s.count(n))) && !o?.create) throw new DOMException("none", "NotFoundError");
+      return {
+        getFile: async () => new File([(await run("readonly", (s) => s.get(n))) ?? new Blob([])], n),
+        createWritable: async () => ({ write: async (b: Blob) => void (await run("readwrite", (s) => s.put(b, n))), close: async () => undefined }),
+      };
+    },
+    removeEntry: async (n) => {
+      if (!(await run("readonly", (s) => s.count(n)))) throw new DOMException("none", "NotFoundError");
+      await run("readwrite", (s) => s.delete(n));
+    },
+  };
+}
 import * as D from "../core/dyadic";
 import {
   deserializeCamera,
@@ -181,6 +214,14 @@ export interface DebugHook {
   canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null; bookmarks: Array<{ name: string; view: SerializedCamera }> }>;
   /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
   removeAssetBytes(hash: string): Promise<void>;
+  /** Use a private browser directory (OPFS) as the library folder, as the picker would. */
+  useTestFolder(name: string): Promise<void>;
+  /** Names of the files in the test folder. */
+  testFolderFiles(): Promise<string[]>;
+  /** Delete a file of the test folder, as a user moving it away would. */
+  testFolderDelete(name: string): Promise<void>;
+  /** "none", "ready", "needs-permission" or "unavailable". */
+  folderState(): string;
   /** Text most recently copied by canvast (Copy Markdown). */
   lastCopied(): string;
   /** The n-th visible character of a text object: code point and outline bounds (font units, y up). */
@@ -538,6 +579,14 @@ export function installDebugHook(
       const bookmarks = loaded.bookmarks.map((b) => ({ name: b.name, view: serializeCamera(toAbsoluteCamera(loaded.space, deserializeFrameCamera(loaded.space, b.view))) }));
       return { objects: loaded.objects.map(serializeWorld).sort((a, b) => (a.id < b.id ? -1 : 1)), view, bookmarks };
     },
+    useTestFolder: async (name) => {
+      await externalFolder.use(testDir(name)); // (not saved: a reload attaches it again, as the saved handle would be)
+    },
+    testFolderFiles: async () => (await testDirKeys(externalFolder.name)).sort(),
+    testFolderDelete: async (name) => {
+      await testDir(externalFolder.name).removeEntry(name);
+    },
+    folderState: () => externalFolder.state,
     removeAssetBytes: async (hash) => {
       const tx = session.repo!.db.transaction("assets", "readwrite");
       tx.objectStore("assets").delete(hash);

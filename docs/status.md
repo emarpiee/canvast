@@ -471,6 +471,14 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.21.1 and v0.22.0 — storage limits made visible; the library folder (2026-10-20)
+
+- **Implemented:** 0.21.1: a full browser store refuses an import in plain words, `storage.persist()` asked once, a notice at 80% of the quota (`storage/quota.ts`). 0.22.0: the library folder ([ADR 0159](adr/0159-library-folder.md)), Chromium only: originals as files named by their SHA-256, stubs in the browser, moves both ways, Reconnect, backups and GC aware of it; schema 10 (an index).
+- **Tested:** unit `quota.test.ts`, `external-folder.test.ts`; E2E `storage.spec` (full store, Chromium and Firefox) and `library-folder.spec` (Chromium: import, reload, backup, file gone, re-import, moves, GC); quick suite (`npm test`, 51 min, 2026-10-20): unit 527 passed; E2E 1141 passed, 19 skipped, 4 failed (below).
+- **Known failures:** four CSS assertions in the viewer and library cards, all failing on the source without these changes too (re-run on it): `assets.spec` "small screens: the details panel is resizable..." (Chromium and Firefox), `assets.spec` "gallery viewer: the view tabs, the workspace menu and the Settings button are hidden..." (Firefox), `files.spec` "an SVG keeps its real preview..." (Firefox). Not caused by storage; to triage.
+- **Unverified:** the real folder picker and the permission prompt (the native dialogs cannot be driven; a stand-in directory with the same interface is used, so a real Chromium session by the owner is the check); a folder on a slow or network drive; thousands of files in one folder (list checks each file's size).
+- **Next bounded task:** the owner tries a real folder; then the full suite when Phase 8 closes.
+
 ## v0.21.0 — settings, panels, linked styles, Phase 8 groundwork (2026-10-19)
 
 - **Implemented:** the items of the changelog entry 0.21.0; [ADR 0156](adr/0156-panel-shape.md) (one shape for every panel) and [ADR 0157](adr/0157-linked-styles.md) (objects follow the saved colour, gradient or adjustment they got).
