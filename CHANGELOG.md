@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.10 — Copy: pictures alone, edited stills, GIF frames (2026-10-21)
+
+- **A copied picture goes alone** (no "N objects" text next to it, which made some apps paste text): one still as a PNG at full size with its crop and adjustments baked in; a GIF or video as the frame it shows.
+- **A shape with a picture or objects fill** is copied as a PNG, not as SVG text (the embedded images would be megabytes); an SVG over 1 MB is never put on the clipboard as text.
+- A paste in canvast knows its own picture while the window kept the focus and nothing else was copied from the app (a browser may re-encode the picture, so the bytes cannot say).
+
 ## 0.25.9 — Ctrl+C reaches other apps (2026-10-21)
 
 - **Copy** puts the shapes' SVG as text and a PNG picture of a copied sheet, picture or shapes on the system clipboard, next to the objects canvast keeps for pasting back. A paste in canvast checks for its own objects first, so a copy comes back as the objects themselves, not as an SVG import or a picture; anything copied elsewhere still imports as before. Cut stays text only.

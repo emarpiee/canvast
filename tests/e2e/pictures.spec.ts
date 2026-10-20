@@ -1,6 +1,7 @@
 import { exportWith, expect, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
+import { encodeGif } from "./gif";
 import { makeWebm } from "./video";
 
 /**
@@ -1060,4 +1061,58 @@ test("an SVG export of a picture fill is the picture itself, put where the canva
   }, svg);
   expect(is(side.left as never, 255, 0, 0), `left half red (${side.left})`).toBe(true);
   expect(is(side.right as never, 0, 0, 255), `right half blue (${side.right})`).toBe(true);
+});
+
+test("Ctrl+C on a picture or a GIF puts only the picture on the system clipboard (the still as it looks, a GIF as its current frame), and Ctrl+V here pastes the picture itself", async ({ app }) => {
+  test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "the clipboard picture is read back in Chromium");
+  const p = app.page;
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const clip = () => p.evaluate(async () => {
+    const it = (await navigator.clipboard.read())[0]!;
+    const bmp = it.types.includes("image/png") ? await createImageBitmap(await it.getType("image/png")) : null;
+    return { types: it.types, w: bmp?.width ?? 0, h: bmp?.height ?? 0 };
+  });
+  const a = await place(app);
+  await p.keyboard.press("v");
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Control+c");
+  await expect.poll(async () => (await clip()).types.join(",")).toBe("image/png"); // (no "N objects" text: an app that prefers text still gets the picture)
+  expect(await clip()).toMatchObject({ w: 120, h: 80 });
+  await p.keyboard.press("Control+v");
+  await expect.poll(async () => (await objs(app)).length).toBe(2);
+  expect((await objs(app)).map((o) => (o as Pic & { assetId?: string }).assetId)).toEqual([(a as Pic & { assetId?: string }).assetId, (a as Pic & { assetId?: string }).assetId]);
+  // a GIF goes as the frame it shows
+  await p.getByTestId("import-input").setInputFiles({ name: "t.gif", mimeType: "image/gif", buffer: Buffer.from(encodeGif(8, 8, [[255, 0, 0], [0, 0, 255]], [0, 1].map((c) => ({ w: 8, h: 8, pixels: Array(64).fill(c) })))) });
+  await expect.poll(async () => (await objs(app)).length).toBe(3);
+  await app.frame();
+  const g = (await objs(app)).at(-1)!;
+  const gb = await boxOf(app, g.id);
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((gb.minX + gb.maxX) / 2), Math.round((gb.minY + gb.maxY) / 2));
+  await p.keyboard.press("Control+c");
+  await expect.poll(async () => (await clip()).types.join(",")).toBe("image/png");
+  expect(await clip()).toMatchObject({ w: 8, h: 8 });
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Ctrl+C on a shape with a picture fill puts the picture of it on the system clipboard, not the megabytes of SVG text an embedded fill would be", async ({ app }) => {
+  test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "the clipboard picture is read back in Chromium");
+  const p = app.page;
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
+  const rect = await pickedRect(app, [400, 450], [600, 550]);
+  const pop = p.locator(".colour-pop");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="image"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  const pb = await boxOf(app, picture.id);
+  await p.mouse.click(Math.round((pb.minX + pb.maxX) / 2), Math.round((pb.minY + pb.maxY) / 2));
+  await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { type?: string } | undefined)?.type).toBe("texture");
+  await p.keyboard.press("Escape");
+  await p.mouse.click(500, 500);
+  await p.keyboard.press("Control+c");
+  await expect.poll(async () => p.evaluate(async () => (await navigator.clipboard.read())[0]?.types.join(",") ?? "")).toBe("image/png");
+  await p.keyboard.press("Control+v");
+  await expect.poll(async () => (await objs(app)).filter((o) => o.kind === "path").length).toBe(2);
+  expect(app.consoleErrors).toEqual([]);
 });

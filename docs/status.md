@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.10 — Copy: pictures alone, edited stills, GIF frames (2026-10-21)
+
+- **Implemented:** `renderedStill` for a picture's edited copy, picture-only clipboard when the text would be a placeholder, no SVG text for texture fills or over 1 MB, own-picture flag instead of byte size.
+- **Tested:** `pictures.spec` (picture, GIF, picture-filled shape; Chromium), copy/paste specs in Chromium and Firefox.
+- **Unverified:** a video's current frame (the same path as a GIF, not run with a video); Firefox writing the picture.
+
 ## v0.25.9 — Ctrl+C reaches other apps (2026-10-21)
 
 - **Implemented:** copy writes SVG text (shapes) and a PNG (`copyPicture` in main.ts); the paste handler checks its own objects first; `copiedText`, `plain` argument of `copySelection`.

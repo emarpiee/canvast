@@ -2429,20 +2429,39 @@ export function pasteAdjustments(doc: DocumentStore, editor: EditorState): void 
   if (copiedAdjust) commitAdjust(doc, editor, copiedAdjust, "Paste adjustments");
 }
 
-/** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
-export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<void> {
+/** The picked still as a PNG with its crop and adjustments baked in (null for a GIF or video, or when no still is picked). */
+export async function renderedStill(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<Blob | null> {
   const o = croppablePicture(doc, editor) ?? pictures(doc, editor).find((p) => !p.media);
   const rec = o && (await assets.record(o.assetId).catch(() => undefined));
-  const png = o && rec ? await renderedPicture(rec.blob, cropOf(o), o.adjust) : null;
+  return o && rec ? await renderedPicture(rec.blob, cropOf(o), o.adjust) : null;
+}
+
+/** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
+export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<void> {
+  const png = await renderedStill(doc, editor, assets);
   try {
     if (!png) throw new Error("no picture");
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    forgetCopiedPicture();
     editor.message = "Copied the picture as it looks now (crop and adjustments baked in).";
   } catch {
     editor.message = "Could not copy the picture to the clipboard.";
   }
   editor.changed();
 }
+
+/** The "N objects" line copySelection writes when there is nothing better to say as text (a picture then goes alone, so an app that prefers text still gets the picture). */
+export const isPlaceholderText = (s: string): boolean => /^canvast: \d+ objects?$/.test(s);
+
+/**
+ * Whether the picture on the system clipboard is still the one copySelection put there. A browser may re-encode a copied picture, so it cannot be
+ * recognised by its bytes: it counts while nothing else could have been copied (this window kept the focus and the app copied nothing else).
+ */
+let pictureIsOurs = false;
+export const markCopiedPicture = (): void => { pictureIsOurs = true; };
+export const forgetCopiedPicture = (): void => { pictureIsOurs = false; };
+export const isCopiedPicture = (): boolean => pictureIsOurs;
+if (typeof window !== "undefined") window.addEventListener("blur", forgetCopiedPicture);
 
 /** Make a new picture of the picked still as it looks now (crop and adjustments baked in), beside it, in the library too. */
 export async function bakePicture(
