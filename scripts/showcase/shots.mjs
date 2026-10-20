@@ -1,4 +1,4 @@
-// README screenshots: imports showcase.canvast into a fresh profile (default theme) and photographs the app.
+// README screenshots: imports showcase.canvast into a fresh profile (theme: System, the browser set to dark) and photographs the app.
 // Run from the repo root after `npm run build`: node scripts/showcase/shots.mjs <showcase.canvast> <outDir>
 import { chromium } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const [archive, out] = process.argv.slice(2);
-const ctx = await chromium.launchPersistentContext(mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-")), { viewport: { width: 1440, height: 900 }, colorScheme: "light" });
+const ctx = await chromium.launchPersistentContext(mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-")), { viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
 const p = ctx.pages()[0] ?? (await ctx.newPage());
 p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
 await p.goto("file://" + process.cwd() + "/dist/canvast.html#debug"); // (the hook gives a frame to wait for; its panels are hidden below)
@@ -17,9 +17,17 @@ const settle = async (ms = 600) => { await frame(); await p.waitForTimeout(ms); 
 const shot = async (name) => {
   // (no notices or stray text selection in the pictures)
   await p.evaluate(() => { for (const b of document.querySelectorAll(".notice-close")) b.click(); getSelection()?.removeAllRanges(); });
-  await settle(); await p.screenshot({ path: `${out}/${name}.png` }); console.log("shot", name); };
+  await settle();
+  await p.evaluate(() => { for (const b of document.querySelectorAll(".notice-close")) b.click(); });
+  await settle(300); await p.screenshot({ path: `${out}/${name}.png` }); console.log("shot", name); };
 const off = () => p.mouse.move(700, 893); // (the pointer on the status bar: no hover outlines on the canvas)
 const blur = () => p.evaluate(() => document.activeElement?.blur());
+
+// A theme colour for the cosmos: the Ultramarine preset (265°) of Settings > Appearance
+await p.getByTestId("view-settings").click();
+await p.getByRole("tab", { name: "Appearance" }).click();
+await p.locator('.set-preset[aria-label="Ultramarine"]').click();
+await p.getByRole("button", { name: "Back to canvas" }).click();
 
 // Import the showcase and open its canvas
 await p.getByTestId("save-status").click();
