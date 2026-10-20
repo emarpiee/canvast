@@ -983,7 +983,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const colours = root.querySelector<HTMLElement>("[data-sel-colours]")!;
     if (pick && still && !colourEditing) {
       const used = actions.selectionPaints();
-      const all = used.count >= 2 ? used.items : [];
+      // (a pen stroke alone has no Fill or Outline button, so its colour is a chip too)
+      const oneStroke = used.count === 1 && [...editor.selection].every((id) => doc.get(id)?.kind === "stroke");
+      const all = used.count >= 2 || oneStroke ? used.items : [];
       const items = all.slice(0, SEL_CHIPS);
       const key = JSON.stringify(all.map((it) => [it.paint, it.fills, it.strokes]));
       if (colours.dataset["list"] !== key) {

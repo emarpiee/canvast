@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.4 — A pen stroke picked alone can be recoloured (2026-10-21)
+
+- **Fixed:** with one pen stroke picked there was no colour control (the pen colour button is for new strokes, and the Fill and Outline buttons are for shapes), so its colour could not be changed. Its colour now shows as a chip in the Properties bar, like the colours of a larger selection.
+
 ## 0.25.3 — What you export is what you see: no colour changes by theme (2026-10-21)
 
 - **Removed the theme mapping of the default ink.** The default pen and outline colour (near-black, `#1f2329`) used to be drawn as a light ink on a dark canvas while the document kept the near-black, so the canvas and an exported SVG or PDF could disagree (v0.25.2 patched the files; this removes the cause). Now nothing is mapped when drawing or exporting: the canvas, picture exports, SVG and PDF all use the stored colours as they are. The default ink is chosen once, when a shape, line, pen stroke or text is made: on a dark canvas it gets the theme's readable ink as a real colour (stored with it), on a light canvas the near-black; a colour you picked is always kept. The chips of the tools show the colour the next object will have. Changing the theme later does not change what is already drawn.

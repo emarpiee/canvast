@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.4 — A pen stroke picked alone can be recoloured (2026-10-21)
+
+- **Implemented:** one picked pen stroke shows its colour as a chip in the Properties bar (`ui/toolbar.ts`).
+- **Tested:** `vectors.spec` "a pen stroke picked alone is recoloured from its colour chip" (Chromium, Firefox).
+- **Committed:** yes. **Next bounded task:** CSS gradient text pasted onto a fill.
+
 ## v0.25.3 — WYSIWYG: no theme mapping (2026-10-21)
 
 - **Implemented:** `render/ink.ts` is now `setCanvasInk` + `newInk` (the default ink chosen when an object is made) and an identity `swatchBackground`; `paintColor` and `exportColor` are gone (drawing and the SVG/PDF writers use stored colours); `newInk` is applied in the shape, line, path and pen tools, the text editor and the tool chips; `recolourOldInk` (command in the palette); SVG outline `align` (clip path or mask) and the SVG box from `paintBounds` (outside outlines, miter tips); `buildTarget` pads by `inkStyle`.

@@ -3294,3 +3294,15 @@ test("on a phone the Actions bar stands above the bottom controls, and the colou
   await expect(p.locator('#toolbar > .toolbar[aria-label="Colours of the selection"] [data-sel-colours]')).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a pen stroke picked alone is recoloured from its colour chip", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.mouse.move(500, 300); await p.mouse.down(); await p.mouse.move(600, 360, { steps: 8 }); await p.mouse.up();
+  await p.keyboard.press("v");
+  await p.mouse.click(550, 330);
+  await p.locator("[data-sel-colour]").first().click();
+  const f = p.locator(".colour-pop [data-hex]");
+  await f.fill("ff0000"); await f.press("Enter"); await p.keyboard.press("Escape");
+  expect(await p.evaluate(() => window.__canvastDebug.objects().map((o: any) => o.color))).toEqual(["#ff0000"]);
+});
