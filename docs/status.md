@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.2 — the default ink in SVG and PDF (2026-10-21)
+
+- **Implemented:** `exportColor` (render/ink.ts: the default ink as "#rrggbb", read from `#hex` or `rgb()` as it is, else drawn on a one-pixel canvas) used by `exportSvg` and `pdfVectorOf` for solid fills and outlines.
+- **Tested:** `svg.test.ts` (mapped on a dark canvas, other colours untouched, stored on a light one), `vectors.spec` "the default outline is written to an SVG as the canvas draws it" (Chromium, Firefox; the SVG was `#1f2329` on a dark canvas before the fix).
+- **Unverified:** a PDF of a dark-canvas export opened in a viewer; the `oklch()` ink read in a browser that returns it unconverted other than Chromium.
+
 ## v0.25.1 — exports are cut to the sheet (2026-10-21)
 
 - **Implemented:** `layoutPaths` (svg-export.ts) takes the sheets that cut each path (`ClipOf`, from `clipSheetsOf` in actions.ts): the box counts only what a sheet lets through, a path wholly outside is left out, and `exportSvg` writes one `<clipPath>` for each sheet and wraps what is on it; `pdfVectorOf` clips each shape's drawing with `W n`; `buildTarget` frames a picked selection by the part that shows.

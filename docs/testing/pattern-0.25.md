@@ -23,3 +23,11 @@ Slowest test of the unit suite: `tests/unit/pattern.test.ts` "makes sound shapes
 | `sheets`, `release`, `pattern`, `pictures` (Chromium) | 50 passed (1.9 min) |
 | `vectors.spec -g "SVG\|svg\|Export\|export\|PDF\|pdf\|clip\|mask\|sheet"` (Chromium) | 9 passed (16.5 s) |
 | `sheets`, `pattern` (Firefox) | 23 passed (1.2 min) |
+
+## v0.25.2: the default ink in SVG and PDF
+
+| Check | Result |
+| --- | --- |
+| `vectors.spec` "the default outline is written to an SVG as the canvas draws it" (Chromium, Firefox) | 2 passed; before the fix the SVG held `#1f2329` on a dark canvas (the PNG outline was the light ink) |
+| `vectors.spec -g "SVG\|svg\|Export\|export\|PDF\|pdf\|clip\|mask\|sheet\|outline"` (Chromium) | 19 passed (38.9 s) |
+| `npm run test:unit` | 545 passed (`svg.test.ts` gained the ink test) |

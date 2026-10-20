@@ -7,6 +7,7 @@ import { geometryBounds, rectSubs } from "../../src/doc/path";
 import { arcToCubics, parsePathData } from "../../src/doc/svg-path";
 import { exportSvg, pathData } from "../../src/app/svg-export";
 import { pdfVectorOf } from "../../src/app/pdf-vector";
+import { DEFAULT_INK, exportColor, setThemeInk } from "../../src/render/ink";
 import { dashChoice, lookFromChoices } from "../../src/doc/stroke-look";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -126,5 +127,25 @@ describe("vector PDF (ADR 0153)", () => {
     expect(pdfVectorOf([rect(0, 0, 10, 10, { arrowEnd: "triangle" })], doc.space, 100, 100)).toBeNull();
     expect(pdfVectorOf([rect(0, 0, 10, 10, { mask: { by: "x", mode: "alpha" } as never })], doc.space, 100, 100)).toBeNull();
     expect(pdfVectorOf([rect(0, 0, 10, 10, { stroke: { type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: [{ o: 0, c: "#ff0000" }, { o: 1, c: "#0000ff" }] } })], doc.space, 100, 100)).toBeNull();
+  });
+});
+
+describe("the default ink in files", () => {
+  it("SVG and PDF write the default ink as the canvas draws it now (a picture export does), and any other colour as it is", () => {
+    const store = new DocumentStore();
+    const shape = (stroke: string): PathObject => rect(0, 0, 100, 60, { fill: "#2563eb", stroke });
+    try {
+      setThemeInk("rgb(227, 234, 230)"); // a dark canvas: the default ink is drawn light
+      expect(exportColor(DEFAULT_INK)).toBe("#e3eae6");
+      expect(exportColor("#ff0000")).toBe("#ff0000");
+      expect(exportSvg([shape(DEFAULT_INK)], store.space)).toContain('stroke="#e3eae6"');
+      expect(exportSvg([shape("#ff0000")], store.space)).toContain('stroke="#ff0000"');
+      expect(pdfVectorOf([shape(DEFAULT_INK)], store.space, 100, 60)!.content).toContain("0.89 0.918 0.902 RG");
+      setThemeInk("oklch(0.93 0.008 160)"); // a colour it cannot read without a page: kept as stored, never a wrong colour
+      expect(exportColor(DEFAULT_INK)).toBe(DEFAULT_INK);
+    } finally {
+      setThemeInk(null); // a light canvas draws the default ink as it is stored
+    }
+    expect(exportSvg([shape(DEFAULT_INK)], store.space)).toContain(`stroke="${DEFAULT_INK}"`);
   });
 });

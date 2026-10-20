@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.2 — The default outline keeps its look in an SVG or a PDF (2026-10-21)
+
+- **Fix:** the default outline colour (the near-black default ink) is drawn light on a dark canvas, and a picture export (PNG, WebP, JPEG, a screenshot) drew it that way too, but Save as SVG, Copy as SVG, Save to library as SVG and the PDF wrote the stored near-black. So shapes with the default outline looked light on the canvas and dark in the saved SVG. The SVG and the PDF now write the default ink as the canvas draws it (light on a dark canvas, the stored colour on a light one). Only the default ink is mapped; every other colour, and gradient stops, are written as they are, and what is stored in the document does not change.
+
 ## 0.25.1 — Exports are cut to the sheet (2026-10-21)
 
 - **Fix:** a pattern (or any shape) that runs past the sheet it is on was exported inconsistently. The picture (PNG, WebP, JPEG) was cut to the sheet but sized from the whole pattern, so a pattern picked by itself came out as a big picture with the visible part small inside and the rest empty; the SVG and the PDF did not cut it at all, so the pattern showed in full, past the frame, and a sheet's SVG was as big as the pattern, not as the sheet. Now every format agrees with the canvas: what is on a sheet that clips (a sheet, or a clipping mask) is cut to it, and the frame of the export is the part that shows (the sheet's, when a pattern fills it and runs past it), whether the sheet or only what is on it is picked, in Export…, *Save as SVG*, *Copy as SVG* and *Save to library as SVG*. In the SVG the sheet's shape is a `<clipPath>` and the shapes on it are inside a group that uses it; in the PDF it is the clip of each shape's drawing; a shape wholly outside its sheet is left out.

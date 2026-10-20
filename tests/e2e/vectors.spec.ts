@@ -2895,6 +2895,32 @@ test("Save to library puts the picked shapes in the library as an SVG picture", 
   await expect(p.getByTestId("asset-card")).toContainText("canvast-shapes");
 });
 
+test("the default outline is written to an SVG as the canvas draws it: light on a dark canvas, as stored on a light one", async ({ app }) => {
+  const p = app.page;
+  const strokeInSvg = async (): Promise<string> => {
+    await exportWith(p, "exportpic");
+    const dlg = p.getByTestId("export-dialog");
+    await dlg.locator('[data-format="svg"]').click();
+    const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+    const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+    await dlg.locator('[data-ex="close"]').click();
+    return /stroke="(#[0-9a-f]{6})"/.exec(svg)![1]!;
+  };
+  await p.emulateMedia({ colorScheme: "dark" });
+  await app.frame();
+  await key(app, "u");
+  await drag(app, [500, 300], [700, 400]);
+  await key(app, "v");
+  await click(app, 600, 350);
+  expect((await last(app)).stroke, "what is stored is still the default ink").toBe("#1f2329");
+  const dark = await strokeInSvg();
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(dark.slice(i, i + 2), 16));
+  expect(Math.min(r!, g!, b!), `on a dark canvas the outline is drawn light, so the file is too (${dark})`).toBeGreaterThan(180);
+  await p.emulateMedia({ colorScheme: "light" });
+  await app.frame();
+  expect(await strokeInSvg(), "on a light canvas it is the stored colour").toBe("#1f2329");
+});
+
 test("initial shape with the setting on keeps the fill and outline, and Reset puts them back", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "shape.initialPaint": true })));

@@ -18,6 +18,7 @@ import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/p
 import type { Arrow } from "../doc/path";
 import type { SubPath } from "../doc/path";
 import { localGradient } from "../render/gradient";
+import { exportColor } from "../render/ink";
 
 const SIZE = 1000;
 
@@ -193,7 +194,7 @@ export function exportSvg(
       }
     }
     if (!isGradient(paint)) {
-      const c = colour(solidOf(paint)); // (a picture still being decoded, or an objects fill not ready: its average colour)
+      const c = colour(exportColor(solidOf(paint))); // (the default ink as the canvas draws it; a picture still being decoded, or an objects fill not ready: its average colour)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;
