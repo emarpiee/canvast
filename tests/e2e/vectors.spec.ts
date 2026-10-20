@@ -2979,3 +2979,24 @@ test("Apply rotation: the turn of a shape becomes its own, the new zero; it look
   expect(((await last(app)) as T).rot, "one undo step brings the turn back").toBeGreaterThan(0);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Edit nodes: a plus cursor where a click adds a node, and a label that names what the keys do over a node or an edge", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 250], [640, 400]);
+  await key(app, "v");
+  await click(app, 520, 320);
+  await key(app, "n");
+  const canvas = p.locator("#canvas");
+  const label = () => p.evaluate(() => window.__canvastDebug.handleLabel());
+  await p.mouse.move(520, 250); // the middle of the top edge
+  await expect(canvas).toHaveClass(/is-add/);
+  await expect.poll(label).toMatch(/add a node/);
+  await p.mouse.move(400, 250); // a corner node
+  await expect(canvas).not.toHaveClass(/is-add/);
+  await expect.poll(label).toMatch(/Alt\+click.*Del/);
+  await p.mouse.move(520, 340); // inside the shape, off every edge and node
+  await expect(canvas).not.toHaveClass(/is-add/);
+  await expect.poll(label).toBeNull();
+});

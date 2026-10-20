@@ -1023,6 +1023,24 @@ export function attachTools(
       editor.nodeSel = { s: gs.s, k: gs.k + 1 };
     } else if (gs.what === "point" && altHeld) commitSub(o, toggleSmooth(gs.base, gs.s, gs.k), "Change node");
   };
+  /**
+   * Edit nodes, pointer over the path: a "+" cursor where a click adds a node, and a few words beside the pointer that name what the keys do there
+   * (the same label the radius, ratio and count handles have).
+   */
+  const hoverNode = (s: ScreenPoint): void => {
+    const tgt = nodeTarget();
+    const hit = tgt ? hitNodes(tgt.po, s.x, s.y, editor.nodeSel) : null;
+    el.classList.toggle("is-add", hit?.kind === "seg" && !tgt!.o.net);
+    const net = !!tgt?.o.net;
+    const text = !hit ? null
+      : hit.kind === "seg" ? (net ? "Click: add a node · Alt+click: delete the edge" : "Click: add a node")
+      : hit.kind === "point" ? (net ? "Drag: move · Alt+click: smooth or corner · Alt on another end: join · Del: delete" : "Drag: move · Alt+click: smooth or corner · Shift+click: pick more · Del: delete")
+      : "Drag: bend";
+    if (text) editor.handleLabel = editor.handleLabel?.text === text && editor.handleLabel.x === s.x && editor.handleLabel.y === s.y ? editor.handleLabel : { x: s.x, y: s.y, text };
+    else if (editor.handleLabel) editor.handleLabel = null;
+    else return;
+    editor.changed();
+  };
   /** Alt held at the release of a press on a node: the click turns the node between a corner and smooth. */
   let altHeld = false;
 
@@ -1631,6 +1649,8 @@ export function attachTools(
       boxLabel = rotating ? "Rotate" : hit ? (hit.edge ? (hit.edge === "n" || hit.edge === "s" ? "Resize height" : "Resize width") : "Resize") : null;
     }
     if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) hoverHandleLabel(local(e), boxLabel);
+    if (effectiveTool() !== "node" || g.kind !== "none" || e.buttons) el.classList.remove("is-add");
+    else hoverNode(local(e));
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
       editor.changed();
@@ -2170,6 +2190,7 @@ export function attachTools(
   const onLeave = (): void => {
     reveal.move(null, false);
     delete el.dataset["hover"];
+    el.classList.remove("is-add");
     if (g.kind === "none" && editor.handleLabel) {
       editor.handleLabel = null;
       editor.changed();
