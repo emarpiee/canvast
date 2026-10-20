@@ -122,6 +122,21 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.getByRole("menuitem", { name: /Copy the gradient Gradient 1 as CSS/ }).click();
   expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(\d+deg, #[0-9a-f]+ 0%, #[0-9a-f]+ 100%\)$/i);
 
+  // a right click on the card copies it too; CSS pasted over the panel is saved as a style (a gradient here, a colour in the Colours tab)
+  await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; });
+  await card("Gradient 1").click({ button: "right" });
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(/);
+  if (p.context().browser()?.browserType().name() === "chromium") {
+    const paste = (t: string) => p.evaluate((x) => { const dt = new DataTransfer(); dt.setData("text/plain", x); document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
+    await panel.hover();
+    await paste("conic-gradient(from 90deg, #ff0000 0deg, #0000ff 180deg)");
+    await expect(panel.locator(".style-card", { hasText: "Angular · 2 stops" })).toHaveCount(1); // (and the card says so)
+    await paste("oklch(0.628 0.2577 29.23)");
+    await panel.getByRole("tab", { name: /^Colours/ }).click();
+    await expect(panel.locator(".style-card", { hasText: "#FF0000" })).toHaveCount(1);
+    await panel.getByRole("tab", { name: /^Gradients/ }).click();
+  }
+
   // written as a GIMP gradient, and a file of that kind read back
   const [file] = await Promise.all([p.waitForEvent("download"), (async () => {
     await panel.getByRole("button", { name: /^More actions for style Gradient 1/ }).click();

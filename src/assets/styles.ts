@@ -81,7 +81,7 @@ export const GRADIENT_KIND: StyleKind = {
   validate: (d) => (isPaint(d) && isGradient(d) ? d : null),
   summary: (d) => {
     const g = d as Gradient;
-    return `${g.type === "linear" ? "Linear" : "Radial"} · ${g.stops.length} stops`;
+    return `${g.type === "linear" ? "Linear" : g.type === "angular" ? "Angular" : "Radial"} · ${g.stops.length} stops`;
   },
   look: (d) => ({ bar: gradientCss(d as Gradient) }),
 };

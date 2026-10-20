@@ -10,7 +10,7 @@ import { parseAco, serializeAco } from "../assets/aco";
 import type { PaletteColour } from "../assets/gpl";
 import { harmonies, parseHex, rgbToHex } from "../colour-picker/index";
 import type { Harmony } from "../colour-picker/colour";
-import { paintCss } from "../doc/paint";
+import { cssOfPaint, parseCssPaint } from "../app/css-paint";
 import type { Gradient, Paint } from "../doc/paint";
 import { writeZip } from "../storage/zip";
 import { openColourPopover, openGradientPopover } from "./colour-popover";
@@ -278,6 +278,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
 
   // ---- Menus ------------------------------------------------------------------------------------------------------------------
   const copyText = (text: string, what: string): void => void navigator.clipboard?.writeText(text).then(() => deps.notify(`Copied ${what}.`), () => deps.notify("Could not copy."));
+  /** A colour as hex and a gradient as CSS: the text `parseCssPaint` pastes back (the menu items and the right click both copy it). */
+  const copyItem = (item: StyleItem): boolean => {
+    const text = item.kind === "colour" || item.kind === "gradient" ? cssOfPaint(item.data as Paint) : null;
+    if (text) copyText(text, item.kind === "colour" ? text : "the gradient as CSS");
+    return text !== null;
+  };
   const editColour = (anchor: HTMLElement, name: string, value: string, change: (hex: string) => void): void =>
     openColourPopover(anchor, { name, value, alpha: true, onInput: () => undefined, onChange: change });
   const remove = (item: StyleItem): void => void confirmDialog({ title: `Delete “${item.name}”?`, lines: ["It is removed from the saved styles. What it was used on keeps its look."], confirmLabel: "Delete" }).then((ok) => { if (ok) void styles.remove(item.id); });
@@ -293,7 +299,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
         { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
         { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
-        { label: "Copy as CSS", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyText(paintCss(item.data as Paint), "the gradient as CSS") },
+        { label: "Copy as CSS", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyItem(item) },
         ...common(item),
         { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
         del,
@@ -303,7 +309,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
         { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
         { label: "Change colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
-        { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyText(String(item.data).toUpperCase(), String(item.data).toUpperCase()) },
+        { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyItem(item) },
         ...common(item),
         del,
       ];
@@ -368,6 +374,23 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (deps.paint.count() > 0) deps.paint.apply(item.data as Paint, item.name, target, true, item.id);
   };
 
+  // A right click on a colour or gradient copies it (the More menu has the same, for touch and the keyboard).
+  panel.addEventListener("contextmenu", (e) => {
+    const id = (e.target as HTMLElement).closest("li")?.querySelector<HTMLElement>("[data-more]")?.dataset["more"];
+    const it = find(id);
+    if (it && copyItem(it)) e.preventDefault();
+  });
+  // Pasting CSS (a colour in any notation, or a gradient) while the pointer or focus is on the panel saves it as a style.
+  window.addEventListener("paste", (e) => {
+    const t = e.target as Element | null;
+    if (!editor.stylesOpen || t?.closest?.("input, textarea, [contenteditable]") || !(panel.matches(":hover") || (document.activeElement && panel.contains(document.activeElement)))) return;
+    const p = parseCssPaint(e.clipboardData?.getData("text/plain") ?? "");
+    if (!p) return;
+    e.preventDefault();
+    e.stopImmediatePropagation(); // (not also the fill of the picked shapes)
+    const kind = typeof p === "string" ? "colour" : "gradient";
+    void styles.add(kind, "", p).then((made) => made && deps.notify(`Saved ${kind === "colour" ? (p as string).toUpperCase() : `the gradient “${made.name}”`}.`));
+  }, true);
   panel.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     if (t.closest("[data-close]")) {

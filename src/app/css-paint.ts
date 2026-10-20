@@ -1,3 +1,4 @@
+import { isGradient, paintCss } from "../doc/paint";
 import type { Gradient, Paint } from "../doc/paint";
 import { cssAngle, cssColour, cssStops, splitTop } from "./svg-import";
 
@@ -63,3 +64,6 @@ export function parseCssColour(text: string): string | null {
 
 /** What pasted CSS text paints: a gradient, or a solid colour. */
 export const parseCssPaint = (text: string): Paint | null => parseCssGradient(text) ?? parseCssColour(text);
+
+/** The CSS text of a paint, the way `parseCssPaint` reads it back (copy and paste are the two halves): a colour as hex, a gradient as CSS. Null for a picture or objects fill. */
+export const cssOfPaint = (p: Paint): string | null => (typeof p === "string" ? p.toUpperCase() : isGradient(p) ? paintCss(p) : null);

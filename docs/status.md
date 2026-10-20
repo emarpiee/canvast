@@ -471,15 +471,21 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.7 — Styles: right-click copy and paste (2026-10-21)
+
+- **Implemented:** `css-paint.ts` (`parseCssPaint`, `cssOfPaint`), Styles right-click copy, paste over the panel saves a style; angular summary fixed.
+- **Tested:** `styles.spec` (all 5, Chromium and Firefox; the paste step Chromium only), `vectors.spec` CSS paste test.
+- **Next bounded task:** elliptical radial gradients, then diamond.
+
 ## v0.25.6 — Paste a colour, copy a gradient as CSS (2026-10-21)
 
-- **Implemented:** `parseCssColour` / `parseCssPaint` (css-gradient.ts), `pasteCssPaint`; `cssColour` reads colours the canvas returns as text (oklch, lab) from a pixel; Styles: gradient **Copy as CSS**.
+- **Implemented:** `parseCssColour` / `parseCssPaint` (css-paint.ts), `pasteCssPaint`; `cssColour` reads colours the canvas returns as text (oklch, lab) from a pixel; Styles: gradient **Copy as CSS**.
 - **Tested:** `vectors.spec` CSS paste test (Chromium); `styles.spec` gradient test (Chromium, Firefox).
 - **Committed:** yes.
 
 ## v0.25.5 — Paste a CSS gradient onto a fill (2026-10-21)
 
-- **Implemented:** `app/css-gradient.ts` reads CSS gradient text; `pasteCssGradient` (actions.ts) puts it on the picked fills; the stop parsing is shared with the conic import (`cssStops`).
+- **Implemented:** `app/css-paint.ts` reads CSS gradient text; `pasteCssGradient` (actions.ts) puts it on the picked fills; the stop parsing is shared with the conic import (`cssStops`).
 - **Tested:** `vectors.spec` "CSS gradient text pasted ..." (Chromium only: Firefox ignores made-up paste text); the other-tool import test still passes.
 - **Known failures / Unverified:** the box is taken as a square; elliptical radial sizes and `px` positions are not read.
 - **Next bounded task:** elliptical radial gradients, then a diamond gradient.

@@ -42,7 +42,7 @@ import type { PdfVector } from "./pdf-vector";
 import type { ExportTarget } from "./export-render";
 import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
-import { parseCssPaint } from "./css-gradient";
+import { parseCssPaint } from "./css-paint";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";

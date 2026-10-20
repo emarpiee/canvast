@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.7 — Styles: right-click copy and paste (2026-10-21)
+
+- **Styles panel:** a right click on a colour or gradient card copies it (hex or CSS); *Copy hex* and *Copy as CSS* stay in the More menu (touch, keyboard). CSS pasted with the pointer over the panel is saved as a new colour or gradient style.
+- **One place for the CSS text:** `app/css-paint.ts` holds both halves (`parseCssPaint` for paste, `cssOfPaint` for copy), used by the canvas paste and the Styles panel.
+- **Fixed:** an angular gradient's Styles card said "Radial".
+
 ## 0.25.6 — Paste a colour, copy a gradient as CSS (2026-10-21)
 
 - **Pasting a solid colour** while shapes are picked makes it their fill: `#rgb`, `#rrggbbaa`, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()` and `color()`, with or without `color:`, `background:` or `fill:`. A colour outside sRGB is clipped to it. A colour word alone (`red`) is not taken, as it is more likely text.
