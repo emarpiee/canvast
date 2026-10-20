@@ -22,6 +22,7 @@
 - **Initial state menu:** Set, Update and Reset to initial state are one grouped menu on the Actions bar, before Bring to front, with matching map-pin icons (they were three loose buttons with unrelated icons).
 - **Initial shape and paint:** a new setting (Drawing, Shapes) makes Set/Update initial shape save the fill and outline too, and Reset puts them back (on by default); the pin buttons are now named Set, Update and Reset to initial state.
 - **Fix:** a fill's option menu no longer blinks at every value change.
+- **Fix:** notices stack above the Actions bar when it is at the bottom; one could cover it and take its clicks.
 - **Pattern fills:** a pattern of a pattern shows the inner pattern (up to three levels; a cycle or itself shows the average colour) and follows a change of the innermost source; the average colour of a sparse pattern is the colour of its shapes, no longer pale or white; an SVG export of a pattern keeps the shapes as vectors, one copy for each tile, cut to the shape (no `<pattern>`, which some viewers show empty, and no pictures), no longer one flat colour.
 - **SVG import:** a `clip-path` becomes a clipping mask holding what it cuts (a pattern exported as SVG and made editable again stays inside its shape).
 - **Phase 8 groundwork:** startup marks, a cheaper search, a low-memory tier, an upgrade test for a replaced HTML file, a qualification script.

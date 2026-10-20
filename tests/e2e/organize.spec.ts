@@ -314,7 +314,7 @@ test("tags can be renamed and deleted for the whole library (ADR 0057)", async (
   await expect(tagRow("colour")).toHaveCount(0);
   // Delete: taken off every asset, the assets stay.
   await sideAct(p, "tag", "hands", "Delete tag hands");
-  await expect(p.getByTestId("confirm-dialog")).toContainText("assets stay");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("items stay");
   await p.getByTestId("confirm-ok").click();
   await expect(tagRow("hands")).toHaveCount(0);
   await p.getByRole("button", { name: /^All items/ }).click();

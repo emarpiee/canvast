@@ -3054,9 +3054,11 @@ test("on a phone the Actions bar stands above the bottom controls, and the colou
   await expect(ctx).toBeVisible();
   const [a, c] = [(await ctx.boundingBox())!, (await p.locator(".hud-controls").boundingBox())!];
   expect(a.y + a.height, "the Actions bar ends above the controls").toBeLessThanOrEqual(c.y + 1);
-  const row = p.locator("#toolbar > .toolbar .tb-options-row");
+  // (the colours' own bar is a .toolbar too: the Properties bar is the other one)
+  const row = p.locator('#toolbar > .toolbar:not([aria-label="Colours of the selection"]) .tb-options-row');
   await expect(row.locator("[data-sel-colours]"), "the colours are in the Properties bar's row").toHaveCount(1);
   await p.setViewportSize({ width: 1280, height: 800 });
-  await expect(p.locator("#toolbar > .toolbar .tb-options-row [data-sel-colours]"), "wider, they are a bar of their own again").toHaveCount(0);
+  await expect(row.locator("[data-sel-colours]"), "wider, they are a bar of their own again").toHaveCount(0);
+  await expect(p.locator('#toolbar > .toolbar[aria-label="Colours of the selection"] [data-sel-colours]')).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });

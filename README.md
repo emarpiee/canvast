@@ -169,7 +169,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
 - **Previous view** and **Next view** walk your camera history; the **dice** goes to a random empty place.
 - **Read-outs:** the bottom left shows the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when picked, hidden).
-- **Hint line** at the bottom says what the tool does and what each key does over a handle. **Notices** report results, often with a *View* button that opens what was made.
+- **Hint line** at the bottom says what the tool does and what each key does over a handle. **Notices** report results, often with a *View* button that opens what was made; they stack above the Actions bar, never over it.
 
 ![Command palette](docs/screenshots/command-palette.webp)
 

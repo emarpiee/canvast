@@ -1029,6 +1029,9 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 @keyframes notice-spin { to { transform: rotate(360deg); } }
 body[data-view="assets"] #notices { bottom: 92px; }
 @media (max-width: 640px) { #notices { bottom: 72px; } }
+/* The Actions bar at the bottom is never covered by a notice: they stack above it. */
+body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([hidden])) #notices { bottom: calc(2 * var(--sp-14) + var(--sp-6) + var(--bar-h) + var(--near)); }
+@media (max-width: 640px) { body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([hidden])) #notices { bottom: calc(var(--hud-bottom-h, 0px) + 2 * var(--near) + var(--bar-h)); } }
 .assets-status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---- Assets view (ui/assets-view.ts, ADR 0054) ------------------------------------------------------------------------

@@ -1181,9 +1181,11 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   await p.evaluate(() => (document.documentElement.dataset["density"] = "dense"));
   expect(await barH(), "dense: a shorter control row").toBeLessThan(compact);
   await p.evaluate(() => delete document.documentElement.dataset["density"]);
+  await expect.poll(barH, "the control row is back to its own height").toBe(compact);
   await p.keyboard.press("f"); // (with its own controls hidden too)
-  const picAfter = (await viewer.locator("figure img").boundingBox())!;
-  for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(picAfter[k] - picBefore[k]), `the picture's ${k} is the same with the controls hidden`).toBeLessThan(1.5);
+  // (the room kept for the controls follows their height through a ResizeObserver, a frame later: poll)
+  const moved = async () => { const a = (await viewer.locator("figure img").boundingBox())!; return Math.max(...(["x", "y", "width", "height"] as const).map((k) => Math.abs(a[k] - picBefore[k]))); };
+  await expect.poll(moved, "the picture is the same size and place with the controls hidden").toBeLessThan(1.5);
   const showB = (await viewer.getByRole("button", { name: "Show the controls" }).boundingBox())!;
   expect(Math.abs(showB.x + showB.width / 2 - (hb.x + hb.width / 2)), "the show button is at the same centre").toBeLessThan(2);
   for (const el of away) await expect(el).toBeHidden();
@@ -2081,7 +2083,10 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   const img = viewer.locator("figure img");
   await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   const ib = (await img.boundingBox())!;
-  expect(Math.abs(ib.y - stage.y - (stage.y + stage.height - ib.y - ib.height)), "equal room above and below").toBeLessThan(2);
+  // (the picture's room keeps clear of the button that hides the controls, at the bottom: --viewer-bottom; it is centred in that room)
+  const keep = await viewer.evaluate((v) => { const d = document.createElement("div"); d.style.height = "var(--viewer-bottom)"; v.append(d); const h = d.getBoundingClientRect().height; d.remove(); return h; });
+  const inset = ib.x - stage.x;
+  expect(Math.abs(ib.y - stage.y - inset - (stage.y + stage.height - keep - ib.y - ib.height)), "centred in its room, above and below").toBeLessThan(2);
   expect(Math.abs(ib.x - stage.x - (stage.x + stage.width - ib.x - ib.width)), "equal room left and right").toBeLessThan(2);
   // The controls are two rows on a phone: previous, count, next; then zoom on the left and the buttons on the right, nothing wrapped.
   const controls = (await viewer.locator(".viewer-bar").boundingBox())!;

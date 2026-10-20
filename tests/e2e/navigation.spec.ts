@@ -350,7 +350,7 @@ test("the command palette: / or Ctrl+K opens it and it finds a command by its wo
   await expect(palette.getByText("No command matches.")).toBeVisible();
   await p.locator(".palette-input").fill("zoom in");
   await expect(palette.locator(".palette-title").first()).toHaveText("Zoom in");
-  await expect(palette.locator("kbd").first()).toHaveText("+");
+  await expect(palette.locator("kbd").first()).toHaveText("+, ="); // (every key the command has)
   const z0 = Number((await app.camera()).zi);
   await p.keyboard.press("Enter");
   await expect(palette).toBeHidden();

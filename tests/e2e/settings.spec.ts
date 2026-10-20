@@ -99,6 +99,8 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await expect(note).toContainText("Undo: Ctrl+Shift+U.");
   await panel.getByRole("button", { name: "Add a key for Undo" }).click();
   await p.keyboard.press("F7");
+  await expect(note).toContainText("caret browsing"); // (a key the browser may take is asked about)
+  await note.getByRole("button", { name: /Use F7 anyway/ }).click();
   await expect(panel.locator('[data-key-row="edit.undo"] kbd')).toHaveText(["Ctrl+Shift+U", "F7"]);
   await panel.getByRole("button", { name: "Take F7 away from Undo" }).click();
   await expect(panel.locator('[data-key-row="edit.undo"] kbd')).toHaveText(["Ctrl+Shift+U"]);
