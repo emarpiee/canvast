@@ -1408,7 +1408,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     root.setProperty("--bar-bottom", `${Math.ceil(Math.max(...bottoms))}px`);
     for (const el of [barBox.querySelector<HTMLElement>(".dock"), document.querySelector<HTMLElement>(".hud-controls")]) if (el) syncScroll(el);
+    // The hint line takes all the room the bottom-right controls leave (it was given a fixed width that they outgrew).
+    const hc = document.querySelector<HTMLElement>(".hud-controls");
+    root.setProperty("--controls-w", `${Math.ceil(hc?.getBoundingClientRect().width ?? 0)}px`);
+    const hudBottom = document.querySelector<HTMLElement>(".hud-bottom");
+    root.setProperty("--hud-bottom-h", `${Math.ceil(hudBottom?.getBoundingClientRect().height ?? 0)}px`);
+    if (hc && !watchedControls) {
+      watchedControls = true;
+      new ResizeObserver(measureNav).observe(hc);
+      if (hudBottom) new ResizeObserver(measureNav).observe(hudBottom);
+    }
   };
+  let watchedControls = false;
   new ResizeObserver(measureNav).observe(navBox);
   new ResizeObserver(measureNav).observe(barBox);
   const dockEl = barBox.querySelector<HTMLElement>(".dock");

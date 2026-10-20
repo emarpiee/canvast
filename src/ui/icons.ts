@@ -71,6 +71,8 @@ import rotateCwSquare from "lucide-static/icons/rotate-cw-square.svg";
 import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
 import searchIcon from "lucide-static/icons/search.svg";
+import chevronsDown from "lucide-static/icons/chevrons-down.svg";
+import chevronsUp from "lucide-static/icons/chevrons-up.svg";
 import chevronsDownUp from "lucide-static/icons/chevrons-down-up.svg";
 import chevronsUpDown from "lucide-static/icons/chevrons-up-down.svg";
 import folderIcon from "lucide-static/icons/folder.svg";
@@ -291,6 +293,8 @@ export const ICONS = {
   ratio: clean(ratioIcon),
   focus: clean(focusIcon),
   search: clean(searchIcon),
+  chevronsDown: clean(chevronsDown),
+  chevronsUp: clean(chevronsUp),
   chevronsDownUp: clean(chevronsDownUp),
   chevronsUpDown: clean(chevronsUpDown),
   folder: clean(folderIcon),

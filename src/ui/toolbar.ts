@@ -341,6 +341,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
   const outlineHome = outlineBtn.parentElement!;
   root.querySelector(".toolbar")!.after(colourBar.el);
+  // On a phone the colours of the selection share the row of the Properties bar (one row less at the top); wider, they are a bar of their own under it.
+  const phoneWidth = window.matchMedia("(max-width: 640px)");
+  const placeColours = (): void => {
+    const group = root.querySelector<HTMLElement>("[data-sel-colours]")!;
+    const home = phoneWidth.matches ? root.querySelector<HTMLElement>(".tb-options-row")! : colourBar.row;
+    if (group.parentElement !== home) home.append(group);
+  };
+  placeColours();
   // The corner-radius lock, snap and the axis-aligned box are a bar of their own beside the Actions bar. It joins that bar's wrapper (the same parent, so the
   // two line up) in `update`, once the Actions bar exists (it is mounted after this one); its clicks are handled here.
   const pickBar = createBar("Selection options", "Selection");
@@ -1074,5 +1082,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   editor.subscribe(update);
   doc.subscribe(update);
+  phoneWidth.addEventListener("change", () => {
+    placeColours();
+    update();
+  });
   update();
 }

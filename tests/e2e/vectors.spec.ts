@@ -1424,6 +1424,10 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   // the rest are a bar of their own beside the Actions bar (with something picked), not in the options bar at the top
   for (const name of [/^Axis-aligned selection box/, /^Snap to other objects/, /^Lock corner radius/]) expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name }).count(), `${name} is not in the options bar`).toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
+  // the hint line never runs under the controls at the bottom right: it takes the room they leave
+  const hintBox = await p.locator(".hint-float").boundingBox();
+  const controlsBox = (await p.locator(".hud-controls").boundingBox())!;
+  if (hintBox && hintBox.y + hintBox.height > controlsBox.y) expect(hintBox.x + hintBox.width, "the hint ends before the controls").toBeLessThanOrEqual(controlsBox.x);
   // Settings > Hints and tooltips: none
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Appearance" }).click();
@@ -3029,4 +3033,23 @@ test("Edit nodes and the corners one by one end by themselves when the shape is 
   await click(app, 900, 600);
   await click(app, 530, 320);
   expect(Math.abs((await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main[0] - 530), "closed after the shape was let go").toBeGreaterThan(15);
+});
+
+test("on a phone the Actions bar stands above the bottom controls, and the colours of the selection share the row of the Properties bar (one row less at the top)", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 390, height: 780 });
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 120, y: 300 }, { x: 260, y: 400 }, 5);
+  await p.keyboard.press("v");
+  await p.mouse.click(190, 350);
+  const ctx = p.locator(".ctx-wrap");
+  await expect(ctx).toBeVisible();
+  const [a, c] = [(await ctx.boundingBox())!, (await p.locator(".hud-controls").boundingBox())!];
+  expect(a.y + a.height, "the Actions bar ends above the controls").toBeLessThanOrEqual(c.y + 1);
+  const row = p.locator("#toolbar > .toolbar .tb-options-row");
+  await expect(row.locator("[data-sel-colours]"), "the colours are in the Properties bar's row").toHaveCount(1);
+  await p.setViewportSize({ width: 1280, height: 800 });
+  await expect(p.locator("#toolbar > .toolbar .tb-options-row [data-sel-colours]"), "wider, they are a bar of their own again").toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
 });

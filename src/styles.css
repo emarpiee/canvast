@@ -980,8 +980,8 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .nav-pill { height: var(--bar-h); }
 .view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); }
-/* Settings: a bar of its own at the top right in the Assets and Settings views; on the canvas the button is the last one of the bottom-right bar (view-switch.ts moves it). */
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
+/* Settings: a button of its own in the top-right corner of every view. */
 .view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
@@ -989,7 +989,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -1058,6 +1058,7 @@ body[data-view="assets"] #notices { bottom: 92px; }
 .assets-main { position: relative; flex: 1; min-width: 0; }
 .assets-scroll { position: absolute; inset: 0; overflow: auto; padding-bottom: var(--sp-10); }
 .assets-body.is-viewing .assets-scroll, .assets-body.is-viewing .assets-side { display: none; }
+.assets-body.is-viewing { gap: 0; padding-top: 0; } /* the viewer and its details panel share the whole page: no gap between them */
 .assets-empty { margin: var(--sp-10) 0; color: var(--hud-muted); }
 
 /* The library: a justified gallery, every picture at its own proportions, no frames or bands around them. */
@@ -1149,14 +1150,18 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-actual figure { width: max-content; height: max-content; align-items: flex-start; margin: auto; }
 .viewer.is-actual img { flex: none; width: auto; max-width: none; max-height: none; }
 .viewer figcaption { flex: none; font-size: var(--text-sm); color: var(--media-muted); text-align: center; }
-.viewer-bar { flex: none; display: flex; align-items: center; gap: var(--sp-8); padding: var(--sp-4) var(--sp-6); background: var(--media-bar); border-top: 1px solid var(--white-a10); }
+.viewer-bar { flex: none; display: flex; align-items: center; gap: calc(var(--near) * 2); padding: var(--near) var(--edge); background: var(--media-bar); border-top: 1px solid var(--white-a10); }
 .viewer.no-bar .viewer-bar { display: none; }
 .viewer-nav, .viewer-tools { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
-.viewer-pos { min-width: 72px; padding: 0 var(--sp-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
+.viewer-pos { min-width: calc(var(--ctl) * 2.4); padding: 0 var(--sp-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
 .vbtn.viewer-back, .vbtn.viewer-details { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
 .vbtn.viewer-back { left: var(--sp-6); }
 .vbtn.viewer-details { right: var(--sp-6); }
 /* with the controls hidden the two at the top fade out, and come back when the pointer is near the top edge (the handle brings the controls back) */
+/* The button that hides the controls floats at the bottom centre, just above them, where the one that shows them comes back to; the picture keeps clear of that strip. */
+.vbtn.viewer-hide { position: absolute; left: 50%; bottom: calc(var(--viewer-bar-h, 56px) + var(--near)); transform: translateX(-50%); z-index: var(--z-item-bar); color: var(--v-fg); background: transparent; border: 0; filter: drop-shadow(0 0 var(--sp-1) var(--v-stage)); }
+.vbtn.viewer-hide:hover { color: var(--hud-accent); }
+.viewer.no-bar .viewer-hide { display: none; }
 .viewer .viewer-ground { display: none; }
 .viewer.has-alpha .viewer-ground { display: inline-flex; }
 .vbtn.viewer-ground { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); color: var(--media-fg); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
@@ -1184,7 +1189,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   .assets-body { flex-direction: column; }
   .assets-side { flex: 0 0 auto; max-height: 24vh; }
   .asset-inspector { flex: 0 0 auto; max-height: 44vh; }
-  .viewer-film { display: none; }
 }
 
 /* The readout's views (app/hud.ts, ADR 0055): what a mode does not show is gone, whatever else sets display. */
@@ -1334,7 +1338,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 @media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: 64px; } }
 @media (max-width: 1180px) { .assets-size input { width: 56px; } }
 /* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). Down to 960 px the bar shares the row of the view tabs (the search gives way first). */
-@media (max-width: 960px) { .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
+@media (max-width: 960px) { .assets-bar .assets-sep { display: none; } .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
 
 /* In the viewer the library bar is not needed and the view tabs are away (body[data-viewing]): the viewer gets the whole page. */
 #assets-view.is-viewing .assets-bar { display: none; }
@@ -1344,7 +1348,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-handle { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; gap: var(--sp-3); width: 240px; height: 72px; padding: 0 0 var(--sp-4); background: none; border: 0; opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer-handle[hidden] { display: none; }
 .viewer-handle:hover, .viewer-handle:focus-within { opacity: 1; }
-.viewer-handle .vbtn { min-width: 40px; height: 32px; background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.viewer-handle .vbtn { min-width: var(--ctl); height: var(--ctl); color: var(--v-fg); background: transparent; border: 0; filter: drop-shadow(0 0 var(--sp-1) var(--v-stage)); }
 .viewer-handle [data-act="play"] { display: none; }
 .viewer.is-showing .viewer-handle [data-act="play"] { display: inline-flex; }
 .viewer.is-showing .viewer-handle { opacity: 0.5; }
@@ -1392,8 +1396,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer-stage { position: relative; display: block; padding: 0; overflow: hidden; }
 .viewer.is-actual .viewer-stage { overflow: auto; }
 .viewer figure { position: absolute; inset: 0; margin: 0; width: auto; height: auto; display: block; }
-.viewer figure img, .viewer figure video { position: absolute; inset: 16px 16px 52px; margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
-.viewer.no-bar figure img, .viewer.no-bar figure video { inset: 16px 16px 52px; }
+.viewer figure img, .viewer figure video { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
 .viewer figcaption { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: var(--sp-3) var(--sp-6); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--media-fg); background: var(--media-caption-bg); border-radius: var(--r-pill); }
 .viewer.is-actual figure { position: static; width: max-content; height: max-content; margin: auto; }
 .viewer.is-actual figure img { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
@@ -1437,10 +1440,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* Viewer zoom: a small control over the picture (the wheel, a pinch, a drag and the keys do the work); the picture is moved with a transform. */
 .viewer-zoom { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); backdrop-filter: blur(8px); }
-.viewer-zoom button { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 var(--sp-4); color: inherit; font: var(--weight-medium) var(--text-sm) var(--font-ui); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; font-variant-numeric: tabular-nums; }
+.viewer-zoom button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-4); color: inherit; font: var(--weight-medium) var(--text-sm) var(--font-ui); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; font-variant-numeric: tabular-nums; }
 .viewer-zoom button svg { width: 16px; height: 16px; }
 .viewer-zoom button:hover { background: var(--white-a14); }
-.viewer-zoom .viewer-zoom-pct { min-width: 52px; }
+.viewer-zoom .viewer-zoom-pct { min-width: calc(var(--ctl) * 1.7); }
 .viewer.no-bar .viewer-zoom { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar .viewer-zoom:hover, .viewer.no-bar .viewer-zoom:focus-within { opacity: 1; }
 .viewer figure img, .viewer figure video { cursor: grab; transition: none; will-change: transform; touch-action: none; }
@@ -1614,7 +1617,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .vbtn:hover:not(:disabled) { background: var(--v-hover); }
 .viewer-interval { background: var(--v-hover); }
 .film-item { background: var(--v-hover); }
-.viewer-zoom, .viewer-handle .vbtn { background: var(--v-pill); border-color: var(--v-line); }
+.viewer-zoom { background: var(--v-pill); border-color: var(--v-line); }
+.viewer-handle .vbtn:hover { color: var(--hud-accent); }
 .viewer-zoom button:hover { background: var(--v-hover); }
 .viewer-handle:not(:hover) .vbtn { color: var(--v-fg); }
 .is-checker, .assets-body:not(.is-list) .asset-card.has-alpha, .film-item.has-alpha, .asset-preview.has-alpha, .viewer-checker i {
@@ -1703,8 +1707,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
   #assets-view:has(.assets-body.is-viewing) { padding-top: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + var(--sp-4)); }
   /* The viewer takes the screen under the tabs: the library bar steps aside, its controls wrap in two rows. */
   #assets-view:has(.assets-body.is-viewing) .assets-bar { display: none; }
-  .viewer-bar { flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); }
-  .viewer-tools { flex-wrap: wrap; justify-content: flex-end; flex: 1; }
+  /* The previews stay, as a row of their own above the controls, and the controls are centred under them. */
+  .viewer-bar { flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); }
+  .viewer-film { order: -1; flex: 1 1 100%; justify-content: safe center; }
+  .viewer-tools { flex-wrap: wrap; justify-content: center; flex: 0 1 auto; }
   .viewer-pos { min-width: 0; padding: 0 var(--sp-2); }
 }
 
@@ -1713,12 +1719,14 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer-edge.is-prev { left: 0; }
 .viewer-edge.is-next { right: 0; }
 .viewer.is-zoomed .viewer-edge, .viewer.is-actual .viewer-edge { display: none; }
-.viewer { --edge-w: 15; }
+/* The picture keeps clear of a strip at the bottom for the button that hides the controls (the same strip, so the picture is the same size, whether the controls are shown or hidden). */
+.viewer { --edge-w: 15; --viewer-bottom: calc(var(--ctl) + 2 * var(--near)); }
+.viewer.no-bar { --viewer-bottom: calc(var(--ctl) + 2 * var(--near) + var(--viewer-bar-h, 0px)); }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
 .viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
 
 /* ---- Viewer: zoom control in the bar, the picture centred on every side; adjustable details on small screens ---- */
-.viewer figure img, .viewer figure video, .viewer.no-bar figure img, .viewer.no-bar figure video, .viewer-checker { inset: 16px; }
+.viewer figure img, .viewer figure video, .viewer-checker { inset: 16px 16px var(--viewer-bottom); }
 .viewer-zoom { position: static; display: inline-flex; flex: none; padding: var(--sp-1); background: var(--v-hover); border: 0; backdrop-filter: none; }
 .viewer.no-bar .viewer-zoom { opacity: 1; }
 .viewer-edge { bottom: 0; }
@@ -1762,21 +1770,21 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.is-list .assets-list-head, .assets-body.is-list .assets-grid { min-width: var(--list-min, 0); }
 
 /* ---- Viewer on a phone: the picture is centred (the inset is inside its box, not added to it), the bar is two tidy rows ---- */
-.viewer figure img, .viewer figure video { width: calc(100% - 32px); height: calc(100% - 32px); }
+.viewer figure img, .viewer figure video { width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); }
 @media (max-width: 640px) {
   .viewer-bar { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px)); }
-  .viewer-nav { display: flex; justify-content: space-between; align-items: center; }
+  .viewer-film { grid-row: 1; }
+  .viewer-nav { display: flex; justify-content: center; align-items: center; gap: var(--sp-4); }
   .viewer-nav .vbtn { min-width: 44px; }
-  .viewer-pos { flex: 1; text-align: center; }
-  .viewer-tools { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: var(--sp-2); }
+  .viewer-pos { flex: none; text-align: center; }
+  .viewer-tools { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: var(--sp-4); }
   .viewer-tools [data-act="play"] span, .viewer-tools [data-act="place"] span { display: none; }
   .viewer-tools [data-act="details"] { display: none; }
-  .viewer-zoom { margin-right: auto; }
   .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { bottom: calc(var(--sheet-now, 58vh) - 14px); }
 }
 
 /* ---- Viewer: the on-canvas player's controls over the picture (ADR 0064); the GIF canvas is placed like the picture ---- */
-.viewer figure canvas.viewer-gif { position: absolute; inset: 16px; margin: auto; width: calc(100% - 32px); height: calc(100% - 32px); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
+.viewer figure canvas.viewer-gif { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
 .viewer figure canvas.viewer-gif[hidden] { display: none; }
 .viewer figure canvas.viewer-vec { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .viewer figure canvas.viewer-vec[hidden] { display: none; }
@@ -2165,9 +2173,11 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 /* The bar is the bottom-most strip, the full width; the view controls float just above it at the right, as they always did. */
 .hud-bottom > .hud-readout { position: static; order: 2; min-width: 0; max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-9); padding: var(--sp-2) var(--edge); white-space: nowrap; overflow: hidden; border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
 .hud-bottom > .hud-controls { position: static; order: 1; align-self: flex-end; margin: 0 var(--edge) var(--near); }
-.hint-float { position: fixed; z-index: var(--z-edge); left: var(--edge); right: calc(var(--edge) + 22rem); bottom: calc(var(--sp-14) + var(--sp-3)); font: var(--font-meta); color: var(--hud-muted); text-align: left; text-wrap: balance; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); pointer-events: none; }
+.hint-float { position: fixed; z-index: var(--z-edge); left: var(--edge); right: calc(var(--edge) + var(--controls-w, 22rem) + var(--edge) + var(--near)); bottom: calc(var(--sp-14) + var(--sp-3)); font: var(--font-meta); color: var(--hud-muted); text-align: left; text-wrap: balance; text-shadow: 0 0 var(--sp-3) var(--canvas-bg), 0 0 var(--sp-6) var(--canvas-bg); pointer-events: none; }
 .hint-float[hidden] { display: none; }
 /* A phone has no room beside the bottom right controls: the line takes the full width, above the Actions bar. */
+/* On a phone the bottom controls and the readout stack: the Actions bar stands above whatever height they have. */
+@media (max-width: 640px) { .ctx-wrap:not(.is-following) { bottom: calc(var(--hud-bottom-h, 0px) + var(--near)); } }
 @media (max-width: 640px) { .hint-float { left: var(--edge); right: var(--edge); bottom: calc(4 * var(--sp-14)); text-align: center; } }
 .hud-readout .hud-diag { display: contents; margin: 0; font: inherit; }
 .hud-readout .hud-save { padding: 0; text-align: left; }
@@ -2614,9 +2624,9 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
   #toolbar > .dock > .tb-group { flex: 1; justify-content: space-evenly; }
 }
 
-/* Phones, Assets and Settings: the gear sits in the top-right corner, so the tabs and the workspace menu stop short of it. */
+/* Phones: the gear sits in the top-right corner, so the tabs and the workspace menu stop short of it. */
 @media (max-width: 640px) {
-  body:not([data-view="canvas"]) #nav { right: calc(var(--edge) + var(--bar-h) + var(--near)); }
+  #nav { right: calc(var(--edge) + var(--bar-h) + var(--near)); }
 }
 /* Small screens, Settings: the tabs are one row that scrolls sideways (the same cue as the bars); a group's title becomes a thin line between its tabs. */
 @media (max-width: 720px) {

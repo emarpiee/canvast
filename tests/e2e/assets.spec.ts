@@ -1164,7 +1164,28 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   const vb = (await viewer.boundingBox())!;
   expect(Math.abs(bb.y - db.y), "on one line").toBeLessThan(2);
   expect(db.x, "details at the right, back at the left").toBeGreaterThan(bb.x + 200);
+  // the button that hides the controls floats at the bottom centre just above them, clear of the picture; the one that shows them is at the same centre
+  const hide = viewer.getByRole("button", { name: "Hide the controls" });
+  const hb = (await hide.boundingBox())!;
+  const bar = (await viewer.locator(".viewer-bar").boundingBox())!;
+  const pic = (await viewer.locator("figure img").boundingBox())!;
+  expect(hb.y + hb.height, "above the controls").toBeLessThanOrEqual(bar.y + 1);
+  expect(hb.y, "below the picture's own room").toBeGreaterThanOrEqual(pic.y + pic.height - 1);
+  const stageBox = (await viewer.locator(".viewer-stage").boundingBox())!;
+  expect(Math.abs(hb.x + hb.width / 2 - (stageBox.x + stageBox.width / 2)), "in the middle").toBeLessThan(2);
+  // the picture is the same size and place with the controls shown or hidden (nothing stretches or shrinks when they go)
+  const picBefore = (await viewer.locator("figure img").boundingBox())!;
+  // and the controls follow Size and comfort: denser, they are shorter
+  const barH = async () => (await viewer.locator(".viewer-bar").boundingBox())!.height;
+  const compact = await barH();
+  await p.evaluate(() => (document.documentElement.dataset["density"] = "dense"));
+  expect(await barH(), "dense: a shorter control row").toBeLessThan(compact);
+  await p.evaluate(() => delete document.documentElement.dataset["density"]);
   await p.keyboard.press("f"); // (with its own controls hidden too)
+  const picAfter = (await viewer.locator("figure img").boundingBox())!;
+  for (const k of ["x", "y", "width", "height"] as const) expect(Math.abs(picAfter[k] - picBefore[k]), `the picture's ${k} is the same with the controls hidden`).toBeLessThan(1.5);
+  const showB = (await viewer.getByRole("button", { name: "Show the controls" }).boundingBox())!;
+  expect(Math.abs(showB.x + showB.width / 2 - (hb.x + hb.width / 2)), "the show button is at the same centre").toBeLessThan(2);
   for (const el of away) await expect(el).toBeHidden();
   await expect(back, "faded out with the controls").toHaveCSS("opacity", "0");
   await expect(details).toHaveCSS("opacity", "0");
@@ -1312,6 +1333,20 @@ test("a button at the bottom right of the viewer cycles the ground under see-thr
   await toAssets(p);
   await open("half.png");
   await expect.poll(far).toEqual([0, 0, 0, 255]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("two quick taps on a thumbnail open the viewer (a phone sends no double-click for a double tap)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "one.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) });
+  const card = p.getByTestId("asset-card").first();
+  await expect(card).toBeVisible();
+  const tap = () => card.evaluate((el) => el.dispatchEvent(new PointerEvent("pointerup", { pointerType: "touch", bubbles: true, cancelable: true })));
+  await tap();
+  await expect(p.getByTestId("slide-view"), "one tap only picks it").toBeHidden();
+  await tap();
+  await expect(p.getByTestId("slide-view"), "the second tap opens it").toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -1536,17 +1571,16 @@ test("the viewer follows the theme, and a picture with see-through pixels sits o
   await expect(card(p, halfHash)).toHaveClass(/has-alpha/);
   await expect(card(p, GREEN_HASH)).not.toHaveClass(/has-alpha/);
   const viewer = p.getByTestId("slide-view");
-  const checker = viewer.locator(".viewer-checker");
+  const ground = viewer.locator("canvas.viewer-vec");
   await card(p, halfHash).dblclick();
   await expect(viewer).toBeVisible();
-  await expect(checker).toBeVisible();
-  // The chequered ground is exactly the picture (40 x 30), not the whole stage.
-  const tile = (await checker.locator("i").boundingBox())!;
-  expect(Math.abs(tile.width / tile.height - 40 / 30)).toBeLessThan(0.02);
+  await expect(ground, "the chequered ground is drawn under a see-through picture").toBeVisible();
+  // It fills the stage (it is not a box the size of the picture).
   const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
-  expect(tile.width).toBeLessThan(stage.width);
+  const gb = (await ground.boundingBox())!;
+  expect(gb.width).toBeGreaterThan(stage.width - 2);
   await p.keyboard.press("ArrowRight");
-  await expect(checker).toBeHidden();
+  await expect(ground, "an opaque picture gets none").toBeHidden();
   // The viewer's ground follows the theme: light in a light theme, dark in a dark one.
   const lightness = () => viewer.evaluate((e) => Number(/oklch\(([\d.]+)/.exec(getComputedStyle(e).backgroundColor)?.[1] ?? "NaN"));
   await p.emulateMedia({ colorScheme: "light" });

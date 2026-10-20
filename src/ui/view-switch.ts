@@ -15,9 +15,9 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
     <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
   const set = (v: AppView): void => {
-    // The Settings button sits at the end of the canvas's bottom-right bar; the other views have no such bar, so it stays at the top right there.
+    // The Settings button is a button of its own at the top right in every view (not one of the buttons of a bar).
     const gear = document.querySelector<HTMLElement>('button[data-view="settings"]');
-    const slot = v === "canvas" ? document.querySelector<HTMLElement>(".hud-controls") : root.querySelector<HTMLElement>(".view-settings");
+    const slot = root.querySelector<HTMLElement>(".view-settings");
     if (gear && slot && gear.parentElement !== slot) slot.append(gear);
     for (const b of document.querySelectorAll<HTMLElement>('[data-view="settings"]')) b.setAttribute("aria-pressed", String(v === "settings"));
     for (const t of tabs) {

@@ -94,6 +94,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `camera` | Screenshot (left tool rail, above Search) |
 | `arrow-left` | Back to the library (top left of the library viewer) |
 | `sun-moon` | Background of see-through pictures (library viewer, bottom right) |
+| `chevrons-down` | Hide the controls (library viewer) |
+| `chevrons-up` | Show the controls (library viewer) |
 | `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
 | `check` | Canvas 1empty |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |

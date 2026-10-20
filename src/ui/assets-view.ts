@@ -168,6 +168,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
+          <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
           <div class="viewer-stage"><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
@@ -188,12 +189,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <button type="button" class="vbtn" data-act="fullscreen" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
               <span class="viewer-quick"><button type="button" class="vbtn" data-act="favorite" aria-pressed="false" aria-label="Favourite" title="Favourite">${ICONS.star}</button>
               <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
-              <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.panelBottomClose}</button>
             </div>
           </div>
           <div class="viewer-handle" hidden>
             <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
-            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.panelBottomOpen}</button>
+            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.chevronsUp}</button>
           </div>
         </div>
       </div>
@@ -496,6 +496,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // Video, audio and GIF play with the same engines and control bar as the on-canvas player (ADR 0064).
   const slideGif = viewer.querySelector<HTMLCanvasElement>(".viewer-gif")!;
   const slideVec = viewer.querySelector<HTMLCanvasElement>(".viewer-vec")!;
+  // The controls lie over the bottom of the stage: the button that hides them floats just above them, wherever their height goes (a phone has two rows).
+  const controlsBar = viewer.querySelector<HTMLElement>(".viewer-bar")!;
+  new ResizeObserver(() => controlsBar.offsetHeight && viewer.style.setProperty("--viewer-bar-h", `${controlsBar.offsetHeight}px`)).observe(controlsBar); // (not while it is hidden: the strip keeps its size)
   /** The open picture is an SVG: it is drawn again at every zoom, on `slideVec`, so it is crisp at any size (the img only gives its size). */
   let vector = false;
   const avEng = avEngine(slideMedia);
@@ -633,6 +636,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (vector) g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
   };
   window.addEventListener("resize", paintVector);
+  // The stage changes size when the controls are hidden or shown (and with the window): the picture is fitted and drawn again for its new size, so an SVG is never a stale bitmap stretched to fit.
+  new ResizeObserver(() => paintZoom()).observe(stage);
   const paintZoom = (): void => {
     const el = shownMedia();
     const z = sizes();
@@ -1636,9 +1641,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void select(hash);
     }
   });
-  grid.addEventListener("dblclick", (e) => {
-    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
-    if (!card || e.shiftKey || e.ctrlKey || e.metaKey) return;
+  const openFromCard = (card: HTMLElement): void => {
     // The first click of this double-click showed the hidden details; opening the viewer puts them back as they were.
     if (autoShown) {
       autoShown = false;
@@ -1649,6 +1652,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // Any file: a missing original shows its thumbnail, a kind without a preview a plain file picture.
     slideSet = null;
     void showSlide(card.dataset["hash"]!);
+  };
+  grid.addEventListener("dblclick", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (!card || e.shiftKey || e.ctrlKey || e.metaKey) return;
+    openFromCard(card);
+  });
+  // A phone sends no double-click for a double tap (and the first tap moves the page under the finger, with the details sheet): two taps on one card in a short time open the viewer.
+  let lastTap: { hash: string; at: number } | null = null;
+  grid.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "touch") return;
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (!card || (e.target as HTMLElement).closest(".asset-check")) return;
+    const hash = card.dataset["hash"]!;
+    if (lastTap && lastTap.hash === hash && e.timeStamp - lastTap.at < 450) {
+      lastTap = null;
+      openFromCard(card);
+    } else lastTap = { hash, at: e.timeStamp };
   });
   /** Move the keyboard (and the pick) through the cards: left and right, up and down (rows in the list), Home and End. */
   /** Where the arrow keys last went: the pick itself lands a moment later, and a quick second key must start from here. */
