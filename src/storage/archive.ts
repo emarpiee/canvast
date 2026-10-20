@@ -47,7 +47,7 @@ export const ARCHIVE_EXTENSION = ".canvast";
 
 export type ExportScope =
   /** `since`: an incremental backup, with only what changed after that time (the `at` of the backup it goes on from). */
-  | { kind: "workspace"; since?: number; /** The library file kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
+  | { kind: "workspace"; since?: number; /** The library index kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
   | { kind: "board"; boardId: string }
   | { kind: "canvas"; canvasId: string }
   | { kind: "assets"; hashes: string[] };
@@ -105,8 +105,10 @@ export interface Manifest {
   styles?: unknown[];
   /** Present for an incremental backup: what it goes on from. A chain is read oldest first, each file starting where the one before ended. */
   incremental?: { since: number };
-  /** The library file of a library folder: no original has bytes in it; they are the files of the folder. */
+  /** The library index of a library folder: no original has bytes in it; they are the files of the folder. */
   libraryFile?: true;
+  /** The device settings that differ from the defaults (a workspace archive): theme, shortcuts, panel layout. Restored only where the importing device has not set them. */
+  settings?: Record<string, unknown>;
 }
 
 export interface ExportResult {
@@ -122,7 +124,7 @@ const HASH_RE = /^[0-9a-f]{64}$/;
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
-export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string): Promise<ExportResult> {
+export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>): Promise<ExportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
@@ -227,6 +229,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
+    ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -274,6 +277,10 @@ export interface ImportPlan {
   organization: Map<string, AssetOrganization>;
   /** Hashes referenced by instances in the archive with no valid original in it. */
   unresolved: string[];
+  /** The file is a library index (no original has bytes in it), not a backup. */
+  libraryFile: boolean;
+  /** The device settings the archive carries (empty when none). */
+  settings: Record<string, unknown>;
   /** Everything skipped, with reasons. Nothing is silently repaired. */
   problems: string[];
   objects: number;
@@ -345,7 +352,7 @@ const sinceOf = (p: Part): number | null => (isObj(p.m["incremental"]) && Number
 const exportedAtOf = (p: Part): number => (typeof p.m["exportedAt"] === "number" ? p.m["exportedAt"] : 0);
 
 /** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
-/** The files of a library folder by hash: what an archive without bytes (the library file) is matched with. */
+/** The files of a library folder by hash: what an archive without bytes (the library index) is matched with. */
 export type FolderFiles = ReadonlyMap<string, { file: string; size: number }>;
 
 export async function readArchive(file: Blob, folder?: FolderFiles): Promise<ImportPlan> {
@@ -383,6 +390,8 @@ async function planOf(parts: Part[], folder?: FolderFiles): Promise<ImportPlan> 
     assets: [],
     organization: new Map(),
     unresolved: [],
+    libraryFile: m["libraryFile"] === true,
+    settings: isObj(m["settings"]) ? (m["settings"] as Record<string, unknown>) : {},
     problems,
     objects: 0,
     styles: [],
@@ -495,7 +504,7 @@ async function planOf(parts: Part[], folder?: FolderFiles): Promise<ImportPlan> 
     }
     seenHash.add(hash);
     if (!at && folder) {
-      // The library file: this original is the file of the folder with its hash, when it is there with the size the file says.
+      // The library index: this original is the file of the folder with its hash, when it is there with the size the file says.
       const f = folder.get(hash);
       if (!f || f.size !== a["size"] || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
         problems.push(`Library item “${label}”: ${f ? "its file in the folder has another size" : "its file is not in the folder"}, so it shows as missing.`);

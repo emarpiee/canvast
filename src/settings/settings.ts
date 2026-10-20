@@ -210,6 +210,35 @@ export class SettingsStore {
     return [...this.values].filter(([k, v]) => v !== (SETTINGS[k as SettingKey] as Def<unknown>).default).map(([k, v]) => `${k} = ${typeof v === "string" && k.startsWith("ui.dock") ? "(layout)" : JSON.stringify(v)}`);
   }
 
+  /** What differs from the defaults, to travel in a backup (ADR 0160). */
+  snapshot(): Record<string, unknown> {
+    return Object.fromEntries(this.values);
+  }
+
+  /** The settings of a backup this device has not set itself: a setting changed here is never overridden. Returns how many were taken. */
+  restore(from: unknown): number {
+    if (!from || typeof from !== "object" || Array.isArray(from)) return 0;
+    let n = 0;
+    for (const key of Object.keys(SETTINGS) as SettingKey[]) {
+      if (this.values.has(key) || !(key in from)) continue;
+      const v = (SETTINGS[key] as Def<unknown>).validate((from as Record<string, unknown>)[key]);
+      if (v === undefined || v === (SETTINGS[key] as Def<unknown>).default) continue;
+      this.values.set(key, v);
+      n++;
+    }
+    if (n) {
+      this.save();
+      for (const key of Object.keys(SETTINGS) as SettingKey[]) for (const fn of this.listeners) fn(key);
+    }
+    return n;
+  }
+
+  /** How many settings `restore` would take. */
+  restorable(from: unknown): number {
+    if (!from || typeof from !== "object" || Array.isArray(from)) return 0;
+    return (Object.keys(SETTINGS) as SettingKey[]).filter((k) => !this.values.has(k) && k in from && (SETTINGS[k] as Def<unknown>).validate((from as Record<string, unknown>)[k]) !== undefined).length;
+  }
+
   /** Whether a value is stored (not the default): lets a build choose its own default. */
   isSet(key: SettingKey): boolean {
     return this.values.has(key);

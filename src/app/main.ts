@@ -1534,6 +1534,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     updateKeyTitles();
   });
   document.documentElement.dataset["version"] = __CANVAST_VERSION__; // before Settings is built: its Develop tab shows it
+  session.settingsHook = { snapshot: () => settings.snapshot(), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s) };
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();

@@ -49,4 +49,19 @@ describe("memory tier (Phase 8)", () => {
     expect([3, 4].map(decodedMbFor)).toEqual(["256", "256"]);
     expect([6, 8, undefined].map(decodedMbFor)).toEqual(["384", "384", "384"]);
   });
+
+  it("takes the settings of a backup only where this device has set none, rejects invalid ones, and keeps them", () => {
+    const from = { "pen.widthPx": 12, "pen.color": "#2563eb", "nav.mode": "anywhere", "lasso.filter": "mars", "unknown.key": 1 };
+    const st = memory();
+    const s = new SettingsStore(st);
+    s.set("pen.widthPx", 5); // set here: kept
+    expect(s.restorable(from)).toBe(2); // pen.color and nav.mode (width is set here; the invalid and unknown ones are not settings)
+    expect(s.restore(from)).toBe(2);
+    expect([s.get("pen.widthPx"), s.get("pen.color"), s.get("nav.mode"), s.get("lasso.filter")]).toEqual([5, "#2563eb", "anywhere", "strokes"]);
+    expect(new SettingsStore(st).get("nav.mode")).toBe("anywhere"); // stored
+    expect(s.restore(from)).toBe(0); // nothing left to take
+    expect(s.restore(null)).toBe(0);
+    expect(new SettingsStore(memory()).snapshot()).toEqual({}); // defaults are not carried
+    expect(s.snapshot()).toEqual({ "pen.widthPx": 5, "pen.color": "#2563eb", "nav.mode": "anywhere" });
+  });
 });

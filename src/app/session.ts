@@ -611,12 +611,15 @@ export class Session {
     return { ...r, fileName };
   }
 
+  /** The device settings, which travel in a workspace backup and come back on import (set by the app). */
+  settingsHook: { snapshot(): Record<string, unknown>; restore(from: unknown): number; restorable(from: unknown): number } | null = null;
+
   async exportArchive(scope: ExportScope): Promise<ExportResult & { fileName: string }> {
     if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
     await this.persistence.flush();
     await this.persistence.saveCamera();
     const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
-    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version);
+    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot());
     const label =
       scope.kind === "workspace" ? r.manifest.workspaceName
       : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")

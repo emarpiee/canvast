@@ -31,10 +31,10 @@ export function confirmReset(d: ResetDeps): Promise<boolean> {
     <p><strong>This cannot be undone.</strong> canvast starts again as if it was never used in this browser.</p>
     <ul class="reset-list">${d.summary.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
     <h3>Before you delete</h3>
-    <p class="reset-last">Last backup: ${esc(d.lastBackup)}</p>
+    <p class="reset-last">Last backup: ${esc(d.lastBackup)}. A backup and the library index also keep your settings (theme, shortcuts, panel layout).</p>
     ${step("full", "Export a backup (.canvast)", "Everything, including the files: the way back.")}
     ${step("files", "Export all files as ZIP", "Just your original files, as they were.")}
-    ${d.saveLibrary ? step("library", "Save library to the folder", "Your canvases and the library's names and tags, beside the files in the library folder.") : ""}
+    ${d.saveLibrary ? step("library", "Save library index to the folder", "Your canvases and the library's names and tags, in a small hidden file beside the files in the library folder (not a backup).") : ""}
     ${d.folderFiles !== null ? `<p class="reset-kept" data-testid="reset-kept"><strong>The ${plural(d.folderFiles, "file")} in the library folder ${d.folderFiles === 1 ? "is" : "are"} not touched.</strong> canvast never deletes files from your disk in bulk. They stay where they are; to remove them, delete the folder yourself.</p>` : ""}
     <label class="reset-type"><span>Type <strong>${RESET_WORD}</strong> to confirm</span><input type="text" data-testid="reset-word" autocomplete="off" spellcheck="false"></label>
     <div class="confirm-actions">

@@ -43,13 +43,13 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
         <dt>Folder</dt><dd><strong>${name}</strong>: new files are stored there.</dd>
         <dt>Files in the folder</dt><dd data-testid="folder-count">${inFolder}</dd>
         <dt>Files in the browser</dt><dd data-testid="browser-count">${inBrowser}</dd>
-        <dt>Library file</dt><dd data-testid="library-file">${saved ? `${esc(LIBRARY_FILE)}, saved ${new Date(saved.lastModified).toLocaleString()}` : "not saved yet"}</dd>
+        <dt>Library index</dt><dd data-testid="library-file">${saved ? `${esc(LIBRARY_FILE)} (hidden), saved ${new Date(saved.lastModified).toLocaleString()}` : "not saved yet"}</dd>
       </dl>
       <h4>Use this folder on another device</h4>
-      <p>The folder holds the files. Your canvases and the names, tags and folders of the library are kept in the browser, so they are not in the folder unless you save them: <strong>Save library to the folder</strong> writes ${esc(LIBRARY_FILE)} beside the files (a small file, without the files themselves; it is not a backup). On the other device, choose the same folder and press <strong>Open library from the folder</strong>: the canvases are added and every file is matched. Do it on a device that has no canvases of its own yet, or they will be added a second time.</p>
+      <p>The folder holds the files. Your canvases and the library's names, tags and folders are kept in the browser, so they are not in the folder unless you save them: <strong>Save library index to the folder</strong> writes a hidden file, ${esc(LIBRARY_FILE)}, beside the files (small, without the files themselves; it is <strong>not a backup</strong>, and not a cache to delete: on another device it is your canvases). There, choose the same folder: you are offered to open it at once (<strong>Open library index from the folder</strong> does the same later). Do it on a device that has no canvases of its own yet, or they are added a second time.</p>
       <div class="storage-actions">
-        ${btn("save-library", "Save library to the folder")}
-        ${btn("open-library", "Open library from the folder", saved ? "" : `No ${LIBRARY_FILE} in the folder yet`)}
+        ${btn("save-library", "Save library index to the folder")}
+        ${btn("open-library", "Open library index from the folder", saved ? "" : `No ${LIBRARY_FILE} in the folder yet`)}
       </div>
       <div class="storage-actions">
         ${btn("in", "Move browser files into the folder", inBrowser ? "" : "Nothing in the browser to move")}

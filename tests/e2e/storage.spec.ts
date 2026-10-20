@@ -343,6 +343,7 @@ test("Start from scratch: a warning with what to do first, a word to type, then 
   const dlg = p.getByTestId("reset-dialog");
   await expect(dlg).toContainText("cannot be undone");
   await expect(dlg).toContainText("Last backup: never");
+  await expect(dlg).toContainText("also keep your settings");
   await expect(dlg.locator('input[type="checkbox"]')).toHaveCount(0); // (nothing on the disk can be ticked for deletion)
   await expect(dlg.getByRole("button", { name: "Export a backup (.canvast)" })).toBeVisible();
   await expect(p.getByTestId("reset-ok")).toBeDisabled();

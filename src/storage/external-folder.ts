@@ -30,8 +30,8 @@ interface FileHandle {
 export class FolderError extends Error {}
 
 const META_KEY = "externalFolder";
-/** The library file kept beside the files: the workspace without the bytes of the originals (ADR 0159). */
-export const LIBRARY_FILE = "canvast-library.canvast";
+/** The library index kept beside the files, hidden: the workspace without the bytes of the originals (ADR 0159). */
+export const LIBRARY_FILE = ".canvast-index";
 const HASH_RE = /^[0-9a-f]{64}$/;
 /** A file of the folder: the hash, and an extension so other programs can open it. */
 const FILE_RE = /^[0-9a-f]{64}(\.[a-z0-9]{1,8})?$/;
@@ -193,7 +193,7 @@ class ExternalFolder {
     return out;
   }
 
-  /** The library file, or null when the folder has none. */
+  /** The library index, or null when the folder has none. */
   async readLibraryFile(): Promise<File | null> {
     if (!this.dir || this.status !== "ready") return null;
     try {
@@ -203,7 +203,7 @@ class ExternalFolder {
     }
   }
 
-  /** Write the library file and read it back by size. */
+  /** Write the library index and read it back by size. */
   async writeLibraryFile(blob: Blob): Promise<void> {
     if (!this.dir || this.status !== "ready") throw new FolderError("the library folder is not available");
     try {
@@ -211,9 +211,9 @@ class ExternalFolder {
       await w.write(blob);
       await w.close();
     } catch (e) {
-      throw new FolderError(`the library file could not be written (${(e as Error).message || (e as Error).name})`);
+      throw new FolderError(`the library index could not be written (${(e as Error).message || (e as Error).name})`);
     }
-    if ((await this.readLibraryFile())?.size !== blob.size) throw new FolderError("the library file written to the folder did not read back the same");
+    if ((await this.readLibraryFile())?.size !== blob.size) throw new FolderError("the library index written to the folder did not read back the same");
   }
 
   /** Remove the file of an erased original. Nothing to do when it is not there. */

@@ -102,17 +102,28 @@ export async function runImport(session: Session, picked: File | readonly File[]
     tell(session, `Cannot import ${file.name}: ${e instanceof ArchiveError ? e.message : (e as Error).message}`);
     return;
   }
+  // A library index and a backup are not the same file: say so, and send the person to the right place (ADR 0159).
+  if (plan.libraryFile && !folder) {
+    tell(session, `${file.name} is a library index, not a backup: it holds no files. Choose the library folder in Settings > Storage and open it there.`);
+    return;
+  }
+  if (!plan.libraryFile && folder) {
+    tell(session, `${file.name} is a backup (it holds the files), not a library index. Use Import archive instead.`);
+    return;
+  }
   const canvases = plan.boards.reduce((n, b) => n + b.canvases.length, 0);
   const where =
     plan.scope === "canvas" ? "It will be added as a new canvas on the open board."
     : plan.scope === "assets" ? "The originals will be added to the library."
     : `It will be added as ${plural(plan.boards.length, "new board")}; nothing existing is replaced.`;
   const lines = [
+    ...(plan.libraryFile ? ["This is a library index: your canvases and the library's names, tags and folders, without the files."] : []),
     `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”${plan.files > 1 ? `, put together from ${plan.files} files of a backup chain` : ""}.`,
     ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
     `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
     ...(folder ? ["Its originals are the files in the library folder."] : []),
+    ...((n) => (n ? [`It also carries your settings (theme, shortcuts, panel layout): ${n} you have not changed on this device ${n === 1 ? "is" : "are"} restored; the others stay as they are here.`] : []))(session.settingsHook?.restorable(plan.settings) ?? 0),
   ];
   if (plan.unresolved.length) lines.push(`${plural(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`);
   if (plan.problems.length) {
@@ -124,9 +135,10 @@ export async function runImport(session: Session, picked: File | readonly File[]
   try {
     const r = await session.applyImport(plan);
     if (!r) return;
+    const restored = session.settingsHook?.restore(plan.settings) ?? 0;
     tell(
       session,
-      `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
+      (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
         (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
         (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
     );
@@ -135,25 +147,25 @@ export async function runImport(session: Session, picked: File | readonly File[]
   }
 }
 
-/** Write the library file into the library folder: the workspace without the bytes of the originals (ADR 0159). */
+/** Write the library index into the library folder: the workspace without the bytes of the originals (ADR 0159). */
 export async function runSaveLibraryFile(session: Session): Promise<boolean> {
-  tell(session, "Saving the library file…");
+  tell(session, "Saving the library index…");
   try {
     const r = await session.exportArchive({ kind: "workspace", noBytes: true });
     await externalFolder.writeLibraryFile(r.blob);
-    tell(session, `Saved ${LIBRARY_FILE} in the library folder (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "library item")}; checked before saving).`);
+    tell(session, `Saved the library index (${LIBRARY_FILE}) in the library folder (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "library item")}; checked before saving).`);
     return true;
   } catch (e) {
-    tell(session, `Could not save the library file: ${(e as Error).message}`);
+    tell(session, `Could not save the library index: ${(e as Error).message}`);
     return false;
   }
 }
 
-/** Open the library of the library folder: its library file is read, and every original in it is matched with a file of the folder. */
+/** Open the library of the library folder: its library index is read, and every original in it is matched with a file of the folder. */
 export async function runOpenLibraryFile(session: Session): Promise<void> {
   const file = await externalFolder.readLibraryFile();
   if (!file) {
-    tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, press “Save library to the folder”.`);
+    tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, press “Save library index to the folder”.`);
     return;
   }
   await runImport(session, new File([file], file.name), await externalFolder.list());

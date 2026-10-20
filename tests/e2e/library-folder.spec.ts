@@ -114,25 +114,40 @@ test("files stored before names had extensions are written again as hash.ext fro
   await expect(p.getByRole("button", { name: /Add file extensions/ })).toHaveCount(0);
 });
 
-test("the library file: saved into the folder, and opened from it, it adds the canvases and matches every file again", async ({ app }) => {
+test("the library index: saved into the folder, and opened from it, it adds the canvases and matches every file again", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-e"));
   const hash = await importPng(p);
   await expect.poll(() => p.evaluate(async () => (await window.__canvastDebug.session()).tree!.length)).toBe(1);
   await p.getByTestId("save-status").click();
   await expect(p.getByTestId("library-file")).toHaveText("not saved yet");
-  await expect(p.getByRole("button", { name: "Open library from the folder" })).toBeDisabled();
-  await p.getByRole("button", { name: "Save library to the folder" }).click();
-  await expect(p.getByTestId("library-file")).toContainText("canvast-library.canvast, saved");
-  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain("canvast-library.canvast");
+  await expect(p.getByRole("button", { name: "Open library index from the folder" })).toBeDisabled();
+  await p.getByRole("button", { name: "Save library index to the folder" }).click();
+  await expect(p.getByTestId("library-file")).toContainText(".canvast-index (hidden), saved");
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(".canvast-index");
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(`${hash}.png`);
   expect((await p.evaluate(() => window.__canvastDebug.session())).tree!.length).toBe(1);
-  expect(await p.getByTestId("set-last-backup").textContent()).toContain("No backup made yet"); // (the library file is not a backup)
+  expect(await p.getByTestId("set-last-backup").textContent()).toContain("No backup made yet"); // (the library index is not a backup)
+
+  // A library index is not a backup: picked as one through Import archive it is refused and the person is sent to the folder.
+  const bytes = await p.evaluate(
+    () =>
+      new Promise<number[]>((res) => {
+        const r = indexedDB.open("test-folder-lib-e");
+        r.onsuccess = () => {
+          const g = r.result.transaction("f").objectStore("f").get(".canvast-index");
+          g.onsuccess = async () => res(Array.from(new Uint8Array(await (g.result as Blob).arrayBuffer())));
+        };
+      }),
+  );
+  await p.getByTestId("set-import-input").setInputFiles({ name: ".canvast-index", mimeType: "application/zip", buffer: Buffer.from(bytes) });
+  await expect(p.getByTestId("toast")).toContainText("is a library index, not a backup");
+  expect((await p.evaluate(() => window.__canvastDebug.session())).tree!.length).toBe(1);
 
   // Another device: it has the folder but not the browser's data. Here: the original's record is gone.
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
   expect(await present(p, hash)).toBe(false);
-  await p.getByRole("button", { name: "Open library from the folder" }).click();
+  await p.getByRole("button", { name: "Open library index from the folder" }).click();
   await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder");
   await p.getByTestId("confirm-ok").click();
   await expect.poll(() => present(p, hash)).toBe(true);
@@ -160,7 +175,7 @@ test("choosing a folder that already holds a library offers to open it at once",
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-g"));
   const hash = await importPng(p);
   await p.getByTestId("save-status").click();
-  await p.getByRole("button", { name: "Save library to the folder" }).click();
+  await p.getByRole("button", { name: "Save library index to the folder" }).click();
   await expect(p.getByTestId("library-file")).toContainText("saved");
   // Like another device: no files of its own in the browser, no folder set.
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);

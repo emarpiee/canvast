@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.1 — The library index is its own kind of file (2026-10-20)
+
+- The file that carries the canvases beside the library folder's files is now the hidden **`.canvast-index`** (it was `canvast-library.canvast`, which looked like a backup; the old name is not read any more), called the *library index* in the app. It is told apart from a backup by its content: a library index picked through *Import archive* is refused with where to go instead, a backup is refused by *Open library index from the folder*, and the open dialog says "This is a library index: ... without the files". The card says plainly that it is not a backup and not a cache to delete.
+
 ## 0.23.0 — Library file for a second device; start from scratch (2026-10-20)
 
 - **Library file:** on the Library folder card, *Save library to the folder* writes `canvast-library.canvast` beside the files (the whole workspace without the files; not a backup) and choosing a folder that holds one offers to open it at once, and *Open library from the folder* adds its canvases and matches every file by its name, so a folder synced to another device opens there with its canvases, names, tags and folders. Manual for now.
