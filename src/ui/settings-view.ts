@@ -70,6 +70,9 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 }
 
 /** The tabs in the sidebar, in groups. */
+/** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", privacy: "tabPrivacy", collaboration: "tabCollaboration", about: "tabAbout", develop: "tabDevelop" };
+
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Media", ["media", "screenshot"]],
@@ -248,7 +251,7 @@ export interface BackupHooks {
 }
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
-  const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}<span class="set-hits" aria-hidden="true"></span></button>`;
+  const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
     ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.map((id) => tabButton(SETTINGS_TABS.find((t) => t.id === id)!)).join("")}`,
   ).join("");
@@ -258,7 +261,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       const scope = SCOPE_LABEL[SETTINGS[r.key].scope];
       return `<div class="set-row" data-row="${r.key}"><label for="${id}"><span class="set-label" id="${id}-l">${esc(r.label)}</span>${r.help ? `<span class="set-help" id="${id}-h">${esc(r.help)}</span>` : ""}</label>
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
-              <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default">Reset</button></div>`;
+              <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
     };
     const body = t.rows
       ? cardsOf(t.rows)
@@ -282,14 +285,14 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
              <p class="set-help">Every change is saved within a fraction of a second and read back to check. The indicator at the bottom shows the state; pressing it brings you here.</p></div>
            <div class="set-info set-card" data-backup><h3>Backup</h3>
              <p data-testid="set-last-backup" data-last-backup>…</p>
-             <div class="storage-actions">
-               <button type="button" data-backup-action="full" data-testid="set-export-full">Export a backup (.canvast)</button>
-               <button type="button" data-backup-action="changes" data-testid="set-export-changes" title="Only what changed since the last backup. Keep it with the full backup and the earlier incremental ones: restoring takes them all together.">Export the changes since the last backup</button>
-               <button type="button" data-backup-action="files" data-testid="set-export-files">Export all files as ZIP</button>
-               <button type="button" data-backup-action="import" data-testid="set-import">Import backup files…</button>
+             <div class="action-rows">
+               <div class="action-row"><button type="button" data-backup-action="full" data-testid="set-export-full">Export backup</button><span>One <code>.canvast</code> file with everything, including the files. Checked before it is handed over.</span></div>
+               <div class="action-row"><button type="button" data-backup-action="changes" data-testid="set-export-changes">Export changes</button><span>Only what changed since the last backup: small. Keep it with the full backup and the earlier ones; restoring takes them all together. Needs a full backup first.</span></div>
+               <div class="action-row"><button type="button" data-backup-action="files" data-testid="set-export-files">Export files</button><span>Just your original files as a ZIP, sorted by type or by your folders.</span></div>
+               <div class="action-row"><button type="button" data-backup-action="import" data-testid="set-import">Import backup…</button><span>Add a backup (or a full one with its incremental ones, picked together) to this workspace; nothing existing is replaced.</span></div>
                <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
              </div>
-             <p class="set-help">A backup is one file you can keep anywhere; it is checked before it is handed over. The browser does not report whether the download finished, so keep the file somewhere safe. After a full backup, an incremental one holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>
+             <p class="set-help">The browser does not report whether a download finished, so keep the file somewhere safe.</p></div>
            <div class="set-info set-card set-danger" data-reset-card><h3>Start from scratch</h3>
              <p>Deletes everything canvast keeps in this browser: all boards and canvases, the library, saved styles and settings. You are asked first, and offered a backup.</p>
              <div class="storage-actions"><button type="button" class="is-danger" data-reset-all data-testid="reset-all">Delete all data…</button></div></div>`

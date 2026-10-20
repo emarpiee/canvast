@@ -1,4 +1,17 @@
 // Lucide icons (ISC license, see THIRD_PARTY_NOTICES.md), inlined at build time.
+import tabDrawingSvg from "lucide-static/icons/square-pen.svg";
+import tabNavigationSvg from "lucide-static/icons/compass.svg";
+import tabShortcutsSvg from "lucide-static/icons/keyboard.svg";
+import tabMediaSvg from "lucide-static/icons/circle-play.svg";
+import tabAppearanceSvg from "lucide-static/icons/monitor.svg";
+import tabPanelsSvg from "lucide-static/icons/panels-top-left.svg";
+import tabPerformanceSvg from "lucide-static/icons/gauge.svg";
+import tabStorageSvg from "lucide-static/icons/hard-drive.svg";
+import tabPrivacySvg from "lucide-static/icons/shield.svg";
+import tabCollaborationSvg from "lucide-static/icons/users.svg";
+import tabAboutSvg from "lucide-static/icons/badge-info.svg";
+import tabDevelopSvg from "lucide-static/icons/code.svg";
+import settingResetSvg from "lucide-static/icons/undo-dot.svg";
 import rectangleHorizontalSvg from "lucide-static/icons/rectangle-horizontal.svg";
 import ellipseShapeSvg from "lucide-static/icons/circle.svg";
 import lineShapeSvg from "lucide-static/icons/slash.svg";
@@ -356,6 +369,19 @@ export const ICONS = {
   listPlus: clean(listPlusIcon),
   grid2x2: clean(grid2x2Icon),
   camera: clean(cameraIcon),
+  tabDrawing: clean(tabDrawingSvg),
+  tabNavigation: clean(tabNavigationSvg),
+  tabShortcuts: clean(tabShortcutsSvg),
+  tabMedia: clean(tabMediaSvg),
+  tabAppearance: clean(tabAppearanceSvg),
+  tabPanels: clean(tabPanelsSvg),
+  tabPerformance: clean(tabPerformanceSvg),
+  tabStorage: clean(tabStorageSvg),
+  tabPrivacy: clean(tabPrivacySvg),
+  tabCollaboration: clean(tabCollaborationSvg),
+  tabAbout: clean(tabAboutSvg),
+  tabDevelop: clean(tabDevelopSvg),
+  settingReset: clean(settingResetSvg),
   tag: clean(tagIcon),
   minus: clean(minus),
   infinity: clean(infinity),

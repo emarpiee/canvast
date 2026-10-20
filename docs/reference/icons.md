@@ -222,4 +222,17 @@ One icon per function: two buttons that do different things never share an icon,
 | `waves` | Stabilizer |
 | `waypoints` | Edit nodes tool |
 | `x` | Hide the Layers panel; Hide the Tags panel; Hide the Bookmarks panel; Close details; Close slide view |
+| `square-pen` | Settings tab: Drawing and selection |
+| `compass` | Settings tab: Navigation |
+| `keyboard` | Settings tab: Shortcuts |
+| `circle-play` | Settings tab: Media and playback |
+| `monitor` | Settings tab: Appearance |
+| `panels-top-left` | Settings tab: Panels |
+| `gauge` | Settings tab: Performance |
+| `hard-drive` | Settings tab: Storage |
+| `shield` | Settings tab: Privacy |
+| `users` | Settings tab: Collaboration |
+| `badge-info` | Settings tab: About and diagnostics |
+| `code` | Settings tab: Develop |
+| `undo-dot` | Reset a setting to its default (every row of Settings) |
 | (own inline icon in `src/colour-picker/picker.ts`, not lucide) | Pick a colour from the screen (the colour picker's eyedropper) |

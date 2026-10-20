@@ -366,3 +366,19 @@ test("Start from scratch: a warning with what to do first, a word to type, then 
   expect(await p.evaluate(() => localStorage.getItem("other-page"))).toBe("keep");
   await expect(p.getByTestId("set-last-backup")).toBeHidden(); // (Settings is closed again)
 });
+
+test("a progress notice stays while work goes on (past the time a plain notice lasts), shows its bar and stage, and ends with its result", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.testProgress("begin", "Exporting the backup"));
+  await p.evaluate(() => window.__canvastDebug.testProgress("update", 0.5, "reading the library (5 of 10)"));
+  const notice = p.getByTestId("toast").locator(".notice.is-progress");
+  await expect(notice).toContainText("Exporting the backup: reading the library (5 of 10) 50%");
+  await expect(notice.locator(".notice-bar span")).toHaveCSS("width", /^\d/);
+  await p.waitForTimeout(4800); // (a plain progress notice closed after 4 s)
+  await expect(notice).toBeVisible();
+  await p.evaluate(() => window.__canvastDebug.testProgress("update", null, "checking the archive"));
+  await expect(notice.locator(".notice-bar.is-unknown")).toBeVisible(); // (work of unknown length moves without a number)
+  await p.evaluate(() => window.__canvastDebug.testProgress("done", "Exported a.canvast"));
+  await expect(notice).toHaveCount(0);
+  await expect(p.getByTestId("toast").locator(".notice.is-success")).toContainText("Exported a.canvast");
+});

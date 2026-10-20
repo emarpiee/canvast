@@ -45,6 +45,9 @@ export const ARCHIVE_FORMAT = "canvast-archive";
 export const ARCHIVE_VERSION = 4;
 export const ARCHIVE_EXTENSION = ".canvast";
 
+/** Where a long job is: the stage in words and how far (done of total). The caller turns it into a progress notice. */
+export type ProgressFn = (stage: string, done: number, total: number) => void;
+
 export type ExportScope =
   /** `since`: an incremental backup, with only what changed after that time (the `at` of the backup it goes on from). */
   | { kind: "workspace"; since?: number; /** The library index kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
@@ -124,7 +127,7 @@ const HASH_RE = /^[0-9a-f]{64}$/;
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
-export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>): Promise<ExportResult> {
+export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn): Promise<ExportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
@@ -184,7 +187,9 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const missingAssets: string[] = [];
   const kept: Array<{ input: ZipInput; hash: string; size: number; type: string; file: string | undefined }> = [];
   let folders: AssetFolder[] | undefined;
-  for (const hash of [...hashes].sort()) {
+  const sortedHashes = [...hashes].sort();
+  for (const [i, hash] of sortedHashes.entries()) {
+    progress?.("Reading the library", i, sortedHashes.length);
     const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     if (!r) {
       missingAssets.push(hash);
@@ -233,21 +238,31 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
-  for (const k of kept) {
+  for (const [i, k] of kept.entries()) {
+    progress?.("Reading the files of the library folder", i, kept.length);
     const blob = await externalFolder.read(k.hash, k.size, k.type, k.file);
     if (!blob) throw new ArchiveError("a file of the library folder is missing or not reachable: reconnect the folder in the storage panel, then export again");
     k.input.data = blob;
   }
 
   const json = (s: string): Blob => new Blob([s], { type: "application/json" });
-  const blob = await writeZip([
-    { name: "manifest.json", data: json(JSON.stringify(manifest, null, 1)) },
-    ...canvasFiles.map((c) => ({ name: c.file, data: json(c.json) })),
-    ...assetBlobs,
-  ]);
+  const blob = await writeZip(
+    [
+      { name: "manifest.json", data: json(JSON.stringify(manifest, null, 1)) },
+      ...canvasFiles.map((c) => ({ name: c.file, data: json(c.json) })),
+      ...assetBlobs,
+    ],
+    new Date(),
+    false,
+    (d, n) => progress?.("Writing the archive", d, n),
+  );
   // Verify what will be handed over: directory, every checksum, and the manifest.
   const entries = await readZip(blob);
-  for (const e of entries.values()) await verifyEntry(e);
+  let checked = 0;
+  for (const e of entries.values()) {
+    await verifyEntry(e);
+    progress?.("Checking the archive", ++checked, entries.size);
+  }
   const back = JSON.parse(await entries.get("manifest.json")!.data.text()) as Manifest;
   if (JSON.stringify(back) !== JSON.stringify(manifest) || entries.size !== 1 + canvasFiles.length + assetBlobs.length) {
     throw new ArchiveError("the archive failed verification after writing");
@@ -355,16 +370,16 @@ const exportedAtOf = (p: Part): number => (typeof p.m["exportedAt"] === "number"
 /** The files of a library folder by hash: what an archive without bytes (the library index) is matched with. */
 export type FolderFiles = ReadonlyMap<string, { file: string; size: number }>;
 
-export async function readArchive(file: Blob, folder?: FolderFiles): Promise<ImportPlan> {
-  return planOf([await readPart(file)], folder);
+export async function readArchive(file: Blob, folder?: FolderFiles, progress?: ProgressFn): Promise<ImportPlan> {
+  return planOf([await readPart(file)], folder, progress);
 }
 
 /**
  * Read a chain of archives as one: a full backup and the incremental backups that go on from it, in any order (they are sorted by the
  * time they were made, and each must start where the one before ended). A canvas or an original is taken from the newest file that has it.
  */
-export async function readArchiveChain(files: readonly Blob[]): Promise<ImportPlan> {
-  if (files.length === 1) return readArchive(files[0]!);
+export async function readArchiveChain(files: readonly Blob[], progress?: ProgressFn): Promise<ImportPlan> {
+  if (files.length === 1) return readArchive(files[0]!, undefined, progress);
   const parts = (await Promise.all(files.map(readPart))).sort((a, b) => exportedAtOf(a) - exportedAtOf(b));
   if (sinceOf(parts[0]!) !== null) throw new ArchiveError("the earliest of these files is an incremental backup: add the full backup it goes on from");
   for (let i = 1; i < parts.length; i++) {
@@ -373,11 +388,11 @@ export async function readArchiveChain(files: readonly Blob[]): Promise<ImportPl
     if (since !== exportedAtOf(parts[i - 1]!)) throw new ArchiveError(`a file is missing from the chain: the backup of ${new Date(exportedAtOf(parts[i]!)).toLocaleString()} goes on from one made at ${new Date(since).toLocaleString()}`);
   }
   if (parts.some((p) => p.m["scope"] !== "workspace")) throw new ArchiveError("a chain is made of backups of the whole workspace");
-  return planOf(parts);
+  return planOf(parts, undefined, progress);
 }
 
 /** The plan to import from the parts of a chain (one part for an ordinary archive). The newest manifest says what there is; the files hold it. */
-async function planOf(parts: Part[], folder?: FolderFiles): Promise<ImportPlan> {
+async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn): Promise<ImportPlan> {
   const latest = parts[parts.length - 1]!;
   const m = latest.m;
   const scope = m["scope"] as ExportScope["kind"];
@@ -493,7 +508,9 @@ async function planOf(parts: Part[], folder?: FolderFiles): Promise<ImportPlan> 
   }
   const valid = new Set<string>();
   const seenHash = new Set<string>();
+  let seenItems = 0;
   for (const { a, at } of listed.values()) {
+    progress?.("Checking the files", seenItems++, listed.size);
     const hash = String(a["hash"]);
     const label = str(a["name"], "") || hash.slice(0, 12);
     const e = at ? at.entries.get(at.file) : undefined;

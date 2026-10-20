@@ -75,14 +75,14 @@ test("files move into the folder and back from the storage panel, each one prove
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-b"));
   await p.getByTestId("save-status").click();
   await expect(p.getByTestId("browser-count")).toHaveText("1");
-  await p.getByRole("button", { name: "Move browser files into the folder" }).click();
+  await p.getByRole("button", { name: "Move into folder" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 1, blob: 0 });
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]);
   expect(await present(p, hash)).toBe(true);
 
   await expect(p.getByTestId("folder-count")).toHaveText("1");
   await expect(p.getByRole("button", { name: "Choose another folder…" })).toBeDisabled(); // (files in it would show as missing)
-  await p.getByRole("button", { name: "Move files back into the browser" }).click();
+  await p.getByRole("button", { name: "Move back to browser" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 0, blob: PNG.length });
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([]);
 });
@@ -108,10 +108,10 @@ test("files stored before names had extensions are written again as hash.ext fro
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
   expect(await present(p, hash)).toBe(true); // (a bare name is still read)
   await p.getByTestId("save-status").click();
-  await p.getByRole("button", { name: "Add file extensions to 1 file" }).click();
+  await p.getByRole("button", { name: "Add extensions" }).click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]);
   expect(await present(p, hash)).toBe(true);
-  await expect(p.getByRole("button", { name: /Add file extensions/ })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: /Add extensions/ })).toHaveCount(0);
 });
 
 test("the library index: saved into the folder, and opened from it, it adds the canvases and matches every file again", async ({ app }) => {
@@ -121,8 +121,8 @@ test("the library index: saved into the folder, and opened from it, it adds the 
   await expect.poll(() => p.evaluate(async () => (await window.__canvastDebug.session()).tree!.length)).toBe(1);
   await p.getByTestId("save-status").click();
   await expect(p.getByTestId("library-file")).toHaveText("not saved yet");
-  await expect(p.getByRole("button", { name: "Open library index from the folder" })).toBeDisabled();
-  await p.getByRole("button", { name: "Save library index to the folder" }).click();
+  await expect(p.getByRole("button", { name: "Open index", exact: true })).toBeDisabled();
+  await p.getByRole("button", { name: "Save index" }).click();
   await expect(p.getByTestId("library-file")).toContainText(".canvast-index (hidden), saved");
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(".canvast-index");
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(`${hash}.png`);
@@ -147,7 +147,7 @@ test("the library index: saved into the folder, and opened from it, it adds the 
   // Another device: it has the folder but not the browser's data. Here: the original's record is gone.
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
   expect(await present(p, hash)).toBe(false);
-  await p.getByRole("button", { name: "Open library index from the folder" }).click();
+  await p.getByRole("button", { name: "Open index", exact: true }).click();
   await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder");
   await p.getByTestId("confirm-ok").click();
   await expect.poll(() => present(p, hash)).toBe(true);
@@ -175,16 +175,41 @@ test("choosing a folder that already holds a library offers to open it at once",
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-g"));
   const hash = await importPng(p);
   await p.getByTestId("save-status").click();
-  await p.getByRole("button", { name: "Save library index to the folder" }).click();
-  await expect(p.getByTestId("library-file")).toContainText("saved");
+  await p.getByRole("button", { name: "Save index" }).click();
+  await expect(p.getByTestId("library-file")).toContainText(".canvast-index (hidden), saved"); // ("not saved yet" also contains "saved")
   // Like another device: no files of its own in the browser, no folder set.
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
+  await p.getByTestId("view-canvas").click(); // (the card is drawn again when the page is opened: the record was removed behind its back)
+  await p.getByTestId("save-status").click();
   await expect(p.getByTestId("folder-count")).toHaveText("0");
-  await p.getByRole("button", { name: "Stop using this folder" }).click();
+  await p.getByRole("button", { name: "Stop using folder" }).click();
   await expect(p.getByTestId("storage-folder")).toContainText("Not set");
   await p.evaluate(() => window.__canvastDebug.stubPicker("lib-g"));
   await p.getByRole("button", { name: "Choose library folder…" }).click();
   await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder"); // (no second button to find)
   await p.getByTestId("confirm-ok").click();
   await expect.poll(() => present(p, hash)).toBe(true);
+});
+
+test("the library index follows the workspace by itself while a folder is in use, and stops when it is switched off", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-h"));
+  const hash = await importPng(p);
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]); // (nothing saved by hand)
+  await p.evaluate(() => window.__canvastDebug.flushAutoIndex()); // (what the timer does a little after the last change)
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(".canvast-index");
+  await p.getByTestId("save-status").click();
+  await expect(p.getByTestId("library-file")).toContainText(".canvast-index (hidden), saved"); // ("not saved yet" also contains "saved")
+  // Switched off: a change writes nothing.
+  await p.evaluate((n) => window.__canvastDebug.testFolderDelete(n), ".canvast-index");
+  await p.getByLabel("Keep the library index up to date automatically").uncheck();
+  await p.getByTestId("view-canvas").click();
+  await p.keyboard.press("p");
+  await p.mouse.move(300, 300);
+  await p.mouse.down();
+  await p.mouse.move(380, 340, { steps: 4 });
+  await p.mouse.up();
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  await p.evaluate(() => window.__canvastDebug.flushAutoIndex());
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).not.toContain(".canvast-index");
 });

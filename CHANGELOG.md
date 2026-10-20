@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.24.0 — Progress you can see; the library index follows by itself; Settings tidied (2026-10-20)
+
+- **Progress notices** ([ADR 0161](docs/adr/0161-progress-notices.md)): exporting (backup, changes, library index, files ZIP), reading and importing an archive, opening a library, importing files, moving files into or out of the library folder, adding extensions and Start from scratch show a notice with a bar and the stage ("Exporting the backup: reading the library (12 of 30) 40%") that stays until the work ends and then says the result. Before, "Preparing the export…" faded after a few seconds while the work went on.
+- **The library index is kept up to date by itself** while a library folder is in use: about 20 seconds after the last change (a commit, an import, a move of files, a setting), at most once a minute, not while another tab is the writer, only when something changed. A checkbox on the card turns it off; *Save index* writes it at once. A failure is said once and tried again after the next change.
+- **Settings > Storage:** each action is a row (a short button and what it does beside it) in the Library folder and Backup cards, and the buttons look like the app's others.
+- **Settings tabs** have an icon each and are indented under their group; the Reset of every setting is an icon (undo with a dot) instead of the word.
+
 ## 0.23.1 — The library index is its own kind of file (2026-10-20)
 
 - The file that carries the canvases beside the library folder's files is now the hidden **`.canvast-index`** (it was `canvast-library.canvast`, which looked like a backup; the old name is not read any more), called the *library index* in the app. It is told apart from a backup by its content: a library index picked through *Import archive* is refused with where to go instead, a backup is refused by *Open library index from the folder*, and the open dialog says "This is a library index: ... without the files". The card says plainly that it is not a backup and not a cache to delete.

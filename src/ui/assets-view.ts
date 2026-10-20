@@ -1,3 +1,4 @@
+import { beginProgress } from "../app/progress";
 import { fileByFolders, filesOfPicker } from "../app/directory";
 import { readMetadata } from "../assets/metadata";
 import type { MetaRow } from "../assets/metadata";
@@ -2577,10 +2578,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
       let done = 0;
+      const progress = beginProgress(session.editor, "import", files.length > 1 ? "Importing files" : "Importing");
       for (const f of files) {
+        progress.update(files.length > 1 ? done / files.length : null, files.length > 1 ? `${done + 1} of ${files.length}, ${f.name || "file"}` : f.name || "file");
         done++;
-        session.editor.message = files.length > 1 ? `Importing ${done} of ${files.length}…` : `Importing ${f.name || "file"}…`;
-        session.editor.changed();
         try {
           const { record, duplicate } = await assets.importFileDetailed(f);
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
@@ -2590,8 +2591,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           session.editor.changed();
         }
       }
-      session.editor.progressDone.add("import");
-      session.editor.changed();
+      progress.done();
       if (n) {
         const notice = duplicateNotice(seen, n);
         session.editor.message = !notice ? `Imported ${plural(n, "file")} into the library.` : seen.length === n ? notice : `${plural(n - seen.length, "new file")} imported. ${notice}`;

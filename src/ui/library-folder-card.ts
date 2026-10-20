@@ -3,6 +3,7 @@ import { plural } from "../doc/plural";
 import { esc } from "./format";
 import { LIBRARY_FILE, externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
 import { runOpenLibraryFile, runSaveLibraryFile } from "./archive-ui";
+import { beginProgress } from "../app/progress";
 import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-move";
 
 /**
@@ -28,6 +29,8 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       const why = session.readOnly ? "Read-only: another tab is editing" : blocked;
       return `<button type="button" data-folder="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
     };
+    /** One action: its button (short) and what it does beside it. */
+    const row = (action: string, label: string, what: string, blocked = ""): string => `<div class="action-row">${btn(action, label, blocked)}<span>${what}</span></div>`;
     if (st === "none") {
       host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>Not set.</strong> Files are kept in the browser's storage.</p><div class="storage-actions">${btn("choose", "Choose library folder…")}</div>`;
       return;
@@ -38,6 +41,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       return;
     }
     const saved = await externalFolder.readLibraryFile();
+    const autoOn = session.settingsHook?.getAuto() ?? true;
     host.innerHTML = `${intro}
       <dl data-testid="storage-folder">
         <dt>Folder</dt><dd><strong>${name}</strong>: new files are stored there.</dd>
@@ -46,30 +50,33 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
         <dt>Library index</dt><dd data-testid="library-file">${saved ? `${esc(LIBRARY_FILE)} (hidden), saved ${new Date(saved.lastModified).toLocaleString()}` : "not saved yet"}</dd>
       </dl>
       <h4>Use this folder on another device</h4>
-      <p>The folder holds the files. Your canvases and the library's names, tags and folders are kept in the browser, so they are not in the folder unless you save them: <strong>Save library index to the folder</strong> writes a hidden file, ${esc(LIBRARY_FILE)}, beside the files (small, without the files themselves; it is <strong>not a backup</strong>, and not a cache to delete: on another device it is your canvases). There, choose the same folder: you are offered to open it at once (<strong>Open library index from the folder</strong> does the same later). Do it on a device that has no canvases of its own yet, or they are added a second time.</p>
-      <div class="storage-actions">
-        ${btn("save-library", "Save library index to the folder")}
-        ${btn("open-library", "Open library index from the folder", saved ? "" : `No ${LIBRARY_FILE} in the folder yet`)}
+      <p>Your canvases and the library's names, tags and folders live in the browser. The <strong>library index</strong> (the hidden file <code>${esc(LIBRARY_FILE)}</code>, small, without the files) carries them into the folder, so another device that chooses this folder can open them. It is <strong>not a backup</strong>, and not a cache to delete.</p>
+      <label class="storage-check"><input type="checkbox" data-auto-index${autoOn ? " checked" : ""}${session.readOnly ? " disabled" : ""}> Keep the library index up to date automatically</label>
+      <div class="action-rows">
+        ${row("save-library", "Save index", "Write the index into the folder now. canvast also does it by itself a little after each change.")}
+        ${row("open-library", "Open index", "Add the canvases of this folder's index to this device. Use it on a device that has none of its own yet, or they are added twice.", saved ? "" : `No ${LIBRARY_FILE} in the folder yet`)}
+        ${row("in", "Move into folder", "Move the files kept in the browser into this folder.", inBrowser ? "" : "Nothing in the browser to move")}
+        ${row("out", "Move back to browser", "Move the files from this folder back into the browser's storage.", inFolder ? "" : "Nothing in the folder to move")}
+        ${bareNames ? row("names", "Add extensions", `Write ${plural(bareNames, "older file")} again as <code>hash.ext</code>, so other programs can open ${bareNames === 1 ? "it" : "them"}.`) : ""}
+        ${row("choose", "Choose another folder…", "Use a different folder.", inFolder ? "Move the files back into the browser first, or they would show as missing" : "")}
+        ${row("forget", "Stop using folder", "Go back to the browser's storage only. The folder and its files stay on your disk.", inFolder ? "Move the files back into the browser first" : "")}
       </div>
-      <div class="storage-actions">
-        ${btn("in", "Move browser files into the folder", inBrowser ? "" : "Nothing in the browser to move")}
-        ${btn("out", "Move files back into the browser", inFolder ? "" : "Nothing in the folder to move")}
-        ${bareNames ? btn("names", `Add file extensions to ${plural(bareNames, "file")}`) : ""}
-        ${btn("choose", "Choose another folder…", inFolder ? "Move the files back into the browser first, or they would show as missing" : "")}
-        ${btn("forget", "Stop using this folder", inFolder ? "Move the files back into the browser first" : "")}
-      </div>
-      <p class="storage-note">Files are named by their content and keep their extension (<code>a07c9f….png</code>), so other programs can open them. Do not move, rename or edit them: canvast finds each one by that name.${bareNames ? ` ${plural(bareNames, "file")} still ${bareNames === 1 ? "has" : "have"} no extension (kept before extensions were added): the button above writes them again with one.` : ""} A backup (.canvast) holds their bytes as always.</p>`;
+      <p class="storage-note">Files are named by their content and keep their extension (<code>a07c9f….png</code>). Do not move, rename or edit them: canvast finds each one by that name.</p>`;
   };
 
+  host.addEventListener("change", (e) => {
+    const box = (e.target as HTMLElement).closest<HTMLInputElement>("[data-auto-index]");
+    if (!box) return;
+    session.settingsHook?.setAuto(box.checked);
+    if (box.checked) session.autoIndex?.poke();
+  });
+  let busy = false;
   host.addEventListener("click", async (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-folder]");
     const db = session.repo?.db;
-    if (!b || !db || b.disabled) return;
+    if (!b || !db || b.disabled || busy) return;
+    busy = true; // (one job at a time: the buttons do nothing until it ends)
     const act = b.dataset["folder"];
-    const say = (t: string): void => {
-      const el = host.querySelector<HTMLElement>('[data-testid="folder-count"]') ?? host;
-      el.textContent = t;
-    };
     try {
       if (act === "choose") {
         await externalFolder.choose(db);
@@ -81,18 +88,23 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       else if (act === "save-library") await runSaveLibraryFile(session);
       else if (act === "open-library") await runOpenLibraryFile(session);
       else if (act === "names") {
-        const r = await addExtensions(db, (d, n) => say(`Renaming files… ${d} of ${n}`));
-        session.tell(r.failed ? `Added extensions to ${plural(r.moved, "file")}; ${r.failed} could not be changed (${r.why}).` : `Added extensions to ${plural(r.moved, "file")}.`);
-      }
-      else {
-        const r = await (act === "in" ? moveToFolder : moveFromFolder)(db, (d, n) => say(`Moving files… ${d} of ${n}`));
-        session.tell(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);
+        const p = beginProgress(session.editor, "folder", "Adding extensions to the files");
+        const r = await addExtensions(db, (d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
+        p.done(r.failed ? `Added extensions to ${plural(r.moved, "file")}; ${r.failed} could not be changed (${r.why}).` : `Added extensions to ${plural(r.moved, "file")}.`);
+      } else {
+        const p = beginProgress(session.editor, "folder", act === "in" ? "Moving files into the folder" : "Moving files back into the browser");
+        const r = await (act === "in" ? moveToFolder : moveFromFolder)(db, (d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
+        p.done(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);
       }
     } catch (err) {
+      session.editor.progressDone.add("folder"); // (a job that threw ends its notice)
       if ((err as Error).name !== "AbortError") session.tell(`Library folder: ${(err as Error).message}`); // (closing the picker is not an error)
     }
+    busy = false;
+    session.autoIndex?.poke(); // (files moved or a folder chosen: the index is out of date)
     void draw();
   });
   externalFolder.subscribe(() => void draw());
+  externalFolder.subscribeSaved(() => void draw()); // (the library index was written by itself)
   return draw;
 }

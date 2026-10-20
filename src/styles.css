@@ -91,6 +91,7 @@
   --sp-7: 14px;
   --sp-8: 16px;
   --sp-9: 20px;
+  --action-w: 190px;
   --sp-10: 24px;
   --sp-11: 28px;
   --sp-12: 32px;
@@ -2653,3 +2654,21 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .reset-kept { margin: var(--sp-5) 0 0; }
 .reset-type { display: grid; gap: var(--sp-3); margin-top: var(--sp-5); }
 .reset-type input { font: inherit; padding: var(--sp-3) var(--sp-4); color: inherit; background: transparent; border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.storage-check { display: flex; gap: var(--sp-4); align-items: center; margin-top: var(--sp-5); }
+.action-rows { display: grid; gap: var(--sp-4); margin-top: var(--sp-5); }
+.action-row { display: grid; grid-template-columns: var(--action-w) 1fr; gap: var(--sp-6); align-items: center; }
+.action-row button { justify-self: stretch; }
+.action-row span { opacity: 0.8; font-size: var(--text-sm); }
+@media (max-width: 640px) { .action-row { grid-template-columns: 1fr; gap: var(--sp-2); } }
+/* Settings: the buttons of the Storage and About cards look like the app's other buttons (the same as Reset every shortcut and Back to canvas). */
+#settings-view .action-row button, #settings-view .storage-actions button, #settings-view [data-persist] { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl); padding: 0 var(--sp-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
+#settings-view .action-row button:hover:not(:disabled), #settings-view .storage-actions button:hover:not(:disabled), #settings-view [data-persist]:hover { background: var(--hud-hover); }
+#settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
+/* Settings tabs: an icon each, and the tabs indented under the group they belong to. */
+.set-tabs button { margin-left: var(--sp-6); }
+.set-tab-icon { display: inline-flex; flex: none; opacity: 0.85; }
+.set-tab-icon svg, .set-row .set-reset svg { width: var(--icon-md); height: var(--icon-md); }
+.set-tab-label { flex: 1; text-align: left; }
+.set-tabs-h { color: var(--hud-fg); }
+.set-row .set-reset { min-width: var(--ctl); padding: 0; }
+@media (max-width: 720px) { .set-tabs button { margin-left: 0; } }

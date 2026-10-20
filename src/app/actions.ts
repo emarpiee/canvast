@@ -1,3 +1,4 @@
+import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
@@ -701,11 +702,11 @@ export async function importImages(
   const records: AssetRecord[] = [];
   const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
   let done = 0;
+  const progress = beginProgress(editor, "import", list.length > 1 ? "Importing files" : "Importing");
   for (const file of list) {
-    done++;
     // Say so at once, for one file as for many: reading a big video takes a while.
-    editor.message = list.length > 1 ? `Importing ${done} of ${list.length}…` : `Importing ${file.name || "file"}…`;
-    editor.changed();
+    progress.update(list.length > 1 ? done / list.length : null, list.length > 1 ? `${done + 1} of ${list.length}, ${file.name || "file"}` : file.name || "file");
+    done++;
     try {
       const { record, duplicate } = await assets.importFileDetailed(file, list.length <= 3);
       if (duplicate) seen.push({ name: record.name || file.name, duplicate });
@@ -718,7 +719,7 @@ export async function importImages(
   // One image goes in the middle as before; several go in a grid. Either way, one undo step.
   const placed = records.length === 1 ? [placeImage(records[0]!, doc, view, 0, "Import file")] : records.length ? placeImages(records, doc, view, `Import ${records.length} files`) : [];
   const notice = duplicateNotice(seen, list.length);
-  editor.progressDone.add("import");
+  progress.done();
   // A file the app cannot show is kept as a card: say so once, and what to do.
   const cards = records.filter((r) => isCard(r));
   const cardNote = !cards.length ? "" : cards.length === 1 ? `“${cards[0]!.name || "File"}” has no preview here, so it shows as a card. Select it to download it.` : `${cards.length} files have no preview here and show as cards. Select one to download it.`;

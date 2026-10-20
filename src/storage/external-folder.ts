@@ -64,6 +64,15 @@ class ExternalFolder {
   get ready(): boolean {
     return this.status === "ready";
   }
+  /** The folder changed in a way a card should redraw for (the library index was written). */
+  touch(): void {
+    for (const fn of this.savedListeners) fn();
+  }
+  private readonly savedListeners = new Set<() => void>();
+  subscribeSaved(fn: () => void): () => void {
+    this.savedListeners.add(fn);
+    return () => this.savedListeners.delete(fn);
+  }
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

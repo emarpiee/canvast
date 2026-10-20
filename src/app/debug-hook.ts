@@ -1,5 +1,9 @@
 import { externalFolder } from "../storage/external-folder";
+import { beginProgress } from "./progress";
+import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
+
+let testProgressHandle: Progress | null = null;
 
 /** A stand-in for the folder the picker gives (the native picker cannot be driven): files kept in a database of their own, so they outlive a reload. */
 function testDb(name: string): Promise<IDBDatabase> {
@@ -229,6 +233,11 @@ export interface DebugHook {
   makeBareName(hash: string): Promise<void>;
   /** The folder picker answers with the test folder `name` (the native dialog cannot be driven). */
   stubPicker(name: string): void;
+  folderList(): Promise<Array<[string, string, number]>>;
+  /** Write the library index now if it is out of date (what its timer does after a quiet moment). */
+  flushAutoIndex(): Promise<void>;
+  /** A progress notice run by hand (app/progress.ts): begin, update (fraction or null, detail), done (result), fail (text). */
+  testProgress(op: "begin" | "update" | "done" | "fail", a?: string | number | null, b?: string): void;
   /** "none", "ready", "needs-permission" or "unavailable". */
   folderState(): string;
   /** Text most recently copied by canvast (Copy Markdown). */
@@ -612,6 +621,14 @@ export function installDebugHook(
       };
       await done(tx);
     },
+    testProgress: (op, a, b) => {
+      if (op === "begin") testProgressHandle = beginProgress(deps.editor, "test", String(a));
+      else if (op === "update") testProgressHandle?.update(a as number | null, b);
+      else if (op === "done") testProgressHandle?.done(a as string);
+      else testProgressHandle?.fail(String(a));
+    },
+    flushAutoIndex: async () => void (await session.autoIndex?.flush()),
+    folderList: async () => [...(await externalFolder.list())].map(([h, v]) => [h.slice(0, 6), v.file.slice(60), v.size]),
     stubPicker: (name) => {
       externalFolder.saveHandle = false;
       (window as unknown as { showDirectoryPicker: () => Promise<Dir> }).showDirectoryPicker = async () => testDir(name);

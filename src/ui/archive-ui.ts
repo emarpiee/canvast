@@ -1,6 +1,8 @@
 import { LIBRARY_FILE, externalFolder } from "../storage/external-folder";
 import type { FolderFiles } from "../storage/archive";
 import type { Session } from "../app/session";
+import { beginProgress } from "../app/progress";
+import type { Progress } from "../app/progress";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
@@ -20,6 +22,9 @@ function tell(session: Session, message: string): void {
   session.editor.changed();
 }
 
+/** A storage job's report as a progress notice: the stage in words with "n of m", and the bar for that stage. */
+const stages = (p: Progress) => (stage: string, done: number, total: number): void => p.update(total > 0 ? done / total : null, `${stage}${total > 1 ? ` (${done} of ${total})` : ""}`);
+
 /** Hand a Blob to the browser's download mechanism. */
 function download(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
@@ -35,21 +40,21 @@ function download(blob: Blob, fileName: string): void {
 }
 
 export async function runExport(session: Session, scope: ExportScope): Promise<boolean> {
-  tell(session, "Preparing the export…");
+  const p = beginProgress(session.editor, "export", scope.kind === "workspace" && scope.since !== undefined ? "Exporting the changes" : scope.kind === "workspace" && scope.noBytes ? "Saving the library index" : "Exporting the backup");
   try {
-    const r = await session.exportArchive(scope);
+    const r = await session.exportArchive(scope, stages(p));
+    p.update(null, "handing the file over");
     download(r.blob, r.fileName);
     const missing = r.manifest.missingAssets.length;
     const inc = r.manifest.incremental;
     const kept = r.manifest.assets.filter((a) => a.file).length;
-    tell(
-      session,
+    p.done(
       `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${inc ? `only what changed since ${new Date(inc.since).toLocaleString()}: ` : ""}${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(inc ? kept : r.manifest.assets.length, "original")}; checked before saving).` + (inc ? " Keep it with the full backup and the incremental ones before it: restoring takes them all together." : "") +
         (missing ? ` ${plural(missing, "original")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
     );
     return true;
   } catch (e) {
-    tell(session, `Export failed: ${(e as Error).message}`);
+    p.fail(`Export failed: ${(e as Error).message}`);
     return false;
   }
 }
@@ -66,18 +71,19 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
     confirmLabel: "Export ZIP",
   });
   if (layout !== "type" && layout !== "folder") return false;
-  tell(session, "Preparing the ZIP…");
+  const p = beginProgress(session.editor, "export", "Exporting the files");
   try {
-    const r = await session.exportFiles(scope, layout);
+    const r = await session.exportFiles(scope, layout, stages(p));
     if (r.files === 0) {
-      tell(session, "There are no files to export here.");
+      p.done("There are no files to export here.");
       return false;
     }
+    p.update(null, "handing the file over");
     download(r.blob, r.fileName);
-    tell(session, `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "original")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
+    p.done(`Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "original")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
     return true;
   } catch (e) {
-    tell(session, `Export failed: ${(e as Error).message}`);
+    p.fail(`Export failed: ${(e as Error).message}`);
     return false;
   }
 }
@@ -96,10 +102,12 @@ export async function runImport(session: Session, picked: File | readonly File[]
   if (!files.length) return;
   const file = files.length === 1 ? files[0]! : { name: `${files.length} backup files` };
   let plan;
+  const reading = beginProgress(session.editor, "import-archive", `Reading ${file.name}`);
   try {
-    plan = await session.readArchive(files.length === 1 ? files[0]! : files, folder);
+    plan = await session.readArchive(files.length === 1 ? files[0]! : files, folder, stages(reading));
+    reading.done();
   } catch (e) {
-    tell(session, `Cannot import ${file.name}: ${e instanceof ArchiveError ? e.message : (e as Error).message}`);
+    reading.fail(`Cannot import ${file.name}: ${e instanceof ArchiveError ? e.message : (e as Error).message}`);
     return;
   }
   // A library index and a backup are not the same file: say so, and send the person to the right place (ADR 0159).
@@ -132,31 +140,36 @@ export async function runImport(session: Session, picked: File | readonly File[]
   }
   const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
+  const saving = beginProgress(session.editor, "import-archive", folder ? "Opening the library" : `Importing ${file.name}`);
+  saving.update(null, "saving into the workspace");
   try {
     const r = await session.applyImport(plan);
-    if (!r) return;
+    if (!r) {
+      saving.done();
+      return;
+    }
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
-    tell(
-      session,
+    saving.done(
       (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
         (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
         (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
     );
   } catch (e) {
-    tell(session, `Import failed; nothing was changed: ${(e as Error).message}`);
+    saving.fail(`Import failed; nothing was changed: ${(e as Error).message}`);
   }
 }
 
 /** Write the library index into the library folder: the workspace without the bytes of the originals (ADR 0159). */
 export async function runSaveLibraryFile(session: Session): Promise<boolean> {
-  tell(session, "Saving the library index…");
+  const p = beginProgress(session.editor, "library-index", "Saving the library index");
   try {
-    const r = await session.exportArchive({ kind: "workspace", noBytes: true });
+    const r = await session.exportArchive({ kind: "workspace", noBytes: true }, stages(p));
+    p.update(null, "writing it to the folder");
     await externalFolder.writeLibraryFile(r.blob);
-    tell(session, `Saved the library index (${LIBRARY_FILE}) in the library folder (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "library item")}; checked before saving).`);
+    p.done(`Saved the library index (${LIBRARY_FILE}) in the library folder (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "library item")}; checked before saving).`);
     return true;
   } catch (e) {
-    tell(session, `Could not save the library index: ${(e as Error).message}`);
+    p.fail(`Could not save the library index: ${(e as Error).message}`);
     return false;
   }
 }
@@ -168,5 +181,9 @@ export async function runOpenLibraryFile(session: Session): Promise<void> {
     tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, press “Save library index to the folder”.`);
     return;
   }
-  await runImport(session, new File([file], file.name), await externalFolder.list());
+  const p = beginProgress(session.editor, "library-index", "Opening the library");
+  p.update(null, "looking at the files in the folder");
+  const list = await externalFolder.list();
+  p.done();
+  await runImport(session, new File([file], file.name), list);
 }

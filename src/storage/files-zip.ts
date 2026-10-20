@@ -6,7 +6,7 @@ import { storedAssetOf } from "../doc/model";
 import { req } from "./idb";
 import { externalFolder } from "./external-folder";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
-import type { ExportScope } from "./archive";
+import type { ExportScope, ProgressFn } from "./archive";
 import type { ZipInput } from "./zip";
 import { writeZip } from "./zip";
 
@@ -60,7 +60,7 @@ export function uniquePath(taken: Set<string>, dir: string, file: string): strin
 
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 
-export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout): Promise<FilesZipResult> {
+export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "assets", "assetCatalog", "meta"], "readonly");
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
   if (scope.kind === "workspace") {
@@ -90,7 +90,9 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   let missing = 0;
   // Sorted by name so that duplicates are numbered the same way every time.
   const rows: Array<{ hash: string; rec: AssetRecord; entry: CatalogEntry | undefined }> = [];
+  let looked = 0;
   for (const hash of hashes) {
+    progress?.("Reading the library", looked++, hashes.size);
     const rec = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     if (!rec) {
       missing++;
@@ -101,6 +103,7 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   // Originals kept in the library folder are read now, after the last read of the database (ADR 0159).
   for (const [i, r] of [...rows.entries()].reverse()) {
     if (!r.rec.ext) continue;
+    progress?.("Reading the files of the library folder", rows.length - i, rows.length);
     const blob = await externalFolder.read(r.hash, r.rec.size, r.rec.type, r.rec.file);
     if (blob) r.rec = { ...r.rec, blob };
     else {
@@ -119,6 +122,6 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
     inputs.push({ name: path, data: rec.blob });
     paths.push(path);
   }
-  return { blob: await writeZip(inputs), files: inputs.length, missing, paths };
+  return { blob: await writeZip(inputs, new Date(), false, (d, n) => progress?.("Writing the ZIP", d, n)), files: inputs.length, missing, paths };
 }
 

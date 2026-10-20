@@ -69,12 +69,15 @@ function dosDateTime(d: Date): { date: number; time: number } {
  * Build a ZIP from entries. The result is composed of the input Blobs; their bytes are only read for CRCs. `force64` writes the ZIP64
  * records even when nothing needs them (for tests, and for tools that want them).
  */
-export async function writeZip(entries: readonly ZipInput[], when = new Date(), force64 = false): Promise<Blob> {
+export async function writeZip(entries: readonly ZipInput[], when = new Date(), force64 = false, onEntry?: (done: number, total: number) => void): Promise<Blob> {
   const enc = new TextEncoder();
   const { date, time } = dosDateTime(when);
   const names = entries.map((e) => enc.encode(e.name));
   const crcs: number[] = [];
-  for (const e of entries) crcs.push(await crc32Blob(e.data));
+  for (const e of entries) {
+    crcs.push(await crc32Blob(e.data));
+    onEntry?.(crcs.length, entries.length);
+  }
   // Does anything need ZIP64? Sizes and offsets are known before anything is written (every local header is the same size in either form).
   let need64 = force64 || entries.length >= MAX_ENTRIES;
   let probe = 0;

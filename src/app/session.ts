@@ -12,7 +12,7 @@ import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain } from "../storage/archive";
-import type { FolderFiles } from "../storage/archive";
+import type { FolderFiles, ProgressFn } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
 import { buildFilesZip } from "../storage/files-zip";
 import { idbGet } from "../storage/idb";
@@ -597,10 +597,10 @@ export class Session {
    * edit made so far. Read-only tabs may export (it only reads).
    */
   /** The original files of a scope as a plain ZIP (see `files-zip.ts`), named and grouped as asked. */
-  async exportFiles(scope: ExportScope, layout: FilesLayout): Promise<FilesZipResult & { fileName: string }> {
+  async exportFiles(scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult & { fileName: string }> {
     if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
     await this.persistence.flush();
-    const r = await buildFilesZip(this.repo.db, this.current.workspaceId, scope, layout);
+    const r = await buildFilesZip(this.repo.db, this.current.workspaceId, scope, layout, progress);
     const tree = this.tree;
     const label =
       scope.kind === "workspace" ? (tree?.workspace.displayName ?? "workspace")
@@ -612,14 +612,16 @@ export class Session {
   }
 
   /** The device settings, which travel in a workspace backup and come back on import (set by the app). */
-  settingsHook: { snapshot(): Record<string, unknown>; restore(from: unknown): number; restorable(from: unknown): number } | null = null;
+  settingsHook: { snapshot(): Record<string, unknown>; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
+  /** Keeps the library index in the library folder up to date (storage/auto-index.ts); set by the app. */
+  autoIndex: { poke(): void; flush(): Promise<void> } | null = null;
 
-  async exportArchive(scope: ExportScope): Promise<ExportResult & { fileName: string }> {
+  async exportArchive(scope: ExportScope, progress?: ProgressFn): Promise<ExportResult & { fileName: string }> {
     if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
     await this.persistence.flush();
     await this.persistence.saveCamera();
     const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
-    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot());
+    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot(), progress);
     const label =
       scope.kind === "workspace" ? r.manifest.workspaceName
       : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")
@@ -653,8 +655,8 @@ export class Session {
   }
 
   /** Validate an archive, or a chain of backups (a full one and the incremental ones after it), without writing anything. */
-  readArchive(files: Blob | readonly Blob[], folder?: FolderFiles): Promise<ImportPlan> {
-    return Array.isArray(files) ? readArchiveChain(files as readonly Blob[]) : readArchive(files as Blob, folder);
+  readArchive(files: Blob | readonly Blob[], folder?: FolderFiles, progress?: ProgressFn): Promise<ImportPlan> {
+    return Array.isArray(files) ? readArchiveChain(files as readonly Blob[], progress) : readArchive(files as Blob, folder, progress);
   }
 
   /** Write a validated archive into this workspace, then open its first canvas. */

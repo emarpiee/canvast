@@ -52,7 +52,9 @@ import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { confirmReset } from "../ui/reset-dialog";
+import { beginProgress } from "./progress";
 import { plural } from "../doc/plural";
+import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
 import { resetAllData } from "../storage/reset";
 import { libraryCounts } from "../storage/external-folder";
@@ -1534,7 +1536,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     updateKeyTitles();
   });
   document.documentElement.dataset["version"] = __CANVAST_VERSION__; // before Settings is built: its Develop tab shows it
-  session.settingsHook = { snapshot: () => settings.snapshot(), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s) };
+  // The library index in the library folder follows the workspace by itself (ADR 0159): a change pokes it, it writes a little later.
+  session.autoIndex = installAutoIndex({
+    enabled: () => settings.get("storage.autoIndex"),
+    readOnly: () => session.readOnly,
+    build: (scope, progress) => session.exportArchive(scope, progress),
+    say: (text) => { editor.message = text; editor.changed(); },
+  });
+  session.subscribeAssets(() => session.autoIndex?.poke()); // (commits, imports, catalog changes)
+  settings.subscribe(() => session.autoIndex?.poke());
+  externalFolder.subscribe(() => session.autoIndex?.poke()); // (a folder was chosen or came back)
+  session.settingsHook = { snapshot: () => settings.snapshot(), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
@@ -1583,9 +1595,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         saveLibrary: folder !== null ? () => runSaveLibraryFile(session) : null,
       });
       if (!sure) return;
-      editor.message = "Deleting all data…";
-      editor.changed();
-      await resetAllData({ db, onBlocked: () => { editor.message = "Close the other canvast tabs: deleting waits for them."; editor.changed(); } });
+      const p = beginProgress(editor, "reset", "Deleting all data");
+      p.update(null, "the page reloads when it is done");
+      await resetAllData({ db, onBlocked: () => p.update(null, "waiting for the other canvast tabs to close") }).catch((e) => p.fail(`Could not delete all data: ${(e as Error).message}`));
     },
   });
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).

@@ -18,6 +18,8 @@ export interface Notice {
   readonly kind: NoticeKind;
   /** 0 to 1, or null for work of unknown length. Only for `progress`. */
   readonly progress?: number | null;
+  /** Stays while the work reports (a watchdog closes it only if the work never says it ended): set by app/progress.ts. */
+  readonly sticky?: boolean;
   /** Notices with the same channel replace each other (all importing messages, say). */
   readonly channel?: string;
   /** A button on the notice (e.g. View); it runs and the notice goes. */
@@ -39,6 +41,8 @@ export function classify(text: string): Notice {
 
 const LIFETIME_MS: Record<NoticeKind, number> = { info: 6000, success: 5000, warning: 9000, error: 14000, progress: 4000 };
 const MAX_SHOWN = 3;
+/** A sticky progress notice that has not been updated for this long is closed: the work must have ended without saying so. */
+const WATCHDOG_MS = 120_000;
 
 interface Shown {
   readonly el: HTMLElement;
@@ -72,7 +76,7 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
   };
   const arm = (s: Shown): void => {
     if (s.timer) clearTimeout(s.timer);
-    s.timer = setTimeout(() => remove(s), LIFETIME_MS[s.notice.kind]);
+    s.timer = setTimeout(() => remove(s), s.notice.sticky ? WATCHDOG_MS : LIFETIME_MS[s.notice.kind]);
   };
 
   const push = (n: Notice): void => {
@@ -86,7 +90,7 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
       return;
     }
     // Work that has ended (a result arrives) replaces the progress notice that reported it.
-    if (n.kind !== "progress") for (const s of [...shown]) if (s.notice.kind === "progress") remove(s);
+    if (n.kind !== "progress") for (const s of [...shown]) if (s.notice.kind === "progress" && !s.notice.sticky) remove(s); // (a sticky one ends by its own channel)
     const el = document.createElement("div");
     const s: Shown = { el, notice: n, timer: null };
     fill(s, n);
@@ -111,6 +115,11 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
     if (editor.progressDone.size) {
       for (const channel of editor.progressDone) for (const s of [...shown]) if (s.notice.channel === channel && s.notice.kind === "progress") remove(s);
       editor.progressDone.clear();
+    }
+    if (editor.progressNow) {
+      const p = editor.progressNow;
+      editor.progressNow = null;
+      push({ text: p.text, kind: "progress", progress: p.fraction, channel: p.channel, sticky: true });
     }
     if (!editor.message) return;
     const text = editor.message;
