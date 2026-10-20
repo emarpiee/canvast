@@ -3,7 +3,7 @@ import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
 import { done, idbGet, req } from "../storage/idb";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "../storage/quota";
-import { externalFolder } from "../storage/external-folder";
+import { externalFolder, folderFileName } from "../storage/external-folder";
 import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
@@ -36,6 +36,8 @@ export interface AssetRecord {
   frames?: number;
   /** 1 on a stub: the bytes are a file of the library folder (ADR 0159) and `blob` is empty. `size` is the file's size. */
   ext?: 1;
+  /** On a stub: the file's name in the folder (hash and extension). Absent on a stub made before names had extensions: then the hash alone. */
+  file?: string;
 }
 
 /** Largest accepted import, to fail fast instead of exhausting memory. */
@@ -292,9 +294,10 @@ export class AssetLibrary {
   private async store(record: AssetRecord, writeBytes: boolean): Promise<void> {
     // With a library folder the file is written and proven first; only then does the browser keep a stub of it.
     const toFolder = writeBytes && externalFolder.ready;
+    const file = folderFileName(record.hash, record.name, record.type);
     if (toFolder) {
       try {
-        await externalFolder.write(record.hash, record.blob);
+        await externalFolder.write(record.hash, record.blob, file);
       } catch (err) {
         throw new ImportError((err as Error).message);
       }
@@ -302,7 +305,7 @@ export class AssetLibrary {
     try {
       const tx = this.db!.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
       const committed = done(tx);
-      if (writeBytes) tx.objectStore("assets").put(toFolder ? ({ ...record, blob: new Blob([]), ext: 1 } satisfies AssetRecord) : record, record.hash);
+      if (writeBytes) tx.objectStore("assets").put(toFolder ? ({ ...record, blob: new Blob([]), ext: 1, file } satisfies AssetRecord) : record, record.hash);
       const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
       if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
       else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
@@ -397,7 +400,7 @@ export class AssetLibrary {
     if (!rec) return rec;
     if (rec.ext) {
       // Kept in the library folder: missing (as for a cleared store) when the file or the permission is gone.
-      const blob = await externalFolder.read(hash, rec.size, rec.type);
+      const blob = await externalFolder.read(hash, rec.size, rec.type, rec.file);
       if (!blob) return undefined;
       rec = { ...rec, blob };
     }

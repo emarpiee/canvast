@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "../../src/assets/sha256";
-import { externalFolder } from "../../src/storage/external-folder";
+import { externalFolder, folderFileName } from "../../src/storage/external-folder";
 import type { Dir } from "../../src/storage/external-folder";
 
 /** An in-memory directory; `tamper` changes what a file reads back as, `perm` is what the browser answers about permission. */
@@ -53,6 +53,25 @@ describe("library folder", () => {
     await externalFolder.remove(hash);
     expect(await externalFolder.has(hash, bytes.length)).toBe(false);
     await externalFolder.remove(hash); // already gone: no error
+  });
+
+  it("names a file by its hash and its own extension (from its name, else its type, else bin) and keeps to those names", async () => {
+    const h = "a".repeat(64);
+    expect(folderFileName(h, "Photo.PNG", "image/png")).toBe(`${h}.png`);
+    expect(folderFileName(h, "", "image/jpeg")).toBe(`${h}.jpg`);
+    expect(folderFileName(h, "x", "image/svg+xml")).toBe(`${h}.svg`);
+    expect(folderFileName(h, "model", "application/octet-stream")).toBe(`${h}.bin`);
+    await expect(externalFolder.write(h, new Blob([bytes]), `${h}.png`)).rejects.toThrow(/did not read back/); // (the bytes are not this hash)
+    expect(dir.files.size).toBe(0); // ... and the bad file is not left
+    const hash = await hashOf();
+    await externalFolder.write(hash, new Blob([bytes]), `${hash}.png`);
+    expect(dir.files.has(`${hash}.png`)).toBe(true);
+    expect(await externalFolder.read(hash, bytes.length, "", `${hash}.png`)).not.toBeNull();
+    expect(await externalFolder.read(hash, bytes.length)).toBeNull(); // the bare name is another file
+    await expect(externalFolder.write(hash, new Blob([bytes]), "../x.png")).rejects.toThrow(/not available/);
+    await expect(externalFolder.write(hash, new Blob([bytes]), `${"b".repeat(64)}.png`)).rejects.toThrow(/not available/); // not this hash
+    await externalFolder.remove(hash, `${hash}.png`);
+    expect(dir.files.size).toBe(0);
   });
 
   it("refuses a write that does not read back the same, and a name that is not a hash", async () => {

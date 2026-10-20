@@ -177,7 +177,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];
-  const kept: Array<{ input: ZipInput; hash: string; size: number; type: string }> = [];
+  const kept: Array<{ input: ZipInput; hash: string; size: number; type: string; file: string | undefined }> = [];
   let folders: AssetFolder[] | undefined;
   for (const hash of [...hashes].sort()) {
     const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
@@ -208,7 +208,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     if (!known) {
       const input: ZipInput = { name: file, data: r.blob };
       assetBlobs.push(input);
-      if (r.ext) kept.push({ input, hash, size: r.size, type: r.type });
+      if (r.ext) kept.push({ input, hash, size: r.size, type: r.type, file: r.file });
     }
   }
   const manifest: Manifest = {
@@ -227,7 +227,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
   for (const k of kept) {
-    const blob = await externalFolder.read(k.hash, k.size, k.type);
+    const blob = await externalFolder.read(k.hash, k.size, k.type, k.file);
     if (!blob) throw new ArchiveError("a file of the library folder is missing or not reachable: reconnect the folder in the storage panel, then export again");
     k.input.data = blob;
   }

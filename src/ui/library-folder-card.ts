@@ -2,7 +2,7 @@ import type { Session } from "../app/session";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
 import { externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
-import { moveFromFolder, moveToFolder } from "../storage/folder-move";
+import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-move";
 
 /**
  * The library folder card of Settings > Storage (ADR 0159): where the originals are kept, and the moves between the
@@ -21,7 +21,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>Not available in this browser.</strong> It needs Chromium (Chrome, Edge, Brave). Your files stay in the browser's storage.</p>`;
       return;
     }
-    const { inFolder, inBrowser } = await libraryCounts(db);
+    const { inFolder, inBrowser, bareNames } = await libraryCounts(db);
     /** A button; `blocked` (a reason) or a read-only tab turns it off, with the reason as its title. */
     const btn = (action: string, label: string, blocked = ""): string => {
       const why = session.readOnly ? "Read-only: another tab is editing" : blocked;
@@ -45,10 +45,11 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       <div class="storage-actions">
         ${btn("in", "Move browser files into the folder", inBrowser ? "" : "Nothing in the browser to move")}
         ${btn("out", "Move files back into the browser", inFolder ? "" : "Nothing in the folder to move")}
+        ${bareNames ? btn("names", `Add file extensions to ${plural(bareNames, "file")}`) : ""}
         ${btn("choose", "Choose another folder…", inFolder ? "Move the files back into the browser first, or they would show as missing" : "")}
         ${btn("forget", "Stop using this folder", inFolder ? "Move the files back into the browser first" : "")}
       </div>
-      <p class="storage-note">Do not move, rename or edit the files in the folder: they are named by their content. A backup (.canvast) holds their bytes as always.</p>`;
+      <p class="storage-note">Files are named by their content and keep their extension (<code>a07c9f….png</code>), so other programs can open them. Do not move, rename or edit them: canvast finds each one by that name.${bareNames ? ` ${plural(bareNames, "file")} still ${bareNames === 1 ? "has" : "have"} no extension (kept before extensions were added): the button above writes them again with one.` : ""} A backup (.canvast) holds their bytes as always.</p>`;
   };
 
   host.addEventListener("click", async (e) => {
@@ -64,6 +65,10 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       if (act === "choose") await externalFolder.choose(db);
       else if (act === "reconnect") await externalFolder.reconnect();
       else if (act === "forget") await externalFolder.forget(db);
+      else if (act === "names") {
+        const r = await addExtensions(db, (d, n) => say(`Renaming files… ${d} of ${n}`));
+        session.tell(r.failed ? `Added extensions to ${plural(r.moved, "file")}; ${r.failed} could not be changed (${r.why}).` : `Added extensions to ${plural(r.moved, "file")}.`);
+      }
       else {
         const r = await (act === "in" ? moveToFolder : moveFromFolder)(db, (d, n) => say(`Moving files… ${d} of ${n}`));
         session.tell(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);

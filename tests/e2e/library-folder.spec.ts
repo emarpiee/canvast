@@ -46,7 +46,7 @@ test("with a library folder an import is a file there and a stub in the browser;
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-a"));
   const hash = await importPng(p);
-  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]); // (the hash and the extension, so other programs open it)
   expect(await record(p, hash)).toEqual({ ext: 1, blob: 0 });
 
   await reload(p);
@@ -61,11 +61,11 @@ test("with a library folder an import is a file there and a stub in the browser;
   expect((await z.get(`assets/${hash}`)!.data.arrayBuffer()).byteLength).toBe(PNG.length);
 
   // The file moved away: the original shows as missing, nothing else breaks, and importing it again restores it.
-  await p.evaluate((h) => window.__canvastDebug.testFolderDelete(h), hash);
+  await p.evaluate((h) => window.__canvastDebug.testFolderDelete(`${h}.png`), hash);
   expect(await present(p, hash)).toBe(false);
   await p.getByTestId("import-input").setInputFiles({ name: "a.png", mimeType: "image/png", buffer: PNG });
   await expect.poll(() => present(p, hash)).toBe(true);
-  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]);
 });
 
 test("files move into the folder and back from the storage panel, each one proven before the other copy goes", async ({ app }) => {
@@ -77,7 +77,7 @@ test("files move into the folder and back from the storage panel, each one prove
   await expect(p.getByTestId("browser-count")).toHaveText("1");
   await p.getByRole("button", { name: "Move browser files into the folder" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 1, blob: 0 });
-  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]);
   expect(await present(p, hash)).toBe(true);
 
   await expect(p.getByTestId("folder-count")).toHaveText("1");
@@ -93,9 +93,23 @@ test("erasing an original from the library (garbage collection) removes its file
   await p.evaluate(() => window.__canvastDebug.setView("assets"));
   await p.getByTestId("assets-import-input").setInputFiles({ name: "lib.png", mimeType: "image/png", buffer: PNG });
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.testFolderFiles()).then((f) => f.length)).toBe(1);
-  const [hash] = await p.evaluate(() => window.__canvastDebug.testFolderFiles());
-  await p.evaluate((h) => window.__canvastDebug.forceCatalogState(h!, "deleted"), hash);
+  const hash = (await p.evaluate(() => window.__canvastDebug.testFolderFiles()))[0]!.split(".")[0]!;
+  await p.evaluate((h) => window.__canvastDebug.forceCatalogState(h, "deleted"), hash);
   await p.evaluate(() => window.__canvastDebug.gc());
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([]);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([]);
+});
+
+test("files stored before names had extensions are written again as hash.ext from Settings > Storage", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-d"));
+  const hash = await importPng(p);
+  await p.evaluate((h) => window.__canvastDebug.makeBareName(h), hash);
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
+  expect(await present(p, hash)).toBe(true); // (a bare name is still read)
+  await p.getByTestId("save-status").click();
+  await p.getByRole("button", { name: "Add file extensions to 1 file" }).click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]);
+  expect(await present(p, hash)).toBe(true);
+  await expect(p.getByRole("button", { name: /Add file extensions/ })).toHaveCount(0);
 });

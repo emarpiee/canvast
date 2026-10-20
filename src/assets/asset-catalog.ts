@@ -253,7 +253,7 @@ export class AssetCatalog {
     const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const blobKeys = new Set((await req(tx.objectStore("assets").getAllKeys())) as string[]);
-    const extKeys = (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
+    const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as Array<{ hash: string; size: number; file?: string }>; // (stubs hold no bytes)
     const usage = new Map<string, { instances: number; canvases: Set<string> }>();
     await new Promise<void>((resolve, reject) => {
       const cur = tx.objectStore("objects").index("assetId").openKeyCursor();
@@ -272,8 +272,7 @@ export class AssetCatalog {
     });
     const known = new Set(entries.map((e) => e.hash));
     // An original kept in the library folder is present only while its file is (ADR 0159).
-    const sizes = new Map(entries.map((e) => [e.hash, e.size]));
-    for (const h of extKeys) if (!(await externalFolder.has(h, sizes.get(h) ?? -1))) blobKeys.delete(h);
+    for (const s of stubs) if (!(await externalFolder.has(s.hash, s.size, s.file))) blobKeys.delete(s.hash);
     return {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: blobKeys.has(e.hash) })),
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
@@ -484,6 +483,7 @@ export class AssetCatalog {
    */
   async collect(roots: ReadonlySet<string>): Promise<GcReport> {
     const report: GcReport = { swept: [], bytesFreed: 0, retained: [], restored: [] };
+    const files = new Map<string, string>(); // swept originals kept in the library folder, and their file names
     const tx = this.db.transaction(["assetCatalog", "assets", "objects", "thumbs"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const catalog = tx.objectStore("assetCatalog");
@@ -496,6 +496,8 @@ export class AssetCatalog {
       } else if (roots.has(e.hash)) {
         report.retained.push(e.hash);
       } else {
+        const stub = await req(tx.objectStore("assets").get(e.hash) as IDBRequest<{ ext?: number; file?: string } | undefined>);
+        if (stub?.ext) files.set(e.hash, stub.file ?? e.hash);
         tx.objectStore("assets").delete(e.hash);
         tx.objectStore("thumbs").delete(e.hash);
         catalog.delete(e.hash);
@@ -504,7 +506,7 @@ export class AssetCatalog {
       }
     }
     await committed;
-    for (const h of report.swept) await externalFolder.remove(h); // a file of the library folder goes with its original
+    for (const h of report.swept) if (files.has(h)) await externalFolder.remove(h, files.get(h)); // a file of the library folder goes with its original
     return report;
   }
 }

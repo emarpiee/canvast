@@ -220,6 +220,8 @@ export interface DebugHook {
   testFolderFiles(): Promise<string[]>;
   /** Delete a file of the test folder, as a user moving it away would. */
   testFolderDelete(name: string): Promise<void>;
+  /** Make a file of the test folder look as one made before names had extensions: renamed to the bare hash, the stub without its file name. */
+  makeBareName(hash: string): Promise<void>;
   /** "none", "ready", "needs-permission" or "unavailable". */
   folderState(): string;
   /** Text most recently copied by canvast (Copy Markdown). */
@@ -585,6 +587,23 @@ export function installDebugHook(
     testFolderFiles: async () => (await testDirKeys(externalFolder.name)).sort(),
     testFolderDelete: async (name) => {
       await testDir(externalFolder.name).removeEntry(name);
+    },
+    makeBareName: async (hash) => {
+      const dir = testDir(externalFolder.name);
+      const name = (await testDirKeys(externalFolder.name)).find((k) => k.startsWith(hash))!;
+      const blob = await (await (await dir.getFileHandle(name)).getFile()).arrayBuffer();
+      const w = await (await dir.getFileHandle(hash, { create: true })).createWritable();
+      await w.write(new Blob([blob]));
+      await w.close();
+      await dir.removeEntry(name);
+      const db = session.repo!.db;
+      const tx = db.transaction("assets", "readwrite");
+      const r = tx.objectStore("assets").get(hash);
+      r.onsuccess = () => {
+        const { file: _f, ...rest } = r.result;
+        tx.objectStore("assets").put(rest, hash);
+      };
+      await done(tx);
     },
     folderState: () => externalFolder.state,
     removeAssetBytes: async (hash) => {

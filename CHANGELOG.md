@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22.3 — Library folder files keep their extension (2026-10-20)
+
+- Files in the library folder are named `<sha256>.<ext>` (from the file's own name, else its type), so other programs and the file manager can open and preview them. Files made before this keep their bare-hash name and still work; **Add file extensions to N files** on the Library folder card writes them again with one (each proven before the old one goes).
+- A file written to the folder that does not read back the same is removed, not left behind.
+
 ## 0.22.2 — One Storage page (2026-10-20)
 
 - **Settings > Storage** holds everything about storage in four cards: Space, Library folder, Saving and Backup. The save indicator opens it. The popover it used to open is removed (it repeated the space and backup lines). The library folder card shows how many files are in the folder and in the browser, and turns off *Choose another folder* and *Stop using this folder* while files are in the folder.

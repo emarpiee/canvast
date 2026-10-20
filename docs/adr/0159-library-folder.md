@@ -5,14 +5,14 @@
 
 ## Decision
 
-In Chromium the person can pick a **library folder** (Settings > Storage, File System Access API). New originals are written there as files named by their SHA-256 and the browser keeps a **stub** of each. The folder has no quota. Elsewhere (Firefox has no directory picker) nothing changes and the README says so.
+In Chromium the person can pick a **library folder** (Settings > Storage, File System Access API). New originals are written there as `<sha256>.<ext>` (the extension from the file's own name, else its type, else `bin`; so other programs and the file manager can open them) and the browser keeps a **stub** of each. The folder has no quota. Elsewhere (Firefox has no directory picker) nothing changes and the README says so.
 
 Also, for every browser: a full store is reported in plain words (an import is refused, nothing half-stored), the browser is asked once to keep the data (`storage.persist()`), and one notice appears at 80% of the quota (`src/storage/quota.ts`).
 
 ## How it works
 
-- A **stub** is the asset's own record in the `assets` store with an empty `blob` and `ext: 1`; `size` is the file's size. Because the key stays, every key-based rule (present, usage, catalog repair, reference-checked GC, the import's "already have it") is unchanged. Schema v10 only adds an index `ext` on that store, to list the stubs. Nothing is converted on upgrade.
-- **Write order:** the file is written, read back and its SHA-256 compared with the name; only then is the stub stored. If the folder cannot be written the import is refused with the reason; it never falls back silently, and a file is never in neither place.
+- A **stub** is the asset's own record in the `assets` store with an empty `blob` and `ext: 1`; `size` is the file's size and `file` its name in the folder (absent on a stub made before names had extensions: the bare hash; the card's *Add file extensions* button writes those again, proven, and removes the old file). Because the key stays, every key-based rule (present, usage, catalog repair, reference-checked GC, the import's "already have it") is unchanged. Schema v10 only adds an index `ext` on that store, to list the stubs. Nothing is converted on upgrade.
+- **Write order:** the file is written, read back and its SHA-256 compared with the hash in its name (a file that does not match is removed, never left); only then is the stub stored. If the folder cannot be written the import is refused with the reason; it never falls back silently, and a file is never in neither place.
 - **Reads:** `AssetLibrary.record` returns the file's bytes when the file exists with the stored size, and `undefined` otherwise, which the app already treats as a missing original (placeholder, flagged in the Library, restored by importing the same file again). The size is checked on every read; the hash on write, on move and by the archive's own verification.
 - **Permission:** a saved handle needs one click per browser session (**Reconnect folder**). Until then folder files show as missing and a notice says why.
 - **Moves:** *Move browser files into the folder* and *Move files back into the browser* (`folder-move.ts`) work one original at a time and prove the new copy before the other goes. A move that fails leaves the original where it was.

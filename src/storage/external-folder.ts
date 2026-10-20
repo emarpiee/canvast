@@ -7,6 +7,7 @@
  * collection) works unchanged, and an original is never in neither place.
  */
 import { sha256Hex } from "../assets/sha256";
+import { extOf } from "../assets/file-kind";
 import { done, idbGet, idbPut, req } from "./idb";
 
 export type FolderState = "none" | "ready" | "needs-permission" | "unavailable";
@@ -28,6 +29,17 @@ export class FolderError extends Error {}
 
 const META_KEY = "externalFolder";
 const HASH_RE = /^[0-9a-f]{64}$/;
+/** A file of the folder: the hash, and an extension so other programs can open it. */
+const FILE_RE = /^[0-9a-f]{64}(\.[a-z0-9]{1,8})?$/;
+
+const TYPE_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/svg+xml": "svg", "image/vnd.microsoft.icon": "ico", "audio/mpeg": "mp3", "audio/x-wav": "wav", "video/quicktime": "mov", "application/x-zip-compressed": "zip", "text/plain": "txt" };
+
+/** The name of an original's file in the folder: its hash and its own extension (from its name, else its type; "bin" when neither says). */
+export function folderFileName(hash: string, name: string, type: string): string {
+  const fromType = TYPE_EXT[type] ?? (/^(?:image|video|audio|font)\/([a-z0-9]{1,8})$/.exec(type)?.[1] ?? "");
+  const ext = (extOf(name).toLowerCase() || fromType || "bin").replace(/[^a-z0-9]/g, "");
+  return `${hash}.${ext || "bin"}`;
+}
 
 export function folderSupported(): boolean {
   return typeof window !== "undefined" && typeof (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker === "function";
@@ -118,15 +130,18 @@ class ExternalFolder {
   }
 
   /** Write the file, read it back and compare it with the hash. Throws when it cannot be proven stored. */
-  async write(hash: string, blob: Blob): Promise<void> {
-    if (!this.dir || !HASH_RE.test(hash)) throw new FolderError("the library folder is not available");
+  async write(hash: string, blob: Blob, file = hash): Promise<void> {
+    if (!this.dir || !HASH_RE.test(hash) || !FILE_RE.test(file) || !file.startsWith(hash)) throw new FolderError("the library folder is not available");
     try {
-      const fh = await this.dir.getFileHandle(hash, { create: true });
+      const fh = await this.dir.getFileHandle(file, { create: true });
       const w = await fh.createWritable();
       await w.write(blob);
       await w.close();
       const back = await fh.getFile();
-      if (back.size !== blob.size || (await sha256Hex(await back.arrayBuffer())) !== hash) throw new FolderError("the file written to the library folder did not read back the same");
+      if (back.size !== blob.size || (await sha256Hex(await back.arrayBuffer())) !== hash) {
+        await this.dir.removeEntry(file).catch(() => undefined); // never leave a file that is not what its name says
+        throw new FolderError("the file written to the library folder did not read back the same");
+      }
     } catch (e) {
       if (e instanceof FolderError) throw e;
       throw new FolderError(`the library folder could not be written (${(e as Error).message || (e as Error).name}). Open the storage panel to reconnect it`);
@@ -137,10 +152,10 @@ class ExternalFolder {
    * The file when it is there with the stored size, else null (missing, moved, no permission). A file of the folder has
    * no extension, so the browser gives it no type: `type` (the original's) is put back, or an SVG would not show.
    */
-  async read(hash: string, size: number, type = ""): Promise<Blob | null> {
-    if (!this.dir || this.status !== "ready" || !HASH_RE.test(hash)) return null;
+  async read(hash: string, size: number, type = "", file = hash): Promise<Blob | null> {
+    if (!this.dir || this.status !== "ready" || !FILE_RE.test(file) || !file.startsWith(hash)) return null;
     try {
-      const f = await (await this.dir.getFileHandle(hash)).getFile();
+      const f = await (await this.dir.getFileHandle(file)).getFile();
       return f.size === size ? (type ? new Blob([f], { type }) : f) : null;
     } catch {
       return null;
@@ -148,15 +163,15 @@ class ExternalFolder {
   }
 
   /** Does the file exist with this size (no bytes read). */
-  async has(hash: string, size: number): Promise<boolean> {
-    return (await this.read(hash, size)) !== null;
+  async has(hash: string, size: number, file = hash): Promise<boolean> {
+    return (await this.read(hash, size, "", file)) !== null;
   }
 
   /** Remove the file of an erased original. Nothing to do when it is not there. */
-  async remove(hash: string): Promise<void> {
-    if (!this.dir || this.status !== "ready" || !HASH_RE.test(hash)) return;
+  async remove(hash: string, file = hash): Promise<void> {
+    if (!this.dir || this.status !== "ready" || !FILE_RE.test(file) || !file.startsWith(hash)) return;
     try {
-      await this.dir.removeEntry(hash);
+      await this.dir.removeEntry(file);
     } catch {
       // already gone, or no permission: the file is only left over, never needed
     }
@@ -171,9 +186,9 @@ export async function externalHashes(db: IDBDatabase): Promise<string[]> {
   return (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
 }
 
-/** How many originals are kept in the folder and how many in the browser's storage. */
-export async function libraryCounts(db: IDBDatabase): Promise<{ inFolder: number; inBrowser: number }> {
+/** How many originals are kept in the folder (and how many of those still have a bare hash for a name) and how many in the browser's storage. */
+export async function libraryCounts(db: IDBDatabase): Promise<{ inFolder: number; inBrowser: number; bareNames: number }> {
   const tx = db.transaction("assets", "readonly");
-  const [all, ext] = await Promise.all([req(tx.objectStore("assets").count()), req(tx.objectStore("assets").index("ext").count())]);
-  return { inFolder: ext, inBrowser: all - ext };
+  const [all, stubs] = await Promise.all([req(tx.objectStore("assets").count()), req(tx.objectStore("assets").index("ext").getAll()) as Promise<Array<{ file?: string }>>]);
+  return { inFolder: stubs.length, inBrowser: all - stubs.length, bareNames: stubs.filter((s) => !s.file).length };
 }
