@@ -1165,6 +1165,30 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a small SVG in the viewer is the vector picture drawn large: not capped at a few times its size and never pixelated (a small raster still is)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30" viewBox="0 0 40 30"><circle cx="20" cy="15" r="12" fill="#e33"/></svg>');
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "tiny.svg", mimeType: "image/svg+xml", buffer: svg }, { name: "tiny.png", mimeType: "image/png", buffer: makePng(8, 6, () => [200, 60, 60, 255]) }]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  const viewer = p.getByTestId("slide-view");
+  const img = viewer.locator("figure img");
+  const open = async (name: string) => {
+    await p.locator('[data-testid="asset-card"]', { hasText: name }).dblclick();
+    await expect(viewer).toBeVisible();
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  };
+  await open("tiny.svg");
+  await expect(img).not.toHaveClass(/is-pixelated/);
+  expect(await img.evaluate((i: HTMLImageElement) => i.style.maxWidth), "no cap at a few times 40 px").toBe("");
+  expect((await img.boundingBox())!.width, "drawn at the size of the stage").toBeGreaterThan(200);
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await open("tiny.png");
+  await expect(img, "a small raster keeps its pixels sharp").toHaveClass(/is-pixelated/);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 /** Import a few small pictures into the library (the first view is the gallery). */
 async function libraryOf(p: Page, n: number): Promise<void> {
   await toAssets(p);
@@ -1903,8 +1927,13 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   const controls = (await viewer.locator(".viewer-bar").boundingBox())!;
   expect(controls.height, "two tidy rows").toBeLessThan(120);
   const prev = (await viewer.locator('[data-act="prev"]').boundingBox())!;
-  const closeB = (await viewer.locator('.viewer-tools [data-act="close"]').boundingBox())!;
-  expect(closeB.y).toBeGreaterThan(prev.y + prev.height - 2);
+  // the way back is a back arrow at the top left of the viewer, not a button of the controls
+  const vb = (await viewer.boundingBox())!;
+  const back = (await viewer.locator(".viewer-back").boundingBox())!;
+  expect(back.x - vb.x, "at the left").toBeLessThan(40);
+  expect(back.y - vb.y, "at the top").toBeLessThan(40);
+  await expect(viewer.locator('.viewer-tools [data-act="close"]')).toHaveCount(0);
+  expect(prev.y, "the previous button is in the controls below").toBeGreaterThan(back.y);
   const zoom = (await viewer.locator(".viewer-zoom").boundingBox())!;
   const bar = (await viewer.locator(".viewer-bar").boundingBox())!;
   expect(zoom.y).toBeGreaterThanOrEqual(bar.y - 1);

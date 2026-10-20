@@ -740,6 +740,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     checker.hidden = true;
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
     if (token !== slideToken) return;
+    if (rec?.type === "image/svg+xml") {
+      // A vector picture is the picture itself, drawn at the size it is shown: not capped at a few times its small natural size, and never pixelated.
+      slideImg.className = "";
+      slideImg.style.maxWidth = "";
+      slideImg.style.maxHeight = "";
+    }
     const thumbnail = async (): Promise<void> => {
       slideCaption.textContent = `${label}. The original is missing or damaged; showing its thumbnail.`;
       slideCaption.classList.add("is-note");
