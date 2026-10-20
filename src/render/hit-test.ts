@@ -147,6 +147,31 @@ export function pickAllByShape(ordered: readonly ProjectedObject[], x: number, y
   return hits;
 }
 
+/**
+ * How far (CSS px) the point is from the object's own outline: a path's edge, a pen line's centre line, the rectangle of a picture or text
+ * (or of a turned one). Infinity when the view is inside the object. This is what Reveal draws as an outline, so a click on that outline
+ * can tell which thing it belongs to.
+ */
+export function edgeDistancePx(po: ProjectedObject, x: number, y: number): number {
+  if (po.cover) return Infinity;
+  if (po.obj.kind === "path" && !po.rotated && po.path) return distanceToOutline(po.path, x, y);
+  if (po.obj.kind === "stroke" && !po.rotated && po.q.length >= 2) {
+    const q = po.q;
+    if (q.length === 2) return Math.hypot(x - q[0]!, y - q[1]!);
+    let d = Infinity;
+    for (let i = 0; i + 3 < q.length; i += 2) d = Math.min(d, distToSegment(x, y, q[i]!, q[i + 1]!, q[i + 2]!, q[i + 3]!));
+    return d;
+  }
+  const c = itemCorners(po);
+  let d = Infinity;
+  for (let i = 0; i < c.length; i++) {
+    const a = c[i]!;
+    const b = c[(i + 1) % c.length]!;
+    d = Math.min(d, distToSegment(x, y, a[0], a[1], b[0], b[1]));
+  }
+  return d;
+}
+
 /** All objects under the point, topmost first. `ordered` is in paint order. */
 export function pickAll(ordered: readonly ProjectedObject[], x: number, y: number): ProjectedObject[] {
   const hits: ProjectedObject[] = [];

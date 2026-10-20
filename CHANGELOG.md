@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.1 — Ctrl+click on a revealed outline picks what the outline belongs to (2026-10-20)
+
+- **Fix (Reveal):** the outlines of things under a filled shape were shown, but Ctrl+click on one picked the filled shape on top, because it also covered the spot. A click within 8 px of an outline now picks the thing that outline belongs to (the nearest one); away from every outline it still picks the top thing, and Ctrl+Alt+click still goes down the stack.
+
 ## 0.24.0 — Progress you can see; the library index follows by itself; Settings tidied (2026-10-20)
 
 - **Progress notices** ([ADR 0161](docs/adr/0161-progress-notices.md)): exporting (backup, changes, library index, files ZIP), reading and importing an archive, opening a library, importing files, moving files into or out of the library folder, adding extensions and Start from scratch show a notice with a bar and the stage ("Exporting the backup: reading the library (12 of 30) 40%") that stays until the work ends and then says the result. Before, "Preparing the export…" faded after a few seconds while the work went on.

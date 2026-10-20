@@ -2051,6 +2051,30 @@ test("Reveal also shows what cannot be picked (a locked thing, a hidden one) as 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Ctrl+click on a revealed outline picks the thing the outline belongs to, even under a filled shape that covers it; elsewhere it picks the top thing (reveal)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 480, y: 360 }, { x: 560, y: 420 }, 8); // a small one, below
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 400, y: 300 }, { x: 700, y: 500 }, 8); // a big filled one over it
+  const [small, big] = ((await p.evaluate(() => window.__canvastDebug.objects())) as unknown as Array<{ id: string }>).slice(-2) as [{ id: string }, { id: string }];
+  await p.keyboard.press("v");
+  await p.mouse.click(120, 650);
+  const ctrlClick = async (x: number, y: number) => {
+    await p.keyboard.down("Control");
+    await p.mouse.click(x, y);
+    await p.keyboard.up("Control");
+    await app.frame();
+    return p.evaluate(() => window.__canvastDebug.selection());
+  };
+  expect(await ctrlClick(481, 390), "on the outline of the small one, under the big one").toEqual([small.id]);
+  await p.mouse.click(120, 650);
+  expect(await ctrlClick(520, 390), "inside both, away from any outline: the top one").toEqual([big.id]);
+  await p.mouse.click(120, 650);
+  expect(await ctrlClick(402, 400), "on the outline of the big one").toEqual([big.id]);
+});
+
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("u");

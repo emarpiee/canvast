@@ -1201,7 +1201,7 @@ export function attachTools(
     if (target && isContainer(target) && !isMaskSheet(target) && hasThingsOn(target)) target = null;
     // Ctrl (or Cmd) and a click picks the very thing under the pointer, however deep it is in a group or a mask, ground or not (what the outlines show).
     // (Shift adds the thing to what is picked or takes it away; Alt goes on to the one below the one already picked)
-    const deep = isDeepPress({ ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey }) ? deepPick(revealHits(vis, s.x, s.y), editor.selection, e.altKey) : null;
+    const deep = isDeepPress({ ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey }) ? deepPick(revealHits(vis, s.x, s.y), editor.selection, e.altKey, s) : null;
     if (deep) {
       target = deep.obj;
       editor.entered = [...(target.groups ?? [])];

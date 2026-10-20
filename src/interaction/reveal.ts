@@ -7,7 +7,7 @@
  */
 import type { EditorState } from "../app/editor-state";
 import type { ObjectId } from "../doc/model";
-import { pickAllByShape } from "../render/hit-test";
+import { edgeDistancePx, pickAllByShape } from "../render/hit-test";
 import type { ProjectedObject } from "../render/projection";
 
 const pickable = (po: ProjectedObject): boolean => !po.obj.hidden && !po.obj.locked;
@@ -40,13 +40,32 @@ export function dimHits(visible: readonly ProjectedObject[], hidden: readonly Pr
   return out;
 }
 
+/** A click this near (CSS px) to an outline that Reveal draws is a click on that outline. */
+export const EDGE_PICK_PX = 8;
+
 /**
- * The thing a Ctrl+click picks: the top one under the pointer; with `below`, the one under the first of them that is already picked (so
- * repeated Ctrl+Alt+clicks go down the stack, and round to the top again). null when nothing is there.
+ * The thing a Ctrl+click picks: when the pointer is on the outline of one of the things under it (`pointer`), that one (the nearest outline; the
+ * top one when two are as near), however many things lie over it: a click on a revealed outline picks what the outline belongs to. Otherwise
+ * the top one under the pointer. With `below`, the one under the first of them that is already picked (so repeated Ctrl+Alt+clicks go down
+ * the stack, and round to the top again). null when nothing is there.
  */
-export function deepPick(hits: readonly ProjectedObject[], picked: ReadonlySet<ObjectId>, below = false): ProjectedObject | null {
+export function deepPick(hits: readonly ProjectedObject[], picked: ReadonlySet<ObjectId>, below = false, pointer?: { x: number; y: number }): ProjectedObject | null {
   if (!hits.length) return null;
-  if (!below) return hits[0]!;
+  if (!below) {
+    if (pointer) {
+      let best: ProjectedObject | null = null;
+      let bestD = EDGE_PICK_PX;
+      for (const h of hits) {
+        const d = edgeDistancePx(h, pointer.x, pointer.y);
+        if (d < bestD || (best === null && d <= bestD)) {
+          best = h;
+          bestD = d;
+        }
+      }
+      if (best) return best;
+    }
+    return hits[0]!;
+  }
   const at = hits.findIndex((h) => picked.has(h.obj.id));
   return hits[at < 0 ? 0 : (at + 1) % hits.length]!;
 }

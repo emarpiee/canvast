@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.24.1 — Reveal: a click on an outline picks its own thing (2026-10-20)
+
+- **Implemented:** `deepPick` takes the pointer and prefers the thing whose outline (`edgeDistancePx`, 8 px) it is on over a filled thing that covers the spot (ADR 0149 table updated).
+- **Tested:** E2E `frames.spec` (new test: the outline of a small shape under a filled ellipse, inside both away from outlines, and the big one's own outline; fails without the change) and the other reveal tests, in Chromium and Firefox. The full quick suite has not been run since 0.22.0.
+- **Unverified:** the 8 px reach on a touch screen (the touch list is the way there, ADR 0151) and with very thick outlines.
+
 ## v0.24.0 — progress notices, the library index by itself, Settings tidied (2026-10-20)
 
 - **Implemented:** progress notices for every wait of the storage and import/export paths ([ADR 0161](adr/0161-progress-notices.md)); the library index written by itself (`storage/auto-index.ts`, a checkbox); Settings > Storage as one row per action; icons and indent for the Settings tabs; an icon for each setting's Reset.

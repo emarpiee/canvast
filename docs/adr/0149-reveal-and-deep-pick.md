@@ -18,7 +18,7 @@ Things on the canvas can be invisible (a shape with no fill and no outline, a sh
 | Input | Result |
 | --- | --- |
 | Hold **Ctrl** and move over the canvas (Select) | The outline and names of everything under the pointer. |
-| **Ctrl+click** | Picks exactly the top thing there (a sheet alone, without what is on it; deep inside a group or a mask). |
+| **Ctrl+click** | Picks exactly the thing there: the one whose **outline** the pointer is on (within 8 px; the nearest outline, the top one when two are as near), even under a filled shape that covers it; otherwise the top one (a sheet alone, without what is on it; deep inside a group or a mask). |
 | **Ctrl+Shift+click** | Adds that thing to what is picked, or takes it away if it is picked. |
 | **Ctrl+Alt+click** | Goes on to the thing below the one already picked. |
 | Point at (or tab to) a **Layers row** | The outline of what the row stands for, on the canvas. |
