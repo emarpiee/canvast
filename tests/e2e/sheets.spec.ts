@@ -25,6 +25,29 @@ const pickSheet = async (app: App) => {
 };
 const selection = (app: App) => app.page.evaluate(() => window.__canvastDebug.selection());
 
+test("a sheet drawn over objects takes the ones wholly inside it (above it, in one undo step), and not the ones it only crosses", async ({ app }) => {
+  await key(app, "u");
+  await drag(app, [450, 350], [520, 400]); // wholly inside the sheet drawn below
+  await drag(app, [650, 350], [780, 420]); // crosses its right edge
+  const [inside, crossing] = (await objs(app)).slice(-2) as [Obj, Obj];
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  let all = await objs(app);
+  const sheet = all.find((o) => o.container)!;
+  expect(all.find((o) => o.id === inside.id)!.parent, "the one inside is on the sheet").toBe(sheet.id);
+  expect(all.find((o) => o.id === crossing.id)!.parent, "the one it only crosses is not").toBeUndefined();
+  expect(all.findIndex((o) => o.id === sheet.id), "the sheet is behind what it holds").toBeLessThan(all.findIndex((o) => o.id === inside.id));
+  await key(app, "v");
+  await click(app, 150, 650);
+  expect(await px(app, 485, 375), "what it holds is still in sight (not under the white sheet)").not.toEqual(await px(app, 420, 320));
+  await key(app, "Control+z");
+  await app.frame();
+  all = await objs(app);
+  expect(all.some((o) => o.container), "one undo takes the sheet away").toBe(false);
+  expect(all.find((o) => o.id === inside.id)!.parent, "and gives the object back").toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a sheet holds what is drawn on it and cuts it at its edge; the Layers clip button shows what is outside", async ({ app }) => {
   const p = app.page;
   await key(app, "c");

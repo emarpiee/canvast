@@ -33,7 +33,7 @@ import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import { boxSelect, edgeDistancePx, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
 import { EDGE_PICK_PX, createReveal, deepPick, isDeepPress, revealHits } from "./reveal";
-import { descendantsOf, isContainer, isMaskSheet } from "../doc/containers";
+import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { cropEdges } from "../doc/crop";
@@ -47,7 +47,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { drawSheetOver, finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -624,6 +624,23 @@ export function attachTools(
     const drawn = shapeObject(d, doc.topZ() + 1);
     const made: PathObject = editor.tool === "sheet" ? { ...drawn, stroke: null, container: { clip: true }, name: nextSheetName() } : drawn;
     const obj = homeObject(normalizeUnit(sheetStart && doc.get(sheetStart) ? { ...made, parent: sheetStart } : made), doc.space);
+    // A sheet drawn over objects takes the ones wholly inside it that are at its level (not on another sheet, unless the sheet is drawn on that one).
+    if (editor.tool === "sheet") {
+      const cam = cameraIn(view.frameCamera, obj.frame ?? doc.space.world);
+      const sb = cam && projectObject(obj, cam, view.viewport, { keepTiny: true })?.box;
+      const level = (o: CanvasObject): ObjectId | undefined => (o.parent !== undefined && doc.get(o.parent) ? o.parent : undefined);
+      const here = sheetStart && doc.get(sheetStart) ? sheetStart : undefined;
+      if (sb) {
+        const inside = visible().filter((po) => {
+          const b = po.box;
+          return !po.cover && !po.obj.hidden && !po.obj.locked && level(po.obj) === here && b.minX >= sb.minX - 0.5 && b.minY >= sb.minY - 0.5 && b.maxX <= sb.maxX + 0.5 && b.maxY <= sb.maxY + 0.5;
+        });
+        const all = doc.ordered();
+        const taken = expandToUnits(all, inside.map((po) => po.obj), []).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.locked);
+        const roots = rootsOf(taken).filter((o) => level(o) === here);
+        if (roots.length) return drawSheetOver(doc, editor, obj as PathObject, roots);
+      }
+    }
     doc.commit(doc.transaction(editor.tool === "sheet" ? "Draw sheet" : `Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
     editor.select([obj.id]);
   };

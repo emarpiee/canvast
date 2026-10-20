@@ -1718,6 +1718,22 @@ const nextSheetName = (all: Iterable<CanvasObject>): string => {
 };
 
 /**
+ * A sheet just drawn over objects takes the ones that lie wholly inside it (ADR 0108): they go on the sheet (`roots`: the ones not already on
+ * another of them; what is on a sheet or in a group goes with it), the sheet goes just behind them so they stay in sight, in one step.
+ */
+export function drawSheetOver(doc: DocumentStore, editor: EditorState, sheet: PathObject, roots: readonly CanvasObject[]): void {
+  const all = doc.ordered();
+  const lowest = Math.min(...roots.map((o) => o.z));
+  const below = [...all].filter((o) => o.z < lowest).pop();
+  const body = { ...sheet, z: lowest - 1 };
+  const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : body;
+  doc.commit(doc.transaction("Draw sheet", [placed, ...roots.map((o) => ({ ...o, parent: sheet.id }) as CanvasObject)]));
+  editor.select([placed.id]);
+  editor.message = `${sheet.name ?? "The sheet"} holds ${roots.length === 1 ? "1 item" : `${roots.length} items`} it was drawn over.`;
+  editor.changed();
+}
+
+/**
  * Put the picked objects on a sheet (ADR 0108): a sheet exactly the size of the objects, put behind them, which holds them. What is inside another
  * sheet goes on the new one, which is itself on that sheet. The picked objects must be in one space.
  */

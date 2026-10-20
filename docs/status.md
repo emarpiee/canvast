@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.24.5 — a sheet drawn over objects takes them (2026-10-21)
+
+- **Implemented:** `drawSheetOver` (actions.ts) and the Sheet tool's commit in `interaction/tools.ts` (objects wholly inside the new sheet's box, at its level, with their groups and contents, go on it; the sheet is placed behind them).
+- **Tested:** new `sheets.spec` test (one inside, one crossing; parent, z order, pixels, one undo), all of `sheets.spec` in Chromium (18 passed), the new test in Firefox.
+- **Unverified:** a sheet drawn over a mix of frames at deep zoom; a rotated or very large capture; touch.
+
 ## v0.24.4 — a group is one unit for Align and Arrange (2026-10-21)
 
 - **Implemented:** `layoutUnits` splits a boolean group into its shapes only when its result is not picked (the shapes were picked as shapes).

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.5 — A sheet drawn over objects takes them (2026-10-21)
+
+- **Sheet tool:** a sheet drawn over objects now puts the ones wholly inside it on the sheet (above it, so they stay in sight), in the same undo step. It takes objects at its own level only (not ones on another sheet, unless it is drawn on that sheet), with what is in their group or on them; locked and hidden ones are left, and an object it only crosses stays out. A notice says how many it holds.
+
 ## 0.24.4 — A group is one thing for Align and Arrange (2026-10-21)
 
 - **Fix:** Align, Distribute and Arrange split a boolean group picked as a whole into its shapes and moved them separately. A group, and a boolean group, picked as a whole is now one unit: it is lined up with what else is picked (its shapes keep their places among themselves), and picked alone there is nothing to line up. To line the shapes of a boolean group up with each other, pick them one by one (in Layers, or enter the group first).
