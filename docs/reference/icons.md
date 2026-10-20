@@ -77,7 +77,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `paintRadial` | Paint chooser: a radial gradient |
 | `paintAngular` | Paint chooser: an angular gradient |
 | `paintImage` | Paint chooser: a picture as the fill (Image) |
-| `paintPattern` | Paint chooser: objects repeated over the shape (Pattern) |
+| `paintObjects` | Paint chooser: objects repeated over the shape (Objects) |
 | `markdown` | Copy Markdown (the text format bar, the Export menu) |
 | `selectAll` | Context menu: Select everything |
 | `paste` | Context menu: Paste |
@@ -173,7 +173,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `dices` | Random empty view (bottom-right controls) |
-| `shuffle` | Randomize: the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |
+| `mountain-snow` | Pattern panel (dock button) |
+| `snowflake` | Pattern panel: keep this setting when randomizing (freeze) |
+| `shuffle` | Randomize: the Pattern panel, the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |
 | `arrow-right-left` | Turn the sheet on its side (sheet bar) |
 | `image-up` | Export… (Actions bar, sheet bar, command palette) |
 | `projector` | Play the bookmarks as a tour |

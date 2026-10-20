@@ -22,6 +22,7 @@ export function duplicateRecords(records: readonly SerializedObject[], newId: ()
     if (r["boolOps"]) s["boolOps"] = mapKeys(r["boolOps"]);
     if (r["mask"] && typeof r["mask"] === "object") s["mask"] = { ...(r["mask"] as Record<string, unknown>), by: gid(String((r["mask"] as { by: unknown }).by)) };
     if (typeof r["result"] === "string") s["result"] = gid(r["result"]);
+    if (r["gen"] && typeof r["gen"] === "object") s["gen"] = { ...(r["gen"] as Record<string, unknown>), gid: gid(String((r["gen"] as { gid: unknown }).gid)) };
     return s;
   });
 }

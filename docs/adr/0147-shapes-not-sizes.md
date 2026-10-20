@@ -18,7 +18,7 @@ The Actions bar (picture-up icon), the sheet bar and the command palette open on
 - **Sizes the shape is made for** are offered first (A4/A3/A5/A6 at 300 ppi, Letter, 4×6 and 8×10 photos, Full HD, 4K, story, link preview, banner …; a single whole picture offers its own pixels as *Original*), then 640, 1080, 1920 and 3840 px wide and 4, 6, 8 and 12 in wide at 300 ppi, each with the height that keeps the ratio. The first exact one is the size it opens at.
 - **File:** PNG, WebP (falls back to PNG), JPEG with quality; background transparent, white or black (JPEG has none); **SVG** when everything picked is vector, sized in the unit chosen (`width="5in"`). Name proposed as `name-WxH`.
 - **Limits:** 16,384 px a side and 120 MP in all; the dialog says when a size is capped and warns past 40 MP.
-- **Output:** Download, Copy (PNG), or Save to library (the *Exports* folder, tag `export`, with the notice's View button).
+- **Output:** Download, Copy (PNG), or Save to library (the *Exports* folder and tag `export` by default, `export.folder` and `export.tags` in Settings > Media and playback; a pattern made by the Pattern panel goes to `pattern.folder` / `pattern.tags` instead, *Patterns* and `pattern`, ADR 0162; with the notice's View button).
 - The last unit, resolution, format, quality and background are remembered in the browser.
 - A live preview shows the shape (on a chequer when transparent) with its measures along the top and left.
 

@@ -228,6 +228,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
+        <button type="button" class="layers-toggle" data-pattern-panel aria-pressed="false" aria-label="Pattern panel" title="Pattern: make waves, blobs, tiles and other patterns on a sheet or shape, with settings and a random button">${ICONS.mountainSnow}</button>
         <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
       </div>
     </div>
@@ -412,8 +413,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       name: which === "fill" ? "Fill" : "Outline",
       paint: paintNow(which),
       noneLabel: which === "fill" ? "No fill" : "No outline",
-      // a picture or a pattern fills the picked shapes (ADR 0154)
-      ...(which === "fill" && editsSelection() ? { modes: ["none", "solid", "linear", "radial", "angular", "image", "pattern"] as const } : {}),
+      // a picture or objects fill the picked shapes (ADR 0154)
+      ...(which === "fill" && editsSelection() ? { modes: ["none", "solid", "linear", "radial", "angular", "image", "objects"] as const } : {}),
       onInput: (p) => setPaint(which, p, false),
       onChange: (p) => setPaint(which, p, true),
       onClose: () => {
@@ -672,7 +673,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   // The first colours of the selection have a chip each; the others are one button, "+N", that opens them as a list (so the row stays short, and none is lost).
   const SEL_CHIPS = 7;
   const chipPaint = (p: Paint): string => (typeof p === "string" ? `linear-gradient(${swatchBackground(p)}, ${swatchBackground(p)})` : paintCss(p));
-  const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : isTexture(p) ? (p.src.kind === "asset" ? "Picture" : "Pattern") : "Gradient");
+  const paintName = (p: Paint): string => (typeof p === "string" ? p.toUpperCase() : isTexture(p) ? (p.src.kind === "asset" ? "Picture" : "Objects") : "Gradient");
   const usage = (it: { fills: number; strokes: number }): string =>
     [it.fills ? `${it.fills} ${it.fills === 1 ? "fill" : "fills"}` : "", it.strokes ? `${it.strokes} ${it.strokes === 1 ? "outline" : "outlines"}` : ""].filter(Boolean).join(" and ");
   // Change a colour everywhere the picked shapes use it: the paint chooser, shown on the colour's chip.
@@ -826,6 +827,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["layers"] !== undefined) {
       editor.layersOpen = !editor.layersOpen;
+      editor.changed();
+    } else if (d["patternPanel"] !== undefined) {
+      editor.patternOpen = !editor.patternOpen;
       editor.changed();
     } else if (d["adjustPanel"] !== undefined) {
       editor.adjustOpen = !editor.adjustOpen;
@@ -1026,6 +1030,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-bookmarks]")!.setAttribute("aria-pressed", String(editor.bookmarksOpen));
     root.querySelector<HTMLElement>("[data-layers]")!.setAttribute("aria-pressed", String(editor.layersOpen));
     root.querySelector<HTMLElement>("[data-adjust-panel]")!.setAttribute("aria-pressed", String(editor.adjustOpen));
+    root.querySelector<HTMLElement>("[data-pattern-panel]")!.setAttribute("aria-pressed", String(editor.patternOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
     root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
     pq("[data-snap]").setAttribute("aria-pressed", String(editor.snap));

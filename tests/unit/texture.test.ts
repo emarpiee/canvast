@@ -11,20 +11,20 @@ import { isTextureValid, layoutOf, nearOrigin, newTexture, sameTexture, withSour
 
 const H = "a".repeat(64);
 describe("texture fills (ADR 0154)", () => {
-  it("accepts a picture or a pattern, and refuses what a document must not hold", () => {
+  it("accepts a picture or objects, and refuses what a document must not hold", () => {
     const pic = newTexture({ kind: "asset", hash: H }, "#102030");
     expect(isTextureValid(pic)).toBe(true);
     expect(isTextureValid(newTexture({ kind: "objects", ids: ["a", "b"] }))).toBe(true);
     expect(isTextureValid({ ...pic, src: { kind: "asset", hash: "nope" } })).toBe(false);
     expect(isTextureValid({ ...pic, src: { kind: "objects", ids: [] } })).toBe(false);
-    expect(isTextureValid({ ...newTexture({ kind: "objects", ids: ["a"] }), mode: "fill" }), "a pattern is always repeated").toBe(false);
+    expect(isTextureValid({ ...newTexture({ kind: "objects", ids: ["a"] }), mode: "fill" }), "objects are always repeated").toBe(false);
     expect(isTextureValid({ ...pic, scale: 0 })).toBe(false);
     expect(isTextureValid({ ...pic, spacing: [-1, 0] })).toBe(false);
     expect(isTextureValid({ ...pic, offset: [NaN, 0] })).toBe(false);
     expect(isTextureValid({ ...pic, avg: "red" })).toBe(false);
     expect(isTextureValid({ ...pic, tile: "round" })).toBe(false);
   });
-  it("a source change keeps the placement, and a pattern becomes tiled", () => {
+  it("a source change keeps the placement, and objects become tiled", () => {
     const pic = { ...newTexture({ kind: "asset", hash: H }), mode: "fit" as const, scale: 2 };
     const pat = withSource(pic, { kind: "objects", ids: ["x"] }, "#000000");
     expect([pat.mode, pat.scale, pat.avg]).toEqual(["tile", 2, "#000000"]);
@@ -79,7 +79,7 @@ describe("texture fills in the document (ADR 0154)", () => {
     const back = deserializeObject(JSON.parse(JSON.stringify(s)));
     expect((back as PathObject).fill).toEqual(pic);
     expect(assetOf(back)).toBe(H);
-    expect(serializeObject(mk(newTexture({ kind: "objects", ids: ["a"] })))["assetId"], "a pattern uses no picture").toBeUndefined();
+    expect(serializeObject(mk(newTexture({ kind: "objects", ids: ["a"] })))["assetId"], "an objects fill uses no picture").toBeUndefined();
   });
   it("is for a fill only, and a broken one is refused", () => {
     expect(() => deserializeObject(JSON.parse(JSON.stringify({ ...serializeObject(mk(null)), fill: { ...pic, scale: -1 } })))).toThrow();

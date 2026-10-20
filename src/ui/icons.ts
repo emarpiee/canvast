@@ -41,6 +41,8 @@ import slidersVerticalSvg from "lucide-static/icons/sliders-vertical.svg";
 import projectorSvg from "lucide-static/icons/projector.svg";
 import cornerUpLeftSvg from "lucide-static/icons/corner-up-left.svg";
 import shuffleSvg from "lucide-static/icons/shuffle.svg";
+import mountainSnowSvg from "lucide-static/icons/mountain-snow.svg";
+import snowflakeSvg from "lucide-static/icons/snowflake.svg";
 import dicesSvg from "lucide-static/icons/dices.svg";
 import imageUpSvg from "lucide-static/icons/image-up.svg";
 import arrowRightLeftSvg from "lucide-static/icons/arrow-right-left.svg";
@@ -208,7 +210,7 @@ import paintLinearSvg from "lucide-static/icons/blinds.svg";
 import paintRadialSvg from "lucide-static/icons/target.svg";
 import paintAngularSvg from "lucide-static/icons/chart-pie.svg";
 import paintImageSvg from "lucide-static/icons/mountain.svg";
-import paintPatternSvg from "lucide-static/icons/brick-wall.svg";
+import paintObjectsSvg from "lucide-static/icons/brick-wall.svg";
 import dropletSvg from "lucide-static/icons/droplet.svg";
 import galleryThumbnailsSvg from "lucide-static/icons/gallery-thumbnails.svg";
 import dropletsSvg from "lucide-static/icons/droplets.svg";
@@ -440,7 +442,7 @@ export const ICONS = {
   paintRadial: clean(paintRadialSvg),
   paintAngular: clean(paintAngularSvg),
   paintImage: clean(paintImageSvg),
-  paintPattern: clean(paintPatternSvg),
+  paintObjects: clean(paintObjectsSvg),
   droplet: clean(dropletSvg),
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
@@ -538,6 +540,8 @@ export const ICONS = {
   cornerUpLeft: clean(cornerUpLeftSvg),
   dices: clean(dicesSvg),
   shuffle: clean(shuffleSvg),
+  mountainSnow: clean(mountainSnowSvg),
+  snowflake: clean(snowflakeSvg),
   imageUp: clean(imageUpSvg),
   arrowRightLeft: clean(arrowRightLeftSvg),
   cornerUpRight: clean(cornerUpRightSvg),

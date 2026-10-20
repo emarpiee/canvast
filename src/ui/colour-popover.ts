@@ -427,8 +427,8 @@ export interface PaintPopoverOptions {
   modes?: ReadonlyArray<Mode>;
 }
 
-/** `image` and `pattern` are the textures of a fill (ADR 0154); offered only where the list says so. */
-type Mode = "none" | "solid" | "linear" | "radial" | "angular" | "image" | "pattern";
+/** `image` and `objects` are the textures of a fill (ADR 0154); offered only where the list says so. */
+type Mode = "none" | "solid" | "linear" | "radial" | "angular" | "image" | "objects";
 
 /** Open the paint chooser under `anchor`: None, Solid, Linear or Radial, with the colour picker or the gradient editor below. */
 export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): void {
@@ -442,9 +442,9 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     o.onChange(p);
   };
   let solid = paint === null ? "#2563eb" : solidOf(paint);
-  /** Image or Pattern chosen before a source is: the controls show, the paint stays what it was until there is a source. */
-  let draft: "image" | "pattern" | null = null;
-  const modeOf = (): Mode => (draft ? draft : paint === null ? "none" : isTexture(paint) ? (paint.src.kind === "asset" ? "image" : "pattern") : isGradient(paint) ? paint.type : "solid");
+  /** Image or Objects chosen before a source is: the controls show, the paint stays what it was until there is a source. */
+  let draft: "image" | "objects" | null = null;
+  const modeOf = (): Mode => (draft ? draft : paint === null ? "none" : isTexture(paint) ? (paint.src.kind === "asset" ? "image" : "objects") : isGradient(paint) ? paint.type : "solid");
   const groups = swatchGroups;
   const pickerOptions = {
     model: store?.get("colour.model") ?? "okhsv",
@@ -468,9 +468,9 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   modes.className = "paint-modes";
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
-  const offered = (o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const)).filter((m) => (m !== "image" && m !== "pattern") || textureHooks());
-  const ICON: Record<Mode, string> = { none: ICONS.paintNone, solid: ICONS.paintSolid, linear: ICONS.paintLinear, radial: ICONS.paintRadial, angular: ICONS.paintAngular, image: ICONS.paintImage, pattern: ICONS.paintPattern };
-  const NAME: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear gradient", radial: "Radial gradient", angular: "Angular gradient", image: "Image", pattern: "Pattern" };
+  const offered = (o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const)).filter((m) => (m !== "image" && m !== "objects") || textureHooks());
+  const ICON: Record<Mode, string> = { none: ICONS.paintNone, solid: ICONS.paintSolid, linear: ICONS.paintLinear, radial: ICONS.paintRadial, angular: ICONS.paintAngular, image: ICONS.paintImage, objects: ICONS.paintObjects };
+  const NAME: Record<Mode, string> = { none: o.noneLabel, solid: "Colour", linear: "Linear gradient", radial: "Radial gradient", angular: "Angular gradient", image: "Image", objects: "Objects" };
   // icons, not words (the name is the tooltip and the accessible name); the row scrolls when there are more kinds than room
   modes.innerHTML = offered.map((m) => `<button type="button" role="radio" data-mode="${m}"${m === "none" ? ' class="colour-none"' : ""} aria-label="${esc(NAME[m])}" title="${esc(NAME[m])}">${ICON[m]}</button>`).join("");
   const body = document.createElement("div");
@@ -485,7 +485,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     body.replaceChildren();
     for (const b of modes.querySelectorAll<HTMLElement>("[data-mode]")) b.setAttribute("aria-checked", String(b.dataset["mode"] === modeOf()));
     if (draft || isTexture(paint)) {
-      const kind = draft ?? (modeOf() as "image" | "pattern");
+      const kind = draft ?? (modeOf() as "image" | "objects");
       const ed = createTextureEditor({
         kind,
         value: isTexture(paint) && (paint.src.kind === "asset") === (kind === "image") ? paint : null,
@@ -547,7 +547,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-mode]");
     if (!b || b.dataset["mode"] === modeOf()) return;
     const m = b.dataset["mode"] as Mode;
-    if (m === "image" || m === "pattern") {
+    if (m === "image" || m === "objects") {
       // (no source yet: the controls show, and the paint is what it was until one is chosen)
       draft = m;
       mount();

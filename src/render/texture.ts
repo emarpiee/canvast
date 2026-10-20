@@ -41,7 +41,7 @@ export const takeTexturePending = (): boolean => {
   return v;
 };
 
-/** The shapes whose tile is being drawn (a pattern whose source holds a pattern): a shape already in it, or a fourth level, is its average colour, so a cycle cannot loop. */
+/** The shapes whose tile is being drawn (an objects fill whose source holds an objects fill): a shape already in it, or a fourth level, is its average colour, so a cycle cannot loop. */
 const drawing: string[] = [];
 const MAX_NESTING = 3;
 
@@ -99,7 +99,7 @@ function flat(t: TexturePaint): string {
   }
 }
 
-/** A pattern fill as what an SVG `<pattern>` needs (ADR 0154): the cell and its tiles, the matrix from the cell to the SVG's units, and the tile as a PNG. Null for a picture or tile not ready (an average colour is written then). */
+/** An objects fill as what an SVG `<pattern>` needs (ADR 0154): the cell and its tiles, the matrix from the cell to the SVG's units, and the tile as a PNG. Null for a picture or tile not ready (an average colour is written then). */
 export interface SvgTexture {
   readonly cw: number;
   readonly ch: number;
@@ -324,7 +324,7 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
   }
   const pat = ctx.createPattern(cell, lay.repeat ? "repeat" : "no-repeat");
   if (!pat) return lastPattern.get(o.id) ?? flat(t);
-  // a pattern still waiting for its pictures is not kept as the one to show later (a half-drawn tile would stay)
+  // a canvas pattern still waiting for its pictures is not kept as the one to show later (a half-drawn tile would stay)
   if (!pendingTile) {
     lastPattern.delete(o.id);
     lastPattern.set(o.id, pat);

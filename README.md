@@ -110,11 +110,12 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
-- **Fill and outline:** solid colour, linear, radial or angular gradient, a picture, or a pattern made of other objects. Outlines have a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit; the outline can be a gradient too.
+- **Fill and outline:** solid colour, linear, radial or angular gradient, a picture, or other objects of the canvas repeated over the shape (*Objects*). Outlines have a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit; the outline can be a gradient too.
 - **Combine shapes:** union, intersect, subtract and exclude stay editable until you flatten them; *Divide* and the *Shape builder* split overlapping shapes; *Outline stroke* turns a line into a shape; *Taper* gives a line a variable width; *Corner smoothing* rounds corners continuously.
 - **Vector networks:** paths that meet at vertices, with the regions between them filled. Edges are split where they cross.
 - **Initial state:** *Set*, *Update* and *Reset to initial state* remember a shape's geometry (and, by default, its fill and outline) so you can experiment and go back. *Apply rotation* makes a shape's current turn its new zero.
 - **Eraser** (`E`): removes whole objects (optionally whole groups), or trims strokes in scissors mode.
+- **Pattern** (panel, mountain button): 39 generators of vector patterns, grouped as Waves, Blobs, Soft, Lines, Tiles and Fields and shown as a grid of small pictures (Ripple, Tides, Drift, Bubbles, Glow, Grain, Stripes, Halftone, Tiles, Contours, Cells, Flow, Marble, Maze and more). Each has the settings of its own (counts, sizes, angles, colours, solid or outline), and a background you can hide. Pick a sheet or a closed shape first (the shape cuts the result to its outline) or let it make a new sheet; *Generate* makes the result, every change after that replaces it live, and the whole session is one undo step until *Done*. *Randomize* picks random settings and a new seed (a snowflake on a setting keeps it); the seed can be typed to make a result again. The result is a group of ordinary editable shapes that remembers its settings: pick it later and the panel shows them, and changes replace it where it is.
 - **SVG:** paste SVG text to get editable paths (gradients, dashes, transforms, `<use>`, symbols and clip paths, which become clipping masks), or make a vector copy of an SVG picture. Export shapes as SVG, copy them as SVG text, or save them to the library as an SVG picture.
 
 ![Boolean shapes: the rocket is a Union, and the Shapes menu is open](docs/screenshots/shapes.webp)
@@ -164,7 +165,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 ### The interface
 
 - **Tool rail** on the left: the tools, then Screenshot, Search, Import, Undo and Redo. **Properties bar** at the top: the options of the tool or of what is picked. **Actions bar**: what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection.
-- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
+- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
 - **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**. A right click on the canvas opens a menu of what fits.
 - **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
 - **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
@@ -273,7 +274,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, eraser |
 | Navigation | How `W` `A` `S` `D` choose the next item; focus on the item or keep the zoom |
 | Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
-| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags) |
+| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots, extracted frames and edited pictures have their own in their own groups |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
 | Panels | Minimize inactive panels, panels kept open |
@@ -309,6 +310,7 @@ canvast describes only what it does. These are the current limits.
 | 3D | Only STL and OBJ are read, and only as a preview card |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
+| Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet scales the pattern as it does any content; it is not made again at the new size |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
 | Boolean groups | Per-corner radii on a boolean result are not available |
 | Eraser | Trimming works on strokes, not on vector paths |
@@ -394,6 +396,7 @@ src/
   search/        boolean query parser and evaluator
   settings/      declared settings, scopes, rebindable shortcuts
   commands/      command registry, palette providers, macros
+  gen/           the pattern generators, a standalone module that imports nothing from the app: seeded random, geometry helpers, one pure function per pattern, an SVG writer
   colour-picker/ the colour picker, a standalone module that imports nothing from the app
   ui/            toolbars, panels, library, settings view, menus, player
   app/           bootstrap, editor state, actions, debug hook
@@ -402,7 +405,7 @@ tests/           unit (Vitest) and end-to-end (Playwright)
 docs/            reference notes, test logs, status
 ```
 
-The colour picker can be built alone with `npm run build:picker`.
+The colour picker can be built alone with `npm run build:picker`, and the pattern generators with `npm run build:patterns` (a script with the global `CanvastPatterns`, an ES module, TypeScript declarations and a demo page in `dist-patterns/`; see [src/gen/README.md](src/gen/README.md) for the API). Both are made to be published as packages of their own.
 
 ---
 
@@ -429,7 +432,8 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | --- | --- |
 | `npm run typecheck` | TypeScript check |
 | `npm run test:unit` | Unit tests (seconds) |
-| `npm test` | Typecheck, unit, quick end-to-end suite, token and picker checks (about 16 min) |
+| `npm test` | Typecheck, unit, quick end-to-end suite, token, picker and pattern-generator checks (about 16 min) |
+| `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
 | `npm run test:full` | The full suite with long stress loops (about 50 min) |
 | `npm run test:snap -- <files or -g pattern>` | Run chosen end-to-end specs |
 | `npm run test:status` | List test builds with their result and how far each is behind the source |

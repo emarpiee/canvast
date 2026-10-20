@@ -165,6 +165,14 @@ export const SETTINGS = {
   "frame.tagSource": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "frame.tagInherit": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "frame.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  // What is saved to the library from the canvas, each in a folder and with tags of its own: a picture from Export… (ADR 0147), a pattern made by
+  // the Pattern panel (ADR 0162, saved by Export… or as SVG) and picked shapes saved as an SVG.
+  "export.folder": { scope: "device", default: "Exports", validate: text(60), effect: "immediate" } as Def<string>,
+  "export.tags": { scope: "device", default: "export", validate: text(200), effect: "immediate" } as Def<string>,
+  "pattern.folder": { scope: "device", default: "Patterns", validate: text(60), effect: "immediate" } as Def<string>,
+  "pattern.tags": { scope: "device", default: "pattern", validate: text(200), effect: "immediate" } as Def<string>,
+  "svg.folder": { scope: "device", default: "Shapes", validate: text(60), effect: "immediate" } as Def<string>,
+  "svg.tags": { scope: "device", default: "shape", validate: text(200), effect: "immediate" } as Def<string>,
   "frame.place": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagShot": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagBoard": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,

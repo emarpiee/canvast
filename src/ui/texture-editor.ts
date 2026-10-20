@@ -1,5 +1,5 @@
 /**
- * The controls of a texture fill (ADR 0154), shown in the paint chooser under Image and Pattern: where the source comes from, how it lies
+ * The controls of a texture fill (ADR 0154), shown in the paint chooser under Image and Objects: where the source comes from, how it lies
  * in the shape, and (when it is repeated) on what grid. Both kinds share every control; the source row and the Mode choice are the only
  * differences. The fields are one table, so each is made and read the same way.
  */
@@ -11,8 +11,8 @@ import { MAX_SCALE, MAX_SPACING, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYP
 
 /** What the app gives the editor: the person's choices on the canvas and in files, and words for a source. */
 export interface TextureHooks {
-  /** Wait for a click on the canvas: a picture (`image`) or the objects under the pointer (`pattern`). null: cancelled. */
-  pickSource(kind: "image" | "pattern"): Promise<TextureSource | null>;
+  /** Wait for a click on the canvas: a picture (`image`) or the objects under the pointer (`objects`). null: cancelled. */
+  pickSource(kind: "image" | "objects"): Promise<TextureSource | null>;
   /** Choose one of the pictures already in the library (a panel beside `anchor`). null: none was chosen. */
   chooseFromLibrary(anchor: HTMLElement): Promise<TextureSource | null>;
   /** A picture file put in the library. null: it could not be. */
@@ -57,7 +57,7 @@ const FIELDS: readonly Field[] = [
 ];
 
 export interface TextureEditorOptions {
-  kind: "image" | "pattern";
+  kind: "image" | "objects";
   /** The texture now; null while no source has been chosen yet. */
   value: TexturePaint | null;
   /** A source was chosen (and `avg` is its average colour): the first texture, or the same one with another source. */

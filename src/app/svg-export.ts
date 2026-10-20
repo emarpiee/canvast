@@ -120,7 +120,7 @@ export function exportSvg(
   space: FrameSpace,
   maskOf: (by: string) => readonly PathObject[] = () => [],
   size?: { w: string; h: string },
-  /** The shapes a pattern of objects repeats (null: not all shapes, a picture of the tile is written instead). */
+  /** The shapes an objects fill repeats (null: not all shapes, a picture of the tile is written instead). */
   sourceOf?: (ids: readonly string[]) => readonly PathObject[] | null,
   evenPad = false,
   depth = 0,
@@ -130,11 +130,11 @@ export function exportSvg(
   const { placed, place, minX, minY, sc, w, h } = lay;
   const defs: string[] = [];
   let usesXlink = false;
-  let cover = ""; // (what a path's fill needs drawn before it: a pattern's images)
+  let cover = ""; // (what a path's fill needs drawn before it: the images of an objects fill)
   const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null, d?: string): string => {
     if (paint === null) return ` ${which}="none"`;
     if (isTexture(paint) && which === "fill") {
-      // a pattern of objects: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
+      // an objects fill: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
       // left for very many tiles: viewers that read Qt's SVG or import into design tools leave a <pattern> empty); a picture is one image of it, the same way
       const src = paint.src.kind === "objects" && sourceOf && depth < 2 ? sourceOf(paint.src.ids) : null;
       const inner = src?.length ? exportSvg(src, space, maskOf, undefined, sourceOf, true, depth + 1) : null;
@@ -174,7 +174,7 @@ export function exportSvg(
       }
     }
     if (!isGradient(paint)) {
-      const c = colour(solidOf(paint)); // (a picture still being decoded, or a pattern not ready: its average colour)
+      const c = colour(solidOf(paint)); // (a picture still being decoded, or an objects fill not ready: its average colour)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;

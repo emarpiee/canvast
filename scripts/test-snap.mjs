@@ -21,6 +21,10 @@ if (built.status !== 0) process.exit(built.status ?? 1);
 const pickerDir = resolve(dir, "picker");
 const builtPicker = spawnSync("node", ["scripts/build-picker.mjs", "--out", pickerDir], { cwd: root, stdio: "inherit" });
 if (builtPicker.status !== 0) process.exit(builtPicker.status ?? 1);
+// the same for the pattern generators' demo page
+const patternsDir = resolve(dir, "patterns");
+const builtPatterns = spawnSync("node", ["scripts/build-patterns.mjs", "--out", patternsDir], { cwd: root, stdio: "inherit" });
+if (builtPatterns.status !== 0) process.exit(builtPatterns.status ?? 1);
 
 for (const script of ["check-offline", "check-names"]) {
   const checked = spawnSync("node", [`scripts/${script}.mjs`, resolve(dir, "canvast.html")], { cwd: root, stdio: "inherit" });
@@ -35,7 +39,7 @@ console.log(`snapshot ${dir.slice(root.length + 1)}  (dist/ is free to rebuild)`
 const child = spawn("npx", ["playwright", "test", "--output", resolve(dir, "results"), "--reporter=line,json", ...args], {
   cwd: root,
   stdio: "inherit",
-  env: { ...process.env, CANVAST_BUILD_DIR: dir, CANVAST_PICKER_DIR: pickerDir, PLAYWRIGHT_JSON_OUTPUT_NAME: resolve(dir, "report.json") },
+  env: { ...process.env, CANVAST_BUILD_DIR: dir, CANVAST_PICKER_DIR: pickerDir, CANVAST_PATTERNS_DIR: patternsDir, PLAYWRIGHT_JSON_OUTPUT_NAME: resolve(dir, "report.json") },
 });
 child.on("exit", async (code) => {
   run.finishedAt = new Date().toISOString();

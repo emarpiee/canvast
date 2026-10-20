@@ -61,6 +61,11 @@ export class DocumentStore {
     return this.undoStack.length > 0;
   }
 
+  /** The step the next undo would take back (a panel that remakes its own last step finds out here whether it is still the last one). */
+  get lastTransaction(): Transaction | undefined {
+    return this.undoStack[this.undoStack.length - 1];
+  }
+
   get canRedo(): boolean {
     return this.redoStack.length > 0;
   }

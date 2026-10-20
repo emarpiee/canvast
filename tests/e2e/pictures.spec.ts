@@ -710,7 +710,7 @@ test("a number changed in the fill options never makes the chooser blink: it sta
   expect(JSON.stringify((await fillOf(app, rect.id)).fill), "one undo step").toBe(before);
 });
 
-test("picture and pattern fills still show their own colour far inside the shape, where they are no longer drawn as patterns (not their average)", async ({ app }) => {
+test("picture and objects fills still show their own colour far inside the shape, where they are no longer drawn as patterns (not their average)", async ({ app }) => {
   const p = app.page;
   const picture = await place(app, "halves.png", makePng(40, 40, (x) => (x < 20 ? [255, 0, 0, 255] : [0, 0, 255, 255])));
   const vp = p.viewportSize()!;
@@ -834,7 +834,7 @@ test("a picture fills a shape (ADR 0154): picked on the canvas, Fill covers it, 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas, the grid and its rows, and a change to the source changes the pattern", async ({ app }) => {
+test("objects repeat over a shape as a fill (ADR 0154): picked on the canvas, the grid and its rows, and a change to the source changes the fill", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("u");
   await p.locator('[data-shape-kind="ellipse"]').click();
@@ -843,7 +843,7 @@ test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas,
   const rect = await pickedRect(app, [400, 450], [700, 600]); // 300 × 150: the tile is 75 px
   const pop = p.locator(".colour-pop");
   await p.click('[data-paint="fill"]');
-  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator('[data-mode="objects"]').click();
   await pop.locator("[data-tex-pick]").click();
   await p.mouse.click(930, 330);
   await expect.poll(async () => ((await fillOf(app, rect.id)).fill as { src?: { kind: string; ids: string[] } } | undefined)?.src?.ids).toEqual([src.id]);
@@ -862,24 +862,24 @@ test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas,
   await p.mouse.click(60, 650);
   await app.frame();
   expect([await px(app, 437, 487), await px(app, 475, 562)], "row one at 37, row two half a tile across").toEqual([blue, blue]);
-  // the source is hidden (the usual way to use a shape as a tile): the pattern still shows it
+  // the source is hidden (the usual way to use a shape as a tile): the fill still shows it
   await p.mouse.click(930, 330);
   await p.getByRole("button", { name: "Layers panel", exact: true }).click();
   await p.getByTestId("layers-panel").locator('[data-do="hide"]').click();
   await p.mouse.click(60, 650);
   await app.frame();
   expect(await px(app, 930, 330), "the source itself is gone from the canvas").toEqual(ground);
-  expect(await px(app, 437, 487), "and the pattern still has it").toEqual(blue);
+  expect(await px(app, 437, 487), "and the fill still has it").toEqual(blue);
   await p.keyboard.press("Control+z"); // (shown again)
   await app.frame();
-  // the source changes (its fill is taken away): the pattern follows
+  // the source changes (its fill is taken away): the fill follows
   await p.mouse.click(930, 330);
   await p.click('[data-paint="fill"]');
   await pop.locator(".colour-none").click();
   await p.keyboard.press("Escape");
   await p.mouse.click(60, 650);
   await app.frame();
-  expect(await px(app, 437, 487), "the pattern shows the change").not.toEqual(blue);
+  expect(await px(app, 437, 487), "the fill shows the change").not.toEqual(blue);
   // deep in and far out: tiles as big as the screen, then too small to see (their average colour), without a fault
   await app.wheel(550, 525, -6000);
   await app.frame();
@@ -888,7 +888,7 @@ test("objects repeat over a shape as a pattern (ADR 0154): picked on the canvas,
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a pattern of a pattern shows the inner pattern, follows a change of the innermost source, and a cycle or itself as the source cannot hang or error", async ({ app }) => {
+test("an objects fill of an objects fill shows the inner one, follows a change of the innermost source, and a cycle or itself as the source cannot hang or error", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");
   await p.keyboard.press("u");
@@ -896,7 +896,7 @@ test("a pattern of a pattern shows the inner pattern, follows a change of the in
   await app.drag({ x: 950, y: 320 }, { x: 1010, y: 380 }, 6); // S: the source
   const s = (await objs(app)).at(-1)!;
   const t = await pickedRect(app, [400, 320], [700, 470]);
-  const setPattern = async (target: [number, number], source: [number, number]) => {
+  const setObjects = async (target: [number, number], source: [number, number]) => {
     // (the chooser of the step before may still be open over the shape, or be closed by this Fill: press away, pick the shape, try again until the chooser is open)
     await expect(async () => {
       await p.keyboard.press("Escape");
@@ -905,7 +905,7 @@ test("a pattern of a pattern shows the inner pattern, follows a change of the in
       await p.click('[data-paint="fill"]', { timeout: 1500 });
       await expect(pop).toBeVisible({ timeout: 1500 }); // (Fill on an open chooser closes it: then try again)
     }).toPass({ timeout: 20000 });
-    await pop.locator('[data-mode="pattern"]').click();
+    await pop.locator('[data-mode="objects"]').click();
     await pop.locator("[data-tex-pick]").click();
     await p.mouse.click(...source);
     await p.keyboard.press("Escape");
@@ -923,13 +923,13 @@ test("a pattern of a pattern shows the inner pattern, follows a change of the in
     }
     return { blue: nb / n, ground: ng / n };
   };
-  await setPattern([670, 440], [980, 350]); // T <- S (clicks on the right of the shapes: the chooser of the step before may still cover their middle)
+  await setObjects([670, 440], [980, 350]); // T <- S (clicks on the right of the shapes: the chooser of the step before may still cover their middle)
   await pickedRect(app, [400, 520], [700, 670]); // Q
-  await setPattern([670, 640], [670, 440]); // Q <- T
+  await setObjects([670, 640], [670, 440]); // Q <- T
   const inner = await share(400, 520, 300, 150);
-  expect(inner.blue, "Q shows the ellipses of T's pattern").toBeGreaterThan(0.1);
+  expect(inner.blue, "Q shows the ellipses of T's fill").toBeGreaterThan(0.1);
   expect(inner.ground, "and the gaps between them (not one flat colour)").toBeGreaterThan(0.1);
-  // the innermost source loses its fill: Q, two patterns away, follows
+  // the innermost source loses its fill: Q, two fills away, follows
   await p.mouse.click(60, 650);
   await p.mouse.click(980, 350);
   await p.click('[data-paint="fill"]');
@@ -940,15 +940,15 @@ test("a pattern of a pattern shows the inner pattern, follows a change of the in
   expect((await share(400, 520, 300, 150)).blue, "Q follows the change of S").toBeLessThan(inner.blue / 4);
   // a cycle (S uses T, T uses S) and a shape that is its own source: drawn, no error
   await p.keyboard.press("Control+z"); // (S has its fill again, so it can be clicked)
-  await setPattern([980, 350], [670, 440]);
-  await setPattern([670, 440], [670, 440]);
+  await setObjects([980, 350], [670, 440]);
+  await setObjects([670, 440], [670, 440]);
   await app.wheel(550, 395, -3000);
   await app.frame();
   expect(app.consoleErrors).toEqual([]);
   expect(s.id).not.toBe(t.id);
 });
 
-test("a sparse pattern (small shapes far apart) far out is the colour of its shapes, not pale or white", async ({ app }) => {
+test("a sparse objects fill (small shapes far apart) far out is the colour of its shapes, not pale or white", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");
   await p.keyboard.press("u");
@@ -956,7 +956,7 @@ test("a sparse pattern (small shapes far apart) far out is the colour of its sha
   await app.drag({ x: 900, y: 300 }, { x: 960, y: 360 }, 6);
   const rect = await pickedRect(app, [400, 450], [700, 600]);
   await p.click('[data-paint="fill"]');
-  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator('[data-mode="objects"]').click();
   await pop.locator("[data-tex-pick]").click();
   await p.mouse.click(930, 330);
   for (const [k, v] of [["sx", "300"], ["sy", "300"], ["scale", "10"]]) await pop.locator(`[data-tex-num="${k}"]`).fill(v!);
@@ -979,7 +979,7 @@ test("a sparse pattern (small shapes far apart) far out is the colour of its sha
   }
 });
 
-test("an SVG export of a pattern fill is the tile put where the canvas puts it (as images cut to the shape), not one flat colour", async ({ app }) => {
+test("an SVG export of an objects fill is the tile put where the canvas puts it (as images cut to the shape), not one flat colour", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");
   await p.keyboard.press("u");
@@ -987,7 +987,7 @@ test("an SVG export of a pattern fill is the tile put where the canvas puts it (
   await app.drag({ x: 900, y: 300 }, { x: 960, y: 360 }, 6);
   const rect = await pickedRect(app, [400, 450], [700, 600]);
   await p.click('[data-paint="fill"]');
-  await pop.locator('[data-mode="pattern"]').click();
+  await pop.locator('[data-mode="objects"]').click();
   await pop.locator("[data-tex-pick]").click();
   await p.mouse.click(930, 330);
   await pop.locator('[data-tex-sel="tile"]').selectOption("hex-h");

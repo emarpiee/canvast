@@ -6,7 +6,7 @@ test runs in both; only the length of the stress loops differs (for example
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox) from a snapshot build, offline and naming checks (run on that snapshot), tokens and picker checks | ~16 min (E2E 15.6 min with Firefox, v0.3.1) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
+| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox) from a snapshot build, offline and naming checks (run on that snapshot), tokens, picker and pattern-generator checks | ~16 min (E2E 15.6 min with Firefox, v0.3.1) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
 | `npm run test:full` | The same, with the **full** E2E stress loops | ~50 min (estimate with Firefox; 34.5 min for Chromium only at v0.2.0) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
 | `npm run test:snap -- <args>` | Playwright against a snapshot build of its own in `test-builds/` (the same tests; every suite goes through it, so no test reads `dist/`). `npm run test:status` shows each snapshot against the source and `dist/` | as the tests chosen | **Whenever work goes on while tests run** (the default way to run E2E during a session) |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |

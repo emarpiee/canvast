@@ -26,7 +26,7 @@ export interface ExportDeps {
   /** The vectors of a target as a PDF page of this size in points (ADR 0153), or null when the page needs a picture. */
   pdfVector(t: ExportTarget, wPt: number, hPt: number): PdfVector | null;
   /** Put the file in the library (and tell the person, with a way to see it). */
-  toLibrary(file: File): Promise<void>;
+  toLibrary(file: File, targets: readonly ExportTarget[]): Promise<void>;
   /** A message for the person (the notice stack). */
   say(text: string): void;
 }
@@ -479,7 +479,7 @@ export function openExportDialog(deps: ExportDeps): void {
             note.textContent = `Saved “${base()}.zip”: ${files.length} pictures, ${size(zip)}.`;
           }
         } else {
-          for (const f of files) await deps.toLibrary(new File([f.blob], f.name, { type: f.mime }));
+          for (const f of files) await deps.toLibrary(new File([f.blob], f.name, { type: f.mime }), ts);
           note.textContent = `Kept ${files.length === 1 ? `“${files[0]!.name}”` : `${files.length} files`} in the library (${size(new Blob(files.map((f) => f.blob)))}).`;
         }
       }

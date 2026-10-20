@@ -86,6 +86,8 @@ import { mountStylesPanel } from "../ui/styles-panel";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
+import { mountPatternPanel } from "../ui/pattern-panel";
+import { patternTargetLabel, foundPattern, makePattern, newPatternSession } from "./pattern";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_COMMAND, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey } from "../settings/shortcuts";
@@ -213,27 +215,27 @@ async function start(): Promise<void> {
       else labelIds.delete(id);
     }
   });
-  // Shapes filled with a pattern of objects (ADR 0154) look different when those objects change.
-  const patternUsers = new Map<string, readonly string[]>();
+  // Shapes filled with objects of the canvas (ADR 0154) look different when those objects change.
+  const objectsUsers = new Map<string, readonly string[]>();
   const sourcesOf = (o: CanvasObject | undefined): readonly string[] | null => (o?.kind === "path" && isTexture(o.fill) && o.fill.src.kind === "objects" ? o.fill.src.ids : null);
   doc.subscribe((_source, changed) => {
     if (!changed) {
-      patternUsers.clear();
-      for (const o of doc.all()) if (sourcesOf(o)) patternUsers.set(o.id, sourcesOf(o)!);
+      objectsUsers.clear();
+      for (const o of doc.all()) if (sourcesOf(o)) objectsUsers.set(o.id, sourcesOf(o)!);
     } else for (const id of changed) {
       const ids = sourcesOf(doc.get(id));
-      if (ids) patternUsers.set(id, ids);
-      else patternUsers.delete(id);
+      if (ids) objectsUsers.set(id, ids);
+      else objectsUsers.delete(id);
     }
   });
   doc.subscribe((_source, changed) => {
     // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
     const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
-    // (a pattern of a pattern follows too, down the chain; a cycle ends because an id is added once)
+    // (an objects fill of an objects fill follows too, down the chain; a cycle ends because an id is added once)
     const hit = new Set(changed);
-    for (let grew = changed !== null && patternUsers.size > 0; grew; ) {
+    for (let grew = changed !== null && objectsUsers.size > 0; grew; ) {
       grew = false;
-      for (const [id, src] of patternUsers) if (!hit.has(id) && src.some((i) => hit.has(i))) (hit.add(id), (grew = true));
+      for (const [id, src] of objectsUsers) if (!hit.has(id) && src.some((i) => hit.has(i))) (hit.add(id), (grew = true));
     }
     const more = changed ? [...hit].filter((id) => !changed.has(id)) : [];
     tiles.invalidate(sheets.length || more.length ? new Set([...changed!, ...more, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
@@ -847,6 +849,15 @@ async function start(): Promise<void> {
     adjustStyles: adjustStylesApi,
   });
   dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
+  const patternSession = newPatternSession();
+  mountPatternPanel(side, editor, {
+    make: (g, values, seed) => makePattern(doc, editor, view, patternSession, g, values, seed),
+    live: () => (patternSession.top !== null && doc.lastTransaction === patternSession.top) || foundPattern(doc, editor) !== null,
+    found: () => { const f = foundPattern(doc, editor); return f ? { id: f.info.id, gid: f.info.gid, seed: f.info.seed, v: f.info.v } : null; },
+    end: () => { patternSession.top = null; patternSession.sheet = null; },
+    target: () => patternTargetLabel(doc, editor),
+  });
+  dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
@@ -976,6 +987,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
   });
+  // File something just saved in the library in the folder and with the tags the settings give for its kind (what is saved from the canvas has its own).
+  const fileInLibraryAs = (hash: string, kind: "export" | "pattern" | "svg"): Promise<string> =>
+    fileInLibrary(session, hash, settings.get(`${kind}.folder`).trim(), shotTags({ screenshot: false, board: false, canvas: false, items: false, custom: settings.get(`${kind}.tags`) }, "", "", []));
+  /** Whether these objects include a pattern made by the Pattern panel (its shapes keep how it was made). */
+  const holdsPattern = (ids: Iterable<string>): boolean => [...ids].some((id) => doc.get(id)?.gen !== undefined);
   // Export… (ui/export-dialog.ts, ADR 0147): the picked sheet, picture or shapes as a picture file whose size is chosen there, from its shape.
   const openExport = (): void => {
     const targets = exportTargets(doc, editor);
@@ -990,10 +1006,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       svg: (t, size) => svgOfTarget(doc, t, size),
       pdfVector: (t, wPt, hPt) => pdfVectorOfTarget(doc, t, wPt, hPt),
       say: (text) => { editor.message = text; editor.changed(); },
-      toLibrary: async (file) => {
+      toLibrary: async (file, targets) => {
         if (!session.catalog) throw new Error("the library is not available in this tab");
         const { record } = await assets.importFileDetailed(file, false);
-        const where = await fileInLibrary(session, record.hash, "Exports", ["export"]);
+        const where = await fileInLibraryAs(record.hash, targets.some((t) => holdsPattern(t.ids)) ? "pattern" : "export");
         editor.message = `Exported “${file.name}” in ${where}.`;
         editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
         editor.changed();
@@ -1101,7 +1117,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
   };
 
-  // Texture fills (ADR 0154): the chooser's Image and Pattern take their source from the canvas or a file.
+  // Texture fills (ADR 0154): the chooser's Image and Objects take their source from the canvas or a file.
   setTextureHooks(createTextureHooks({
     editor,
     host: textureHost,
@@ -1234,7 +1250,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     try {
       const name = "canvast-shapes.svg";
       const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
-      editor.message = `Saved “${name}” in the library.`;
+      const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(doc.all(), editor.selection)]) ? "pattern" : "svg");
+      editor.message = `Saved “${name}” in ${where}.`;
       editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
     } catch (e) {
       editor.message = `Could not save to the library: ${(e as Error).message}`;
@@ -1723,6 +1740,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
+      { group: "Panel", title: "Pattern", words: "toggle show hide generator wave blob background random tiles", enabled: () => onCanvas, run: () => { editor.patternOpen = !editor.patternOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
       { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
       { group: "Go to", title: "Canvas view", run: () => setView("canvas") },

@@ -139,6 +139,8 @@ export class EditorState {
   stylesTab: string | null = null;
   /** The Adjust panel is shown (ui/adjust-panel.ts). */
   adjustOpen = false;
+  /** The Pattern panel (ui/pattern-panel.ts, ADR 0162) is shown. */
+  patternOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */
@@ -219,7 +221,7 @@ export class EditorState {
   /** A text is being typed in (ui/text-editor.ts): the Properties bar shows the text's options, not the active tool's. */
   editingText = false;
   /** A texture fill is waiting for its source (ADR 0154): the next press on the canvas gives what is under it to `take` instead of picking it. */
-  sourcePick: { readonly kind: "image" | "pattern"; take(objs: readonly CanvasObject[]): void } | null = null;
+  sourcePick: { readonly kind: "image" | "objects"; take(objs: readonly CanvasObject[]): void } | null = null;
   /** The words Reveal says for a screen reader (the hint line speaks them): what is under the pointer; null when nothing is revealed. */
   revealText: string | null = null;
   /** When a finger's long press last opened the "under your finger" list (performance.now): the context menu the browser sends with the same long press is not wanted then. */

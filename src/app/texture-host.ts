@@ -1,6 +1,6 @@
 /**
  * Where a texture fill (ADR 0154) gets its pictures and objects: the app's asset library for a picture, and Export's own drawing
- * (`paintExport`) for objects, so a pattern tile is drawn by the same code as everything else. Told to `render/texture.ts` once.
+ * (`paintExport`) for objects, so a tile of objects is drawn by the same code as everything else. Told to `render/texture.ts` once.
  */
 import type { AssetLibrary } from "../assets/asset-library";
 import type { DocumentStore } from "../doc/document-store";
@@ -28,7 +28,7 @@ export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex;
     fresh();
     const key = ids.join(",");
     if (!targets.has(key)) {
-      const sel = ids.map((i) => deps.doc.get(i)).filter((o): o is CanvasObject => !!o); // (a source may be hidden: the pattern still shows it)
+      const sel = ids.map((i) => deps.doc.get(i)).filter((o): o is CanvasObject => !!o); // (a source may be hidden: the fill still shows it)
       targets.set(key, sel.length ? buildTarget(deps.doc, sel, null) : null);
     }
     return targets.get(key)!;

@@ -471,6 +471,16 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.0 — Pattern generators (2026-10-21)
+
+- **Implemented:** `src/gen/` (seeded RNG and value noise, geometry helpers, 39 generators declared as settings plus one pure function each, `generate`, `randomValues`, `cleanValues`), `app/pattern.ts` (target: picked sheet, picked closed shape cut by a mask copy, or a new sheet; a session replaces its own last undo step through `DocumentStore.lastTransaction`), `ui/pattern-panel.ts` (panel built from the generator's settings), dock button, palette command, `mountainSnow` icon.
+- **Tested:** see the test log of this slice in `docs/testing/` (unit: `tests/unit/pattern.test.ts`; E2E: `tests/e2e/pattern.spec.ts`, Chromium and Firefox).
+- **Unverified:** a pattern on a sheet or shape at deep zoom or in a non-world frame; a rotated target (refused with a message); a pattern whose group was nested in other groups or sheets at deep levels; touch.
+
+- **Package:** `src/gen` is self-contained (`core.ts` holds the shared shapes; `check:patterns`), `scripts/build-patterns.mjs` builds `dist-patterns/` (script, module, declarations, demo), `src/gen/README.md` documents the API; not published (the owner will publish it with the colour picker).
+
+**Next bounded task:** make a pattern again when its sheet is resized; presets (named settings per generator); a palette control that feeds every colour setting.
+
 ## v0.24.5 — a sheet drawn over objects takes them (2026-10-21)
 
 - **Implemented:** `drawSheetOver` (actions.ts) and the Sheet tool's commit in `interaction/tools.ts` (objects wholly inside the new sheet's box, at its level, with their groups and contents, go on it; the sheet is placed behind them).
@@ -533,10 +543,10 @@ visible strokes). Alternatives:
 
 ## v0.20.0 — texture fills (2026-10-19)
 
-- **Implemented:** [ADR 0154](adr/0154-texture-fills.md): `TexturePaint` (a picture or objects as a fill), one drawing path through `canvasPaint`, the Image and Pattern modes of the paint chooser, library references, tile-cache invalidation for patterns.
-- **Tested:** unit (layout, validation, storage, average colour, SVG and PDF fallbacks), E2E in `pictures.spec.ts` (picture fill: pick, Fill, Tile, space, undo, reload, file; pattern: pick, grid, brick rows, source change, deep zoom in and out).
+- **Implemented:** [ADR 0154](adr/0154-texture-fills.md): `TexturePaint` (a picture or objects as a fill), one drawing path through `canvasPaint`, the Image and Objects (called Pattern until v0.25.0) modes of the paint chooser, library references, tile-cache invalidation for objects fills.
+- **Tested:** unit (layout, validation, storage, average colour, SVG and PDF fallbacks), E2E in `pictures.spec.ts` (picture fill: pick, Fill, Tile, space, undo, reload, file; objects: pick, grid, brick rows, source change, deep zoom in and out).
 - **Known failures:** the Firefox text-editor failures of v0.19.1.
-- **Unverified:** Firefox for the texture tests (see the commit); a very large picture as a tile; patterns across paste between canvases.
+- **Unverified:** Firefox for the texture tests (see the commit); a very large picture as a tile; objects fills across paste between canvases.
 - **Next bounded task:** the "Not done" list of ADR 0154 (outline and text textures, adjustments on an image fill, handles on the canvas).
 
 ## v0.19.2 — picture, reveal and export gaps (2026-10-19)

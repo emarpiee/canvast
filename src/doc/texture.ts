@@ -1,6 +1,6 @@
 /**
  * Texture fills (ADR 0154): a shape filled with a picture or with other objects repeated over it. One kind of paint for both, so one
- * set of controls and one drawing path: the *source* is a picture of the library (`asset`) or objects of the canvas (`objects`, a pattern),
+ * set of controls and one drawing path: the *source* is a picture of the library (`asset`) or objects of the canvas (`objects`, repeated over the shape),
  * and the same placement says how it lies in the shape: how big, turned, moved, and whether it is repeated (and on what grid).
  *
  * Everything is measured in the shape's own box, like a gradient (ADR 0100): the tile of a repeated source is a share of the box's longer
@@ -12,7 +12,7 @@ export type TextureSource =
   | { readonly kind: "asset"; readonly hash: string }
   | { readonly kind: "objects"; readonly ids: readonly string[] };
 
-/** How a picture lies in the shape: `fill` covers it (the overflow is cut), `fit` shows all of it, `crop` is `fill` with the controls free, `tile` repeats it. A pattern is always `tile`. */
+/** How a picture lies in the shape: `fill` covers it (the overflow is cut), `fit` shows all of it, `crop` is `fill` with the controls free, `tile` repeats it. Objects are always `tile`. */
 export type TextureMode = "fill" | "fit" | "crop" | "tile";
 /** The grid of repeated tiles: rows one above the other, rows each half a tile across from the one above (`hex-h`), or columns half a tile down from the one beside (`hex-v`). */
 export type TileType = "rect" | "hex-h" | "hex-v";
@@ -72,12 +72,12 @@ export function isTextureValid(v: unknown): v is TexturePaint {
     && typeof t["avg"] === "string" && AVG.test(t["avg"]);
 }
 
-/** A texture with the usual starting values: a picture covers the shape, a pattern repeats. */
+/** A texture with the usual starting values: a picture covers the shape, objects repeat. */
 export function newTexture(src: TextureSource, avg = "#808080"): TexturePaint {
   return { type: "texture", src, mode: src.kind === "asset" ? "fill" : "tile", scale: 1, rotation: 0, offset: [0, 0], tile: "rect", spacing: [0, 0], align: "center", avg };
 }
 
-/** The same texture with another source (a pattern becomes `tile`, a picture keeps its mode). */
+/** The same texture with another source (objects become `tile`, a picture keeps its mode). */
 export const withSource = (t: TexturePaint, src: TextureSource, avg: string): TexturePaint => ({ ...t, src, avg, mode: src.kind === "objects" ? "tile" : t.mode });
 
 /** Whether two textures draw the same (the average colour is not part of it). */

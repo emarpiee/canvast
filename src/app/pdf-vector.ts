@@ -90,7 +90,7 @@ export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt
     const o = p.o;
     if (o.mask || o.net || o.profile || o.arrowStart || o.arrowEnd || o.align || (o.blend && !BLENDS[o.blend])) return null;
     if (o.stroke !== null && isGradient(o.stroke)) return null;
-    if (isTexture(o.fill)) return null; // (a picture or a pattern: this page is drawn as a picture)
+    if (isTexture(o.fill)) return null; // (a picture or objects: this page is drawn as a picture)
     if (o.fill !== null && o.stroke !== null && o.opacity < 1) return null; // (a group's opacity is not two opacities)
     const subs = mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
     const width = o.width * p.k * sc;

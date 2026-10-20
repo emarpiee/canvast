@@ -87,6 +87,8 @@ interface ObjectBase {
   readonly tags?: readonly string[];
   /** The saved style (Styles panel) each part of this object follows, by part ("fill", "stroke", "adjust"): editing the style updates it; changing the part by hand unlinks it (doc/style-links.ts). Absent = none. */
   readonly styles?: Readonly<Record<string, string>>;
+  /** The settings a pattern (ADR 0162) was made with, kept on the first shape of its group `gid`: the Pattern panel opens them again when the group is picked. Absent = not made by a generator. */
+  readonly gen?: GenInfo;
   /** A mask (ADR 0144): the objects of the group `by` (those with `isMask`) hide or show this one, by their opacity (`alpha`) or their brightness (`luminance`); `invert` swaps hidden and shown. */
   readonly mask?: { readonly by: string; readonly mode: "alpha" | "luminance"; readonly invert?: true };
   /** This object is part of a mask (of the group `mask.by` of another object): it is not drawn or picked on its own, only used to cut that object. */
@@ -96,6 +98,19 @@ interface ObjectBase {
   /** Drawn, but cannot be picked, selected or edited while true (ADR 0021); absent = unlocked. */
   readonly locked?: boolean;
 }
+
+/** What a pattern was made with: generator id, group id, seed and the values of its settings (numbers, texts and switches). */
+export interface GenInfo {
+  readonly id: string;
+  readonly gid: string;
+  readonly seed: number;
+  readonly v: Readonly<Record<string, number | string | boolean>>;
+}
+
+const validGen = (g: unknown): g is GenInfo => {
+  const o = g as GenInfo | null;
+  return typeof o === "object" && o !== null && typeof o.id === "string" && o.id.length > 0 && o.id.length <= 32 && typeof o.gid === "string" && ID_RE.test(o.gid) && Number.isInteger(o.seed) && typeof o.v === "object" && o.v !== null && Object.keys(o.v).length <= 64 && Object.values(o.v).every((x) => (typeof x === "number" && Number.isFinite(x)) || (typeof x === "string" && x.length <= 16) || typeof x === "boolean");
+};
 
 /** Blend modes offered (the canvas's `globalCompositeOperation` names); absent on an object = normal. */
 export const BLEND_MODES = ["multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion"] as const;
@@ -532,6 +547,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
   if (o.tags !== undefined && !(Array.isArray(o.tags) && o.tags.length > 0 && o.tags.length <= MAX_OBJECT_TAGS && new Set(o.tags.map((t) => t.toLowerCase())).size === o.tags.length && o.tags.every((t) => typeof t === "string" && t.length > 0 && t.length <= MAX_TAG_LENGTH && isTag(t)))) throw new InvalidObjectError("bad tags");
   if (o.mask !== undefined && !(typeof o.mask === "object" && o.mask !== null && typeof o.mask.by === "string" && ID_RE.test(o.mask.by) && (o.mask.mode === "alpha" || o.mask.mode === "luminance") && (o.mask.invert === undefined || o.mask.invert === true))) throw new InvalidObjectError("bad mask");
+  if (o.gen !== undefined && !validGen(o.gen)) throw new InvalidObjectError("bad generator settings");
   if (o.isMask !== undefined && o.isMask !== true) throw new InvalidObjectError("isMask is true or absent");
   if ((o.hidden !== undefined && o.hidden !== true) || (o.locked !== undefined && o.locked !== true)) throw new InvalidObjectError("hidden and locked are true or absent");
   if (o.rot !== undefined && !(Number.isInteger(o.rot) && o.rot > 0 && o.rot < TURN)) throw new InvalidObjectError("rot must be a whole angle in (0, 2^32)");
@@ -702,6 +718,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
     ...(s["styles"] !== undefined && typeof s["styles"] === "object" && s["styles"] !== null ? { styles: cleanStyleLinks(s["styles"] as Record<string, unknown>) } : {}),
     ...(s["mask"] !== undefined ? { mask: { ...(s["mask"] as { by: string; mode: "alpha" }) } } : {}),
+    ...(validGen(s["gen"]) ? { gen: s["gen"] } : {}),
     ...(s["isMask"] === true ? { isMask: true as const } : {}),
     ...(s["hidden"] === true ? { hidden: true as const } : {}),
     ...(s["locked"] === true ? { locked: true as const } : {}),

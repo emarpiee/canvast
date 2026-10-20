@@ -525,7 +525,7 @@ export function resettable(doc: DocumentStore, editor: EditorState): { turned: b
   return { turned: sel.some((o) => !o.locked && !!o.rot), stretched: sel.some(distorted), bakeable: sel.some(canApplyRotation) };
 }
 
-/** A turned shape whose paint does not depend on its box: its points can take the turn (a gradient or pattern is laid out in the box it is turned with). */
+/** A turned shape whose paint does not depend on its box: its points can take the turn (a gradient or an objects fill is laid out in the box it is turned with). */
 const canApplyRotation = (o: CanvasObject): o is PathObject => o.kind === "path" && !o.locked && !!o.rot && o.result === undefined && (o.fill === null || typeof o.fill === "string") && (o.stroke === null || typeof o.stroke === "string");
 
 /**
@@ -1627,7 +1627,7 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
   return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original };
 }
 
-/** The shapes a pattern of objects repeats, hidden ones too (hiding the source is the usual way to use it), for the SVG; null when any is not a shape. */
+/** The shapes an objects fill repeats, hidden ones too (hiding the source is the usual way to use it), for the SVG; null when any is not a shape. */
 const sourceShapes = (doc: DocumentStore) => (ids: readonly string[]): PathObject[] | null => {
   const os = ids.map((id) => doc.get(id));
   return os.length && os.every((o): o is PathObject => o?.kind === "path") ? os.map((o) => ({ ...o, hidden: false })) : null;
@@ -1711,7 +1711,7 @@ export function setSheetClip(doc: DocumentStore, editor: EditorState, id: string
 }
 
 /** The next free "Sheet n" name. */
-const nextSheetName = (all: Iterable<CanvasObject>): string => {
+export const nextSheetName = (all: Iterable<CanvasObject>): string => {
   let n = 0;
   for (const o of all) if (isContainer(o)) n = Math.max(n, Number(/^Sheet (\d+)$/.exec(o.name ?? "")?.[1] ?? 0));
   return `Sheet ${n + 1}`;
