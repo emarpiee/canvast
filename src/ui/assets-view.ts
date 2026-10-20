@@ -818,6 +818,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.src = slideUrl;
     armShow();
   };
+  // With the controls hidden, the back arrow and the details toggle at the top show again while the pointer is near the top edge.
+  viewer.addEventListener("pointermove", (e) => {
+    if (!viewer.classList.contains("no-bar")) return;
+    viewer.classList.toggle("is-near-top", e.clientY - viewer.getBoundingClientRect().top < 90);
+  });
+  viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top"));
   const closeSlide = (): void => {
     const was = slideHash;
     stopShow();

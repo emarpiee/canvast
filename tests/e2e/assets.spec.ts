@@ -1161,12 +1161,18 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   const back = viewer.locator(".viewer-back");
   const details = viewer.locator(".viewer-details");
   const [bb, db] = [(await back.boundingBox())!, (await details.boundingBox())!];
+  const vb = (await viewer.boundingBox())!;
   expect(Math.abs(bb.y - db.y), "on one line").toBeLessThan(2);
   expect(db.x, "details at the right, back at the left").toBeGreaterThan(bb.x + 200);
   await p.keyboard.press("f"); // (with its own controls hidden too)
   for (const el of away) await expect(el).toBeHidden();
-  await expect(back).toBeHidden();
-  await expect(details).toBeHidden();
+  await expect(back, "faded out with the controls").toHaveCSS("opacity", "0");
+  await expect(details).toHaveCSS("opacity", "0");
+  await p.mouse.move(vb.x + 300, vb.y + 20); // near the top edge: they come back
+  await expect(back).toHaveCSS("opacity", "1");
+  await expect(details).toHaveCSS("opacity", "1");
+  await p.mouse.move(vb.x + 300, vb.y + 400);
+  await expect(back).toHaveCSS("opacity", "0");
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   for (const el of away) await expect(el, "back when it closes").toBeVisible();
