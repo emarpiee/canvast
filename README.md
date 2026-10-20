@@ -245,7 +245,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every original once.
+- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every original once, and your device settings (theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the originals it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, shows what it contains and any problems, and only then adds the boards and canvases in a single transaction. Nothing existing is replaced and originals you already have are not stored twice.
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
@@ -266,7 +266,7 @@ IndexedDB database `canvast`, in the browser's storage for local files. Moving t
 
 ## Settings and accessibility
 
-Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually or together.
+Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
 
 | Group | What it holds |
 | --- | --- |
@@ -278,7 +278,8 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
 | Panels | Minimize inactive panels, panels kept open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
-| Storage, Privacy, Collaboration | Storage use and backups; what stays on your machine |
+| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
+| Privacy, Collaboration | What stays on your machine; collaboration (none) |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see below) |
 
