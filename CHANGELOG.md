@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.5 — Paste a CSS gradient onto a fill (2026-10-21)
+
+- **Pasting CSS gradient text** (`linear-gradient(...)`, `radial-gradient(...)` or `conic-gradient(...)`, with or without `background:`) while shapes are picked makes it their fill. Angles, `to <side>`, `at` positions and stop positions in percent (degrees for a conic) are read; a repeating gradient, positions in lengths and anything unreadable are left alone (nothing changes). The box is taken as a square, so a linear angle on a wide shape differs slightly from a browser.
+
 ## 0.25.4 — A pen stroke picked alone can be recoloured (2026-10-21)
 
 - **Fixed:** with one pen stroke picked there was no colour control (the pen colour button is for new strokes, and the Fill and Outline buttons are for shapes), so its colour could not be changed. Its colour now shows as a chip in the Properties bar, like the colours of a larger selection; it offers a flat colour only (a stroke has no gradient).

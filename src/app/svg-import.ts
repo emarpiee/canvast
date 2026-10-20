@@ -71,7 +71,7 @@ export function parseTransform(t: string | null | undefined): Matrix {
 
 let swatch: CanvasRenderingContext2D | null = null;
 /** Any CSS colour as "#rrggbb" or "#rrggbbaa" (the browser reads it), or null when it is not one. */
-function cssColour(v: string): string | null {
+export function cssColour(v: string): string | null {
   swatch ??= document.createElement("canvas").getContext("2d");
   if (!swatch) return null;
   swatch.fillStyle = "#010203";
@@ -86,7 +86,7 @@ function cssColour(v: string): string | null {
 }
 
 /** The pieces of an argument list split at the commas that are not inside brackets. */
-const splitTop = (s: string): string[] => {
+export const splitTop = (s: string): string[] => {
   const out: string[] = [];
   let depth = 0, cur = "";
   for (const ch of s) {
@@ -99,12 +99,41 @@ const splitTop = (s: string): string[] => {
 };
 
 /** An angle or position in a CSS gradient as degrees (deg, turn, rad, grad) or, for a percentage, as a fraction of a turn times 360. */
-const cssAngle = (v: string): number | null => {
+export const cssAngle = (v: string): number | null => {
   const m = /^(-?[\d.]+)(deg|turn|rad|grad|%)?$/.exec(v.trim());
   if (!m) return null;
   const x = parseFloat(m[1]!);
   return m[2] === "turn" ? x * 360 : m[2] === "rad" ? (x * 180) / Math.PI : m[2] === "grad" ? x * 0.9 : m[2] === "%" ? x * 3.6 : x;
 };
+
+/**
+ * The stops of a CSS gradient: each part is a colour with up to two positions (two make a band), `pos` turns a position into 0 to 1 (or null when
+ * it is not one it can read). Missing positions are spread evenly; positions never go back. Null when a part is not readable or there is under two.
+ */
+export function cssStops(parts: readonly string[], pos: (v: string) => number | null): Array<{ o: number; c: string }> | null {
+  const raw: Array<{ o: number | null; c: string }> = [];
+  for (const part of parts) {
+    const sm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]+|[a-zA-Z]+)\s*(\S*)\s*(\S*)$/.exec(part);
+    const c = sm ? cssColour(sm[1]!) : null;
+    if (!sm || !c || (sm[2] && pos(sm[2]) === null)) return null;
+    const a = sm[2] ? pos(sm[2]) : null;
+    raw.push({ o: a === null ? null : a, c });
+    const b = sm[3] ? pos(sm[3]) : null;
+    if (b !== null) raw.push({ o: b, c }); // (a colour with two positions is a band)
+  }
+  if (raw.length < 2) return null;
+  if (raw[0]!.o === null) raw[0]!.o = 0;
+  if (raw[raw.length - 1]!.o === null) raw[raw.length - 1]!.o = 1;
+  for (let i = 1; i < raw.length - 1; i++) {
+    if (raw[i]!.o !== null) continue;
+    let j = i;
+    while (raw[j]!.o === null) j++;
+    const a = raw[i - 1]!.o!, z = raw[j]!.o!;
+    for (let k = i; k < j; k++) raw[k]!.o = a + ((z - a) * (k - i + 1)) / (j - i + 1);
+  }
+  let last = 0;
+  return raw.map((s) => ({ o: (last = Math.min(1, Math.max(last, s.o!))), c: s.c }));
+}
 
 /** A CSS `conic-gradient(from 90deg at 50% 50%, colour 0deg, colour 96deg, ...)`: its first edge in degrees clockwise from the top, its centre as fractions of its box, and its stops. */
 function parseConic(css: string): { from: number; at: [number, number]; stops: Array<{ o: number; c: string }> } | null {
@@ -122,28 +151,8 @@ function parseConic(css: string): { from: number; at: [number, number]; stops: A
     }
     parts.shift();
   }
-  const raw: Array<{ o: number | null; c: string }> = [];
-  for (const part of parts) {
-    const sm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]+|[a-zA-Z]+)\s*(\S*)\s*(\S*)$/.exec(part);
-    const c = sm ? cssColour(sm[1]!) : null;
-    if (!sm || !c) return null;
-    const a = sm[2] ? cssAngle(sm[2]) : null;
-    raw.push({ o: a === null ? null : a / 360, c });
-    const b = sm[3] ? cssAngle(sm[3]) : null;
-    if (b !== null) raw.push({ o: b / 360, c }); // (a colour with two positions is a band)
-  }
-  if (raw.length < 2) return null;
-  if (raw[0]!.o === null) raw[0]!.o = 0;
-  if (raw[raw.length - 1]!.o === null) raw[raw.length - 1]!.o = 1;
-  for (let i = 1; i < raw.length - 1; i++) {
-    if (raw[i]!.o !== null) continue;
-    let j = i;
-    while (raw[j]!.o === null) j++;
-    const a = raw[i - 1]!.o!, z = raw[j]!.o!;
-    for (let k = i; k < j; k++) raw[k]!.o = a + ((z - a) * (k - i + 1)) / (j - i + 1);
-  }
-  let last = 0;
-  const stops = raw.map((s) => ({ o: (last = Math.min(1, Math.max(last, s.o!))), c: s.c }));
+  const stops = cssStops(parts, (v) => { const a = cssAngle(v); return a === null ? null : a / 360; });
+  if (!stops) return null;
   return { from, at, stops };
 }
 

@@ -3317,3 +3317,36 @@ test("a pen stroke's colour chip offers a flat colour only, no gradient modes", 
   await expect(p.locator(".colour-pop [data-hex]")).toBeVisible();
   await expect(p.locator('.colour-pop [data-mode="linear"]')).toHaveCount(0);
 });
+
+test("CSS gradient text pasted with a shape picked becomes its fill (linear, radial, conic; a repeating or unreadable one is left alone)", async ({ app }) => {
+  test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "Firefox ignores the text of a made-up paste event");
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [500, 300], [760, 460]);
+  await key(app, "v");
+  await click(app, 630, 380);
+  const paste = (t: string) => p.evaluate((x) => { const dt = new DataTransfer(); dt.setData("text/plain", x); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
+  type G = { type: string; x0?: number; x1?: number; y0?: number; y1?: number; cx?: number; r?: number; angle?: number; stops: Array<{ o: number; c: string }> };
+  const fill = async (): Promise<G> => (await last(app)).fill as unknown as G;
+  await paste("background: linear-gradient(90deg, #ff0000 0%, #0000ff 100%);");
+  await expect.poll(async () => (await fill())?.type).toBe("linear");
+  let g = await fill();
+  expect(g.x0).toBeCloseTo(0, 2); expect(g.x1).toBeCloseTo(1, 2); expect(g.y0).toBeCloseTo(0.5, 2);
+  expect(g.stops.map((s) => s.c)).toEqual(["#ff0000", "#0000ff"]);
+  await paste("radial-gradient(circle at 30% 40%, #00ff00, #000000 80%)");
+  await expect.poll(async () => (await fill())?.type).toBe("radial");
+  g = await fill();
+  expect(g.cx).toBeCloseTo(0.3, 2);
+  expect(g.stops.map((s) => s.o)).toEqual([0, 0.8]);
+  await paste("conic-gradient(from 90deg at 50% 50%, #ff0000 0deg, #0000ff 180deg)");
+  await expect.poll(async () => (await fill())?.type).toBe("angular");
+  g = await fill();
+  expect(g.angle).toBeCloseTo(0, 1); // (CSS counts from the top: 90deg is pointing right)
+  expect(g.stops.map((s) => s.o)).toEqual([0, 0.5]);
+  for (const t of ["repeating-linear-gradient(red, blue 20%)", "linear-gradient(red, nonsense)", "linear-gradient(red 10px, blue 90px)"]) {
+    await paste(t);
+    await app.frame();
+    expect((await fill()).type, t).toBe("angular");
+  }
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -471,6 +471,13 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.5 — Paste a CSS gradient onto a fill (2026-10-21)
+
+- **Implemented:** `app/css-gradient.ts` reads CSS gradient text; `pasteCssGradient` (actions.ts) puts it on the picked fills; the stop parsing is shared with the conic import (`cssStops`).
+- **Tested:** `vectors.spec` "CSS gradient text pasted ..." (Chromium only: Firefox ignores made-up paste text); the other-tool import test still passes.
+- **Known failures / Unverified:** the box is taken as a square; elliptical radial sizes and `px` positions are not read.
+- **Next bounded task:** elliptical radial gradients, then a diamond gradient.
+
 ## v0.25.4 — A pen stroke picked alone can be recoloured (2026-10-21)
 
 - **Implemented:** one picked pen stroke shows its colour as a chip in the Properties bar (`ui/toolbar.ts`).
