@@ -1191,10 +1191,17 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   for (const el of away) await expect(el).toBeHidden();
   await expect(back, "faded out with the controls").toHaveCSS("opacity", "0");
   await expect(details).toHaveCSS("opacity", "0");
-  await p.mouse.move(vb.x + 300, vb.y + 20); // near the top edge: they come back
+  // (Firefox in the test harness sends a pointerleave right after every mouse move, which undoes the state: there the pointer events are sent as events)
+  const firefox = p.context().browser()?.browserType().name() === "firefox";
+  const pointerAt = async (y: number): Promise<void> => {
+    if (firefox) await viewer.evaluate((v, yy) => v.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: yy, bubbles: true })), y);
+    else await p.mouse.move(vb.x + 300, vb.y + y, { steps: 5 });
+  };
+  await pointerAt(300);
+  await pointerAt(20); // near the top edge: they come back
   await expect(back).toHaveCSS("opacity", "1");
   await expect(details).toHaveCSS("opacity", "1");
-  await p.mouse.move(vb.x + 300, vb.y + 400);
+  await pointerAt(400);
   await expect(back).toHaveCSS("opacity", "0");
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
@@ -2085,13 +2092,17 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   const ib = (await img.boundingBox())!;
   // (the picture's room keeps clear of the button that hides the controls, at the bottom: --viewer-bottom; it is centred in that room)
   const keep = await viewer.evaluate((v) => { const d = document.createElement("div"); d.style.height = "var(--viewer-bottom)"; v.append(d); const h = d.getBoundingClientRect().height; d.remove(); return h; });
-  const inset = ib.x - stage.x;
-  expect(Math.abs(ib.y - stage.y - inset - (stage.y + stage.height - keep - ib.y - ib.height)), "centred in its room, above and below").toBeLessThan(2);
+  const top = await img.evaluate((i) => parseFloat(getComputedStyle(i).inset)); // (the room's top margin; the picture may be narrower than the room, so its own left gap says nothing)
+  expect(Math.abs(ib.y + ib.height / 2 - (stage.y + top + (stage.y + stage.height - keep)) / 2), "centred in its room, above and below").toBeLessThan(2);
   expect(Math.abs(ib.x - stage.x - (stage.x + stage.width - ib.x - ib.width)), "equal room left and right").toBeLessThan(2);
-  // The controls are two rows on a phone: previous, count, next; then zoom on the left and the buttons on the right, nothing wrapped.
+  // The controls are three rows on a phone: the previews; previous, play, next and the count; then zoom and the buttons, nothing wrapped.
   const controls = (await viewer.locator(".viewer-bar").boundingBox())!;
-  expect(controls.height, "two tidy rows").toBeLessThan(120);
+  expect(controls.height, "three tidy rows").toBeLessThan(150);
   const prev = (await viewer.locator('[data-act="prev"]').boundingBox())!;
+  const film = (await viewer.locator(".film-item").first().boundingBox())!;
+  const pct = (await viewer.locator(".viewer-zoom-pct").boundingBox())!;
+  expect(film.y + film.height, "the previews are the top row").toBeLessThanOrEqual(prev.y);
+  expect(prev.y + prev.height, "the previous button is above the zoom row").toBeLessThanOrEqual(pct.y);
   // the way back is a back arrow at the top left of the viewer, not a button of the controls
   const vb = (await viewer.boundingBox())!;
   const back = (await viewer.locator(".viewer-back").boundingBox())!;
