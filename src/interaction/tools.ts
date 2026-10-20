@@ -31,8 +31,8 @@ import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
-import { boxSelect, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
-import { createReveal, deepPick, isDeepPress, revealHits } from "./reveal";
+import { boxSelect, edgeDistancePx, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
+import { EDGE_PICK_PX, createReveal, deepPick, isDeepPress, revealHits } from "./reveal";
 import { descendantsOf, isContainer, isMaskSheet } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
@@ -1208,6 +1208,15 @@ export function attachTools(
       editor.openMask = maskAbove(target)?.id ?? null;
     }
     let click: CanvasObject | undefined;
+    // A picked thing can be taken by its outline even when a filled shape covers it (what Ctrl+click on a revealed outline picked): a drag from
+    // there moves it; a click that does not move picks the thing on top, as it always did.
+    if (!deep && !e.altKey && !e.shiftKey && target && editor.selection.size && !editor.selection.has(target.id)) {
+      const held = revealHits(vis, s.x, s.y).find((h) => editor.selection.has(h.obj.id) && edgeDistancePx(h, s.x, s.y) <= EDGE_PICK_PX);
+      if (held) {
+        click = target;
+        target = held.obj;
+      }
+    }
     if (e.altKey && hits.length > 1) {
       cycleIndex = (cycleIndex + 1) % hits.length;
       const next = hits[cycleIndex]!.obj;

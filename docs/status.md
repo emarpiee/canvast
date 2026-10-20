@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.24.2 — Reveal: a picked thing can be moved by its outline (2026-10-20)
+
+- **Implemented:** the press handler takes a picked thing within 8 px of its outline although a filled shape covers the spot (`click` keeps the top thing for a click that does not move).
+- **Tested:** the reveal test in `frames.spec` now moves the picked shape by its top edge (and checks the big one stayed and a click picks the top one), Chromium and Firefox; `editing.spec` and `sheets.spec` in Chromium (39 passed). The full quick suite has not been run since 0.22.0.
+- **Unverified:** dragging a picked thing by an outline that lies under a text or a picture; touch.
+
 ## v0.24.1 — Reveal: a click on an outline picks its own thing (2026-10-20)
 
 - **Implemented:** `deepPick` takes the pointer and prefers the thing whose outline (`edgeDistancePx`, 8 px) it is on over a filled thing that covers the spot (ADR 0149 table updated).

@@ -2073,6 +2073,21 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   expect(await ctrlClick(520, 390), "inside both, away from any outline: the top one").toEqual([big.id]);
   await p.mouse.click(120, 650);
   expect(await ctrlClick(402, 400), "on the outline of the big one").toEqual([big.id]);
+
+  // The picked small one is moved by a drag from its outline, although the big one covers it; the big one stays.
+  await p.mouse.click(120, 650);
+  await ctrlClick(481, 390);
+  const before = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, small.id);
+  const bigBefore = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id);
+  await app.drag({ x: 500, y: 360 }, { x: 540, y: 385 }, 8); // (on its top edge, between the handles; a distance that no snap line of the big one pulls)
+  const after = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, small.id);
+  expect(Math.round(after.minX - before.minX), "the small one moved right").toBe(40);
+  expect(Math.round(after.minY - before.minY)).toBe(25);
+  expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([small.id]);
+  // A click (no move) there picks what is on top, as before.
+  await p.mouse.click(after.minX + 20, after.minY);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([big.id]);
 });
 
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.2 — A thing picked through Reveal can be moved (2026-10-20)
+
+- **Fix:** after Ctrl+click picked a thing under a filled shape, a drag from its outline drew a selection box instead of moving it, because the press landed on the covering shape, which was not picked. A press within 8 px of the outline of a picked thing now takes that thing, so the drag moves it; a click that does not move still picks the thing on top.
+
 ## 0.24.1 — Ctrl+click on a revealed outline picks what the outline belongs to (2026-10-20)
 
 - **Fix (Reveal):** the outlines of things under a filled shape were shown, but Ctrl+click on one picked the filled shape on top, because it also covered the spot. A click within 8 px of an outline now picks the thing that outline belongs to (the nearest one); away from every outline it still picks the top thing, and Ctrl+Alt+click still goes down the stack.
