@@ -2,7 +2,7 @@
 
 ## 0.25.4 — A pen stroke picked alone can be recoloured (2026-10-21)
 
-- **Fixed:** with one pen stroke picked there was no colour control (the pen colour button is for new strokes, and the Fill and Outline buttons are for shapes), so its colour could not be changed. Its colour now shows as a chip in the Properties bar, like the colours of a larger selection.
+- **Fixed:** with one pen stroke picked there was no colour control (the pen colour button is for new strokes, and the Fill and Outline buttons are for shapes), so its colour could not be changed. Its colour now shows as a chip in the Properties bar, like the colours of a larger selection; it offers a flat colour only (a stroke has no gradient).
 
 ## 0.25.3 — What you export is what you see: no colour changes by theme (2026-10-21)
 

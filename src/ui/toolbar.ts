@@ -687,6 +687,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       name: "Selection colour",
       paint: item.paint,
       noneLabel: "No colour",
+      // a pen stroke has one flat colour: no gradient to offer when strokes are all that is picked
+      ...([...editor.selection].every((id) => doc.get(id)?.kind === "stroke") ? { modes: ["solid"] as const } : {}),
       onInput: (p) => actions.recolourSelected(current, p, false),
       onChange: (p) => {
         actions.recolourSelected(current, p, true);

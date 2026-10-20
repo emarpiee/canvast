@@ -3306,3 +3306,14 @@ test("a pen stroke picked alone is recoloured from its colour chip", async ({ ap
   await f.fill("ff0000"); await f.press("Enter"); await p.keyboard.press("Escape");
   expect(await p.evaluate(() => window.__canvastDebug.objects().map((o: any) => o.color))).toEqual(["#ff0000"]);
 });
+
+test("a pen stroke's colour chip offers a flat colour only, no gradient modes", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.mouse.move(500, 300); await p.mouse.down(); await p.mouse.move(600, 360, { steps: 8 }); await p.mouse.up();
+  await p.keyboard.press("v");
+  await p.mouse.click(550, 330);
+  await p.locator("[data-sel-colour]").first().click();
+  await expect(p.locator(".colour-pop [data-hex]")).toBeVisible();
+  await expect(p.locator('.colour-pop [data-mode="linear"]')).toHaveCount(0);
+});
