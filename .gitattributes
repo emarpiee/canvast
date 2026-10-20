@@ -1,2 +1,5 @@
 # Keep LF everywhere so the single-file build digest is reproducible on any checkout.
 * text=auto eol=lf
+# Archives and pictures are bytes: never convert their line endings.
+*.canvast binary
+*.webp binary
