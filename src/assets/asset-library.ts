@@ -2,6 +2,7 @@ import type { RasterSource } from "../render/draw-objects";
 import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
 import { done, idbGet, req } from "../storage/idb";
+import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "../storage/quota";
 import type { CatalogEntry } from "./asset-catalog";
 import { AssetCatalog, entryFromRecord } from "./asset-catalog";
 import { makeThumb } from "./thumb";
@@ -175,6 +176,9 @@ export class AssetLibrary {
     private readonly onReady: () => void,
   ) {}
 
+  /** Told once when storage is nearly full (set by the app, which shows it as a notice). */
+  onNotice: ((text: string) => void) | null = null;
+
   /** Import a file: hash, decode (validates it is an image), store once. */
   async importFile(file: Blob & { name?: string }): Promise<AssetRecord> {
     return (await this.importFileDetailed(file)).record;
@@ -283,14 +287,23 @@ export class AssetLibrary {
    * deleted or absent catalog entry to the library.
    */
   private async store(record: AssetRecord, writeBytes: boolean): Promise<void> {
-    const tx = this.db!.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
-    const committed = done(tx);
-    if (writeBytes) tx.objectStore("assets").put(record, record.hash);
-    const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
-    if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
-    else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
-    await committed;
-    if (writeBytes) this.queueThumb(record);
+    try {
+      const tx = this.db!.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
+      const committed = done(tx);
+      if (writeBytes) tx.objectStore("assets").put(record, record.hash);
+      const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
+      if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
+      else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
+      await committed;
+    } catch (err) {
+      if (isQuotaError(err)) throw new ImportError(FULL_MESSAGE);
+      throw err;
+    }
+    if (writeBytes) {
+      this.queueThumb(record);
+      void requestPersistence();
+      void nearFullNotice().then((t) => t && this.onNotice?.(t));
+    }
   }
 
   private thumbQueue: Promise<void> = Promise.resolve();

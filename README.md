@@ -296,7 +296,7 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. All files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files |
+| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. All files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used |
 | What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete from library* to free space |
 
 **Content**
@@ -329,7 +329,7 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB. Export backups regularly |
+| Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB. When it is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
 | Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |

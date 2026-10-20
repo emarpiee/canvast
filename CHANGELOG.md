@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.1 — Full storage is reported, not silent (2026-10-20)
+
+- An import that does not fit the browser's storage is refused in plain words (export a backup, delete unused files) and stores nothing half-way; it was the browser's raw error.
+- The browser is asked once to keep the data under storage pressure (first import), and a notice appears once when 80% of its quota is used.
+
 ## 0.21.0 — Settings for corners, density and theme; panels in one shape; linked styles; Phase 8 groundwork (2026-10-19)
 
 - **Settings (Appearance):** Corners (Round or Sharp, every radius and the handles on the canvas), a third density (Dense), Actions bar (at the bottom or following the selection), and an Adaptive theme colour that takes the hue of the canvas background.

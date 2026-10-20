@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, openActions, rowAction, test } from "./harness";
+import { makePng } from "./png";
 
 /**
  * Phase 1 storage foundation: Workspace → Boards → Canvas, per-object
@@ -317,4 +318,18 @@ test("two tabs without Web Locks: the localStorage heartbeat lease keeps one wri
   await p2.close();
   await expect.poll(async () => (await sess(p1)).readOnly, { timeout: 10000 }).toBe(false);
   await context.close();
+});
+
+test("a full browser store refuses an import in plain words and loses nothing", async ({ app }) => {
+  await app.page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...a: Parameters<IDBObjectStore["put"]>) {
+      if (this.name === "assets") throw new DOMException("full", "QuotaExceededError");
+      return put.apply(this, a);
+    };
+  });
+  const buffer = makePng(8, 8, () => [200, 30, 30, 255]);
+  await app.page.getByTestId("import-input").setInputFiles({ name: "full.png", mimeType: "image/png", buffer });
+  await expect(app.page.getByTestId("toast")).toContainText("storage is full");
+  expect(await app.page.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
 });

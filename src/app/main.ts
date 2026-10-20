@@ -410,6 +410,7 @@ async function start(): Promise<void> {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
+  assets.onNotice = (text) => { editor.message = text; editor.changed(); };
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
   const textureHost = createTextureHost({ doc, index, assets, theme: () => theme });
   setTextureHost(textureHost); // (texture fills, ADR 0154)
