@@ -232,7 +232,7 @@ html, body {
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
-input[type="range"], .media-scrub { touch-action: none; } /* (a number field and its name do not take the finger: a bar that scrolls sideways scrolls from them) */
+input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub-input] { touch-action: none; } /* (a number field takes a finger that drags it; its name does not, so a bar that scrolls sideways scrolls from the name) */
 
 #canvas {
   display: block;

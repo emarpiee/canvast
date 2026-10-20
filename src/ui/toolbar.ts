@@ -621,7 +621,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   let scrub: { label: HTMLElement; input: HTMLInputElement; key: string; start: number; x: number; moved: boolean; last: number } | null = null;
   root.addEventListener("pointerdown", (e) => {
     const label = (e.target as HTMLElement).closest<HTMLElement>("[data-scrub]");
-    if (!label || e.button !== 0 || e.pointerType === "touch" || (e.target as HTMLElement).tagName !== "INPUT") return; // (the field scrubs, with a mouse or a pen; its name is only a label, and a finger scrolls the bar)
+    if (!label || e.button !== 0 || (e.target as HTMLElement).tagName !== "INPUT") return; // (the field scrubs, under a finger too; its name is only a label, so a bar that scrolls sideways scrolls from it)
     const input = label.querySelector<HTMLInputElement>("input")!;
     if ((e.target as HTMLElement).tagName === "INPUT" && document.activeElement === input) return; // (being typed in)
     scrub = { label, input, key: label.dataset["scrub"]!, start: parseFloat(input.value) || 0, x: e.clientX, moved: false, last: NaN };

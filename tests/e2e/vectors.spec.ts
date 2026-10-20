@@ -1937,7 +1937,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
   expect(await px(640, 400)).toEqual([37, 99, 235]);
 });
 
-test("numbers are live: dragging the outline width's name or its field changes the shape while the pointer is still down, and stores one undo step on release", async ({ app }) => {
+test("numbers are live: dragging the outline width's field (not its name) changes the shape while the pointer is still down, and stores one undo step on release", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
   const dark = (c: number[] | null) => !!c && Math.abs(c[0]! - 31) < 14 && Math.abs(c[1]! - 35) < 14 && Math.abs(c[2]! - 41) < 14;
@@ -1950,9 +1950,17 @@ test("numbers are live: dragging the outline width's name or its field changes t
   const start = Number(await width.inputValue());
   const before = (await objs(app)).length;
   expect(dark(await px(494, 400)), "a thin outline does not reach 6 px outside the edge").toBe(false);
-  for (const grab of ["label", "field"] as const) {
+  // the name is only a label: dragging it changes nothing
+  const nameBox = (await p.locator(".outline-pop label[for=op-width]").boundingBox())!;
+  await p.mouse.move(nameBox.x + nameBox.width / 2, nameBox.y + nameBox.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(nameBox.x + nameBox.width / 2 + 80, nameBox.y + nameBox.height / 2, { steps: 6 });
+  await p.mouse.up();
+  expect(Number(await width.inputValue()), "dragging the name does not change the number").toBe(start);
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  for (const grab of ["field"] as const) {
     if (!(await width.isVisible())) await p.click("[data-outline-options]"); // (an undo closes the pop-up)
-    const box = (await (grab === "label" ? p.locator(".outline-pop label[for=op-width]") : width).boundingBox())!;
+    const box = (await width.boundingBox())!;
     await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await p.mouse.down();
     await p.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2, { steps: 8 });
@@ -2047,11 +2055,11 @@ test("only a picked shape moves (a press-and-slide on another draws the selectio
   const x1 = (await screenBox(app, b.id)).minX;
   expect(x1 - x0, "the node moved by the whole distance to A's edge, not 3 px short").toBeCloseTo(boxA.maxX - 1 - 700, 0);
 
-  // a name tied to its field with `for` (the Width of Outline options) can be dragged too
+  // the field of the Width of Outline options (its name is tied to it with `for`) scrubs too
   await key(app, "v");
   await p.click("[data-outline-options]");
   const w0 = Number(await p.locator(".outline-pop .op-width").inputValue());
-  const lb = (await p.locator(".outline-pop label.op-label").first().boundingBox())!;
+  const lb = (await p.locator(".outline-pop .op-width").boundingBox())!;
   await p.mouse.move(lb.x + 4, lb.y + lb.height / 2);
   await p.mouse.down();
   await p.mouse.move(lb.x + 4 + 20, lb.y + lb.height / 2, { steps: 5 });
@@ -2059,14 +2067,13 @@ test("only a picked shape moves (a press-and-slide on another draws the selectio
   expect(Number(await p.locator(".outline-pop .op-width").inputValue())).toBeCloseTo(w0 + 5, 5); // 2 px per 0.5
 });
 
-test("a number's name can be dragged to change it (Sides before drawing a polygon), and SVG text pasted on the canvas becomes shapes", async ({ app }) => {
+test("a number's field can be dragged to change it (Sides before drawing a polygon), and SVG text pasted on the canvas becomes shapes", async ({ app }) => {
   const p = app.page;
   await key(app, "u");
   await p.click('[data-shape-kind="polygon"]');
   const sides = p.locator("[data-sides]");
-  const label = p.locator("[data-sides-wrap]");
   await expect(sides).toHaveValue("6");
-  const r = (await label.boundingBox())!;
+  const r = (await sides.boundingBox())!;
   await p.mouse.move(r.x + 6, r.y + r.height / 2);
   await p.mouse.down();
   await p.mouse.move(r.x + 6 + 40, r.y + r.height / 2, { steps: 6 });

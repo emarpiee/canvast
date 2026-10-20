@@ -32,7 +32,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
   root.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
     // Only the field scrubs (a press on its name is just a label: it focuses the field).
-    if (!(t instanceof HTMLInputElement) || e.pointerType === "touch") return; // (a finger scrolls the bar it starts on; the mouse and the pen scrub)
+    if (!(t instanceof HTMLInputElement)) return; // (the field scrubs, under a finger too; its name is only a label, so a bar that scrolls sideways scrolls from it)
     const own = t.labels?.[0] ?? t.closest<HTMLElement>("label");
     const label = mark(own) ?? (own?.matches("label[data-scrubbable]") ? own : null);
     if (!label || e.button !== 0 || label.closest("[data-scrub-root]") !== root) return; // (a nested root handles its own)
