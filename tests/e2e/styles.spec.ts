@@ -116,6 +116,12 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await card("Gradient 1").click();
   await expect.poll(async () => ((await objs(app)).find((o) => o.kind === "text") as Obj & { gradient?: Grad }).gradient?.type).toBe("linear");
 
+  // copied as CSS (pasting it on a shape puts it back, see the paste test in vectors.spec)
+  await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => { (window as unknown as { copied: string }).copied = t; } }, configurable: true }); });
+  await panel.getByRole("button", { name: /^More actions for style Gradient 1/ }).click();
+  await p.getByRole("menuitem", { name: /Copy the gradient Gradient 1 as CSS/ }).click();
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(\d+deg, #[0-9a-f]+ 0%, #[0-9a-f]+ 100%\)$/i);
+
   // written as a GIMP gradient, and a file of that kind read back
   const [file] = await Promise.all([p.waitForEvent("download"), (async () => {
     await panel.getByRole("button", { name: /^More actions for style Gradient 1/ }).click();

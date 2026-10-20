@@ -10,6 +10,7 @@ import { parseAco, serializeAco } from "../assets/aco";
 import type { PaletteColour } from "../assets/gpl";
 import { harmonies, parseHex, rgbToHex } from "../colour-picker/index";
 import type { Harmony } from "../colour-picker/colour";
+import { paintCss } from "../doc/paint";
 import type { Gradient, Paint } from "../doc/paint";
 import { writeZip } from "../storage/zip";
 import { openColourPopover, openGradientPopover } from "./colour-popover";
@@ -292,6 +293,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
         { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
         { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
+        { label: "Copy as CSS", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyText(paintCss(item.data as Paint), "the gradient as CSS") },
         ...common(item),
         { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
         del,

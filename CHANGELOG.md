@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.6 — Paste a colour, copy a gradient as CSS (2026-10-21)
+
+- **Pasting a solid colour** while shapes are picked makes it their fill: `#rgb`, `#rrggbbaa`, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()` and `color()`, with or without `color:`, `background:` or `fill:`. A colour outside sRGB is clipped to it. A colour word alone (`red`) is not taken, as it is more likely text.
+- **Styles panel:** a gradient has **Copy as CSS** in its More menu (a colour already had **Copy hex**); the text pastes back onto a fill.
+
 ## 0.25.5 — Paste a CSS gradient onto a fill (2026-10-21)
 
 - **Pasting CSS gradient text** (`linear-gradient(...)`, `radial-gradient(...)` or `conic-gradient(...)`, with or without `background:`) while shapes are picked makes it their fill. Angles, `to <side>`, `at` positions and stop positions in percent (degrees for a conic) are read; a repeating gradient, positions in lengths and anything unreadable are left alone (nothing changes). The box is taken as a square, so a linear angle on a wide shape differs slightly from a browser.

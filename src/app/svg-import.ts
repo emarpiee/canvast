@@ -71,6 +71,18 @@ export function parseTransform(t: string | null | undefined): Matrix {
 
 let swatch: CanvasRenderingContext2D | null = null;
 /** Any CSS colour as "#rrggbb" or "#rrggbbaa" (the browser reads it), or null when it is not one. */
+/** The colour the context's fill style paints (oklch, lab, color(...) and the like read back as text, not numbers), as hex, clipped to sRGB. */
+function pixelColour(ctx: CanvasRenderingContext2D): string | null {
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillRect(0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  if (d[3] === 0) return null;
+  const h = (n: number): string => n.toString(16).padStart(2, "0");
+  const a = d[3]! / 255; // (the pixel is premultiplied: the colour is divided by its alpha)
+  const u = (n: number): number => Math.min(255, Math.round(n / a));
+  return `#${h(u(d[0]!))}${h(u(d[1]!))}${h(u(d[2]!))}${d[3] === 255 ? "" : h(d[3]!)}`;
+}
+
 export function cssColour(v: string): string | null {
   swatch ??= document.createElement("canvas").getContext("2d");
   if (!swatch) return null;
@@ -80,7 +92,7 @@ export function cssColour(v: string): string | null {
   if (out === "#010203" && v.trim().toLowerCase() !== "#010203") return null;
   if (out.startsWith("#")) return out.toLowerCase();
   const m = /^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(out);
-  if (!m) return null;
+  if (!m) return pixelColour(swatch);
   const h = (n: number): string => Math.round(n).toString(16).padStart(2, "0");
   return `#${h(+m[1]!)}${h(+m[2]!)}${h(+m[3]!)}${h(+m[4]! * 255)}`;
 }

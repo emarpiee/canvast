@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.6 — Paste a colour, copy a gradient as CSS (2026-10-21)
+
+- **Implemented:** `parseCssColour` / `parseCssPaint` (css-gradient.ts), `pasteCssPaint`; `cssColour` reads colours the canvas returns as text (oklch, lab) from a pixel; Styles: gradient **Copy as CSS**.
+- **Tested:** `vectors.spec` CSS paste test (Chromium); `styles.spec` gradient test (Chromium, Firefox).
+- **Committed:** yes.
+
 ## v0.25.5 — Paste a CSS gradient onto a fill (2026-10-21)
 
 - **Implemented:** `app/css-gradient.ts` reads CSS gradient text; `pasteCssGradient` (actions.ts) puts it on the picked fills; the stop parsing is shared with the conic import (`cssStops`).

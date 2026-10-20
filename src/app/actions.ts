@@ -42,7 +42,7 @@ import type { PdfVector } from "./pdf-vector";
 import type { ExportTarget } from "./export-render";
 import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
-import { parseCssGradient } from "./css-gradient";
+import { parseCssPaint } from "./css-gradient";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
@@ -1682,12 +1682,12 @@ export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean =
 /** The picked paths as SVG text (ADR 0107), or null when none is picked or they cannot be placed together. */
 export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), undefined, sourceShapes(doc), false, 0, clipSheetsOf(doc));
 
-/** Pasted CSS gradient text (`linear-gradient(...)` and the like) becomes the fill of what is picked; false when it is not one or nothing can take it. */
-export function pasteCssGradient(doc: DocumentStore, editor: EditorState, text: string): boolean {
-  const g = parseCssGradient(text);
+/** Pasted CSS text (a gradient such as `linear-gradient(...)`, or a colour such as `#71ddd3` or `oklch(...)`) becomes the fill of what is picked; false when it is not one or nothing can take it. */
+export function pasteCssPaint(doc: DocumentStore, editor: EditorState, text: string): boolean {
+  const g = parseCssPaint(text);
   if (!g || paintTargetCount(doc, editor) === 0 || editor.blockEdit()) return false;
   commitPaint(doc, editor, { fill: g });
-  editor.message = `Pasted the ${g.type} gradient as the fill.`;
+  editor.message = typeof g === "string" ? "Pasted the colour as the fill." : `Pasted the ${(g as { type: string }).type} gradient as the fill.`;
   editor.changed();
   return true;
 }

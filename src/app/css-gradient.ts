@@ -1,5 +1,5 @@
-import type { Gradient } from "../doc/paint";
-import { cssAngle, cssStops, splitTop } from "./svg-import";
+import type { Gradient, Paint } from "../doc/paint";
+import { cssAngle, cssColour, cssStops, splitTop } from "./svg-import";
 
 const SIDES: Record<string, number> = { top: 0, right: 90, bottom: 180, left: 270 };
 const percent = (v: string): number | null => (/^-?[\d.]+%$/.test(v) ? parseFloat(v) / 100 : null);
@@ -53,3 +53,13 @@ export function parseCssGradient(text: string): Gradient | null {
   if (f === null) return null;
   return { type: "angular", cx: centre[0], cy: centre[1], angle: (((f - 90) % 360) + 360) % 360, stops: list }; // (CSS counts from the top, the model from pointing right)
 }
+
+/** A solid CSS colour as hex: `#rgb`, `#rrggbbaa`, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()` or `color()`, with or without `color:`/`background:`/`fill:`. Null for anything else (a colour word alone is not taken: it is more likely text). */
+export function parseCssColour(text: string): string | null {
+  const m = /^\s*(?:(?:background(?:-color)?|color|fill|stroke)\s*:\s*)?(#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\))\s*;?\s*$/i.exec(text);
+  if (!m || (m[1]!.startsWith("#") && ![4, 5, 7, 9].includes(m[1]!.length))) return null;
+  return cssColour(m[1]!);
+}
+
+/** What pasted CSS text paints: a gradient, or a solid colour. */
+export const parseCssPaint = (text: string): Paint | null => parseCssGradient(text) ?? parseCssColour(text);
