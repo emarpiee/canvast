@@ -101,6 +101,7 @@ import stickyNoteSvg from "lucide-static/icons/sticky-note.svg";
 import venetianMaskSvg from "lucide-static/icons/venetian-mask.svg";
 import circleDashedSvg from "lucide-static/icons/circle-dashed.svg";
 import contrastSvg from "lucide-static/icons/contrast.svg";
+import sunMoonSvg from "lucide-static/icons/sun-moon.svg";
 import scanEyeSvg from "lucide-static/icons/scan-eye.svg";
 import circleSlashSvg from "lucide-static/icons/circle-slash.svg";
 import circleMinusSvg from "lucide-static/icons/circle-minus.svg";
@@ -328,6 +329,7 @@ export const ICONS = {
   venetianMask: clean(venetianMaskSvg),
   circleDashed: clean(circleDashedSvg),
   contrast: clean(contrastSvg),
+  sunMoon: clean(sunMoonSvg),
   scanEye: clean(scanEyeSvg),
   circleSlash: clean(circleSlashSvg),
   circleMinus: clean(circleMinusSvg),

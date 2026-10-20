@@ -28,6 +28,7 @@ import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
 import { hasAlpha } from "./alpha";
+import { VIEW_GROUNDS, type ViewGround } from "../storage/workspace-repo";
 import type { Engine } from "./media-player";
 import { avEngine, gifEngine } from "./media-player";
 import { mountPlayerControls } from "./player-controls";
@@ -163,7 +164,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-          <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
+          <div class="viewer-stage"><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
@@ -580,7 +581,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return { nw, nh, fw: Math.min(boxW, (boxH * nw) / nh) };
   };
   /** A see-through picture lies on a chequered ground that fills the stage and stays where it is (it does not zoom or move with the picture); an SVG is also drawn here, again at every zoom, so it is crisp. */
+  const GROUND_NAME: Record<ViewGround, string> = { checker: "chequered", gray: "neutral grey", black: "black", white: "white" };
+  /** The button that cycles the ground under see-through pictures says which one it is now and which comes next. */
+  const labelGround = (): void => {
+    const now = session.viewGround;
+    const next = VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!;
+    const b = viewer.querySelector<HTMLElement>(".viewer-ground")!;
+    b.title = `Background of see-through pictures: ${GROUND_NAME[now]} (click for ${GROUND_NAME[next]})`;
+    b.setAttribute("aria-label", `Background of see-through pictures: ${GROUND_NAME[now]}. Next: ${GROUND_NAME[next]}`);
+    b.dataset["ground"] = now;
+  };
   const paintVector = (): void => {
+    labelGround();
     const ground = !vector && !slideImg.hidden && slideAlpha && slideGif.hidden && slideMedia.hidden; // (a see-through picture: only the chequered ground)
     slideVec.hidden = !(vector || ground);
     if (!vector && !ground) return;
@@ -610,7 +622,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     t.fillStyle = cs.getPropertyValue("--check-a").trim() || "#3a3a3a";
     t.fillRect(cell, 0, cell, cell);
     t.fillRect(0, cell, cell, cell);
-    g.fillStyle = g.createPattern(tile, "repeat") ?? "transparent"; // (the whole stage, anchored to it: the picture slides over a ground that stays put)
+    const tone = session.viewGround;
+    g.fillStyle = tone === "gray" ? "#808080" : tone === "black" ? "#000000" : tone === "white" ? "#ffffff" : (g.createPattern(tile, "repeat") ?? "transparent"); // (the whole stage, anchored to it: the picture slides over a ground that stays put)
     g.fillRect(0, 0, w, h);
     if (vector) g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
   };
@@ -873,9 +886,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // With the controls hidden, the back arrow and the details toggle at the top show again while the pointer is near the top edge.
   viewer.addEventListener("pointermove", (e) => {
     if (!viewer.classList.contains("no-bar")) return;
-    viewer.classList.toggle("is-near-top", e.clientY - viewer.getBoundingClientRect().top < 90);
+    const r = viewer.getBoundingClientRect();
+    viewer.classList.toggle("is-near-top", e.clientY - r.top < 90);
+    viewer.classList.toggle("is-near-bottom", r.bottom - e.clientY < 90);
   });
-  viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top"));
+  viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {
     const was = slideHash;
     stopShow();
@@ -977,6 +992,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (act === "prev") stepSlide(-1);
     else if (act === "next") stepSlide(1);
     else if (act === "close") closeSlide();
+    else if (act === "ground") {
+      const now = session.viewGround;
+      void session.setViewGround(VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!);
+      paintVector();
+    }
     else if (act === "play") setShowing(!showing);
     else if (act === "fullscreen") void (document.fullscreenElement ? document.exitFullscreen() : viewer.requestFullscreen()).catch(() => undefined);
     else if (act === "details") toggleDetails();

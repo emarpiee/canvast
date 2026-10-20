@@ -21,8 +21,14 @@ import { done, idbGet, req } from "./idb";
  */
 export const SCHEMA_VERSION = 2;
 
+/** What a see-through picture lies on in the library viewer (kept with the workspace). */
+export type ViewGround = "checker" | "gray" | "black" | "white";
+export const VIEW_GROUNDS: readonly ViewGround[] = ["checker", "gray", "black", "white"];
+
 export interface WorkspaceRecord {
   id: string;
+  /** The ground under see-through pictures in the viewer: absent is the chequered one. */
+  viewGround?: ViewGround;
   displayName: string;
   boardIds: string[];
   createdAt: number;
@@ -289,6 +295,14 @@ export class WorkspaceRepo {
     const w = await req(tx.objectStore("workspaces").get(id) as IDBRequest<WorkspaceRecord | undefined>);
     if (!w) throw new Error(`workspace ${id} not found`);
     tx.objectStore("workspaces").put({ ...w, displayName: name });
+    await done(tx);
+  }
+
+  async setViewGround(id: string, ground: ViewGround): Promise<void> {
+    const tx = this.db.transaction("workspaces", "readwrite");
+    const w = await req(tx.objectStore("workspaces").get(id) as IDBRequest<WorkspaceRecord | undefined>);
+    if (!w) throw new Error(`workspace ${id} not found`);
+    tx.objectStore("workspaces").put({ ...w, viewGround: ground });
     await done(tx);
   }
 

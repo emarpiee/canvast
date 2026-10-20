@@ -1269,6 +1269,52 @@ test("a see-through picture in the viewer: the chequered ground fills the stage 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a button at the bottom right of the viewer cycles the ground under see-through pictures: chequered, neutral grey, black, white; kept with the workspace over a reload", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "half.png", mimeType: "image/png", buffer: makePng(40, 30, (x) => (x < 20 ? [0, 0, 0, 0] : [220, 40, 40, 255])) },
+    { name: "solid.png", mimeType: "image/png", buffer: makePng(40, 30, () => [20, 120, 220, 255]) },
+  ]);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  const viewer = p.getByTestId("slide-view");
+  const open = async (name: string) => {
+    await p.locator('[data-testid="asset-card"]', { hasText: name }).dblclick();
+    await expect(viewer).toBeVisible();
+    await expect.poll(() => viewer.locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  };
+  await open("solid.png");
+  await expect(viewer.locator(".viewer-ground"), "only for a picture with see-through pixels").toBeHidden();
+  await p.keyboard.press("Escape");
+  await open("half.png");
+  const btn = viewer.locator(".viewer-ground");
+  await expect(btn).toBeVisible();
+  const details = (await viewer.locator(".viewer-details").boundingBox())!;
+  const bb = (await btn.boundingBox())!;
+  expect(Math.abs(bb.x + bb.width - (details.x + details.width)), "at the right edge, in line with the details toggle above").toBeLessThan(2);
+  const ground = viewer.locator("canvas.viewer-vec");
+  const far = () => ground.evaluate((c: HTMLCanvasElement) => [...c.getContext("2d")!.getImageData(5, 5, 1, 1).data]);
+  await expect(btn).toHaveAttribute("title", /chequered \(click for neutral grey\)/);
+  const chequer = await far();
+  for (const [name, rgb] of [["neutral grey", [128, 128, 128]], ["black", [0, 0, 0]], ["white", [255, 255, 255]]] as const) {
+    await btn.click();
+    await expect.poll(far).toEqual([...rgb, 255]);
+    await expect(btn).toHaveAttribute("title", new RegExp(`: ${name} \\(click for`));
+  }
+  await btn.click();
+  expect(await far(), "round to the chequered ground again").toEqual(chequer);
+  await btn.click();
+  await btn.click(); // black
+  await expect.poll(far).toEqual([0, 0, 0, 255]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await open("half.png");
+  await expect.poll(far).toEqual([0, 0, 0, 255]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 /** Import a few small pictures into the library (the first view is the gallery). */
 async function libraryOf(p: Page, n: number): Promise<void> {
   await toAssets(p);

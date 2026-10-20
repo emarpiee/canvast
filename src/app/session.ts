@@ -19,7 +19,7 @@ import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
 import type { EditorState } from "./editor-state";
 import { CanvasPersistence } from "../storage/canvas-persistence";
-import type { BoardRecord, CanvasRecord, CurrentMeta, WorkspaceRecord } from "../storage/workspace-repo";
+import type { BoardRecord, CanvasRecord, CurrentMeta, ViewGround, WorkspaceRecord } from "../storage/workspace-repo";
 import { HierarchyError, RevisionConflictError, WorkspaceRepo } from "../storage/workspace-repo";
 import { ensureWorkspace } from "../storage/migrate-v1";
 import type { StartupOutcome } from "../storage/migrate-v1";
@@ -754,6 +754,20 @@ export class Session {
       this.onAssetsRenamed?.();
     }
     return ok ? n : 0;
+  }
+
+  /** The ground under see-through pictures in the library viewer (kept with the workspace). */
+  get viewGround(): ViewGround {
+    return this.tree?.workspace.viewGround ?? "checker";
+  }
+
+  async setViewGround(ground: ViewGround): Promise<void> {
+    const ws = this.tree?.workspace;
+    if (!ws) return;
+    ws.viewGround = ground; // (shown at once; kept only where this tab may write)
+    if (this.readOnly || !this.repo) return;
+    await this.repo.setViewGround(ws.id, ground);
+    this.post({ kind: "tree" });
   }
 
   async renameWorkspace(name: string): Promise<void> {

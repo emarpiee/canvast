@@ -1157,8 +1157,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .vbtn.viewer-back { left: var(--sp-6); }
 .vbtn.viewer-details { right: var(--sp-6); }
 /* with the controls hidden the two at the top fade out, and come back when the pointer is near the top edge (the handle brings the controls back) */
-.viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
-.viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
+.viewer .viewer-ground { display: none; }
+.viewer.has-alpha .viewer-ground { display: inline-flex; }
+.vbtn.viewer-ground { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); color: var(--media-fg); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-ground { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
+.viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-5); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
 .vbtn:hover:not(:disabled) { background: var(--white-a12); }
