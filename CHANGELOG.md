@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.24.3 — The ends of a gradient snap (2026-10-20)
+## 0.24.4 — A group is one thing for Align and Arrange (2026-10-21)
+
+- **Fix:** Align, Distribute and Arrange split a boolean group picked as a whole into its shapes and moved them separately. A group, and a boolean group, picked as a whole is now one unit: it is lined up with what else is picked (its shapes keep their places among themselves), and picked alone there is nothing to line up. To line the shapes of a boolean group up with each other, pick them one by one (in Layers, or enter the group first).
+ — The ends of a gradient snap (2026-10-20)
 
 - **Fix:** dragging a gradient's handle on the canvas ignored the Snap toggle. With it on, the handle (the ends of a linear gradient, the centre and radius of a radial one, the angle handle) now lines up its x or y with the edges and middle of anything in view, the shape it paints included, or with a node of a path, within 6 px, and the guide line shows; with it off it moves freely, as before.
 

@@ -1666,6 +1666,14 @@ test("align works on the shapes of a boolean group, and menus keep off the selec
   const xs = f.corners.map((c) => c[0]), ys = f.corners.map((c) => c[1]);
   const overlaps = bar.x < Math.max(...xs) && bar.x + bar.width > Math.min(...xs) && bar.y < Math.max(...ys) && bar.y + bar.height > Math.min(...ys);
   expect(overlaps, "the bar is off the selected shapes").toBe(false);
+  // The whole group is one thing: Align has nothing to line up in it (it is not split into its shapes) ...
+  await alignWith(p, "align:centre");
+  await app.frame();
+  expect((await members()).map((o) => o.ax), "a whole boolean group is not split by Align").toEqual(before);
+  // ... the shapes are lined up with each other once they are picked as shapes: the group is entered and they are picked.
+  await p.mouse.dblclick(620, 380);
+  await app.frame();
+  await p.keyboard.press("Control+a");
   await alignWith(p, "align:centre");
   await app.frame();
   const after = await members();

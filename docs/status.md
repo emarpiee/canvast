@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.24.4 — a group is one unit for Align and Arrange (2026-10-21)
+
+- **Implemented:** `layoutUnits` splits a boolean group into its shapes only when its result is not picked (the shapes were picked as shapes).
+- **Tested:** new `frames.spec` test (a group and a boolean group aligned and arranged with others keep their members' offsets; each picked alone moves nothing; the boolean case fails without the change); `vectors.spec` "align works on the shapes of a boolean group" now enters the group and picks the shapes (and checks the whole group is not split); the group, boolean and align tests of both specs in Chromium (24 passed) and the two in Firefox.
+- **Unverified:** a boolean group nested in a group, and groups on sheets, were not exercised by the new test.
+
 ## v0.24.3 — gradient handles snap (2026-10-20)
 
 - **Implemented:** `snapGradientPoint` in `interaction/tools.ts` (the Snap toggle, ADR 0019): the pointer's x and y snap to the box edges and middle of the shapes in view and to path nodes, within `SNAP_PX`, with the guide.

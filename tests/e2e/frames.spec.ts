@@ -1,4 +1,4 @@
-import { alignWith, arrangeWith, contextChoose, expect, recordMetric, setPenColour, test } from "./harness";
+import { alignWith, arrangeWith, boolWith, contextChoose, expect, recordMetric, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
@@ -1630,6 +1630,87 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
   await p.locator('[data-ctx="arrangemenu"]').click();
   await expect(p.locator('.pop-menu [data-id="gap:none"]')).toHaveAttribute("aria-checked", "true");
   await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Align and Arrange treat a group, and a boolean group, as one thing: its members keep their places among themselves", async ({ app }) => {
+  const p = app.page;
+  type O = { id: string; groups?: string[]; result?: unknown };
+  const all = async (): Promise<O[]> => (await p.evaluate(() => window.__canvastDebug.objects())) as unknown as O[];
+  const box = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  const rect = async (x0: number, y0: number, x1: number, y1: number): Promise<string> => {
+    await app.drag({ x: x0, y: y0 }, { x: x1, y: y1 }, 6);
+    return (await all()).at(-1)!.id;
+  };
+  const a = await rect(420, 260, 480, 300);
+  const b = await rect(500, 320, 580, 380);
+  const c = await rect(700, 260, 760, 300);
+  const d = await rect(560, 480, 640, 540);
+  await p.keyboard.press("v");
+  await p.mouse.click(120, 650);
+  const pickAll = async (): Promise<void> => {
+    await p.mouse.click(120, 650);
+    await p.keyboard.press("Control+a");
+  };
+  const group = async (...at: Array<[number, number]>): Promise<void> => {
+    await p.mouse.click(120, 650);
+    for (const [i, [x, y]] of at.entries()) {
+      if (i) await p.keyboard.down("Shift");
+      await p.mouse.click(x, y);
+      if (i) await p.keyboard.up("Shift");
+    }
+  };
+
+  // A plain group of a and b, then the group, c and d are aligned and arranged: a and b keep their offset to each other.
+  await group([430, 270], [510, 330]);
+  await p.keyboard.press("Control+g");
+  await pickAll();
+  const offset0 = { x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY };
+  await alignWith(p, "align:left");
+  expect({ x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY }, "a group is aligned as one: its members keep their offset").toEqual(offset0);
+  expect(Math.round((await box(c)).minX), "c goes to the group's left edge").toBe(Math.round((await box(a)).minX));
+  expect(Math.round((await box(d)).minX)).toBe(Math.round((await box(a)).minX));
+  await arrangeWith(p, "grid:stack");
+  expect({ x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY }, "and arranged as one").toEqual(offset0);
+  // A group picked alone, as a whole, is one thing too: Align and Arrange have nothing to line up and move nothing.
+  const grouped = [await box(a), await box(b)];
+  await p.mouse.click(120, 650);
+  const ab = await box(a);
+  await p.mouse.click((ab.minX + ab.maxX) / 2, (ab.minY + ab.maxY) / 2);
+  await app.frame();
+  expect((await p.evaluate(() => window.__canvastDebug.selection())).length, "the whole group is picked").toBe(2);
+  await alignWith(p, "align:left");
+  await arrangeWith(p, "grid:stack");
+  expect([await box(a), await box(b)], "a group alone is not split into its members").toEqual(grouped);
+  expect(app.consoleErrors).toEqual([]);
+
+  // The same for a boolean group (the shapes inside it are hidden; the result is drawn): it is one unit.
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z"); // (the group is undone: a, b, c, d are single shapes again)
+  await group([430, 270], [510, 330]);
+  await boolWith(p, "op:union");
+  await pickAll();
+  const members = (await all()).filter((o) => !o.result && [a, b].includes(o.id));
+  expect(members).toHaveLength(2);
+  const off1 = { x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY };
+  await alignWith(p, "align:right");
+  expect({ x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY }, "a boolean group is aligned as one").toEqual(off1);
+  await arrangeWith(p, "grid:stack");
+  expect({ x: (await box(b)).minX - (await box(a)).minX, y: (await box(b)).minY - (await box(a)).minY }, "and arranged as one").toEqual(off1);
+  // Picked alone, as a whole, it is one thing: there is nothing to line up (it is not split into its shapes).
+  const before = [await box(a), await box(b)];
+  await p.mouse.click(120, 650);
+  const result = (await all()).find((o) => o.result)!;
+  const rb = await box(result.id);
+  await p.mouse.click((rb.minX + rb.maxX) / 2, (rb.minY + rb.maxY) / 2);
+  expect((await p.evaluate(() => window.__canvastDebug.selection())).length, "the whole group is picked").toBeGreaterThanOrEqual(3);
+  await alignWith(p, "align:left");
+  await arrangeWith(p, "grid:stack");
+  expect([await box(a), await box(b)], "nothing moved: a whole boolean group is one thing").toEqual(before);
+  await expect(p.getByTestId("toast")).toContainText("Select at least 2 items");
   expect(app.consoleErrors).toEqual([]);
 });
 

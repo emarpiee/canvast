@@ -127,11 +127,13 @@ const LABELS: Record<SortKey, string> = { "name-asc": "A to Z", "name-desc": "Z 
  */
 function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap<string, { name: string; date: number }>): { units: Unit[]; within: ReturnType<typeof unionBounds>; homed: boolean } | string {
   // (a boolean group's result is derived from its shapes and never moves by itself)
-  const picked = selected(doc, editor).filter((o) => !o.locked && !isResult(o));
+  const chosen = selected(doc, editor);
+  const picked = chosen.filter((o) => !o.locked && !isResult(o));
   let level = editor.entered.length;
   // Shapes picked inside one boolean group (in the Layers list, say, without entering it) are lined up with each other, not as the one unit the group is.
+  // A boolean group picked as a whole (its result is picked with its shapes) is one unit: it is lined up with what else is picked, or not at all alone.
   const gid = picked[0]?.groups?.[level];
-  if (gid && picked.length >= 1 && picked.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid])) level += 1;
+  if (gid && picked.length >= 1 && picked.every((o) => o.groups?.[level] === gid && o.boolOps?.[gid]) && !chosen.some((o) => isResult(o) && o.result === gid)) level += 1;
   const container = level > 0 ? picked[0]?.groups?.[level - 1] : undefined;
   const f0 = picked[0]?.frame ?? doc.space.world;
   const homed = new Set(picked.map((o) => o.frame?.id ?? 0)).size > 1;
