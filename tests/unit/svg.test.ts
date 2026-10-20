@@ -5,9 +5,9 @@ import type { PathObject } from "../../src/doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 import { geometryBounds, rectSubs } from "../../src/doc/path";
 import { arcToCubics, parsePathData } from "../../src/doc/svg-path";
-import { exportSvg, pathData } from "../../src/app/svg-export";
+import { angularCount, exportSvg, pathData } from "../../src/app/svg-export";
 import { pdfVectorOf } from "../../src/app/pdf-vector";
-import { DEFAULT_INK, exportColor, setThemeInk } from "../../src/render/ink";
+import { DEFAULT_INK, newInk, setCanvasInk } from "../../src/render/ink";
 import { dashChoice, lookFromChoices } from "../../src/doc/stroke-look";
 
 const ORIGIN = { x: D.ZERO, y: D.ZERO };
@@ -130,22 +130,65 @@ describe("vector PDF (ADR 0153)", () => {
   });
 });
 
-describe("the default ink in files", () => {
-  it("SVG and PDF write the default ink as the canvas draws it now (a picture export does), and any other colour as it is", () => {
+describe("the default ink (WYSIWYG: nothing is mapped by the theme)", () => {
+  it("a new object gets the canvas's readable ink on a dark canvas and the near-black on a light one; any colour that was chosen is kept", () => {
+    try {
+      setCanvasInk("rgb(227, 234, 230)"); // a dark canvas
+      expect(newInk(DEFAULT_INK)).toBe("#e3eae6");
+      expect(newInk("#1F2329")).toBe("#e3eae6");
+      expect(newInk("#ff0000")).toBe("#ff0000");
+      setCanvasInk(DEFAULT_INK); // a light canvas
+      expect(newInk(DEFAULT_INK)).toBe(DEFAULT_INK);
+      setCanvasInk("not a colour"); // unreadable without a page: the colour is kept, never a wrong one
+      expect(newInk(DEFAULT_INK)).toBe(DEFAULT_INK);
+    } finally {
+      setCanvasInk(null);
+    }
+  });
+
+  it("SVG and PDF write the colours as they are stored, whatever the canvas is", () => {
     const store = new DocumentStore();
     const shape = (stroke: string): PathObject => rect(0, 0, 100, 60, { fill: "#2563eb", stroke });
     try {
-      setThemeInk("rgb(227, 234, 230)"); // a dark canvas: the default ink is drawn light
-      expect(exportColor(DEFAULT_INK)).toBe("#e3eae6");
-      expect(exportColor("#ff0000")).toBe("#ff0000");
-      expect(exportSvg([shape(DEFAULT_INK)], store.space)).toContain('stroke="#e3eae6"');
+      setCanvasInk("rgb(227, 234, 230)");
+      expect(exportSvg([shape(DEFAULT_INK)], store.space)).toContain(`stroke="${DEFAULT_INK}"`);
       expect(exportSvg([shape("#ff0000")], store.space)).toContain('stroke="#ff0000"');
-      expect(pdfVectorOf([shape(DEFAULT_INK)], store.space, 100, 60)!.content).toContain("0.89 0.918 0.902 RG");
-      setThemeInk("oklch(0.93 0.008 160)"); // a colour it cannot read without a page: kept as stored, never a wrong colour
-      expect(exportColor(DEFAULT_INK)).toBe(DEFAULT_INK);
+      expect(pdfVectorOf([shape(DEFAULT_INK)], store.space, 100, 60)!.content).toContain("0.122 0.137 0.161 RG");
     } finally {
-      setThemeInk(null); // a light canvas draws the default ink as it is stored
+      setCanvasInk(null);
     }
-    expect(exportSvg([shape(DEFAULT_INK)], store.space)).toContain(`stroke="${DEFAULT_INK}"`);
+  });
+});
+
+describe("an outline inside or outside its edge (as the canvas draws it)", () => {
+  it("is a clip path (inside) or a mask (outside) on a line of twice the width, and the box holds the whole outline", () => {
+    const store = new DocumentStore();
+    const shape = (align?: "inside" | "outside"): PathObject => rect(0, 0, 100, 60, { fill: "#2563eb", stroke: "#dc2626", width: 10, ...(align ? { align } : {}) });
+    const box = (svg: string): number[] => /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg)!.slice(1).map(Number);
+    const centred = exportSvg([shape()], store.space)!;
+    const inside = exportSvg([shape("inside")], store.space)!;
+    const outside = exportSvg([shape("outside")], store.space)!;
+    expect(inside).toMatch(/<clipPath id="a\d+"><path d="/);
+    expect(inside).toMatch(/<g clip-path="url\(#a\d+\)"><path[^>]*stroke-width="[\d.]+"/);
+    expect(outside).toMatch(/<mask id="a\d+"/);
+    expect(outside).toMatch(/<g mask="url\(#a\d+\)">/);
+    const sw = (svg: string) => Number(/stroke-width="([\d.]+)"/.exec(svg)![1]);
+    expect(sw(inside) / box(inside)[0]!, "the line is twice as wide (20 of a box 100 wide), cut to one side").toBeCloseTo(0.2, 3);
+    expect(sw(outside) / box(outside)[0]!, "and the box has the whole outline round the shape (20 of 120)").toBeCloseTo(20 / 120, 3);
+    // the box: inside adds nothing past the shape, centred half the width, outside the whole width
+    const [wc, wi, wo] = [box(centred)[1]!, box(inside)[1]!, box(outside)[1]!]; // (the heights: the longer side is always 1000)
+    expect(wi).toBeLessThan(wc);
+    expect(wo).toBeGreaterThan(wc);
+  });
+});
+
+describe("an angular gradient in an SVG", () => {
+  it("is counted for the warning, and without a page to draw it on the SVG still holds a gradient (never nothing)", () => {
+    const store = new DocumentStore();
+    const angular = rect(0, 0, 100, 60, { fill: { type: "angular", cx: 0.5, cy: 0.5, angle: 0, stops: [{ o: 0, c: "#ff0000" }, { o: 1, c: "#0000ff" }] } });
+    const plain = rect(0, 0, 100, 60, { fill: "#00ff00" });
+    expect(angularCount([angular, plain, { ...angular, hidden: true }])).toBe(1);
+    expect(angularCount([plain])).toBe(0);
+    expect(exportSvg([angular], store.space)).toContain("<linearGradient"); // (the stand-in; the app writes a picture)
   });
 });

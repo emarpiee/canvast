@@ -27,7 +27,7 @@ import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
 import type { PenKind } from "../interaction/pens";
 import { ICONS } from "./icons";
-import { swatchBackground } from "../render/ink";
+import { newInk, swatchBackground } from "../render/ink";
 import { penFromSlider, sliderFromPen } from "../interaction/pen-width";
 
 export interface ToolbarActions {
@@ -409,6 +409,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   };
   const openPaint = (anchor: HTMLElement, which: "fill" | "stroke"): void => {
     editor.gradientFocus = which; // the handles on the canvas are this paint's
+    editor.changed(); // (the hint line says whose gradient they are)
     openPaintPopover(anchor, {
       name: which === "fill" ? "Fill" : "Outline",
       paint: paintNow(which),
@@ -892,7 +893,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     flyAt("shape", "shape", editor.tool === "shape" || editor.tool === "path", editor.tool === "path" ? ICONS.pathTool : (SHAPE_MENU.find((k) => k.id === editor.shapeKind)?.icon ?? ICONS.shapeTool));
     flyAt("pen", "pen", editor.tool === "pen", PEN_MENU.find((k) => k.id === editor.penKind)?.icon ?? ICONS.pencil);
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
-    root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = swatchBackground(editor.penColor);
+    root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = newInk(editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));
     const sides = root.querySelector<HTMLInputElement>("[data-sides]")!;
     const tips = root.querySelector<HTMLInputElement>("[data-tips]")!;
@@ -1011,7 +1012,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
       b.hidden = (editor.tool === "select" || editor.tool === "node") && (!sel || several);
       b.classList.toggle("is-none", value === null);
-      (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${swatchBackground(value)}, ${swatchBackground(value)})` : paintCss(value));
+      (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${sel ? value : newInk(value)}, ${sel ? value : newInk(value)})` : paintCss(value)); // (what the next shape gets is the colour it will have)
     }
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-only]")) b.hidden = editor.tool !== "pen"; // (the pen's own presets and zoom behaviour: not for strokes already drawn)

@@ -372,15 +372,15 @@ test("text placed deep stays exact at any magnification: letter edge and fill, n
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("the text box shows the default ink in a readable colour on the dark canvas, while the stored colour stays the default (ADR 0052)", async ({ app }) => {
+test("the text box starts in a readable ink on the dark canvas, chosen once when it is made (ADR 0052)", async ({ app }) => {
   const p = app.page;
   await p.emulateMedia({ colorScheme: "dark" });
   await p.getByRole("radio", { name: "Text" }).click();
   await p.mouse.click(400, 300);
   const box = p.getByTestId("text-editor");
   await expect(box).toBeFocused();
-  // The ink is drawn as a light oklch on the dark canvas (the stored colour is the near-black default).
-  const light = await box.evaluate((e) => Number(/oklch\(([\d.]+)/.exec(getComputedStyle(e).color)?.[1] ?? 0));
+  // WYSIWYG: the default ink is picked once for the dark canvas and stored; the box shows that colour.
+  const light = await box.evaluate((e) => { const c = getComputedStyle(e).color.match(/[\d.]+/g)!.map(Number); return (0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!) / 255; });
   expect(light, "light enough to read on the dark canvas").toBeGreaterThan(0.7);
   expect(app.consoleErrors).toEqual([]);
 });

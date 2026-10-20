@@ -16,7 +16,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -125,7 +125,7 @@ import { isLabelled, itemLabels, itemName } from "../render/item-label";
 import { drawReveal, drawRevealOutlines, revealWords } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
 import { SettingsStore } from "../settings/settings";
-import { setThemeInk } from "../render/ink";
+import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
 
 declare const __CANVAST_VERSION__: string;
@@ -371,7 +371,7 @@ async function start(): Promise<void> {
   applyZen();
   applyThemeAttribute();
   let theme = readTheme(document.documentElement);
-  setThemeInk(theme.ink);
+  setCanvasInk(theme.ink);
   let dpr = window.devicePixelRatio || 1;
   // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
   const quality = new QualityGovernor((level) => {
@@ -631,7 +631,7 @@ async function start(): Promise<void> {
   new ResizeObserver(resize).observe(host);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
-    setThemeInk(theme.ink);
+    setCanvasInk(theme.ink);
     tiles.clear();
     invalidate();
   });
@@ -894,7 +894,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
           return px > 0 ? [{ ...bare, stroke: po.obj.stroke ?? "#ffffff", width: px / ppu }] : po.obj.stroke === undefined ? [] : [bare];
         }
         // A shape's outline of 0 is no outline (its width is kept for when it is turned on again); a width on one without an outline turns one on.
-        if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: "#1f2329" } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
+        if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: newInk("#1f2329") } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
         return px > 0 ? [{ ...po.obj, width: px / ppu }] : [];
       });
       if (!final) return showReplaced(editor, next);
@@ -935,7 +935,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       await fontLoader.ensure(record.hash);
       return record.hash;
     },
-    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, editor.penColor) : editor.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD }, editor.penColor) : selectedTextStyle(doc, editor, textPpu)),
+    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, newInk(editor.penColor)) : editor.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD }, newInk(editor.penColor)) : selectedTextStyle(doc, editor, textPpu)),
     setTextStyle: (look, final = true) => {
       if (editor.tool === "text" || editor.tool === "note") editor.textLook = { ...editor.textLook, ...look };
       if (textEditor.isOpen) textEditor.restyle(look);
@@ -1004,6 +1004,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       targets,
       render: (t, w, h, bg) => renderExport({ doc, index, assets, theme }, t, w, h, bg),
       svg: (t, size) => svgOfTarget(doc, t, size),
+      svgWarning: (ts) => svgWarningOfTargets(ts),
       pdfVector: (t, wPt, hPt) => pdfVectorOfTarget(doc, t, wPt, hPt),
       say: (text) => { editor.message = text; editor.changed(); },
       toLibrary: async (file, targets) => {
@@ -1251,7 +1252,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const name = "canvast-shapes.svg";
       const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
       const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(doc.all(), editor.selection)]) ? "pattern" : "svg");
-      editor.message = `Saved “${name}” in ${where}.`;
+      editor.message = `Saved “${name}” in ${where}.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`;
       editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
     } catch (e) {
       editor.message = `Could not save to the library: ${(e as Error).message}`;
@@ -1659,14 +1660,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         // The canvas colours follow the dials too: read them again and redraw.
         applyAppearance();
         theme = readTheme(document.documentElement);
-        setThemeInk(theme.ink);
+        setCanvasInk(theme.ink);
         tiles.clear();
         invalidate();
         return;
       case "ui.theme":
         applyThemeAttribute();
         theme = readTheme(document.documentElement);
-        setThemeInk(theme.ink);
+        setCanvasInk(theme.ink);
         tiles.clear();
         invalidate();
         return;
@@ -1689,6 +1690,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const list: Command[] = [
       ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(keymap.display(TOOL_COMMAND[t])), enabled: () => onCanvas, run: () => editor.setTool(t) })),
       { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
+      { group: "Edit", title: "Change the old default ink to the canvas ink", words: "recolour near-black dark outline theme light old drawings readable", enabled: () => onCanvas && newInk(DEFAULT_INK) !== DEFAULT_INK, run: () => void recolourOldInk(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
       { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => void copySelection(doc, editor, view) },
       { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
@@ -1723,7 +1725,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
       ...(["taper", "taper-start", "taper-end", "swell"] as const).map((profile): Command => ({ group: "Path", title: `Width: ${profile.replace("-", " ")}`, words: "variable width thin thick shape", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, profile) })),
       { group: "Path", title: "Width: even", words: "variable width taper remove", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => setWidthProfile(doc, editor, null) },
-      { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = "Copied the shapes as SVG text"; editor.changed(); }); } },
+      { group: "Export", title: "Copy the selection as SVG", words: "vector clipboard text", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => { const t = svgOfSelection(doc, editor); if (t) void copyText(t).then(() => { editor.message = `Copied the shapes as SVG text.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`; editor.changed(); }); } },
       { group: "Export", title: "Export… (choose a size)", words: "picture png jpeg webp size dpi print sheet image save", enabled: () => onCanvas && exportTarget(doc, editor) !== null, run: () => openExport() },
       { group: "Export", title: "Save the selection to the library as SVG", words: "vector assets", enabled: () => onCanvas && canExportSvg(doc, editor), run: () => void saveSvgToLibrary() },
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },

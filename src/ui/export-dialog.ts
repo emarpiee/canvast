@@ -23,6 +23,8 @@ export interface ExportDeps {
   render(t: ExportTarget, w: number, h: number, bg: Background): Promise<HTMLCanvasElement>;
   /** The vectors of a target as SVG text of this size (width and height as SVG writes them), or null when it cannot be. */
   svg(t: ExportTarget, size: { w: string; h: string }): string | null;
+  /** A warning for the SVG of these targets (what the file cannot hold as vectors), or null. */
+  svgWarning?(targets: readonly ExportTarget[]): string | null;
   /** The vectors of a target as a PDF page of this size in points (ADR 0153), or null when the page needs a picture. */
   pdfVector(t: ExportTarget, wPt: number, hPt: number): PdfVector | null;
   /** Put the file in the library (and tell the person, with a way to see it). */
@@ -133,6 +135,7 @@ export function openExportDialog(deps: ExportDeps): void {
       </div>
     </div>
     <p class="ex-note" data-ex-note role="status" aria-live="polite"></p>
+    <p class="ex-warn" data-ex-warn role="note" hidden></p>
     <footer class="ex-foot">
       <button type="button" class="ex-btn" data-ex="library" title="Keep it in the library of this workspace">${ICONS.library}<span>Save to library</span></button>
       <button type="button" class="ex-btn" data-ex="copy" title="Copy the picture to the clipboard (as PNG)">${ICONS.clipboardPlain}<span>Copy</span></button>
@@ -323,6 +326,9 @@ export function openExportDialog(deps: ExportDeps): void {
     // (the chips are made once: a press on one must not be lost to them being redrawn when the field it leaves fires its change)
     for (const b of chips.querySelectorAll<HTMLElement>("[data-chip]")) b.setAttribute("aria-pressed", String(suggestions[Number(b.dataset["chip"])]!.w === s.w));
     note.textContent = s.capped ? `Capped at ${MAX_SIDE.toLocaleString("en")} px a side and ${(MAX_AREA / 1e6).toFixed(0)} MP: that is the most a picture can be.` : mp > 40 ? "A big picture: it can take a moment and a lot of memory." : "";
+    const warn = prefs.format === "svg" ? (deps.svgWarning?.(ts) ?? null) : null;
+    q("[data-ex-warn]").hidden = !warn;
+    q("[data-ex-warn]").textContent = warn ? `⚠ ${warn}` : "";
     const lossy = prefs.format === "webp" || prefs.format === "jpeg";
     q("[data-ex-quality]").hidden = !lossy;
     q("[data-ex-bgrow]").hidden = prefs.format === "svg";

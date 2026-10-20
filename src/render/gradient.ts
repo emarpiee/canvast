@@ -7,7 +7,6 @@ import type { Gradient, Paint } from "../doc/paint";
 import { hexOf, isGradient, sliceStops, solidOf, stopsAt } from "../doc/paint";
 import { geometryBounds, paintBounds, rectSubs } from "../doc/path";
 import { isTexture } from "../doc/texture";
-import { paintColor } from "./ink";
 import { texturePaint, textureColourAt } from "./texture";
 import type { Projection } from "./projection";
 
@@ -95,7 +94,7 @@ export function paintAt(o: PathObject, paint: Paint, x: number, y: number): stri
 /** What to set as `fillStyle` or `strokeStyle` for a paint, in the view described by `p` and `vp` (see the head of this file). */
 export function canvasPaint(ctx: CanvasRenderingContext2D, o: PathObject, paint: Paint, p: Projection, vp: Viewport): string | CanvasGradient | CanvasPattern {
   if (isTexture(paint)) return texturePaint(ctx, o, paint, p, vp);
-  if (!isGradient(paint)) return paintColor(paint); // (the default ink follows the theme)
+  if (!isGradient(paint)) return paint;
   const l = localGradient(o, paint);
   const cx = D.toNumber(p.lx);
   const cy = D.toNumber(p.ly);

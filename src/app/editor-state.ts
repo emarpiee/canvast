@@ -279,7 +279,10 @@ export class EditorState {
   }
 
   select(ids: Iterable<ObjectId>, additive = false): void {
-    if (!additive) this.selection.clear();
+    if (!additive) {
+      this.selection.clear();
+      this.gradientFocus = null; // (a new pick starts with the fill's gradient again: the focus was for the shape that was picked)
+    }
     this.nodeSel = null;
     this.region = null;
     this.nodeMulti.clear();

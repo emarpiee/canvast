@@ -27,6 +27,7 @@ import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { cropEdges, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
+import { DEFAULT_INK, newInk } from "../render/ink";
 import type { Constraint } from "../doc/constraints";
 import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, type SubPath } from "../doc/path";
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
@@ -35,7 +36,7 @@ import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
 import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
-import { exportSvg } from "./svg-export";
+import { angularCount, exportSvg } from "./svg-export";
 import { pdfVectorOf } from "./pdf-vector";
 import type { PdfVector } from "./pdf-vector";
 import type { ExportTarget } from "./export-render";
@@ -43,7 +44,7 @@ import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, editSubs, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
+import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -1613,7 +1614,7 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
   else {
     // the outlines are part of what is seen: add half the widest to every side; what a clipping sheet holds counts only where the sheet lets it
     // through (a pattern that runs past its sheet is framed by the sheet), and what lies wholly outside it not at all
-    const half = Math.max(0, ...sel.map((o) => (o.kind === "path" && o.stroke !== null ? o.width / 2 : o.kind === "stroke" ? o.width / 2 : 0) * 2 ** (o.unit - first.unit)));
+    const half = Math.max(0, ...sel.map((o) => (o.kind === "path" ? (inkStyle(o)?.width ?? 0) / 2 : o.kind === "stroke" ? o.width / 2 : 0) * 2 ** (o.unit - first.unit)));
     const pad = D.shift(D.fromNumber(half), first.unit);
     const clips = clipSheetsOf(doc);
     for (const o of sel) {
@@ -1665,6 +1666,15 @@ export const pdfVectorOfTarget = (doc: DocumentStore, t: ExportTarget, wPt: numb
 
 /** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
 const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && !isMaskObject(o));
+
+/** The words that warn that an SVG holds a picture of an angular gradient (SVG has none), or null when none of the shapes has one. */
+export const angularWarning = (shapes: number): string | null => (shapes ? `${shapes === 1 ? "The angular gradient of 1 shape is" : `The angular gradients of ${shapes} shapes are`} saved as a picture inside the SVG: SVG has no angular gradient.` : null);
+
+/** The warning for the SVG of these export targets (see `angularWarning`). */
+export const svgWarningOfTargets = (ts: readonly ExportTarget[]): string | null => angularWarning(ts.reduce((n, t) => n + (t.vectors ? angularCount(t.vectors) : 0), 0));
+
+/** The warning for the SVG of the picked paths (Save as SVG, Copy as SVG, Save to library as SVG). */
+export const svgWarningOfSelection = (doc: DocumentStore, editor: EditorState): string | null => angularWarning(angularCount(svgPaths(doc, editor)));
 
 export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean => svgPaths(doc, editor).length > 0;
 
@@ -2562,4 +2572,36 @@ export function resizeOnSheet(doc: DocumentStore, editor: EditorState, w: number
   editor.preview = { kind: "none" };
   doc.commit(doc.transaction("Resize", [...plan.values()]));
   editor.changed();
+}
+
+/**
+ * Drawings made before v0.25.3 keep the default near-black ink, which a dark canvas used to draw light; it is drawn as stored now. Give every
+ * such colour (outline, fill, a pen stroke's, a text's and its outline's) the canvas's readable ink: one undo step. Locked objects are left.
+ * Returns how many objects changed.
+ */
+export function recolourOldInk(doc: DocumentStore, editor: EditorState): number {
+  if (editor.blockEdit()) return 0;
+  const to = newInk(DEFAULT_INK);
+  if (to === DEFAULT_INK) {
+    editor.message = "This canvas is light: the near-black ink can be read as it is.";
+    editor.changed();
+    return 0;
+  }
+  const old = (c: unknown): boolean => typeof c === "string" && c.toLowerCase() === DEFAULT_INK;
+  const next: CanvasObject[] = [];
+  for (const o of doc.all()) {
+    if (o.locked) continue;
+    if (o.kind === "stroke" && old(o.color)) next.push({ ...o, color: to });
+    else if (o.kind === "path" && (old(o.fill) || old(o.stroke))) next.push({ ...o, ...(old(o.fill) ? { fill: to } : {}), ...(old(o.stroke) ? { stroke: to } : {}) });
+    else if (o.kind === "text" && (old(o.color) || old(o.outline?.c))) next.push({ ...o, ...(old(o.color) ? { color: to } : {}), ...(o.outline && old(o.outline.c) ? { outline: { ...o.outline, c: to } } : {}) });
+  }
+  if (!next.length) {
+    editor.message = "Nothing on this canvas has the old default ink.";
+    editor.changed();
+    return 0;
+  }
+  doc.commit(doc.transaction(`Change the old default ink (${next.length} ${next.length === 1 ? "object" : "objects"})`, next));
+  editor.message = `Changed the old default ink of ${next.length} ${next.length === 1 ? "object" : "objects"} to the canvas's ink.`;
+  editor.changed();
+  return next.length;
 }

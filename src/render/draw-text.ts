@@ -1,4 +1,3 @@
-import { paintColor } from "./ink";
 import * as D from "../core/dyadic";
 import type { Viewport } from "../core/camera";
 import type { ImageObject, PathObject, TextObject } from "../doc/model";
@@ -81,7 +80,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
     if (o.card) {
       // The card behind the words (a note): the whole box, with rounded corners.
       const x0 = sx(0), y0 = sy(0), x1 = sx(lay.width), y1 = sy(lay.height);
-      ctx.fillStyle = paintColor(o.card.fill);
+      ctx.fillStyle = o.card.fill;
       ctx.beginPath();
       ctx.roundRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0), Math.min(o.card.radius * emPx, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2));
       ctx.fill();
@@ -94,7 +93,7 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
     }
     if (o.outline) strokeOutline(ctx, p, vp, o, lay, emPx, po.exact, sx, sy, minX, maxX, minY, maxY);
     for (const colour of colours) {
-      ctx.fillStyle = o.gradient && colour === o.color ? canvasPaint(ctx, gradientHost(o, lay), o.gradient, p, vp) : paintColor(colour);
+      ctx.fillStyle = o.gradient && colour === o.color ? canvasPaint(ctx, gradientHost(o, lay), o.gradient, p, vp) : colour;
       ctx.beginPath();
       const path = new ExactPath(ctx, p, vp);
       let filled = false;
@@ -165,7 +164,7 @@ function strokeOutline(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewpor
   path.close();
   ctx.lineJoin = "round";
   ctx.lineWidth = Math.min(1e6, 2 * out.w * emPx);
-  ctx.strokeStyle = paintColor(out.c);
+  ctx.strokeStyle = out.c;
   ctx.stroke();
 }
 
@@ -377,7 +376,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
   const gs = glyphScale(line, g);
   const pixelW = Math.ceil((g.adv / gs + 2 * pad) * R);
   const pixelH = Math.ceil(Math.max(o.lineHeight ?? LINE_HEIGHT, (line.bottom - line.top) / gs) * R);
-  const key = `${g.cp}|${g.bold}|${g.italic}|${paintColor(colour)}|${pixelW}|${pixelH}|${((line.baseline - line.top) / gs).toFixed(4)}`;
+  const key = `${g.cp}|${g.bold}|${g.italic}|${colour}|${pixelW}|${pixelH}|${((line.baseline - line.top) / gs).toFixed(4)}`;
   let src = rasters.get(key);
   if (!src) {
     if (rasters.size > 256) rasters.clear();
@@ -385,7 +384,7 @@ function drawFallbackRaster(ctx: CanvasRenderingContext2D, p: Projection, vp: Vi
     c.width = pixelW;
     c.height = pixelH;
     const r = c.getContext("2d", { willReadFrequently: true })!;
-    r.fillStyle = paintColor(colour);
+    r.fillStyle = colour;
     r.font = `${g.bold ? "bold " : ""}${R}px ${FALLBACK_FAMILY}`;
     r.translate(pad * R, ((line.baseline - line.top) / gs) * R);
     if (g.italic) r.transform(1, 0, -SKEW, 1, 0, 0);

@@ -18,7 +18,8 @@ import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
 import { pictureBox } from "../render/gradient";
-import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
+import { newInk } from "../render/ink";
+import { NODE_REACH_PX, handleGuide, shapeHandles, hitCornerHandle, gradientHandles, gradientHandleLabel, hitGradient, hitNodes, isSmoothNode, localOf, moveGradientHandle, nodesOnScreen } from "./path-edit";
 import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
@@ -543,7 +544,7 @@ export function attachTools(
     const b = localIn(frame, anchor, unit, { x: s.x + 1, y: s.y });
     return Math.hypot(b.x - a.x, b.y - a.y);
   };
-  const paintOf = (c: Paint | null): Paint | null => c;
+  const paintOf = (c: Paint | null): Paint | null => (typeof c === "string" ? newInk(c) : c); // (the default ink becomes the canvas's readable ink when a shape is made: the colour stored is the colour seen)
 
   /** The box of a shape dragged by (dx, dy) from its start: Shift keeps it square (a line: to 45 degree steps), Alt grows it from the start as its centre. */
   const shapeBox = (kind: ShapeKind, dx: number, dy: number, shift: boolean, alt: boolean): { bx: number; by: number; bw: number; bh: number } => {
@@ -581,7 +582,7 @@ export function attachTools(
       sides: editor.shapeSides,
       tips: editor.shapeTips,
       fill: editor.tool === "sheet" ? "#ffffff" : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
-      stroke: editor.tool === "sheet" ? null : editor.shapeKind === "line" && editor.shapeStroke === null ? "#1f2329" : paintOf(editor.shapeStroke),
+      stroke: editor.tool === "sheet" ? null : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
       width,
     };
     sheetStart = sheetAt(s.x, s.y)?.id;
@@ -696,7 +697,7 @@ export function attachTools(
       return;
     }
     // A closed path is a shape to fill; an open one is a line, and never goes unpainted.
-    const stroke = d.stroke ?? (closed || d.fill !== null ? null : "#1f2329");
+    const stroke = d.stroke ?? (closed || d.fill !== null ? null : newInk("#1f2329"));
     const obj: PathObject = {
       id: newObjectId(),
       kind: "path",
@@ -879,7 +880,9 @@ export function attachTools(
     if (!tgt) return;
     const s = snapGradientPoint(s0);
     const l = localOf(tgt.po, s.x, s.y);
-    previewPaint(doc, editor, { [g.which]: moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y) });
+    const moved = moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y);
+    previewPaint(doc, editor, { [g.which]: moved });
+    editor.handleLabel = { x: s.x, y: s.y, text: gradientHandleLabel(g.which, moved, g.handle) }; // (whose gradient, what kind, and the angle as it turns)
   };
 
   /** Every handle on a shape names its value while the pointer is over it, not only while it is dragged (Radius, Ratio, Count, the gradient's ends). */
@@ -898,7 +901,7 @@ export function attachTools(
       } else {
         const gh = editor.tool === "node" || editor.cornersOpen === tgt.o.id ? null : gradientHandles(tgt.po, editor.gradientFocus);
         const hit = gh && hitGradient(gh, s.x, s.y);
-        if (hit) text = hit === "p0" ? "Gradient start" : hit === "p1" ? "Gradient end" : hit === "c" ? "Gradient centre" : "Gradient radius";
+        if (hit) text = gradientHandleLabel(gh!.which, gh!.g, hit);
       }
     }
     if (text) editor.handleLabel = editor.handleLabel?.text === text && !guide && boxLabel === text ? editor.handleLabel : { x: s.x, y: s.y, text, guide };
@@ -1594,7 +1597,7 @@ export function attachTools(
         const depth = depthOf(view.frameCamera);
         const px = penWidthNow(editor.penWidthPx, editor.lock, depth);
         sheetStart = sheetAt(s.x, s.y)?.id;
-        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: editor.penColor, kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}), ...(editor.penKind === "ink" || editor.penKind === "pencil" ? { tilt: [], tiltAz: [] } : {}) };
+        editor.draft = { frame: view.frame, anchor: world(s), unit: -cam.zi, points: [], width: px / f, color: newInk(editor.penColor), kind: editor.penKind, ...(editor.penKind === "ink" ? { pressure: [], speed: [] } : {}), ...(editor.penKind === "ink" || editor.penKind === "pencil" ? { tilt: [], tiltAz: [] } : {}) };
         editor.draftDone = [];
         penPoint(s, e);
         g = { kind: "pen", pointerId: e.pointerId, last: s, tip: s, depth, px, at: e.timeStamp };

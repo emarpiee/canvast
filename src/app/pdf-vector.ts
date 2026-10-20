@@ -14,7 +14,6 @@ import { NODE, miterLimitOf } from "../doc/path";
 import type { SubPath } from "../doc/path";
 import { mapSubs } from "../doc/path";
 import { localGradient } from "../render/gradient";
-import { exportColor } from "../render/ink";
 import { layoutPaths } from "./svg-export";
 import type { ClipOf } from "./svg-export";
 
@@ -97,8 +96,8 @@ export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt
     const subs = mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]);
     const width = o.width * p.k * sc;
     const fill: Paint | null = o.fill, stroke = o.stroke;
-    const fc = fill !== null && !isGradient(fill) ? rgbOf(exportColor(fill as string)) : null;
-    const sk = stroke !== null && !isGradient(stroke) ? rgbOf(exportColor(stroke as string)) : null;
+    const fc = fill !== null && !isGradient(fill) ? rgbOf(fill) : null;
+    const sk = stroke !== null && !isGradient(stroke) ? rgbOf(stroke as string) : null;
     // the sheets that cut it: what lies outside them is not drawn (each one's shape is the clip)
     const cuts = lay.clips(p).flatMap((c) => [pathOps(mapSubs(c.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc])), `W${c.o.evenodd ? "*" : ""} n`]);
     const ops: string[] = ["q", ...cuts, gsName((fc?.a ?? 1) * o.opacity, (sk?.a ?? 1) * o.opacity, o.blend ? BLENDS[o.blend]! : null) + " gs"];

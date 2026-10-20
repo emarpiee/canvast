@@ -471,6 +471,15 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.3 — WYSIWYG: no theme mapping (2026-10-21)
+
+- **Implemented:** `render/ink.ts` is now `setCanvasInk` + `newInk` (the default ink chosen when an object is made) and an identity `swatchBackground`; `paintColor` and `exportColor` are gone (drawing and the SVG/PDF writers use stored colours); `newInk` is applied in the shape, line, path and pen tools, the text editor and the tool chips; `recolourOldInk` (command in the palette); SVG outline `align` (clip path or mask) and the SVG box from `paintBounds` (outside outlines, miter tips); `buildTarget` pads by `inkStyle`.
+- **Tested:** `svg.test.ts` (newInk, files hold stored colours, aligned outlines), `vectors.spec` "WYSIWYG colours" (dark and light canvas, canvas pixel, SVG, the old-ink command and its undo; Chromium, Firefox); the full quick suite on this source is in `docs/testing/pattern-0.25.md`.
+- **Gradients from other tools:** `svg-import.ts` applies a gradient's own transform scale to a radial radius and reads a CSS `conic-gradient` box (`parseConic`) in a clipped group as an angular gradient on the clip's shape; a diamond is read as a clipped group of linear-gradient rectangles. Test: `vectors.spec` "gradients written by another design tool are read" (Chromium; samples checked by hand: linear, radial, angular and diamond all import).
+- **Gradient handles say whose they are:** `gradientSides` / `gradientHandleLabel` (path-edit.ts), the hint (tool-hint.ts) and the hover and drag labels (tools.ts); `editor.select` clears `gradientFocus`. Test: `vectors.spec` "fill and outline both gradients: the hint line and the handle names ...".
+- **Angular gradients in SVG:** written as a PNG picture (up to 384 px a side) cut by a clip path (fill) or a mask of the stroked line (outline), `angularCount` + `angularWarning` (Export dialog with SVG chosen, Save to library as SVG, Copy as SVG); other design tools have no better answer (they write a radial gradient or an HTML box). The real gradient is written on the element (`data-canvast-fill` / `-stroke`) and `svg-import.ts` reads it back (a vector copy or a pasted SVG is editable again; before, such a file was "not an SVG drawing this app can read" because its shape had no visible paint). Test: `vectors.spec` "an angular gradient ... is written as a picture" (Chromium also pastes it back).
+- **Unverified:** a PDF of a dark-canvas drawing in a viewer; an angular gradient on an outline that is also aligned inside or outside (a linear stand-in is written); an outside outline with a width profile or arrows; pasted SVG that holds `#1f2329` (kept as given).
+
 ## v0.25.2 — the default ink in SVG and PDF (2026-10-21)
 
 - **Implemented:** `exportColor` (render/ink.ts: the default ink as "#rrggbb", read from `#hex` or `rgb()` as it is, else drawn on a one-pixel canvas) used by `exportSvg` and `pdfVectorOf` for solid fills and outlines.

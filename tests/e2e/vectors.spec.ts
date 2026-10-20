@@ -2895,30 +2895,201 @@ test("Save to library puts the picked shapes in the library as an SVG picture", 
   await expect(p.getByTestId("asset-card")).toContainText("canvast-shapes");
 });
 
-test("the default outline is written to an SVG as the canvas draws it: light on a dark canvas, as stored on a light one", async ({ app }) => {
+test("WYSIWYG colours: a new shape's default outline is a real colour chosen for the canvas it is drawn on, and the canvas, a picture and an SVG all show exactly what is stored", async ({ app }) => {
   const p = app.page;
-  const strokeInSvg = async (): Promise<string> => {
+  const exported = async (format: "svg" | "png"): Promise<Buffer> => {
     await exportWith(p, "exportpic");
     const dlg = p.getByTestId("export-dialog");
-    await dlg.locator('[data-format="svg"]').click();
+    await dlg.locator(`[data-format="${format}"]`).click();
     const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
-    const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+    const bytes = (await import("node:fs")).readFileSync((await download.path())!);
     await dlg.locator('[data-ex="close"]').click();
-    return /stroke="(#[0-9a-f]{6})"/.exec(svg)![1]!;
+    return bytes;
   };
+  const draw = async (from: [number, number], to: [number, number]) => {
+    await key(app, "u");
+    await drag(app, from, to);
+    await key(app, "v");
+    await click(app, (from[0] + to[0]) / 2, (from[1] + to[1]) / 2);
+  };
+  // a dark canvas: the outline is made light, and stored light
   await p.emulateMedia({ colorScheme: "dark" });
   await app.frame();
-  await key(app, "u");
-  await drag(app, [500, 300], [700, 400]);
-  await key(app, "v");
-  await click(app, 600, 350);
-  expect((await last(app)).stroke, "what is stored is still the default ink").toBe("#1f2329");
-  const dark = await strokeInSvg();
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(dark.slice(i, i + 2), 16));
-  expect(Math.min(r!, g!, b!), `on a dark canvas the outline is drawn light, so the file is too (${dark})`).toBeGreaterThan(180);
+  await draw([500, 300], [700, 400]);
+  const dark = (await last(app)).stroke as string;
+  expect(dark, "a real colour, not the near-black the dark canvas cannot show").toMatch(/^#[0-9a-f]{6}$/);
+  expect(dark).not.toBe("#1f2329");
+  // the canvas shows it too: the pixel on the outline is the stored colour
+  await key(app, "Escape"); // (the selection box is not part of the drawing)
+  await app.frame();
+  const edge = await p.evaluate(() => [window.__canvastDebug.pixelAt(500, 350), window.__canvastDebug.pixelAt(499, 350), window.__canvastDebug.pixelAt(501, 350)]);
+  const want = [1, 3, 5].map((i) => parseInt(dark.slice(i, i + 2), 16));
+  expect(edge.some((px) => px.every((v, i) => Math.abs(v - want[i]!) <= 3)), `the canvas draws ${dark}`).toBe(true);
+  await click(app, 600, 350); // (picked again to be exported)
+  const svg = (await exported("svg")).toString("utf8");
+  expect(/stroke="(#[0-9a-f]{6})"/.exec(svg)![1], "the SVG holds exactly what is stored").toBe(dark);
+  // a light canvas: the near-black, as before
   await p.emulateMedia({ colorScheme: "light" });
   await app.frame();
-  expect(await strokeInSvg(), "on a light canvas it is the stored colour").toBe("#1f2329");
+  await key(app, "Escape");
+  await draw([800, 300], [1000, 400]);
+  expect((await last(app)).stroke).toBe("#1f2329");
+  // the dark shape did not change when the canvas became light: what is stored is what is seen
+  expect((await objs(app))[0]!.stroke).toBe(dark);
+  // an old drawing (the near-black stored) on a dark canvas is drawn as stored; one command gives it the canvas's ink, as one undo step
+  await p.emulateMedia({ colorScheme: "dark" });
+  await app.frame();
+  await key(app, "Escape");
+  await key(app, "Control+k");
+  await p.locator(".palette-input").fill("old default ink");
+  await key(app, "Enter");
+  await expect.poll(async () => (await last(app)).stroke).toBe(dark);
+  expect((await objs(app)).every((o) => o.stroke === dark)).toBe(true);
+  await key(app, "Control+z");
+  expect((await last(app)).stroke).toBe("#1f2329");
+});
+
+test("an angular gradient (SVG has none) is written as a picture inside the SVG, with a warning where it is exported and saved", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [500, 300], [760, 460]);
+  await key(app, "v");
+  await click(app, 630, 380);
+  await p.click('[data-paint="fill"]');
+  await p.locator(".colour-pop").locator('[data-mode="angular"]').click();
+  await key(app, "Escape");
+  expect(((await last(app)).fill as unknown as { type: string }).type).toBe("angular");
+  await exportWith(p, "exportpic");
+  const dlg = p.getByTestId("export-dialog");
+  await expect(dlg.locator("[data-ex-warn]")).toBeHidden(); // (a picture: nothing is lost)
+  await dlg.locator('[data-format="svg"]').click();
+  await expect(dlg.locator("[data-ex-warn]")).toContainText("The angular gradient of 1 shape is saved as a picture inside the SVG");
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+  expect(svg).toMatch(/<g[^>]* clip-path="url\(#v\d+\)"><image xlink:href="data:image\/png;base64,/);
+  expect(svg, "not a linear stand-in").not.toContain("<linearGradient");
+  await dlg.locator('[data-ex="close"]').click();
+  // the file can be made editable again: pasted back, the shape has the real angular gradient (not the picture, which is no shape)
+  if (p.context().browser()?.browserType().name() === "chromium") { // (Firefox ignores the text of a made-up paste event: the app reads real pastes there)
+    const before = (await last(app)).fill as unknown as { type: string; stops: unknown[]; angle: number; cx: number; cy: number };
+    const count = (await objs(app)).length;
+    await p.evaluate((t) => { const dt = new DataTransfer(); dt.setData("text/plain", t); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, svg);
+    await expect.poll(async () => (await objs(app)).length).toBe(count + 1);
+    const back = (await last(app)).fill as unknown as typeof before;
+    expect(back.type).toBe("angular");
+    expect(back).toEqual(before);
+  }
+  // Save to library as SVG says so too
+  await exportWith(p, "svglibrary");
+  await expect(p.getByTestId("toast")).toContainText("saved as a picture inside the SVG");
+});
+
+test("a vector network with an angular fill is written as a picture too (its regions are filled one by one)", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [500, 250], [760, 500]);
+  await key(app, "Escape");
+  await key(app, "u");
+  await drag(app, [650, 350], [900, 560]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await key(app, "Control+k");
+  await p.locator(".palette-input").fill("vector network");
+  await key(app, "Enter");
+  expect((await last(app) as Obj & { net?: boolean }).net).toBe(true);
+  await p.click('[data-paint="fill"]');
+  await p.locator(".colour-pop").locator('[data-mode="angular"]').click();
+  await key(app, "Escape");
+  await exportWith(p, "exportpic");
+  const dlg = p.getByTestId("export-dialog");
+  await dlg.locator('[data-format="svg"]').click();
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+  expect(svg).toContain("<image xlink:href=\"data:image/png;base64,");
+  expect(svg, "not a linear stand-in").not.toContain("<linearGradient");
+});
+
+test("fill and outline both gradients: the hint line and the handle names say whose gradient the handles on the shape are and of what kind, and Outline switches them", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  const hint = p.getByTestId("tool-hint");
+  await key(app, "u");
+  await drag(app, [500, 300], [760, 460]);
+  await key(app, "v");
+  await click(app, 630, 380);
+  await expect(p.getByTestId("tool-hint")).not.toContainText("gradient"); // (none yet)
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await key(app, "Escape");
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // the focused picker button would show its own hint
+  await p.mouse.move(300, 600);
+  await expect(hint).toContainText("its fill's linear gradient");
+  await expect(hint, "one gradient: nothing to choose").not.toContainText("instead");
+  await p.click('[data-paint="stroke"]');
+  await pop.locator('[data-mode="radial"]').click(); // (this also puts the handles on the outline's gradient)
+  await key(app, "Escape");
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await p.mouse.move(300, 600);
+  // both are gradients: the hint names the ones the handles are on, and the way to the other
+  await expect(hint).toContainText("its outline's radial gradient");
+  await expect(hint).toContainText("Press Fill in the bar above to edit its linear gradient instead");
+  const handleNames = async (): Promise<string[]> => {
+    const names: string[] = [];
+    for (const [x, y] of await p.evaluate(() => window.__canvastDebug.drawnHandles())) {
+      await p.mouse.move(x, y);
+      await app.frame();
+      const t = await p.evaluate(() => window.__canvastDebug.handleLabel());
+      if (t?.includes("gradient")) names.push(t);
+    }
+    return names;
+  };
+  expect((await handleNames()).every((t) => t.startsWith("Outline · radial gradient · "))).toBe(true);
+  // the fill's: press Fill, and the handles and the hint follow
+  await p.click('[data-paint="fill"]');
+  await key(app, "Escape");
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // the focused picker button would show its own hint
+  await p.mouse.move(300, 600);
+  await expect(hint).toContainText("its fill's linear gradient");
+  const fillNames = await handleNames();
+  expect(fillNames.length).toBeGreaterThan(0);
+  expect(fillNames.every((t) => /^Fill · linear gradient · (start|end)$/.test(t))).toBe(true);
+  // another shape picked starts with its fill again
+  await key(app, "Escape");
+  await click(app, 630, 380);
+  await expect(hint).toContainText("its fill's linear gradient");
+});
+
+test("gradients written by another design tool are read: a radial one sized by its own transform, an angular one written as a CSS conic gradient box, a diamond one as clipped gradient rectangles", async ({ app }) => {
+  test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "Firefox ignores the text of a made-up paste event");
+  const p = app.page;
+  const shape = "M20 10H160Q176 10 176 26V150Q176 168 158 168H28Q10 168 10 150V26Q10 10 20 10Z";
+  const paste = async (svg: string) => {
+    const n = (await objs(app)).length;
+    await p.evaluate((t) => { const dt = new DataTransfer(); dt.setData("text/plain", t); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, svg);
+    await expect.poll(async () => (await objs(app)).length).toBeGreaterThan(n);
+    await key(app, "Escape");
+  };
+  const stops = `<stop stop-color="#FF0000"/><stop offset="0.269231" stop-color="#FFBF00"/><stop offset="0.533654" stop-color="#00FF15"/><stop offset="0.6875" stop-color="#AA00FF"/>`;
+  type G = { type: string; r?: number; cx: number; cy: number; angle?: number; stops: Array<{ o: number; c: string }> };
+  // radial: r="1" and the size in gradientTransform (here a scale of 143.5 on a shape 186 wide)
+  await paste(`<svg width="186" height="179" viewBox="0 0 186 179" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${shape}" fill="url(#r)"/><defs><radialGradient id="r" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(92.8855 96.5426) rotate(90) scale(143.5)">${stops}</radialGradient></defs></svg>`);
+  const radial = (await last(app)).fill as unknown as G;
+  expect(radial.type).toBe("radial");
+  expect(radial.r!).toBeGreaterThan(0.7);
+  expect(radial.r!).toBeLessThan(0.9); // 143.5 over the shape's 166 wide
+  expect(radial.cx).toBeCloseTo(0.5, 1);
+  // angular: a clipped group with a box holding a CSS conic gradient, turned a quarter
+  await paste(`<svg width="186" height="179" viewBox="0 0 186 179" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#c)"><g transform="matrix(0 0.1435 -0.1435 0 92.8855 96.5426)"><foreignObject x="-1006.97" y="-1006.97" width="2013.94" height="2013.94"><div xmlns="http://www.w3.org/1999/xhtml" style="background:conic-gradient(from 90deg,rgba(255, 0, 0, 1) 0deg,rgba(255, 191, 0, 1) 96.9231deg,rgba(0, 255, 21, 1) 192.115deg,rgba(170, 0, 255, 1) 252.692deg,rgba(255, 0, 0, 1) 360deg);height:100%;width:100%;opacity:1"></div></foreignObject></g></g><path d="${shape}" fill="none"/><defs><clipPath id="c"><path d="${shape}"/></clipPath></defs></svg>`);
+  const angular = (await last(app)).fill as unknown as G;
+  expect(angular.type).toBe("angular");
+  expect(angular.angle).toBeCloseTo(90, 0); // the first edge points down after the quarter turn
+  expect(angular.stops.map((q) => Math.round(q.o * 1000) / 1000)).toEqual([0, 0.269, 0.534, 0.702, 1]);
+  expect(angular.stops[0]!.c.slice(0, 7)).toBe("#ff0000");
+  expect(angular.cx).toBeCloseTo(0.5, 1);
+  // diamond: four mirrored rectangles with a linear gradient, cut by the shape: kept as what it is, a clipped group (there is no diamond gradient here)
+  const before = (await objs(app)).length;
+  await paste(`<svg width="186" height="179" viewBox="0 0 186 179" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#c)"><g transform="matrix(0 0.1435 -0.1435 0 92.8855 96.5426)"><rect x="0" y="0" width="1006.97" height="1006.97" fill="url(#d)"/><rect x="0" y="0" width="1006.97" height="1006.97" transform="scale(1 -1)" fill="url(#d)"/></g></g><defs><clipPath id="c"><path d="${shape}"/></clipPath><linearGradient id="d" x1="0" y1="0" x2="1006.97" y2="0" gradientUnits="userSpaceOnUse">${stops}</linearGradient></defs></svg>`);
+  expect((await objs(app)).length).toBeGreaterThan(before);
 });
 
 test("initial shape with the setting on keeps the fill and outline, and Reset puts them back", async ({ app }) => {

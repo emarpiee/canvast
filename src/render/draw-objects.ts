@@ -10,7 +10,6 @@ import { ARROW_LEN, miterLimitOf } from "../doc/path";
 import type { Arrow, FlatPath } from "../doc/path";
 import { canvasPaint, pictureBox } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
-import { paintColor } from "./ink";
 import { adjustPixel, cropOf, isNeutral } from "../doc/adjust";
 import { playingFilter } from "./adjust-filter";
 import { adjustedSource } from "./adjust-image";
@@ -66,7 +65,7 @@ export function paint(ctx: CanvasRenderingContext2D, o: CanvasObject, body: () =
 export function drawStroke(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp: Viewport, color?: string): void {
   const o = po.obj as StrokeObject;
   paint(ctx, o, () => {
-    ctx.strokeStyle = ctx.fillStyle = paintColor(color ?? o.color);
+    ctx.strokeStyle = ctx.fillStyle = color ?? o.color;
     if (po.exact) fillPolygons(ctx, exactStrokeCoverage(po, vp));
     else strokeClipped(ctx, po, vp);
   });
@@ -105,7 +104,7 @@ export function batchable(po: ProjectedObject): boolean {
  */
 export function strokeBatch(ctx: CanvasRenderingContext2D, items: readonly ProjectedObject[], lineWidth: number, vp: Viewport): void {
   const o = items[0]!.obj as StrokeObject;
-  ctx.strokeStyle = paintColor(o.color);
+  ctx.strokeStyle = o.color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -412,7 +411,7 @@ export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp
       }
       return;
     }
-    ctx.fillStyle = cover.color ? paintColor(cover.color) : placeholder;
+    ctx.fillStyle = cover.color ? cover.color : placeholder;
     ctx.fillRect(-1, -1, vp.width + 2, vp.height + 2);
   });
 }

@@ -2561,6 +2561,8 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-name { flex-direction: row; align-items: center; gap: var(--sp-4); }
 .ex-name input { flex: 1; min-width: 0; }
 .ex-ext { color: var(--hud-muted); font: var(--font-value); }
+.ex-warn { margin: 0; padding: 0 var(--sp-9); color: var(--hud-danger); font: var(--font-meta); }
+.ex-warn[hidden] { display: none; }
 .ex-note { min-height: var(--sp-9); margin: 0; padding: 0 var(--sp-9); color: var(--hud-muted); font: var(--font-meta); }
 .ex-foot { display: flex; justify-content: flex-end; gap: var(--sp-4); padding: var(--sp-6) var(--sp-9) var(--sp-8); }
 .ex-btn { display: inline-flex; align-items: center; gap: var(--sp-3); height: var(--sp-13); padding: 0 var(--sp-7); color: inherit; background: transparent; border: 1px solid var(--hud-border); border-radius: var(--r-sm); font: var(--weight-medium) var(--text-md) var(--font-ui); cursor: pointer; }

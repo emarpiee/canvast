@@ -206,6 +206,28 @@ export function gradientHandles(po: ProjectedObject, focus: "fill" | "stroke" | 
   return out.pts.every((q) => Math.abs(q.x) < FAR && Math.abs(q.y) < FAR) ? out : null;
 }
 
+/** The words for a gradient: "linear", "radial" or "angular". */
+export const gradientName = (g: Gradient): string => g.type;
+
+/** The paint a gradient is on, as the person knows it: "Fill" or "Outline". */
+export const paintName = (which: "fill" | "stroke"): string => (which === "fill" ? "Fill" : "Outline");
+
+/** What a gradient handle is called, with whose gradient it is (the fill's or the outline's) and its kind: "Outline · angular gradient · start angle". */
+export function gradientHandleLabel(which: "fill" | "stroke", g: Gradient, id: GradHandle): string {
+  const part = g.type === "linear" ? (id === "p0" ? "start" : "end") : id === "c" ? "centre" : g.type === "radial" ? "radius" : "start angle";
+  return `${paintName(which)} · ${gradientName(g)} gradient · ${part}${g.type === "angular" && id === "r" ? ` ${Math.round(g.angle)}°` : ""}`;
+}
+
+/** Which gradient the handles on the canvas belong to, and the other one when both the fill and the outline are gradients (null: none). */
+export function gradientSides(o: PathObject, focus: "fill" | "stroke" | null): { active: "fill" | "stroke"; g: Gradient; other: { which: "fill" | "stroke"; g: Gradient } | null } | null {
+  const fill = isGradient(o.fill) ? o.fill : null, stroke = isGradient(o.stroke) ? o.stroke : null;
+  const active = focus && (focus === "fill" ? fill : stroke) ? focus : fill ? "fill" : stroke ? "stroke" : null;
+  if (!active) return null;
+  const otherWhich = active === "fill" ? "stroke" : "fill";
+  const other = (otherWhich === "fill" ? fill : stroke);
+  return { active, g: (active === "fill" ? fill : stroke)!, other: other ? { which: otherWhich, g: other } : null };
+}
+
 /** Which handle a press at (x, y) takes, if any. */
 export function hitGradient(h: GradientHandles, x: number, y: number): GradHandle | null {
   let best: GradHandle | null = null;

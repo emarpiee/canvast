@@ -1,4 +1,5 @@
 import * as D from "../core/dyadic";
+import { newInk } from "../render/ink";
 import type { WorldPoint } from "../core/camera";
 import { lookAt, worldToScreen } from "../core/camera";
 import { fromLocal } from "../core/frames";
@@ -16,7 +17,6 @@ import { layoutOf } from "../text/layout";
 import { NEW_TEXT_PX, NOTE_CARD, NOTE_INK, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { BUNDLED_FONT_NAME, FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
-import { paintColor } from "../render/ink";
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { openColourPopover } from "./colour-popover";
@@ -153,11 +153,11 @@ export function mountTextEditor(
     } else {
       box.style.transform = "";
     }
-    box.style.color = paintColor(target.color);
+    box.style.color = target.color;
     // A card (a note): the space round the words, its colour and its rounding, inside the box.
     box.style.boxSizing = target.card ? "border-box" : "";
     box.style.padding = target.card ? `${target.card.pad * em}px` : "";
-    box.style.background = target.card ? paintColor(target.card.fill) : "";
+    box.style.background = target.card ? target.card.fill : "";
     box.style.borderRadius = target.card ? `${target.card.radius * em}px` : "";
     box.style.setProperty("--gap", String(target.paraGap ?? 0.6));
     box.style.setProperty("--indent", String(target.indent ?? 0));
@@ -251,7 +251,7 @@ export function mountTextEditor(
       const anchor = drawn ? at : { x: D.sub(at.x, D.shift(D.fromNumber(size * pad), unit)), y: D.sub(at.y, D.shift(D.fromNumber(size * (0.65 + pad)), unit)) };
       // `at` is in the camera frame's coordinates: the new text starts there.
       const frame = view.frame === doc.space.world ? {} : { frame: view.frame };
-      const base: TextObject = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: drawn ? drawn.widthPx / f : size, size, color: look.color ?? editor.penColor };
+      const base: TextObject = { id: newObjectId(), kind: "text", ...frame, anchor, unit, z: 0, opacity: 1, attachmentTargetId: null, md: "", w: drawn ? drawn.widthPx / f : size, size, color: look.color ?? newInk(editor.penColor) };
       target = withLook(base, { ...look, autoWidth: !drawn });
       isNew = true;
     }

@@ -1,4 +1,5 @@
 import { isMaskSheet } from "../doc/containers";
+import { newInk } from "./ink";
 import { lookFromChoices } from "../doc/stroke-look";
 import type { Viewport } from "../core/camera";
 import type { FrameCamera } from "../core/frames";
@@ -321,7 +322,7 @@ export function drawOverlays(
       attachmentTargetId: null,
       sub: [{ n, closed: false }],
       fill: null,
-      stroke: pd.stroke ?? "#1f2329",
+      stroke: pd.stroke ?? newInk("#1f2329"),
       width: pd.width,
       ...lookFromChoices(editor.shapeJoin, editor.shapeCap, "centre", undefined, editor.shapeDash),
     };

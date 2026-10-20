@@ -2,23 +2,23 @@
  * Export vector paths as an SVG file (ADR 0107). The paths are put in the units of the first one, exactly (their anchors differ by an exact
  * amount, then one rounding), turned as they are drawn, and the drawing is scaled to a 1000-unit box so any depth of zoom comes out in
  * readable numbers. Kept: fill and outline colour with transparency, linear and radial gradients, width, corners, ends, dashes, the fill
- * rule, opacity and blend mode, names. Not kept: an outline's inside or outside position (drawn centred), which SVG has no word for.
+ * rule, opacity and blend mode, names, and an outline inside or outside its edge (a clip path or a mask). SVG has no angular (sweep) gradient: one
+ * is written as a picture of the gradient inside the shape (`angularCount` tells the caller, who warns), and as a linear stand-in without a page.
  */
 import { outlineOf } from "../doc/outline-stroke";
 import type { FrameSpace } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { PathObject } from "../doc/model";
-import { expressObjectIn, pathSubs } from "../doc/model";
+import { alignOf, expressObjectIn, inkStyle, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
 import { isTexture } from "../doc/texture";
 import { svgTexture } from "../render/texture";
 import { regionSplit } from "../doc/network";
-import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf } from "../doc/path";
+import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf, paintBounds } from "../doc/path";
 import type { Arrow } from "../doc/path";
 import type { SubPath } from "../doc/path";
 import { localGradient } from "../render/gradient";
-import { exportColor } from "../render/ink";
 
 const SIZE = 1000;
 
@@ -102,14 +102,18 @@ export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, eve
   }
   // The box of everything, with half the widest outline around it, scaled to SIZE. What a sheet cuts counts only where the sheet lets it through
   // (the box of a pattern that runs far past its sheet is the sheet's), and a path wholly outside its sheet is not drawn at all.
-  const widest = evenPad ? Math.max(0, ...all.map((p) => (p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0))) : 0;
+  const reach = (p: Placed): number => ((inkStyle(p.o)?.width ?? 0) * p.k) / 2; // (an outline outside the edge reaches its whole width past it, one inside nothing)
+  const widest = evenPad ? Math.max(0, ...all.map(reach)) : 0;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const placed: Placed[] = [];
   const cut = new Map<Placed, Placed[]>();
   for (const p of all) {
-    const b = geometryBounds(p.subs);
-    const h = evenPad ? widest : p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0;
-    let [x0, y0, x1, y1] = [b.minX - h, b.minY - h, b.maxX + h, b.maxY + h];
+    // the box of what is drawn: the curves, the outline round them (inside, centred or outside) and the tips of mitered corners
+    const g = geometryBounds(p.subs);
+    const st = inkStyle(p.o);
+    const ink = st ? paintBounds(p.subs, { ...st, width: st.width * p.k }) : g;
+    const h = evenPad ? widest : 0;
+    let [x0, y0, x1, y1] = [Math.min(g.minX - h, ink.minX), Math.min(g.minY - h, ink.minY), Math.max(g.maxX + h, ink.maxX), Math.max(g.maxY + h, ink.maxY)];
     const clips = (clipOf?.(p.o) ?? []).map(place).filter((c): c is Placed => c !== null); // (a sheet that cannot be placed with the rest cuts nothing)
     for (const c of clips) {
       const cb = geometryBounds(c.subs);
@@ -130,6 +134,31 @@ export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, eve
 }
 
 /** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
+/** How many of these paths have an angular gradient as a fill or an outline: SVG cannot say one, so the file holds a picture of it (the caller says so). */
+export function angularCount(paths: readonly PathObject[]): number {
+  const angular = (p: unknown): boolean => isGradient(p as Paint) && (p as Gradient).type === "angular";
+  return paths.filter((o) => !o.hidden && (angular(o.fill) || angular(o.stroke))).length;
+}
+
+/** The longest side, in pixels, of the picture an angular gradient is written as. */
+const ANGULAR_PX = 384;
+
+/** A picture (a PNG as a data URL) of an angular gradient over a box of the drawing, or null without a page to draw it on. */
+function angularPicture(g: Gradient & { type: "angular" }, box: { x: number; y: number; w: number; h: number }, cx: number, cy: number, a0: number): string | null {
+  if (typeof document === "undefined" || !(box.w > 0 && box.h > 0)) return null;
+  const k = Math.min(1, ANGULAR_PX / Math.max(box.w, box.h));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(box.w * k));
+  c.height = Math.max(1, Math.round(box.h * k));
+  const ctx = c.getContext("2d");
+  if (!ctx || typeof ctx.createConicGradient !== "function") return null;
+  const cg = ctx.createConicGradient(a0, (cx - box.x) * k, (cy - box.y) * k);
+  for (const s of g.stops) cg.addColorStop(Math.min(1, Math.max(0, s.o)), s.c);
+  ctx.fillStyle = cg;
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c.toDataURL("image/png");
+}
+
 /** More tile images than this in one fill: a <pattern> instead (the file would be very long). */
 const MAX_TILE_USES = 2500;
 
@@ -151,7 +180,12 @@ export function exportSvg(
   const defs: string[] = [];
   let usesXlink = false;
   let cover = ""; // (what a path's fill needs drawn before it: the images of an objects fill)
-  const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null, d?: string): string => {
+  let coverLine = ""; // (what its outline needs drawn after it: the picture of an angular gradient, cut to the line)
+  // An angular gradient is written as a picture (SVG has none), and its real definition rides on the element (`data-canvast-fill`, `data-canvast-stroke`):
+  // other programs show the picture, and this app reads the attribute back, so the file can be made editable again (svg-import.ts).
+  const paintAttr = (p: Placed, which: "fill" | "stroke", paint: Paint | null, d?: string): string =>
+    paintAttrOf(p, which, paint, d) + (isGradient(paint) && paint.type === "angular" ? ` data-canvast-${which}="${esc(JSON.stringify(paint))}"` : "");
+  const paintAttrOf = (p: Placed, which: "fill" | "stroke", paint: Paint | null, d?: string): string => {
     if (paint === null) return ` ${which}="none"`;
     if (isTexture(paint) && which === "fill") {
       // an objects fill: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
@@ -193,8 +227,35 @@ export function exportSvg(
         return ` fill="url(#${id})"`;
       }
     }
+    if (isGradient(paint) && paint.type === "angular" && d !== undefined) {
+      // an angular gradient: a picture of it, cut to the shape (the fill) or to the line (the outline: a mask of the stroked path)
+      const lg = localGradient(p.o, paint);
+      if (lg.type === "angular") {
+        const [gx, gy] = [(p.at(lg.cx, lg.cy)[0] - minX) * sc, (p.at(lg.cx, lg.cy)[1] - minY) * sc];
+        const bb = geometryBounds(mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]));
+        const reach = which === "stroke" ? (p.o.width * p.k * sc) * (alignOf(p.o) ? 1 : 0.5) + (p.o.miterAngle !== undefined || p.o.join === "miter" ? (p.o.width * p.k * sc) * 2 : 0) : 0;
+        const box = { x: bb.minX - reach, y: bb.minY - reach, w: bb.maxX - bb.minX + 2 * reach, h: bb.maxY - bb.minY + 2 * reach };
+        const href = angularPicture(paint as Gradient & { type: "angular" }, box, gx, gy, lg.a0);
+        if (href) {
+          usesXlink = true;
+          const id = `v${defs.length}`;
+          const image = `<image xlink:href="${href}" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.w)}" height="${num(box.h)}" preserveAspectRatio="none"/>`;
+          const grp = `${p.o.opacity < 1 ? ` opacity="${num(p.o.opacity)}"` : ""}${p.o.blend ? ` style="mix-blend-mode:${p.o.blend}"` : ""}`;
+          if (which === "fill") {
+            defs.push(`<clipPath id="${id}"><path d="${d}"${p.o.evenodd ? ' clip-rule="evenodd"' : ""}/></clipPath>`);
+            cover += `  <g${grp} clip-path="url(#${id})">${image}</g>\n`;
+            return ` fill="none"`;
+          }
+          const w = p.o.width * p.k * sc;
+          const line = ` stroke="#fff" stroke-width="${num(w)}" stroke-linejoin="${p.o.join ?? "round"}" stroke-linecap="${p.o.dash && p.o.dash[0] === 0 ? "round" : (p.o.cap ?? "round")}"${p.o.dash ? ` stroke-dasharray="${num(p.o.dash[0] * w)} ${num(p.o.dash[1] * w)}"` : ""}`;
+          defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.w)}" height="${num(box.h)}"><path d="${d}" fill="none"${line}/></mask>`);
+          coverLine += `  <g${grp} mask="url(#${id})">${image}</g>\n`;
+          return ` stroke="none"`;
+        }
+      }
+    }
     if (!isGradient(paint)) {
-      const c = colour(exportColor(solidOf(paint))); // (the default ink as the canvas draws it; a picture still being decoded, or an objects fill not ready: its average colour)
+      const c = colour(solidOf(paint)); // (a picture still being decoded, or an objects fill not ready: its average colour)
       return ` ${which}="${c.rgb}"${c.a < 1 ? ` ${which}-opacity="${c.a}"` : ""}`;
     }
     const id = `g${defs.length}`;
@@ -274,8 +335,34 @@ export function exportSvg(
     const split = o.net ? regionSplit({ sub: p.subs, regions: o.regions }) : null;
     const regions = split ? map(split.base) : null;
     cover = "";
+    coverLine = "";
     const d = pathData(subs);
-    let a = ` d="${d}"` + (split ? ' fill="none"' : paintAttr(p, "fill", o.fill, live ? undefined : d)) + (live ? "" : paintAttr(p, "stroke", o.stroke));
+    // An outline inside or outside its edge (as the canvas draws it): the centred line of twice the width, cut to the inside of the shape (a clip
+    // path) or to what is outside it (a mask), over the fill. The fill and the outline are one group, so opacity and blend mode apply to both.
+    const side = !split && !live && o.stroke !== null ? alignOf(o) : undefined;
+    if (side) {
+      const lineW = width * 2;
+      const id = `a${defs.length}`;
+      const big = Math.max(w, h) * 2 + lineW;
+      const rule = o.evenodd ? ' fill-rule="evenodd"' : "";
+      defs.push(side === "inside"
+        ? `<clipPath id="${id}"><path d="${d}"${o.evenodd ? ' clip-rule="evenodd"' : ""}/></clipPath>`
+        : `<mask id="${id}" maskUnits="userSpaceOnUse" x="${num(-big)}" y="${num(-big)}" width="${num(w + 2 * big)}" height="${num(h + 2 * big)}"><rect x="${num(-big)}" y="${num(-big)}" width="${num(w + 2 * big)}" height="${num(h + 2 * big)}" fill="#fff"/><path d="${d}" fill="#000"${rule}/></mask>`);
+      const cap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round");
+      let st = ` d="${d}" fill="none"${paintAttr(p, "stroke", o.stroke)} stroke-width="${num(lineW)}" stroke-linejoin="${o.join ?? "round"}" stroke-linecap="${cap}"`;
+      if (o.miterAngle !== undefined && o.join === "miter") st += ` stroke-miterlimit="${num(miterLimitOf(o.miterAngle))}"`;
+      if (o.dash) {
+        // (twice as wide, so the caps reach twice as far past a dash: the dash is cut shorter and the gap longer by as much, as the canvas does)
+        const dash = Math.max(0, o.dash[0] * width - (cap === "butt" ? 0 : width));
+        st += ` stroke-dasharray="${num(dash)} ${num((o.dash[0] + o.dash[1]) * width - dash)}"`;
+        if (o.dashOffset) st += ` stroke-dashoffset="${num(o.dashOffset * width)}"`;
+      }
+      const fillEl = o.fill !== null ? `  <path d="${d}"${paintAttr(p, "fill", o.fill, d)}${rule}/>\n` : "";
+      const inner = `${cover}${fillEl}  <g ${side === "inside" ? "clip-path" : "mask"}="url(#${id})"><path${st}/></g>`;
+      const wrap = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}${o.name ? ` id="${esc(o.name.replace(/\s+/g, "-"))}"` : ""}`;
+      return wrap ? `  <g${wrap}>\n${inner}\n  </g>` : inner;
+    }
+    let a = ` d="${d}"` + (split ? ' fill="none"' : paintAttr(p, "fill", o.fill, live ? undefined : d)) + (live ? "" : paintAttr(p, "stroke", o.stroke, d));
     if (!split && o.fill !== null && o.evenodd) a += ` fill-rule="evenodd"`;
     if (o.stroke !== null && !live) {
       a += ` stroke-width="${num(width)}"`;
@@ -291,8 +378,8 @@ export function exportSvg(
     if (o.name) a += ` id="${esc(o.name.replace(/\s+/g, "-"))}"`;
     const common = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}`;
     const fillPart = split
-      ? [...(o.fill !== null && regions!.length ? [`  <path d="${pathData(regions!)}"${paintAttr(p, "fill", o.fill)}${o.evenodd ? ' fill-rule="evenodd"' : ""}${common}/>\n`] : []),
-        ...split.own.filter((r) => r.paint !== null).map((r) => `  <path d="${pathData(map([r.sub]))}"${paintAttr(p, "fill", r.paint)}${common}/>\n`)].join("")
+      ? [...(o.fill !== null && regions!.length ? [`  <path d="${pathData(regions!)}"${paintAttr(p, "fill", o.fill, pathData(regions!))}${o.evenodd ? ' fill-rule="evenodd"' : ""}${common}/>\n`] : []),
+        ...split.own.filter((r) => r.paint !== null).map((r) => `  <path d="${pathData(map([r.sub]))}"${paintAttr(p, "fill", r.paint, pathData(map([r.sub])))}${common}/>\n`)].join("")
       : "";
     if (live) {
       const { rot: _r, base: _b, ...flat } = o;
@@ -300,7 +387,7 @@ export function exportSvg(
       const common2 = `${o.opacity < 1 ? ` opacity="${num(o.opacity)}"` : ""}${o.blend ? ` style="mix-blend-mode:${o.blend}"` : ""}`;
       return (o.fill !== null ? `  <path${a}/>\n` : "") + `  <path d="${pathData(shape)}"${paintAttr(p, "fill", o.stroke)}${common2}/>`;
     }
-    return fillPart + (cover ? cover.replace(/<g clip-path/, `<g${common} clip-path`) : "") + `  <path${a}/>` + arrowsSvg(p, subs, width);
+    return fillPart + (cover ? cover.replace(/<g clip-path/, `<g${common} clip-path`) : "") + `  <path${a}/>` + (coverLine ? `\n${coverLine.trimEnd()}` : "") + arrowsSvg(p, subs, width);
   };
   // Masks (ADR 0144): the mask group's paths become an SVG <mask>; an inverted one is turned by a filter. A mask that cannot be placed is left out.
   const maskIds = new Map<string, string | null>();

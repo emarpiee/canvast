@@ -31,3 +31,12 @@ Slowest test of the unit suite: `tests/unit/pattern.test.ts` "makes sound shapes
 | `vectors.spec` "the default outline is written to an SVG as the canvas draws it" (Chromium, Firefox) | 2 passed; before the fix the SVG held `#1f2329` on a dark canvas (the PNG outline was the light ink) |
 | `vectors.spec -g "SVG\|svg\|Export\|export\|PDF\|pdf\|clip\|mask\|sheet\|outline"` (Chromium) | 19 passed (38.9 s) |
 | `npm run test:unit` | 545 passed (`svg.test.ts` gained the ink test) |
+
+## v0.25.3: WYSIWYG colours, SVG outline position, angular gradients, gradient import
+
+| Check | Result |
+| --- | --- |
+| `npm test` (quick suite) on the build before the angular/network work | 1174 passed, 8 failed (55.4 min): the 4 known CSS failures plus `text.spec` "readable ink" ×4, whose test still read the removed theme mapping (rewritten) |
+| `vectors`, `pattern`, `pictures`, `text` specs, `-g "angular\|network\|gradients\|both gradients\|WYSIWYG\|SVG\|Export\|PDF\|clip\|sheet\|outline\|readable ink"` (Chromium, Firefox) | 63 passed, 4 failed (3.4 min); the 4 were test-side: hint test read the focused picker button's hint, radius bound 0.85 should be 0.9 (143.5 over the 166-wide shape), text test parsed oklch |
+| The 3 fixed tests re-run from a fresh snapshot (Chromium, Firefox) | 4 passed (16.7 s) + "both gradients" 2 passed (9.2 s) |
+| Not re-run on the final source | the full quick suite (only the specs above ran after the angular/network changes) |

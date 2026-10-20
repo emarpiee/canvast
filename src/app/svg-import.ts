@@ -6,6 +6,7 @@
  */
 import type { Dash } from "../doc/stroke-look";
 import type { Gradient, Paint } from "../doc/paint";
+import { isPaint } from "../doc/paint";
 import { NODE, geometryBounds, mapSubs } from "../doc/path";
 import type { Cap, Join, SubPath } from "../doc/path";
 import { parsePathData } from "../doc/svg-path";
@@ -82,6 +83,68 @@ function cssColour(v: string): string | null {
   if (!m) return null;
   const h = (n: number): string => Math.round(n).toString(16).padStart(2, "0");
   return `#${h(+m[1]!)}${h(+m[2]!)}${h(+m[3]!)}${h(+m[4]! * 255)}`;
+}
+
+/** The pieces of an argument list split at the commas that are not inside brackets. */
+const splitTop = (s: string): string[] => {
+  const out: string[] = [];
+  let depth = 0, cur = "";
+  for (const ch of s) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { out.push(cur.trim()); cur = ""; } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+};
+
+/** An angle or position in a CSS gradient as degrees (deg, turn, rad, grad) or, for a percentage, as a fraction of a turn times 360. */
+const cssAngle = (v: string): number | null => {
+  const m = /^(-?[\d.]+)(deg|turn|rad|grad|%)?$/.exec(v.trim());
+  if (!m) return null;
+  const x = parseFloat(m[1]!);
+  return m[2] === "turn" ? x * 360 : m[2] === "rad" ? (x * 180) / Math.PI : m[2] === "grad" ? x * 0.9 : m[2] === "%" ? x * 3.6 : x;
+};
+
+/** A CSS `conic-gradient(from 90deg at 50% 50%, colour 0deg, colour 96deg, ...)`: its first edge in degrees clockwise from the top, its centre as fractions of its box, and its stops. */
+function parseConic(css: string): { from: number; at: [number, number]; stops: Array<{ o: number; c: string }> } | null {
+  const m = /conic-gradient\(([\s\S]*)\)\s*(?:;|$)/.exec(css) ?? /conic-gradient\(([\s\S]*)\)/.exec(css);
+  if (!m) return null;
+  const parts = splitTop(m[1]!);
+  let from = 0;
+  let at: [number, number] = [0.5, 0.5];
+  const head = /^(?:from\s+(\S+))?\s*(?:at\s+(\S+)\s+(\S+))?$/.exec(parts[0] ?? "");
+  if (head && (head[1] || head[2])) {
+    if (head[1]) from = cssAngle(head[1]) ?? 0;
+    if (head[2] && head[3]) {
+      const p = (s: string): number => (s === "left" || s === "top" ? 0 : s === "right" || s === "bottom" ? 1 : s === "center" ? 0.5 : s.endsWith("%") ? parseFloat(s) / 100 : 0.5);
+      at = [p(head[2]), p(head[3])];
+    }
+    parts.shift();
+  }
+  const raw: Array<{ o: number | null; c: string }> = [];
+  for (const part of parts) {
+    const sm = /^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]+|[a-zA-Z]+)\s*(\S*)\s*(\S*)$/.exec(part);
+    const c = sm ? cssColour(sm[1]!) : null;
+    if (!sm || !c) return null;
+    const a = sm[2] ? cssAngle(sm[2]) : null;
+    raw.push({ o: a === null ? null : a / 360, c });
+    const b = sm[3] ? cssAngle(sm[3]) : null;
+    if (b !== null) raw.push({ o: b / 360, c }); // (a colour with two positions is a band)
+  }
+  if (raw.length < 2) return null;
+  if (raw[0]!.o === null) raw[0]!.o = 0;
+  if (raw[raw.length - 1]!.o === null) raw[raw.length - 1]!.o = 1;
+  for (let i = 1; i < raw.length - 1; i++) {
+    if (raw[i]!.o !== null) continue;
+    let j = i;
+    while (raw[j]!.o === null) j++;
+    const a = raw[i - 1]!.o!, z = raw[j]!.o!;
+    for (let k = i; k < j; k++) raw[k]!.o = a + ((z - a) * (k - i + 1)) / (j - i + 1);
+  }
+  let last = 0;
+  const stops = raw.map((s) => ({ o: (last = Math.min(1, Math.max(last, s.o!))), c: s.c }));
+  return { from, at, stops };
 }
 
 /** The same colour with its alpha multiplied by `k`. */
@@ -233,7 +296,8 @@ export function parseSvg(text: string): SvgImport | null {
         return { type: "linear", x0, y0, x1, y1, stops: st } as Gradient;
       }
       const [cx, cy] = at(attr("cx", 0.5), attr("cy", 0.5));
-      const r = attr("r", 0.5) * (user ? Math.hypot(m[0], m[1]) / Math.max(bw, bh) : 1);
+      // (a gradient's own transform scales its radius: design tools write r="1" and size the gradient by gradientTransform; a stretched one counts by its mean scale)
+      const r = attr("r", 0.5) * Math.sqrt(Math.abs(gt[0] * gt[3] - gt[1] * gt[2])) * (user ? Math.hypot(m[0], m[1]) / Math.max(bw, bh) : 1);
       return r > 0 ? ({ type: "radial", cx, cy, r, stops: st } as Gradient) : solid();
     }
     const c = cssColour(v);
@@ -243,8 +307,15 @@ export function parseSvg(text: string): SvgImport | null {
     if (!subs.length) return;
     const sub = mapSubs(subs, (x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
     const scale = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
-    const fill = paintOf(st.fill, st.fillOpacity, sub, m);
-    const stroke = st.strokeWidth > 0 ? paintOf(st.stroke, st.strokeOpacity, sub, m) : null;
+    // an angular gradient written by this app (SVG has none: the file holds a picture, and the gradient rides on the element) is read back as the gradient
+    const own = (k: "fill" | "stroke"): Gradient | null => {
+      try {
+        const g = JSON.parse(el.getAttribute(`data-canvast-${k}`) ?? "null") as unknown;
+        return isPaint(g) && typeof g === "object" && (g as Gradient).type === "angular" ? (g as Gradient) : null;
+      } catch { return null; }
+    };
+    const fill = own("fill") ?? paintOf(st.fill, st.fillOpacity, sub, m);
+    const stroke = st.strokeWidth > 0 ? (own("stroke") ?? paintOf(st.stroke, st.strokeOpacity, sub, m)) : null;
     if (fill === null && stroke === null) return;
     const width = Math.max(st.strokeWidth * scale, 1e-9);
     // dashes are kept in widths of the outline: the first two lengths (a single one means dash and gap alike)
@@ -290,6 +361,40 @@ export function parseSvg(text: string): SvgImport | null {
     // clip-path="url(#id)": the clip's shapes (in the user space of this element) become a clipping mask for what is inside; the outermost one counts
     const clipRef = /url\(\s*['"]?#([^'")\s]+)/.exec(el.getAttribute("clip-path") ?? /clip-path:\s*([^;]+)/.exec(el.getAttribute("style") ?? "")?.[1] ?? "");
     const clipEl = clipRef ? byId.get(clipRef[1]!) : undefined;
+    // A group that holds an HTML box with a CSS conic gradient, cut by a clip path (how another design tool writes an angular gradient, which SVG has
+    // none of): the clip's shape is filled with that angular gradient. Where the box is turned or flipped, the gradient follows.
+    if ((name === "g" || name === "svg") && clipEl?.localName === "clipPath" && el.querySelector("foreignObject")) {
+      const fo = el.querySelector("foreignObject")!;
+      const css = (fo.querySelector("div, span")?.getAttribute("style") ?? "").replace(/&quot;/g, '"');
+      const conic = parseConic(css);
+      if (conic) {
+        let mt = m;
+        const chain: Element[] = [];
+        for (let n: Element | null = fo.parentElement; n && n !== el; n = n.parentElement) chain.unshift(n);
+        for (const n of chain) mt = mul(mt, parseTransform(n.getAttribute("transform")));
+        const fx = len(fo.getAttribute("x"), vw), fy = len(fo.getAttribute("y"), vh), fw = len(fo.getAttribute("width"), vw), fh = len(fo.getAttribute("height"), vh);
+        const sub: SubPath[] = [];
+        for (const c of clipEl.children) {
+          const cm = mul(m, parseTransform(c.getAttribute("transform")));
+          const g = c.localName === "use" ? null : geomOf(c, vw, vh);
+          if (g) sub.push(...mapSubs(g, (x, y) => [cm[0] * x + cm[2] * y + cm[4], cm[1] * x + cm[3] * y + cm[5]]).map((q) => ({ ...q, closed: true })));
+        }
+        const b = geometryBounds(sub);
+        const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+        if (sub.length && bw > 0 && bh > 0) {
+          const lx = fx + conic.at[0] * fw, ly = fy + conic.at[1] * fh; // the gradient's centre in the box's own units, then in the drawing's
+          const X = mt[0] * lx + mt[2] * ly + mt[4], Y = mt[1] * lx + mt[3] * ly + mt[5];
+          const th = (conic.from * Math.PI) / 180; // the first edge: up turned by `from`, then by the box's own turn
+          const dx = mt[0] * Math.sin(th) - mt[2] * Math.cos(th), dy = mt[1] * Math.sin(th) - mt[3] * Math.cos(th);
+          const flipped = mt[0] * mt[3] - mt[1] * mt[2] < 0; // (a mirrored box runs the colours the other way round)
+          const stops = flipped ? [...conic.stops].reverse().map((s) => ({ o: 1 - s.o, c: s.c })) : conic.stops;
+          const angle = ((((Math.atan2(dy, dx) * 180) / Math.PI) % 360) + 360) % 360;
+          const grad = { type: "angular", cx: (X - b.minX) / bw, cy: (Y - b.minY) / bh, angle: flipped ? (360 - angle) % 360 : angle, stops: stops.map((s) => ({ o: s.o, c: fade(s.c, st.fillOpacity) })) } as Gradient;
+          shapes.push({ sub, fill: grad, stroke: null, width: 1e-9, evenodd: false, opacity: Math.min(1, Math.max(0.01, a)), ...(activeClip !== undefined ? { clip: activeClip } : {}) });
+          return; // (the shape that follows in the file is the outline, if it has one: it is read as any other)
+        }
+      }
+    }
     if (!clipDone && clipEl?.localName === "clipPath" && activeClip === undefined && (name === "g" || name === "use" || name === "svg" || name === "a")) {
       const subs: SubPath[] = [];
       for (const c of clipEl.children) {

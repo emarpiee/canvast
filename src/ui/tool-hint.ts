@@ -10,6 +10,7 @@ import type { PathObject } from "../doc/model";
 import type { ShapeKind } from "../doc/path";
 import { isGradient } from "../doc/paint";
 import { hasCorners } from "../doc/shape-params";
+import { gradientName, gradientSides, paintName } from "../interaction/path-edit";
 
 const SHAPE_HINT: Record<ShapeKind, string> = {
   rect: "Drag to draw a rectangle · Shift: square · Alt: from the centre",
@@ -42,7 +43,11 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       if (boolEntered) return "Inside a boolean group: edit its shapes and the result follows · Esc goes back out";
       // (a gradient's handles are on the shape: the group's own paint is what a picked boolean group shows)
       const gradient = paths.some((o) => !boolGroupsOf(o!).some((g) => !g.own && !editor.entered.includes(g.gid)) && (isGradient((o as PathObject).fill) || isGradient((o as PathObject).stroke)));
-      const handles = gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline picks which one)" : "";
+      // one shape: say whose gradient the handles on it are (the fill's or the outline's) and how to get the other one's; several: the general words
+      const sides = paths.length === 1 && sel.length === 1 ? gradientSides(paths[0] as PathObject, editor.gradientFocus) : null;
+      const handles = sides
+        ? ` · Drag the round handles on the shape to move its ${paintName(sides.active).toLowerCase()}'s ${gradientName(sides.g)} gradient${sides.other ? ` · Press ${paintName(sides.other.which)} in the bar above to edit its ${gradientName(sides.other.g)} gradient instead` : ""}`
+        : gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline picks which one)" : "";
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases · The pin saves its initial state" + handles;
       if (paths.length === 1 && sel.length === 1) {
         const shape = (paths[0] as PathObject).shape;
