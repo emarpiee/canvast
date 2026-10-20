@@ -128,7 +128,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(/);
   if (p.context().browser()?.browserType().name() === "chromium") {
     const paste = (t: string) => p.evaluate((x) => { const dt = new DataTransfer(); dt.setData("text/plain", x); document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
-    await panel.hover();
+    await p.mouse.click(40, 700); // nothing picked, the pointer off the panel: it is still saved
     await paste("conic-gradient(from 90deg, #ff0000 0deg, #0000ff 180deg)");
     await expect(panel.locator(".style-card", { hasText: "Angular · 2 stops" })).toHaveCount(1); // (and the card says so)
     await paste("oklch(0.628 0.2577 29.23)");

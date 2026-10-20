@@ -125,7 +125,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKHCL; a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. Number fields change by dragging the field.
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
 - **Palettes:** *Palette from a colour* builds harmonies, and a palette can be taken from a picture. Palettes and gradients can be imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files.
-- **Styles panel:** saved colours, gradients, text styles and adjustment stacks. An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it. A colour or gradient card is copied by a right click on it, or by *Copy hex* / *Copy as CSS* in its More menu; CSS pasted (a colour in any notation, or a gradient) with the pointer over the panel is saved as a new style.
+- **Styles panel:** saved colours, gradients, text styles and adjustment stacks. An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it. A colour or gradient card is copied by a right click on it, or by *Copy hex* / *Copy as CSS* in its More menu; CSS pasted (a colour in any notation, or a gradient) is saved as a new style when the pointer is over the panel or nothing is picked.
 
 ### Text
 

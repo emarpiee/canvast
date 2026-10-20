@@ -380,10 +380,10 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const it = find(id);
     if (it && copyItem(it)) e.preventDefault();
   });
-  // Pasting CSS (a colour in any notation, or a gradient) while the pointer or focus is on the panel saves it as a style.
+  // Pasting CSS (a colour in any notation, or a gradient) saves it as a style when the pointer or focus is on the panel, or when nothing is picked that could take it as a fill.
   window.addEventListener("paste", (e) => {
     const t = e.target as Element | null;
-    if (!editor.stylesOpen || t?.closest?.("input, textarea, [contenteditable]") || !(panel.matches(":hover") || (document.activeElement && panel.contains(document.activeElement)))) return;
+    if (!editor.stylesOpen || t?.closest?.("input, textarea, [contenteditable]") || !(deps.paint.count() === 0 || panel.matches(":hover") || (document.activeElement && panel.contains(document.activeElement)))) return;
     const p = parseCssPaint(e.clipboardData?.getData("text/plain") ?? "");
     if (!p) return;
     e.preventDefault();
