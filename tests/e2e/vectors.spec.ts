@@ -559,6 +559,33 @@ test("gradients: Linear and Radial in the paint chooser, stops, angle, handles o
   }
 });
 
+test("a gradient handle snaps like a move does (the Snap toggle): to the middle and the sides of the shape and of what is in view; off, it does not", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await key(app, "u");
+  await p.click('[data-paint="stroke"]');
+  await pop.locator(".colour-none").click();
+  await key(app, "Escape");
+  await drag(app, [500, 300], [760, 400]);
+  await key(app, "v");
+  await p.click('[data-paint="fill"]');
+  await pop.locator('[data-mode="linear"]').click();
+  await pop.locator(".cg [data-angle]").fill("0");
+  await key(app, "Escape");
+  const box = await screenBox(app, (await last(app)).id);
+  const mid = (box.minY + box.maxY) / 2;
+  const cx = (box.minX + box.maxX) / 2;
+  const x1 = async () => ((await last(app)).fill as unknown as { x1: number }).x1;
+  await drag(app, [box.maxX - 1, mid], [cx - 4, mid]); // dropped 4 px short of the shape's middle
+  expect(await x1(), "snapped onto the middle").toBeCloseTo(0.5, 6);
+  await p.keyboard.press("Control+z");
+  expect(await x1()).toBe(1);
+  await p.getByRole("button", { name: "Snap to other objects" }).click(); // off
+  await drag(app, [box.maxX - 1, mid], [cx - 4, mid]);
+  expect(Math.abs((await x1()) - 0.5), "not snapped").toBeGreaterThan(0.005);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("Booleans (non-destructive boolean groups): the four operations from the selection bar, the shapes kept inside a group, one undo step", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);

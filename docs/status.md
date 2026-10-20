@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.24.3 — gradient handles snap (2026-10-20)
+
+- **Implemented:** `snapGradientPoint` in `interaction/tools.ts` (the Snap toggle, ADR 0019): the pointer's x and y snap to the box edges and middle of the shapes in view and to path nodes, within `SNAP_PX`, with the guide.
+- **Tested:** new `vectors.spec` test (on: a handle dropped 4 px short of the shape's middle lands on it; off: it does not; fails without the change) and the gradient tests of the spec, Chromium and Firefox. The full quick suite has not been run since 0.22.0.
+- **Unverified:** snapping the angular gradient's angle handle (it uses the same pointer snap, which changes the angle slightly rather than aligning a point); a rotated shape's gradient.
+
 ## v0.24.2 — Reveal: a picked thing can be moved by its outline (2026-10-20)
 
 - **Implemented:** the press handler takes a picked thing within 8 px of its outline although a filled shape covers the spot (`click` keeps the top thing for a click that does not move).

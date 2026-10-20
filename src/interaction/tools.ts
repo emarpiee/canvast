@@ -830,10 +830,37 @@ export function attachTools(
     else commitCorners(doc, editor, [px], () => ppu, final);
     editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Radius ${Math.round(px * 10) / 10}`, guide: handleGuide(h, g.what === "corner" ? { what: "corner", dot } : { what: "main" }, open) };
   };
-  const updateGradient = (s: ScreenPoint): void => {
+  /**
+   * A gradient handle with the Snap toggle on (ADR 0019): its x or y lines up with the edges or the middle of anything in view (the shape
+   * it paints too: the ends of a gradient go to its sides and centre) or with a node of a path, within SNAP_PX, and the guide shows where.
+   */
+  const snapGradientPoint = (s: ScreenPoint): ScreenPoint => {
+    editor.guides = null;
+    if (!editor.snap) return s;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const po of visible().slice(0, MAX_SNAP_TARGETS)) {
+      if (po.cover) continue;
+      xs.push(po.box.minX, (po.box.minX + po.box.maxX) / 2, po.box.maxX);
+      ys.push(po.box.minY, (po.box.minY + po.box.maxY) / 2, po.box.maxY);
+      if (po.obj.kind === "path") for (const n of nodesOnScreen(po)) { xs.push(n.p[0]); ys.push(n.p[1]); }
+    }
+    const nearest = (v: number, list: readonly number[]): number | null => {
+      let best: number | null = null;
+      for (const c of list) if (Math.abs(c - v) <= SNAP_PX && (best === null || Math.abs(c - v) < Math.abs(best - v))) best = c;
+      return best;
+    };
+    const sx = nearest(s.x, xs);
+    const sy = nearest(s.y, ys);
+    if (sx !== null) editor.guides = { x: sx };
+    if (sy !== null) editor.guides = { ...editor.guides, y: sy };
+    return { ...s, x: sx ?? s.x, y: sy ?? s.y };
+  };
+  const updateGradient = (s0: ScreenPoint): void => {
     if (g.kind !== "grad") return;
     const tgt = gradientTarget();
     if (!tgt) return;
+    const s = snapGradientPoint(s0);
     const l = localOf(tgt.po, s.x, s.y);
     previewPaint(doc, editor, { [g.which]: moveGradientHandle(tgt.o, g.g, g.handle, l.x, l.y) });
   };
@@ -1919,6 +1946,7 @@ export function attachTools(
         break;
       case "grad": {
         const p = editor.preview;
+        editor.guides = null;
         if (cancelled || p.kind !== "paint") editor.preview = { kind: "none" };
         else commitPaint(doc, editor, { [g.which]: p[g.which] as Gradient });
         break;

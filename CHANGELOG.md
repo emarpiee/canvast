@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.3 — The ends of a gradient snap (2026-10-20)
+
+- **Fix:** dragging a gradient's handle on the canvas ignored the Snap toggle. With it on, the handle (the ends of a linear gradient, the centre and radius of a radial one, the angle handle) now lines up its x or y with the edges and middle of anything in view, the shape it paints included, or with a node of a path, within 6 px, and the guide line shows; with it off it moves freely, as before.
+
 ## 0.24.2 — A thing picked through Reveal can be moved (2026-10-20)
 
 - **Fix:** after Ctrl+click picked a thing under a filled shape, a drag from its outline drew a selection box instead of moving it, because the press landed on the covering shape, which was not picked. A press within 8 px of the outline of a picked thing now takes that thing, so the drag moves it; a click that does not move still picks the thing on top.
