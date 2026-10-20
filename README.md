@@ -4,6 +4,7 @@
 
 - **Endless in every direction.** There is no minimum or maximum zoom and no border. A line drawn at one scale stays sharp at any other, and what you drew a thousand zoom levels ago is still there when you come back.
 - **Yours, on your machine.** Everything is saved in your browser's own storage while you work. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
+- **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. canvast is not a warehouse for tens of thousands of files, because everything lives in your browser's storage, which has a size limit (see [Limitations](#limitations)).
 - **One file.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it.
 
 ![One continuous dive: from the observable universe, through the Solar System and Earth, into a leaf, its DNA and an atom](docs/screenshots/dive.webp)
@@ -258,7 +259,7 @@ Deleting objects; deleting a canvas or board (confirmed, cannot be undone; pictu
 
 ### Where the data lives
 
-IndexedDB database `canvast`, in the browser's storage for local files. Moving the HTML file to another folder keeps your data. Opening it in a different browser, profile or private window does not, and clearing site data deletes it. This is why regular backups matter.
+IndexedDB database `canvast`, in the browser's storage for local files. Moving the HTML file to another folder keeps your data. Opening it in a different browser, profile or private window does not, and clearing site data deletes it. This is why regular backups matter. The browser's storage has a size limit, so canvast suits projects rather than very large collections of files; see [Limitations](#limitations).
 
 ---
 
@@ -290,6 +291,13 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 ## Limitations
 
 canvast describes only what it does. These are the current limits.
+
+**Scale**
+
+| Area | Limitation |
+| --- | --- |
+| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. All files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files |
+| What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete from library* to free space |
 
 **Content**
 
