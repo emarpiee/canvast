@@ -36,7 +36,7 @@ await p.getByTestId("confirm-ok").click();
 await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
 await p.keyboard.press("Escape");
 await p.getByTestId("workspace-nav").click();
-await p.getByTestId("workspace-menu").getByText("A tour of everything", { exact: true }).click();
+await p.getByTestId("workspace-menu").getByText("Powers of two", { exact: true }).click();
 if (await p.getByTestId("workspace-menu").isVisible()) await p.keyboard.press("Escape");
 await blur();
 
@@ -56,8 +56,8 @@ await bookmarks(false);
 await off();
 await shot("hero");
 
-// 2. Deep in the galaxy (1,000 levels down)
-await go("4 · A galaxy 1,000 levels down");
+// 2. A million levels down
+await go("19 · One million levels down");
 await bookmarks(false);
 await off();
 await shot("deep-zoom");
@@ -65,23 +65,23 @@ await shot("deep-zoom");
 // 3. A tour of the bookmarks
 await bookmarks(true);
 await p.getByRole("button", { name: "Play the bookmarks as a tour" }).click();
-for (let i = 0; i < 4; i++) { await p.keyboard.press("ArrowRight"); await settle(400); }
+for (let i = 0; i < 12; i++) { await p.keyboard.press("ArrowRight"); await settle(250); }
 await shot("tour");
 await p.keyboard.press("Escape");
 
 // 4. Boolean shapes: the rocket is a Union, with the Shapes menu open
-await go("3 · Earth and the Moon");
+await go("8 · Earth");
 await bookmarks(false);
 await p.keyboard.press("v");
-await p.mouse.click(1062, 352);
+await p.mouse.click(1180, 352);
 await p.locator('[data-ctx="boolmenu"]').click();
 await p.mouse.move(1300, 600);
 await shot("shapes");
 await p.keyboard.press("Escape");
 await p.keyboard.press("Escape");
 
-// 5. The cosmic web
-await go("5 · The cosmic web");
+// 5. 1,000 levels up
+await go("7 · The multiverse (1,000 levels up)");
 await bookmarks(false);
 await off();
 await shot("zoom-out");
@@ -91,7 +91,7 @@ await go("1 · The Solar System");
 await bookmarks(false);
 await p.getByRole("button", { name: "Layers panel", exact: true }).click();
 await p.keyboard.down("Control");
-await p.mouse.click(880, 530);
+await p.mouse.click(1091, 343);
 await p.keyboard.up("Control");
 await off();
 await shot("layers");
@@ -107,9 +107,9 @@ await shot("command-palette");
 await p.keyboard.press("Escape");
 
 // 8. Export: the Earth (a clipping mask) picked by its name, Export… dialog
-await go("3 · Earth and the Moon");
+await go("8 · Earth");
 await bookmarks(false);
-await p.mouse.click(225, 213);
+await p.mouse.click(447, 150);
 await p.keyboard.press("Control+k");
 await p.keyboard.type("Export… (choose a size)");
 await p.keyboard.press("Enter");
@@ -118,7 +118,7 @@ await p.keyboard.press("Escape");
 await p.keyboard.press("Escape");
 
 // 9. Library: screenshots of the bookmarks, kept in the library
-for (const name of ["1 · The Solar System", "3 · Earth and the Moon", "4 · A galaxy 1,000 levels down", "5 · The cosmic web", "2 · Saturn's ring (Exclude)"]) {
+for (const name of ["1 · The Solar System", "4 · The Milky Way", "8 · Earth", "9 · An island", "13 · DNA", "16 · Inside a proton"]) {
   await go(name);
   await bookmarks(false);
   await p.getByRole("button", { name: "Screenshot", exact: true }).click();
