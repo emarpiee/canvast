@@ -317,7 +317,7 @@ test("a sheet resized with its handle takes what is on it along when deep in a z
   const sbox = await box(sheet.id);
   expect(Number(await x.inputValue()), "where it is, per cent of the sheet's width").toBeCloseTo((((await box(rect.id)).minX - sbox.minX) / (sbox.maxX - sbox.minX)) * 100, 0);
   const x0 = (await box(rect.id)).minX;
-  const label = (await x.locator("xpath=..").boundingBox())!;
+  const label = (await x.boundingBox())!; // (the field scrubs; its name is only a label)
   await p.mouse.move(label.x + 4, label.y + label.height / 2);
   await p.mouse.down();
   await p.mouse.move(label.x + 44, label.y + label.height / 2, { steps: 8 });
@@ -383,7 +383,7 @@ test("an object on a sheet shows where it is from the sheet's corner, and X, Y, 
   await key(app, "Control+z");
   await app.frame();
   expect((await box(rect.id)).minX).toBeCloseTo(rb.minX, 0);
-  // the names X, Y, W and H scrub like the other numbers: drag the name to the right and the field grows (and the object moves)
+  // the fields X, Y, W and H scrub like the other numbers: drag the field to the right and the field grows (and the object moves)
   const x0 = Number(await x.inputValue());
   const label = (await x.locator("xpath=..").boundingBox())!;
   await p.mouse.move(label.x + 4, label.y + label.height / 2);

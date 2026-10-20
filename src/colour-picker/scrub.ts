@@ -1,9 +1,10 @@
 /**
- * Drag a number's name left or right to change it (the quick way to a value, as in a design tool): every `<label>` of one
- * `<input type="number">` (wrapped or by `for`) inside `root` becomes draggable. The field gets `input` events while dragging and one `change` on release
- * (so one undo step); a plain click on the name focuses the field. The field scrubs as well until it has the focus (a press on it that does not move goes into it). Shift moves ten times faster. Labels with `data-scrub` do their own thing.
+ * Drag a number field left or right to change it (the quick way to a value, as in a design tool): every `<input type="number">` that has a
+ * `<label>` (wrapped or by `for`) inside `root` becomes draggable. The field gets `input` events while dragging and one `change` on release (so one
+ * undo step). A press on the field that does not move goes into it (to type); a press on its name is only a label click, which focuses the field.
+ * Shift moves ten times faster.
  */
-export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or right to change it"): void {
+export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or right to change it"): void {
   let drag: { label: HTMLElement; input: HTMLInputElement; start: number; x: number; moved: boolean; id: number } | null = null;
   const numberOf = (label: HTMLElement): HTMLInputElement | null => {
     const c = (label as HTMLLabelElement).control; // the wrapped field, or the one `for` names
@@ -15,7 +16,8 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
     if (!l || l.dataset["scrub"] !== undefined || l.closest("[data-scrub-root]") !== root || !numberOf(l)) return null;
     l.dataset["scrubbable"] = "";
     numberOf(l)!.dataset["scrubInput"] = ""; // (the field scrubs too, wherever its label is: wrapped or `for`)
-    if (!l.title) l.title = hint;
+    const field = numberOf(l)!;
+    if (!field.title) field.title = hint;
     return l;
   };
   for (const l of root.querySelectorAll<HTMLElement>("label")) mark(l);
@@ -29,8 +31,9 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the name left or ri
   };
   root.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
-    // A press on a field counts as a press on its label (the one that wraps it, or names it by `for`).
-    const own = t instanceof HTMLInputElement ? (t.labels?.[0] ?? t.closest<HTMLElement>("label")) : t.closest<HTMLElement>("label");
+    // Only the field scrubs (a press on its name is just a label: it focuses the field).
+    if (!(t instanceof HTMLInputElement) || e.pointerType === "touch") return; // (a finger scrolls the bar it starts on; the mouse and the pen scrub)
+    const own = t.labels?.[0] ?? t.closest<HTMLElement>("label");
     const label = mark(own) ?? (own?.matches("label[data-scrubbable]") ? own : null);
     if (!label || e.button !== 0 || label.closest("[data-scrub-root]") !== root) return; // (a nested root handles its own)
     const input = numberOf(label)!;

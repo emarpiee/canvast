@@ -1005,11 +1005,11 @@ test("corner radius on every kind of shape: one value or four on a rectangle, an
   expect(await nodes((await objs(app)).find((o) => (o as Obj & { result?: string }).result !== undefined)!)).toBe(8);
 });
 
-test("numbers without typing: drag a name (Radius, Points, Ratio) or a dot on the canvas; live, one undo step", async ({ app }) => {
+test("numbers without typing: drag the field (Radius, Points, Ratio) or a dot on the canvas; live, one undo step", async ({ app }) => {
   const p = app.page;
   type P = Obj & { radius?: number | number[]; params?: { inner?: number; tips?: number } };
   const lastP = async () => (await last(app)) as P;
-  const labelBox = async (name: string) => (await p.locator(`[data-scrub="${name}"]`).boundingBox())!;
+  const labelBox = async (name: string) => (await p.locator(`[data-scrub="${name}"] input`).boundingBox())!; // (the field scrubs: its name is only a label)
   // a rectangle: drag the Radius name to the right
   await key(app, "u");
   await drag(app, [500, 300], [700, 420]);
@@ -1605,7 +1605,7 @@ test("a boolean group's corner radius updates live while it is dragged, like a p
   await boolWith(p, "op:union");
   await app.frame();
   const corner = await px(507, 307); // (inside the sharp corner)
-  const lb = (await p.locator('[data-scrub="radius"]').boundingBox())!;
+  const lb = (await p.locator('[data-scrub="radius"] input').boundingBox())!;
   await p.mouse.move(lb.x + 8, lb.y + lb.height / 2);
   await p.mouse.down();
   await p.mouse.move(lb.x + 8 + 40, lb.y + lb.height / 2, { steps: 6 });

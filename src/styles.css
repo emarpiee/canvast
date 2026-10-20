@@ -232,7 +232,7 @@ html, body {
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
-input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-scrub-input] { touch-action: none; }
+input[type="range"], .media-scrub { touch-action: none; } /* (a number field and its name do not take the finger: a bar that scrolls sideways scrolls from them) */
 
 #canvas {
   display: block;
@@ -2346,7 +2346,6 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .tb-shape { flex: none; height: var(--icon-md); aspect-ratio: var(--shape, 1); border: 1px solid var(--hud-muted); border-radius: var(--r-xs); background: color-mix(in oklch, var(--hud-accent) 18%, transparent); }
 .toolbar .tb-count label { display: inline-flex; align-items: center; gap: var(--sp-3); }
 .toolbar .tb-count select, .text-format select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--field-h); padding: 0 var(--sp-3); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
-.toolbar .tb-count[data-scrub], label[data-scrubbable] { cursor: ew-resize; user-select: none; }
 input[data-scrub-input] { cursor: ew-resize; user-select: text; }
 input[data-scrub-input]:focus { cursor: text; }
 .toolbar .tb-count[data-scrub] input { cursor: ew-resize; }
