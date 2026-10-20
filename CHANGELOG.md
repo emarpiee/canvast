@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.11 — Colour names, palettes copy too (2026-10-21)
+
+- **Pasting a colour name** (`red`, `rebeccapurple`) makes it the fill, or a colour style in the Styles panel; a word that is not a colour name changes nothing.
+- **Palettes:** a right click or long press on a palette card copies it as CSS variables; on a colour of an opened palette, as hex (it is not applied).
+
 ## 0.25.10 — Copy: pictures alone, edited stills, GIF frames (2026-10-21)
 
 - **A copied picture goes alone** (no "N objects" text next to it, which made some apps paste text): one still as a PNG at full size with its crop and adjustments baked in; a GIF or video as the frame it shows.

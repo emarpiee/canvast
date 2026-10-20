@@ -471,6 +471,11 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.11 — Colour names, palettes copy too (2026-10-21)
+
+- **Implemented:** `parseCssColour` takes colour names; palette cards and chips copy by right click or long press.
+- **Tested:** `vectors.spec` CSS paste test (Chromium), `styles.spec` (Chromium, Firefox).
+
 ## v0.25.10 — Copy: pictures alone, edited stills, GIF frames (2026-10-21)
 
 - **Implemented:** `renderedStill` for a picture's edited copy, picture-only clipboard when the text would be a placeholder, no SVG text for texture fills or over 1 MB, own-picture flag instead of byte size.

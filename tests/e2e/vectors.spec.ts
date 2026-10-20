@@ -3344,10 +3344,13 @@ test("CSS text pasted with a shape picked becomes its fill: a gradient (linear, 
   expect(g.angle).toBeCloseTo(0, 1); // (CSS counts from the top: 90deg is pointing right)
   expect(g.stops.map((s) => s.o)).toEqual([0, 0.5]);
   // a solid colour in any CSS notation is a fill too
-  for (const [t, hex] of [["#71DDD3", "#71ddd3"], ["rgb(255 0 0)", "#ff0000"], ["hsl(120 100% 50%)", "#00ff00"], ["oklch(0.628 0.2577 29.23)", "#ff0000"], ["fill: #0000ff80;", "#0000ff80"]] as const) {
+  for (const [t, hex] of [["#71DDD3", "#71ddd3"], ["rgb(255 0 0)", "#ff0000"], ["hsl(120 100% 50%)", "#00ff00"], ["oklch(0.628 0.2577 29.23)", "#ff0000"], ["fill: #0000ff80;", "#0000ff80"], ["rebeccapurple", "#663399"]] as const) {
     await paste(t);
     await expect.poll(async () => String((await last(app)).fill), t).toBe(hex);
   }
+  await paste("hello"); // (a word that is no colour name changes nothing)
+  await app.frame();
+  expect(String((await last(app)).fill)).toBe("#663399");
   await paste("conic-gradient(from 90deg at 50% 50%, #ff0000 0deg, #0000ff 180deg)");
   await expect.poll(async () => ((await fill()) as G).type).toBe("angular");
   for (const t of ["repeating-linear-gradient(red, blue 20%)", "linear-gradient(red, nonsense)", "linear-gradient(red 10px, blue 90px)"]) {

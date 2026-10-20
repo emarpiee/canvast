@@ -175,6 +175,17 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   await card.locator(".palette-chip").nth(1).click();
   const picked = (await objs(app)).at(-1)!;
   expect(picked.fill).toMatch(/^#[0-9a-f]{6}$/);
+  // a right click on the palette copies it as CSS variables; a long press on a chip copies that colour and does not apply it
+  await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => { (window as unknown as { copied: string }).copied = t; } }, configurable: true }); });
+  await card.locator("[data-toggle]").click({ button: "right" });
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^:root \{\n  --palette_1-1: #[0-9a-f]+;/);
+  const before = (await objs(app)).at(-1)!.fill;
+  await card.locator(".palette-chip").nth(0).hover();
+  await p.mouse.down();
+  await p.waitForTimeout(650);
+  await p.mouse.up();
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^#[0-9A-F]{6}$/);
+  expect((await objs(app)).at(-1)!.fill, "a long press does not apply").toEqual(before);
   // edited: named, one more added, one removed
   await card.getByRole("button", { name: /^More actions for style Palette 1/ }).click();
   await p.getByRole("menuitem", { name: /Edit the colours of Palette 1/ }).click();

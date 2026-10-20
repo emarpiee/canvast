@@ -55,9 +55,9 @@ export function parseCssGradient(text: string): Gradient | null {
   return { type: "angular", cx: centre[0], cy: centre[1], angle: (((f - 90) % 360) + 360) % 360, stops: list }; // (CSS counts from the top, the model from pointing right)
 }
 
-/** A solid CSS colour as hex: `#rgb`, `#rrggbbaa`, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()` or `color()`, with or without `color:`/`background:`/`fill:`. Null for anything else (a colour word alone is not taken: it is more likely text). */
+/** A solid CSS colour as hex: `#rgb`, `#rrggbbaa`, `rgb()`, `hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()` or `color()`, with or without `color:`/`background:`/`fill:`. A colour name (`red`, `rebeccapurple`) works when the browser knows it; any other word is not a colour and gives null. */
 export function parseCssColour(text: string): string | null {
-  const m = /^\s*(?:(?:background(?:-color)?|color|fill|stroke)\s*:\s*)?(#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\))\s*;?\s*$/i.exec(text);
+  const m = /^\s*(?:(?:background(?:-color)?|color|fill|stroke)\s*:\s*)?(#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\)|[a-z]{3,30})\s*;?\s*$/i.exec(text);
   if (!m || (m[1]!.startsWith("#") && ![4, 5, 7, 9].includes(m[1]!.length))) return null;
   return cssColour(m[1]!);
 }

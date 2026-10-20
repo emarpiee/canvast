@@ -105,7 +105,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (item.kind === "palette") {
       const pal = dataOf<PaletteData>(item);
       const isOpen = opened.has(item.id) || editing === item.id;
-      return `<li class="style-palette${isOpen ? " is-open" : ""}"><button type="button" class="style-card" data-toggle="${esc(item.id)}" aria-expanded="${isOpen}" title="Show the colours">${body}</button>${more}${isOpen ? (editing === item.id ? paletteEditor(item, pal) : paletteGrid(pal, can)) : ""}</li>`;
+      return `<li class="style-palette${isOpen ? " is-open" : ""}" data-copyable><button type="button" class="style-card" data-toggle="${esc(item.id)}" aria-expanded="${isOpen}" title="Show the colours">${body}</button>${more}${isOpen ? (editing === item.id ? paletteEditor(item, pal) : paletteGrid(pal, can)) : ""}</li>`;
     }
     return `<li${item.kind === "colour" || item.kind === "gradient" ? " data-copyable" : ""}><button type="button" class="style-card" data-style="${esc(item.id)}" title="${esc(title)}"${can ? "" : " disabled"}>${body}</button>${more}</li>`;
   };
@@ -279,7 +279,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   // ---- Menus ------------------------------------------------------------------------------------------------------------------
   const copyText = (text: string, what: string): void => void navigator.clipboard?.writeText(text).then(() => deps.notify(`Copied ${what}.`), () => deps.notify("Could not copy."));
   /** A colour as hex and a gradient as CSS: the text `parseCssPaint` pastes back (the menu items and the right click both copy it). */
+  const paletteCss = (item: StyleItem): string => `:root {\n${paletteOf(item).map((c, i) => `  --${slug(item.name, "palette")}-${slug(c.name ?? "", String(i + 1))}: ${c.c};`).join("\n")}\n}`;
   const copyItem = (item: StyleItem): boolean => {
+    if (item.kind === "palette") return copyText(paletteCss(item), "the palette as CSS variables"), true;
     const text = item.kind === "colour" || item.kind === "gradient" ? cssOfPaint(item.data as Paint) : null;
     if (text) copyText(text, item.kind === "colour" ? text : "the gradient as CSS");
     return text !== null;
@@ -322,7 +324,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         { label: "Add the selection's colours", icon: ICONS.listPlus, disabled: fromSel.length === 0, aria: `Add the colours of the selection to ${item.name}`, run: () => void setPalette(item, [...cols, ...fromSel.filter((c) => !cols.some((x) => x.c === c)).map((c) => ({ c }))].slice(0, MAX_PALETTE)) },
         { label: "Sort by hue", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by hue`, run: () => void setPalette(item, sorted("hue")) },
         { label: "Sort by lightness", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by lightness`, run: () => void setPalette(item, sorted("light")) },
-        { label: "Copy as CSS variables", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyText(`:root {\n${cols.map((c, i) => `  --${slug(item.name, "palette")}-${slug(c.name ?? "", String(i + 1))}: ${c.c};`).join("\n")}\n}`, "the CSS variables") },
+        { label: "Copy as CSS variables", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyItem(item) },
         ...common(item),
         { label: "Export as .gpl", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, run: () => void exportItems("palette", [item]) },
         { label: "Export as .ase", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, run: () => void exportItems("palette", [item], "ase") },
@@ -378,7 +380,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   onLongPress(panel, "li[data-copyable]", (li) => {
     const it = find(li.querySelector<HTMLElement>("[data-more]")?.dataset["more"]);
     if (it) copyItem(it);
-  }, { except: "[data-more], input, .pal-actions" });
+  }, { except: "[data-more], input, .pal-actions, .palette-grid, .palette-edit" });
+  // ...and a colour of an opened palette is copied as hex by the same press, without being applied.
+  onLongPress(panel, ".palette-chip", (chip) => {
+    const it = find(chip.closest("li")?.querySelector<HTMLElement>("[data-more]")?.dataset["more"]);
+    const c = it && paletteOf(it)[Number(chip.dataset["chip"])];
+    if (c) copyText(c.c.toUpperCase(), c.c.toUpperCase());
+  });
   // Pasting CSS (a colour in any notation, or a gradient) saves it as a style when the pointer or focus is on the panel, or when nothing is picked that could take it as a fill.
   window.addEventListener("paste", (e) => {
     const t = e.target as Element | null;
