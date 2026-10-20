@@ -56,7 +56,7 @@ test("with a library folder an import is a file there and a stub in the browser;
 
   // A backup holds the bytes of an original that lives in the folder.
   await p.getByTestId("save-status").click();
-  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("export-workspace").click()]);
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("set-export-full").click()]);
   const z = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
   expect((await z.get(`assets/${hash}`)!.data.arrayBuffer()).byteLength).toBe(PNG.length);
 
@@ -74,11 +74,14 @@ test("files move into the folder and back from the storage panel, each one prove
   expect(await record(p, hash)).toEqual({ ext: 0, blob: PNG.length });
   await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-b"));
   await p.getByTestId("save-status").click();
+  await expect(p.getByTestId("browser-count")).toHaveText("1");
   await p.getByRole("button", { name: "Move browser files into the folder" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 1, blob: 0 });
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([hash]);
   expect(await present(p, hash)).toBe(true);
 
+  await expect(p.getByTestId("folder-count")).toHaveText("1");
+  await expect(p.getByRole("button", { name: "Choose another folder…" })).toBeDisabled(); // (files in it would show as missing)
   await p.getByRole("button", { name: "Move files back into the browser" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 0, blob: PNG.length });
   expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([]);

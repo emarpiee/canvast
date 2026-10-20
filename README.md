@@ -185,7 +185,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Export** items as a `.canvast` archive, download originals, or export all files as a plain ZIP sorted by file type or by folder.
 - **Safe deletion:** an item in use cannot be deleted from the library. An original is erased only when nothing, including undo, can bring it back.
 - **Missing originals** (for example after clearing site data, or a file taken out of the library folder) are flagged with their usage; importing the same file again restores every instance.
-- **Library folder** (Chromium): in the storage panel, *Choose library folder…* keeps your files as plain files in a folder of your disk, named by their content, instead of in the browser's storage, so the library is limited by your disk and not by the browser. *Move browser files into the folder* and *Move files back into the browser* move what is already there. After a restart the browser asks permission once more: press *Reconnect folder*. Do not move, rename or edit the files in that folder; backups (`.canvast`) hold their bytes as always.
+- **Library folder** (Chromium): in **Settings > Storage**, *Choose library folder…* keeps your files as plain files in a folder of your disk, named by their content, instead of in the browser's storage, so the library is limited by your disk and not by the browser. *Move browser files into the folder* and *Move files back into the browser* move what is already there. After a restart the browser asks permission once more: press *Reconnect folder*. Do not move, rename or edit the files in that folder; backups (`.canvast`) hold their bytes as always.
 
 | | |
 | --- | --- |
@@ -235,7 +235,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 
 ### Saving
 
-Every change is saved automatically within a fraction of a second, together with the camera, in your browser's IndexedDB. Only the objects that changed are written, in one atomic transaction, and then read back to check. The indicator shows *Unsaved changes… → Saving… → Saved → Saved (verified)*; click it for the storage panel (role of this tab, space used, persistence permission and backup status). Reloading restores the canvas and the view.
+Every change is saved automatically within a fraction of a second, together with the camera, in your browser's IndexedDB. Only the objects that changed are written, in one atomic transaction, and then read back to check. The indicator shows *Unsaved changes… → Saving… → Saved → Saved (verified)*; click it to open **Settings > Storage**: space used, whether the browser keeps the data, the library folder, how saving is going (and the role of this tab) and backups. Reloading restores the canvas and the view.
 
 If storage cannot be opened, canvast keeps working in memory and says so.
 
@@ -245,7 +245,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Export workspace backup** (storage panel) downloads one `.canvast` file holding every board, canvas, object and view, plus every original once.
+- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every original once.
 - A board, a canvas or a single library item can be exported on its own, with only the originals it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, shows what it contains and any problems, and only then adds the boards and canvases in a single transaction. Nothing existing is replaced and originals you already have are not stored twice.
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.

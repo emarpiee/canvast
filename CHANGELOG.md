@@ -1,12 +1,16 @@
 # Changelog
 
+## 0.22.2 — One Storage page (2026-10-20)
+
+- **Settings > Storage** holds everything about storage in four cards: Space, Library folder, Saving and Backup. The save indicator opens it. The popover it used to open is removed (it repeated the space and backup lines). The library folder card shows how many files are in the folder and in the browser, and turns off *Choose another folder* and *Stop using this folder* while files are in the folder.
+
 ## 0.22.1 — Library folder: SVG files show (2026-10-20)
 
 - **Fix:** an SVG kept in the library folder showed as a broken picture: the folder's files have no extension, so the browser gave them no type, and an SVG needs `image/svg+xml`. A file read from the folder now gets the original's type back (also in backups and when moved back). Nothing stored needs repair: the type was always kept.
 
 ## 0.22.0 — Library folder (2026-10-20)
 
-- **Library folder** (Chromium, ADR 0159): pick a folder in the storage panel and new originals are kept there as plain files named by their SHA-256, outside the browser's storage limit. Each file is written, read back and compared before the browser keeps a stub of it. *Move browser files into the folder* and *Move files back into the browser* move what exists; *Reconnect folder* after a restart; files missing from the folder are flagged like missing originals; backups read the folder's files and refuse to leave one out; erasing an original removes its file.
+- **Library folder** (Chromium, ADR 0159): pick a folder in the storage panel (Settings > Storage since 0.22.2) and new originals are kept there as plain files named by their SHA-256, outside the browser's storage limit. Each file is written, read back and compared before the browser keeps a stub of it. *Move browser files into the folder* and *Move files back into the browser* move what exists; *Reconnect folder* after a restart; files missing from the folder are flagged like missing originals; backups read the folder's files and refuse to leave one out; erasing an original removes its file.
 - Schema 10: an index on the stubs. Nothing is converted.
 
 ## 0.21.1 — Full storage is reported, not silent (2026-10-20)

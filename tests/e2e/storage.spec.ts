@@ -283,18 +283,17 @@ test("a commit against a stale revision is rejected and reported, never overwrit
   expect(await p.evaluate((c) => window.__canvastDebug.storedObjectIds(c), current!.canvasId)).toEqual(stored);
 });
 
-test("the storage panel reports save state, tab role, space, persistence and backup status", async ({ app }) => {
+test("pressing the save indicator opens Settings > Storage: space, library folder, saving and backup status", async ({ app }) => {
   const p = app.page;
   await draw(p, [[300, 300], [400, 350]]);
   await saved(p);
   await p.getByTestId("save-status").click();
-  const panel = p.getByTestId("storage-panel");
-  await expect(panel).toBeVisible();
-  await expect(panel.getByTestId("storage-save-state")).toHaveText("verified");
-  await expect(panel.getByTestId("storage-role")).toContainText("editing (writer)");
-  await expect(panel.getByTestId("storage-backup")).toContainText("none");
-  await expect(panel).toContainText("Browser storage is not a backup");
-  await expect(panel).toContainText(/used of about|unknown/);
+  await expect(p.getByTestId("storage-save-state")).toHaveText("verified");
+  await expect(p.getByTestId("storage-role")).toContainText("editing (writer)");
+  await expect(p.getByTestId("set-last-backup")).toContainText("No backup made yet");
+  await expect(p.locator("[data-storage]")).toContainText("Browser storage is not a backup");
+  await expect(p.locator("[data-used]")).not.toHaveText("…");
+  await expect(p.getByTestId("storage-folder")).toBeVisible();
 });
 
 test("two tabs without Web Locks: the localStorage heartbeat lease keeps one writer", async ({ browser }) => {

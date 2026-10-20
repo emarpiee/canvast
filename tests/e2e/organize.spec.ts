@@ -243,7 +243,7 @@ test("tags, favourites and folders travel in archives and merge on import withou
 
   await p.getByTestId("view-canvas").click();
   await p.getByTestId("save-status").click();
-  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("export-workspace").click()]);
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("set-export-full").click()]);
   const bytes = await readFile((await dl.path())!);
   const man = JSON.parse(await (await readZip(new Blob([new Uint8Array(bytes)]))).get("manifest.json")!.data.text()) as {
     assets: Array<{ hash: string; tags: string[]; favorite: boolean; folders: string[][] }>;
@@ -258,8 +258,8 @@ test("tags, favourites and folders travel in archives and merge on import withou
   await q.goto(APP_URL);
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   for (let i = 0; i < 2; i++) {
-    if (await q.getByTestId("storage-panel").isHidden()) await q.getByTestId("save-status").click();
-    await q.getByTestId("import-archive-input").setInputFiles({ name: dl.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
+    if (await q.getByTestId("set-export-full").isHidden()) await q.getByTestId("save-status").click();
+    await q.getByTestId("set-import-input").setInputFiles({ name: dl.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
     await q.getByTestId("confirm-ok").click();
     await expect(q.getByTestId("toast")).toContainText("Imported");
   }

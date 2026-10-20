@@ -170,3 +170,10 @@ export async function externalHashes(db: IDBDatabase): Promise<string[]> {
   const tx = db.transaction("assets", "readonly");
   return (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
 }
+
+/** How many originals are kept in the folder and how many in the browser's storage. */
+export async function libraryCounts(db: IDBDatabase): Promise<{ inFolder: number; inBrowser: number }> {
+  const tx = db.transaction("assets", "readonly");
+  const [all, ext] = await Promise.all([req(tx.objectStore("assets").count()), req(tx.objectStore("assets").index("ext").count())]);
+  return { inFolder: ext, inBrowser: all - ext };
+}

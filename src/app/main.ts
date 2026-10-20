@@ -50,7 +50,7 @@ import { WorkspaceRepo } from "../storage/workspace-repo";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
-import { mountStoragePanel } from "../ui/storage-panel";
+import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { mountToolbar } from "../ui/toolbar";
 import { initColourPopover } from "../ui/colour-popover";
 import { labelOf, mountLayersPanel } from "../ui/layers-panel";
@@ -1538,6 +1538,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     exportFiles: () => runExportFiles(session, { kind: "workspace" }),
     importFiles: (files) => runImport(session, files),
     readOnly: () => session.readOnly,
+    saving: () => {
+      const p = session.persistence;
+      return {
+        state: p.state,
+        error: p.lastError ?? "",
+        lastVerified: p.lastVerifiedAt ? `${new Date(p.lastVerifiedAt).toLocaleTimeString()}${p.lastCommit ? ` (revision ${p.revision}, ${p.lastCommit.puts} written, ${p.lastCommit.deletes} deleted)` : ""}` : "not yet",
+        role: `${session.readOnly ? "read-only (another tab is editing)" : "editing (writer)"} · lease via ${session.lease.mechanism}`,
+      };
+    },
+    onSaving: (fn) => void session.persistence.subscribe(fn),
+    folder: (() => {
+      let draw: (() => Promise<void>) | null = null;
+      return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
+    })(),
+    persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
   });
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
   settings.subscribe((key) => {
@@ -1598,7 +1613,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     editor.changed();
   });
-  mountStoragePanel(document.getElementById("hud")!, session, document.querySelector<HTMLElement>('[data-testid="save-status"]')!);
+  // The save indicator opens Settings > Storage, the one place for space, the library folder, saving and backups.
+  document.querySelector<HTMLElement>('[data-testid="save-status"]')!.addEventListener("click", () => { setView("settings"); settingsView.show("storage"); });
 
   // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
   // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.

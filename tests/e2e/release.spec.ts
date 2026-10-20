@@ -113,14 +113,14 @@ async function exportAll(p: Page): Promise<void> {
 }
 
 async function exportWorkspace(p: Page): Promise<{ name: string; bytes: Buffer }> {
-  if (await p.getByTestId("storage-panel").isHidden()) await p.getByTestId("save-status").click();
-  await expect(p.getByTestId("storage-panel")).toBeVisible();
-  return download(p, () => p.getByTestId("export-workspace").click());
+  if (await p.getByTestId("set-export-full").isHidden()) await p.getByTestId("save-status").click();
+  await expect(p.getByTestId("set-export-full")).toBeVisible();
+  return download(p, () => p.getByTestId("set-export-full").click());
 }
 
 async function importWorkspace(p: Page, name: string, bytes: Buffer): Promise<void> {
-  if (await p.getByTestId("storage-panel").isHidden()) await p.getByTestId("save-status").click();
-  await p.getByTestId("import-archive-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
+  if (await p.getByTestId("set-export-full").isHidden()) await p.getByTestId("save-status").click();
+  await p.getByTestId("set-import-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
   const dlg = p.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   await p.getByTestId("toast").evaluate((t) => (t.textContent = ""));

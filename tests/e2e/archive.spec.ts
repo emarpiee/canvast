@@ -67,8 +67,8 @@ async function openMenu(p: Page): Promise<void> {
 }
 
 async function openPanel(p: Page): Promise<void> {
-  if (await p.getByTestId("storage-panel").isHidden()) await p.getByTestId("save-status").click();
-  await expect(p.getByTestId("storage-panel")).toBeVisible();
+  if (await p.getByTestId("set-export-full").isHidden()) await p.getByTestId("save-status").click();
+  await expect(p.getByTestId("set-export-full")).toBeVisible();
 }
 
 /** Run an export action and return the downloaded file. */
@@ -85,7 +85,7 @@ async function manifestOf(bytes: Buffer): Promise<Record<string, unknown> & { bo
 /** Import through the storage panel; returns the confirmation dialog for inspection. */
 async function importArchive(p: Page, name: string, bytes: Buffer, accept = true): Promise<string> {
   await openPanel(p);
-  await p.getByTestId("import-archive-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
+  await p.getByTestId("set-import-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
   const dlg = p.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   const text = (await dlg.textContent()) ?? "";
@@ -95,6 +95,7 @@ async function importArchive(p: Page, name: string, bytes: Buffer, accept = true
   await expect(dlg).toHaveCount(0);
   // Wait for the outcome, not the dialog: a fresh profile already shows "Board 1 › Canvas 1".
   if (accept) await expect(p.getByTestId("toast")).toContainText(/Imported|Import failed/);
+  await p.getByTestId("view-canvas").click(); // (the backup tools are in Settings > Storage; the canvas is read from here)
   return text;
 }
 
@@ -153,11 +154,10 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   ].sort());
 
   await openPanel(p);
-  await expect(p.getByTestId("storage-backup")).toContainText("none");
-  const file = await download(p, () => p.getByTestId("export-workspace").click());
+  await expect(p.getByTestId("set-last-backup")).toContainText("No backup made yet");
+  const file = await download(p, () => p.getByTestId("set-export-full").click());
   expect(file.name).toMatch(/^My-workspace-\d{4}-\d{2}-\d{2}\.canvast$/);
-  await expect(p.getByTestId("storage-backup")).toContainText(file.name);
-  await expect(p.getByTestId("storage-backup")).toContainText("checked before saving");
+  await expect(p.getByTestId("set-last-backup")).toContainText(file.name);
 
   // The file: one entry per original (not per instance), every checksum valid.
   const m = await manifestOf(file.bytes);
@@ -265,13 +265,13 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   const p = app.page;
   await importImage(p);
   await openPanel(p);
-  const good = await download(p, () => p.getByTestId("export-workspace").click());
+  const good = await download(p, () => p.getByTestId("set-export-full").click());
   const before = await sess(p);
   const treeShape = (s: Sess) => s.tree!.map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])]);
 
   const refuse = async (name: string, bytes: Buffer, message: RegExp): Promise<void> => {
     await openPanel(p);
-    await p.getByTestId("import-archive-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
+    await p.getByTestId("set-import-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
     await expect(p.getByTestId("toast")).toHaveText(message);
     await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
     expect(treeShape(await sess(p))).toEqual(treeShape(before));
@@ -328,13 +328,13 @@ test("a read-only tab can export but not import", async ({ app, context }) => {
   const p2 = await openApp(context);
   expect((await sess(p2)).readOnly).toBe(true);
   await openPanel(p2);
-  await expect(p2.getByTestId("import-archive")).toBeDisabled();
-  const file = await download(p2, () => p2.getByTestId("export-workspace").click());
+  await expect(p2.getByTestId("set-import")).toBeDisabled();
+  const file = await download(p2, () => p2.getByTestId("set-export-full").click());
   const m = await manifestOf(file.bytes);
   expect(m.assets.map((a) => a.hash)).toEqual([HASH]);
   // A read-only tab does not record the backup (it cannot write); the writer's panel shows none yet.
   await openPanel(p1);
-  await expect(p1.getByTestId("storage-backup")).toContainText("none");
+  await expect(p1.getByTestId("set-last-backup")).toContainText("No backup made yet");
   await p2.close();
 });
 
@@ -384,13 +384,13 @@ test("an incremental backup holds only what changed, a chain of backups restores
 
   await openPanel(p);
   // no backup yet: there is nothing to go on from
-  await p.getByTestId("export-changes").click();
-  await expect(p.getByTestId("toast")).toContainText("make a full backup first");
-  const full = await download(p, () => p.getByTestId("export-workspace").click());
+  await expect(p.getByTestId("set-export-changes")).toBeDisabled();
+  const full = await download(p, () => p.getByTestId("set-export-full").click());
   const fullM = await manifestOf(full.bytes);
   expect(fullM["incremental"]).toBeUndefined();
   expect((fullM["styles"] as unknown[]).length).toBe(1);
 
+  await p.getByTestId("view-canvas").click(); // (Settings > Storage was open for the backup)
   // one canvas changes (a stroke on the open one) and one original is added
   const before = (await sess(p)).current!.canvasId;
   await stroke(p, 700, 300);
@@ -401,7 +401,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   await saved(p);
 
   await openPanel(p);
-  const inc = await download(p, () => p.getByTestId("export-changes").click());
+  const inc = await download(p, () => p.getByTestId("set-export-changes").click());
   const m = await manifestOf(inc.bytes);
   expect(m["incremental"]).toEqual({ since: fullM["exportedAt"] });
   const canvases = m.boards.flatMap((b) => b.canvases) as unknown as Array<{ id: string; file?: string }>;
@@ -412,7 +412,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   const z = await readZip(new Blob([new Uint8Array(inc.bytes)]));
   expect(z.size).toBe(1 + 1 + 1);
   expect(inc.bytes.length).toBeLessThan(full.bytes.length);
-  await expect(p.getByTestId("storage-backup")).toContainText(inc.name);
+  await expect(p.getByTestId("set-last-backup")).toContainText(inc.name);
 
   // a chain restores as one, in whichever order the files are picked
   const srcTree = (await sess(p)).tree!;
@@ -420,7 +420,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   const other = await freshProfile(browser);
   const q = other.page;
   await openPanel(q);
-  await q.getByTestId("import-archive-input").setInputFiles([
+  await q.getByTestId("set-import-input").setInputFiles([
     { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
     { name: full.name, mimeType: "application/zip", buffer: full.bytes },
   ]);
@@ -438,7 +438,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
 
   // the incremental file alone says what it is; two of them without the full one are refused
   await openPanel(q);
-  await q.getByTestId("import-archive-input").setInputFiles({ name: inc.name, mimeType: "application/zip", buffer: inc.bytes });
+  await q.getByTestId("set-import-input").setInputFiles({ name: inc.name, mimeType: "application/zip", buffer: inc.bytes });
   await expect(dlg).toBeVisible();
   const alone = (await dlg.textContent()) ?? "";
   expect(alone).toContain("incremental backup on its own");
@@ -446,7 +446,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   await expect(dlg).toHaveCount(0);
   await q.getByTestId("toast").evaluate((t) => (t.textContent = ""));
   await openPanel(q);
-  await q.getByTestId("import-archive-input").setInputFiles([
+  await q.getByTestId("set-import-input").setInputFiles([
     { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
     { name: "again.canvast", mimeType: "application/zip", buffer: inc.bytes },
   ]);

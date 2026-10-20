@@ -1,0 +1,78 @@
+import type { Session } from "../app/session";
+import { plural } from "../doc/plural";
+import { esc } from "./format";
+import { externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
+import { moveFromFolder, moveToFolder } from "../storage/folder-move";
+
+/**
+ * The library folder card of Settings > Storage (ADR 0159): where the originals are kept, and the moves between the
+ * browser's storage and a folder on the disk. Returns the function that draws it again; the card draws itself after each action.
+ */
+export function mountLibraryFolderCard(host: HTMLElement, session: Session): () => Promise<void> {
+  const draw = async (): Promise<void> => {
+    const db = session.repo?.db;
+    if (!db) {
+      host.innerHTML = `<p>Storage is not available in this tab.</p>`;
+      return;
+    }
+    const st = externalFolder.state;
+    const intro = `<p>Keep the files of your library as plain files in a folder on your disk instead of in this browser's storage. A folder has no size limit, so the library can grow as large as your disk.</p>`;
+    if (st === "none" && !folderSupported()) {
+      host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>Not available in this browser.</strong> It needs Chromium (Chrome, Edge, Brave). Your files stay in the browser's storage.</p>`;
+      return;
+    }
+    const { inFolder, inBrowser } = await libraryCounts(db);
+    /** A button; `blocked` (a reason) or a read-only tab turns it off, with the reason as its title. */
+    const btn = (action: string, label: string, blocked = ""): string => {
+      const why = session.readOnly ? "Read-only: another tab is editing" : blocked;
+      return `<button type="button" data-folder="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
+    };
+    if (st === "none") {
+      host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>Not set.</strong> Files are kept in the browser's storage.</p><div class="storage-actions">${btn("choose", "Choose library folder…")}</div>`;
+      return;
+    }
+    const name = esc(externalFolder.name);
+    if (st !== "ready") {
+      host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>${name}</strong> ${st === "needs-permission" ? `needs your permission again (the browser asks once each time it restarts). ${plural(inFolder, "file")} in it show as missing until you allow it.` : "cannot be used right now."}</p><div class="storage-actions">${btn("reconnect", st === "needs-permission" ? "Reconnect folder" : "Try again")}</div>`;
+      return;
+    }
+    host.innerHTML = `${intro}
+      <dl data-testid="storage-folder">
+        <dt>Folder</dt><dd><strong>${name}</strong>: new files are stored there.</dd>
+        <dt>Files in the folder</dt><dd data-testid="folder-count">${inFolder}</dd>
+        <dt>Files in the browser</dt><dd data-testid="browser-count">${inBrowser}</dd>
+      </dl>
+      <div class="storage-actions">
+        ${btn("in", "Move browser files into the folder", inBrowser ? "" : "Nothing in the browser to move")}
+        ${btn("out", "Move files back into the browser", inFolder ? "" : "Nothing in the folder to move")}
+        ${btn("choose", "Choose another folder…", inFolder ? "Move the files back into the browser first, or they would show as missing" : "")}
+        ${btn("forget", "Stop using this folder", inFolder ? "Move the files back into the browser first" : "")}
+      </div>
+      <p class="storage-note">Do not move, rename or edit the files in the folder: they are named by their content. A backup (.canvast) holds their bytes as always.</p>`;
+  };
+
+  host.addEventListener("click", async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-folder]");
+    const db = session.repo?.db;
+    if (!b || !db || b.disabled) return;
+    const act = b.dataset["folder"];
+    const say = (t: string): void => {
+      const el = host.querySelector<HTMLElement>('[data-testid="folder-count"]') ?? host;
+      el.textContent = t;
+    };
+    try {
+      if (act === "choose") await externalFolder.choose(db);
+      else if (act === "reconnect") await externalFolder.reconnect();
+      else if (act === "forget") await externalFolder.forget(db);
+      else {
+        const r = await (act === "in" ? moveToFolder : moveFromFolder)(db, (d, n) => say(`Moving files… ${d} of ${n}`));
+        session.tell(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") session.tell(`Library folder: ${(err as Error).message}`); // (closing the picker is not an error)
+    }
+    void draw();
+  });
+  externalFolder.subscribe(() => void draw());
+  return draw;
+}

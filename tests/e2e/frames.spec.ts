@@ -288,7 +288,7 @@ test("work at 2^10^12 and 10^15 saves, reopens after a reload, and travels in an
 
   // Export the workspace and import it into an empty profile.
   await p.getByTestId("save-status").click();
-  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("export-workspace").click()]);
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("set-export-full").click()]);
   const bytes = await readFile((await dl.path())!);
   const context = await browser.newContext();
   const q = await context.newPage();
@@ -296,7 +296,7 @@ test("work at 2^10^12 and 10^15 saves, reopens after a reload, and travels in an
   await q.goto(APP_URL);
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await q.getByTestId("save-status").click();
-  await q.getByTestId("import-archive-input").setInputFiles({ name: "deep.canvast", mimeType: "application/zip", buffer: bytes });
+  await q.getByTestId("set-import-input").setInputFiles({ name: "deep.canvast", mimeType: "application/zip", buffer: bytes });
   await q.getByTestId("confirm-ok").click();
   await expect(q.getByTestId("toast")).toContainText(/Imported/);
   // The imported canvas opens at its saved view with the same three objects in the same frames.

@@ -5,7 +5,7 @@
 
 ## Decision
 
-In Chromium the person can pick a **library folder** (storage panel, File System Access API). New originals are written there as files named by their SHA-256 and the browser keeps a **stub** of each. The folder has no quota. Elsewhere (Firefox has no directory picker) nothing changes and the README says so.
+In Chromium the person can pick a **library folder** (Settings > Storage, File System Access API). New originals are written there as files named by their SHA-256 and the browser keeps a **stub** of each. The folder has no quota. Elsewhere (Firefox has no directory picker) nothing changes and the README says so.
 
 Also, for every browser: a full store is reported in plain words (an import is refused, nothing half-stored), the browser is asked once to keep the data (`storage.persist()`), and one notice appears at 80% of the quota (`src/storage/quota.ts`).
 
@@ -27,3 +27,7 @@ The folder is outside canvast's control: files moved, renamed or deleted there s
 ## Tests
 
 `tests/unit/external-folder.test.ts` (write, verify, read, permission), `tests/e2e/library-folder.spec.ts` (Chromium; the native picker cannot be driven, so a stand-in directory with the same interface is attached through the debug hook): import, reload, backup, a file gone, re-import, moves both ways, GC.
+
+## Where it lives in the interface
+
+Settings > Storage is the one place for all of it, in four cards: **Space** (used, available, whether the browser keeps the data), **Library folder**, **Saving** (state, last verified save, this tab's role) and **Backup**. The save indicator opens it; the popover it used to open is gone (it repeated Space and Backup). "Choose another folder" and "Stop using this folder" are off while files are in the folder (they would show as missing); *Move files back into the browser* comes first.

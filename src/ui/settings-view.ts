@@ -227,7 +227,7 @@ function controlHtml(row: Row, id: string): string {
 }
 
 /** Mount the view into `root`; returns what main needs to show and hide it. */
-/** What the Storage tab needs to make and read backups (the same ones the workspace menu and the storage popover have). */
+/** What the Storage tab needs: the save state, the library folder, and backups (the same ones the workspace menu has). */
 export interface BackupHooks {
   last(): Promise<{ at: number; kind: "full" | "incremental"; fileName: string; bytes: number } | null>;
   exportFull(): Promise<void>;
@@ -235,6 +235,14 @@ export interface BackupHooks {
   exportFiles(): Promise<void>;
   importFiles(files: File[]): Promise<void>;
   readOnly(): boolean;
+  /** How saving is going, in plain words, for the Saving card. */
+  saving(): { state: string; error: string; lastVerified: string; role: string };
+  /** Call `fn` when the save state changes. */
+  onSaving(fn: () => void): void;
+  /** Draw the library folder card into `host` (once), and again whenever called. */
+  folder(host: HTMLElement): Promise<void>;
+  /** Ask the browser to keep the data under storage pressure. */
+  persist(): Promise<void>;
 }
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
@@ -263,8 +271,13 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
            <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
            <div data-tool-keys></div><div class="set-note" data-key-note role="status" aria-live="polite"></div><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
       : t.id === "storage"
-        ? `<div class="set-info set-card" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
-           <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy below.</p></div>
+        ? `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
+             <dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd><span data-persisted>…</span> <button type="button" data-persist hidden>Ask the browser to keep it</button></dd></dl>
+             <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy (Backup, below).</p></div>
+           <div class="set-info set-card" data-folder-card><h3>Library folder</h3><div data-folder-host></div></div>
+           <div class="set-info set-card" data-saving><h3>Saving</h3>
+             <dl><dt>Status</dt><dd data-testid="storage-save-state" data-save-state>…</dd><dt>Last verified save</dt><dd data-save-verified>…</dd><dt>This tab</dt><dd data-testid="storage-role" data-save-role>…</dd></dl>
+             <p class="set-help">Every change is saved within a fraction of a second and read back to check. The indicator at the bottom shows the state; pressing it brings you here.</p></div>
            <div class="set-info set-card" data-backup><h3>Backup</h3>
              <p data-testid="set-last-backup" data-last-backup>…</p>
              <div class="storage-actions">
@@ -274,7 +287,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                <button type="button" data-backup-action="import" data-testid="set-import">Import backup files…</button>
                <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
              </div>
-             <p class="set-help">A backup is one file you can keep anywhere. After a full one, an incremental backup holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>`
+             <p class="set-help">A backup is one file you can keep anywhere; it is checked before it is handed over. The browser does not report whether the download finished, so keep the file somewhere safe. After a full backup, an incremental one holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>`
         : t.id === "about"
           ? `<div class="set-info set-card"><h3>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
              <div class="set-info set-card"><h3>This browser</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
@@ -391,6 +404,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
   });
 
+  /** The Saving card: how saving is going. */
+  const saving = (): void => {
+    if (!backup) return;
+    const v = backup.saving();
+    const set = (sel: string, text: string): void => {
+      const el = root.querySelector<HTMLElement>(sel);
+      if (el) el.textContent = text;
+    };
+    set("[data-save-state]", v.error ? `${v.state}: ${v.error}` : v.state);
+    set("[data-save-verified]", v.lastVerified);
+    set("[data-save-role]", v.role);
+  };
+  backup?.onSaving(saving);
+
   const storage = async (): Promise<void> => {
     const set = (sel: string, text: string): void => {
       const el = root.querySelector<HTMLElement>(sel);
@@ -400,15 +427,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     try {
       const est = await navigator.storage?.estimate?.();
       set("[data-used]", mb(est?.usage));
-      set("[data-quota]", mb(est?.quota));
+      set("[data-quota]", est?.quota !== undefined && est.usage !== undefined ? `${mb(est.quota)} (${Math.round((est.usage / est.quota) * 100)}% used)` : mb(est?.quota));
       const persisted = await navigator.storage?.persisted?.();
       set("[data-persisted]", persisted === undefined ? "unknown" : persisted ? "Yes" : "No (the browser may clear it when space is short)");
+      const ask = root.querySelector<HTMLButtonElement>("[data-persist]");
+      if (ask) ask.hidden = persisted !== false || !backup;
     } catch {
       set("[data-used]", "unknown");
       set("[data-quota]", "unknown");
       set("[data-persisted]", "unknown");
     }
     if (backup) {
+      saving();
+      const host = root.querySelector<HTMLElement>("[data-folder-host]");
+      if (host) void backup.folder(host);
       const last = await backup.last();
       set("[data-last-backup]", last ? `Last backup: ${new Date(last.at).toLocaleString()} (${last.kind === "incremental" ? "incremental" : "full"}), ${last.fileName}, ${mb(last.bytes)}.` : "No backup made yet.");
       const ro = backup.readOnly();
@@ -419,6 +451,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
   };
   root.addEventListener("click", (e) => {
+    if (backup && (e.target as HTMLElement).closest("[data-persist]")) {
+      void backup.persist().then(() => storage());
+      return;
+    }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-backup-action]");
     if (!b || !backup) return;
     const a = b.dataset["backupAction"];
