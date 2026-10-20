@@ -1600,7 +1600,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },
       { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },
-      { group: "View", title: "Fit the selection in view", keys: "Alt", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
+      { group: "View", title: "Fit the selection in view", keys: "Ctrl+Space", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
       { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
       { group: "View", title: "Previous view", keys: "Alt+Shift+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
       { group: "View", title: "Next view", keys: "Alt+Shift+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },

@@ -176,8 +176,8 @@ type Gesture =
   /** Crossing the regions of the Shape builder (ADR 0145). */
   | { kind: "builder"; pointerId: number }
   /** A lasso drawn round nodes of the picked paths (Edit nodes). */
-  | { kind: "nodelasso"; pointerId: number; additive: boolean }
-  | { kind: "cornerlasso"; pointerId: number; id: ObjectId; additive: boolean }
+  | { kind: "nodelasso"; pointerId: number; additive: boolean; /** What was under the press: a click without a drag picks it. */ target: CanvasObject | null }
+  | { kind: "cornerlasso"; pointerId: number; id: ObjectId; additive: boolean; target: CanvasObject | null }
   | { kind: "node"; pointerId: number; id: ObjectId; what: "point" | "in" | "out" | "seg"; s: number; k: number; t: number; prev: { s: number; k: number } | null; base: readonly SubPath[]; start: ScreenPoint; startLocal: { x: number; y: number }; moved: boolean; smooth: boolean }
   | {
       kind: "scale";
@@ -767,9 +767,9 @@ export function attachTools(
     const h = shapeHandles(tgt.po, open, editor);
     const pick = h && hitCornerHandle(h, s.x, s.y, open);
     // Corners opened out: a drag that starts on empty ground is a lasso that picks corners, to be moved together.
-    if (h && open && !pick && pickAll(unlocked(visible()), s.x, s.y).length === 0) {
+    if (h && open && !pick) {
       editor.lasso = [s.x, s.y];
-      g = { kind: "cornerlasso", pointerId: e.pointerId, id: tgt.o.id, additive: e.shiftKey };
+      g = { kind: "cornerlasso", pointerId: e.pointerId, id: tgt.o.id, additive: e.shiftKey, target: pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null };
       editor.changed();
       return true;
     }
@@ -1032,10 +1032,12 @@ export function attachTools(
     const hit = tgt ? hitNodes(tgt.po, s.x, s.y, editor.nodeSel) : null;
     el.classList.toggle("is-add", hit?.kind === "seg" && !tgt!.o.net);
     const net = !!tgt?.o.net;
-    const text = !hit ? null
-      : hit.kind === "seg" ? (net ? "Click: add a node · Alt+click: delete the edge" : "Click: add a node")
-      : hit.kind === "point" ? (net ? "Drag: move · Alt+click: smooth or corner · Alt on another end: join · Del: delete" : "Drag: move · Alt+click: smooth or corner · Shift+click: pick more · Del: delete")
-      : "Drag: bend";
+    const inside = !hit && !!tgt && pickAll(unlocked(visible()), s.x, s.y)[0]?.obj.id === tgt.o.id;
+    // short, like the names the other handles give (Radius, Ratio, Count): what it is, then its key
+    const text = !hit ? (inside ? "Lasso nodes" : null)
+      : hit.kind === "seg" ? (net ? "Add node · Alt: cut" : "Add node")
+      : hit.kind === "point" ? (net ? "Node · Alt: join · Del" : "Node · Alt: smooth · Del")
+      : "Bend";
     if (text) editor.handleLabel = editor.handleLabel?.text === text && editor.handleLabel.x === s.x && editor.handleLabel.y === s.y ? editor.handleLabel : { x: s.x, y: s.y, text };
     else if (editor.handleLabel) editor.handleLabel = null;
     else return;
@@ -1457,7 +1459,6 @@ export function attachTools(
 
   // ---- pointer events ----------------------------------------------------
   const onPointerDown = (e: PointerEvent): void => {
-    altAlone = false;
     const s = local(e);
     if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 1) return;
     e.preventDefault();
@@ -1590,9 +1591,10 @@ export function attachTools(
         editor.region = null;
         // Not on a node: a click picks the path to edit (or clears), a drag from nothing is a box.
         const hit = pickAll(unlocked(visible()), s.x, s.y)[0]?.obj ?? null;
-        if (!hit && nodeTargets().length && !editor.blockEdit()) {
-          // from empty ground a drag draws a lasso round nodes to pick (a click clears the selection, as before)
-          g = { kind: "nodelasso", pointerId: e.pointerId, additive: e.shiftKey };
+        if (nodeTargets().length && !editor.blockEdit()) {
+          // a drag from anywhere that is not a node or an edge, inside a shape too, draws a lasso round nodes to pick (the shape is not moved here: that is the Select
+          // tool's); a click without a drag picks what is under it, or clears the selection
+          g = { kind: "nodelasso", pointerId: e.pointerId, additive: e.shiftKey, target: hit };
           editor.lasso = [s.x, s.y];
           break;
         }
@@ -1965,7 +1967,7 @@ export function attachTools(
         const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1);
         if (Math.max(...xs) - Math.min(...xs) < DRAG_THRESHOLD_PX && Math.max(...ys) - Math.min(...ys) < DRAG_THRESHOLD_PX) {
           editor.cornerSel = null;
-          if (!g.additive) editor.select([]); // a click on empty ground clears, as it did
+          if (!g.additive && !g.target) editor.select([]); // a click on empty ground clears, as it did (on the shape or another one it keeps the pick)
           break;
         }
         const tgt = gradientTarget();
@@ -1982,7 +1984,13 @@ export function attachTools(
         if (cancelled || !poly) break;
         const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1);
         if (Math.max(...xs) - Math.min(...xs) < DRAG_THRESHOLD_PX && Math.max(...ys) - Math.min(...ys) < DRAG_THRESHOLD_PX) {
-          if (!g.additive) editor.select([]); // a click on empty ground clears, as it did
+          if (g.target) {
+            // a click on a shape picks it to edit (Shift adds it or takes it away)
+            const ids = new Set(g.additive ? editor.selection : []);
+            if (ids.has(g.target.id) && g.additive) ids.delete(g.target.id);
+            else ids.add(g.target.id);
+            editor.select([...ids]);
+          } else if (!g.additive) editor.select([]); // a click on empty ground clears, as it did
           break;
         }
         const next = new Map<ObjectId, Set<string>>(g.additive ? [...editor.nodeMulti].map(([id, set]) => [id, new Set(set)]) : []);
@@ -2067,11 +2075,8 @@ export function attachTools(
   };
 
   // ---- keyboard ----------------------------------------------------------
-  /** Alt pressed and released on its own (no other key or pointer in between) brings the selection into view. */
-  let altAlone = false;
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!canvasShortcutsActive(e)) return;
-    altAlone = e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey;
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
@@ -2104,6 +2109,10 @@ export function attachTools(
       flattenSelection(doc, editor);
     } else if (mod && (e.key === "]" || e.key === "[")) {
       arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
+    } else if (mod && e.key === " ") {
+      // Ctrl+Space brings the selection into view; again: everything visible at this zoom (the cycle is in item-navigation.ts)
+      e.preventDefault();
+      if (!e.repeat && g.kind === "none") hooks.focusSelection();
     } else if (mod || e.altKey) {
       return;
     } else if (e.key === "#" || e.key === "@") {
@@ -2162,14 +2171,6 @@ export function attachTools(
 
   const onKeyUp = (e: KeyboardEvent): void => {
     if (e.key === "Control" || e.key === "Meta") reveal.key(false);
-    if (e.key === "Alt" && altAlone) {
-      altAlone = false;
-      if (canvasShortcutsActive(e)) {
-        e.preventDefault(); // not the browser's menu bar
-        hooks.focusSelection();
-      }
-      return;
-    }
     if (e.key === " ") {
       spaceDown = false;
       el.classList.remove("is-hand");
@@ -2198,8 +2199,19 @@ export function attachTools(
   };
   el.addEventListener("pointerleave", onLeave);
   // Leaving the Path tool ends the path being drawn (open).
+  let hadSelection = false;
   const unsubscribe = editor.subscribe(() => {
     if (editor.pathDraft && editor.tool !== "path") commitPath(false);
+    const has = editor.selection.size > 0;
+    if (g.kind === "none") {
+      // Radius and node editing end by themselves when the shape is let go (a click elsewhere, Esc, delete) or another one is picked.
+      if (editor.cornersOpen !== null && !(editor.selection.size === 1 && editor.selection.has(editor.cornersOpen))) {
+        editor.cornersOpen = null;
+        editor.cornerSel = null;
+      }
+      if (editor.tool === "node" && hadSelection && !has && !editor.pathDraft) editor.setTool("select");
+      hadSelection = has; // (not while a gesture runs: a lasso that clears the selection ends the mode when it is over)
+    }
   });
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);

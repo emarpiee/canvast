@@ -249,7 +249,7 @@ or network connection.
 - **Snapping, arranging and clipboard:** a moving selection snaps to other
   objects with guide lines; align, distribute, copy, cut, paste and
   duplicate; `Alt`+drag copies.
-- **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Alt` brings the
+- **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Ctrl+Space` brings the
   selection into view, bookmarks save places and zooms, the canvas search finds
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
 - **Shapes and paths:** the Shape tool (rectangle, ellipse, line, polygon, star), the Path tool (Bézier curves) and Edit nodes; fills and
@@ -281,7 +281,7 @@ or network connection.
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
 | Step to the next item | `W` `A` `S` `D` (rebind in Settings > Shortcuts; Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
-| Bring the selection into view | `Alt` pressed and released alone; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
+| Bring the selection into view | `Ctrl+Space`; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
 | Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
 | Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library and canvas search; ADR 0069) · `.png` a file type (ADR 0082) |
 | Select several layers | `Ctrl`+click toggles · `Shift`+click selects a range · `Ctrl+Shift`+click adds a range |

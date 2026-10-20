@@ -2992,11 +2992,40 @@ test("Edit nodes: a plus cursor where a click adds a node, and a label that name
   const label = () => p.evaluate(() => window.__canvastDebug.handleLabel());
   await p.mouse.move(520, 250); // the middle of the top edge
   await expect(canvas).toHaveClass(/is-add/);
-  await expect.poll(label).toMatch(/add a node/);
+  await expect.poll(label).toMatch(/Add node/);
   await p.mouse.move(400, 250); // a corner node
   await expect(canvas).not.toHaveClass(/is-add/);
-  await expect.poll(label).toMatch(/Alt\+click.*Del/);
-  await p.mouse.move(520, 340); // inside the shape, off every edge and node
+  await expect.poll(label).toMatch(/Alt: smooth.*Del/);
+  await p.mouse.move(520, 340); // inside the shape, off every edge and node: a drag here is a lasso, not a move
   await expect(canvas).not.toHaveClass(/is-add/);
+  await expect.poll(label).toMatch(/Lasso nodes/);
+  const before = ((await last(app)) as Obj & { ax?: unknown }).ax;
+  await drag(app, [500, 320], [560, 360]);
+  expect(((await last(app)) as Obj & { ax?: unknown }).ax, "the shape did not move").toEqual(before);
+  await p.mouse.move(800, 600); // empty ground
   await expect.poll(label).toBeNull();
+});
+
+test("Edit nodes and the corners one by one end by themselves when the shape is let go", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [500, 300], [560, 340]); // (a small shape, so that focusing it changes the view)
+  await key(app, "v");
+  await click(app, 530, 320);
+  // Edit nodes: a click on empty ground leaves the mode
+  await key(app, "n");
+  expect(await tool(app)).toBe("node");
+  await click(app, 900, 600);
+  expect(await tool(app), "back to Select when nothing is picked").toBe("select");
+  // the corners opened out: closed again when the shape is let go
+  await click(app, 530, 320);
+  const main = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  await p.mouse.dblclick(main[0], main[1]);
+  await app.frame();
+  // (opened out, the main dot is in the middle of the shape; closed, it sits inside the first corner)
+  expect(Math.abs((await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main[0] - 530), "the corners are opened out").toBeLessThan(8);
+  await click(app, 900, 600);
+  await click(app, 530, 320);
+  expect(Math.abs((await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main[0] - 530), "closed after the shape was let go").toBeGreaterThan(15);
 });

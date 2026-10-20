@@ -51,6 +51,6 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 
 ## Workflow
 
-- Work on `main`. Ask before pushing. After a slice, build `dist/` (`npm run build`) so the owner can test it; never `pkill -f` (it kills the shell); `rm` and `cp` are interactive aliases here (use `\rm -f`, `\cp -f`).
+- Work on `main`. Ask before pushing. **Rebuild `dist/` (`npm run build`) immediately after every source change**, before running tests: the owner tests it live. After a slice, build `dist/` too; never `pkill -f` (it kills the shell); `rm` and `cp` are interactive aliases here (use `\rm -f`, `\cp -f`).
 - Work happens in phases/slices (see `docs/status.md`); a finished slice bumps `package.json` version, updates `CHANGELOG.md`, `docs/status.md`, README and its test log, and is committed as `feat(<area>): ... (vX.Y.Z)`.
 - **Use emojis for readability in replies and summaries.** Status: ✅ done and verified (visibly green), ❌ failed, ⚠️ done with a caveat or a risk, ⏳ running or waiting, 🔜 next. Use a few more to mark kinds of content when it helps scanning (🧪 tests, 📝 docs, 🚀 push or release, ⏱️ times, 🐛 bug), one per row or heading, not decoration. Never mark something ✅ that was not verified.

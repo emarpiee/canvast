@@ -345,6 +345,7 @@ export function drawOverlays(
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
   if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme);
+  if (editor.tool === "select" || editor.tool === "node") drawHandleLabel(ctx, editor, theme);
   // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
   if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
 
@@ -510,6 +511,13 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.fill();
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/** The line a handle slides along and the few words beside the pointer (Radius 12, Count 8, what the keys do over a node): for the Select and Edit nodes tools. */
+function drawHandleLabel(ctx: CanvasRenderingContext2D, editor: EditorState, theme: SceneTheme): void {
+  if (!editor.handleLabel) return;
+  ctx.save();
   if (editor.handleLabel?.guide) {
     // The line the handle slides along, with an arrowhead at each end: the way it moves is shown before and while it is dragged.
     const { x0, y0, x1, y1, arc } = editor.handleLabel.guide;

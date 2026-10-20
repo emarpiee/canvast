@@ -96,7 +96,7 @@ export const FIXED_SHORTCUTS: ReadonlyArray<{ group: string; items: readonly Fix
       { keys: "W A S D (changeable above)", does: "Step the selection to the next item up, left, down or right (the way is set in Settings > Navigation)" },
       { keys: "Ctrl+K, Ctrl+Shift+P", does: "The command palette: find any command or setting by its words" },
       { keys: "Alt+Shift+Left, Alt+Shift+Right", does: "Previous view, next view (the buttons beside Fit)" },
-      { keys: "Alt (press and release)", does: "Bring the selection into view; again: fit everything visible at this zoom" },
+      { keys: "Ctrl+Space", does: "Bring the selection into view; again: fit everything visible at this zoom" },
       { keys: "Ctrl+F", does: "Search the canvas by file or layer name (in the Assets view: the library)" },
       { keys: "Ctrl+Shift+F", does: "Go to the Assets view and search the library" },
       { keys: "/", does: "The command palette (same as Ctrl+K)" },
