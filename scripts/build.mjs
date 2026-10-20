@@ -37,8 +37,9 @@ const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modu
 const licence = async (path) => (await readFile(resolve(root, "node_modules", path), "utf8")).replace(/--/g, "- -").trim();
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
+const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, MIT, travels in the file too)
 const notices =
-  `<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
+  `<!--\ncanvast\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)

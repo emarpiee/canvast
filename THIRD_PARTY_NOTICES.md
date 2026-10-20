@@ -1,6 +1,6 @@
 # Third-party notices
 
-The built `dist/canvast.html` bundles the following third-party material.
+canvast's own code is MIT-licensed (see [LICENSE](LICENSE)); its text is also embedded at the top of the built file. The built `dist/canvast.html` bundles the following third-party material.
 Its license text is also embedded as a comment at the top of the built file.
 
 ## Lucide icons
