@@ -10,7 +10,7 @@ export type AppView = "canvas" | "assets" | "settings";
 export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => void): (v: AppView) => void {
   root.innerHTML = `
     <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
-      <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Assets view">${ICONS.images}<span>Assets</span></button>
+      <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>
     </div>
     <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];

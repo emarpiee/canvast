@@ -79,7 +79,8 @@ import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
-import { FIXED_SHORTCUTS, TOOL_KEY_SETTING, TOOL_NAME, TOOL_ORDER, navForKey, releaseStepKeys, toolForKey, toolKeys } from "../settings/shortcuts";
+import { FIXED_SHORTCUTS, TOOL_COMMAND, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey } from "../settings/shortcuts";
+import { KEY_COMMANDS, Keymap, displayCombo, installKeymap } from "../settings/keymap";
 import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import { openExportDialog } from "../ui/export-dialog";
@@ -246,7 +247,9 @@ async function start(): Promise<void> {
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
   initColourPopover(settings);
-  releaseStepKeys(settings); // a tool key set to W A S D before they became the step keys goes back to its own letter (ADR 0072)
+  // Every shortcut is a command of the keymap (ADR 0158): the layer that turns the keys the person chose into the keys the handlers hear goes in before any handler.
+  const keymap = new Keymap(settings);
+  installKeymap(keymap);
   // Developer tools (the panel, the diagnostics, the test hook): on for a session with #debug at the end of the address (the tests use
   // this), or always once switched on in Settings > Develop (applies after a reload). There is no separate debug build.
   const debug = location.hash.includes("debug") || settings.get("dev.tools");
@@ -669,7 +672,7 @@ async function start(): Promise<void> {
     },
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
   });
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(settings, k), navForKey: (k) => navForKey(settings, k),
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
@@ -1455,7 +1458,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== settings.get("key.zen")) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== "z") return;
     if (document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
     e.preventDefault();
     settings.set("ui.zen", !settings.get("ui.zen"));
@@ -1473,12 +1476,36 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   // Tool buttons say which key picks them (the keys can be changed in Settings).
   const updateToolTitles = (): void => {
-    const keys = toolKeys(settings);
-    for (const t of TOOL_ORDER) document.querySelector<HTMLElement>(`button[data-tool="${t}"]`)?.setAttribute("title", `${TOOL_NAME[t]} (${keys[t].toUpperCase()})`);
+    for (const t of TOOL_ORDER) {
+      const k = keymap.display(TOOL_COMMAND[t]);
+      document.querySelector<HTMLElement>(`button[data-tool="${t}"]`)?.setAttribute("title", k ? `${TOOL_NAME[t]} (${k})` : TOOL_NAME[t]);
+    }
   };
   updateToolTitles();
+  // The buttons that name a key name the one in use now (Settings > Shortcuts): the words are fixed here, the keys are the keymap's.
+  const updateKeyTitles = (): void => {
+    const k = (id: string): string => keymap.display(id);
+    const keyed = (text: string, id: string, more = ""): string => (k(id) ? `${text} (${k(id)}${more})` : text);
+    const title = (action: string, text: string): void => document.querySelector<HTMLElement>(`[data-action="${action}"]`)?.setAttribute("title", text);
+    title("undo", keyed("Undo", "edit.undo"));
+    title("redo", keyed("Redo", "edit.redo"));
+    title("search", `Search the canvas (${[k("find.canvas"), k("find.tag") && `${k("find.tag")} tag`, k("find.bookmark") && `${k("find.bookmark")} bookmark`].filter(Boolean).join("; ") || "no key"})`.replace(" (no key)", ""));
+    title("zen", keyed("Zen mode: fade the bars and panels out; each shows while the pointer is over it", "view.zen"));
+    title("zoom-out", keyed("Zoom out", "view.zoomOut"));
+    title("zoom-in", keyed("Zoom in", "view.zoomIn"));
+    title("cam-back", keyed("Previous view", "view.back"));
+    title("cam-fwd", keyed("Next view", "view.forward"));
+    title("fit-selection", keyed("Fit the selection in view", "view.focus"));
+    title("fit-all", keyed("Fit everything visible at this zoom in view", "view.focus", " again"));
+    title("home", keyed("Return to origin", "view.home"));
+  };
+  updateKeyTitles();
+  keymap.subscribe(() => {
+    updateToolTitles();
+    updateKeyTitles();
+  });
   document.documentElement.dataset["version"] = __CANVAST_VERSION__; // before Settings is built: its Develop tab shows it
-  const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, () => setView("canvas"), {
+  const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
       return r ? { at: r.at, kind: r.kind ?? "full", fileName: r.fileName, bytes: r.bytes } : null;
@@ -1558,7 +1585,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const onCanvas = appView === "canvas";
     const key = (k: string): string => k.toUpperCase();
     const list: Command[] = [
-      ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(settings.get(TOOL_KEY_SETTING[t]) as string), enabled: () => onCanvas, run: () => editor.setTool(t) })),
+      ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(keymap.display(TOOL_COMMAND[t])), enabled: () => onCanvas, run: () => editor.setTool(t) })),
       { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
       { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => void copySelection(doc, editor, view) },
@@ -1600,12 +1627,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Zoom in", keys: "+", enabled: () => onCanvas, run: () => zoomByStep(view, 1) },
       { group: "View", title: "Zoom out", keys: "−", enabled: () => onCanvas, run: () => zoomByStep(view, -1) },
       { group: "View", title: "Return to the origin", keys: "0", words: "home reset", enabled: () => onCanvas, run: () => goHome(view) },
-      { group: "View", title: "Fit the selection in view", keys: "Ctrl+Space", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
+      { group: "View", title: "Fit the selection in view", keys: "F", enabled: () => onCanvas && sel, run: () => focusCycle.fit("selection") },
       { group: "View", title: "Fit everything in view", enabled: () => onCanvas, run: () => focusCycle.fit("all") },
       { group: "View", title: "Previous view", keys: "Alt+Shift+Left", words: "back camera", enabled: () => onCanvas && history.canBack(), run: () => history.back() },
       { group: "View", title: "Next view", keys: "Alt+Shift+Right", words: "forward camera", enabled: () => onCanvas && history.canForward(), run: () => history.forward() },
       { group: "View", title: "Go to a random empty view", words: "dice random far away", enabled: () => onCanvas, run: () => goRandomView() },
-      { group: "View", title: "Zen mode", keys: key(settings.get("key.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
+      { group: "View", title: "Zen mode", keys: key(keymap.display("view.zen")), words: "focus hide bars", run: () => void settings.set("ui.zen", !settings.get("ui.zen")) },
       { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
@@ -1614,12 +1641,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
       { group: "Panel", title: "Tags", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.tagsOpen = !editor.tagsOpen; editor.changed(); } },
       { group: "Go to", title: "Canvas view", run: () => setView("canvas") },
-      { group: "Go to", title: "Assets view", words: "library", run: () => setView("assets") },
+      { group: "Go to", title: "Library", words: "assets files pictures", run: () => setView("assets") },
       { group: "Go to", title: "Shortcuts", keys: "?", words: "keys keyboard help", run: () => { setView("settings"); settingsView.show("shortcuts"); } },
       { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
       { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
     ];
+    // the keys shown are the ones in use now (Settings > Shortcuts)
+    const TITLE_COMMAND: Record<string, string> = { Undo: "edit.undo", Redo: "edit.redo", Duplicate: "edit.duplicate", "Delete the selection": "edit.delete", "Select everything": "edit.selectAll", Group: "edit.group", Ungroup: "edit.ungroup", "Bring to front": "edit.front", "Send to back": "edit.back", "Zoom in": "view.zoomIn", "Zoom out": "view.zoomOut", "Return to the origin": "view.home", "Fit the selection in view": "view.focus", "Previous view": "view.back", "Next view": "view.forward", Shortcuts: "find.help" };
+    for (const c of list) {
+      const id = TITLE_COMMAND[c.title];
+      if (id) c.keys = keymap.bindings(id).map(displayCombo).join(", ");
+    }
     return list;
   });
   // The context menu (right click, or the menu key): the commands that fit what is under the pointer and what is picked, from the same registry.
@@ -1649,7 +1682,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     out.push({ group: "Canvas", kind: "canvas", title: "Rename this board", words: "name", enabled: () => !!session.current, takes: { prompt: "New name of the board", run: (n) => void session.renameBoard(session.current!.boardId, n) }, run: () => undefined });
     return out;
   });
-  registry.setProvider("shortcuts", () => FIXED_SHORTCUTS.flatMap((g) => g.items.map((i): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, keys: i.keys, words: g.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } }))));
+  registry.setProvider("shortcuts", () => [...KEY_COMMANDS.map((c): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: c.name, keys: keymap.bindings(c.id).map(displayCombo).join(", ") || "none", words: c.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })), ...FIXED_SHORTCUTS.flatMap((g) => g.items.map((i): Command => ({ group: "Shortcut", kind: "shortcut", quiet: true, title: i.does, keys: i.keys, words: g.group, run: () => { setView("settings"); settingsView.show("shortcuts"); } })))]);
   const macros = new Macros(registry, (text) => { editor.message = text; editor.changed(); });
   const palette = mountCommandPalette(registry);
   window.addEventListener("keydown", (e) => {

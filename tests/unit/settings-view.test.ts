@@ -26,15 +26,13 @@ describe("settings view table (ADR 0048)", () => {
   });
 });
 
-describe("tool key settings (ADR 0049)", () => {
-  it("default to the letters the toolbar has always shown, one tool each", async () => {
-    const { TOOL_ORDER, TOOL_KEY_SETTING } = await import("../../src/settings/shortcuts");
-    const keys = TOOL_ORDER.map((t) => (SETTINGS[TOOL_KEY_SETTING[t]] as Def<string>).default);
-    expect(keys).toEqual(["h", "v", "n", "p", "u", "b", "c", "l", "t", "m", "e"]);
+describe("tool keys (ADR 0049, 0158)", () => {
+  it("are the letters the toolbar has always shown, one tool each", async () => {
+    const { TOOL_ORDER, TOOL_COMMAND } = await import("../../src/settings/shortcuts");
+    const { commandById } = await import("../../src/settings/keymap");
+    const keys = TOOL_ORDER.map((t) => commandById(TOOL_COMMAND[t])!.defaults[0]);
+    expect(keys).toEqual(["H", "V", "N", "P", "U", "B", "C", "L", "T", "M", "E"]);
     expect(new Set(keys).size).toBe(keys.length);
-    const def = SETTINGS["key.pen"] as Def<string>;
-    expect(def.validate("k")).toBe("k");
-    expect([def.validate("K"), def.validate("5"), def.validate("kk"), def.validate("")]).toEqual([undefined, undefined, undefined, undefined]);
   });
 });
 

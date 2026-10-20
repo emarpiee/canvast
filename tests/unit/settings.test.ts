@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { SettingsStore } from "../../src/settings/settings";
-import { keyOwner, releaseStepKeys } from "../../src/settings/shortcuts";
 
 function memory(initial: Record<string, string> = {}) {
   const m = new Map(Object.entries(initial));
@@ -40,19 +39,6 @@ describe("settings (device scope)", () => {
     const s = new SettingsStore(null);
     s.set("pen.stabilizer.on", true);
     expect(s.get("pen.stabilizer.on")).toBe(true);
-  });
-});
-
-describe("step keys W A S D (ADR 0072)", () => {
-  it("take back a tool key set to one of them, and leave the others alone", () => {
-    const st = memory({ "canvast.settings": JSON.stringify({ "key.pen": "w", "key.lasso": "d", "key.text": "x" }) });
-    const s = new SettingsStore(st);
-    expect(releaseStepKeys(s).sort()).toEqual(["lasso", "pen"]);
-    expect(s.get("key.pen")).toBe("p");
-    expect(s.get("key.lasso")).toBe("l");
-    expect(s.get("key.text")).toBe("x");
-    expect(releaseStepKeys(s)).toEqual([]);
-    expect(keyOwner(s, "w", "key.pen")).toBe("Step up");
   });
 });
 

@@ -116,9 +116,9 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
-    <div class="assets-bar" role="toolbar" aria-label="Asset library">
+    <div class="assets-bar" role="toolbar" aria-label="Library">
       <div class="assets-searchbox">
-              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search assets">
+              <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${searchHelpButton()}
         <div class="assets-search-pop" data-testid="assets-search-pop">
@@ -133,7 +133,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </div>
       <span class="assets-count" data-testid="assets-count"></span>
       <select data-testid="assets-usage" aria-label="Show">
-        <option value="all">All assets</option><option value="used">In use</option><option value="unused">Unused</option>
+        <option value="all">All items</option><option value="used">In use</option><option value="unused">Unused</option>
       </select>
       <select data-testid="assets-sort" aria-label="Sort by">
         <option value="newest">Newest first</option><option value="name">Name A–Z</option><option value="size">Largest first</option><option value="uses">Most used</option>
@@ -148,7 +148,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.fileInput}<span>Import</span></button>
       <button type="button" class="assets-btn is-icon" data-action="import-folder" data-testid="assets-import-folder" aria-label="Import a folder" title="Import a folder: every file in it, put in library folders of the same names">${ICONS.folderInput}</button>
-      <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the assets you picked, as a slideshow">${ICONS.play}</button>
+      <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you picked, as a slideshow">${ICONS.play}</button>
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" multiple hidden data-testid="assets-import-input">
       <input type="file" multiple hidden webkitdirectory data-testid="assets-import-folder-input">
@@ -193,7 +193,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </div>
       <div class="col-grip" data-grip="insp" data-testid="insp-grip" role="separator" aria-orientation="vertical" aria-label="Resize the details panel" title="Drag to resize the details panel (double-click to reset)" tabindex="0"></div>
       <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
-      <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Asset details" hidden></aside>
+      <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Details" hidden></aside>
     </div>
     <div class="place-menu" role="menu" aria-label="Place on" data-testid="place-menu" hidden></div>`;
   const body = root.querySelector<HTMLElement>(".assets-body")!;
@@ -944,7 +944,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!visible) return;
     const gen = ++generation;
     if (!session.catalog) {
-      grid.innerHTML = `<p class="assets-empty">Storage is unavailable, so there is no asset library in this tab.</p>`;
+      grid.innerHTML = `<p class="assets-empty">Storage is unavailable, so there is no library in this tab.</p>`;
       return;
     }
     await session.persistence.flush(); // usage reflects every edit made so far
@@ -1048,7 +1048,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!listing) return;
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
-    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} asset${listing.entries.length === 1 ? "" : "s"}`;
+    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
     const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
     const cards = rows.map((e) => {
       const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
@@ -1098,8 +1098,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const html = cards.length + missing.length
       ? cards.join("") + missing.join("")
       : listing.entries.length
-        ? `<p class="assets-empty">No assets match.</p>`
-        : `<p class="assets-empty">No assets yet. Import files here (any type), or drop them on a canvas.</p>`;
+        ? `<p class="assets-empty">Nothing in the library matches.</p>`
+        : `<p class="assets-empty">The library is empty. Import files here (any type), or drop them on a canvas.</p>`;
     grid.style.setProperty("--thumb", `${sizeInput.value}px`);
     // The cards are only drawn again when something about them changed: picking, opening and typing leave them (and the pictures) alone.
     if (html !== lastGridHtml) {
@@ -1187,7 +1187,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
     const scopeName = ((): string => {
-      if (scope === "all") return "All assets";
+      if (scope === "all") return "All items";
       if (scope === "favorites") return "Favourites";
       if (scope === "unfiled") return "Unfiled";
       if (scope === "similar") return "Similar images";
@@ -1202,7 +1202,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
       <div class="side-body">
         <ul class="side-list side-views">
-          ${item("all", "All assets", entries.length, { icon: ICONS.images })}
+          ${item("all", "All items", entries.length, { icon: ICONS.images })}
           ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
           ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
@@ -1651,8 +1651,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "delete-all": {
         const gone = group.filter((h) => listing?.entries.some((x) => x.hash === h && x.instances === 0));
         void confirmDialog({
-          title: `Delete ${gone.length} asset${gone.length === 1 ? "" : "s"} from the library?`,
-          lines: ["Their originals are erased from this browser's storage once nothing can use them any more. Assets in use are kept."],
+          title: `Delete ${gone.length} item${gone.length === 1 ? "" : "s"} from the library?`,
+          lines: ["Their originals are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
           confirmLabel: `Delete ${gone.length}`,
         }).then(async (ok) => {
           if (ok) await session.deleteAssets(gone);
@@ -1722,7 +1722,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void confirmDialog({
           title: `Delete “${e?.name || "Untitled"}” from the library?`,
           lines: [`Its original (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
-          confirmLabel: "Delete asset",
+          confirmLabel: "Delete item",
         }).then(async (ok) => {
           if (ok) await session.deleteAsset(hash);
           await refresh();
@@ -1985,7 +1985,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       } else {
         void confirmDialog({
           title: `Delete the tag “${label}”?`,
-          lines: ["It is taken off every asset that has it. The assets stay in the library."],
+          lines: ["It is taken off every item that has it. The items stay in the library."],
           confirmLabel: "Delete tag",
         }).then(async (ok) => {
           if (ok && (await session.organize((c) => c.deleteTag(label))) && scope === `tag:${key}`) scope = "all";
@@ -2041,7 +2041,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (!f) break;
         void confirmDialog({
           title: `Delete folder “${f.name}”?`,
-          lines: ["Its subfolders are deleted too. The assets in them stay in the library; they are only taken out of these folders."],
+          lines: ["Its subfolders are deleted too. The items in them stay in the library; they are only taken out of these folders."],
           confirmLabel: "Delete folder",
         }).then(async (ok) => {
           if (ok && (await session.organize((c) => c.deleteFolder(id))) && scope === `folder:${id}`) scope = "all";
@@ -2103,11 +2103,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return en ? [{ id: h, name: en.name }] : [];
     });
     if (!items.length) return;
-    const result = await openBatchRename(items, { noun: items.length === 1 ? "asset" : "assets" });
+    const result = await openBatchRename(items, { noun: items.length === 1 ? "item" : "items" });
     if (!result) return;
     const n = await session.renameAssets(result.map((r) => ({ hash: r.id, name: r.name })));
     if (n) {
-      session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} assets.`;
+      session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} items.`;
       session.editor.changed();
     }
     await refresh();

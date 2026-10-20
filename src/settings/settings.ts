@@ -130,6 +130,8 @@ export const SETTINGS = {
   "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  /** Every shortcut the person changed, as JSON: command id → keys (settings/keymap.ts). Empty: all as they were. */
+  "keys.custom": { scope: "device", default: "{}", validate: (v: unknown) => { try { return typeof v === "string" && typeof JSON.parse(v) === "object" ? v : undefined; } catch { return undefined; } }, effect: "immediate" } as Def<string>,
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,
   "arrange.gap": { scope: "device", default: "normal", validate: oneOf("none", "tight", "normal", "wide", "wider"), effect: "immediate" } as Def<"none" | "tight" | "normal" | "wide" | "wider">,
   // Screenshots (ADR 0080).

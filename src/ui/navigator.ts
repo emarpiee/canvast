@@ -271,7 +271,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     }
   });
 
-  const KEPT = "Images placed on it stay in the Assets library. This cannot be undone.";
+  const KEPT = "Images placed on it stay in the library. This cannot be undone.";
   const confirmDeleteCanvas = async (id: string): Promise<void> => {
     const entry = session.tree?.boards.find((b) => b.canvases.some((c) => c.id === id));
     const c = entry?.canvases.find((x) => x.id === id);

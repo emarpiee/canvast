@@ -112,10 +112,10 @@ test("U1/U2/U4/U5: draw over deep-zoomed media, move only the media, lasso strok
 
   // U5 — direct click selects the viewport-filling image; dragging it moves only it.
   await key(app, "v");
-  // This test checks the exact pointer delta, so snapping to the stroke nearby is off (it has its own test).
-  await app.page.getByRole("button", { name: "Snap to other objects" }).click();
   await click(app, 300, 560);
   expect(await selection(app)).toEqual([img0.id]);
+  // This test checks the exact pointer delta, so snapping to the stroke nearby is off (it has its own test). (The option is in the bar beside the Actions bar: with something picked.)
+  await app.page.getByRole("button", { name: "Snap to other objects" }).click();
   const w0 = await app.worldAt(300, 560);
   const w1 = await app.worldAt(500, 550);
   await drag(app, [300, 560], [500, 550]);
@@ -413,7 +413,7 @@ test("selection action bar: follows the selection, hides while moving and for no
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("W A S D step the selection between items (nearest in view, by layer) and frames each; Ctrl+Space brings the selection into view (ADR 0058)", async ({ app }) => {
+test("W A S D step the selection between items (nearest in view, by layer) and frames each; F brings the selection into view (ADR 0058)", async ({ app }) => {
   const p = app.page;
   // Three strokes in a row, drawn left to right (so the right-most is on top).
   await key(app, "p");
@@ -441,12 +441,12 @@ test("W A S D step the selection between items (nearest in view, by layer) and f
   const sb = (await screenOfObject(app, b!.id))!.box;
   const vp = p.viewportSize()!;
   expect(Math.abs((sb.minX + sb.maxX) / 2 - vp.width / 2)).toBeLessThan(60);
-  // Ctrl+Space frames the selection again after the view was moved away.
+  // F frames the selection again after the view was moved away.
   for (let i = 0; i < 4; i++) await key(app, "ArrowLeft");
   await app.frame();
   const away = (await screenOfObject(app, b!.id))!.box;
   expect(Math.abs((away.minX + away.maxX) / 2 - vp.width / 2)).toBeGreaterThan(150);
-  await p.keyboard.press("Control+Space");
+  await p.keyboard.press("f");
   await app.frame();
   const back = (await screenOfObject(app, b!.id))!.box;
   expect(Math.abs((back.minX + back.maxX) / 2 - vp.width / 2)).toBeLessThan(60);
@@ -648,7 +648,7 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Alt held as a drag starts carries a copy; the original stays; Ctrl+Space still focuses (ADR 0063)", async ({ app }) => {
+test("Alt held as a drag starts carries a copy; the original stays; F still focuses (ADR 0063)", async ({ app }) => {
   const p = app.page;
   const s = await penStroke(app, [[400, 300], [520, 340]]);
   await key(app, "v");
@@ -674,15 +674,15 @@ test("Alt held as a drag starts carries a copy; the original stays; Ctrl+Space s
   const cb = (await screenOfObject(app, copy.id))!.box;
   expect(Math.abs(cb.minX - box0.minX - 60)).toBeLessThan(2);
   expect(Math.abs(cb.minY - box0.minY - 90)).toBeLessThan(2);
-  // Ctrl+Space after the drag still brings the selection into view.
+  // F after the drag still brings the selection into view.
   const zoom0 = await p.evaluate(() => window.__canvastDebug.camera());
-  await p.keyboard.press("Control+Space");
+  await p.keyboard.press("f");
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.camera())).not.toEqual(zoom0);
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Space again fits everything visible; a third press returns to the selection; the fit buttons do the same (ADR 0063)", async ({ app }) => {
+test("F again fits everything visible; a third press returns to the selection; the fit buttons do the same (ADR 0063)", async ({ app }) => {
   const p = app.page;
   const a = await penStroke(app, [[480, 300], [560, 330]]); // clear of the developer panel
   const b = await penStroke(app, [[900, 500], [980, 530]]);
@@ -693,7 +693,7 @@ test("Ctrl+Space again fits everything visible; a third press returns to the sel
     return !!s && s.box.minX >= 0 && s.box.minY >= 0 && s.box.maxX <= 1280 && s.box.maxY <= 800;
   };
   const alt = async () => {
-    await p.keyboard.press("Control+Space");
+    await p.keyboard.press("f");
     await app.frame();
   };
   const fitSelection = p.getByRole("button", { name: "Fit the selection in view" });
@@ -786,7 +786,7 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Space fit-to-view uses what is near and visible at this zoom: items far away at the same zoom are left out, never an empty view (ADR 0063)", async ({ app }) => {
+test("F fit-to-view uses what is near and visible at this zoom: items far away at the same zoom are left out, never an empty view (ADR 0063)", async ({ app }) => {
   const p = app.page;
   const a = await penStroke(app, [[500, 300], [580, 340]]);
   // A second stroke about 30 windows to the right (Shift+Right pans half a window).
@@ -800,7 +800,7 @@ test("Ctrl+Space fit-to-view uses what is near and visible at this zoom: items f
   await p.mouse.click(Math.round((s.minX + s.maxX) / 2), Math.round((s.minY + s.maxY) / 2));
   expect(await selection(app)).toEqual([a.id]);
   for (let i = 0; i < 2; i++) {
-    await p.keyboard.press("Control+Space");
+    await p.keyboard.press("f");
     await app.frame();
   }
   const box = (await screenOfObject(app, a.id))!.box;
@@ -848,14 +848,14 @@ test("resize with Shift snaps the edge the proportions give, not the pointer (th
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+Space after selecting another item focuses that item (the cycle goes on only for the same selection) (ADR 0063)", async ({ app }) => {
+test("F after selecting another item focuses that item (the cycle goes on only for the same selection) (ADR 0063)", async ({ app }) => {
   const p = app.page;
   // Two strokes close together: after focusing on the first, the second is still on screen to click.
   const a = await penStroke(app, [[560, 400], [600, 430]]);
   const b = await penStroke(app, [[640, 400], [680, 430]]);
   await key(app, "v");
   const alt = async () => {
-    await p.keyboard.press("Control+Space");
+    await p.keyboard.press("f");
     await app.frame();
   };
   const pick = async (id: string) => {

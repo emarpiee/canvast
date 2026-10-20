@@ -470,17 +470,17 @@ async function planOf(parts: Part[]): Promise<ImportPlan> {
     const e = at ? at.entries.get(at.file) : undefined;
     const type = str(a["type"], "") || "application/octet-stream";
     if (!HASH_RE.test(hash) || seenHash.has(hash)) {
-      problems.push(`Asset “${label}” has an invalid or repeated content hash and was skipped.`);
+      problems.push(`Library item “${label}” has an invalid or repeated content hash and was skipped.`);
       continue;
     }
     seenHash.add(hash);
     if (!e || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
-      problems.push(`Asset “${label}” is missing or invalid in the archive and was skipped.`);
+      problems.push(`Library item “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
     }
     const bytes = await e.data.arrayBuffer();
     if ((await sha256Hex(bytes)) !== hash) {
-      problems.push(`Asset “${label}” does not match its content hash (damaged) and was skipped.`);
+      problems.push(`Library item “${label}” does not match its content hash (damaged) and was skipped.`);
       continue;
     }
     valid.add(hash);

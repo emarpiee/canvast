@@ -2111,7 +2111,7 @@ export function attachTools(
     } else if (mod && (e.key === "]" || e.key === "[")) {
       arrangeSelection(doc, editor, e.key === "]" ? "front" : "back");
     } else if (mod && e.key === " ") {
-      // Ctrl+Space brings the selection into view; again: everything visible at this zoom (the cycle is in item-navigation.ts)
+      // The focus key (the keymap sends F here as Ctrl+Space) brings the selection into view; again: everything visible at this zoom (the cycle is in item-navigation.ts)
       e.preventDefault();
       if (!e.repeat && g.kind === "none") hooks.focusSelection();
     } else if (mod || e.altKey) {

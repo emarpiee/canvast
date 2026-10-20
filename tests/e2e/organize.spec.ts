@@ -78,8 +78,8 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   // Choosing the chosen tag again lets go of it.
   await side(p, /#ref/).click();
   await expect(cards(p)).toHaveCount(2);
-  await expect(side(p, /All assets/)).toHaveAttribute("aria-current", "true");
-  await side(p, /All assets/).click();
+  await expect(side(p, /All items/)).toHaveAttribute("aria-current", "true");
+  await side(p, /All items/).click();
   await expect(cards(p)).toHaveCount(2);
 
   // Search: words match name, type or tags; #tag is exact.
@@ -226,7 +226,7 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await p.getByTestId("confirm-ok").click();
   await expect(p.getByTestId("folder-tree")).toContainText("No folders yet.");
   await expect(side(p, /^Unfiled/)).toContainText("2");
-  await expect(side(p, /^All assets/)).toContainText("2");
+  await expect(side(p, /^All items/)).toContainText("2");
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());
   expect(app.consoleErrors).toEqual([]);
 });
@@ -317,7 +317,7 @@ test("tags can be renamed and deleted for the whole library (ADR 0057)", async (
   await expect(p.getByTestId("confirm-dialog")).toContainText("assets stay");
   await p.getByTestId("confirm-ok").click();
   await expect(tagRow("hands")).toHaveCount(0);
-  await p.getByRole("button", { name: /^All assets/ }).click();
+  await p.getByRole("button", { name: /^All items/ }).click();
   await expect(cards(p)).toHaveCount(2);
   await pick(p, HASH);
   await expect(p.getByTestId("asset-tags")).toHaveText(/#reference/);

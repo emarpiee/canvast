@@ -852,7 +852,15 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
   .set-tabs { width: auto; flex-direction: row; flex-wrap: wrap; }
   .set-row { grid-template-columns: 1fr; gap: var(--sp-3); }
 }
-.set-keyrow { grid-template-columns: minmax(0, 1fr) 220px 100px 60px; }
+.set-keyrow { grid-template-columns: minmax(0, 1fr) minmax(280px, 1.6fr); }
+.set-keyrow .set-control { flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-3); }
+.set-chip { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.set-chip-x { padding: 0 var(--sp-2); color: var(--hud-muted); background: transparent; border: 0; cursor: pointer; font: var(--text-md) var(--font-ui); }
+.set-chip-x:hover { color: var(--hud-fg); }
+.set-none { color: var(--hud-muted); font: var(--text-sm) var(--font-ui); }
+.set-key.is-waiting { color: var(--hud-accent-fg); background: var(--hud-accent); }
+[data-key-note] { margin: var(--sp-4) 0; }
+[data-key-note] button { margin-left: var(--sp-3); }
 .set-key, .set-keys kbd { display: inline-block; min-width: 28px; padding: var(--sp-1) var(--sp-4); text-align: center; font: var(--weight-semibold) var(--text-sm) var(--font-mono); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-xs); }
 .set-keys h3 { margin: var(--sp-10) 0 var(--sp-2); font-size: var(--text-lg); }
 .set-keys h4 { margin: var(--sp-7) 0 var(--sp-2); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }

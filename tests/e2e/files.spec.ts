@@ -178,7 +178,7 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
   // Many: Ctrl+A picks all three; Enumerate is the first way, with a preview before anything changes.
   await p.locator("#assets-view").press("Control+a");
   await p.getByTestId("bulk-rename").click();
-  await expect(dialog).toContainText("Rename 3 assets");
+  await expect(dialog).toContainText("Rename 3 items");
   await p.getByLabel("Name pattern").fill("Item ##");
   await p.getByLabel("First number").fill("5");
   const preview = p.getByTestId("rename-preview");

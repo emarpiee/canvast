@@ -65,73 +65,97 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("shortcuts: tool keys can be changed and are refused when taken; the list opens with ? (ADR 0049)", async ({ app }) => {
+test("shortcuts: every key can be changed, to a key or a chord, with warnings; the list opens with ? (ADR 0049, 0158)", async ({ app }) => {
   const p = app.page;
   const panel = p.locator("#settings-view");
+  const note = panel.locator("[data-key-note]");
   const tool = () => p.evaluate(() => window.__canvastDebug.tool());
-  // "?" opens the list on the Shortcuts tab; the fixed shortcuts are there.
+  const change = (name: string) => panel.getByRole("button", { name: `Change the keys for ${name}` });
+  // "?" opens the list on the Shortcuts tab; the editable keys and the fixed shortcuts are there.
   await p.keyboard.press("?");
   await expect(panel).toBeVisible();
   await expect(panel.locator("#set-panel-shortcuts")).toBeVisible();
   await expect(panel.locator("#set-panel-shortcuts")).toContainText("Ctrl+Z");
-  // Pen to K: K works on the canvas, P no longer does, the button says K. A letter that is taken is refused.
-  await panel.getByRole("button", { name: "Change the key for Pen" }).click();
+  await expect(panel.locator('[data-key-row="view.focus"] kbd')).toHaveText("F"); // (the focus is F, not an Alt tap)
+  // Pen to K: K works on the canvas, P no longer does, the button says K.
+  await change("Pen").click();
   await p.keyboard.press("k");
-  await expect(panel.locator("[data-key-note]")).toContainText("Pen is now K");
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await expect(note).toContainText("Pen: K.");
+  // A key another command has is asked about, not taken silently; Cancel leaves everything as it was.
+  await change("Lasso").click();
   await p.keyboard.press("k");
-  await expect(panel.locator("[data-key-note]")).toContainText("already the key for Pen");
-  // The keys that step between items (W A S D) are changed the same way, and share the conflict check with the tools.
-  await expect(panel.getByRole("button", { name: "Change the key for Step up" })).toBeVisible();
-  await panel.getByRole("button", { name: "Change the key for Step up" }).click();
-  await p.keyboard.press("d");
-  await expect(panel.locator("[data-key-note]")).toContainText("already the key for Step right");
-  await panel.getByRole("button", { name: "Change the key for Step up" }).click();
-  await p.keyboard.press("i");
-  await expect(panel.locator("[data-key-note]")).toContainText("Step up is now I");
-  await panel.getByRole("button", { name: "Reset the key for Step up to its default" }).click();
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
-  await p.keyboard.press("5");
-  await expect(panel.locator("[data-key-note]")).toContainText("one plain letter");
-  // Waiting for a letter never gets stuck: a click elsewhere, another tab or closing ends it, and the letter works wherever the focus is.
-  const waiting = panel.getByText("press a letter");
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await expect(note).toContainText("already the key for Pen");
+  await note.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.locator('[data-key-row="tool.lasso"] kbd')).toHaveText("L");
+  // A chord with Alt: warned (a menu may open), and used when confirmed.
+  await change("Lasso").click();
+  await p.keyboard.press("Alt+q");
+  await expect(note).toContainText("can open a menu");
+  await note.getByRole("button", { name: /Use Alt\+Q anyway/ }).click();
+  await expect(panel.locator('[data-key-row="tool.lasso"] kbd')).toHaveText("Alt+Q");
+  // A chord with Ctrl and Shift: no warning. A second key is added beside the first, and a key can be taken away.
+  await change("Undo").click();
+  await p.keyboard.press("Control+Shift+u");
+  await expect(note).toContainText("Undo: Ctrl+Shift+U.");
+  await panel.getByRole("button", { name: "Add a key for Undo" }).click();
+  await p.keyboard.press("F7");
+  await expect(panel.locator('[data-key-row="edit.undo"] kbd')).toHaveText(["Ctrl+Shift+U", "F7"]);
+  await panel.getByRole("button", { name: "Take F7 away from Undo" }).click();
+  await expect(panel.locator('[data-key-row="edit.undo"] kbd')).toHaveText(["Ctrl+Shift+U"]);
+  // What can never work is refused with the reason; Escape cancels.
+  await change("Pen").click();
+  await p.keyboard.press("Control+w");
+  await expect(note).toContainText("The browser keeps Ctrl+W");
+  await change("Pen").click();
+  await p.keyboard.press("Escape");
+  await expect(note).toContainText("Cancelled");
+  await expect(panel).toBeVisible(); // Escape ended the waiting, it did not close the view
+  // Waiting for keys never gets stuck: a click elsewhere, another tab or closing ends it.
+  const waiting = panel.getByText("press the keys");
+  await change("Pen").click();
   await expect(waiting).toBeVisible();
   await panel.getByRole("tab").nth(1).click();
   await expect(waiting).toHaveCount(0);
   await panel.getByRole("tab", { name: "Shortcuts" }).click();
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
+  await change("Pen").click();
   await p.mouse.click(5, 5); // the focus leaves the panel
-  await expect(waiting).toHaveCount(0);
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
-  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await p.keyboard.press("Escape");
-  await expect(waiting).toHaveCount(0);
-  await expect(panel).toBeVisible(); // Escape ended the waiting, it did not close the view
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
-  await p.keyboard.press("?");
-  await panel.getByRole("button", { name: "Change the key for Lasso" }).click();
-  await panel.getByRole("button", { name: "Back to canvas" }).click();
-  await p.keyboard.press("?");
   await expect(waiting).toHaveCount(0);
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (K)");
   // The tool tooltips belong to the tool buttons only; the canvas (which also carries the current tool) has none.
   await expect(p.locator("#canvas")).not.toHaveAttribute("title", /.+/);
+  // On the canvas: the new keys work, the old ones do not.
   await p.keyboard.press("v");
   expect(await tool()).toBe("select");
   await p.keyboard.press("p");
   expect(await tool(), "the old key no longer picks the pen").toBe("select");
   await p.keyboard.press("k");
   expect(await tool()).toBe("pen");
-  // Kept after a reload; Reset puts P back.
+  await p.keyboard.press("v");
+  await p.keyboard.press("Alt+q");
+  expect(await tool(), "the chord picks the lasso").toBe("lasso");
+  await p.keyboard.press("v");
+  await p.keyboard.press("l");
+  expect(await tool(), "the old key no longer picks the lasso").toBe("select");
+  // Undo on its chord, and no longer on Ctrl+Z.
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 500, y: 300 }, { x: 600, y: 360 }, 5);
+  const count = () => p.evaluate(() => window.__canvastDebug.objects().length);
+  expect(await count()).toBe(1);
+  await p.keyboard.press("Control+z");
+  expect(await count(), "Ctrl+Z is not Undo now").toBe(1);
+  await p.keyboard.press("Control+Shift+u");
+  expect(await count(), "the chord is").toBe(0);
+  // Kept after a reload; one button puts every key back.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.keyboard.press("v");
   await p.keyboard.press("k");
   expect(await tool()).toBe("pen");
   await p.keyboard.press("?");
-  await panel.getByRole("button", { name: "Reset the key for Pen to its default" }).click();
+  await panel.getByRole("button", { name: "Reset every shortcut" }).click();
+  await expect(panel.locator('[data-key-row="tool.pen"] kbd')).toHaveText("P");
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await p.keyboard.press("v");
   await p.keyboard.press("p");

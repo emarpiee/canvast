@@ -57,7 +57,7 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
     lines: ["Every file keeps its original name. Choose how they are grouped inside the ZIP."],
     choices: [
       { value: "type", label: "By file type", help: "A folder for each extension: item.obj goes in obj, photo.png in png. Files with no extension go in other." },
-      { value: "folder", label: "By my folders", help: "The folders you made in the Assets view; files with no folder go in the folder of their file type." },
+      { value: "folder", label: "By my folders", help: "The folders you made in the Library; files with no folder go in the folder of their file type." },
     ],
     confirmLabel: "Export ZIP",
   });
@@ -96,7 +96,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
   const canvases = plan.boards.reduce((n, b) => n + b.canvases.length, 0);
   const where =
     plan.scope === "canvas" ? "It will be added as a new canvas on the open board."
-    : plan.scope === "assets" ? "The originals will be added to the Assets library."
+    : plan.scope === "assets" ? "The originals will be added to the library."
     : `It will be added as ${plural(plan.boards.length, "new board")}; nothing existing is replaced.`;
   const lines = [
     `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”${plan.files > 1 ? `, put together from ${plan.files} files of a backup chain` : ""}.`,

@@ -876,10 +876,10 @@ test("snapping: a moved stroke lines up exactly with another one (home and a tri
     const ids = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id).slice(-2);
     const [a, b] = ids as [string, string];
     await p.keyboard.press("v");
-    const snap = p.getByRole("button", { name: "Snap to other objects" });
-    await expect(snap).toHaveAttribute("aria-pressed", "true");
     // 20 px apart; move B left by 17: within 6 px of A's left edge, so it jumps to exactly it (B is picked first: only a picked item moves).
     await p.mouse.click(520, 500);
+    const snap = p.getByRole("button", { name: "Snap to other objects" }); // (in the bar beside the Actions bar: with something picked)
+    await expect(snap).toHaveAttribute("aria-pressed", "true");
     await app.drag({ x: 520, y: 500 }, { x: 503, y: 500 }, 6);
     expect((await box(b)).minX).toBe((await box(a)).minX);
     await p.keyboard.press("Control+z");

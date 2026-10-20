@@ -65,7 +65,7 @@ const MAX_FOLDER_NAME = 120;
 /** Format tags the way Obsidian does (ADR 0084) and drop repeats that differ only in case (the first spelling wins). */
 export function normalizeTags(tags: readonly string[]): string[] {
   const out = formatTags(tags);
-  if (out.length > MAX_TAGS) throw new CatalogInputError(`an asset can have at most ${MAX_TAGS} tags`);
+  if (out.length > MAX_TAGS) throw new CatalogInputError(`an item can have at most ${MAX_TAGS} tags`);
   return out;
 }
 
@@ -133,7 +133,7 @@ export class AssetInUseError extends Error {
     readonly hash: string,
     readonly instances: number,
   ) {
-    super(`the asset is still used by ${plural(instances, "instance")}; remove ${instances === 1 ? "it" : "them"} first`);
+    super(`the item is still used by ${plural(instances, "instance")}; remove ${instances === 1 ? "it" : "them"} first`);
   }
 }
 
@@ -289,7 +289,7 @@ export class AssetCatalog {
   ): Promise<CatalogEntry> {
     return this.write(["assetCatalog", "meta"], async (tx) => {
       const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
-      if (!e || e.state !== "active") throw new CatalogInputError("the asset is not in the library");
+      if (!e || e.state !== "active") throw new CatalogInputError("the item is not in the library");
       const m = meta(e);
       const next: CatalogEntry = { ...e, ...m };
       if (change.favorite !== undefined) next.favorite = change.favorite;
@@ -454,7 +454,7 @@ export class AssetCatalog {
       const n = await req(tx.objectStore("objects").index("assetId").count(hash));
       if (n > 0) throw new AssetInUseError(hash, n);
       const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
-      if (!e) throw new Error(`asset ${hash} is not in the library`);
+      if (!e) throw new Error(`item ${hash} is not in the library`);
       tx.objectStore("assetCatalog").put({ ...e, state: "deleted", deletedAt: Date.now() } satisfies CatalogEntry);
       await committed;
     } catch (err) {

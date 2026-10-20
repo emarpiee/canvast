@@ -332,7 +332,7 @@ test("deleting canvases and boards removes their objects, keeps shared originals
   await openMenu(p);
   await rowAction(p, "canvas", "Canvas 2", "Delete");
   await expect(p.getByTestId("confirm-dialog")).toContainText("It holds 2 objects on board “Board 1”.");
-  await expect(p.getByTestId("confirm-dialog")).toContainText("Images placed on it stay in the Assets library.");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Images placed on it stay in the library.");
   await p.keyboard.press("Escape");
   await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
   expect((await sess(p)).tree![0]!.canvases.map((c) => c.name)).toEqual(["Canvas 1", "Canvas 2"]);
@@ -1018,13 +1018,13 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await p.getByTestId("assets-side").getByRole("button", { name: /^Batch/ }).click();
   await expect(cards).toHaveCount(5);
   // Delete: nothing is used, so all go; the summary says so.
-  await p.getByTestId("assets-side").getByRole("button", { name: /^All assets/ }).click();
+  await p.getByTestId("assets-side").getByRole("button", { name: /^All items/ }).click();
   await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).focus();
   await p.keyboard.press("Control+a");
   await p.getByTestId("bulk-delete").click();
   await p.getByTestId("confirm-ok").click();
   await expect(cards).toHaveCount(0);
-  await expect(p.getByTestId("toast")).toContainText("Deleted 5 assets from the library.");
+  await expect(p.getByTestId("toast")).toContainText("Deleted 5 items from the library.");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -1757,7 +1757,7 @@ test("in-canvas tags: tag items on the canvas, list them across the workspace, a
   await expect(p.getByTestId("asset-tags")).toContainText("#ABC");
   await expect(suggest.getByRole("button", { name: /Add the tag ABC/ })).toHaveCount(0);
   // Placing a picture that has library tags asks; "with" carries them over, cancel places nothing.
-  await p.getByRole("button", { name: /^All assets/ }).click();
+  await p.getByRole("button", { name: /^All items/ }).click();
   await card(p, HASH).click();
   const before = (await objs()).length;
   await p.getByTestId("asset-place").click();

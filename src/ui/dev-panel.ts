@@ -46,7 +46,7 @@ export function mountDevPanel(root: HTMLElement, view: ViewState, doc: DocumentS
       <select aria-label="Auto-zoom speed (levels per second)" title="Levels per second">
         ${SPEEDS.map((v) => `<option value="${v}"${v === 10 ? " selected" : ""}>${v} lv/s</option>`).join("")}
       </select>
-      <button type="button" data-clear aria-label="Clear canvas" title="Clear canvas: delete every object on this canvas (Ctrl+Z brings them back)">Clear</button>
+      <button type="button" data-clear aria-label="Clear canvas" title="Clear canvas: delete every object on this canvas (Undo brings them back)">Clear</button>
       <button type="button" data-notice aria-label="Show a sample notice" title="Show one random notice (info, success, warning, error or progress). Shift: four at once, to see the stack.">${ICONS.bell}</button>
     </div>`;
   root.appendChild(panel);

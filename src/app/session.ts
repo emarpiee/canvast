@@ -299,7 +299,7 @@ export class Session {
     try {
       await this.catalog.markDeleted(hash);
     } catch (e) {
-      this.tell(e instanceof AssetInUseError ? `Not deleted: ${e.message}.` : `Could not delete the asset: ${(e as Error).message}`);
+      this.tell(e instanceof AssetInUseError ? `Not deleted: ${e.message}.` : `Could not delete the item: ${(e as Error).message}`);
       return null;
     }
     this.gcPending = true;
@@ -449,11 +449,11 @@ export class Session {
     if (this.editor.blockEdit() || !this.assets) return null;
     const rec = await this.assets.record(hash);
     if (!rec) {
-      this.tell("The original of this asset is missing, so it cannot be placed.");
+      this.tell("The original of this item is missing, so it cannot be placed.");
       return null;
     }
     const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
-    return placeImage(rec, this.doc, this.view, 0, "Place asset", tags).id;
+    return placeImage(rec, this.doc, this.view, 0, "Place item", tags).id;
   }
 
   /**
@@ -484,8 +484,8 @@ export class Session {
       if (rec) recs.push(rec);
     }
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the originals are missing and were not placed.`);
-    if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place asset", tagsOf.get(recs[0]!.hash) ?? []);
-    else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} assets`, tagsOf);
+    if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place item", tagsOf.get(recs[0]!.hash) ?? []);
+    else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} items`, tagsOf);
     return recs.length;
   }
 
@@ -505,7 +505,7 @@ export class Session {
       } catch (e) {
         if (e instanceof AssetInUseError) inUse++;
         else {
-          this.tell(`Could not delete the asset: ${(e as Error).message}`);
+          this.tell(`Could not delete the item: ${(e as Error).message}`);
           break;
         }
       }
@@ -516,7 +516,7 @@ export class Session {
       this.post({ kind: "assets" });
       this.emitAssets();
     }
-    this.tell(`Deleted ${gone.length} asset${gone.length === 1 ? "" : "s"} from the library.${inUse ? ` ${inUse} in use ${inUse === 1 ? "was" : "were"} kept.` : ""}`);
+    this.tell(`Deleted ${gone.length} item${gone.length === 1 ? "" : "s"} from the library.${inUse ? ` ${inUse} in use ${inUse === 1 ? "was" : "were"} kept.` : ""}`);
     return gone.length;
   }
 

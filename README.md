@@ -8,7 +8,7 @@ or network connection.
 
 > **Status: v0.20.0, vector networks, masks, grouped menus, touch gestures, vector PDF, texture fills.** Done:
 > endless navigation and editing at any depth, a Workspace → Boards →
-> Canvases model with safe incremental saving, a shared Assets library with
+> Canvases model with safe incremental saving, a shared library with
 > tags, folders and file types, `.canvast` archives and plain ZIP export,
 > text, groups, hide and lock, snapping, rotation, four pens, videos, audio
 > and GIFs with an on-canvas player, a Settings view, accessibility options and
@@ -45,7 +45,7 @@ or network connection.
 > makes a text as wide as its words, a dragged box one of that width; pictures and
 > file cards show their name above them like sheets; @mentions were removed.
 >
-> **v0.17.0 in short:** a redesigned Assets view (gallery, viewer with the canvas
+> **v0.17.0 in short:** a redesigned Library (gallery, viewer with the canvas
 > player's controls, multi-select, one folder per asset, renamable tags, a
 > plain ZIP by file type (a folder per extension) or by folder, whole-workspace export and import); in-canvas
 > tags; search of the canvas (`/` name, `#` tag, `@` bookmark; `Ctrl+F`) and
@@ -150,14 +150,14 @@ or network connection.
   object by object. The old data is kept unchanged.
 - **Deleting boards and canvases.** Each has a **Delete** button in the
   breadcrumb menu. A confirmation says what will be removed. Images placed
-  there stay in the Assets library. A board always keeps at least one canvas,
+  there stay in the library. A board always keeps at least one canvas,
   and the workspace at least one board.
 
-### Assets view (Phase 1)
+### Library (Phase 1)
 
-- **Canvas | Assets** at top-left switches between the endless canvas and
+- **Canvas | Library** at top-left switches between the endless canvas and
   the asset library. The canvas keeps its view, selection and undo history
-  while you are in Assets.
+  while you are in the Library.
 - **One original, many instances.** Each imported file is stored once.
   Every image you place is an instance that refers to it, on any board or
   canvas.
@@ -200,7 +200,7 @@ or network connection.
   so keep the file somewhere safe.
 - **Smaller exports:**
   - **Export** next to a board or canvas in the breadcrumb menu;
-  - **Export as archive** for one asset in the Assets view.
+  - **Export as archive** for one item in the Library.
   Each includes only the originals it uses.
 - **Import archive…** in the storage panel, or drop a `.canvast` file on the
   page:
@@ -249,7 +249,7 @@ or network connection.
 - **Snapping, arranging and clipboard:** a moving selection snaps to other
   objects with guide lines; align, distribute, copy, cut, paste and
   duplicate; `Alt`+drag copies.
-- **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `Ctrl+Space` brings the
+- **Navigation aids:** `W` `A` `S` `D` step to the next item (changeable in Settings > Shortcuts), `F` brings the
   selection into view, bookmarks save places and zooms, the canvas search finds
   items by name, tag or bookmark, with AND, OR, XOR and NOT.
 - **Shapes and paths:** the Shape tool (rectangle, ellipse, line, polygon, star), the Path tool (Bézier curves) and Edit nodes; fills and
@@ -281,20 +281,20 @@ or network connection.
 | Delete selection | `Delete` / `Backspace` |
 | Select all / clear | `Ctrl/⌘+A` · `Esc` (also cancels a gesture in progress) |
 | Step to the next item | `W` `A` `S` `D` (rebind in Settings > Shortcuts; Settings > Navigation: nearest in view, nearest anywhere, by layer; focus on the item or keep the zoom) |
-| Bring the selection into view | `Ctrl+Space`; again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
-| Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the Assets library |
+| Bring the selection into view | `F` (changeable); again: everything visible at this zoom; buttons beside zoom out and in for touch screens |
+| Search the canvas | `Ctrl+F` or the dock button searches everything at once (names, groups, tags, bookmarks); pressing `/` name only, `#` tag only (in-canvas tags and library tags), `@` bookmark only; `#tag` typed in the box is a search word · `Ctrl+F` · `Ctrl+Shift+F` searches the library |
 | Combine search words | space or `AND`/`&` both · `OR`/`\|` either · `XOR`/`^` exactly one · `NOT`/`!`/`-` not · `( )` group · `"a phrase"` (library and canvas search; ADR 0069) · `.png` a file type (ADR 0082) |
 | Select several layers | `Ctrl`+click toggles · `Shift`+click selects a range · `Ctrl+Shift`+click adds a range |
-| Viewer (Assets) | `F` shows or hides the controls · arrows or edge clicks move between pictures · wheel zooms · drag pans |
+| Viewer (Library) | `F` shows or hides the controls · arrows or edge clicks move between pictures · wheel zooms · drag pans |
 | Row actions | the ⋯ button on a bookmark, folder, tag or navigator row opens a menu (Up/Down/Home/End, `Esc` closes) |
 | Resize | drag a corner or side handle; `Shift` keeps proportions, `Alt` about the middle, `Ctrl` no snapping (the edge snaps to other items) |
 | Copy by dragging | hold `Alt` as the drag starts |
-| Import images | toolbar image button · drag files onto the page · paste (in Assets view these add to the library only) |
+| Import images | toolbar image button · drag files onto the page · paste (in Library these add to the library only) |
 | Export / import | storage panel (click the save indicator): **Export workspace backup**, **Import archive…** · menu **Export** per board or canvas · drop a `.canvast` file on the page |
-| Switch view | **Canvas** / **Assets** at top-left (←/→ move between them) |
+| Switch view | **Canvas** / **Library** at top-left (←/→ move between them) |
 | Jump to a zoom level | click the zoom read-out, type `3000`, `2^-500` or `10^900`, press Enter (Esc cancels). It zooms about the screen centre; one jump can move up to 10,000,000 levels |
 | Import any file | the Import button, drag and drop or paste: pictures, video and audio show as themselves; any other file (3D model, document, ...) is kept as a card with its extension, and can be downloaded |
-| Show a picture in the library | select it, then the library button in the selection bar: the Assets view opens with its original picked |
+| Show a picture in the library | select it, then the library button in the selection bar: the Library opens with its original picked |
 | Screenshot | the camera button in the bottom-right controls: saves the view to the library (Settings > Screenshot sets the format, name, folder, tags and what is included) |
 | Zen mode | the leaf button beside Home, or `Z` (rebind in Settings > Shortcuts): the floating bars and panels fade out and show again while the pointer is over them (ADR 0075) |
 | Settings | **Settings** view: tabs, scopes, reset, theme (system, light, dark), rebindable tool keys, `?` for the shortcut list, interface size, contrast and motion |
@@ -309,7 +309,7 @@ view: its centre in world coordinates plus a zoom level. A **zoom level** of
 the canvas: a stroke, an image instance (picture, video, audio or GIF) or a text. An **asset** is an imported source
 file. Each asset is stored once, and placed images are **instances** that
 refer to it. A **workspace** holds **boards**; each board holds one or more
-**canvases**. **Canvas view** shows one canvas; **Assets view** shows the
+**canvases**. **Canvas view** shows one canvas; **Library** shows the
 workspace's shared library.
 
 ## Quick start
@@ -420,7 +420,7 @@ src/
   search/query.ts           AND, OR, XOR, NOT query parser and evaluator (ADR 0069)
   settings/                 declared settings with scopes, rebindable shortcuts
   interaction/              also snapping, pens, item navigation (W A S D), shortcut scopes
-  ui/                       toolbar, text editor overlay, view switch, workspace navigator, Assets view (gallery,
+  ui/                       toolbar, text editor overlay, view switch, workspace navigator, Library (gallery,
                             viewer), Layers and Bookmarks panels, canvas search, Settings view, shared ⋯ More
                             menu, media player, confirmation dialog, storage panel, dev panel, Lucide icons
   app/                      bootstrap, editor state, actions, HUD, debug hook, bench scenes
@@ -612,7 +612,7 @@ reproduces on any checkout.
 | Phase 0B — editing, precision, recovery | 52/52 unit; final E2E 61 passed / 2 by-design skips, 6 harness failures fixed and re-run 21/21 across 3 projects; offline + naming checks pass; `dist/canvast.html` v0.0.2 sha256 `1f7e3cb4…0576` | see `git log` |
 | Phase 0C — scale proof | 58/58 unit; E2E 67 passed / 2 by-design skips / 0 failed (3 projects); bench 1M objects 6.4 s → 7.7 ms frame p50; `dist/canvast.html` v0.0.3 sha256 `45028f49…8859` | see `git log` |
 | Phase 1 slice 1 — workspace and storage foundation | 58/58 unit; E2E 88 passed / 2 by-design skips / 0 failed (3 projects); `dist/canvast.html` v0.1.0 sha256 `c1fb8b7f…ac4` | see `git log` |
-| Phase 1 slice 2 — Assets view, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |
+| Phase 1 slice 2 — Library, catalog, GC, safe deletion | 68/68 unit; full E2E 112 passed / 2 by-design skips / 0 failed (3 projects, 34.5 min); 2 mutation checks caught; `dist/canvast.html` v0.2.0 sha256 `9db358e8…31b7` | see `git log` |
 | Phase 1 slice 3 — portable archives (export/import) | 75/75 unit; quick E2E 121 passed / 2 by-design skips / 3 failed (one stale assertion, fixed and re-run 3/3); 2 mutation checks caught; `dist/canvast.html` v0.3.0 sha256 `2db91b09…9d9a` | see `git log` |
 | Firefox support (v0.3.1) | Firefox 157 added as a 4th E2E project; grid drawing 7.8× faster in Firefox; quick E2E 165 passed / 3 by-design skips / 0 failed (4 projects); tested build `f64a472e…92bf` (same code, pre-bump label); `dist/canvast.html` v0.3.1 sha256 `60ccde68…1a30` | see `git log` |
 | Phase 1 slice 4 — raster tile cache | tiles 24/24 (4 projects); dense 10K pan 89→2.2 ms, still 152→3.3 ms p50 (Chromium), Firefox 98→2 / 172→2 ms; quick E2E 189 passed / 3 by-design skips / 0 failed (4 projects); `dist/canvast.html` v0.4.0 sha256 `4528f2b3…f65a` | see `git log` |

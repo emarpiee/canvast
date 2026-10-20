@@ -235,7 +235,7 @@ export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: Edi
 }
 
 /**
- * Fit the view to as much as it can show legibly (the second press of Ctrl+Space, the "fit everything" button): the widest fit at which nothing
+ * Fit the view to as much as it can show legibly (the second press of the focus key, the "fit everything" button): the widest fit at which nothing
  * becomes a speck. Candidates are the items that are legible now (4 px up to 16 windows) and, with a selection, within a factor of 64 of
  * its size; they are taken nearest first (to the selection, or to the middle of the window) and each is added while, after the fit, every
  * included item is still at least 4 px on screen, the selection (if any) at least 14 px, and nothing is more than 40 windows away. So the
@@ -308,7 +308,7 @@ export function fitAllVisible(doc: DocumentStore, view: ViewState, editor?: Edit
 }
 
 /**
- * Ctrl+Space cycles the view: the selection, then everything visible at this zoom, then the selection again.
+ * The focus key (F at first; Settings > Shortcuts) cycles the view: the selection, then everything visible at this zoom, then the selection again.
  * A press with nothing selected fits everything. The cycle only continues while the view is where it left it.
  */
 export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: EditorState, zoomOnSelection: () => boolean): { tap(): void; fit(kind: "selection" | "all"): void } {
@@ -333,7 +333,7 @@ export function createFocusCycle(doc: DocumentStore, view: ViewState, editor: Ed
   return {
     tap() {
       // The cycle goes on only while the view is where it was left AND the same things are selected: a different selection is a new
-      // focus (select another item, press Ctrl+Space: the view goes to that one, not out to everything).
+      // focus (select another item, press the focus key: the view goes to that one, not out to everything).
       const same = last !== null && last.cam === here() && last.sel === selKey();
       if (!editor.selection.size) return all();
       if (same && last!.kind === "selection") return all();

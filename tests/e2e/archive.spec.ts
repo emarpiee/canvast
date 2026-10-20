@@ -250,7 +250,7 @@ test("canvas, board and asset exports contain only what their scope needs", asyn
     },
     [assetFile.bytes.toString("base64"), assetFile.name],
   );
-  await expect(q.getByTestId("confirm-dialog")).toContainText("added to the Assets library");
+  await expect(q.getByTestId("confirm-dialog")).toContainText("added to the library");
   await q.getByTestId("confirm-ok").click();
   await expect.poll(() => stored(q)).toEqual([HASH, GREEN_HASH].sort());
   expect((await sess(q)).tree!.length).toBe(1);

@@ -4,7 +4,8 @@ import { openColourPopover } from "./colour-popover";
 import { swatchBackground } from "../render/ink";
 import { NAME_STYLES } from "../app/screenshot";
 import { SETTINGS } from "../settings/settings";
-import { FIXED_SHORTCUTS, KEY_ROWS, keyOwner } from "../settings/shortcuts";
+import { FIXED_SHORTCUTS } from "../settings/shortcuts";
+import { KEY_COMMANDS, type Keymap, type KeyCommand, comboOfEvent, displayCombo, judge } from "../settings/keymap";
 import { esc } from "./format";
 import { syncScroll } from "./bar";
 declare const __CANVAST_VERSION__: string;
@@ -43,7 +44,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "lasso.filter": "Selecting and arranging",
   "shape.initialPaint": "Shapes",
   "eraser.diameterPx": "Eraser",
-  "assets.edgeWidth": "The asset viewer",
+  "assets.edgeWidth": "The library viewer",
   "media.volume": "Players",
   "frame.format": "Extracted frames",
   "edit.format": "Edited pictures",
@@ -106,16 +107,16 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "media",
     label: "Media and playback",
     rows: [
-      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next asset (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
-      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each asset stays in the Assets slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
+      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
+      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
       { key: "media.volume", label: "Starting volume", help: "Where each player starts. A player's own volume slider changes only that player.", control: { kind: "range", min: 0, max: 100, step: 1, unit: "%" } },
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.gif", label: "GIF step", help: "Frames the step buttons move an animated GIF.", control: { kind: "range", min: 1, max: 100, step: 1, unit: "frames" } },
       { key: "frame.format", label: "Extracted frame format", help: "The picture file made by Extract frame. PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
       { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
-      { key: "frame.place", label: "Place extracted frames on the canvas", help: "When a frame is extracted in the Assets viewer: also put it on the open canvas. (From a player on the canvas it is always placed beside the video.)", control: { kind: "toggle" } },
-      { key: "frame.folder", label: "Extracted frames: library folder", help: "Frames are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Extracted frames" } },
+      { key: "frame.place", label: "Place extracted frames on the canvas", help: "When a frame is extracted in the library viewer: also put it on the open canvas. (From a player on the canvas it is always placed beside the video.)", control: { kind: "toggle" } },
+      { key: "frame.folder", label: "Extracted frames: library folder", help: "Frames are filed in this folder of the library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Extracted frames" } },
       { key: "frame.name", label: "Extracted frames: file name", help: "Words in braces are replaced: {name} the video's name, {position} where in it (0m03s, or frame12 for a GIF), {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{name}-{position}" } },
       { key: "frame.nameStyle", label: "Extracted frames: name words", help: "How the video's name and the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
       { key: "frame.tagFrame", label: "Extracted frames: tag “extracted-frame”", control: { kind: "toggle" } },
@@ -124,7 +125,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "frame.tagsCustom", label: "Extracted frames: your own tags", help: "Tags you choose, put on every extracted frame. Separate them with commas.", control: { kind: "text", max: 200, placeholder: "reference, still" } },
       { key: "edit.format", label: "Edited picture format", help: "The picture file made by Make a new picture (a picture with its crop and adjustments baked in). PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
       { key: "edit.quality", label: "Edited picture quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
-      { key: "edit.folder", label: "Edited pictures: library folder", help: "Edited pictures are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Edited pictures" } },
+      { key: "edit.folder", label: "Edited pictures: library folder", help: "Edited pictures are filed in this folder of the library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Edited pictures" } },
       { key: "edit.name", label: "Edited pictures: file name", help: "Words in braces are replaced: {name} the original's name, {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{name}-edited" } },
       { key: "edit.nameStyle", label: "Edited pictures: name words", help: "How the original's name and the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
       { key: "edit.tagEdited", label: "Edited pictures: tag “edited-picture”", control: { kind: "toggle" } },
@@ -151,7 +152,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "shot.transparent", label: "Transparent background", help: "No background colour behind the content (WebP and PNG; JPEG is filled white). Turn the pattern off too for a clean cut-out.", control: { kind: "toggle" } },
       { key: "shot.interface", label: "Include the interface", help: "The floating bars and panels over the canvas (the toolbar, panels, readout). Off by default: a clean picture of the canvas.", control: { kind: "toggle" } },
       { key: "shot.copy", label: "Also copy it to the clipboard", help: "As a PNG, ready to paste into another app.", control: { kind: "toggle" } },
-      { key: "shot.folder", label: "Library folder", help: "Screenshots are filed in this folder of the Assets library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Screenshots" } },
+      { key: "shot.folder", label: "Library folder", help: "Screenshots are filed in this folder of the library (made the first time). Leave it empty to file them in no folder.", control: { kind: "text", max: 60, placeholder: "Screenshots" } },
       { key: "shot.name", label: "File name", help: "Words in braces are replaced: {board} {canvas} {workspace} {ddmmyyyy} {yyyymmdd} {hhmmss} {hhmm} {yyyy} {mm} {dd} {hh} {min} {ss}. The extension is added.", control: { kind: "text", max: 120, placeholder: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}" } },
       { key: "shot.nameStyle", label: "Name words", help: "How the board and canvas names are written in the file name.", control: { kind: "select", options: NAME_STYLES.map(([v, l]) => [v, l] as [string, string]) } },
       { key: "shot.tagShot", label: "Tag: screenshot", help: "Put the tag “screenshot” on every screenshot, to find them all.", control: { kind: "toggle" } },
@@ -236,7 +237,7 @@ export interface BackupHooks {
   readOnly(): boolean;
 }
 
-export function mountSettingsView(root: HTMLElement, settings: SettingsStore, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
+export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}">${esc(t.label)}<span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
     ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.map((id) => tabButton(SETTINGS_TABS.find((t) => t.id === id)!)).join("")}`,
@@ -258,8 +259,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
       : t.id === "shortcuts"
-        ? `<div class="set-info set-keys"><p>Tool keys and the keys that step to the next item are a single letter and work on the canvas. Press <strong>Change</strong>, then the new letter; Escape cancels.</p>
-           <div data-tool-keys></div><p class="set-note" data-key-note role="status"></p><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
+        ? `<div class="set-info set-keys"><p>Every shortcut can be changed, to one key or to several together (Ctrl+Shift+F, Alt+Q). Press <strong>Change</strong>, then the keys you want; <strong>Add</strong> gives the command another key; the <strong>×</strong> takes a key away; Escape cancels. You are warned when a key is already used, or when the browser or the system may take it.</p>
+           <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
+           <div data-tool-keys></div><div class="set-note" data-key-note role="status" aria-live="polite"></div><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
       : t.id === "storage"
         ? `<div class="set-info set-card" data-storage><p>Your canvases are kept in this browser's storage, on this device.</p><dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd data-persisted>…</dd></dl>
            <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy below.</p></div>
@@ -431,25 +433,41 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     if (files.length) void backup.importFiles(files).then(() => storage());
   });
 
-  /** The key being changed, waiting for a letter. */
-  let capturing: SettingKey | null = null;
+  /** The command waiting for its keys (Change replaces what it has, Add puts another beside it). */
+  let capturing: { id: string; mode: "replace" | "add" } | null = null;
+  /** A choice that needs a word from the person first: a warning, or a key another command has. */
+  let pending: { id: string; mode: "replace" | "add"; combo: string; owners: KeyCommand[]; why: string } | null = null;
+  const nameOf = (id: string): string => KEY_COMMANDS.find((c) => c.id === id)!.name;
   const renderKeys = (): void => {
     const host = root.querySelector<HTMLElement>("[data-tool-keys]");
     if (!host) return;
     let group = "";
-    host.innerHTML = KEY_ROWS.map((r) => {
-      const def = SETTINGS[r.setting].default as string;
-      const cur = settings.get(r.setting) as string;
-      const head = r.group !== group ? `${group ? "</div>" : ""}<div class="set-card"><h3>${esc(r.group)}</h3>` : "";
-      group = r.group;
-      return `${head}<div class="set-row set-keyrow"><span class="set-label">${esc(r.name)}</span>
-        <div class="set-control"><kbd class="set-key">${capturing === r.setting ? "press a letter…" : esc(cur.toUpperCase())}</kbd><button type="button" class="set-reset" data-change-key="${r.setting}" aria-label="Change the key for ${esc(r.name)}">Change</button></div>
-        <span class="set-scope">This device</span><button type="button" class="set-reset" data-reset="${r.setting}" aria-label="Reset the key for ${esc(r.name)} to its default"${cur === def ? " disabled" : ""}>Reset</button></div>`;
-    }).join("") + (KEY_ROWS.length ? "</div>" : "");
+    host.innerHTML = KEY_COMMANDS.map((c) => {
+      const head = c.group !== group ? `${group ? "</div>" : ""}<div class="set-card"><h3>${esc(c.group)}</h3>` : "";
+      group = c.group;
+      const chips = keymap.bindings(c.id).length
+        ? keymap.bindings(c.id).map((b) => `<span class="set-chip"><kbd class="set-key">${esc(displayCombo(b))}</kbd><button type="button" class="set-chip-x" data-key-remove="${c.id}" data-combo="${esc(b)}" aria-label="Take ${esc(displayCombo(b))} away from ${esc(c.name)}">×</button></span>`).join("")
+        : `<span class="set-none">no key</span>`;
+      const waiting = capturing?.id === c.id ? `<kbd class="set-key is-waiting">press the keys…</kbd>` : "";
+      return `${head}<div class="set-row set-keyrow" data-key-row="${c.id}"><span class="set-label">${esc(c.name)}</span>
+        <div class="set-control">${chips}${waiting}<button type="button" class="set-reset" data-change-key="${c.id}" data-mode="replace" aria-label="Change the keys for ${esc(c.name)}">Change</button><button type="button" class="set-reset" data-change-key="${c.id}" data-mode="add" aria-label="Add a key for ${esc(c.name)}">Add</button>
+        <span class="set-scope">This device</span><button type="button" class="set-reset" data-key-reset="${c.id}" aria-label="Reset the keys for ${esc(c.name)} to their default"${keymap.isDefault(c.id) ? " disabled" : ""}>Reset</button></div></div>`;
+    }).join("") + "</div>";
   };
   const keyNote = (text: string): void => {
     const n = root.querySelector<HTMLElement>("[data-key-note]");
     if (n) n.textContent = text;
+    pending = null;
+  };
+  /** Give `combo` to a command (replacing its keys, or beside them), taking it from the commands in `owners`. */
+  const bind = (id: string, mode: "replace" | "add", combo: string, owners: readonly KeyCommand[]): void => {
+    for (const o of owners) keymap.set(o.id, keymap.bindings(o.id).filter((c) => c !== combo));
+    keymap.set(id, mode === "replace" ? [combo] : [...keymap.bindings(id), combo]);
+  };
+  const askNote = (text: string, yes: string): void => {
+    const n = root.querySelector<HTMLElement>("[data-key-note]");
+    if (!n) return;
+    n.innerHTML = `<span>${esc(text)}</span> <button type="button" class="set-reset" data-key-yes>${esc(yes)}</button> <button type="button" class="set-reset" data-key-no>Cancel</button>`;
   };
   const all = SETTINGS_TABS.flatMap((t) => t.rows ?? []);
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
@@ -518,51 +536,81 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, on
     if (preset) return void settings.set(preset.dataset["preset"] as SettingKey, Number(preset.dataset["value"]) as never);
     const change = t.closest<HTMLElement>("[data-change-key]");
     if (change) {
-      capturing = change.dataset["changeKey"] as SettingKey;
+      capturing = { id: change.dataset["changeKey"]!, mode: change.dataset["mode"] === "add" ? "add" : "replace" };
+      keymap.capturing = true;
       keyNote("");
       renderKeys();
-      root.querySelector<HTMLElement>(`[data-change-key="${capturing}"]`)?.focus();
+      root.querySelector<HTMLElement>(`[data-change-key="${capturing.id}"][data-mode="${capturing.mode}"]`)?.focus();
       return;
     }
+    const drop = t.closest<HTMLElement>("[data-key-remove]");
+    if (drop) {
+      const id = drop.dataset["keyRemove"]!;
+      keymap.set(id, keymap.bindings(id).filter((c) => c !== drop.dataset["combo"]));
+      return keyNote(`${nameOf(id)}: ${drop.dataset["combo"]} taken away.${keymap.bindings(id).length ? "" : " It has no key now."}`);
+    }
+    const resetKey = t.closest<HTMLElement>("[data-key-reset]");
+    if (resetKey) {
+      keymap.reset(resetKey.dataset["keyReset"]!);
+      return keyNote(`${nameOf(resetKey.dataset["keyReset"]!)}: back to its own keys.`);
+    }
+    if (t.closest("[data-keys-reset-all]")) {
+      settings.reset("keys.custom" as SettingKey);
+      return keyNote("Every shortcut is back to its own keys.");
+    }
+    if (t.closest("[data-key-yes]") && pending) {
+      const p = pending;
+      bind(p.id, p.mode, p.combo, p.owners);
+      return keyNote(`${nameOf(p.id)}: ${displayCombo(p.combo)}.${p.owners.length ? ` ${p.owners.map((o) => o.name).join(" and ")} has no longer that key.` : ""}`);
+    }
+    if (t.closest("[data-key-no]")) return keyNote("Cancelled: nothing changed.");
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
     if (t.closest("[data-reload]")) location.reload();
     if (t.closest("[data-done]")) onClose();
   });
-  /** Stop waiting for a letter (focus moved away, another tab, or the view closed): nothing changes. */
+  /** Stop waiting for keys (focus moved away, another tab, or the view closed): nothing changes. */
   const cancelCapture = (): void => {
     if (!capturing) return;
     capturing = null;
+    keymap.capturing = false;
     renderKeys();
   };
   root.addEventListener("pointerdown", (e) => {
-    if (capturing && !(e.target as HTMLElement).closest(`[data-change-key="${capturing}"]`)) cancelCapture();
+    if (capturing && !(e.target as HTMLElement).closest(`[data-change-key="${capturing.id}"]`)) cancelCapture();
   });
-  // While waiting for a letter every key is for the key being chosen, wherever the focus is (a click elsewhere cancels).
+  // While waiting for keys every key press is for the command being changed, wherever the focus is (a click elsewhere cancels).
   window.addEventListener(
     "keydown",
     (e) => {
       if (!capturing || root.hidden) return;
-      // Any key is for the key being chosen: a letter sets it, Escape cancels, everything else is refused with a reason.
-      const setting = capturing;
-      const name = KEY_ROWS.find((r) => r.setting === setting)!.name;
       e.preventDefault();
       e.stopPropagation();
-      if (e.key === "Tab" || e.key === "Shift") return;
+      if (e.key === "Escape") {
+        cancelCapture();
+        keyNote("Cancelled: nothing changed.");
+        return;
+      }
+      const combo = comboOfEvent(e);
+      if (!combo) return; // (a modifier alone: wait for the key it goes with)
+      const { id, mode } = capturing;
       capturing = null;
-      const letter = e.key.length === 1 ? e.key.toLowerCase() : "";
-      if (e.key === "Escape") keyNote("");
-      else if (!/^[a-z]$/.test(letter) || e.ctrlKey || e.metaKey || e.altKey) keyNote("A key here is one plain letter, a to z.");
-      else {
-        const other = keyOwner(settings, letter, setting);
-        if (other) keyNote(`${letter.toUpperCase()} is already the key for ${other}. Change that one first.`);
-        else {
-          settings.set(setting, letter);
-          keyNote(`${name} is now ${letter.toUpperCase()}.`);
-        }
+      keymap.capturing = false;
+      const v = judge(combo, id);
+      const owners = keymap.owners(combo, id);
+      const shown = displayCombo(combo);
+      if (v.level === "refuse") keyNote(v.why);
+      else if (v.level === "warn" || owners.length) {
+        keyNote("");
+        const why = [v.level === "warn" ? v.why : "", owners.length ? `${shown} is already the key for ${owners.map((o) => o.name).join(" and ")}.` : ""].filter(Boolean).join(" ");
+        pending = { id, mode, combo, owners, why };
+        askNote(why, owners.length ? `Use ${shown} for ${nameOf(id)}, not for ${owners.map((o) => o.name).join(" and ")}` : `Use ${shown} anyway`);
+      } else {
+        bind(id, mode, combo, []);
+        keyNote(`${nameOf(id)}: ${shown}.${v.level === "note" ? " " + v.why : ""}`);
       }
       renderKeys();
-      root.querySelector<HTMLElement>(`[data-change-key="${setting}"]`)?.focus();
+      root.querySelector<HTMLElement>(`[data-change-key="${id}"]`)?.focus();
     },
     true,
   );

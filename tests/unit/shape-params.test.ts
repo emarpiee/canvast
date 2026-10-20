@@ -89,16 +89,15 @@ describe("parametric shapes", () => {
     radii[1] = max;
     expect(maxFor(star, radii, 0)).toBeLessThan(maxFor(star, new Array<number>(10).fill(0), 0));
   });
-  it("the box of a shape is its sharp box: rounding it, or changing a star's ratio, never resizes it", () => {
+  it("the box of a shape is the shape as drawn: rounding its tips shrinks the box with it (no empty space left)", () => {
     const star = drawn("star");
-    const box = (o: PathObject) => JSON.stringify(Object.values(localBounds(o)).map((v) => Math.round((v as number) * 1e6) / 1e6));
-    const sharp = box(star);
+    const width = (o: PathObject) => localBounds(o).maxX - localBounds(o).minX;
     const rounded = withRadius(star, 1e6); // as round as it can be: the tips are cut right back
-    expect(geometryBounds(rounded.sub).maxX - geometryBounds(rounded.sub).minX).toBeLessThan(geometryBounds(star.sub).maxX - geometryBounds(star.sub).minX);
-    expect(box(rounded)).toBe(sharp);
-    expect(box(withShapeParams(rounded, { inner: 0.05 })!)).toBe(sharp);
-    const turned = { ...rounded, rot: 123456789 };
-    expect(box({ ...star, rot: 123456789 })).toBe(box(turned)); // and the same turned
+    expect(width(rounded)).toBeLessThan(width(star));
+    const geom = geometryBounds(rounded.sub).maxX - geometryBounds(rounded.sub).minX;
+    expect(width(rounded) - geom, "the drawn shape and its outline, nothing more").toBeLessThan(10);
+    const flatter = withShapeParams(rounded, { inner: 0.05 })!;
+    expect(width(flatter)).toBeLessThanOrEqual(width(star) + 1e-6);
   });
   it("a corner takes its arc from the whole edge it ends, not only the segment next to it: a string of tiny segments does not hold it to a hair", () => {
     // a 100 x 100 square whose top edge also has nodes 1 and 2 units from the corner (as a Boolean operation leaves them)

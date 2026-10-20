@@ -1,4 +1,4 @@
-# ADR 0058: stepping between items (Ctrl+Arrow) and the focus key (Alt until 2026-10-20, then Ctrl+Space)
+# ADR 0058: stepping between items (Ctrl+Arrow) and the focus key (Alt until 2026-10-20, then F)
 
 Status: accepted (owner request, 2026-10-16; the idea comes from the owner's other canvas project, adapted to endless depth)
 
@@ -16,4 +16,4 @@ Status: accepted (owner request, 2026-10-16; the idea comes from the owner's oth
 
 `editing.spec.ts`: stepping right, right, left in view with framing; Alt alone versus Alt with a key; by-layer stepping from nothing selected; a tiny deeper item skipped in view and reached in anywhere.
 
-**2026-10-20 (owner): the focus key is Ctrl+Space, not Alt.** Alt pressed and released alone no longer does anything; Ctrl+Space brings the selection into view and a second press fits everything visible at this zoom (the same cycle). Alt is free for its other jobs (copy on drag, smooth or corner, join, cut, draw from the middle, remove a region), so nothing blocks its tap any more.
+**2026-10-20 (owner): the focus key is F, not an Alt tap** (and, like every key, it can be changed: ADR 0158). Alt pressed and released alone no longer does anything; F brings the selection into view and a second press fits everything visible at this zoom (the same cycle). Alt is free for its other jobs (copy on drag, smooth or corner, join, cut, draw from the middle, remove a region), so nothing blocks its tap any more.
