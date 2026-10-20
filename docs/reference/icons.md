@@ -92,6 +92,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `bring-to-front` | Bring to front |
 | `calendar-days` | By date added, newest first |
 | `camera` | Screenshot (left tool rail, above Search) |
+| `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
 | `check` | Canvas 1empty |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |
 | `chevron-left` | Previous |

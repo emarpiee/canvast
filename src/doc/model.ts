@@ -305,7 +305,7 @@ export function pathSubs(o: PathObject): readonly SubPath[] {
   if (!o.rot) return o.sub;
   let r = turnedPaths.get(o);
   if (!r) {
-    const b = paintBounds(o.base ?? o.sub, pathStyle(o)); // (a rounded path turns about the middle of its sharp box: rounding does not move it)
+    const b = paintBounds(o.sub, pathStyle(o)); // (a path turns about the middle of the box it is drawn in)
     const { c, s } = cosSin(o.rot);
     turnedPaths.set(o, (r = rotateSubs(o.sub, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
   }
@@ -320,7 +320,7 @@ export function editSubs(o: PathObject): readonly SubPath[] {
   if (!o.rot) return o.base;
   let r = turnedBases.get(o);
   if (!r) {
-    const b = paintBounds(o.base ?? o.sub, pathStyle(o));
+    const b = paintBounds(o.sub, pathStyle(o)); // (the same pivot as the drawn shape)
     const { c, s } = cosSin(o.rot);
     turnedBases.set(o, (r = rotateSubs(o.base, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, c, s)));
   }
@@ -412,8 +412,8 @@ export function strokePoints(o: StrokeObject): readonly number[] {
 
 /** Bounds of the object's own geometry before `rot` is applied. */
 export function unrotatedBounds(o: CanvasObject): LocalBounds {
-  // (the box of a rounded path is that of its sharp outline: rounding, or changing a star's ratio, never resizes it)
-  if (o.kind === "path") return paintBounds(o.base ?? o.sub, inkStyle(o));
+  // (the box of a path is that of the shape as drawn: rounding its corners or changing a star's ratio shrinks the box with it)
+  if (o.kind === "path") return paintBounds(o.sub, inkStyle(o));
   if (o.kind === "image") return { minX: 0, minY: 0, maxX: o.w, maxY: o.h };
   if (o.kind === "text") {
     if (o.onPath) return textPathBounds(o);
@@ -443,7 +443,7 @@ export function pivotOf(o: CanvasObject): { x: number; y: number } {
 }
 
 export function localBounds(o: CanvasObject): LocalBounds {
-  if (o.kind === "path") return o.rot ? paintBounds(o.base ? editSubs(o) : pathSubs(o), inkStyle(o)) : paintBounds(o.base ?? o.sub, inkStyle(o));
+  if (o.kind === "path") return paintBounds(pathSubs(o), inkStyle(o));
   if (o.kind !== "stroke") {
     const b = unrotatedBounds(o);
     if (!o.rot) return b;

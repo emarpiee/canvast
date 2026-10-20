@@ -47,7 +47,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -165,7 +165,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -177,6 +177,7 @@ type Gesture =
   | { kind: "builder"; pointerId: number }
   /** A lasso drawn round nodes of the picked paths (Edit nodes). */
   | { kind: "nodelasso"; pointerId: number; additive: boolean }
+  | { kind: "cornerlasso"; pointerId: number; id: ObjectId; additive: boolean }
   | { kind: "node"; pointerId: number; id: ObjectId; what: "point" | "in" | "out" | "seg"; s: number; k: number; t: number; prev: { s: number; k: number } | null; base: readonly SubPath[]; start: ScreenPoint; startLocal: { x: number; y: number }; moved: boolean; smooth: boolean }
   | {
       kind: "scale";
@@ -746,7 +747,7 @@ export function attachTools(
   /** A press on a handle of the selected path's gradient takes it. */
   const startGradientPress = (e: PointerEvent, s: ScreenPoint): boolean => {
     const tgt = gradientTarget();
-    if (!tgt || editor.blockEdit()) return false;
+    if (!tgt || editor.blockEdit() || editor.tool === "node" || editor.cornersOpen === tgt.o.id) return false; // (its handles are hidden then)
     const h = gradientHandles(tgt.po, editor.gradientFocus);
     const handle = h && hitGradient(h, s.x, s.y);
     if (!h || !handle) return false;
@@ -756,6 +757,7 @@ export function attachTools(
   /** A press on the main radius dot, one of the corners' own dots (when opened out) or the star's ratio handle takes it; held still, the main dot opens the corners out (or closes them). */
   const toggleCorners = (id: ObjectId): void => {
     editor.cornersOpen = editor.cornersOpen === id ? null : id;
+    editor.cornerSel = null;
     editor.changed();
   };
   const startCornerPress = (e: PointerEvent, s: ScreenPoint): boolean => {
@@ -764,6 +766,13 @@ export function attachTools(
     const open = editor.cornersOpen === tgt.o.id;
     const h = shapeHandles(tgt.po, open, editor);
     const pick = h && hitCornerHandle(h, s.x, s.y, open);
+    // Corners opened out: a drag that starts on empty ground is a lasso that picks corners, to be moved together.
+    if (h && open && !pick && pickAll(unlocked(visible()), s.x, s.y).length === 0) {
+      editor.lasso = [s.x, s.y];
+      g = { kind: "cornerlasso", pointerId: e.pointerId, id: tgt.o.id, additive: e.shiftKey };
+      editor.changed();
+      return true;
+    }
     if (!h || !pick) return false;
     const dot = pick.what === "corner" ? pick.dot : pick.what === "main" ? h.main : null;
     const along = dot ? (s.x - dot.cx) * dot.ux + (s.y - dot.cy) * dot.uy : 0;
@@ -775,6 +784,10 @@ export function attachTools(
       }
     }, LONG_PRESS_MS) : 0;
     g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
+    const sel = editor.cornerSel;
+    if (g.kind === "round" && pick.what === "corner" && sel && sel.id === id && sel.idx.size > 1 && sel.idx.has(pick.dot.index)) {
+      g.multi = new Map(h.corners.filter((d) => sel.idx.has(d.index)).map((d) => [d.index, { r0: d.px, max: d.max }]));
+    } else if (pick.what === "corner" && sel && !(sel.id === id && sel.idx.has(pick.dot.index))) editor.cornerSel = null; // (another corner: the picked ones are let go)
     return true;
   };
   const updateCorner = (s: ScreenPoint, final: boolean): void => {
@@ -812,7 +825,8 @@ export function attachTools(
     // Along the corner's bisector, from where the dot was taken (so it never jumps); the main dot in the middle of an opened-out shape: sideways.
     const delta = g.what === "main" && open ? s.x - g.x0 : ((s.x - dot.cx) * dot.ux + (s.y - dot.cy) * dot.uy - g.proj0) * dot.sinHalf;
     const px = Math.max(0, Math.min(g.what === "corner" ? dot.max : dot.maxAll, g.r0 + delta));
-    if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
+    if (g.what === "corner" && g.multi) commitCornerSet(doc, editor, g.id, new Map([...g.multi].map(([i, c]) => [i, Math.max(0, Math.min(c.max, c.r0 + delta))])), ppu, final);
+    else if (g.what === "corner") commitCornerAt(doc, editor, g.id, g.index, px, ppu, final);
     else commitCorners(doc, editor, [px], () => ppu, final);
     editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Radius ${Math.round(px * 10) / 10}`, guide: handleGuide(h, g.what === "corner" ? { what: "corner", dot } : { what: "main" }, open) };
   };
@@ -838,7 +852,7 @@ export function attachTools(
         guide = handleGuide(h, pick, open);
         text = pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
       } else {
-        const gh = gradientHandles(tgt.po, editor.gradientFocus);
+        const gh = editor.tool === "node" || editor.cornersOpen === tgt.o.id ? null : gradientHandles(tgt.po, editor.gradientFocus);
         const hit = gh && hitGradient(gh, s.x, s.y);
         if (hit) text = hit === "p0" ? "Gradient start" : hit === "p1" ? "Gradient end" : hit === "c" ? "Gradient centre" : "Gradient radius";
       }
@@ -1671,6 +1685,7 @@ export function attachTools(
       }
       case "lasso":
       case "nodelasso":
+      case "cornerlasso":
         editor.lasso!.push(s.x, s.y);
         editor.changed();
         break;
@@ -1921,6 +1936,24 @@ export function attachTools(
           return o?.kind === "path" ? [rebuilt(o, sub)] : [];
         });
         if (objs.length) doc.commit(doc.transaction(objs.length === 1 ? "Move nodes" : `Move nodes of ${objs.length} paths`, objs));
+        break;
+      }
+      case "cornerlasso": {
+        const poly = editor.lasso;
+        editor.lasso = null;
+        if (cancelled || !poly) break;
+        const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1);
+        if (Math.max(...xs) - Math.min(...xs) < DRAG_THRESHOLD_PX && Math.max(...ys) - Math.min(...ys) < DRAG_THRESHOLD_PX) {
+          editor.cornerSel = null;
+          if (!g.additive) editor.select([]); // a click on empty ground clears, as it did
+          break;
+        }
+        const tgt = gradientTarget();
+        const h = tgt && tgt.o.id === g.id ? shapeHandles(tgt.po, true, editor) : null;
+        if (!h) break;
+        const inside = h.corners.filter((d) => pointInPolygon(d.x, d.y, poly)).map((d) => d.index);
+        const prev = g.additive && editor.cornerSel?.id === g.id ? editor.cornerSel.idx : new Set<number>();
+        editor.cornerSel = inside.length || prev.size ? { id: g.id, idx: new Set([...prev, ...inside]) } : null;
         break;
       }
       case "nodelasso": {

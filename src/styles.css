@@ -282,10 +282,6 @@ input[type="range"], .media-scrub, [data-scrubbable], [data-scrub], input[data-s
   text-overflow: ellipsis;
 }
 
-/* The selection options (corner-radius lock, snap, axis box, ignore fill) stand beside the Actions bar, on its right (measured in toolbar.ts); with no Actions bar, where it would be. */
-#toolbar > .toolbar.tb-pick { position: fixed; left: 50%; bottom: calc(2 * var(--sp-14) + var(--sp-6)); transform: translateX(-50%); z-index: var(--z-edge); pointer-events: auto; }
-#toolbar > .toolbar.tb-pick.is-beside { left: calc(var(--pick-left) + var(--near)); top: var(--pick-top); bottom: auto; transform: translateY(-50%); } /* (--pick-top: the middle of the Actions bar) */
-
 .hud-controls {
   right: 12px;
   bottom: 12px;
@@ -868,10 +864,14 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 }
 
 /* The Actions bar (ui/context-bar.ts, ADR 0128): one row at a fixed place, bottom centre above the readout; never attached to an item. */
-.ctx-bar { position: absolute; left: 50%; bottom: calc(2 * var(--sp-14) + var(--sp-6)); z-index: var(--z-edge); display: flex; align-items: center; max-width: calc(100% - 2 * var(--edge)); transform: translateX(-50%); overflow-x: auto; scrollbar-width: none; backdrop-filter: blur(6px); }
+/* The Actions bar and the selection options bar beside it share one parent, which is what is placed (ui/context-bar.ts), so they always line up. */
+.ctx-wrap { position: absolute; left: 50%; bottom: calc(2 * var(--sp-14) + var(--sp-6)); z-index: var(--z-edge); display: flex; align-items: center; gap: var(--near); max-width: calc(100% - 2 * var(--edge)); transform: translateX(-50%); }
+.ctx-wrap:has(> .ctx-bar[hidden]) { display: none; }
+.ctx-wrap.is-following { bottom: auto; transform: none; } /* (placed from the selection) */
+.ctx-wrap > .toolbar { flex: none; }
+.ctx-bar { display: flex; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; backdrop-filter: blur(6px); }
 .ctx-bar::-webkit-scrollbar { display: none; }
 .ctx-bar[hidden] { display: none; }
-.ctx-bar.is-following { bottom: auto; transform: none; } /* (placed from the selection: ui/context-bar.ts) */
 .ctx-bar .tb-group { flex: none; }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
@@ -2210,7 +2210,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; translate: 0 calc(var(--sp-3) * var(--anim-move)); } }
 /* Menus, popovers, panels and dialogs come in with a short fade and rise. */
-.pop-menu, .side-menu, .nav-actions, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .layers-panel, .bookmarks-panel, .tags-panel, .storage-panel, .search-help, .ctx-bar, dialog.confirm[open] { animation: pop-in var(--dur-base) var(--ease-out) both; }
+.pop-menu, .side-menu, .nav-actions, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .layers-panel, .bookmarks-panel, .tags-panel, .storage-panel, .search-help, .ctx-bar, .ctx-wrap > .toolbar, dialog.confirm[open] { animation: pop-in var(--dur-base) var(--ease-out) both; }
 dialog.confirm[open]::backdrop { animation: fade-in var(--dur-base) var(--ease-out) both; }
 /* A view fades in when it opens; so does a settings tab. */
 #assets-view:not([hidden]), #settings-view:not([hidden]), .set-panels > section:not([hidden]), .viewer:not([hidden]) { animation: fade-in var(--dur-base) var(--ease-out) both; }

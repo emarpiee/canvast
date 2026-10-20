@@ -24,9 +24,11 @@ export interface ContextActions {
   duplicate(): void;
   /** Take the turn off the selection; give stretched pictures their own proportions back. */
   resetRotation(): void;
+  /** Make the current turn of the shapes their own (the new zero). */
+  applyRotation(): void;
   resetProportions(): void;
   /** What the selection can be reset from. */
-  resettable(): { turned: boolean; stretched: boolean };
+  resettable(): { turned: boolean; stretched: boolean; bakeable: boolean };
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
   fileSelection(): { hash: string; open: boolean } | null;
   /** Any file of the library is picked: its original can be downloaded (several as a ZIP; ADR 0119). */
@@ -159,12 +161,16 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("vectorise", ICONS.vectorPolygon, "Make editable vector shapes from this SVG picture (the picture stays)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
     group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one picked", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the picked shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the picked things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
     group("Attach",
       btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +
     group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
-  host.appendChild(bar);
+  // The bar is placed inside a wrapper, which the selection options bar (ui/toolbar.ts) joins: one parent for both, so they line up.
+  const wrap = document.createElement("div");
+  wrap.className = "ctx-wrap";
+  wrap.append(bar);
+  host.appendChild(wrap);
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
   const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
@@ -306,6 +312,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "copypng": actions.copyRendered(); break;
       case "bake": actions.bake(); break;
       case "unrotate": actions.resetRotation(); break;
+      case "baserot": actions.applyRotation(); break;
       case "unstretch": actions.resetProportions(); break;
       case "duplicate": actions.duplicate(); break;
       case "group": actions.group(); break;
@@ -324,9 +331,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   const follow = (): void => {
     const box = editor.selectionBoxOnScreen;
     const on = placement() === "follow" && box !== null && !bar.hidden;
+    wrap.classList.toggle("is-following", on);
     bar.classList.toggle("is-following", on);
     if (!on) {
-      bar.style.left = bar.style.top = bar.style.bottom = "";
+      wrap.style.left = wrap.style.top = wrap.style.bottom = "";
       // At the bottom a media player may come down onto this bar (its picture is low): the bar then stands just above the player.
       const playerEl = document.querySelector<HTMLElement>("[data-testid=media-bar]:not([hidden])");
       if (box && playerEl && !bar.hidden) {
@@ -336,16 +344,16 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         const playerTop = mediaBarTop(Math.max(...box.frame.corners.map((c) => c[1] / k)), playerEl.offsetHeight, room);
         const mine = bar.getBoundingClientRect();
         const [top, bottom] = [(mine.top - home.top) / k, (mine.bottom - home.top) / k];
-        if (bottom > playerTop - MENU_GAP && top < playerTop + playerEl.offsetHeight + MENU_GAP) bar.style.bottom = `${Math.round(room - playerTop + MENU_GAP)}px`;
+        if (bottom > playerTop - MENU_GAP && top < playerTop + playerEl.offsetHeight + MENU_GAP) wrap.style.bottom = `${Math.round(room - playerTop + MENU_GAP)}px`;
       }
       return;
     }
-    bar.style.bottom = "";
+    wrap.style.bottom = "";
     const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1; // (the bars are drawn zoomed by the interface size)
     const xs = box.frame.corners.map((c) => c[0] / k);
     const ys = box.frame.corners.map((c) => c[1] / k);
     const home = host.getBoundingClientRect();
-    const [w, h, room] = [bar.offsetWidth, bar.offsetHeight, home.height / k];
+    const [w, h, room] = [wrap.offsetWidth, bar.offsetHeight, home.height / k];
     const edge = MENU_GAP;
     // A media player stands right under its picture and never moves from there (ui/media-player.ts): this bar goes above the picture; with no room
     // above, under the player; with no room there either (a picture that fills the view), just above the player, over the picture.
@@ -360,8 +368,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       top = above - handle >= edge ? above - handle : under + h <= room - edge ? under : Math.max(edge, playerTop - MENU_GAP - h);
     } else top = below + h <= room - edge ? below : above >= edge ? above : Math.max(edge, room - h - edge); // (no room either side: the bottom edge)
     const left = Math.max(edge, Math.min(home.width / k - w - edge, (Math.min(...xs) + Math.max(...xs)) / 2 - w / 2));
-    bar.style.left = `${Math.round(left)}px`;
-    bar.style.top = `${Math.round(top)}px`;
+    wrap.style.left = `${Math.round(left)}px`;
+    wrap.style.top = `${Math.round(top)}px`;
   };
   const update = (): void => {
     const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "node" || editor.tool === "lasso") && editor.preview.kind === "none";
@@ -400,6 +408,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("exportmenu").hidden = !(actions.canExport() || actions.canDownload() || actions.canExportSvg() || sel.some((o) => o!.kind === "text"));
     q("statemenu").hidden = !actions.initialState();
     q("unrotate").hidden = !reset.turned;
+    q("baserot").hidden = !reset.bakeable;
     q("unstretch").hidden = !reset.stretched;
     // with two or more kinds picked, the kind chosen in the Properties bar shows only its tools (All, or none chosen: everything)
     const kinds = new Set(sel.map((o) => (isContainer(o) ? "sheet" : o!.kind === "path" ? "shape" : o!.kind === "image" ? "picture" : o!.kind))); // (as the Properties bar tells them apart)

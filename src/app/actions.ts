@@ -42,7 +42,7 @@ import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseSvg } from "./svg-import";
 import { pivotOf } from "../doc/model";
-import { MAX_NAME_LENGTH, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
+import { MAX_NAME_LENGTH, editSubs, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
@@ -517,9 +517,29 @@ export function resetProportions(doc: DocumentStore, editor: EditorState): numbe
 }
 
 /** Whether any selected item is turned, or any selected picture stretched (the selection bar shows the reset buttons then). */
-export function resettable(doc: DocumentStore, editor: EditorState): { turned: boolean; stretched: boolean } {
+export function resettable(doc: DocumentStore, editor: EditorState): { turned: boolean; stretched: boolean; bakeable: boolean } {
   const sel = selected(doc, editor);
-  return { turned: sel.some((o) => !o.locked && !!o.rot), stretched: sel.some(distorted) };
+  return { turned: sel.some((o) => !o.locked && !!o.rot), stretched: sel.some(distorted), bakeable: sel.some(canApplyRotation) };
+}
+
+/** A turned shape whose paint does not depend on its box: its points can take the turn (a gradient or pattern is laid out in the box it is turned with). */
+const canApplyRotation = (o: CanvasObject): o is PathObject => o.kind === "path" && !o.locked && !!o.rot && o.result === undefined && (o.fill === null || typeof o.fill === "string") && (o.stroke === null || typeof o.stroke === "string");
+
+/**
+ * Make the turn of the selected shapes their own: the points are turned and the turn is set to nothing, so a shape looks the same, is "not turned"
+ * (its box fits it, and Reset rotation has nothing to undo) and a later turn starts from here. A polygon or star becomes an ordinary path (its numbers
+ * were made for the unturned shape). One undo step. Returns how many changed.
+ */
+export function applyRotation(doc: DocumentStore, editor: EditorState): number {
+  if (editor.blockEdit()) return 0;
+  const next = selected(doc, editor).filter(canApplyRotation).map((o) => {
+    const { rot: _rot, params: _params, ...rest } = o;
+    return { ...rest, sub: pathSubs(o), ...(o.base ? { base: editSubs(o) } : {}) } as PathObject;
+  });
+  if (!next.length) return 0;
+  doc.commit(doc.transaction(next.length === 1 ? "Apply rotation" : `Apply rotation of ${next.length} shapes`, next));
+  editor.changed();
+  return next.length;
 }
 
 /** Show every hidden object, or unlock every locked one. */
@@ -1038,12 +1058,17 @@ export function selectedCorners(doc: DocumentStore, editor: EditorState): { id: 
 
 /** Set the radius of one corner (its place among the nodes of the sharp outline) of one path, the others as they are: one undo step. */
 export function commitCornerAt(doc: DocumentStore, editor: EditorState, id: string, index: number, px: number, ppu: number, final = true): void {
+  commitCornerSet(doc, editor, id, new Map([[index, px]]), ppu, final);
+}
+
+/** Set the radius of several corners (place among the nodes of the sharp outline, and px at this zoom) of one path at once, the others as they are: one undo step. */
+export function commitCornerSet(doc: DocumentStore, editor: EditorState, id: string, changes: ReadonlyMap<number, number>, ppu: number, final = true): void {
   const o = doc.get(id);
   if (editor.blockEdit() || !o || (o.kind !== "path" && o.kind !== "image") || o.locked || !(ppu > 0 && ppu < Infinity)) return;
   if (o.kind === "image") {
     // a picture has four corners (top left, top right, bottom right, bottom left), none rounder than half its shorter side
     const now = o.radius === undefined ? [0, 0, 0, 0] : typeof o.radius === "number" ? [o.radius, o.radius, o.radius, o.radius] : [...o.radius];
-    now[index] = Math.min(Math.max(0, px / ppu), Math.min(o.w, o.h) / 2);
+    for (const [index, px] of changes) now[index] = Math.min(Math.max(0, px / ppu), Math.min(o.w, o.h) / 2);
     const { radius: _r, ...rest } = o;
     const made: ImageObject = now.every((v) => v === 0) ? rest : { ...rest, radius: now };
     if (!final) return showReplaced(editor, [made]);
@@ -1054,7 +1079,7 @@ export function commitCornerAt(doc: DocumentStore, editor: EditorState, id: stri
   }
   const nodes = nodesIn(o.base ?? o.sub);
   const now = o.radius === undefined ? new Array<number>(nodes).fill(0) : typeof o.radius === "number" ? new Array<number>(nodes).fill(o.radius) : [...o.radius];
-  now[index] = Math.max(0, px / ppu);
+  for (const [index, px] of changes) now[index] = Math.max(0, px / ppu);
   const made = withRadius(o, now);
   if (!final) return showReplaced(editor, [made]);
   editor.preview = { kind: "none" };

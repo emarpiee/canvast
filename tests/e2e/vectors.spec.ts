@@ -1320,7 +1320,7 @@ test("resizing a rounded shape: the radius goes with it, and stays the same size
   expect(c.r / b.r).toBeCloseTo(1, 3);
 });
 
-test("a rounded star keeps its box when its radius, points or ratio change, and resizes like any shape", async ({ app }) => {
+test("a rounded star's box fits the shape as drawn (it shrinks with a big radius, no empty space left), and it resizes like any shape", async ({ app }) => {
   const p = app.page;
   const frame = async () => {
     const f = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
@@ -1338,12 +1338,10 @@ test("a rounded star keeps its box when its radius, points or ratio change, and 
   await key(app, "v");
   await click(app, 600, 420);
   const plain = await frame();
-  for (const [sel, v] of [["[data-sel-radius]", "14"], ["[data-sel-inner]", "9"], ["[data-sel-inner]", "5"], ["[data-sel-radius]", "60"], ["[data-sel-tips]", "7"]] as const) {
-    await set(sel, v);
-    const f = await frame();
-    expect(Math.abs(f.w - plain.w), `${sel} = ${v}`).toBeLessThan(8); // (a hair for the outline's own tips)
-    expect(Math.abs(f.x - plain.x)).toBeLessThan(8);
-  }
+  await set("[data-sel-radius]", "60");
+  expect((await frame()).w, "rounded: the box follows the shape in").toBeLessThan(plain.w - 20);
+  await set("[data-sel-radius]", "0");
+  expect(Math.abs((await frame()).w - plain.w), "sharp again: the same box").toBeLessThan(8);
   // resized with a handle, it is the shape that is resized: half the size, half the radius
   await set("[data-sel-inner]", "40");
   await set("[data-sel-radius]", "30");
@@ -1421,8 +1419,9 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await key(app, "Escape");
   await click(app, 300, 650); // (nothing picked)
   await expect(p.getByRole("button", { name: "Show all hidden" }), "Show all and Unlock all are in the context menu, not the bar").toHaveCount(0);
-  await expect(p.getByRole("button", { name: /^Axis-aligned selection box/ })).toBeVisible();
-  // they are a bar of their own, not in the options bar at the top
+  await expect(p.getByRole("toolbar", { name: "Selection options" }), "with nothing picked there is no bar of selection options").toBeHidden();
+  await expect(p.getByRole("button", { name: /^Ignore the object that fills the view/ }), "the fill-pick guard stays in the options bar: it is for when nothing is picked").toBeVisible();
+  // the rest are a bar of their own beside the Actions bar (with something picked), not in the options bar at the top
   for (const name of [/^Axis-aligned selection box/, /^Snap to other objects/, /^Lock corner radius/]) expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name }).count(), `${name} is not in the options bar`).toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // Settings > Hints and tooltips: none
@@ -2881,7 +2880,7 @@ test("initial shape with the setting on keeps the fill and outline, and Reset pu
   expect(back.width).toBe(before.width);
 });
 
-test("the selection options (radius lock, snap, axis box) stand right beside the Actions bar, on its right and on its line, and follow it", async ({ app }) => {
+test("the selection options (radius lock, snap, axis box) are a bar of their own beside the Actions bar, under the same parent so they line up, and they follow it", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("u");
   await p.locator('[data-shape-kind="rect"]').click();
@@ -2890,23 +2889,93 @@ test("the selection options (radius lock, snap, axis box) stand right beside the
   const ctx = p.locator(".ctx-bar:not([hidden])");
   await expect(ctx).toBeVisible();
   const pick = p.getByRole("toolbar", { name: "Selection options" });
-  const beside = async () => {
-    const [a, b] = [(await ctx.boundingBox())!, (await pick.boundingBox())!];
-    return { gap: b.x - (a.x + a.width), dy: Math.abs(b.y + b.height / 2 - (a.y + a.height / 2)) };
+  await expect(pick).toBeVisible();
+  expect(await pick.evaluate((e) => e.parentElement === document.querySelector(".ctx-bar")!.parentElement && e.previousElementSibling === document.querySelector(".ctx-bar")), "the same parent, next to the Actions bar").toBe(true);
+  const [a, b] = [(await ctx.boundingBox())!, (await pick.boundingBox())!];
+  expect(b.x - (a.x + a.width), "a gap, not inside").toBeGreaterThan(0);
+  expect(b.x - (a.x + a.width), "close").toBeLessThan(24);
+  const line = async () => {
+    const [c, d] = [(await ctx.boundingBox())!, (await pick.boundingBox())!];
+    return Math.abs(d.y + d.height / 2 - (c.y + c.height / 2));
   };
-  await expect.poll(async () => (await beside()).gap).toBeGreaterThanOrEqual(0);
-  const at = await beside();
-  expect(at.gap, "close to the Actions bar").toBeLessThan(24);
-  await expect.poll(async () => (await beside()).dy, "on its line").toBeLessThan(4);
-  // Settings > Actions bar: follows the selection; the options stay beside it
+  expect(await line(), "on the bar's line").toBeLessThan(2);
+  // Settings > Actions bar: follows the selection; the options go with it
   await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Appearance" }).click();
   await p.locator("#settings-view").getByLabel("Actions bar", { exact: true }).selectOption("follow");
   await p.getByTestId("view-canvas").click();
   await expect(ctx).toHaveClass(/is-following/);
-  await expect.poll(async () => (await beside()).gap).toBeGreaterThanOrEqual(0);
-  const moved = await beside();
-  expect(moved.gap, "close to it, where it follows").toBeLessThan(24);
-  await expect.poll(async () => (await beside()).dy, "still on its line").toBeLessThan(4);
+  await expect(pick).toBeVisible();
+  expect(await line(), "still on the bar's line").toBeLessThan(2);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("corners opened out one by one: a lasso on empty ground picks several, dragging one moves them all in one undo step", async ({ app }) => {
+  const p = app.page;
+  type P = Obj & { radius?: number | number[] };
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [300, 300], [560, 440]);
+  await key(app, "v");
+  await click(app, 430, 370);
+  const main0 = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!.main;
+  await p.mouse.dblclick(main0[0], main0[1]);
+  await app.frame();
+  const dots = (await p.evaluate(() => window.__canvastDebug.cornerDots()))!;
+  expect(dots.corners).toHaveLength(4);
+  const [bl, br] = [dots.corners[3]!, dots.corners[2]!];
+  // a lasso from empty ground below the shape, round the two bottom corners
+  const path: Array<[number, number]> = [[bl[0] - 40, br[1] + 40], [br[0] + 40, br[1] + 40], [br[0] + 40, br[1] - 25], [bl[0] - 40, br[1] - 25], [bl[0] - 40, br[1] + 35]];
+  await p.mouse.move(...path[0]!);
+  await p.mouse.down();
+  for (const pt of path.slice(1)) await p.mouse.move(pt[0], pt[1], { steps: 4 });
+  await p.mouse.up();
+  await app.frame();
+  const before = ((await last(app)) as P).radius;
+  await drag(app, [br[0], br[1]], [br[0] - 20, br[1] - 20]);
+  const r = ((await last(app)) as P).radius as number[];
+  expect(Array.isArray(r)).toBe(true);
+  expect(r.filter((v) => v > 0), "the two picked corners moved together").toHaveLength(2);
+  expect(r[2]!).toBeCloseTo(r[3]!, 1);
+  await key(app, "Control+z");
+  expect(((await last(app)) as P).radius, "one undo step").toEqual(before);
+});
+
+test("Apply rotation: the turn of a shape becomes its own, the new zero; it looks the same, its box fits it, one undo step", async ({ app }) => {
+  const p = app.page;
+  type T = Obj & { rot?: number };
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  await drag(app, [400, 250], [600, 330]);
+  await key(app, "v");
+  await click(app, 500, 290);
+  const apply = p.getByRole("button", { name: /^Apply rotation/ });
+  await expect(apply, "nothing is turned yet").toBeHidden();
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!;
+  const c0 = (await frame()).corners[0]!;
+  await p.mouse.move(c0[0] - 16, c0[1] - 16);
+  await p.mouse.down();
+  await p.mouse.move(c0[0] - 60, c0[1] + 10, { steps: 6 });
+  await p.mouse.up();
+  await app.frame();
+  expect(((await last(app)) as T).rot, "turned").toBeGreaterThan(0);
+  expect(Math.abs((await frame()).angle), "its box is turned with it").toBeGreaterThan(0.05);
+  await expect(apply).toBeVisible();
+  await key(app, "Escape");
+  const ink = async () => p.evaluate(() => window.__canvastDebug.inkedPixels(2));
+  const before = await ink();
+  await click(app, 500, 290);
+  await apply.click();
+  await app.frame();
+  await key(app, "Escape");
+  await app.frame();
+  expect(((await last(app)) as T).rot, "no turn left").toBeUndefined();
+  expect(Math.abs((await ink()) - before) / before, "it looks the same").toBeLessThan(0.02);
+  await click(app, 500, 290);
+  expect(Math.abs((await frame()).angle), "its box is straight and fits it").toBeLessThan(1e-6);
+  await expect(apply).toBeHidden();
+  await expect(p.getByRole("button", { name: "Reset rotation" })).toBeHidden();
+  await key(app, "Control+z");
+  expect(((await last(app)) as T).rot, "one undo step brings the turn back").toBeGreaterThan(0);
   expect(app.consoleErrors).toEqual([]);
 });

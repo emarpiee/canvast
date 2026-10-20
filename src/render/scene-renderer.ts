@@ -345,7 +345,8 @@ export function drawOverlays(
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
   if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme);
-  if (editor.tool === "select" || editor.tool === "node") drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
+  // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
+  if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
 
   if (editor.lasso && editor.lasso.length >= 4) {
     ctx.save();
@@ -423,15 +424,24 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
   if (open) {
     // One corner's own radius: a small ring with a dot in it.
     for (const d of h.corners) {
-      ctx.fillStyle = theme.handleFill;
+      const picked = editor.cornerSel?.id === po.obj.id && editor.cornerSel.idx.has(d.index); // (taken with a lasso, to be moved together)
+      ctx.fillStyle = picked ? theme.selection : theme.handleFill;
       ctx.beginPath();
       dot(ctx, theme, d.x, d.y, HANDLE_SIZE_PX / 2 - 1);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = theme.selection;
+      ctx.strokeStyle = picked ? theme.handleFill : theme.selection;
+      // (a small rounded corner in it, as on the main dot: this one sets this corner's radius alone)
+      const c = 2.2;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(d.x, d.y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(d.x - c, d.y + c);
+      ctx.lineTo(d.x - c, d.y);
+      ctx.arc(d.x, d.y, c, Math.PI, 1.5 * Math.PI);
+      ctx.lineTo(d.x + c, d.y - c);
+      ctx.stroke();
+      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = theme.selection;
     }
   }
   if (h.main) {
@@ -448,20 +458,37 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.beginPath();
     dot(ctx, theme, h.main.x, h.main.y, HANDLE_SIZE_PX / 2 + 6);
     ctx.stroke();
+    // What it sets, drawn on it: a rounded corner.
+    const [mx, my, c] = [h.main.x, h.main.y, 3.5];
+    ctx.strokeStyle = theme.handleFill;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(mx - c, my + c);
+    ctx.lineTo(mx - c, my);
+    ctx.arc(mx, my, c, Math.PI, 1.5 * Math.PI);
+    ctx.lineTo(mx + c, my - c);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+    ctx.strokeStyle = theme.selection;
   }
   const r = HANDLE_SIZE_PX / 2 + 1;
   if (h.ratio) {
-    // The ratio of a star: a diamond.
-    ctx.fillStyle = theme.selection;
-    ctx.lineWidth = 1.25;
+    // The ratio of a star: a small four-pointed star, its points against its waist (the inner radius against the outer).
+    const [qx, qy, ro] = [h.ratio.x, h.ratio.y, r + 3];
+    ctx.fillStyle = theme.handleFill;
+    ctx.strokeStyle = theme.selection;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(h.ratio.x, h.ratio.y - r);
-    ctx.lineTo(h.ratio.x + r, h.ratio.y);
-    ctx.lineTo(h.ratio.x, h.ratio.y + r);
-    ctx.lineTo(h.ratio.x - r, h.ratio.y);
+    for (let i = 0; i < 8; i++) {
+      const t = (i * Math.PI) / 4;
+      const rr = i % 2 === 0 ? ro : ro * 0.42;
+      const px = qx + Math.sin(t) * rr, py = qy - Math.cos(t) * rr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = theme.handleFill;
     ctx.stroke();
   }
   if (h.count) {

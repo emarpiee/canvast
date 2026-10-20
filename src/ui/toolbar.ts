@@ -3,7 +3,7 @@ import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
-import { createBar, syncGroups, syncScroll } from "./bar";
+import { createBar, isOff, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
 import type { CanvasObject } from "../doc/model";
@@ -317,6 +317,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="select node" role="group" aria-label="Selection options">
         <button type="button" class="snap" data-kind="any" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="snap" data-kind="any" data-box-axis aria-pressed="false" aria-label="Axis-aligned selection box" title="Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation">${ICONS.boxSelect}</button>
+      </div>
+      <div class="tb-group tb-options" data-for="select node" role="group" aria-label="Pick options">
         <button type="button" class="snap" data-kind="tool" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: zoomed far into an object it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser" role="group" aria-label="Size">
@@ -339,33 +341,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
   const outlineHome = outlineBtn.parentElement!;
   root.querySelector(".toolbar")!.after(colourBar.el);
-  // The corner-radius lock, snap, the axis-aligned box and the fill-pick guard are a bar of their own at the bottom right, above the navigation controls (not in the options bar).
+  // The corner-radius lock, snap and the axis-aligned box are a bar of their own beside the Actions bar. It joins that bar's wrapper (the same parent, so the
+  // two line up) in `update`, once the Actions bar exists (it is mounted after this one); its clicks are handled here.
   const pickBar = createBar("Selection options", "Selection");
-  pickBar.el.classList.add("tb-pick");
   const pickGroup = root.querySelector<HTMLElement>('.tb-group[aria-label="Selection options"]')!;
   pickGroup.prepend(root.querySelector("[data-lock-radius]")!); // (the lock of the corner radius is one of them: it is about how a shape resizes)
   pickBar.row.append(pickGroup);
-  colourBar.el.after(pickBar.el);
-  // They stand right beside the Actions bar, on its right, wherever it is (at the bottom or following the selection); with no Actions bar they take its place.
-  let watched: HTMLElement | null = null;
-  const placePick = (): void => {
-    const ctx = document.querySelector<HTMLElement>(".ctx-bar"); // (mounted after this bar: the first update after it finds it)
-    if (!ctx) return;
-    if (watched !== ctx) {
-      watched = ctx;
-      new MutationObserver(placePick).observe(ctx, { attributes: true, attributeFilter: ["style", "hidden", "class"] });
-      new ResizeObserver(placePick).observe(ctx);
-      ctx.addEventListener("animationend", placePick); // (it slides in: the place it settles at is the one to stand beside)
-    }
-    const r = ctx.getBoundingClientRect();
-    const beside = !ctx.hidden && r.width > 0;
-    pickBar.el.classList.toggle("is-beside", beside);
-    if (beside) {
-      pickBar.el.style.setProperty("--pick-left", `${r.right}px`);
-      pickBar.el.style.setProperty("--pick-top", `${r.top + r.height / 2}px`);
-    }
-  };
-  window.addEventListener("resize", placePick);
+  const pq = (sel: string): HTMLElement => pickGroup.querySelector<HTMLElement>(sel)!;
   const input = root.querySelector<HTMLInputElement>("input[type=file]")!;
   input.addEventListener("change", () => {
     if (input.files?.length) actions.importFiles([...input.files]);
@@ -771,7 +753,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.changed();
   });
 
-  root.addEventListener("click", (e) => {
+  const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest("button");
     if (!b) return;
     const d = b.dataset;
@@ -872,7 +854,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     else if (d["action"] === "screenshot") actions.screenshot();
     else if (d["action"] === "undo") actions.undo();
     else if (d["action"] === "redo") actions.redo();
-  });
+  };
+  root.addEventListener("click", onClick);
+  pickGroup.addEventListener("click", onClick);
 
   const update = (): void => {
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
@@ -1036,12 +1020,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-adjust-panel]")!.setAttribute("aria-pressed", String(editor.adjustOpen));
     root.querySelector<HTMLElement>("[data-tags]")!.setAttribute("aria-pressed", String(editor.tagsOpen));
     root.querySelector<HTMLElement>("[data-styles]")!.setAttribute("aria-pressed", String(editor.stylesOpen));
-    root.querySelector<HTMLElement>("[data-snap]")!.setAttribute("aria-pressed", String(editor.snap));
-    root.querySelector<HTMLElement>("[data-box-axis]")!.setAttribute("aria-pressed", String(editor.alignBox));
+    pq("[data-snap]").setAttribute("aria-pressed", String(editor.snap));
+    pq("[data-box-axis]").setAttribute("aria-pressed", String(editor.alignBox));
     root.querySelector<HTMLElement>("[data-ignore-fill]")!.setAttribute("aria-pressed", String(editor.ignoreFilling));
     root.querySelector<HTMLElement>("[data-follow]")!.setAttribute("aria-pressed", String(editor.followZoom));
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
-    const lockR = root.querySelector<HTMLElement>("[data-lock-radius]")!;
+    const lockR = pq("[data-lock-radius]");
     lockR.setAttribute("aria-pressed", String(editor.lockRadius));
     if (editor.preview.kind === "none") lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
@@ -1067,11 +1051,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     chips.hidden = !chipHtml;
     if (picking) {
-      for (const el of root.querySelectorAll<HTMLElement>(".toolbar [data-kind]")) {
+      for (const el of [...root.querySelectorAll<HTMLElement>(".toolbar [data-kind]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-kind]")]) {
         const ks = el.dataset["kind"]!.split(" ");
         el.toggleAttribute("data-off", !(ks.includes("any") || (chosen ? ks.includes(chosen) : ks.includes("tool"))));
       }
-    } else for (const el of root.querySelectorAll<HTMLElement>(".toolbar [data-off]")) el.removeAttribute("data-off");
+    } else for (const el of [...root.querySelectorAll<HTMLElement>(".toolbar [data-off]"), ...pickGroup.querySelectorAll<HTMLElement>("[data-off]")]) el.removeAttribute("data-off");
     // The bar shows what the current tool offers and is gone when there is nothing to show.
     const row = root.querySelector<HTMLElement>(".tb-options-row")!;
     root.querySelector<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
@@ -1083,9 +1067,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     syncGroups(colourBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     colourBar.el.hidden = ![...colourBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(colourBar.row);
-    syncGroups(pickBar.row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
-    pickBar.el.hidden = ![...pickBar.row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
-    placePick();
+    const wrap = document.querySelector(".ctx-wrap");
+    if (wrap && pickBar.el.parentElement !== wrap) wrap.append(pickBar.el);
+    pickGroup.hidden = ![...pickGroup.children].some((c) => !isOff(c as HTMLElement));
+    pickBar.el.hidden = !(rowTool === "select" || rowTool === "node") || editor.selection.size === 0 || pickGroup.hidden;
   };
   editor.subscribe(update);
   doc.subscribe(update);
