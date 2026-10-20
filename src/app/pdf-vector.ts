@@ -15,6 +15,7 @@ import type { SubPath } from "../doc/path";
 import { mapSubs } from "../doc/path";
 import { localGradient } from "../render/gradient";
 import { layoutPaths } from "./svg-export";
+import type { ClipOf } from "./svg-export";
 
 /** A page drawn as vectors: its content stream and the named resources the stream uses (dictionary bodies). */
 export interface PdfVector {
@@ -72,8 +73,8 @@ function shadingOf(g: Gradient, coords: string, kind: 2 | 3): string | null {
  * The paths as a PDF page of `wPt` × `hPt` points, or null when the page needs something the vector path cannot say (see the head of
  * this file). The paths are framed like a pick in Export… (half the widest outline on every side) and stretched to the page.
  */
-export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt: number, hPt: number): PdfVector | null {
-  const lay = layoutPaths(paths, space, true);
+export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt: number, hPt: number, clipOf?: ClipOf): PdfVector | null {
+  const lay = layoutPaths(paths, space, true, clipOf);
   if (!lay) return null;
   const { placed, minX, minY, sc, w, h } = lay;
   const gs: string[] = [];
@@ -97,7 +98,9 @@ export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt
     const fill: Paint | null = o.fill, stroke = o.stroke;
     const fc = fill !== null && !isGradient(fill) ? rgbOf(fill) : null;
     const sk = stroke !== null && !isGradient(stroke) ? rgbOf(stroke as string) : null;
-    const ops: string[] = ["q", gsName((fc?.a ?? 1) * o.opacity, (sk?.a ?? 1) * o.opacity, o.blend ? BLENDS[o.blend]! : null) + " gs"];
+    // the sheets that cut it: what lies outside them is not drawn (each one's shape is the clip)
+    const cuts = lay.clips(p).flatMap((c) => [pathOps(mapSubs(c.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc])), `W${c.o.evenodd ? "*" : ""} n`]);
+    const ops: string[] = ["q", ...cuts, gsName((fc?.a ?? 1) * o.opacity, (sk?.a ?? 1) * o.opacity, o.blend ? BLENDS[o.blend]! : null) + " gs"];
     if (fc) ops.push(`${fc.rg} rg`);
     if (sk) {
       const cap = o.dash && o.dash[0] === 0 ? "round" : (o.cap ?? "round");

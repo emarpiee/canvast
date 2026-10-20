@@ -21,7 +21,7 @@ import { isGradient, solidOf } from "../doc/paint";
 import { plainText } from "../text/markdown";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
-import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
+import { ancestorsOf, descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
@@ -1599,24 +1599,46 @@ export function exportTargets(doc: DocumentStore, editor: EditorState): ExportTa
   return one ? [one] : [];
 }
 
+/** The sheets that cut an object: those it is on that hide what lies outside them, innermost first (what the canvas does when it draws it). */
+const clipSheetsOf = (doc: DocumentStore) => (o: CanvasObject): PathObject[] => ancestorsOf((id) => doc.get(id), o).filter((a) => a.container.clip);
+
 export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sheet: CanvasObject | null): ExportTarget | null {
   const ids = new Set<ObjectId>([...sel.map((o) => o.id)]);
   for (const id of descendantsOf(doc.all(), new Set(ids))) ids.add(id);
   const all = [...ids].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o && !o.hidden && !isMaskObject(o));
   const first = sheet ?? sel[0]!;
   const frame = first.frame ?? doc.space.world;
-  const bounds = sheet ? worldBounds(sheet) : unionBounds(sel.map((o) => expressObjectIn(o, frame)));
-  if (!bounds) return null;
-  let { min, max } = bounds;
-  if (!sheet) {
-    // the outlines are part of what is seen: add half the widest to every side
+  let bounds: { min: { x: D.Dyadic; y: D.Dyadic }; max: { x: D.Dyadic; y: D.Dyadic } } | null = null;
+  if (sheet) bounds = worldBounds(sheet);
+  else {
+    // the outlines are part of what is seen: add half the widest to every side; what a clipping sheet holds counts only where the sheet lets it
+    // through (a pattern that runs past its sheet is framed by the sheet), and what lies wholly outside it not at all
     const half = Math.max(0, ...sel.map((o) => (o.kind === "path" && o.stroke !== null ? o.width / 2 : o.kind === "stroke" ? o.width / 2 : 0) * 2 ** (o.unit - first.unit)));
-    if (half > 0) {
-      const pad = D.shift(D.fromNumber(half), first.unit);
-      min = { x: D.sub(min.x, pad), y: D.sub(min.y, pad) };
-      max = { x: D.add(max.x, pad), y: D.add(max.y, pad) };
+    const pad = D.shift(D.fromNumber(half), first.unit);
+    const clips = clipSheetsOf(doc);
+    for (const o of sel) {
+      const b = worldBounds(expressObjectIn(o, frame));
+      let [x0, y0, x1, y1] = [D.sub(b.min.x, pad), D.sub(b.min.y, pad), D.add(b.max.x, pad), D.add(b.max.y, pad)];
+      const cuts = clips(o);
+      for (const c of cuts) {
+        const cb = worldBounds(expressObjectIn(c, frame));
+        if (D.cmp(cb.min.x, x0) > 0) x0 = cb.min.x;
+        if (D.cmp(cb.min.y, y0) > 0) y0 = cb.min.y;
+        if (D.cmp(cb.max.x, x1) < 0) x1 = cb.max.x;
+        if (D.cmp(cb.max.y, y1) < 0) y1 = cb.max.y;
+      }
+      if (cuts.length && (D.cmp(x0, x1) >= 0 || D.cmp(y0, y1) >= 0)) continue;
+      if (!bounds) bounds = { min: { x: x0, y: y0 }, max: { x: x1, y: y1 } };
+      else {
+        if (D.cmp(x0, bounds.min.x) < 0) bounds.min.x = x0;
+        if (D.cmp(y0, bounds.min.y) < 0) bounds.min.y = y0;
+        if (D.cmp(x1, bounds.max.x) > 0) bounds.max.x = x1;
+        if (D.cmp(y1, bounds.max.y) > 0) bounds.max.y = y1;
+      }
     }
   }
+  if (!bounds) return null;
+  const { min, max } = bounds;
   const lw = D.toNumber(D.shift(D.sub(max.x, min.x), -first.unit)), lh = D.toNumber(D.shift(D.sub(max.y, min.y), -first.unit));
   if (!(lw > 0 && lh > 0) || !Number.isFinite(lw + lh)) return null;
   const paths = all.filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o));
@@ -1635,11 +1657,11 @@ const sourceShapes = (doc: DocumentStore) => (ids: readonly string[]): PathObjec
 
 /** The picked vectors as SVG text with the width and height the export asks for (any unit SVG knows), or null when it cannot. */
 export function svgOfTarget(doc: DocumentStore, t: ExportTarget, size: { w: string; h: string }): string | null {
-  return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size, sourceShapes(doc)) : null;
+  return t.vectors ? exportSvg(t.vectors, doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), size, sourceShapes(doc), false, 0, clipSheetsOf(doc)) : null;
 }
 
 /** The picked vectors as a PDF page of this size in points (ADR 0153), or null when the target is not all plain vectors or needs a picture. */
-export const pdfVectorOfTarget = (doc: DocumentStore, t: ExportTarget, wPt: number, hPt: number): PdfVector | null => (t.vectors ? pdfVectorOf(t.vectors, doc.space, wPt, hPt) : null);
+export const pdfVectorOfTarget = (doc: DocumentStore, t: ExportTarget, wPt: number, hPt: number): PdfVector | null => (t.vectors ? pdfVectorOf(t.vectors, doc.space, wPt, hPt, clipSheetsOf(doc)) : null);
 
 /** The paths Export as SVG takes: the picked paths, a boolean group by its result (its shapes are not drawn on their own). */
 const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && !isMaskObject(o));
@@ -1647,7 +1669,7 @@ const svgPaths = (doc: DocumentStore, editor: EditorState): PathObject[] => sele
 export const canExportSvg = (doc: DocumentStore, editor: EditorState): boolean => svgPaths(doc, editor).length > 0;
 
 /** The picked paths as SVG text (ADR 0107), or null when none is picked or they cannot be placed together. */
-export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), undefined, sourceShapes(doc));
+export const svgOfSelection = (doc: DocumentStore, editor: EditorState): string | null => exportSvg(svgPaths(doc, editor), doc.space, (by) => maskMembers(doc.all(), by).filter((o): o is PathObject => o.kind === "path"), undefined, sourceShapes(doc), false, 0, clipSheetsOf(doc));
 
 /**
  * Put the shapes of SVG text on the canvas (ADR 0107): centred in the view, the longer side half of the shorter side of the view, grouped

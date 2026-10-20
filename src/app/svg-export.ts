@@ -57,9 +57,14 @@ export interface Placed {
   at: (x: number, y: number) => [number, number];
 }
 
+/** The sheets that cut a path (those it is on that clip what lies outside them, innermost first); empty = nothing cuts it. */
+export type ClipOf = (o: PathObject) => readonly PathObject[];
+
 export interface PathLayout {
-  /** The paths in the units of the first, and how to put another path in them. */
+  /** The paths in the units of the first, and how to put another path in them. A path wholly outside the sheet that cuts it is left out. */
   readonly placed: Placed[];
+  /** The sheets that cut a placed path, in the same units: what lies outside them is not drawn, and does not count in the box. */
+  readonly clips: (p: Placed) => readonly Placed[];
   readonly place: (src: PathObject) => Placed | null;
   /** The top left of the box (in those units) and the scale to the 1000-unit box; `w` × `h` is the box after scaling. */
   readonly minX: number;
@@ -74,7 +79,7 @@ export interface PathLayout {
  * to draw or they are too far apart to be placed together. `evenPad`: every side gets half the widest outline (as Export… frames a pick),
  * else each path adds its own half.
  */
-export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, evenPad = false): PathLayout | null {
+export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, evenPad = false, clipOf?: ClipOf): PathLayout | null {
   const objs = paths.filter((o) => !o.hidden && o.sub.length > 0);
   if (!objs.length) return null;
   const base = objs[0]!;
@@ -88,27 +93,39 @@ export function layoutPaths(paths: readonly PathObject[], space: FrameSpace, eve
     const at = (x: number, y: number): [number, number] => [x * k + dx, y * k + dy];
     return { o: e, subs: mapSubs(pathSubs(e), at), k, at };
   };
-  const placed: Placed[] = [];
+  const all: Placed[] = [];
   for (const src of objs) {
     const p = place(src);
     if (!p) return null;
-    placed.push(p);
+    all.push(p);
   }
-  // The box of everything, with half the widest outline around it, scaled to SIZE.
-  const widest = evenPad ? Math.max(0, ...placed.map((p) => (p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0))) : 0;
+  // The box of everything, with half the widest outline around it, scaled to SIZE. What a sheet cuts counts only where the sheet lets it through
+  // (the box of a pattern that runs far past its sheet is the sheet's), and a path wholly outside its sheet is not drawn at all.
+  const widest = evenPad ? Math.max(0, ...all.map((p) => (p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0))) : 0;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of placed) {
+  const placed: Placed[] = [];
+  const cut = new Map<Placed, Placed[]>();
+  for (const p of all) {
     const b = geometryBounds(p.subs);
     const h = evenPad ? widest : p.o.stroke !== null ? (p.o.width * p.k) / 2 : 0;
-    minX = Math.min(minX, b.minX - h);
-    minY = Math.min(minY, b.minY - h);
-    maxX = Math.max(maxX, b.maxX + h);
-    maxY = Math.max(maxY, b.maxY + h);
+    let [x0, y0, x1, y1] = [b.minX - h, b.minY - h, b.maxX + h, b.maxY + h];
+    const clips = (clipOf?.(p.o) ?? []).map(place).filter((c): c is Placed => c !== null); // (a sheet that cannot be placed with the rest cuts nothing)
+    for (const c of clips) {
+      const cb = geometryBounds(c.subs);
+      [x0, y0, x1, y1] = [Math.max(x0, cb.minX), Math.max(y0, cb.minY), Math.min(x1, cb.maxX), Math.min(y1, cb.maxY)];
+    }
+    if (clips.length && !(x0 < x1 && y0 < y1)) continue;
+    placed.push(p);
+    cut.set(p, clips);
+    minX = Math.min(minX, x0);
+    minY = Math.min(minY, y0);
+    maxX = Math.max(maxX, x1);
+    maxY = Math.max(maxY, y1);
   }
   const span = Math.max(maxX - minX, maxY - minY);
-  if (!(span > 0) || !Number.isFinite(span)) return null;
+  if (!placed.length || !(span > 0) || !Number.isFinite(span)) return null;
   const sc = SIZE / span;
-  return { placed, place, minX, minY, sc, w: (maxX - minX) * sc, h: (maxY - minY) * sc };
+  return { placed, clips: (p) => cut.get(p) ?? [], place, minX, minY, sc, w: (maxX - minX) * sc, h: (maxY - minY) * sc };
 }
 
 /** The SVG text for these paths (hidden ones left out), or null when there is nothing to draw or they are too far apart to be placed together. */
@@ -124,8 +141,10 @@ export function exportSvg(
   sourceOf?: (ids: readonly string[]) => readonly PathObject[] | null,
   evenPad = false,
   depth = 0,
+  /** The sheets that cut each path: what lies outside them is cut in the SVG too, as on the canvas. */
+  clipOf?: ClipOf,
 ): string | null {
-  const lay = layoutPaths(paths, space, evenPad);
+  const lay = layoutPaths(paths, space, evenPad, clipOf);
   if (!lay) return null;
   const { placed, place, minX, minY, sc, w, h } = lay;
   const defs: string[] = [];
@@ -305,10 +324,23 @@ export function exportSvg(
     maskIds.set(key, id);
     return id;
   };
+  // The sheets that cut paths (a sheet's own shape, whatever it is, is the clip): one <clipPath> for each, used by every path on it.
+  const clipIds = new Map<string, string>();
+  const clipFor = (c: Placed): string => {
+    let id = clipIds.get(c.o.id);
+    if (!id) {
+      id = `c${clipIds.size}`;
+      clipIds.set(c.o.id, id);
+      defs.push(`<clipPath id="${id}"><path d="${pathData(mapSubs(c.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]))}"${c.o.evenodd ? ' clip-rule="evenodd"' : ""}/></clipPath>`);
+    }
+    return id;
+  };
   const body = placed.map((p) => {
     const m = p.o.mask ? maskFor(p.o.mask.by, p.o.mask.mode, p.o.mask.invert === true) : null;
-    const out = render(p);
-    return m ? `  <g mask="url(#${m})">\n${out}\n  </g>` : out;
+    let out = render(p);
+    if (m) out = `  <g mask="url(#${m})">\n${out}\n  </g>`;
+    for (const c of lay.clips(p)) out = `  <g clip-path="url(#${clipFor(c)})">\n${out}\n  </g>`;
+    return out;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg"${usesXlink ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ""} viewBox="0 0 ${num(w)} ${num(h)}" width="${size ? esc(size.w) : num(w)}" height="${size ? esc(size.h) : num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
 }

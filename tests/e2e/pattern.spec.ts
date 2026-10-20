@@ -157,3 +157,40 @@ test("Saved to the library, each kind has its own folder and tags: a pattern, a 
   expect((await filed()).find((f) => f.folder === "Mine")?.tags).toEqual(["a", "b"]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a pattern that runs past its sheet exports as the sheet's frame: the picture, the SVG and the PDF are cut to it, whether the sheet or only the pattern is picked", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "spiral"); // its lines run far past the sheet
+  await make(app);
+  const sheet = sheets(await objs(app))[0]!;
+  await p.locator("[data-pg-done]").click();
+  const dlg = p.getByTestId("export-dialog");
+  const exportAs = async (format: "png" | "svg" | "pdf"): Promise<Buffer> => {
+    await exportWith(p, "exportpic");
+    await dlg.locator(`[data-format="${format}"]`).click();
+    const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+    const bytes = (await import("node:fs")).readFileSync((await download.path())!);
+    await dlg.locator('[data-ex="close"]').click();
+    return bytes;
+  };
+  const ratioOfPng = (b: Buffer) => b.readUInt32BE(16) / b.readUInt32BE(20);
+  const ratioOfSvg = (t: string) => { const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(t)!; return Number(m[1]) / Number(m[2]); };
+  const frame = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, sheet.id);
+  const frameRatio = (frame.maxX - frame.minX) / (frame.maxY - frame.minY);
+
+  // the sheet picked: the frame is the sheet
+  for (const picked of ["sheet", "pattern"] as const) {
+    if (picked === "pattern") { await p.mouse.click((frame.minX + frame.maxX) / 2, (frame.minY + frame.maxY) / 2); await app.frame(); expect((await p.evaluate(() => window.__canvastDebug.selection())).length).toBeGreaterThan(1); }
+    else expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([sheet.id]);
+    const png = await exportAs("png");
+    expect(ratioOfPng(png), `${picked}: the picture is the frame`).toBeCloseTo(frameRatio, 1);
+    const svg = (await exportAs("svg")).toString("utf8");
+    expect(ratioOfSvg(svg), `${picked}: the SVG is the frame`).toBeCloseTo(frameRatio, 1);
+    expect(svg, `${picked}: and what runs past it is cut`).toMatch(/<g clip-path="url\(#c\d+\)">/);
+    expect(svg).toMatch(/<clipPath id="c\d+">/);
+    const pdf = (await exportAs("pdf")).toString("latin1");
+    expect(pdf.startsWith("%PDF"), picked).toBe(true);
+  }
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.1 — Exports are cut to the sheet (2026-10-21)
+
+- **Fix:** a pattern (or any shape) that runs past the sheet it is on was exported inconsistently. The picture (PNG, WebP, JPEG) was cut to the sheet but sized from the whole pattern, so a pattern picked by itself came out as a big picture with the visible part small inside and the rest empty; the SVG and the PDF did not cut it at all, so the pattern showed in full, past the frame, and a sheet's SVG was as big as the pattern, not as the sheet. Now every format agrees with the canvas: what is on a sheet that clips (a sheet, or a clipping mask) is cut to it, and the frame of the export is the part that shows (the sheet's, when a pattern fills it and runs past it), whether the sheet or only what is on it is picked, in Export…, *Save as SVG*, *Copy as SVG* and *Save to library as SVG*. In the SVG the sheet's shape is a `<clipPath>` and the shapes on it are inside a group that uses it; in the PDF it is the clip of each shape's drawing; a shape wholly outside its sheet is left out.
+
 ## 0.25.0 — Pattern generators; the Pattern fill is now Objects (2026-10-21)
 
 - **Renamed:** the paint chooser's **Pattern** fill (objects of the canvas repeated over a shape) is now **Objects**, in the interface, the code and the docs, so that **Pattern** names the new pattern generator panel. Stored documents are unchanged (the source kind was always `objects`). Older entries below keep the name they had at the time.

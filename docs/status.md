@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.1 — exports are cut to the sheet (2026-10-21)
+
+- **Implemented:** `layoutPaths` (svg-export.ts) takes the sheets that cut each path (`ClipOf`, from `clipSheetsOf` in actions.ts): the box counts only what a sheet lets through, a path wholly outside is left out, and `exportSvg` writes one `<clipPath>` for each sheet and wraps what is on it; `pdfVectorOf` clips each shape's drawing with `W n`; `buildTarget` frames a picked selection by the part that shows.
+- **Tested:** `pattern.spec` "a pattern that runs past its sheet exports as the sheet's frame" (picture ratio, SVG ratio and clip, PDF, sheet picked and pattern picked; failed before the fix), plus the export specs listed in `docs/testing/pattern-0.25.md`.
+- **Unverified:** an object on a sheet inside a rotated sheet; a clipping mask sheet of a very curved shape in the PDF (the clip is the shape; checked by the file starting as a PDF, not rendered).
+
 ## v0.25.0 — Pattern generators (2026-10-21)
 
 - **Implemented:** `src/gen/` (seeded RNG and value noise, geometry helpers, 39 generators declared as settings plus one pure function each, `generate`, `randomValues`, `cleanValues`), `app/pattern.ts` (target: picked sheet, picked closed shape cut by a mask copy, or a new sheet; a session replaces its own last undo step through `DocumentStore.lastTransaction`), `ui/pattern-panel.ts` (panel built from the generator's settings), dock button, palette command, `mountainSnow` icon.
