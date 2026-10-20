@@ -471,6 +471,13 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.22.0 to v0.23.0 — library folder polish, library file, start from scratch (2026-10-20)
+
+- **Implemented:** SVG types restored for folder files (0.22.1), one Storage page in Settings (0.22.2), `<hash>.<ext>` names with a card button for older files (0.22.3), the library file (save and open, manual) and Start from scratch (0.23.0); [ADR 0159](adr/0159-library-folder.md).
+- **Tested:** unit `external-folder.test.ts`; E2E `library-folder.spec` (Chromium, 7: import, reload, backup, file gone, moves, GC, bare names, the library file, reset keeps the folder's files, choosing a folder with a library offers to open it) and `storage.spec` (Chromium and Firefox: save indicator page, Start from scratch in Chromium run); archive, settings, release, organize and frames archive specs after the Storage page change. The full quick suite has not been run since 0.22.0.
+- **Unverified:** the real folder picker and permission prompt on the owner's machines (the owner uses it; the tests use a stand-in directory); opening a library file on a second real device; two devices writing the library file at once; Start from scratch with other tabs open (the other tab is told to close; the wait message is not tested).
+- **Next bounded task:** automatic, debounced saving of the library file; the full suite.
+
 ## v0.21.1 and v0.22.0 — storage limits made visible; the library folder (2026-10-20)
 
 - **Implemented:** 0.21.1: a full browser store refuses an import in plain words, `storage.persist()` asked once, a notice at 80% of the quota (`storage/quota.ts`). 0.22.0: the library folder ([ADR 0159](adr/0159-library-folder.md)), Chromium only: originals as files named by their SHA-256, stubs in the browser, moves both ways, Reconnect, backups and GC aware of it; schema 10 (an index).

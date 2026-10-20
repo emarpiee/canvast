@@ -51,6 +51,12 @@ import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
+import { confirmReset } from "../ui/reset-dialog";
+import { plural } from "../doc/plural";
+import { fmtBytes } from "../ui/format";
+import { resetAllData } from "../storage/reset";
+import { libraryCounts } from "../storage/external-folder";
+import { runSaveLibraryFile } from "../ui/archive-ui";
 import { mountToolbar } from "../ui/toolbar";
 import { initColourPopover } from "../ui/colour-popover";
 import { labelOf, mountLayersPanel } from "../ui/layers-panel";
@@ -1533,9 +1539,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const r = await session.lastBackup();
       return r ? { at: r.at, kind: r.kind ?? "full", fileName: r.fileName, bytes: r.bytes } : null;
     },
-    exportFull: () => runExport(session, { kind: "workspace" }),
+    exportFull: async () => void (await runExport(session, { kind: "workspace" })),
     exportChanges: () => runExportChanges(session),
-    exportFiles: () => runExportFiles(session, { kind: "workspace" }),
+    exportFiles: async () => void (await runExportFiles(session, { kind: "workspace" })),
     importFiles: (files) => runImport(session, files),
     readOnly: () => session.readOnly,
     saving: () => {
@@ -1553,6 +1559,33 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
+    reset: async () => {
+      const db = session.repo?.db ?? null;
+      const tree = session.tree;
+      const boards = tree?.boards.length ?? 0;
+      const canvases = tree?.boards.reduce((n, b) => n + b.canvases.length, 0) ?? 0;
+      const items = (await session.catalog?.list().catch(() => null))?.entries.length ?? 0;
+      const est = await navigator.storage?.estimate?.().catch(() => undefined);
+      const last = await session.lastBackup();
+      const folder = externalFolder.ready && db ? (await libraryCounts(db)).inFolder : null;
+      const sure = await confirmReset({
+        summary: [
+          `${plural(boards, "board")} with ${plural(canvases, "canvas", "canvases")}`,
+          `${plural(items, "library item")}${est?.usage ? `, ${fmtBytes(est.usage)} of browser storage` : ""}`,
+          "the saved styles, bookmarks, tags, folders and every setting of this device",
+          folder !== null ? "the link to the library folder (its files stay on your disk)" : "",
+        ].filter(Boolean),
+        lastBackup: last ? `${new Date(last.at).toLocaleString()} (${last.fileName})` : "never",
+        folderFiles: folder,
+        exportFull: () => runExport(session, { kind: "workspace" }),
+        exportFiles: () => runExportFiles(session, { kind: "workspace" }),
+        saveLibrary: folder !== null ? () => runSaveLibraryFile(session) : null,
+      });
+      if (!sure) return;
+      editor.message = "Deleting all data…";
+      editor.changed();
+      await resetAllData({ db, onBlocked: () => { editor.message = "Close the other canvast tabs: deleting waits for them."; editor.changed(); } });
+    },
   });
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
   settings.subscribe((key) => {

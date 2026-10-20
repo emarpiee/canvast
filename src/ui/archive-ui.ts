@@ -1,3 +1,5 @@
+import { LIBRARY_FILE, externalFolder } from "../storage/external-folder";
+import type { FolderFiles } from "../storage/archive";
 import type { Session } from "../app/session";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
@@ -32,7 +34,7 @@ function download(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export async function runExport(session: Session, scope: ExportScope): Promise<void> {
+export async function runExport(session: Session, scope: ExportScope): Promise<boolean> {
   tell(session, "Preparing the export…");
   try {
     const r = await session.exportArchive(scope);
@@ -45,13 +47,15 @@ export async function runExport(session: Session, scope: ExportScope): Promise<v
       `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${inc ? `only what changed since ${new Date(inc.since).toLocaleString()}: ` : ""}${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(inc ? kept : r.manifest.assets.length, "original")}; checked before saving).` + (inc ? " Keep it with the full backup and the incremental ones before it: restoring takes them all together." : "") +
         (missing ? ` ${plural(missing, "original")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
     );
+    return true;
   } catch (e) {
     tell(session, `Export failed: ${(e as Error).message}`);
+    return false;
   }
 }
 
 /** Export the original files of a scope as a plain ZIP, after asking how to group them. */
-export async function runExportFiles(session: Session, scope: ExportScope): Promise<void> {
+export async function runExportFiles(session: Session, scope: ExportScope): Promise<boolean> {
   const layout = await chooseDialog({
     title: "Export the files as a ZIP",
     lines: ["Every file keeps its original name. Choose how they are grouped inside the ZIP."],
@@ -61,15 +65,20 @@ export async function runExportFiles(session: Session, scope: ExportScope): Prom
     ],
     confirmLabel: "Export ZIP",
   });
-  if (layout !== "type" && layout !== "folder") return;
+  if (layout !== "type" && layout !== "folder") return false;
   tell(session, "Preparing the ZIP…");
   try {
     const r = await session.exportFiles(scope, layout);
-    if (r.files === 0) return tell(session, "There are no files to export here.");
+    if (r.files === 0) {
+      tell(session, "There are no files to export here.");
+      return false;
+    }
     download(r.blob, r.fileName);
     tell(session, `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "original")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
+    return true;
   } catch (e) {
     tell(session, `Export failed: ${(e as Error).message}`);
+    return false;
   }
 }
 
@@ -81,14 +90,14 @@ export async function runExportChanges(session: Session): Promise<void> {
 }
 
 /** Validate an archive (or a chain of backups: a full one and the incremental ones after it), show what it contains, and import it only after confirmation. */
-export async function runImport(session: Session, picked: File | readonly File[]): Promise<void> {
+export async function runImport(session: Session, picked: File | readonly File[], folder?: FolderFiles): Promise<void> {
   if (session.editor.blockEdit()) return;
   const files = Array.isArray(picked) ? (picked as readonly File[]) : [picked as File];
   if (!files.length) return;
   const file = files.length === 1 ? files[0]! : { name: `${files.length} backup files` };
   let plan;
   try {
-    plan = await session.readArchive(files.length === 1 ? files[0]! : files);
+    plan = await session.readArchive(files.length === 1 ? files[0]! : files, folder);
   } catch (e) {
     tell(session, `Cannot import ${file.name}: ${e instanceof ArchiveError ? e.message : (e as Error).message}`);
     return;
@@ -103,13 +112,14 @@ export async function runImport(session: Session, picked: File | readonly File[]
     ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
     `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
+    ...(folder ? ["Its originals are the files in the library folder."] : []),
   ];
   if (plan.unresolved.length) lines.push(`${plural(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`);
   if (plan.problems.length) {
     lines.push(`Problems (${plan.problems.length}):`, ...plan.problems.slice(0, 5));
     if (plan.problems.length > 5) lines.push(`…and ${plan.problems.length - 5} more.`);
   }
-  const ok = await confirmDialog({ title: `Import ${file.name}?`, lines, confirmLabel: "Import", danger: false });
+  const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
   try {
     const r = await session.applyImport(plan);
@@ -123,4 +133,28 @@ export async function runImport(session: Session, picked: File | readonly File[]
   } catch (e) {
     tell(session, `Import failed; nothing was changed: ${(e as Error).message}`);
   }
+}
+
+/** Write the library file into the library folder: the workspace without the bytes of the originals (ADR 0159). */
+export async function runSaveLibraryFile(session: Session): Promise<boolean> {
+  tell(session, "Saving the library file…");
+  try {
+    const r = await session.exportArchive({ kind: "workspace", noBytes: true });
+    await externalFolder.writeLibraryFile(r.blob);
+    tell(session, `Saved ${LIBRARY_FILE} in the library folder (${fmtBytes(r.blob.size)}; ${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(r.manifest.assets.length, "library item")}; checked before saving).`);
+    return true;
+  } catch (e) {
+    tell(session, `Could not save the library file: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/** Open the library of the library folder: its library file is read, and every original in it is matched with a file of the folder. */
+export async function runOpenLibraryFile(session: Session): Promise<void> {
+  const file = await externalFolder.readLibraryFile();
+  if (!file) {
+    tell(session, `This folder has no ${LIBRARY_FILE}. On the device that has the library, press “Save library to the folder”.`);
+    return;
+  }
+  await runImport(session, new File([file], file.name), await externalFolder.list());
 }

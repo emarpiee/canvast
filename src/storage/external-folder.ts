@@ -17,6 +17,8 @@ export interface Dir {
   readonly name: string;
   getFileHandle(name: string, o?: { create?: boolean }): Promise<FileHandle>;
   removeEntry(name: string): Promise<void>;
+  /** The names in the folder (a real directory handle has it; the tests' stand-in too). */
+  keys?(): AsyncIterable<string>;
   queryPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
 }
@@ -28,6 +30,8 @@ interface FileHandle {
 export class FolderError extends Error {}
 
 const META_KEY = "externalFolder";
+/** The library file kept beside the files: the workspace without the bytes of the originals (ADR 0159). */
+export const LIBRARY_FILE = "canvast-library.canvast";
 const HASH_RE = /^[0-9a-f]{64}$/;
 /** A file of the folder: the hash, and an extension so other programs can open it. */
 const FILE_RE = /^[0-9a-f]{64}(\.[a-z0-9]{1,8})?$/;
@@ -91,11 +95,15 @@ class ExternalFolder {
     }
   }
 
+  /** Tests only: a stand-in directory cannot be saved in the database (it has functions), so it is used for the session. */
+  saveHandle = true;
+
   /** Ask the user for a folder (needs a click) and remember it. */
   async choose(db: IDBDatabase): Promise<void> {
     const pick = (window as unknown as { showDirectoryPicker: (o: { mode: "readwrite" }) => Promise<Dir> }).showDirectoryPicker;
     const dir = await pick.call(window, { mode: "readwrite" });
-    await this.attach(db, dir);
+    if (this.saveHandle) await this.attach(db, dir);
+    else await this.use(dir);
   }
 
   /** Use this directory as the library folder (what `choose` does after the picker; tests pass a private directory). */
@@ -165,6 +173,47 @@ class ExternalFolder {
   /** Does the file exist with this size (no bytes read). */
   async has(hash: string, size: number, file = hash): Promise<boolean> {
     return (await this.read(hash, size, "", file)) !== null;
+  }
+
+  /** Every file of the folder that is an original (named by hash, with or without an extension), with its size. */
+  async list(): Promise<Map<string, { file: string; size: number }>> {
+    const out = new Map<string, { file: string; size: number }>();
+    if (!this.dir?.keys || this.status !== "ready") return out;
+    const names: string[] = [];
+    for await (const n of this.dir.keys()) if (FILE_RE.test(n)) names.push(n);
+    for (let i = 0; i < names.length; i += 50) {
+      await Promise.all(names.slice(i, i + 50).map(async (n) => {
+        try {
+          out.set(n.slice(0, 64), { file: n, size: (await (await this.dir!.getFileHandle(n)).getFile()).size });
+        } catch {
+          // gone while listing
+        }
+      }));
+    }
+    return out;
+  }
+
+  /** The library file, or null when the folder has none. */
+  async readLibraryFile(): Promise<File | null> {
+    if (!this.dir || this.status !== "ready") return null;
+    try {
+      return await (await this.dir.getFileHandle(LIBRARY_FILE)).getFile();
+    } catch {
+      return null;
+    }
+  }
+
+  /** Write the library file and read it back by size. */
+  async writeLibraryFile(blob: Blob): Promise<void> {
+    if (!this.dir || this.status !== "ready") throw new FolderError("the library folder is not available");
+    try {
+      const w = await (await this.dir.getFileHandle(LIBRARY_FILE, { create: true })).createWritable();
+      await w.write(blob);
+      await w.close();
+    } catch (e) {
+      throw new FolderError(`the library file could not be written (${(e as Error).message || (e as Error).name})`);
+    }
+    if ((await this.readLibraryFile())?.size !== blob.size) throw new FolderError("the library file written to the folder did not read back the same");
   }
 
   /** Remove the file of an erased original. Nothing to do when it is not there. */

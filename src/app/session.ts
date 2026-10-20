@@ -12,6 +12,7 @@ import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain } from "../storage/archive";
+import type { FolderFiles } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
 import { buildFilesZip } from "../storage/files-zip";
 import { idbGet } from "../storage/idb";
@@ -622,7 +623,7 @@ export class Session {
       : scope.kind === "board" ? r.manifest.boards[0]!.name
       : `${r.manifest.boards[0]!.name}-${r.manifest.boards[0]!.canvases[0]!.name}`;
     const fileName = archiveFileName(label, new Date(r.manifest.exportedAt));
-    if (scope.kind === "workspace" && !this.readOnly) {
+    if (scope.kind === "workspace" && !this.readOnly && !scope.noBytes) {
       const rec: BackupRecord = {
         kind: scope.since !== undefined ? "incremental" : "full",
         at: r.manifest.exportedAt,
@@ -649,8 +650,8 @@ export class Session {
   }
 
   /** Validate an archive, or a chain of backups (a full one and the incremental ones after it), without writing anything. */
-  readArchive(files: Blob | readonly Blob[]): Promise<ImportPlan> {
-    return Array.isArray(files) ? readArchiveChain(files as readonly Blob[]) : readArchive(files as Blob);
+  readArchive(files: Blob | readonly Blob[], folder?: FolderFiles): Promise<ImportPlan> {
+    return Array.isArray(files) ? readArchiveChain(files as readonly Blob[]) : readArchive(files as Blob, folder);
   }
 
   /** Write a validated archive into this workspace, then open its first canvas. */

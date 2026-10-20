@@ -1,7 +1,8 @@
 import type { Session } from "../app/session";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
-import { externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
+import { LIBRARY_FILE, externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
+import { runOpenLibraryFile, runSaveLibraryFile } from "./archive-ui";
 import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-move";
 
 /**
@@ -36,12 +37,20 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>${name}</strong> ${st === "needs-permission" ? `needs your permission again (the browser asks once each time it restarts). ${plural(inFolder, "file")} in it show as missing until you allow it.` : "cannot be used right now."}</p><div class="storage-actions">${btn("reconnect", st === "needs-permission" ? "Reconnect folder" : "Try again")}</div>`;
       return;
     }
+    const saved = await externalFolder.readLibraryFile();
     host.innerHTML = `${intro}
       <dl data-testid="storage-folder">
         <dt>Folder</dt><dd><strong>${name}</strong>: new files are stored there.</dd>
         <dt>Files in the folder</dt><dd data-testid="folder-count">${inFolder}</dd>
         <dt>Files in the browser</dt><dd data-testid="browser-count">${inBrowser}</dd>
+        <dt>Library file</dt><dd data-testid="library-file">${saved ? `${esc(LIBRARY_FILE)}, saved ${new Date(saved.lastModified).toLocaleString()}` : "not saved yet"}</dd>
       </dl>
+      <h4>Use this folder on another device</h4>
+      <p>The folder holds the files. Your canvases and the names, tags and folders of the library are kept in the browser, so they are not in the folder unless you save them: <strong>Save library to the folder</strong> writes ${esc(LIBRARY_FILE)} beside the files (a small file, without the files themselves; it is not a backup). On the other device, choose the same folder and press <strong>Open library from the folder</strong>: the canvases are added and every file is matched. Do it on a device that has no canvases of its own yet, or they will be added a second time.</p>
+      <div class="storage-actions">
+        ${btn("save-library", "Save library to the folder")}
+        ${btn("open-library", "Open library from the folder", saved ? "" : `No ${LIBRARY_FILE} in the folder yet`)}
+      </div>
       <div class="storage-actions">
         ${btn("in", "Move browser files into the folder", inBrowser ? "" : "Nothing in the browser to move")}
         ${btn("out", "Move files back into the browser", inFolder ? "" : "Nothing in the folder to move")}
@@ -62,9 +71,15 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       el.textContent = t;
     };
     try {
-      if (act === "choose") await externalFolder.choose(db);
+      if (act === "choose") {
+        await externalFolder.choose(db);
+        // A folder that already holds a library (saved on another device) is offered at once: one more click, not three.
+        if (await externalFolder.readLibraryFile()) await runOpenLibraryFile(session);
+      }
       else if (act === "reconnect") await externalFolder.reconnect();
       else if (act === "forget") await externalFolder.forget(db);
+      else if (act === "save-library") await runSaveLibraryFile(session);
+      else if (act === "open-library") await runOpenLibraryFile(session);
       else if (act === "names") {
         const r = await addExtensions(db, (d, n) => say(`Renaming files… ${d} of ${n}`));
         session.tell(r.failed ? `Added extensions to ${plural(r.moved, "file")}; ${r.failed} could not be changed (${r.why}).` : `Added extensions to ${plural(r.moved, "file")}.`);

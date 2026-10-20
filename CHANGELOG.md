@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23.0 — Library file for a second device; start from scratch (2026-10-20)
+
+- **Library file:** on the Library folder card, *Save library to the folder* writes `canvast-library.canvast` beside the files (the whole workspace without the files; not a backup) and choosing a folder that holds one offers to open it at once, and *Open library from the folder* adds its canvases and matches every file by its name, so a folder synced to another device opens there with its canvases, names, tags and folders. Manual for now.
+- **Start from scratch:** Settings > Storage has *Delete all data…*: a warning that says what goes, offers a backup, the files as a ZIP and the library file first (each ticks off when done), says that the library folder's files are never touched (canvast does not delete files from your disk in bulk), and needs `DELETE` typed. It then deletes canvast's database and its own `localStorage` keys (not other pages') and reloads.
+
 ## 0.22.3 — Library folder files keep their extension (2026-10-20)
 
 - Files in the library folder are named `<sha256>.<ext>` (from the file's own name, else its type), so other programs and the file manager can open and preview them. Files made before this keep their bare-hash name and still work; **Add file extensions to N files** on the Library folder card writes them again with one (each proven before the old one goes).

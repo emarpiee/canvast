@@ -4,7 +4,7 @@ import type { Dir } from "../storage/external-folder";
 /** A stand-in for the folder the picker gives (the native picker cannot be driven): files kept in a database of their own, so they outlive a reload. */
 function testDb(name: string): Promise<IDBDatabase> {
   return new Promise((res, rej) => {
-    const r = indexedDB.open(`canvast-test-folder-${name}`, 1);
+    const r = indexedDB.open(`test-folder-${name}`, 1); // (not "canvast*": a reset deletes those, and a real folder is on the disk)
     r.onupgradeneeded = () => r.result.createObjectStore("f");
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -18,6 +18,11 @@ function testDir(name: string): Dir {
   const run = async <T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> => req(fn((await testDb(name)).transaction("f", mode).objectStore("f")));
   return {
     name,
+    keys: () => ({
+      async *[Symbol.asyncIterator]() {
+        for (const k of await testDirKeys(name)) yield k;
+      },
+    }),
     getFileHandle: async (n, o) => {
       if (!(await run("readonly", (s) => s.count(n))) && !o?.create) throw new DOMException("none", "NotFoundError");
       return {
@@ -222,6 +227,8 @@ export interface DebugHook {
   testFolderDelete(name: string): Promise<void>;
   /** Make a file of the test folder look as one made before names had extensions: renamed to the bare hash, the stub without its file name. */
   makeBareName(hash: string): Promise<void>;
+  /** The folder picker answers with the test folder `name` (the native dialog cannot be driven). */
+  stubPicker(name: string): void;
   /** "none", "ready", "needs-permission" or "unavailable". */
   folderState(): string;
   /** Text most recently copied by canvast (Copy Markdown). */
@@ -604,6 +611,10 @@ export function installDebugHook(
         tx.objectStore("assets").put(rest, hash);
       };
       await done(tx);
+    },
+    stubPicker: (name) => {
+      externalFolder.saveHandle = false;
+      (window as unknown as { showDirectoryPicker: () => Promise<Dir> }).showDirectoryPicker = async () => testDir(name);
     },
     folderState: () => externalFolder.state,
     removeAssetBytes: async (hash) => {

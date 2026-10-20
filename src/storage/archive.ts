@@ -47,7 +47,7 @@ export const ARCHIVE_EXTENSION = ".canvast";
 
 export type ExportScope =
   /** `since`: an incremental backup, with only what changed after that time (the `at` of the backup it goes on from). */
-  | { kind: "workspace"; since?: number }
+  | { kind: "workspace"; since?: number; /** The library file kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
   | { kind: "board"; boardId: string }
   | { kind: "canvas"; canvasId: string }
   | { kind: "assets"; hashes: string[] };
@@ -105,6 +105,8 @@ export interface Manifest {
   styles?: unknown[];
   /** Present for an incremental backup: what it goes on from. A chain is read oldest first, each file starting where the one before ended. */
   incremental?: { since: number };
+  /** The library file of a library folder: no original has bytes in it; they are the files of the folder. */
+  libraryFile?: true;
 }
 
 export interface ExportResult {
@@ -128,6 +130,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const canvasFiles: Array<{ file: string; json: string }> = [];
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
   const since = scope.kind === "workspace" ? scope.since : undefined;
+  const noBytes = scope.kind === "workspace" && scope.noBytes === true;
   let objects = 0;
 
   const boardIds = scope.kind === "workspace" ? ws.boardIds : scope.kind === "board" ? [scope.boardId] : [];
@@ -186,7 +189,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       continue;
     }
     const file = `assets/${hash}`;
-    const known = since !== undefined && r.importedAt <= since; // already in an earlier file of the chain: its list entry, not its bytes
+    const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
     const m = entry ? meta(entry) : { tags: [], favorite: false, folderIds: [] };
     folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
@@ -223,6 +226,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     missingAssets,
     ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
+    ...(noBytes ? { libraryFile: true as const } : {}),
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -341,8 +345,11 @@ const sinceOf = (p: Part): number | null => (isObj(p.m["incremental"]) && Number
 const exportedAtOf = (p: Part): number => (typeof p.m["exportedAt"] === "number" ? p.m["exportedAt"] : 0);
 
 /** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
-export async function readArchive(file: Blob): Promise<ImportPlan> {
-  return planOf([await readPart(file)]);
+/** The files of a library folder by hash: what an archive without bytes (the library file) is matched with. */
+export type FolderFiles = ReadonlyMap<string, { file: string; size: number }>;
+
+export async function readArchive(file: Blob, folder?: FolderFiles): Promise<ImportPlan> {
+  return planOf([await readPart(file)], folder);
 }
 
 /**
@@ -363,7 +370,7 @@ export async function readArchiveChain(files: readonly Blob[]): Promise<ImportPl
 }
 
 /** The plan to import from the parts of a chain (one part for an ordinary archive). The newest manifest says what there is; the files hold it. */
-async function planOf(parts: Part[]): Promise<ImportPlan> {
+async function planOf(parts: Part[], folder?: FolderFiles): Promise<ImportPlan> {
   const latest = parts[parts.length - 1]!;
   const m = latest.m;
   const scope = m["scope"] as ExportScope["kind"];
@@ -487,6 +494,31 @@ async function planOf(parts: Part[]): Promise<ImportPlan> {
       continue;
     }
     seenHash.add(hash);
+    if (!at && folder) {
+      // The library file: this original is the file of the folder with its hash, when it is there with the size the file says.
+      const f = folder.get(hash);
+      if (!f || f.size !== a["size"] || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
+        problems.push(`Library item “${label}”: ${f ? "its file in the folder has another size" : "its file is not in the folder"}, so it shows as missing.`);
+        continue;
+      }
+      valid.add(hash);
+      plan.assets.push({
+        hash,
+        type,
+        size: f.size,
+        name: str(a["name"], ""),
+        pixelW: a["pixelW"] as number,
+        pixelH: a["pixelH"] as number,
+        blob: new Blob([]),
+        importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
+        ...(a["card"] === true ? { card: true } : {}),
+        ext: 1,
+        file: f.file,
+      });
+      const org = readOrganization(a, label, problems);
+      if (org) plan.organization.set(hash, org);
+      continue;
+    }
     if (!e || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
       problems.push(`Library item “${label}” is missing or invalid in the archive and was skipped.`);
       continue;

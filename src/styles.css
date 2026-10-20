@@ -2640,3 +2640,16 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .adj-row[data-lv-row] { grid-template-columns: minmax(0, 1fr) 3.75rem; row-gap: var(--sp-3); }
 .adj-group > .adj-row:has(> select) { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
 .adj-group > .adj-row:has(> select) button { flex: none; white-space: nowrap; }
+#settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
+.set-danger { border-color: var(--hud-danger); }
+dialog.reset-dialog { max-width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; }
+dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--text-lg); }
+.reset-list { margin: 0 0 var(--sp-4); padding-left: var(--sp-8); }
+.reset-last { margin: 0 0 var(--sp-3); opacity: 0.8; }
+.reset-step { display: grid; grid-template-columns: max-content 1fr max-content; align-items: center; gap: var(--sp-4); margin-bottom: var(--sp-3); }
+.reset-step button { font: var(--weight-medium) var(--text-md) var(--font-ui); padding: var(--sp-3) var(--sp-5); color: inherit; background: transparent; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.reset-step button:disabled { opacity: 0.45; cursor: default; }
+.reset-step span { opacity: 0.75; font-size: var(--text-sm); }
+.reset-kept { margin: var(--sp-5) 0 0; }
+.reset-type { display: grid; gap: var(--sp-3); margin-top: var(--sp-5); }
+.reset-type input { font: inherit; padding: var(--sp-3) var(--sp-4); color: inherit; background: transparent; border: 1px solid var(--hud-border); border-radius: var(--r-sm); }

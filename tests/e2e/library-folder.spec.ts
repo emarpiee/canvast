@@ -113,3 +113,63 @@ test("files stored before names had extensions are written again as hash.ext fro
   expect(await present(p, hash)).toBe(true);
   await expect(p.getByRole("button", { name: /Add file extensions/ })).toHaveCount(0);
 });
+
+test("the library file: saved into the folder, and opened from it, it adds the canvases and matches every file again", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-e"));
+  const hash = await importPng(p);
+  await expect.poll(() => p.evaluate(async () => (await window.__canvastDebug.session()).tree!.length)).toBe(1);
+  await p.getByTestId("save-status").click();
+  await expect(p.getByTestId("library-file")).toHaveText("not saved yet");
+  await expect(p.getByRole("button", { name: "Open library from the folder" })).toBeDisabled();
+  await p.getByRole("button", { name: "Save library to the folder" }).click();
+  await expect(p.getByTestId("library-file")).toContainText("canvast-library.canvast, saved");
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain("canvast-library.canvast");
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toContain(`${hash}.png`);
+  expect((await p.evaluate(() => window.__canvastDebug.session())).tree!.length).toBe(1);
+  expect(await p.getByTestId("set-last-backup").textContent()).toContain("No backup made yet"); // (the library file is not a backup)
+
+  // Another device: it has the folder but not the browser's data. Here: the original's record is gone.
+  await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
+  expect(await present(p, hash)).toBe(false);
+  await p.getByRole("button", { name: "Open library from the folder" }).click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder");
+  await p.getByTestId("confirm-ok").click();
+  await expect.poll(() => present(p, hash)).toBe(true);
+  expect(await record(p, hash)).toEqual({ ext: 1, blob: 0 });
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.session())).tree!.length).toBe(2); // (added, nothing replaced)
+});
+
+test("Start from scratch never touches the files of the library folder and says so", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-f"));
+  const hash = await importPng(p);
+  await p.getByTestId("save-status").click();
+  await p.getByTestId("reset-all").click();
+  await expect(p.getByTestId("reset-kept")).toContainText("1 file in the library folder is not touched");
+  await p.getByTestId("reset-word").fill("DELETE");
+  await Promise.all([p.waitForEvent("load"), p.getByTestId("reset-ok").click()]);
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([]); // (the browser's data is gone)
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-f"));
+  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([`${hash}.png`]); // (the file is still there)
+});
+
+test("choosing a folder that already holds a library offers to open it at once", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.useTestFolder("lib-g"));
+  const hash = await importPng(p);
+  await p.getByTestId("save-status").click();
+  await p.getByRole("button", { name: "Save library to the folder" }).click();
+  await expect(p.getByTestId("library-file")).toContainText("saved");
+  // Like another device: no files of its own in the browser, no folder set.
+  await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
+  await expect(p.getByTestId("folder-count")).toHaveText("0");
+  await p.getByRole("button", { name: "Stop using this folder" }).click();
+  await expect(p.getByTestId("storage-folder")).toContainText("Not set");
+  await p.evaluate(() => window.__canvastDebug.stubPicker("lib-g"));
+  await p.getByRole("button", { name: "Choose library folder…" }).click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder"); // (no second button to find)
+  await p.getByTestId("confirm-ok").click();
+  await expect.poll(() => present(p, hash)).toBe(true);
+});

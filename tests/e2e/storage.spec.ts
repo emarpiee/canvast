@@ -332,3 +332,36 @@ test("a full browser store refuses an import in plain words and loses nothing", 
   await expect(app.page.getByTestId("toast")).toContainText("storage is full");
   expect(await app.page.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
 });
+
+test("Start from scratch: a warning with what to do first, a word to type, then everything of canvast is gone and other pages' storage is not", async ({ app }) => {
+  const p = app.page;
+  await draw(p, [[300, 300], [400, 350]]);
+  await saved(p);
+  await p.evaluate(() => localStorage.setItem("other-page", "keep"));
+  await p.getByTestId("save-status").click();
+  await p.getByTestId("reset-all").click();
+  const dlg = p.getByTestId("reset-dialog");
+  await expect(dlg).toContainText("cannot be undone");
+  await expect(dlg).toContainText("Last backup: never");
+  await expect(dlg.locator('input[type="checkbox"]')).toHaveCount(0); // (nothing on the disk can be ticked for deletion)
+  await expect(dlg.getByRole("button", { name: "Export a backup (.canvast)" })).toBeVisible();
+  await expect(p.getByTestId("reset-ok")).toBeDisabled();
+  const [dl] = await Promise.all([p.waitForEvent("download"), dlg.getByRole("button", { name: "Export a backup (.canvast)" }).click()]);
+  expect(dl.suggestedFilename()).toMatch(/\.canvast$/);
+  await expect(dlg.locator('[data-done="full"]')).toHaveText("Done ✓");
+  // Cancel keeps everything.
+  await p.getByTestId("reset-cancel").click();
+  expect((await objectIds(p)).length).toBe(1);
+  // Typing the word enables the button; deleting reloads into a fresh start.
+  await p.getByTestId("reset-all").click();
+  await p.getByTestId("reset-word").fill("delete");
+  await expect(p.getByTestId("reset-ok")).toBeDisabled(); // (the word is DELETE)
+  await p.getByTestId("reset-word").fill("DELETE");
+  await Promise.all([p.waitForEvent("load"), p.getByTestId("reset-ok").click()]);
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect((await objectIds(p)).length).toBe(0);
+  expect(await p.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("canvast") && k !== "canvast-writer-lease"))).toEqual([]);
+  expect(await p.evaluate(() => localStorage.getItem("other-page"))).toBe("keep");
+  await expect(p.getByTestId("set-last-backup")).toBeHidden(); // (Settings is closed again)
+});

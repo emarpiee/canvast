@@ -243,6 +243,8 @@ export interface BackupHooks {
   folder(host: HTMLElement): Promise<void>;
   /** Ask the browser to keep the data under storage pressure. */
   persist(): Promise<void>;
+  /** Start from scratch: the warning, the suggestions before it, and the deletion. */
+  reset(): Promise<void>;
 }
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
@@ -287,7 +289,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                <button type="button" data-backup-action="import" data-testid="set-import">Import backup files…</button>
                <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
              </div>
-             <p class="set-help">A backup is one file you can keep anywhere; it is checked before it is handed over. The browser does not report whether the download finished, so keep the file somewhere safe. After a full backup, an incremental one holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>`
+             <p class="set-help">A backup is one file you can keep anywhere; it is checked before it is handed over. The browser does not report whether the download finished, so keep the file somewhere safe. After a full backup, an incremental one holds only what changed, so it is small; to restore, pick the full backup and the incremental ones together.</p></div>
+           <div class="set-info set-card set-danger" data-reset-card><h3>Start from scratch</h3>
+             <p>Deletes everything canvast keeps in this browser: all boards and canvases, the library, saved styles and settings. You are asked first, and offered a backup.</p>
+             <div class="storage-actions"><button type="button" class="is-danger" data-reset-all data-testid="reset-all">Delete all data…</button></div></div>`
         : t.id === "about"
           ? `<div class="set-info set-card"><h3>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
              <div class="set-info set-card"><h3>This browser</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
@@ -451,6 +456,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
   };
   root.addEventListener("click", (e) => {
+    if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {
+      void backup.reset();
+      return;
+    }
     if (backup && (e.target as HTMLElement).closest("[data-persist]")) {
       void backup.persist().then(() => storage());
       return;
