@@ -203,6 +203,7 @@ import bookmark from "lucide-static/icons/bookmark.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
+import arrowLeft from "lucide-static/icons/arrow-left.svg";
 import chevronUp from "lucide-static/icons/chevron-up.svg";
 import arrowDownAZ from "lucide-static/icons/arrow-down-a-z.svg";
 import arrowDownZA from "lucide-static/icons/arrow-down-z-a.svg";
@@ -440,6 +441,7 @@ export const ICONS = {
   sendToBack: clean(sendToBack),
   magnet: clean(magnet),
   chevronLeft: clean(chevronLeft),
+  arrowLeft: clean(arrowLeft),
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
   maximize: clean(maximize),

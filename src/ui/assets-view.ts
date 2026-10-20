@@ -161,6 +161,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="assets-main">
         <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
+          <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
@@ -182,7 +183,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <button type="button" class="vbtn is-primary" data-act="place" title="Place on the open canvas">${ICONS.mapPin}<span>Place</span></button></span>
               <button type="button" class="vbtn" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
               <button type="button" class="vbtn" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.panelBottomClose}</button>
-              <button type="button" class="vbtn" data-act="close" aria-label="Close slide view" title="Back to the library (Esc)">${ICONS.x}</button>
             </div>
           </div>
           <div class="viewer-handle" hidden>
