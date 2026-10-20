@@ -1453,7 +1453,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     inspector.innerHTML = `
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
-        <button type="button" class="assets-btn is-icon" data-action="close" aria-label="Close details" title="Close the details">${ICONS.x}</button>
       </div>
       ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
       ${
@@ -1745,10 +1744,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         });
         break;
       }
-      case "close":
-        if (!viewer.hidden) toggleDetails();
-        else void select(null);
-        break;
       case "slide":
         void showSlide(hash);
         break;
