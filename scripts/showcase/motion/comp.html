@@ -1,0 +1,322 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>canvast motion</title>
+<style>
+@font-face { font-family: I; font-weight: 300; src: url(../../../node_modules/@expo-google-fonts/inter/300Light/Inter_300Light.ttf); }
+@font-face { font-family: I; font-weight: 400; src: url(../../../node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf); }
+@font-face { font-family: I; font-weight: 600; src: url(../../../node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf); }
+@font-face { font-family: I; font-weight: 800; src: url(../../../node_modules/@expo-google-fonts/inter/800ExtraBold/Inter_800ExtraBold.ttf); }
+@font-face { font-family: I; font-weight: 900; src: url(../../../node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.ttf); }
+html, body { margin: 0; background: #000; }
+canvas { display: block; }
+</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// A 15 s, 30 fps motion piece, one pure function of the frame number: render(f). Footage comes from footage.mjs (?foot=<dir>).
+const W = 1920, H = 1080, FPS = 30;
+const C = document.getElementById("c"), g = C.getContext("2d");
+const FOOT = new URLSearchParams(location.search).get("foot");
+const COL = { bg: "#060818", ink: "#ffffff", gold: "#ffd166", cyan: "#7ae7ff", violet: "#8b7bff", deep: "#0d1240" };
+
+// ── easing and time ───────────────────────────────────────────────────────────────────────────────────────────
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (f, a, b) => clamp((f - a) / (b - a));
+const outExpo = (t) => (t >= 1 ? 1 : 1 - 2 ** (-10 * t));
+const inExpo = (t) => (t <= 0 ? 0 : 2 ** (10 * t - 10));
+const outCubic = (t) => 1 - (1 - t) ** 3;
+const inCubic = (t) => t * t * t;
+const inOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const outBack = (t, s = 1.9) => 1 + (s + 1) * (t - 1) ** 3 + s * (t - 1) ** 2;
+let seed = 7;
+const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+// ── assets ────────────────────────────────────────────────────────────────────────────────────────────────────
+const cache = new Map();
+const img = (name) => {
+  if (!cache.has(name)) cache.set(name, new Promise((res, rej) => { const i = new Image(); i.onload = () => i.decode().then(() => res(i)); i.onerror = rej; i.src = `${FOOT}/${name}`; }));
+  return cache.get(name);
+};
+let META = null;
+const footName = (i) => `f${String(i).padStart(4, "0")}.jpg`;
+
+// ── shared pieces ─────────────────────────────────────────────────────────────────────────────────────────────
+const STARS = Array.from({ length: 320 }, () => ({ x: rnd() * 2 - 1, y: rnd() * 2 - 1, z: rnd(), r: 0.6 + rnd() * 1.6, c: ["#ffffff", "#cfe3ff", "#ffe8c2", "#b8b0ff"][Math.floor(rnd() * 4)] }));
+function starfield(speed, alpha = 1, cx = W / 2, cy = H / 2) { // stars rushing out of the centre: a sense of going forward
+  for (const s of STARS) {
+    let z = (s.z - speed) % 1; if (z <= 0) z += 1;
+    const k = 1 / (z * 1.6 + 0.05), x = cx + s.x * W * 0.32 * k, y = cy + s.y * H * 0.32 * k;
+    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+    const a = alpha * clamp((1 - z) * 1.4) * 0.9;
+    g.globalAlpha = a; g.fillStyle = s.c;
+    g.beginPath(); g.arc(x, y, s.r * (0.4 + (1 - z) * 1.3), 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+function background() {
+  const r = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.7);
+  r.addColorStop(0, "#141a52"); r.addColorStop(0.55, "#090c2a"); r.addColorStop(1, "#030410");
+  g.fillStyle = r; g.fillRect(0, 0, W, H);
+}
+function vignette(a = 0.55) {
+  const r = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75);
+  r.addColorStop(0, "rgba(0,0,0,0)"); r.addColorStop(1, `rgba(0,0,0,${a})`);
+  g.fillStyle = r; g.fillRect(0, 0, W, H);
+}
+const NOISE = Array.from({ length: 4 }, () => { const c = document.createElement("canvas"); c.width = 480; c.height = 270; const x = c.getContext("2d"), d = x.createImageData(480, 270); for (let i = 0; i < d.data.length; i += 4) { const v = rnd() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } x.putImageData(d, 0, 0); return c; });
+function grain(f, a = 0.045) { g.globalAlpha = a; g.globalCompositeOperation = "overlay"; g.drawImage(NOISE[f % 4], 0, 0, W, H); g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; }
+function cover(im, scale = 1, ox = 0, oy = 0) { // draw an image to cover the frame, scaled about the middle
+  const k = Math.max(W / im.width, H / im.height) * scale, w = im.width * k, h = im.height * k;
+  g.drawImage(im, (W - w) / 2 + ox, (H - h) / 2 + oy, w, h);
+}
+function rgbSplit(im, amt, scale = 1) { // a chromatic kick on a cut
+  cover(im, scale);
+  if (amt <= 0) return;
+  g.globalCompositeOperation = "screen";
+  g.globalAlpha = 0.55; g.filter = "sepia(1) saturate(8) hue-rotate(-50deg)"; cover(im, scale, -amt, 0);
+  g.filter = "sepia(1) saturate(8) hue-rotate(150deg)"; cover(im, scale, amt, 0);
+  g.filter = "none"; g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
+}
+function text(s, x, y, { size = 64, weight = 800, color = COL.ink, align = "left", base = "alphabetic", track = 0, alpha = 1 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `${weight} ${size}px I`; g.fillStyle = color; g.textAlign = align; g.textBaseline = base;
+  if ("letterSpacing" in g) g.letterSpacing = `${track}px`;
+  g.fillText(s, x, y); g.restore();
+}
+const width = (s, size, weight, track = 0) => { g.save(); g.font = `${weight} ${size}px I`; if ("letterSpacing" in g) g.letterSpacing = `${track}px`; const w = g.measureText(s).width; g.restore(); return w; };
+/** Text revealed from below through a mask: the line rises into place. */
+function riseText(s, x, y, t, o = {}) {
+  const size = o.size ?? 64;
+  g.save(); g.beginPath(); g.rect(x - (o.align === "center" ? 2000 : 10), y - size * 1.05, 4000, size * 1.35); g.clip();
+  text(s, x, y + (1 - outExpo(t)) * size * 1.2, o); g.restore();
+}
+const sup = (n) => String(n).replace(/[-0-9]/g, (d) => "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"["-0123456789".indexOf(d)]);
+const commas = (n) => Math.round(n).toLocaleString("en");
+
+// ── 1. ZOOM IN: the second O is a lens onto the canvas (0 – 2 s) ──────────────────────────────────────────────
+async function intro(f) {
+  background();
+  starfield(f * 0.004, seg(f, 0, 12));
+  const push = inExpo(seg(f, 34, 60)); // the dive through the lens
+  const S = Math.exp(lerp(0, Math.log(60), push));
+  const size = 300, ringR = 104, ringW = 46, gap = 18;
+  const word = [["Z", 0], ["O", 1], ["O", 2], ["M", 3]];
+  const ws = [width("Z", size, 900), ringR * 2 + ringW, ringR * 2 + ringW, width("M", size, 900)];
+  const total = ws.reduce((a, b) => a + b, 0) + gap * 3;
+  let x = W / 2 - total / 2;
+  const cy = H / 2 - 40;
+  const lensX = W / 2 - total / 2 + ws[0] + gap + ws[1] + gap + ws[2] / 2; // the second O
+  g.save();
+  g.translate(lensX, cy); g.scale(S, S); g.translate(-lensX, -cy);
+  word.forEach(([ch, i], k) => {
+    const t = outBack(seg(f, 2 + k * 3, 16 + k * 3));
+    const w = ws[i], mid = x + w / 2;
+    g.save(); g.globalAlpha = clamp(seg(f, 2 + k * 3, 8 + k * 3)); g.translate(mid, cy + (1 - t) * 160); g.scale(lerp(0.4, 1, t), lerp(0.4, 1, t));
+    if (ch === "O") {
+      g.lineWidth = ringW; g.strokeStyle = k === 2 ? COL.gold : COL.ink;
+      g.beginPath(); g.arc(0, 0, ringR, 0, Math.PI * 2); g.stroke();
+    } else text(ch, 0, size * 0.36, { size, weight: 900, align: "center" });
+    g.restore();
+    x += w + gap;
+  });
+  g.restore();
+  // the lens: the canvas itself, behind the ring, revealed full size
+  const lensT = outExpo(seg(f, 12, 24));
+  const r = (ringR - ringW / 2 + 1) * S * lensT;
+  if (r > 0) {
+    const web = await img("f0000.jpg");
+    g.save(); g.beginPath(); g.arc(lensX + (W / 2 - lensX) * push, cy + (H / 2 - cy) * push, r, 0, Math.PI * 2); g.clip();
+    cover(web, lerp(1.6, 1, push)); g.restore();
+    // ring drawn again over the footage edge
+    g.save(); g.lineWidth = ringW * S; g.strokeStyle = COL.gold; g.beginPath(); g.arc(lensX + (W / 2 - lensX) * push, cy + (H / 2 - cy) * push, ringR * S * lensT, 0, Math.PI * 2); g.stroke(); g.restore();
+  }
+  // "IN." under the word, then "There is no edge." as a whisper
+  const inT = seg(f, 14, 26), fade = 1 - seg(f, 34, 42);
+  riseText("IN.", W / 2, cy + 250, inT, { size: 110, weight: 300, align: "center", track: 40, color: COL.gold, alpha: fade });
+  riseText("an endless canvas", W / 2, cy + 330, seg(f, 20, 32), { size: 30, weight: 600, align: "center", track: 14, color: COL.cyan, alpha: fade * 0.9 });
+  // speed lines during the push
+  if (push > 0.05) {
+    g.save(); g.strokeStyle = "#ffffff"; g.lineCap = "round";
+    for (let i = 0; i < 70; i++) {
+      const a = (i / 70) * Math.PI * 2 + i * 0.37, r0 = 260 + ((i * 97) % 300), len = 80 + push * 600;
+      g.globalAlpha = 0.18 * push; g.lineWidth = 2 + (i % 3);
+      g.beginPath(); g.moveTo(W / 2 + Math.cos(a) * r0 * (1 + push * 2), H / 2 + Math.sin(a) * r0 * (1 + push * 2)); g.lineTo(W / 2 + Math.cos(a) * (r0 * (1 + push * 2) + len), H / 2 + Math.sin(a) * (r0 * (1 + push * 2) + len)); g.stroke();
+    }
+    g.restore();
+  }
+}
+
+// ── 2. The dive: the app's own footage, on the beat (2 – 8.6 s) ────────────────────────────────────────────────
+const SCENES_RULER = [[-40, "Cosmic web"], [-32, "Local Group"], [-27, "Milky Way"], [-18, "Neighbourhood"], [-9, "Heliosphere"], [0, "Solar System"], [5, "Earth"], [12, "Island"], [19, "Tree"], [25, "Leaf"], [32, "Cells"], [40, "DNA"], [47, "Atom"], [54, "Nucleus"], [60, "Proton"]];
+async function dive(f) {
+  const n = META.frames.length, i = Math.min(n - 1, f - 60), m = META.frames[i], leg = META.leg;
+  const k = i % leg, landing = Math.floor(i / leg), beat = Math.max(0, 1 - k / 5); // a punch as each leg starts
+  const im = await img(footName(i));
+  g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+  cover(im, 1 + 0.025 * beat * (i > 0 ? 1 : 0));
+  vignette(0.6);
+  if (i < 3) { g.fillStyle = `rgba(255,255,255,${0.35 * (1 - i / 3)})`; g.fillRect(0, 0, W, H); }
+  // the ruler on the right: one tick a level, the scenes named
+  const z = m.z, rx = 1810, mid = H / 2, PX = 13;
+  g.save();
+  g.beginPath(); g.rect(rx - 330, 120, 400, H - 240); g.clip();
+  for (let L = Math.floor(z) - 40; L <= Math.ceil(z) + 40; L++) {
+    const y = mid + (L - z) * PX, major = L % 10 === 0;
+    g.globalAlpha = clamp(1 - Math.abs(y - mid) / 430) * 0.9;
+    g.fillStyle = major ? COL.ink : "rgba(255,255,255,0.55)";
+    g.fillRect(rx - (major ? 26 : 12), y - 1, major ? 26 : 12, 2);
+    if (major) text(`${L > 0 ? "+" : ""}${L}`, rx - 36, y + 6, { size: 16, weight: 600, align: "right", color: "rgba(255,255,255,0.75)" });
+  }
+  for (const [L, name] of SCENES_RULER) {
+    const y = mid + (L - z) * PX;
+    g.globalAlpha = clamp(1 - Math.abs(y - mid) / 430);
+    g.fillStyle = COL.cyan; g.beginPath(); g.arc(rx + 14, y, 4, 0, 7); g.fill();
+    text(name.toUpperCase(), rx - 90, y + 6, { size: 14, weight: 600, align: "right", track: 2, color: COL.cyan, alpha: 0.8 });
+  }
+  g.restore();
+  g.fillStyle = COL.gold; g.beginPath(); g.moveTo(rx + 34, mid); g.lineTo(rx + 52, mid - 11); g.lineTo(rx + 52, mid + 11); g.closePath(); g.fill();
+  g.fillRect(rx - 40, mid - 1.5, 74, 3);
+  // the counter, bottom right: zoom level and magnification
+  const zr = Math.round(z), ten = Math.round(z * Math.log10(2));
+  text("ZOOM LEVEL", 1640, 880, { size: 18, weight: 600, align: "right", track: 6, color: COL.cyan });
+  const num = `${zr > 0 ? "+" : zr < 0 ? "−" : ""}${Math.abs(zr)}`;
+  text(num, 1640, 990, { size: 128, weight: 900, align: "right" });
+  text(`×10${sup(ten)}`, 1640, 1036, { size: 34, weight: 600, align: "right", color: COL.gold });
+  // the scene, bottom left: its name rises in as it lands
+  const name = (k >= leg * 0.55 ? m.to : m.from).toUpperCase();
+  const idx = k >= leg * 0.55 ? landing + 2 : landing + 1;
+  const tin = k >= leg * 0.55 ? seg(k, leg * 0.55, leg * 0.55 + 5) : 1;
+  const tout = k < leg * 0.55 ? 1 - seg(k, leg * 0.35, leg * 0.55) : 1;
+  g.save(); g.globalAlpha = tout;
+  text(`${String(idx).padStart(2, "0")} / 15`, 120, 900, { size: 20, weight: 600, track: 6, color: COL.cyan, alpha: tin });
+  g.fillStyle = COL.gold; g.fillRect(120, 918, 420 * outExpo(tin), 3);
+  riseText(name, 120, 1000, tin, { size: 66, weight: 900, track: 2 });
+  g.restore();
+  // a mark at the top: the whole trip, and where we are on it
+  const prog = clamp((z + 40) / 100);
+  g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(0, H - 6, W, 6);
+  g.fillStyle = COL.gold; g.fillRect(0, H - 6, W * prog, 6);
+  text("RECORDED LIVE IN CANVAST", 120, 1046, { size: 14, weight: 600, track: 6, color: "rgba(255,255,255,0.55)" });
+}
+
+// ── 3. Beyond: +1,000, +1,000,000, still exact (8.6 – 11 s) ────────────────────────────────────────────────────
+async function beyond(f) {
+  if (f < 282) {
+    const t = seg(f, 258, 282), im = await img("plus1000.jpg");
+    rgbSplit(im, f - 258 < 4 ? (4 - (f - 258)) * 14 : 0, 1 + t * 0.08);
+    g.fillStyle = "rgba(4,5,20,0.45)"; g.fillRect(0, 0, W, H); vignette(0.7);
+    const s = lerp(1.5, 1, outExpo(seg(f, 258, 266)));
+    g.save(); g.translate(W / 2, H / 2); g.scale(s, s); text("+1,000", 0, 60, { size: 250, weight: 900, align: "center", alpha: seg(f, 258, 262) }); g.restore();
+    riseText("ZOOM LEVELS DOWN", W / 2, H / 2 + 160, seg(f, 262, 272), { size: 40, weight: 600, align: "center", track: 18, color: COL.gold });
+  } else if (f < 306) {
+    const t = seg(f, 282, 306), im = await img("million.jpg");
+    rgbSplit(im, f - 282 < 4 ? (4 - (f - 282)) * 18 : 0, 1 + t * 0.1);
+    g.fillStyle = "rgba(4,5,20,0.5)"; g.fillRect(0, 0, W, H); vignette(0.7);
+    const v = lerp(1000, 1000000, outExpo(seg(f, 282, 298)));
+    const jit = f < 298 ? (Math.sin(f * 9) * 6) : 0;
+    text(`+${commas(v)}`, W / 2 + jit, H / 2 + 60, { size: 210, weight: 900, align: "center" });
+    riseText("AND STILL GOING", W / 2, H / 2 + 160, seg(f, 290, 300), { size: 40, weight: 600, align: "center", track: 18, color: COL.gold });
+  } else {
+    const im = await img("million.jpg");
+    cover(im, 1.1 + seg(f, 306, 330) * 0.04);
+    g.fillStyle = "rgba(4,5,20,0.62)"; g.fillRect(0, 0, W, H); vignette(0.75);
+    riseText(`10${sup(301030)}× magnified.`, W / 2, H / 2 - 10, seg(f, 306, 316), { size: 104, weight: 900, align: "center" });
+    riseText("Every point still exact.", W / 2, H / 2 + 110, seg(f, 312, 322), { size: 72, weight: 300, align: "center", color: COL.gold });
+  }
+  grain(f, 0.05);
+}
+
+// ── 4. It is an app: the window, and what it is (11 – 13.2 s) ─────────────────────────────────────────────────
+function rounded(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+async function reveal(f) {
+  background();
+  starfield(0.3 + f * 0.002, 0.8);
+  const t = inOut(seg(f, 334, 356));
+  const home = await img("home.jpg"), app = await img("app-home.jpg");
+  const fullW = W, fullH = W * (900 / 1600), winW = 980, winH = winW * (900 / 1600);
+  const cw = lerp(fullW * 1.0, winW, t), ch = lerp(fullH, winH, t);
+  const cx = lerp(W / 2, 1360, t), cy = lerp(H / 2, H / 2 + 10, t);
+  const rot = lerp(0, -0.035, t) + Math.sin(f * 0.05) * 0.004 * t;
+  g.save(); g.translate(cx, cy); g.rotate(rot);
+  g.shadowColor = "rgba(0,0,0,0.6)"; g.shadowBlur = 80 * t; g.shadowOffsetY = 30 * t;
+  rounded(-cw / 2, -ch / 2, cw, ch, 22 * t); g.fillStyle = "#000"; g.fill(); g.shadowColor = "transparent";
+  g.save(); rounded(-cw / 2, -ch / 2, cw, ch, 22 * t); g.clip();
+  g.drawImage(home, -cw / 2, -ch / 2, cw, ch);
+  g.globalAlpha = seg(f, 336, 346); g.drawImage(app, -cw / 2, -ch / 2, cw, ch); g.globalAlpha = 1;
+  g.restore();
+  g.lineWidth = 2; g.strokeStyle = `rgba(139,123,255,${0.7 * t})`; rounded(-cw / 2, -ch / 2, cw, ch, 22 * t); g.stroke();
+  g.restore();
+  // a file badge on the window
+  const bt = outBack(seg(f, 352, 364));
+  if (bt > 0) {
+    g.save(); g.translate(1360 + winW / 2 - 60, H / 2 + 10 + winH / 2 - 20); g.scale(bt, bt); g.rotate(0.06);
+    rounded(-150, -36, 300, 72, 36); g.fillStyle = COL.gold; g.fill();
+    text("canvast.html", 0, 12, { size: 32, weight: 800, align: "center", color: "#1a1236" }); g.restore();
+  }
+  const lines = [["One HTML file.", COL.ink], ["Works offline.", COL.ink], ["No edge. No limit.", COL.gold]];
+  lines.forEach(([s, c], k) => {
+    const lt = seg(f, 348 + k * 7, 360 + k * 7);
+    if (lt <= 0) return;
+    const y = 400 + k * 110;
+    g.save(); g.globalAlpha = clamp(lt * 2);
+    g.strokeStyle = COL.cyan; g.lineWidth = 7; g.lineCap = "round"; g.lineJoin = "round";
+    const ck = outExpo(lt);
+    g.beginPath(); g.moveTo(120, y - 22); g.lineTo(120 + 14 * clamp(ck * 2), y - 22 + 14 * clamp(ck * 2)); if (ck > 0.5) g.lineTo(134 + 26 * clamp(ck * 2 - 1), y - 8 - 30 * clamp(ck * 2 - 1)); g.stroke();
+    g.restore();
+    riseText(s, 190, y, lt, { size: 66, weight: 800, color: c });
+  });
+  text("No server · no account · no network", 190, 760, { size: 26, weight: 400, color: "rgba(255,255,255,0.7)", alpha: seg(f, 372, 384), track: 2 });
+  grain(f, 0.04);
+}
+
+// ── 5. The mark (13.2 – 15 s) ──────────────────────────────────────────────────────────────────────────────────
+function lemniscate(t, a) { const s = Math.sin(t), c = Math.cos(t), d = 1 + s * s; return [a * c / d, a * s * c / d]; }
+async function outro(f) {
+  background();
+  starfield(0.6 + f * 0.0015, 0.7);
+  // the window leaves
+  const out = seg(f, 396, 406);
+  if (out < 1) {
+    const app = await img("app-home.jpg"), winW = 980 * lerp(1, 0.2, inCubic(out)), winH = winW * (900 / 1600);
+    g.save(); g.globalAlpha = 1 - out; g.translate(lerp(1360, W / 2, out), H / 2 + 10); g.rotate(-0.035 * (1 - out));
+    g.drawImage(app, -winW / 2, -winH / 2, winW, winH); g.restore();
+  }
+  // ∞ drawn with one stroke, then breathing
+  const dt = inOut(seg(f, 400, 424)), cx = W / 2, cy = H / 2 - 120, A = 190;
+  if (dt > 0) {
+    const grad = g.createLinearGradient(cx - A, cy, cx + A, cy);
+    grad.addColorStop(0, COL.cyan); grad.addColorStop(0.5, COL.violet); grad.addColorStop(1, COL.gold);
+    g.save(); g.strokeStyle = grad; g.lineWidth = 30; g.lineCap = "round"; g.lineJoin = "round";
+    g.shadowColor = "rgba(139,123,255,0.8)"; g.shadowBlur = 30 + 10 * Math.sin(f * 0.3);
+    g.beginPath();
+    const steps = 240, end = Math.PI * 2 * dt, t0 = -Math.PI / 2;
+    for (let i = 0; i <= steps; i++) { const [x, y] = lemniscate(t0 + (end * i) / steps, A); i ? g.lineTo(cx + x, cy + y) : g.moveTo(cx + x, cy + y); }
+    g.stroke();
+    if (dt < 1) { const [x, y] = lemniscate(t0 + end, A); g.fillStyle = "#fff"; g.shadowColor = "#fff"; g.shadowBlur = 40; g.beginPath(); g.arc(cx + x, cy + y, 12, 0, 7); g.fill(); }
+    g.restore();
+  }
+  // the word, letter by letter
+  const word = "canvast", size = 150, total = width(word, size, 800, -2);
+  let x = W / 2 - total / 2;
+  for (let i = 0; i < word.length; i++) {
+    const lt = seg(f, 414 + i * 1.6, 426 + i * 1.6), w = width(word[i], size, 800);
+    g.save(); g.beginPath(); g.rect(x - 10, cy + 150, w + 20, 200); g.clip();
+    text(word[i], x, cy + 300 + (1 - outExpo(lt)) * 170, { size, weight: 800 });
+    g.restore(); x += w - 2;
+  }
+  riseText("An endless canvas. Zoom in forever.", W / 2, cy + 380, seg(f, 426, 438), { size: 38, weight: 400, align: "center", color: "rgba(255,255,255,0.85)", track: 1 });
+  riseText("ONE FILE · OFFLINE · OPEN IT AND ZOOM", W / 2, cy + 440, seg(f, 430, 442), { size: 20, weight: 600, align: "center", color: COL.gold, track: 8 });
+  grain(f, 0.04);
+  const end = seg(f, 444, 450); if (end > 0) { g.fillStyle = `rgba(0,0,0,${end * 0.6})`; g.fillRect(0, 0, W, H); }
+}
+
+window.render = async (f) => {
+  if (!META) META = await (await fetch(`${FOOT}/footage.json`)).json();
+  await document.fonts.load("900 100px I"); await document.fonts.load("800 100px I"); await document.fonts.load("600 100px I"); await document.fonts.load("400 100px I"); await document.fonts.load("300 100px I");
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.filter = "none";
+  if (f < 60) await intro(f);
+  else if (f < 258) await dive(f);
+  else if (f < 330) await beyond(f);
+  else if (f < 396) await reveal(f);
+  else await outro(f);
+  if (f >= 56 && f < 64) { g.fillStyle = `rgba(255,255,255,${0.5 * (1 - Math.abs(f - 60) / 4)})`; g.fillRect(0, 0, W, H); } // the flash as we pass the lens
+};
+</script></body></html>
