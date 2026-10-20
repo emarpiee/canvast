@@ -63,3 +63,48 @@ test("colour picker: ring, box, hex, models, layouts, recent colours, Settings (
   await expect(row.locator(".set-colour-hex")).toHaveText("#00FF00");
   expect(await p.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!)["pen.color"])).toBe("#00ff00");
 });
+
+test("colour picker: a copied hex takes the #, a pasted one loses it; a long press on a swatch copies it without choosing it (also a right click)", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("p");
+  await p.evaluate(() => { const w = window as unknown as { copied: string }; w.copied = ""; Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t: string) => { w.copied = t; } }, configurable: true }); });
+  const pop = p.locator(".colour-pop");
+  const hex = pop.locator("[data-hex]");
+  await p.locator("[data-colour-open]").click();
+  await hex.fill("123456");
+  await hex.press("Enter");
+  // copy / cut of the whole field carry the #; a paste with one leaves it out (Chromium: Firefox gives a made-up clipboard event no data)
+  const chromium = p.context().browser()?.browserType().name() === "chromium";
+  await hex.focus();
+  await hex.press("Control+a");
+  const out = await hex.evaluate((e) => { const dt = new DataTransfer(); e.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true, cancelable: true })); return dt.getData("text/plain"); });
+  if (chromium) {
+    expect(out).toBe("#123456");
+    await hex.press("Control+a");
+    await hex.evaluate((e) => { const dt = new DataTransfer(); dt.setData("text/plain", "#00ff7f"); e.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); });
+    await expect(hex).toHaveValue("00FF7F");
+  }
+  await hex.press("Enter");
+  await p.keyboard.press("Escape");
+  // a swatch (the recent colours): long press copies "#RRGGBB" and leaves the picker's colour alone; a short click still chooses it
+  await p.locator("[data-colour-open]").click();
+  await hex.fill("abcdef");
+  await hex.press("Enter");
+  const sw = pop.locator(".cp-swatch[data-c]").first();
+  const want = `#${String(await sw.getAttribute("data-c")).replace("#", "").toUpperCase()}`;
+  const before = await hex.inputValue();
+  const box = (await sw.boundingBox())!;
+  await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await p.mouse.down();
+  await p.waitForTimeout(650);
+  await p.mouse.up();
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(want);
+  expect(await hex.inputValue(), "a long press does not choose").toBe(before);
+  await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; });
+  await sw.click({ button: "right" });
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(want);
+  expect(await hex.inputValue()).toBe(before);
+  await sw.click();
+  expect(await hex.inputValue(), "a click chooses").toBe(want.slice(1));
+  expect(app.consoleErrors).toEqual([]);
+});

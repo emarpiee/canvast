@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.8 — Picker: copy swatches, # in the hex field (2026-10-21)
+
+- **Colour picker package:** copying the whole hex field puts `#RRGGBB` on the clipboard and pasting `#RRGGBB` drops the `#`; a swatch is copied (not chosen) by a long press, a right click or Ctrl/Cmd+C, with `onCopy`, `onLongPress`, `copyToClipboard` and `flashCopied` exported.
+- **App:** the same on a saved gradient in the fill picker (copies its CSS) and, by a long press, on the colour and gradient cards in Styles.
+
 ## 0.25.7 — Styles: right-click copy and paste (2026-10-21)
 
 - **Styles panel:** a right click on a colour or gradient card copies it (hex or CSS); *Copy hex* and *Copy as CSS* stay in the More menu (touch, keyboard). CSS pasted with the pointer over the panel, or with nothing picked, is saved as a new colour or gradient style.

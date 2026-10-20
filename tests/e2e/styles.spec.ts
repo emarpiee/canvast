@@ -126,6 +126,13 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; });
   await card("Gradient 1").click({ button: "right" });
   expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(/);
+  // a long press copies it too, and does not apply it to the picked shape
+  await p.evaluate(() => { (window as unknown as { copied: string }).copied = ""; });
+  await card("Gradient 1").first().hover();
+  await p.mouse.down();
+  await p.waitForTimeout(650);
+  await p.mouse.up();
+  expect(await p.evaluate(() => (window as unknown as { copied: string }).copied)).toMatch(/^linear-gradient\(/);
   if (p.context().browser()?.browserType().name() === "chromium") {
     const paste = (t: string) => p.evaluate((x) => { const dt = new DataTransfer(); dt.setData("text/plain", x); document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
     await p.mouse.click(40, 700); // nothing picked, the pointer off the panel: it is still saved

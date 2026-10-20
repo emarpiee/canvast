@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.25.8 — Picker: copy swatches, # in the hex field (2026-10-21)
+
+- **Implemented:** `colour-picker/press.ts` (long press, copy), hex field copy/paste, `onCopy`; saved-gradient chips and Styles cards copy by long press.
+- **Tested:** `colour-picker.spec` new test and `styles.spec` (Chromium, Firefox; made-up clipboard data steps Chromium only).
+- **Fixed on the way:** a long press left its click-swallowing flag set, so the next click was lost.
+
 ## v0.25.7 — Styles: right-click copy and paste (2026-10-21)
 
 - **Implemented:** `css-paint.ts` (`parseCssPaint`, `cssOfPaint`), Styles right-click copy, paste over the panel saves a style; angular summary fixed.

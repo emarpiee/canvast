@@ -2,6 +2,8 @@ import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stro
 import { NOTE_CARD, NOTE_COLOURS } from "../text/text-style";
 import type { Arrow } from "../doc/path";
 import { createColourPicker, type ColourPicker, type SwatchGroup } from "../colour-picker/picker";
+import { copyToClipboard, flashCopied, onLongPress } from "../colour-picker/press";
+import { cssOfPaint } from "../app/css-paint";
 import { createGradientEditor, type GradientValue } from "../colour-picker/gradient";
 import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt, solidOf } from "../doc/paint";
@@ -155,6 +157,12 @@ function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: (
     box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the picked stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
   };
   render();
+  // A saved gradient is copied as CSS by a long press, a right click or Ctrl/Cmd+C, and is not used.
+  onLongPress(box, "[data-saved]", (chip) => {
+    const g = saved[Number(chip.dataset["saved"])]?.gradient;
+    const css = g ? cssOfPaint(g) : null;
+    if (css) void copyToClipboard(css).then((ok) => ok && flashCopied(chip));
+  });
   box.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
     const chip = t.closest<HTMLElement>("[data-saved]");

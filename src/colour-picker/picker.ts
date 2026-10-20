@@ -13,6 +13,7 @@
  * Speed: see docs/performance.md. Drawing a box costs about 1.4 ms and only when the hue or the model changes; the ring and the
  * slider tracks are CSS gradients, so a drag does no pixel work except the box.
  */
+import { copyToClipboard, flashCopied, onLongPress } from "./press";
 import {
   HARMONIES,
   MODELS,
@@ -97,6 +98,8 @@ export interface PickerOptions {
   onModel?: (model: Model) => void;
   onView?: (view: View) => void;
   onFormat?: (format: TextFormat) => void;
+  /** A swatch was long-pressed, right-clicked or copied with Ctrl/Cmd+C: its colour (`#RRGGBB`) is on the clipboard and was not chosen. */
+  onCopy?: (text: string) => void;
   /** Add the stylesheet to the document (default true); a host that includes PICKER_CSS itself passes false. */
   injectStyles?: boolean;
 }
@@ -564,6 +567,25 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     const v = hexInput.value.trim();
     if (v && parseColour(format === "hex" && /^[0-9a-f]+$/i.test(v) ? `#${v}` : v)) setText(v, hexInput);
   });
+  // The # is in front of the field, not in it: a copy of the whole value takes it along, a paste leaves it out.
+  const whole = (): boolean => hexInput.selectionStart === 0 && hexInput.selectionEnd === hexInput.value.length && /^[0-9a-f]+$/i.test(hexInput.value);
+  for (const kind of ["copy", "cut"] as const)
+    hexInput.addEventListener(kind, (e) => {
+      if (format !== "hex" || !whole()) return;
+      e.clipboardData?.setData("text/plain", `#${hexInput.value.toUpperCase()}`);
+      e.preventDefault();
+      if (kind === "cut") {
+        hexInput.value = "";
+        hexInput.dispatchEvent(new Event("input"));
+      }
+    });
+  hexInput.addEventListener("paste", (e) => {
+    const text = (e.clipboardData?.getData("text/plain") ?? "").trim();
+    if (format !== "hex" || !/^#[0-9a-f]{3,8}$/i.test(text)) return;
+    e.preventDefault();
+    hexInput.setRangeText(text.slice(1).toUpperCase(), hexInput.selectionStart ?? 0, hexInput.selectionEnd ?? 0, "end");
+    hexInput.dispatchEvent(new Event("input"));
+  });
   hexInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       if (setText(hexInput.value)) commit();
@@ -594,6 +616,16 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-c]");
     if (b && setText(b.dataset["c"]!)) commit();
   };
+  // A swatch is copied (as #RRGGBB) by a long press, a right click or Ctrl/Cmd+C, and is not chosen.
+  for (const area of [groupsEl, harmonyEl])
+    onLongPress(area, "[data-c]", (b) => {
+      const text = `#${b.dataset["c"]!.replace("#", "").toUpperCase()}`;
+      void copyToClipboard(text).then((ok) => {
+        if (!ok) return;
+        flashCopied(b);
+        options.onCopy?.(text);
+      });
+    });
   groupsEl.addEventListener("click", pickSwatch);
   harmonyEl.addEventListener("click", pickSwatch);
   root.querySelector("[data-eye]")?.addEventListener("click", async () => {

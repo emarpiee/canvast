@@ -24,6 +24,7 @@ Makes a picker. Append `picker.el` where you want it. The picker is `size` px wi
 | `onInput` | `(value) => void` | none | Every step of a drag or key press. |
 | `onChange` | `(value) => void` | none | Once, when a gesture ends (pointer up, Enter, a swatch). Not called when the value did not change. |
 | `onModel`, `onView`, `onFormat` | `(x) => void` | none | The user switched; keep it to reopen the same way. |
+| `onCopy` | `(text) => void` | none | A swatch was copied (long press, right click, or Ctrl/Cmd+C on it): `text` is `#RRGGBB`. The colour is not chosen. |
 | `injectStyles` | boolean | `true` | Add the stylesheet to the document. Pass `false` if you include `PICKER_CSS` yourself. |
 
 ### Layouts
@@ -90,3 +91,9 @@ Colours here are `Rgb = [r, g, b]` bytes, and a model's colour is a `Triple = { 
 | `contrastRatio(a, b)` | WCAG 2 contrast of two opaque colours, 1 to 21. |
 | `harmonies(rgb, kind, hue?)` | The colours of a harmony, turned in OKHCL so each stays inside sRGB. |
 | `prefersDarkText(rgb)` | Whether black text reads better than white on this colour. |
+
+## Copying and pasting
+
+- The hex field keeps its `#` outside the field: copying or cutting the whole value puts `#RRGGBB` on the clipboard, and pasting `#RRGGBB` puts the digits in the field (no `##`).
+- A swatch (recent, saved or harmony) is copied, not chosen, by a long press (500 ms), a right click, or Ctrl/Cmd+C while it has the focus. The swatch gets the class `is-copied` for a moment (style it with `.cp-swatch.is-copied`).
+- `onLongPress(root, selector, action, { ms, except })`, `copyToClipboard(text)` and `flashCopied(el)` are exported for a host's own swatches (the click that ends a long press is swallowed).

@@ -8,7 +8,7 @@ import { MAX_PALETTE, parseGpl, serializeGpl } from "../assets/gpl";
 import { parseAse, serializeAse } from "../assets/ase";
 import { parseAco, serializeAco } from "../assets/aco";
 import type { PaletteColour } from "../assets/gpl";
-import { harmonies, parseHex, rgbToHex } from "../colour-picker/index";
+import { harmonies, onLongPress, parseHex, rgbToHex } from "../colour-picker/index";
 import type { Harmony } from "../colour-picker/colour";
 import { cssOfPaint, parseCssPaint } from "../app/css-paint";
 import type { Gradient, Paint } from "../doc/paint";
@@ -107,7 +107,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       const isOpen = opened.has(item.id) || editing === item.id;
       return `<li class="style-palette${isOpen ? " is-open" : ""}"><button type="button" class="style-card" data-toggle="${esc(item.id)}" aria-expanded="${isOpen}" title="Show the colours">${body}</button>${more}${isOpen ? (editing === item.id ? paletteEditor(item, pal) : paletteGrid(pal, can)) : ""}</li>`;
     }
-    return `<li><button type="button" class="style-card" data-style="${esc(item.id)}" title="${esc(title)}"${can ? "" : " disabled"}>${body}</button>${more}</li>`;
+    return `<li${item.kind === "colour" || item.kind === "gradient" ? " data-copyable" : ""}><button type="button" class="style-card" data-style="${esc(item.id)}" title="${esc(title)}"${can ? "" : " disabled"}>${body}</button>${more}</li>`;
   };
 
   const paletteGrid = (pal: PaletteData, can: boolean): string =>
@@ -374,12 +374,11 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (deps.paint.count() > 0) deps.paint.apply(item.data as Paint, item.name, target, true, item.id);
   };
 
-  // A right click on a colour or gradient copies it (the More menu has the same, for touch and the keyboard).
-  panel.addEventListener("contextmenu", (e) => {
-    const id = (e.target as HTMLElement).closest("li")?.querySelector<HTMLElement>("[data-more]")?.dataset["more"];
-    const it = find(id);
-    if (it && copyItem(it)) e.preventDefault();
-  });
+  // A long press or a right click on a colour or gradient copies it (the More menu has the same, for the keyboard), and does not apply it.
+  onLongPress(panel, "li[data-copyable]", (li) => {
+    const it = find(li.querySelector<HTMLElement>("[data-more]")?.dataset["more"]);
+    if (it) copyItem(it);
+  }, { except: "[data-more], input, .pal-actions" });
   // Pasting CSS (a colour in any notation, or a gradient) saves it as a style when the pointer or focus is on the panel, or when nothing is picked that could take it as a fill.
   window.addEventListener("paste", (e) => {
     const t = e.target as Element | null;

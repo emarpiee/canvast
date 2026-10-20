@@ -7,3 +7,5 @@ export { createGradientEditor } from "./gradient";
 export type { GradientEditor, GradientEditorOptions, GradientLabels, GradientStopValue, GradientValue } from "./gradient";
 export { PICKER_CSS, ensureStyles } from "./style";
 export { scrubNumbers } from "./scrub";
+export { copyToClipboard, flashCopied, onLongPress } from "./press";
+export type { LongPressOptions } from "./press";
