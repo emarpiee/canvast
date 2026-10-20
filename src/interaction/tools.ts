@@ -1031,6 +1031,7 @@ export function attachTools(
     const tgt = nodeTarget();
     const hit = tgt ? hitNodes(tgt.po, s.x, s.y, editor.nodeSel) : null;
     el.classList.toggle("is-add", hit?.kind === "seg" && !tgt!.o.net);
+    el.classList.toggle("is-node", hit?.kind === "point" || hit?.kind === "in" || hit?.kind === "out"); // (a node or a handle: it is taken and moved)
     const net = !!tgt?.o.net;
     const inside = !hit && !!tgt && pickAll(unlocked(visible()), s.x, s.y)[0]?.obj.id === tgt.o.id;
     // short, like the names the other handles give (Radius, Ratio, Count): what it is, then its key
@@ -1651,7 +1652,7 @@ export function attachTools(
       boxLabel = rotating ? "Rotate" : hit ? (hit.edge ? (hit.edge === "n" || hit.edge === "s" ? "Resize height" : "Resize width") : "Resize") : null;
     }
     if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) hoverHandleLabel(local(e), boxLabel);
-    if (effectiveTool() !== "node" || g.kind !== "none" || e.buttons) el.classList.remove("is-add");
+    if (effectiveTool() !== "node" || g.kind !== "none" || e.buttons) el.classList.remove("is-add", "is-node");
     else hoverNode(local(e));
     if (g.kind === "none" && effectiveTool() === "eraser") {
       editor.eraser = { at: local(e), boxes: [] };
@@ -2191,7 +2192,7 @@ export function attachTools(
   const onLeave = (): void => {
     reveal.move(null, false);
     delete el.dataset["hover"];
-    el.classList.remove("is-add");
+    el.classList.remove("is-add", "is-node");
     if (g.kind === "none" && editor.handleLabel) {
       editor.handleLabel = null;
       editor.changed();

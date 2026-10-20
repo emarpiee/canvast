@@ -2993,8 +2993,9 @@ test("Edit nodes: a plus cursor where a click adds a node, and a label that name
   await p.mouse.move(520, 250); // the middle of the top edge
   await expect(canvas).toHaveClass(/is-add/);
   await expect.poll(label).toMatch(/Add node/);
-  await p.mouse.move(400, 250); // a corner node
+  await p.mouse.move(400, 250); // a corner node: a move cursor, not the lasso's or the plus
   await expect(canvas).not.toHaveClass(/is-add/);
+  await expect(canvas).toHaveClass(/is-node/);
   await expect.poll(label).toMatch(/Alt: smooth.*Del/);
   await p.mouse.move(520, 340); // inside the shape, off every edge and node: a drag here is a lasso, not a move
   await expect(canvas).not.toHaveClass(/is-add/);
