@@ -1196,10 +1196,21 @@ test("a small SVG in the viewer is the vector picture drawn large: not capped at
   await expect(img).not.toHaveClass(/is-pixelated/);
   expect(await img.evaluate((i: HTMLImageElement) => i.style.maxWidth), "no cap at a few times 40 px").toBe("");
   expect((await img.boundingBox())!.width, "drawn at the size of the stage").toBeGreaterThan(200);
+  // it is drawn again at every zoom on a canvas (crisp at any size, with a chequered ground that stays put), not scaled as a picture
+  const vec = viewer.locator("canvas.viewer-vec");
+  await expect(vec).toBeVisible();
+  await expect(img).toHaveClass(/is-vector/);
+  const centre = () => vec.evaluate((c: HTMLCanvasElement) => [...c.getContext("2d")!.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data]);
+  await expect.poll(centre).toEqual([238, 51, 51, 255]); // the circle's red at the middle
+  for (let i = 0; i < 4; i++) await viewer.getByRole("button", { name: "Zoom in" }).click();
+  await expect(viewer.locator(".viewer-zoom-pct")).not.toHaveText("Fit");
+  expect(await img.evaluate((i: HTMLImageElement) => i.style.transform), "the img is not scaled").toBe("");
+  await expect.poll(centre).toEqual([238, 51, 51, 255]);
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await open("tiny.png");
   await expect(img, "a small raster keeps its pixels sharp").toHaveClass(/is-pixelated/);
+  await expect(vec, "only an SVG is drawn on the canvas").toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
 

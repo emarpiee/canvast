@@ -164,7 +164,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
-            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
+            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><canvas class="viewer-vec" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -489,6 +489,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const stage = viewer.querySelector<HTMLElement>(".viewer-stage")!;
   // Video, audio and GIF play with the same engines and control bar as the on-canvas player (ADR 0064).
   const slideGif = viewer.querySelector<HTMLCanvasElement>(".viewer-gif")!;
+  const slideVec = viewer.querySelector<HTMLCanvasElement>(".viewer-vec")!;
+  /** The open picture is an SVG: it is drawn again at every zoom, on `slideVec`, so it is crisp at any size (the img only gives its size). */
+  let vector = false;
   const avEng = avEngine(slideMedia);
   const gifEng = gifEngine(slideGif);
   const controls = mountPlayerControls(stage, settings, {
@@ -576,12 +579,47 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const boxH = el.offsetHeight || box.height / zoom.s;
     return { nw, nh, fw: Math.min(boxW, (boxH * nw) / nh) };
   };
+  /** Draw the SVG at the size it is shown, on a chequered ground that stays where it is (it does not zoom or move with the picture). */
+  const paintVector = (): void => {
+    if (!vector) return;
+    const sr = stage.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const [w, h] = [Math.max(1, Math.round(sr.width * dpr)), Math.max(1, Math.round(sr.height * dpr))];
+    if (slideVec.width !== w || slideVec.height !== h) {
+      slideVec.width = w;
+      slideVec.height = h;
+    }
+    const g = slideVec.getContext("2d")!;
+    g.clearRect(0, 0, w, h);
+    const z = sizes();
+    if (!z || !slideImg.complete) return;
+    const base = slideImg.getBoundingClientRect();
+    const dw = z.fw * zoom.s;
+    const dh = ((z.fw * z.nh) / z.nw) * zoom.s;
+    const x = base.left + base.width / 2 - sr.left + zoom.x - dw / 2;
+    const y = base.top + base.height / 2 - sr.top + zoom.y - dh / 2;
+    const cs = getComputedStyle(viewer);
+    const cell = Math.max(2, Math.round(16 * dpr));
+    const tile = document.createElement("canvas");
+    tile.width = tile.height = cell * 2;
+    const t = tile.getContext("2d")!;
+    t.fillStyle = cs.getPropertyValue("--check-b").trim() || "#2a2a2a";
+    t.fillRect(0, 0, cell * 2, cell * 2);
+    t.fillStyle = cs.getPropertyValue("--check-a").trim() || "#3a3a3a";
+    t.fillRect(cell, 0, cell, cell);
+    t.fillRect(0, cell, cell, cell);
+    g.fillStyle = g.createPattern(tile, "repeat") ?? "transparent"; // (anchored to the canvas, not to the picture)
+    g.fillRect(x * dpr, y * dpr, dw * dpr, dh * dpr);
+    g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
+  };
+  window.addEventListener("resize", paintVector);
   const paintZoom = (): void => {
     const el = shownMedia();
     const z = sizes();
-    for (const m of [slideImg, slideMedia, slideGif]) m.style.transform = m === el && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
+    const vec = vector && el === slideImg;
+    for (const m of [slideImg, slideMedia, slideGif]) m.style.transform = m === el && !vec && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
     // A picture with see-through pixels sits on a chequered ground exactly the size of the picture, zoomed with it.
-    checker.hidden = !(el === slideImg && slideAlpha && z);
+    checker.hidden = vec || !(el === slideImg && slideAlpha && z);
     if (!checker.hidden && z) {
       const tile = checker.firstElementChild as HTMLElement;
       tile.style.width = `${z.fw}px`;
@@ -590,6 +628,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     zoomPct.textContent = z ? (zoom.s === 1 ? "Fit" : `${Math.round(((zoom.s * z.fw) / z.nw) * 100)}%`) : "Fit";
     viewer.classList.toggle("is-zoomed", zoom.s !== 1);
+    paintVector();
   };
   const resetZoom = (): void => {
     zoom.s = 1;
@@ -734,6 +773,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.style.maxHeight = `${e.pixelH * 3}px`;
     freeSlideUrl();
     unloadMedia();
+    vector = false;
+    slideVec.hidden = true;
+    slideImg.classList.remove("is-vector");
     slideImg.hidden = false;
     slideTile.hidden = true;
     slideAlpha = false;
@@ -745,8 +787,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.className = "";
       slideImg.style.maxWidth = "";
       slideImg.style.maxHeight = "";
+      vector = true;
+      slideVec.hidden = false;
+      slideImg.classList.add("is-vector");
     }
     const thumbnail = async (): Promise<void> => {
+      vector = false;
+      slideVec.hidden = true;
+      slideImg.classList.remove("is-vector");
       slideCaption.textContent = `${label}. The original is missing or damaged; showing its thumbnail.`;
       slideCaption.classList.add("is-note");
       slideImg.src = await thumbFor(hash).catch(() => "");

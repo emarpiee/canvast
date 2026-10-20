@@ -1774,6 +1774,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* ---- Viewer: the on-canvas player's controls over the picture (ADR 0064); the GIF canvas is placed like the picture ---- */
 .viewer figure canvas.viewer-gif { position: absolute; inset: 16px; margin: auto; width: calc(100% - 32px); height: calc(100% - 32px); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
 .viewer figure canvas.viewer-gif[hidden] { display: none; }
+.viewer figure canvas.viewer-vec { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.viewer figure canvas.viewer-vec[hidden] { display: none; }
+.viewer img.is-vector { opacity: 0; pointer-events: none; }
 .viewer-media-bar { position: absolute; left: 50%; bottom: 14px; top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); }
 .viewer-media-bar[hidden] { display: none; }
 .viewer-media-bar .media-gap { flex: 1; }
