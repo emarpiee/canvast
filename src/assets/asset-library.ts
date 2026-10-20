@@ -397,7 +397,7 @@ export class AssetLibrary {
     if (!rec) return rec;
     if (rec.ext) {
       // Kept in the library folder: missing (as for a cleared store) when the file or the permission is gone.
-      const blob = await externalFolder.read(hash, rec.size);
+      const blob = await externalFolder.read(hash, rec.size, rec.type);
       if (!blob) return undefined;
       rec = { ...rec, blob };
     }

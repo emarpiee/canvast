@@ -58,7 +58,7 @@ export async function moveFromFolder(db: IDBDatabase, progress: (done: number, t
   return run(db, await eachKey(db, true), async (hash) => {
     const rec = await idbGet<AssetRecord>(db, "assets", hash);
     if (!rec?.ext) return false;
-    const blob = await externalFolder.read(hash, rec.size);
+    const blob = await externalFolder.read(hash, rec.size, rec.type);
     if (!blob) throw new Error("a file is missing from the library folder");
     const tx = db.transaction("assets", "readwrite", { durability: "strict" });
     const committed = done(tx);

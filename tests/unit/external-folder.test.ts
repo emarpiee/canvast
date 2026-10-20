@@ -48,6 +48,8 @@ describe("library folder", () => {
     expect(externalFolder.state).toBe("ready");
     expect(await externalFolder.read(hash, bytes.length)).not.toBeNull();
     expect(await externalFolder.read(hash, bytes.length + 1)).toBeNull(); // a changed file is missing, not wrong
+    // A file of the folder has no extension, so no type; the original's is put back (an SVG shows only with image/svg+xml).
+    expect((await externalFolder.read(hash, bytes.length, "image/svg+xml"))!.type).toBe("image/svg+xml");
     await externalFolder.remove(hash);
     expect(await externalFolder.has(hash, bytes.length)).toBe(false);
     await externalFolder.remove(hash); // already gone: no error

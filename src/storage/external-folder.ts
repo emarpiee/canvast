@@ -133,12 +133,15 @@ class ExternalFolder {
     }
   }
 
-  /** The file when it is there with the stored size, else null (missing, moved, no permission). */
-  async read(hash: string, size: number): Promise<Blob | null> {
+  /**
+   * The file when it is there with the stored size, else null (missing, moved, no permission). A file of the folder has
+   * no extension, so the browser gives it no type: `type` (the original's) is put back, or an SVG would not show.
+   */
+  async read(hash: string, size: number, type = ""): Promise<Blob | null> {
     if (!this.dir || this.status !== "ready" || !HASH_RE.test(hash)) return null;
     try {
       const f = await (await this.dir.getFileHandle(hash)).getFile();
-      return f.size === size ? f : null;
+      return f.size === size ? (type ? new Blob([f], { type }) : f) : null;
     } catch {
       return null;
     }

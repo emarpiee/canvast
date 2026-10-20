@@ -101,7 +101,7 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   // Originals kept in the library folder are read now, after the last read of the database (ADR 0159).
   for (const [i, r] of [...rows.entries()].reverse()) {
     if (!r.rec.ext) continue;
-    const blob = await externalFolder.read(r.hash, r.rec.size);
+    const blob = await externalFolder.read(r.hash, r.rec.size, r.rec.type);
     if (blob) r.rec = { ...r.rec, blob };
     else {
       rows.splice(i, 1);
