@@ -164,7 +164,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
           <div class="viewer-stage"><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
-            <figure><div class="viewer-checker" hidden><i></i></div><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><canvas class="viewer-vec" hidden></canvas><figcaption></figcaption></figure></div>
+            <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
@@ -579,9 +579,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const boxH = el.offsetHeight || box.height / zoom.s;
     return { nw, nh, fw: Math.min(boxW, (boxH * nw) / nh) };
   };
-  /** Draw the SVG at the size it is shown, on a chequered ground that stays where it is (it does not zoom or move with the picture). */
+  /** A see-through picture lies on a chequered ground that fills the stage and stays where it is (it does not zoom or move with the picture); an SVG is also drawn here, again at every zoom, so it is crisp. */
   const paintVector = (): void => {
-    if (!vector) return;
+    const ground = !vector && !slideImg.hidden && slideAlpha && slideGif.hidden && slideMedia.hidden; // (a see-through picture: only the chequered ground)
+    slideVec.hidden = !(vector || ground);
+    if (!vector && !ground) return;
     const sr = stage.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const [w, h] = [Math.max(1, Math.round(sr.width * dpr)), Math.max(1, Math.round(sr.height * dpr))];
@@ -593,11 +595,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     g.clearRect(0, 0, w, h);
     const z = sizes();
     if (!z || !slideImg.complete) return;
-    const base = slideImg.getBoundingClientRect();
+    const base = slideImg.getBoundingClientRect(); // (a raster picture is scaled by a transform: its box already holds the zoom and the pan)
     const dw = z.fw * zoom.s;
     const dh = ((z.fw * z.nh) / z.nw) * zoom.s;
-    const x = base.left + base.width / 2 - sr.left + zoom.x - dw / 2;
-    const y = base.top + base.height / 2 - sr.top + zoom.y - dh / 2;
+    const x = base.left + base.width / 2 - sr.left + (vector ? zoom.x : 0) - dw / 2;
+    const y = base.top + base.height / 2 - sr.top + (vector ? zoom.y : 0) - dh / 2;
     const cs = getComputedStyle(viewer);
     const cell = Math.max(2, Math.round(16 * dpr));
     const tile = document.createElement("canvas");
@@ -608,9 +610,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     t.fillStyle = cs.getPropertyValue("--check-a").trim() || "#3a3a3a";
     t.fillRect(cell, 0, cell, cell);
     t.fillRect(0, cell, cell, cell);
-    g.fillStyle = g.createPattern(tile, "repeat") ?? "transparent"; // (anchored to the canvas, not to the picture)
-    g.fillRect(x * dpr, y * dpr, dw * dpr, dh * dpr);
-    g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
+    g.fillStyle = g.createPattern(tile, "repeat") ?? "transparent"; // (the whole stage, anchored to it: the picture slides over a ground that stays put)
+    g.fillRect(0, 0, w, h);
+    if (vector) g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
   };
   window.addEventListener("resize", paintVector);
   const paintZoom = (): void => {
@@ -619,7 +621,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const vec = vector && el === slideImg;
     for (const m of [slideImg, slideMedia, slideGif]) m.style.transform = m === el && !vec && (zoom.s !== 1 || zoom.x || zoom.y) ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : "";
     // A picture with see-through pixels sits on a chequered ground exactly the size of the picture, zoomed with it.
-    checker.hidden = vec || !(el === slideImg && slideAlpha && z);
+    checker.hidden = true; // (the chequered ground is drawn on the canvas under the picture, where it stays put)
     if (!checker.hidden && z) {
       const tile = checker.firstElementChild as HTMLElement;
       tile.style.width = `${z.fw}px`;
@@ -693,6 +695,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!shownMedia()) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     stage.setPointerCapture(e.pointerId);
+    if (zoom.s !== 1) viewer.classList.add("is-grabbing");
     pinch = pointers.size === 2 ? Math.hypot(...[...pointers.values()].reduce((a, p, i) => (i ? [p.x - a[0]!, p.y - a[1]!] : [p.x, p.y]), [0, 0] as number[]) as [number, number]) : 0;
   });
   stage.addEventListener("pointermove", (e) => {
@@ -712,6 +715,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
   const endPointer = (e: PointerEvent): void => {
+    viewer.classList.remove("is-grabbing");
     pointers.delete(e.pointerId);
     pinch = 0;
   };

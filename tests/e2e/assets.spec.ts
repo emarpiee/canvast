@@ -1204,6 +1204,7 @@ test("a small SVG in the viewer is the vector picture drawn large: not capped at
   await expect.poll(centre).toEqual([238, 51, 51, 255]); // the circle's red at the middle
   for (let i = 0; i < 4; i++) await viewer.getByRole("button", { name: "Zoom in" }).click();
   await expect(viewer.locator(".viewer-zoom-pct")).not.toHaveText("Fit");
+  expect(await viewer.locator(".viewer-stage").evaluate((e) => getComputedStyle(e).cursor), "zoomed: the hand, over the vector too").toBe("grab");
   expect(await img.evaluate((i: HTMLImageElement) => i.style.transform), "the img is not scaled").toBe("");
   await expect.poll(centre).toEqual([238, 51, 51, 255]);
   await p.keyboard.press("Escape");
@@ -1211,6 +1212,60 @@ test("a small SVG in the viewer is the vector picture drawn large: not capped at
   await open("tiny.png");
   await expect(img, "a small raster keeps its pixels sharp").toHaveClass(/is-pixelated/);
   await expect(vec, "only an SVG is drawn on the canvas").toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the library bar shares the row of the view tabs from 960 px up (a 1,100 px PC window loses no row to it), and wraps under them below", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  const rows = async () => {
+    const [nav, search, last] = await Promise.all([p.locator("#nav").boundingBox(), p.locator(".assets-bar .assets-search").boundingBox(), p.locator('.assets-bar [data-action="details"]').boundingBox()]);
+    return { nav: nav!, search: search!, last: last! };
+  };
+  for (const width of [1100, 1000]) {
+    await p.setViewportSize({ width, height: 800 });
+    const r = await rows();
+    expect(r.search.y, `${width}: on the row of the view tabs`).toBeLessThan(r.nav.y + r.nav.height);
+    expect(r.search.x, `${width}: right of the tabs`).toBeGreaterThanOrEqual(r.nav.x + r.nav.width - 2);
+    expect(r.last.x + r.last.width, `${width}: inside the window`).toBeLessThanOrEqual(width);
+  }
+  await p.setViewportSize({ width: 900, height: 800 });
+  const w = await rows();
+  expect(w.search.y, "900: under the tabs").toBeGreaterThanOrEqual(w.nav.y + w.nav.height - 2);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a see-through picture in the viewer: the chequered ground fills the stage and stays where it is while the picture is zoomed and panned, and zoomed in a drag pans (hand cursor)", async ({ app }) => {
+  const p = app.page;
+  await toAssets(p);
+  // left half see-through, right half red
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "half.png", mimeType: "image/png", buffer: makePng(40, 30, (x) => (x < 20 ? [0, 0, 0, 0] : [220, 40, 40, 255])) });
+  await p.getByTestId("asset-card").first().dblclick();
+  const viewer = p.getByTestId("slide-view");
+  await expect(viewer).toBeVisible();
+  const img = viewer.locator("figure img");
+  await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  const ground = viewer.locator("canvas.viewer-vec");
+  await expect(ground, "the ground is on the canvas under the picture").toBeVisible();
+  await expect(viewer.locator(".viewer-checker"), "not a box that travels with the picture").toBeHidden();
+  const cursor = () => img.evaluate((i) => getComputedStyle(i).cursor);
+  for (let i = 0; i < 3; i++) await viewer.getByRole("button", { name: "Zoom in" }).click();
+  expect(await cursor(), "zoomed: a drag pans").toBe("grab");
+  // the chequer under a fixed point of the stage is the same colour after the picture is panned a little (it does not move with it)
+  const st = (await viewer.locator(".viewer-stage").boundingBox())!;
+  const at = { x: Math.round(st.x + st.width / 2 - 40), y: Math.round(st.y + st.height / 2) }; // inside the zoomed picture's see-through (left) half
+  const px = () => ground.evaluate((c: HTMLCanvasElement, at2: { x: number; y: number }) => [...c.getContext("2d")!.getImageData(Math.round(at2.x * (c.width / c.clientWidth)), Math.round(at2.y * (c.height / c.clientHeight)), 1, 1).data], { x: at.x - st.x, y: at.y - st.y });
+  const before = await px();
+  expect(before[3], "drawn there").toBe(255);
+  // and it fills the stage: a point far from the picture has it too
+  const far = await ground.evaluate((c: HTMLCanvasElement) => c.getContext("2d")!.getImageData(5, c.height - 5, 1, 1).data[3]);
+  expect(far, "the ground is not a box the size of the picture").toBe(255);
+  await p.mouse.move(st.x + st.width / 2, st.y + st.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(st.x + st.width / 2 + 7, st.y + st.height / 2 + 3, { steps: 3 }); // not a whole square: the picture moves, the chequer does not
+  expect(await cursor(), "while dragging").toBe("grabbing");
+  await p.mouse.up();
+  expect(await px()).toEqual(before);
   expect(app.consoleErrors).toEqual([]);
 });
 

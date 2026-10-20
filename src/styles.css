@@ -1329,8 +1329,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 @media (max-width: 1500px) { .assets-count { display: none; } }
 @media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: 64px; } }
 @media (max-width: 1180px) { .assets-size input { width: 56px; } }
-/* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). */
-@media (max-width: 1180px) { .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
+/* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). Down to 960 px the bar shares the row of the view tabs (the search gives way first). */
+@media (max-width: 960px) { .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
 
 /* In the viewer the library bar is not needed and the view tabs are away (body[data-viewing]): the viewer gets the whole page. */
 #assets-view.is-viewing .assets-bar { display: none; }
@@ -1777,6 +1777,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer figure canvas.viewer-vec { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .viewer figure canvas.viewer-vec[hidden] { display: none; }
 .viewer img.is-vector { opacity: 0; pointer-events: none; }
+/* zoomed in, a drag pans: the hand says so */
+.viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img, .viewer.is-zoomed video, .viewer.is-zoomed canvas.viewer-gif { cursor: grab; }
+.viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img, .viewer.is-grabbing figure video, .viewer.is-grabbing figure canvas.viewer-gif { cursor: grabbing; }
 .viewer-media-bar { position: absolute; left: 50%; bottom: 14px; top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); }
 .viewer-media-bar[hidden] { display: none; }
 .viewer-media-bar .media-gap { flex: 1; }
