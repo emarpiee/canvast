@@ -16,7 +16,7 @@ export interface BookmarkThumbs {
   update(ids?: readonly string[]): void;
 }
 
-export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined, tour: () => void = () => undefined, thumbs: BookmarkThumbs = { update: () => undefined }): void {
+export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list: BookmarkList, capture: () => string | undefined, tour: () => void = () => undefined, thumbs: BookmarkThumbs = { update: () => undefined }, addSelection: () => void = () => undefined): void {
   const panel = document.createElement("aside");
   panel.className = "layers-panel bookmarks-panel";
   panel.setAttribute("aria-label", "Bookmarks");
@@ -39,7 +39,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     const missing = list.items.filter((b) => !b.thumb);
     const rows = list.items
       .map(
-        (b) => `<li class="bookmark" data-id="${b.id}">
+        (b) => `<li class="bookmark" data-id="${b.id}" draggable="true">
         <div class="bookmark-go" role="button" tabindex="0" aria-label="Go to ${esc(b.name)}" title="Go there">
           ${b.thumb ? `<img class="bookmark-thumb" alt="" src="${b.thumb}">` : '<span class="bookmark-thumb"></span>'}
           <span class="bookmark-text"><span class="bookmark-name" title="Double-click to rename">${esc(b.name)}</span><span class="bookmark-meta">${esc(when(b.at))}</span></span>
@@ -51,7 +51,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     panel.innerHTML = panelHtml({
       title: "Bookmarks",
       count: list.items.length,
-      tools: `<button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button>
+      tools: `<button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button><button type="button" class="layer-btn" data-add-sel aria-label="Bookmark the picked things" title="Save a bookmark that brings the picked things into view"${editor.selection.size ? "" : " disabled"}>${ICONS.bookmarkCheck}</button>
         <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.galleryThumbnails}</button>`,
       sub: missing.length ? `<p class="bm-missing" data-testid="bm-missing"><span>${missing.length} bookmark${missing.length === 1 ? " has" : "s have"} no picture.</span><button type="button" data-fill>Fill in</button></p>` : "",
       body: `<ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`,
@@ -122,11 +122,14 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
         ],
         "Update the bookmark pictures",
       );
+    } else if (t.closest("[data-add-sel]")) {
+      addSelection();
     } else if (t.closest("[data-add]")) {
       void list.add(capture());
     } else if (li && t.closest("[data-bm-more]")) {
       const id = li.dataset["id"]!;
       const name = li.querySelector(".bookmark-name")?.textContent ?? "bookmark";
+      const at = list.items.findIndex((b) => b.id === id);
       openMoreMenu(
         t.closest<HTMLElement>("[data-bm-more]")!,
         [
@@ -142,6 +145,8 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
               }),
           },
           { label: "Update its picture", icon: ICONS.galleryThumbnails, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
+          { label: "Move up", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, run: () => void list.move(id, at - 1) },
+          { label: "Move down", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, run: () => void list.move(id, at + 1) },
           { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
         ],
         `Actions for bookmark ${name}`,
@@ -163,4 +168,24 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     const li = name?.closest<HTMLElement>("li.bookmark");
     if (li) startRename(li);
   });
+  // Drag a card onto another to move it there (the tour follows the order).
+  let dragged = "";
+  panel.addEventListener("dragstart", (e) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.bookmark");
+    if (!li || (e.target as HTMLElement).closest("input")) return e.preventDefault();
+    dragged = li.dataset["id"]!;
+    e.dataTransfer?.setData("text/plain", dragged); // (Firefox starts no drag without data)
+  });
+  panel.addEventListener("dragover", (e) => {
+    if (dragged && (e.target as HTMLElement).closest("li.bookmark")) e.preventDefault();
+  });
+  panel.addEventListener("drop", (e) => {
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.bookmark");
+    const from = dragged;
+    dragged = "";
+    if (!li || !from || li.dataset["id"] === from) return;
+    e.preventDefault();
+    void list.move(from, list.items.findIndex((b) => b.id === li.dataset["id"]));
+  });
+  panel.addEventListener("dragend", () => (dragged = ""));
 }

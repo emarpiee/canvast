@@ -110,6 +110,7 @@ export const STEP_GROUP = "Step to the next item";
 export const VIEW_GROUP = "View";
 export const FIND_GROUP = "Find and commands";
 export const EDIT_GROUP = "Editing";
+export const BOOKMARK_GROUP = "Bookmarks";
 
 /** Every command that has a key, in the order Settings lists them. */
 export const KEY_COMMANDS: readonly KeyCommand[] = [
@@ -140,6 +141,9 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("view.panHold", "Pan with any tool (hold, and drag)", VIEW_GROUP, "Space"),
   cmd("view.back", "Previous view", VIEW_GROUP, "Alt+Shift+ArrowLeft"),
   cmd("view.forward", "Next view", VIEW_GROUP, "Alt+Shift+ArrowRight"),
+  cmd("bookmark.prev", "Go to the previous bookmark", BOOKMARK_GROUP, "["),
+  cmd("bookmark.next", "Go to the next bookmark", BOOKMARK_GROUP, "]"),
+  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => cmd(`bookmark.${n}`, `Go to bookmark ${n}`, BOOKMARK_GROUP, `Alt+${n}`)),
   cmd("find.palette", "The command palette", FIND_GROUP, ["Ctrl+K", "Ctrl+Shift+P"], undefined, "global"),
   cmd("find.slash", "The command palette (a plain key)", FIND_GROUP, "/"),
   cmd("find.canvas", "Search the canvas by file or layer name", FIND_GROUP, "Ctrl+F", undefined, "global"),

@@ -19,6 +19,7 @@ export function mountTour(host: HTMLElement, view: ViewState, list: BookmarkList
   let at = -1;
   let zenBefore = false;
   let glideBefore = 0;
+  let timer = 0;
 
   const show = (i: number): void => {
     const items = list.items;
@@ -26,7 +27,12 @@ export function mountTour(host: HTMLElement, view: ViewState, list: BookmarkList
     at = Math.max(0, Math.min(items.length - 1, i));
     const b = items[at]!;
     view.glideMs = glideBefore > 0 ? Math.max(glideBefore, 900) : 0; // a tour glides slowly enough to follow (or not at all with reduced motion)
-    list.go(b.id);
+    clearTimeout(timer);
+    // With a wait set, the tour moves on by itself once the view has arrived (a glide cut short by the person stops it).
+    const wait = settings.get("tour.pause") * 1000;
+    list.go(b.id, () => {
+      if (wait > 0 && at === i && at < items.length - 1) timer = window.setTimeout(() => at === i && show(at + 1), wait);
+    });
     caption.innerHTML = `<button type="button" data-prev aria-label="Previous stop"${at === 0 ? " disabled" : ""}>${ICONS.chevronLeft}</button>
       <span class="tour-name">${esc(b.name)}</span><span class="tour-n">${at + 1} / ${items.length}</span>
       <button type="button" data-next aria-label="Next stop"${at === items.length - 1 ? " disabled" : ""}>${ICONS.chevronRight}</button>
@@ -35,6 +41,7 @@ export function mountTour(host: HTMLElement, view: ViewState, list: BookmarkList
   const stop = (): void => {
     if (at < 0) return;
     at = -1;
+    clearTimeout(timer);
     caption.hidden = true;
     view.glideMs = glideBefore;
     if (!zenBefore) void settings.set("ui.zen", false);

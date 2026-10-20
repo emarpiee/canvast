@@ -91,7 +91,7 @@ import { patternTargetLabel, foundPattern, makePattern, newPatternSession } from
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_COMMAND, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey } from "../settings/shortcuts";
-import { KEY_COMMANDS, Keymap, displayCombo, installKeymap } from "../settings/keymap";
+import { KEY_COMMANDS, Keymap, comboOfEvent, displayCombo, installKeymap } from "../settings/keymap";
 import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
@@ -367,6 +367,10 @@ async function start(): Promise<void> {
     // Gliding between views (ADR 0116): off for reduced motion, and in the test session (a test reads the camera the moment it asks).
     const still = m === "reduce" || (m === "system" && matchMedia("(prefers-reduced-motion: reduce)").matches);
     view.glideMs = debug || still ? 0 : Math.round(420 * (m === "subtle" ? speed * 0.6 : speed));
+    view.travel = settings.get("nav.travel");
+    view.distanceAware = settings.get("nav.speed") === "distance";
+    view.maxGlideMs = settings.get("nav.maxSeconds") * 1000;
+    view.ease = settings.get("nav.ease");
   };
   applyAppearance();
   applyZen();
@@ -743,7 +747,7 @@ async function start(): Promise<void> {
     if (key === "panel.autoFold" || key === "panel.keep") dock.apply();
   });
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
-  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) });
+  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) }, () => void bookmarkPicked());
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -1162,6 +1166,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     save: (hex) => session.styles.add("colour", "", hex).then((made) => { if (made) { editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`; editor.changed(); } }),
   });
   const history = new CameraHistory(view);
+  // A bookmark of the picked things: the view that brings them into the window, saved while the camera stays where it is; its picture follows.
+  const bookmarkPicked = (): void => {
+    if (!editor.selection.size) return;
+    const before = view.frameCamera;
+    focusObjects(doc, view, [...editor.selection], true);
+    const saved = bookmarkList.add();
+    view.setFrameCamera(before);
+    void saved.then((b) => {
+      if (!b) return void (editor.message = "The bookmark limit is reached.", editor.changed());
+      void refreshThumbs([b.id]);
+    });
+  };
   // Fresh pictures for the bookmarks (ADR 0124): the canvas visits each place, one at a time, and comes back.
   let thumbsRunning = false;
   const refreshThumbs = async (ids?: readonly string[]): Promise<void> => {
@@ -1507,6 +1523,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (e.key === "ArrowLeft") history.back();
     else history.forward();
   });
+  // Bookmark keys (Settings > Shortcuts): previous and next, and the first nine by number.
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat || document.body.dataset["view"] !== "canvas" || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog")) return;
+    const c = comboOfEvent(e);
+    const n = c === "[" ? -1 : c === "]" ? 1 : /^Alt\+[1-9]$/.test(c ?? "") ? 0 : null;
+    if (n === null) return;
+    e.preventDefault();
+    if (n === 0 ? bookmarkList.goTo(Number(c!.slice(4)) - 1) : bookmarkList.step(n)) return;
+    editor.message = bookmarkList.items.length ? "That bookmark's place no longer exists." : "No bookmarks yet.";
+    editor.changed();
+  });
   // The Zen key (Settings > Shortcuts, Z at first) fades the floating bars and panels out and back, on the canvas.
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.toLowerCase() !== "z") return;
@@ -1642,6 +1669,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "ui.density":
       case "ui.motion":
       case "ui.animSpeed":
+      case "nav.travel":
+      case "nav.speed":
+      case "nav.maxSeconds":
+      case "nav.ease":
         applyAppearance();
         return;
       case "ui.zen":
@@ -1743,6 +1774,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
+      { group: "View", title: "Bookmark the picked things", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Pattern", words: "toggle show hide generator wave blob background random tiles", enabled: () => onCanvas, run: () => { editor.patternOpen = !editor.patternOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },
@@ -1929,7 +1961,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
     );
   }
   resize();

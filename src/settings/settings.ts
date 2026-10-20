@@ -181,6 +181,12 @@ export const SETTINGS = {
   "shot.copy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "nav.mode": { scope: "device", default: "view", validate: oneOf("view", "anywhere", "layer"), effect: "immediate" } as Def<"view" | "anywhere" | "layer">,
   "nav.arrive": { scope: "device", default: "focus", validate: oneOf("focus", "keep"), effect: "immediate" } as Def<"focus" | "keep">,
+  // Camera travel (ADR 0163): how the view moves to a bookmark or a previous view.
+  "nav.travel": { scope: "device", default: "fly", validate: oneOf("fly", "near", "cut"), effect: "immediate" } as Def<"fly" | "near" | "cut">,
+  "nav.speed": { scope: "device", default: "distance", validate: oneOf("distance", "fixed"), effect: "immediate" } as Def<"distance" | "fixed">,
+  "nav.ease": { scope: "device", default: "smooth", validate: oneOf("smooth", "linear", "out"), effect: "immediate" } as Def<"smooth" | "linear" | "out">,
+  "nav.maxSeconds": { scope: "device", default: 3, validate: range(0.5, 6), effect: "immediate" } as Def<number>,
+  "tour.pause": { scope: "device", default: 0, validate: range(0, 10), effect: "immediate" } as Def<number>,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

@@ -187,6 +187,7 @@ import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
 import activity from "lucide-static/icons/activity.svg";
 import boxSelect from "lucide-static/icons/box-select.svg";
+import bookmarkCheck from "lucide-static/icons/bookmark-check.svg";
 import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
@@ -462,6 +463,7 @@ export const ICONS = {
   paintBucket: clean(paintBucketSvg),
   bookmark: clean(bookmark),
   bookmarkPlus: clean(bookmarkPlus),
+  bookmarkCheck: clean(bookmarkCheck),
   chevronDown: clean(chevronDown),
   chevronRight: clean(chevronRight),
   image: clean(image),

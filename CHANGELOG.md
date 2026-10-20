@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.0 — Camera travel and bookmark keys (2026-10-21)
+
+- **Camera travel** (Settings → Navigation): a far bookmark (another depth or frame, or too far to show the way) no longer cuts; the view zooms out from here and in to there. *Travel to a bookmark*: Fly / Glide near only / Cut. *Travel time*: grows with the distance or fixed, up to *Longest trip*. *Travel easing*: smooth, linear, ease-out.
+- **Tour:** *wait at each stop* (0 to 10 s) makes the tour move on by itself once the view has arrived; moving the camera yourself stops it.
+- **Bookmarks:** drag a card to reorder (or *Move up* / *Move down* in the ⋯ menu); `Alt+1`…`Alt+9`, `]` and `[` go to a bookmark (Shortcuts); a button and a palette command bookmark the picked things.
+
 ## 0.25.11 — Colour names, palettes copy too (2026-10-21)
 
 - **Pasting a colour name** (`red`, `rebeccapurple`) makes it the fill, or a colour style in the Styles panel; a word that is not a colour name changes nothing.

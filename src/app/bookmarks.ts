@@ -70,12 +70,41 @@ export class BookmarkList {
     await this.set(this.items.filter((b) => b.id !== id));
   }
 
+  /** Move a bookmark to a place in the order (the tour follows the order). */
+  async move(id: string, to: number): Promise<void> {
+    const from = this.items.findIndex((b) => b.id === id);
+    if (from < 0) return;
+    const next = [...this.items];
+    const [b] = next.splice(from, 1);
+    next.splice(Math.max(0, Math.min(next.length, to)), 0, b!);
+    if (next.every((x, i) => x === this.items[i])) return;
+    await this.set(next);
+  }
+
+  /** The bookmark last gone to (by id): "next" and "previous" start from it. */
+  private last = "";
+
+  /** Go to the next or previous bookmark (wrapping), or the first/last one when none was visited yet. False when there are none. */
+  step(dir: 1 | -1): boolean {
+    const n = this.items.length;
+    if (!n) return false;
+    const i = this.items.findIndex((b) => b.id === this.last);
+    return this.go(this.items[i < 0 ? (dir > 0 ? 0 : n - 1) : (i + dir + n) % n]!.id);
+  }
+
+  /** Go to the n-th bookmark (from 0). False when there is none. */
+  goTo(n: number): boolean {
+    const b = this.items[n];
+    return !!b && this.go(b.id);
+  }
+
   /** Go to a bookmark: the camera is set exactly, at any depth. Returns false when its frame is no longer there. */
-  go(id: string): boolean {
+  go(id: string, done?: () => void): boolean {
     const b = this.items.find((x) => x.id === id);
     if (!b) return false;
+    this.last = id;
     try {
-      this.view.flyTo(deserializeFrameCamera(this.doc.space, b.view));
+      this.view.flyTo(deserializeFrameCamera(this.doc.space, b.view), done);
       return true;
     } catch {
       return false;

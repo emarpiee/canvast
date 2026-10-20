@@ -60,6 +60,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "ui.zen": "Focus",
   "quality.auto": "Drawing quality",
   "ui.motion": "Animation",
+  "nav.travel": "Camera travel",
 };
 /** Rows into cards (a title on a card only when the tab has more than one). */
 function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
@@ -152,6 +153,11 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       { key: "nav.mode", label: "Next item (W A S D)", help: "How the step keys (W A S D, changeable in Shortcuts) step from the selected item to the next. Nearest in view: the nearest item you can see at this zoom (items too small or far larger than the window are skipped). Nearest anywhere: the nearest by position, at any zoom or depth. By layer: up and down the stacking order, top-most first.", control: { kind: "select", options: [["view", "Nearest in view"], ["anywhere", "Nearest anywhere"], ["layer", "By layer"]] } },
       { key: "nav.arrive", label: "On arriving at an item", help: "What the view does when a step key (or a search) takes you to an item. Focus on it: zoom so the item fills the window. Keep the zoom level: only move the view so the item is in the middle.", control: { kind: "select", options: [["focus", "Focus on the item"], ["keep", "Keep the zoom level"]] } },
+      { key: "nav.travel", label: "Travel to a bookmark", help: "How the view gets to a bookmark or a previous view. Fly: glide to near places and, for far ones (another depth or frame), zoom out from here and in to there. Near only: glide to near places, cut straight to far ones. Cut: always arrive at once. Animation set to None always cuts.", control: { kind: "select", options: [["fly", "Fly (glide near, dive to far)"], ["near", "Glide near only"], ["cut", "Cut"]] } },
+      { key: "nav.speed", label: "Travel time", help: "Distance-aware: a short hop takes the base time (Animation speed), a long trip takes longer, up to the limit below. Fixed: every trip takes the base time.", control: { kind: "select", options: [["distance", "Grows with distance"], ["fixed", "Fixed"]] } },
+      { key: "nav.maxSeconds", label: "Longest trip", help: "The most a trip may take with distance-aware time.", control: { kind: "range", min: 0.5, max: 6, step: 0.5, unit: "s" } },
+      { key: "nav.ease", label: "Travel easing", help: "Smooth starts and ends slowly. Linear moves at one pace. Ease-out starts fast and settles.", control: { kind: "select", options: [["smooth", "Smooth"], ["linear", "Linear"], ["out", "Ease-out"]] } },
+      { key: "tour.pause", label: "Tour: wait at each stop", help: "A tour of the bookmarks moves on by itself after this many seconds at a stop. 0: you step with the arrow keys.", control: { kind: "range", min: 0, max: 10, step: 1, unit: "s" } },
     ],
   },
   {

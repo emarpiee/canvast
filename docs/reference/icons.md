@@ -88,6 +88,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `paintBucket` | Navigation bar: Canvas background colour (hold to go back to the default) |
 | `bookmark` | Bookmarks panel |
 | `bookmark-plus` | Add bookmark |
+| `bookmark-check` | Bookmark the picked things |
 | `box-select` | Axis-aligned selection box |
 | `bring-to-front` | Bring to front |
 | `calendar-days` | By date added, newest first |
@@ -166,8 +167,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |
 | `unlink` | Detach the picked objects |
-| `arrow-up` | Move a board or canvas up in its list |
-| `arrow-down` | Move a board or canvas down in its list |
+| `arrow-up` | Move a board or canvas up in its list; Move a bookmark up |
+| `arrow-down` | Move a board or canvas down in its list; Move a bookmark down |
 | `scissors` | Eraser: cut parts out of strokes |
 | `copy-check` | Similar images (the library) |
 | `corner-up-left` | Previous view (camera history) |

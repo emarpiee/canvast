@@ -471,6 +471,12 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.26.0 — Camera travel and bookmark keys (2026-10-21)
+
+- **Implemented:** `ViewState.flyTo` dives (24 levels out, then in) for other frames or trips over 8 levels of zoom-out, with `travel`, `distanceAware`, `maxGlideMs`, `ease`; settings `nav.travel/speed/maxSeconds/ease`, `tour.pause`; bookmark `move`, `step`, `goTo`; keys `bookmark.prev/next/1-9`; drag reorder; bookmark of the picked things; debug hook `setSetting`. ADR 0163.
+- **Tested:** three new tests in `bookmarks.spec` (see `docs/testing/camera-travel-0.26.md`).
+- **Unverified:** how the dive looks on a heavy canvas (frame hitches), Firefox, touch reorder (drag uses HTML drag-and-drop; Move up/down is the touch route).
+
 ## v0.25.11 — Colour names, palettes copy too (2026-10-21)
 
 - **Implemented:** `parseCssColour` takes colour names; palette cards and chips copy by right click or long press.
