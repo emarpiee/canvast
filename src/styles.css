@@ -1326,6 +1326,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-bar { flex-wrap: nowrap; }
 .assets-search { flex: 1 1 140px; max-width: 360px; }
 .assets-bar > * { flex-shrink: 0; }
+.assets-bar .assets-sep { align-self: stretch; flex: none; width: 1px; margin: var(--sp-2) var(--sp-1); background: var(--hud-border); }
 .assets-bar .assets-search { flex-shrink: 1; min-width: 80px; }
 .assets-bar select { min-width: 0; text-overflow: ellipsis; }
 .assets-bar > select { flex-shrink: 1; }

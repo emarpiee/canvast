@@ -133,6 +133,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
       </div>
       <span class="assets-count" data-testid="assets-count"></span>
+      <span class="assets-sep" role="separator"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All items</option><option value="used">In use</option><option value="unused">Unused</option>
       </select>
@@ -141,15 +142,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
-      <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
+      <span class="assets-sep" role="separator"></span>
       <div class="assets-layout" role="group" aria-label="Layout">
         <button type="button" class="assets-btn is-icon" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
         <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
       </div>
+      <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
       <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
+      <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.fileInput}<span>Import</span></button>
       <button type="button" class="assets-btn is-icon" data-action="import-folder" data-testid="assets-import-folder" aria-label="Import a folder" title="Import a folder: every file in it, put in library folders of the same names">${ICONS.folderInput}</button>
+      <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you picked, as a slideshow">${ICONS.play}</button>
+      <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" multiple hidden data-testid="assets-import-input">
       <input type="file" multiple hidden webkitdirectory data-testid="assets-import-folder-input">
