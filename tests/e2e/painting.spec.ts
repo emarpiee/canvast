@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, setPenColour, test } from "./harness";
+import { LIMITS, expect, reps, setPenColour, test } from "./harness";
 import type { Page } from "@playwright/test";
 
 /**
@@ -298,5 +298,63 @@ test("a plain wheel over a bar's row that is wider than the window scrolls it si
   await p.mouse.wheel(0, 200);
   await expect.poll(() => row.evaluate((r) => r.scrollLeft)).toBeGreaterThan(0);
   expect(await at(), "the page did not move or zoom").toEqual(before);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+/** An ABR v2 file (the format's own layout, big-endian): `n` sampled brushes, each a `size` px tip of seeded noise in a round fade. */
+function makeAbr(n: number, size: number): Buffer {
+  const parts: Buffer[] = [];
+  const head = Buffer.alloc(4);
+  head.writeUInt16BE(2, 0);
+  head.writeUInt16BE(n, 2);
+  parts.push(head);
+  let seed = 1;
+  for (let i = 0; i < n; i++) {
+    const name = `Big ${i + 1}`;
+    const body = Buffer.alloc(4 + 2 + 4 + name.length * 2 + 1 + 8 + 16 + 2 + 1 + size * size);
+    let o = body.writeUInt32BE(0, 0); // misc
+    o = body.writeUInt16BE(25, o); // spacing
+    o = body.writeUInt32BE(name.length, o);
+    for (const ch of name) o = body.writeUInt16BE(ch.charCodeAt(0), o);
+    o = body.writeUInt8(1, o); // anti-alias
+    o += 8; // short bounds
+    for (const v of [0, 0, size, size]) o = body.writeInt32BE(v, o); // top, left, bottom, right
+    o = body.writeUInt16BE(8, o); // depth
+    o = body.writeUInt8(0, o); // raw
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      const r = Math.hypot(x - size / 2, y - size / 2) / (size / 2);
+      body[o++] = r >= 1 ? 0 : Math.round((1 - r) * (128 + (seed >>> 25)));
+    }
+    const h = Buffer.alloc(6);
+    h.writeUInt16BE(2, 0);
+    h.writeUInt32BE(body.length, 2);
+    parts.push(h, body);
+  }
+  return Buffer.concat(parts);
+}
+
+test("a large .abr (hundreds of sampled brushes) imports within its time budget, and the Thumbnails view lists them quickly", async ({ app }, info) => {
+  test.skip(info.project.name !== "chromium", "a timing test: one project");
+  const p = app.page;
+  await newPainting(p);
+  const brushes = () => p.evaluate(() => window.__canvastDebug.paint.brushes());
+  await p.locator('[data-brush-panel="brushes"]').click();
+  const panel = p.getByTestId("brushes-panel");
+  const before = (await brushes()).presets.length;
+  const n = reps(400, 200);
+  const abr = makeAbr(n, 128);
+  const t0 = Date.now();
+  await panel.getByTestId("brushes-import-input").setInputFiles({ name: "Big.abr", mimeType: "application/octet-stream", buffer: abr });
+  await expect.poll(async () => (await brushes()).presets.length, { timeout: n * LIMITS.abrImportPerBrushMs + 5000 }).toBe(before + n);
+  const perBrush = (Date.now() - t0) / n;
+  console.log(`abr import: ${n} brushes, ${(abr.length / 1e6).toFixed(1)} MB, ${perBrush.toFixed(1)} ms per brush`);
+  expect(perBrush).toBeLessThanOrEqual(LIMITS.abrImportPerBrushMs);
+  const t1 = Date.now();
+  await panel.locator('[data-brush-view="grid"]').click();
+  await expect(panel.locator('[data-group="Big"] .brush-cell')).toHaveCount(n);
+  const grid = Date.now() - t1;
+  console.log(`thumbnails view: ${grid} ms`);
+  expect(grid).toBeLessThanOrEqual(LIMITS.brushGridMs);
   expect(app.consoleErrors).toEqual([]);
 });

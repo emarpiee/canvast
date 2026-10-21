@@ -20,6 +20,10 @@ export const LIMITS = {
   minInkedSamples: 200,
   /** Render-call p95 on the reference machine (CPU-side recording time). */
   renderP95Ms: 8,
+  /** A large `.abr` import (sampled tips, 128 px): its time per brush, read, stored and listed. */
+  abrImportPerBrushMs: 50,
+  /** The Brushes panel's Thumbnails view of a group of hundreds of brushes. */
+  brushGridMs: 1000,
 };
 
 /** The build the tests open: the snapshot `npm run test:snap` made (CANVAST_BUILD_DIR), never `dist/` (see build-dir.ts). */

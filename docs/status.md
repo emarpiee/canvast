@@ -48,7 +48,9 @@ Unverified / Committed / Next bounded task**.
 
 **Committed:** see git log (feat(paint): ... (v0.32.1)).
 
-**Next bounded task:** a large generated `.abr` test; then P2c tools.
+**Next bounded task:** P2c tools (Pencil, Eyedropper in both views, view rotate and mirror, raster layer masks).
+
+**Large `.abr` (2026-10-22):** `painting.spec.ts` "a large .abr" (generated ABR v2, 128 px sampled tips, Chromium only; limits `abrImportPerBrushMs` 50, `brushGridMs` 1000, set before the first run): quick 200 brushes 3.3 MB 7.8 ms/brush, grid 289 ms; full 400 brushes 6.6 MB 6.6 ms/brush, grid 353 ms.
 
 **v0.32.2:** brush presets in workspace archives (format 6; `brushesOf`/`readBrushes`/`importBrushes` in `paint/archive-part.ts`, tips checked by inflate + SHA-256); the canvas crumb stays in the Paint view (only the board menu is canvas-only). Tested: `archive.spec.ts` + `painting.spec.ts` 13/13 Chromium, the archive paintings test in Firefox.
 
@@ -60,7 +62,7 @@ Unverified / Committed / Next bounded task**.
 
 **Known failures:** none known.
 
-**Unverified:** a large `.abr` set (hundreds of brushes, big tips) for speed and memory; pen tilt and rotation controls with a real pen; touch layout of the two panels.
+**Unverified:** pen tilt and rotation controls with a real pen; touch layout of the two panels.
 
 **Committed:** see git log (feat(paint): ... (v0.32.0)).
 
