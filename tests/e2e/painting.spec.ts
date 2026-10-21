@@ -77,7 +77,7 @@ test("a layer clipped to the one below shows only where that one has paint; alph
   const base = s.layers[0]!.id;
   await setColour(p, "#dd2222");
   await stroke(p, [200, 500], [1700, 500]); // red line across, on Layer 1
-  await p.locator('#paint-view [data-act="new-layer"]').click();
+  await p.locator('[data-paint-layers] [data-act="new-layer"]').click();
   await p.locator('.pop-menu [data-id="paint"]').click();
   await expect.poll(async () => (await state(p)).layers.length).toBe(2);
   const top = (await state(p)).activeId!;
@@ -208,7 +208,7 @@ test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, B
   const sampled = b0.presets.find((x) => x.tips > 0)!;
   await panel.locator(`[data-brush="${sampled.id}"]`).click();
   expect((await brushes()).tool?.preset).toBe(sampled.id);
-  await expect(p.locator(".paint-preset-name")).toHaveText(sampled.name);
+  await expect(p.locator('[data-brush-panel="brushes"]')).toHaveAttribute("aria-label", `Brushes: ${sampled.name}`);
   await p.locator('[data-paint-options] input[data-opt="size"]').fill("80");
   await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
   await stroke(p, [900, 400], [1700, 400]); // (right of the Brushes panel, which docks on the left)
@@ -230,7 +230,7 @@ test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, B
   await set.getByLabel("Keep scattering").click();
   const curve = set.locator('[data-curve-of="shapeDynamics.size"]');
   await expect(curve).toBeHidden();
-  await set.locator('[data-k="shapeDynamics.size.control"] [data-v="penPressure"]').click();
+  await set.locator('[data-k="shapeDynamics.size.control"] select').selectOption("penPressure");
   await curve.locator("summary").click();
   await curve.locator("canvas").click({ position: { x: 96, y: 150 } }); // (a point under the straight line)
   await expect.poll(async () => (await brushes()).tool?.brush).toMatchObject({ mode: "Multiply", locks: { scattering: true }, shapeDynamics: { size: { control: "penPressure" } } });

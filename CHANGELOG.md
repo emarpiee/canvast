@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.3 — Paint panels match the app (2026-10-22)
+
+- The Paint view's **Layers** and **Adjustment** panels are the dock's panels, like the canvas's Layers panel (title bar, fold, move, close).
+- **Brushes panel:** tips drawn in the theme's ink (some showed green); a **Thumbnails** view (the tips in a grid, with their sizes) beside the list. The Brushes button shows the tool's tip; the picked preset and the open button have a ring, not the accent fill.
+- **Brush settings** laid out as the other panels: padding, wider labels, menus for long choices (controls), switches two to a line, a curve only under a controlled jitter.
+
 ## 0.32.2 — Brush presets in backups (2026-10-22)
 
 - **Workspace backups carry the brush presets** with their tips (archive format 6); importing adds the presets the library does not have yet.

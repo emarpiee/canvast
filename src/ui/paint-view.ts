@@ -35,7 +35,7 @@ import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type Obj
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
 import { TOOLS, TOOL_IDS, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
 import { brushOf, cleanBrush, tipsOf, type Brush } from "../paint/brushes";
-import { mountBrushPanels, type BrushPanels } from "./brush-panels";
+import { drawThumb, mountBrushPanels, type BrushPanels } from "./brush-panels";
 import type { DockSpec } from "./panel-dock";
 import { LAYER_KINDS, nextName, type Layer, type Painting } from "../paint/model";
 
@@ -129,10 +129,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
           <canvas class="paint-canvas" data-testid="paint-canvas" tabindex="0" aria-label="The page: paint with the picked tool"></canvas>
           <canvas class="paint-cursor" aria-hidden="true"></canvas>
         </div>
-        <div class="paint-side">
-          <aside class="paint-layers" data-paint-layers aria-label="Layers"></aside>
-          <aside class="paint-layers paint-adjust" data-adjust aria-label="Adjustment" hidden></aside>
-        </div>
         <input type="file" accept="image/*" hidden data-testid="paint-picture-input">
       </div>
       <div class="paint-pages" data-pages role="tablist" aria-label="Pages"></div>
@@ -143,7 +139,20 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const stage = $<HTMLElement>("[data-stage]");
   const canvas = $<HTMLCanvasElement>(".paint-canvas");
   const cursor = $<HTMLCanvasElement>(".paint-cursor");
-  const layersEl = $<HTMLElement>("[data-paint-layers]");
+  /** A panel of the view in the canvas's dock (ADR 0123), shown only in the Paint view. */
+  const dockPanel = (cls: string, label: string, attr: string): HTMLElement => {
+    const el = document.createElement("aside");
+    el.className = `layers-panel ${cls}`;
+    el.setAttribute("aria-label", label);
+    el.setAttribute(attr, "");
+    el.dataset["only"] = "paint";
+    return el;
+  };
+  const layersEl = dockPanel("paint-layers", "Layers", "data-paint-layers");
+  const adjustEl = dockPanel("adjust-panel paint-adjust", "Adjustment", "data-adjust");
+  adjustEl.hidden = true;
+  deps.dock(layersEl, { id: "paint-layers", title: "Layers", side: "right" });
+  deps.dock(adjustEl, { id: "paint-adjust", title: "Adjustment", side: "right" });
   const pagesEl = $<HTMLElement>("[data-pages]");
   const optionsEl = deps.optionsSlot;
   /** The painting's own bar, beside the view tabs (main.ts puts it in the top bar): its name, its page size, and what is done with a page. */
@@ -156,7 +165,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
     if (b) void action(b.dataset["act"]!, b);
   });
-  const adjustEl = $<HTMLElement>("[data-adjust]");
   const pictureInput = $<HTMLInputElement>('[data-testid="paint-picture-input"]');
   /** The canvas's own tools on the picked vector layer (ADR 0167). */
   const vhost: VectorHost = createVectorHost({
@@ -255,13 +263,16 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const renderOptions = (): void => {
     const t = paintTool();
     const preset = t ? brushPanels.presetName(t) : "";
-    const key = t ? `${t}\n${preset}\n${JSON.stringify(toolValues(t))}` : "";
+    const key = t ? `${t}\n${preset}\n${JSON.stringify(toolValues(t))}\n${JSON.stringify(toolBrush(t)["tip"] ?? "")}` : "";
     if (key === optionsFor) return;
     optionsFor = key;
     if (!t) return void (optionsEl.innerHTML = "");
     const vals = toolValues(t);
-    const panelBtn = (id: "brushes" | "settings", icon: string, label: string, title: string, text = ""): string => `<button type="button" data-brush-panel="${id}" aria-pressed="${brushPanels.isOpen(id)}" aria-label="${esc(label)}" title="${esc(title)}">${icon}${text ? `<span class="paint-preset-name">${esc(text)}</span>` : ""}</button>`;
-    optionsEl.innerHTML = panelBtn("brushes", ICONS.brushPresets, "Brushes", `Brushes: the presets${preset ? ` (now ${preset})` : ""}`, preset) + TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("") + panelBtn("settings", ICONS.brushSettings, "Brush settings", "Brush settings: the tip, its dynamics, scattering, texture and more");
+    const panelBtn = (id: "brushes" | "settings", icon: string, label: string, title: string): string => `<button type="button" data-brush-panel="${id}" aria-pressed="${brushPanels.isOpen(id)}" aria-label="${esc(label)}" title="${esc(title)}">${icon}</button>`;
+    // (the Brushes button shows the tool's tip, as the presets do)
+    optionsEl.innerHTML = panelBtn("brushes", `<canvas class="paint-tip" width="56" height="56" aria-hidden="true"></canvas>`, preset ? `Brushes: ${preset}` : "Brushes", `Brushes: the presets${preset ? ` (now ${preset})` : ""}`) + TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("") + panelBtn("settings", ICONS.brushSettings, "Brush settings", "Brush settings: the tip, its dynamics, scattering, texture and more");
+    const tipEl = optionsEl.querySelector<HTMLCanvasElement>(".paint-tip")!;
+    drawThumb(tipEl, brushOf(t, vals, toolBrush(t), "#000000"), getComputedStyle(tipEl.parentElement!).color);
     for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-brush-panel]")) b.addEventListener("click", () => {
       brushPanels.toggle(b.dataset["brushPanel"] as "brushes" | "settings");
       b.setAttribute("aria-pressed", String(brushPanels.isOpen(b.dataset["brushPanel"] as "brushes" | "settings")));
@@ -288,6 +299,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   };
   const brushPanels = mountBrushPanels({
     store,
+    view: () => deps.settings.get("paint.brushView"),
+    setView: (v) => deps.settings.set("paint.brushView", v),
     engine: startEngine,
     readOnly: deps.readOnly,
     tell: deps.tell,
@@ -311,10 +324,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   };
   scrubNumbers(optionsEl);
   /** The rail's tool changed (or the picked layer, which decides what the Eraser takes): the options, the cursor, what is remembered. */
-  const side = $<HTMLElement>(".paint-side");
   vhost.editor.layersOpen = true;
   const followTool = (): void => {
-    side.hidden = !vhost.editor.layersOpen; // (the dock's Layers button: the canvas's, ADR 0168)
+    layersEl.hidden = !vhost.editor.layersOpen; // (the dock's Layers button: the canvas's, ADR 0168)
     stage.dataset["tool"] = tool();
     document.body.dataset["paintTarget"] = session?.active()?.kind === "object" ? "vector" : "pixels";
     renderOptions();
@@ -364,7 +376,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       body: `<ul class="paint-layer-list" role="listbox" aria-label="Layers, top first">${stack.map(row).join("")}</ul>`,
       foot: act ? `<label class="layers-blend">Blend <select data-blend aria-label="Blend mode of the picked layer">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="0" max="100" step="1" value="${pct}" aria-label="Opacity of the picked layer"> <output>${pct}%</output></label>` : "",
     });
-    layersEl.querySelector("[data-close]")?.remove(); // (part of the view, not a floating panel)
   };
 
   /** What a new layer can be (ADR 0166): each kind of layer, made with the canvas's own makers (objects.ts). */
@@ -493,6 +504,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const s = session;
     if (!s) return;
     const t = e.target as HTMLElement;
+    if (t.closest("[data-close]")) {
+      vhost.editor.layersOpen = false;
+      return vhost.editor.changed();
+    }
     const add = t.closest<HTMLElement>('[data-act="new-layer"]');
     if (add) return newLayerMenu(add);
     if (t.closest('[data-act="delete-layer"]')) {

@@ -34,6 +34,9 @@ export interface BrushPanelDeps {
   brush(t: ToolId): Brush;
   preset(t: ToolId): string;
   setTool(t: ToolId, patch: { values?: Values; brush?: Brush; preset?: string }): void;
+  /** How the Brushes panel lists the presets (a device setting). */
+  view(): "list" | "grid";
+  setView(v: "list" | "grid"): void;
   /** Put a panel in the dock (the left stack, beside the tools). */
   dock(el: HTMLElement, spec: DockSpec): void;
 }
@@ -141,13 +144,15 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     const shownList = f ? list.filter((p) => p.name.toLowerCase().includes(f) || groupKey(p).toLowerCase().includes(f)) : list;
     const groups = new Map<string, BrushPreset[]>();
     for (const p of shownList) groups.set(groupKey(p), [...(groups.get(groupKey(p)) ?? []), p]);
-    const row = (p: BrushPreset): string => `<li role="option" class="layer brush-row" aria-selected="${p.id === current}" data-brush="${p.id}" title="${esc(p.name)}"><canvas class="brush-thumb" width="32" height="32" aria-hidden="true"></canvas><span class="layer-name">${esc(p.name)}</span>${moreButton(`More actions for brush ${p.name}`, `data-brush-more="${p.id}"`)}</li>`;
+    const grid = deps.view() === "grid";
+    const cell = (p: BrushPreset): string => `<li role="option" class="brush-cell" aria-selected="${p.id === current}" data-brush="${p.id}" title="${esc(p.name)}" aria-label="${esc(p.name)}"><canvas class="brush-thumb" width="40" height="40" aria-hidden="true"></canvas><span class="brush-size">${typeof p.brush["size"] === "number" ? Math.round(p.brush["size"]) : ""}</span></li>`;
+    const row = (p: BrushPreset): string => grid ? cell(p) : `<li role="option" class="layer brush-row" aria-selected="${p.id === current}" data-brush="${p.id}" title="${esc(p.name)}"><canvas class="brush-thumb" width="32" height="32" aria-hidden="true"></canvas><span class="layer-name">${esc(p.name)}</span>${moreButton(`More actions for brush ${p.name}`, `data-brush-more="${p.id}"`)}</li>`;
     brushesEl.innerHTML = panelHtml({
       title: "Brushes",
       count: list.length,
       tools: `<button type="button" class="layer-btn" data-act="save" aria-label="Save the brush" title="Save the brush: the tool's brush as a new preset">${ICONS.save}</button><button type="button" class="layer-btn" data-act="import" aria-label="Import brushes" title="Import brushes: .abr files, or canvast brush files (.json)">${ICONS.arrowDownToLine}</button><button type="button" class="layer-btn" data-act="more" aria-haspopup="menu" aria-expanded="false" aria-label="More brush actions" title="Export all the brushes, or bring back the built-in ones">${ICONS.ellipsis}</button>`,
-      sub: `<input type="search" class="brush-find" data-find placeholder="Find a brush" aria-label="Find a brush" value="${esc(filter)}">${t ? "" : `<p class="adj-note">Pick the Brush or the Eraser to use a preset.</p>`}`,
-      body: [...groups].map(([g, ps]) => `<div class="brush-group" data-group="${esc(g)}"><div class="adj-group-head"><h4>${esc(g)}</h4>${moreButton(`More actions for the group ${g}`, `data-group-more="${esc(g)}"`)}</div><ul class="paint-layer-list" role="listbox" aria-label="${esc(g)}">${ps.map(row).join("")}</ul></div>`).join("") || `<p class="adj-note">${list.length ? "No brush has that name." : "No brushes yet."}</p>`,
+      sub: `<div class="brush-sub"><input type="search" class="brush-find" data-find placeholder="Find a brush" aria-label="Find a brush" value="${esc(filter)}"><button type="button" class="layer-btn" data-brush-view="grid" aria-pressed="${grid}" aria-label="Thumbnails" title="Thumbnails: the tips in a grid, with their sizes">${ICONS.layoutGrid}</button><button type="button" class="layer-btn" data-brush-view="list" aria-pressed="${!grid}" aria-label="List" title="List: the tips with their names">${ICONS.layoutList}</button></div>${t ? "" : `<p class="adj-note">Pick the Brush or the Eraser to use a preset.</p>`}`,
+      body: [...groups].map(([g, ps]) => `<div class="brush-group" data-group="${esc(g)}"><div class="adj-group-head"><h4>${esc(g)}</h4>${moreButton(`More actions for the group ${g}`, `data-group-more="${esc(g)}"`)}</div><ul class="${grid ? "brush-grid" : "paint-layer-list"}" role="listbox" aria-label="${esc(g)}">${ps.map(row).join("")}</ul></div>`).join("") || `<p class="adj-note">${list.length ? "No brush has that name." : "No brushes yet."}</p>`,
     });
     brushesEl.append(fileInput);
     const ink = getComputedStyle(brushesEl).color;
@@ -306,6 +311,11 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
         { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, run: () => void save(list.filter((x) => x.id !== p.id)) },
       ], `Brush ${p.name}`);
     }
+    const vb = el.closest<HTMLElement>("[data-brush-view]");
+    if (vb) {
+      deps.setView(vb.dataset["brushView"] as "list" | "grid");
+      return renderBrushes();
+    }
     const gmore = el.closest<HTMLElement>("[data-group-more]");
     if (gmore) {
       const g = gmore.dataset["groupMore"]!;
@@ -436,7 +446,8 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     }
     for (const d of settingsEl.querySelectorAll<HTMLDetailsElement>("[data-pick]")) if (d.open) markPick(t, d);
     for (const [d, c] of curves) {
-      d.hidden = getPath(effective(t), `${d.dataset["curveOf"]}.control`) === "off";
+      const c0 = `${d.dataset["curveOf"]}.control`;
+      d.hidden = (getPath(effective(t), c0) ?? getPath(defaults, c0) ?? "off") === "off";
       if ((d as HTMLDetailsElement).open) c.draw();
     }
     for (const b of settingsEl.querySelectorAll<HTMLElement>("[data-lock]")) b.setAttribute("aria-pressed", String(onOf(t, `locks.${b.dataset["lock"]}`)));
@@ -494,7 +505,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
 }
 
 /** A picture of a brush's tip: its preview bitmap, or a round tip drawn from its hardness and roundness. */
-function drawThumb(c: HTMLCanvasElement, b: Brush, ink: string): void {
+export function drawThumb(c: HTMLCanvasElement, b: Brush, ink: string): void {
   const g = c.getContext("2d");
   if (!g) return;
   const tip = getPath(b, "tip.stored") as { preview?: { width: number; height: number; data: string } } | undefined;
@@ -502,15 +513,17 @@ function drawThumb(c: HTMLCanvasElement, b: Brush, ink: string): void {
   if (pv && pv.width > 0 && pv.height > 0) {
     const bytes = Uint8Array.from(atob(pv.data), (ch) => ch.charCodeAt(0));
     if (bytes.length !== pv.width * pv.height * 2) return;
-    const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(ink) ?? ["", "0", "0", "0"];
     const img = g.createImageData(pv.width, pv.height);
-    for (let i = 0; i < pv.width * pv.height; i++) {
-      img.data.set([Number(m[1]), Number(m[2]), Number(m[3]), bytes[i * 2 + 1]!], i * 4);
-    }
+    for (let i = 0; i < pv.width * pv.height; i++) img.data[i * 4 + 3] = bytes[i * 2 + 1]!;
     const tmp = document.createElement("canvas");
     tmp.width = pv.width;
     tmp.height = pv.height;
-    tmp.getContext("2d")!.putImageData(img, 0, 0);
+    const tg = tmp.getContext("2d")!;
+    tg.putImageData(img, 0, 0);
+    // (the ink is any CSS colour, oklch included: the canvas paints it where the tip has alpha)
+    tg.globalCompositeOperation = "source-in";
+    tg.fillStyle = ink;
+    tg.fillRect(0, 0, pv.width, pv.height);
     const k = Math.min(c.width / pv.width, c.height / pv.height);
     g.drawImage(tmp, (c.width - pv.width * k) / 2, (c.height - pv.height * k) / 2, pv.width * k, pv.height * k);
     return;
