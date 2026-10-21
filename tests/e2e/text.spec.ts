@@ -957,7 +957,7 @@ test("words of their own font: chosen in the text's format bar, stored as a span
   await p.mouse.dblclick(310, 308);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await p.keyboard.press("Control+a");
-  const wordsFont = p.locator("[data-font-of-words]");
+  const wordsFont = p.getByRole("toolbar", { name: "Text format" }).locator("[data-font-of-words]");
   await expect(wordsFont.locator("option:checked"), "it names the font the words are in: the text's own").toHaveText("Comfortaa-Regular");
   await wordsFont.selectOption({ label: "RedHatDisplay-Medium" });
   await expect(wordsFont.locator("option:checked"), "and the new one once the words have it").toHaveText("RedHatDisplay-Medium");
@@ -973,7 +973,7 @@ test("words of their own font: chosen in the text's format bar, stored as a span
   // back to the text's font: the span goes away
   await p.mouse.dblclick(310, 308);
   await p.keyboard.press("Control+a");
-  await p.locator("[data-font-of-words]").selectOption({ label: "Comfortaa-Regular" });
+  await p.getByRole("toolbar", { name: "Text format" }).locator("[data-font-of-words]").selectOption({ label: "Comfortaa-Regular" });
   await finish(p);
   expect((await textObjects(p))[0]!.md).toBe("Hamburg AVA 123");
 });

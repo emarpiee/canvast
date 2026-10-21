@@ -12,7 +12,8 @@ import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet";
+/** The tools of the rail (ADR 0168): the canvas's, and the Brush, which only the Painting view has. */
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet" | "brush";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 

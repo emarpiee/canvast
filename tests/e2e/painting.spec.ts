@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "./harness";
+import { expect, setPenColour, test } from "./harness";
 import type { Page } from "@playwright/test";
 
 /**
@@ -37,12 +37,12 @@ async function newPainting(p: Page, fill?: (p: Page) => Promise<void>): Promise<
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.paint.state()?.layers.length ?? 0)).toBe(1);
   return state(p);
 }
-const setColour = async (p: Page, hex: string): Promise<void> => {
-  await p.locator('.paint-rail [data-act="colour"]').click();
-  const field = p.locator(".colour-pop [data-hex]");
-  await field.fill(hex.replace("#", ""));
-  await field.press("Enter");
-  await p.keyboard.press("Escape");
+/** The paint colour is the Properties bar's colour, as on the canvas (ADR 0168). */
+const setColour = setPenColour;
+/** A choice of the painting's menu (the pill beside the view tabs). */
+const fromPaintingMenu = async (p: Page, id: string): Promise<void> => {
+  await p.getByTestId("painting-menu").click();
+  await p.locator(`.pop-menu [data-id="${id}"]`).click();
 };
 const row = (p: Page, name: string) => p.locator(".paint-layer", { hasText: name });
 
@@ -132,7 +132,7 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
 
   // A larger page keeps the pixels where they are, with empty room on the right; undo gives the old size back.
   const layer1 = s.layers.find((l) => l.pageId === s.pages[0]!.id)!.id;
-  await p.locator('#paint-view [data-act="page-size"]').click();
+  await fromPaintingMenu(p, "page-size");
   await p.locator('[data-f="unit"]').selectOption("px");
   await p.locator('[data-f="w"]').fill("1500");
   await p.getByTestId("page-dialog-ok").click();
@@ -143,12 +143,12 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
   await expect.poll(async () => (await px(p, layer1, 500, 300))?.[3] ?? -1).toBe(255);
 
-  const [dl] = await Promise.all([p.waitForEvent("download"), p.locator('#paint-view [data-act="export"]').click()]);
+  const [dl] = await Promise.all([p.waitForEvent("download"), fromPaintingMenu(p, "export")]);
   const png = await readFile((await dl.path())!);
   expect(png.readUInt32BE(16), "the PNG is the page's width").toBe(1181);
   expect(png.readUInt32BE(20)).toBe(591);
 
-  await p.locator('#paint-view [data-act="place"]').click();
+  await fromPaintingMenu(p, "place");
   await expect(p.locator("body")).toHaveAttribute("data-view", "canvas");
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).filter((o) => o["kind"] === "image").length).toBe(1);
   const img = (await p.evaluate(() => window.__canvastDebug.objects())).find((o) => o["kind"] === "image")!;
@@ -159,14 +159,14 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
 test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector layer; its Select moves one shape alone, its keys work, undo is the painting's; Rasterize makes it a paint layer", async ({ app }) => {
   const p = app.page;
   await newPainting(p);
-  const ink = [31, 35, 41], white = [255, 255, 255];
+  const ink = [0x25, 0x63, 0xeb], white = [255, 255, 255]; // (the canvas's Shape tool and its fill: one tool for both views, ADR 0168)
   await p.keyboard.press("u");
   await stroke(p, [400, 300], [800, 600]);
   await stroke(p, [1200, 300], [1500, 600]);
   const layers = (await state(p)).layers;
   expect(layers.map((l) => [l.name, l.kind]), "both on one new vector layer").toEqual([["Layer 1", "raster"], ["Vector 1", "object"]]);
   const vec = layers[1]!;
-  await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "filled with the paint colour" }).toEqual(ink);
+  await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "filled as the canvas fills a new shape" }).toEqual(ink);
   expect((await screenPx(p, 1350, 450)).slice(0, 3)).toEqual(ink);
   await p.keyboard.press("v");
   await stroke(p, [600, 450], [600, 450]); // (as on the canvas: a click picks, then a drag moves what is picked)

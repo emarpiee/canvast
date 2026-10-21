@@ -8,7 +8,7 @@
 import * as D from "../core/dyadic";
 import { fromLocal } from "../core/frames";
 import { ViewState } from "../app/view-state";
-import { EditorState, type Tool } from "../app/editor-state";
+import { EditorState } from "../app/editor-state";
 import { DocumentStore } from "../doc/document-store";
 import { deserializeObject } from "../doc/model";
 import { FrameIndex } from "../scene/frame-index";
@@ -17,6 +17,7 @@ import { visibleObjects } from "../render/scene-view";
 import { drawObjects, drawOverlays, type SceneTheme } from "../render/scene-renderer";
 import type { AssetLibrary } from "../assets/asset-library";
 import { attachTools, type ToolHooks } from "../interaction/tools";
+import { toolForKey } from "../settings/shortcuts";
 import { mountTextEditor } from "../ui/text-editor";
 import type { PaintCamera } from "./camera";
 import { nextName, type Layer, type ObjectLayer } from "./model";
@@ -28,15 +29,15 @@ export interface VectorHostDeps {
   readonly el: HTMLCanvasElement;
   readonly stage: HTMLElement;
   session(): PaintSession | null;
-  /** Whether one of the vector tools is chosen (else the pointer and keys are the Painting view's). */
+  /** Whether the pointer is the canvas's tools' (else a painting tool has it). */
   active(): boolean;
+  /** Whether the keys are the canvas's tools' (while a painting is open and shown). */
+  keysActive(): boolean;
   camera(): PaintCamera;
   /** The canvas's gestures moved the view (pan, pinch): the Painting view takes it (and keeps it within its limits). */
   setCamera(c: PaintCamera): void;
   size(): { w: number; h: number };
   redraw(): void;
-  /** The canvas's tools chose another tool (Esc: Select, Enter: Edit nodes). */
-  toolChanged(t: Tool): void;
   assets: AssetLibrary;
   theme(): SceneTheme;
   fonts?: () => Promise<Array<{ hash: string; name: string; unusable: string }>>;
@@ -123,21 +124,14 @@ export function createVectorHost(deps: VectorHostDeps) {
     deps.setCamera({ scale, x: w / 2 - D.toNumber(c.center.x) * scale, y: h / 2 - D.toNumber(c.center.y) * scale });
   });
 
-  let tool: Tool = editor.tool;
-  editor.subscribe(() => {
-    deps.redraw();
-    if (editor.tool !== tool) {
-      tool = editor.tool;
-      if (deps.active()) deps.toolChanged(tool);
-    }
-  });
+  editor.subscribe(deps.redraw);
   editor.subscribeRedraw(deps.redraw);
 
   const text = mountTextEditor(deps.stage, view, doc, editor, deps.fonts);
   for (const b of deps.stage.querySelectorAll<HTMLElement>('[data-testid="text-editor"]')) b.dataset["testid"] = "paint-text-editor"; // (the canvas's is "text-editor")
   attachTools(deps.el, view, doc, index, editor, {
     editText: (t, at, box) => text.open(t, at, box),
-    toolForKey: () => undefined, // (the Painting view's keys choose its tools)
+    toolForKey: (k) => toolForKey(k, "paint"),
     navForKey: () => undefined,
     navigate: () => undefined,
     focusSelection: () => undefined,
@@ -147,19 +141,17 @@ export function createVectorHost(deps: VectorHostDeps) {
     scope: "paint",
     history: { undo: () => deps.session()?.undo(), redo: () => deps.session()?.redo() },
     active: deps.active,
+    keysActive: deps.keysActive,
   });
 
   return {
     doc,
     editor,
     view,
+    index,
+    text,
     sync,
     syncCamera,
-    /** Choose a canvas tool (the Painting view's vector tools are the canvas's). */
-    setTool(t: Tool): void {
-      tool = t;
-      if (editor.tool !== t) editor.setTool(t);
-    },
     /** The layer being edited, with what the gesture going on shows (a move, a resize): into a target placed by `at`. True: draw again soon. */
     drawLayer(id: string, g: CanvasRenderingContext2D, at: At): boolean | null {
       if (id !== layerId) return null;

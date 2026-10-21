@@ -33,7 +33,7 @@ import { copySelection, cutSelection, pasteObjects } from "../app/actions";
 import type { Tool } from "../app/editor-state";
 import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
-import { TOOLS, TOOL_IDS, brushOf, toolForKey, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { TOOLS, brushOf, valuesOf, type OptionSpec, type ToolId } from "../paint/tools";
 import { LAYER_KINDS, nextName, type Layer, type Painting } from "../paint/model";
 
 export interface PaintViewDeps {
@@ -46,7 +46,9 @@ export interface PaintViewDeps {
   /** Put a picture on the canvas (through the library) and show the canvas. */
   placeOnCanvas(png: Blob, name: string): Promise<void>;
   /** The library (pictures and fonts of shape, text and picture layers) and the theme the canvas's renderer draws with (ADR 0166). */
-  readonly assets: AssetLibrary | null;
+  readonly assets: AssetLibrary;
+  /** The Properties bar's place for the painting tools' options (ui/toolbar.ts, ADR 0168): the rail and the bars are the canvas's. */
+  readonly optionsSlot: HTMLElement;
   theme(): SceneTheme;
   /** Bring a file into the library (a picture for a picture layer); null when it is not a picture. */
   importPicture(file: File): Promise<{ hash: string; pixelW: number; pixelH: number } | null>;
@@ -65,6 +67,11 @@ export interface PaintView {
   /** Draw now (the test hook reads pixels after it). */
   drawNow(): void;
   readonly camera: PaintCamera;
+  /** The painting's bar (name, page size), which main.ts puts beside the view tabs. */
+  readonly head: HTMLElement;
+  /** The picked vector layer's document, editor, view, index and text editor: what the shared bars work on in this view (ADR 0168). */
+  readonly vector: VectorHost;
+  fit(): void;
 }
 
 const ZOOM_STEP = 1.25;
@@ -78,8 +85,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   let engineError: string | null = null;
   let visible = false;
   let cam: PaintCamera = { scale: 1, x: 0, y: 0 };
-  let tool: ToolId = deps.settings.get("paint.tool");
-  let colour = deps.settings.get("paint.colour");
   const toolValues = (t: ToolId): Record<string, number | boolean | string> => valuesOf(t, (deps.settings.get("paint.tools") as Record<string, unknown>)[t]);
   const setToolValue = (t: ToolId, key: string, v: number | boolean | string): void => {
     const all = { ...(deps.settings.get("paint.tools") as Record<string, unknown>) };
@@ -87,12 +92,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     deps.settings.set("paint.tools", all);
   };
 
-  /** The canvas tool a Painting tool is (ADR 0167), if it is one: the vector tools are the canvas's own. */
-  const canvasTool = (t: ToolId): Tool | null => {
-    const a = TOOLS[t].action;
-    if (a.paint || !("canvas" in a) || !a.canvas) return null;
-    return a.canvas === "shape" && toolValues(t)["shape"] === "path" ? "path" : a.canvas;
-  };
   const nextLayerName = (s: PaintSession, stem: string): string => nextName(stem, [...s.layers.values()].map((l) => l.name));
 
   root.innerHTML = `
@@ -104,28 +103,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       <ul class="paint-items" data-items aria-label="Paintings"></ul>
     </div>
     <div class="paint-editor" data-screen="editor" hidden>
-      <div class="paint-bar" role="toolbar" aria-label="Painting">
-        <button type="button" data-act="list" aria-label="All paintings" title="All paintings">${ICONS.paintings}</button>
-        <button type="button" class="paint-name" data-act="rename" data-name title="Rename the painting"></button>
-        <button type="button" class="paint-size" data-act="page-size" data-page-size title="Page size and resolution">${ICONS.pageSize}<span></span></button>
-        <span class="paint-spacer"></span>
-        <button type="button" data-act="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${ICONS.undo}</button>
-        <button type="button" data-act="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${ICONS.redo}</button>
-        <span class="paint-sep" role="separator"></span>
-        <button type="button" data-act="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
-        <button type="button" class="paint-zoom" data-act="zoom-100" data-zoom title="Actual size, 100 % (Ctrl+1)">100 %</button>
-        <button type="button" data-act="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
-        <button type="button" data-act="fit" aria-label="Fit the page in the view" title="Fit the page in the view (Ctrl+0)">${ICONS.fitPage}</button>
-        <span class="paint-sep" role="separator"></span>
-        <button type="button" data-act="export" aria-label="Export the page as PNG" title="Export the page as PNG">${ICONS.imageUp}</button>
-        <button type="button" data-act="place" aria-label="Place the page on the canvas" title="Place the page on the canvas: a picture in the library, put in the middle of the canvas view">${ICONS.placeOnCanvas}</button>
-      </div>
-      <div class="paint-bar paint-options" data-options role="group" aria-label="Tool options"></div>
       <div class="paint-main">
-        <div class="paint-rail" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
-          ${TOOL_IDS.map((t) => `<button type="button" role="radio" data-tool="${t}" aria-label="${TOOLS[t].label}" title="${TOOLS[t].label} (${TOOLS[t].key}): ${esc(TOOLS[t].hint)}">${(ICONS as Record<string, string>)[TOOLS[t].icon === "eraser" ? "paintEraser" : TOOLS[t].icon]}</button>`).join("")}
-          <button type="button" class="swatch swatch-current" data-act="colour" aria-haspopup="dialog" aria-expanded="false" aria-label="Paint colour" title="Paint colour (Alt-click the page to pick one from it)"><span data-chip></span></button>
-        </div>
         <div class="paint-stage" data-stage>
           <canvas class="paint-canvas" data-testid="paint-canvas" tabindex="0" aria-label="The page: paint with the picked tool"></canvas>
           <canvas class="paint-cursor" aria-hidden="true"></canvas>
@@ -146,12 +124,21 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const cursor = $<HTMLCanvasElement>(".paint-cursor");
   const layersEl = $<HTMLElement>("[data-paint-layers]");
   const pagesEl = $<HTMLElement>("[data-pages]");
-  const optionsEl = $<HTMLElement>("[data-options]");
+  const optionsEl = deps.optionsSlot;
+  /** The painting's own bar, beside the view tabs (main.ts puts it in the top bar): its name, its page size, and what is done with a page. */
+  const head = document.createElement("div");
+  head.className = "nav paint-head";
+  head.dataset["only"] = "paint";
+  // (the canvas's own pill: what the board and canvas menu is on the canvas)
+  head.innerHTML = `<div class="nav-pill" data-active="true"><button type="button" class="nav-crumb" data-act="list" data-testid="paint-list" aria-label="All paintings" title="All paintings">${ICONS.paintings}</button><button type="button" class="nav-name-btn" data-act="painting-menu" data-testid="painting-menu" aria-haspopup="menu" aria-expanded="false" title="The painting: rename, page size, export, place on the canvas"><span class="nav-crumb-text" data-name></span>${ICONS.chevronDown}</button></div>`;
+  head.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
+    if (b) void action(b.dataset["act"]!, b);
+  });
   const adjustEl = $<HTMLElement>("[data-adjust]");
   const pictureInput = $<HTMLInputElement>('[data-testid="paint-picture-input"]');
   /** The canvas's own tools on the picked vector layer (ADR 0167). */
-  const vhost: VectorHost | null = deps.assets
-    ? createVectorHost({
+  const vhost: VectorHost = createVectorHost({
         el: canvas,
         stage,
         session: () => session,
@@ -164,17 +151,18 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         },
         size: () => view(),
         redraw: () => redraw(),
-        toolChanged: (t) => {
-          const pt = t === "path" ? "shape" : TOOL_IDS.find((i) => { const a = TOOLS[i].action; return !a.paint && "canvas" in a && a.canvas === t; });
-          if (!pt) return;
-          if (t === "path") setToolValue("shape", "shape", "path");
-          setTool(pt);
-        },
         assets: deps.assets,
         theme: deps.theme,
-        revealList: (at, things, pick) => openRevealList(canvas, vhost!.editor, at, things, pick),
-      })
-    : null;
+        revealList: (at, things, pick) => openRevealList(canvas, vhost.editor, at, things, pick),
+        keysActive: () => !!session && visible,
+      });
+  /** The rail's tool, as the canvas's tools keep it (one rail for both views, ADR 0168). */
+  const tool = (): Tool => vhost.editor.tool;
+  /** The painting tool in use, when the rail's tool paints here: the Brush, or the Eraser on a layer that is not a vector layer (whose
+   * shapes the canvas's Eraser takes, as on the canvas). Every other tool is the canvas's. */
+  const paintTool = (): ToolId | null => (tool() === "brush" ? "brush" : tool() === "eraser" && session?.active()?.kind !== "object" ? "eraser" : null);
+  /** The paint colour: the canvas's pen colour (the Properties bar's colour, ADR 0168). */
+  const colour = (): string => vhost.editor.penColor;
 
   const view = (): { w: number; h: number } => ({ w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
   const page = () => session!.page();
@@ -204,8 +192,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
-    vhost?.drawOverlay(g, dpr);
-    $<HTMLElement>("[data-zoom]").textContent = `${Math.round(cam.scale * 100)} %`;
+    vhost.drawOverlay(g, dpr);
     drawCursor();
   };
   const redraw = (): void => {
@@ -219,8 +206,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cursor.width, cursor.height);
-    if (!pointerAt || !TOOLS[tool].action.paint || panning) return;
-    const r = (Number(toolValues(tool)["size"]) / 2) * cam.scale * dpr;
+    const t = paintTool();
+    if (!pointerAt || !t || panning) return;
+    const r = (Number(toolValues(t)["size"]) / 2) * cam.scale * dpr;
     g.lineWidth = 1;
     for (const [c, d] of [[css.getPropertyValue("--white").trim() || "#fff", 1], [css.getPropertyValue("--black").trim() || "#000", 0]] as const) {
       g.strokeStyle = c;
@@ -235,74 +223,51 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     redraw();
   }).observe(stage);
 
-  // ---- the bar, the rail, the options --------------------------------------------------------------------------------------------------
+  // ---- the painting tools' options (in the Properties bar, ADR 0168) ------------------------------------------------------------------
 
-  /** A paint option's value as the paint it is ("" is the paint colour). */
-  const paintOf = (v: string): Paint | null => (v === "" ? colour : (paintFromText(v) ?? null));
-  /** The options bar of a tool, from its schema (paint/tools.ts): each kind of option is one control here. */
-  const optionHtml = (o: OptionSpec, v: number | boolean | string, vals: Values): string => {
-    switch (o.kind) {
-      case "number":
-        if (o.when && vals[o.when[0]] !== o.when[1]) return "";
-        return `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`;
-      case "switch":
-        return `<label class="tb-count" title="${esc(o.hint)}"><input type="checkbox" data-opt="${o.key}"${v ? " checked" : ""}> ${esc(o.label)}</label>`;
-      case "choice":
-        return `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <select data-opt="${o.key}" aria-label="${esc(o.label)}">${o.choices.map(([c, label]) => `<option value="${c}"${c === v ? " selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
-      case "paint":
-        return `<button type="button" class="swatch swatch-paint${v === "none" ? " is-none" : ""}" data-opt-paint="${o.key}" aria-haspopup="dialog" aria-label="${esc(o.label)}" title="${esc(o.hint)}"><span data-paint-chip></span><b class="swatch-name">${esc(o.label)}</b></button>`;
-    }
-  };
+  /** One option of a painting tool, from its schema (paint/tools.ts): each kind of option is one control. */
+  const optionHtml = (o: OptionSpec, v: number | boolean): string =>
+    o.kind === "number"
+      ? `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`
+      : `<button type="button" data-opt="${o.key}" aria-pressed="${!!v}" title="${esc(o.hint)}">${esc(o.label)}</button>`; // (a switch: the bar's toggle, as the canvas's)
+  let optionsFor: ToolId | null | undefined;
   const renderOptions = (): void => {
-    const vals = toolValues(tool);
-    optionsEl.innerHTML = (TOOLS[tool].options as readonly OptionSpec[]).map((o) => optionHtml(o, vals[o.key]!, vals)).join("");
-    for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setToolValue(tool, f.dataset["opt"]!, v));
-    for (const c of optionsEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) c.addEventListener("change", () => setToolValue(tool, c.dataset["opt"]!, c.checked));
-    for (const c of optionsEl.querySelectorAll<HTMLSelectElement>("select[data-opt]")) c.addEventListener("change", () => {
-      setToolValue(tool, c.dataset["opt"]!, c.value);
-      setTool(tool); // (Path is the canvas's other tool; an option shown only for one choice comes or goes)
+    const t = paintTool();
+    if (t === optionsFor) return;
+    optionsFor = t;
+    if (!t) return void (optionsEl.innerHTML = "");
+    const vals = toolValues(t);
+    optionsEl.innerHTML = TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("");
+    for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setToolValue(t, f.dataset["opt"]!, v));
+    for (const b of optionsEl.querySelectorAll<HTMLElement>("button[data-opt]")) b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", String(on));
+      setToolValue(t, b.dataset["opt"]!, on);
     });
-    for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-opt-paint]")) {
-      const p = paintOf(String(vals[b.dataset["optPaint"]!]));
-      b.querySelector<HTMLElement>("[data-paint-chip]")!.style.setProperty("--paint", p === null ? "transparent" : typeof p === "string" ? p : "var(--hud-muted)");
-    }
   };
-  optionsEl.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-opt-paint]");
-    if (!b) return;
-    const o = (TOOLS[tool].options as readonly OptionSpec[]).find((x) => x.key === b.dataset["optPaint"]);
-    if (!o || o.kind !== "paint") return;
-    const t = tool;
-    openPaintPopover(b, {
-      name: o.label,
-      paint: paintOf(String(toolValues(t)[o.key])),
-      noneLabel: o.none,
-      onInput: (p) => setToolValue(t, o.key, paintToText(p)),
-      onChange: (p) => {
-        setToolValue(t, o.key, paintToText(p));
-        renderOptions();
-      },
-    });
-  });
   scrubNumbers(optionsEl);
-  const setTool = (t: ToolId): void => {
-    tool = t;
-    deps.settings.set("paint.tool", t);
-    for (const b of root.querySelectorAll<HTMLElement>(".paint-rail [data-tool]")) b.setAttribute("aria-checked", String(b.dataset["tool"] === t));
-    stage.dataset["tool"] = t;
-    const ct = canvasTool(t);
-    if (ct) vhost?.setTool(ct);
+  /** The rail's tool changed (or the picked layer, which decides what the Eraser takes): the options, the cursor, what is remembered. */
+  const side = $<HTMLElement>(".paint-side");
+  vhost.editor.layersOpen = true;
+  const followTool = (): void => {
+    side.hidden = !vhost.editor.layersOpen; // (the dock's Layers button: the canvas's, ADR 0168)
+    stage.dataset["tool"] = tool();
+    document.body.dataset["paintTarget"] = session?.active()?.kind === "object" ? "vector" : "pixels";
     renderOptions();
-    redraw();
+    if (deps.settings.get("paint.tool") !== tool()) deps.settings.set("paint.tool", tool());
+    if (deps.settings.get("paint.colour") !== colour()) deps.settings.set("paint.colour", colour());
+    drawCursor();
+  };
+  vhost.editor.subscribe(followTool);
+  const setColour = (hex: string): void => {
+    vhost.editor.penColor = hex;
+    vhost.editor.changed();
   };
   const renderBar = (): void => {
     if (!session) return;
     const p = page();
-    $<HTMLElement>("[data-name]").textContent = session.painting.name;
-    $<HTMLElement>("[data-page-size] span").textContent = `${p.w} × ${p.h} px · ${p.dpi} DPI`;
-    $<HTMLButtonElement>('[data-act="undo"]').disabled = !session.history.canUndo;
-    $<HTMLButtonElement>('[data-act="redo"]').disabled = !session.history.canRedo;
-    $<HTMLElement>("[data-chip]").style.setProperty("--paint", colour);
+    head.querySelector<HTMLElement>("[data-name]")!.textContent = `${session.painting.name} · ${p.w} × ${p.h} px`;
+    vhost.editor.changed(); // (the rail's undo and redo follow the painting's history)
   };
 
   // ---- the layers panel -----------------------------------------------------------------------------------------------------------
@@ -346,9 +311,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       { id: "paint", label: "Paint layer", hint: "An empty layer to paint on", icon: ICONS.newLayer, run: () => s.addLayer() },
       { id: "vector", label: "Vector layer", hint: "An empty layer for shapes, paths, pen strokes and texts, edited with the canvas's tools", icon: ICONS.vectorLayer, run: () => {
         s.addLayer(s.freshLayer({ kind: "object", objs: [] }, named("Vector")), "New vector layer");
-        if (!canvasTool(tool)) setTool("select");
+        if (paintTool()) vhost.editor.setTool("select");
       } },
-      { id: "fill", label: "Fill layer", hint: "The page covered by a colour, a gradient or a texture", icon: ICONS.fillLayer, run: () => s.addLayer(s.freshLayer({ kind: "fill", paint: colour }, named("Fill")), "New fill layer") },
+      { id: "fill", label: "Fill layer", hint: "The page covered by a colour, a gradient or a texture", icon: ICONS.fillLayer, run: () => s.addLayer(s.freshLayer({ kind: "fill", paint: colour() }, named("Fill")), "New fill layer") },
       { id: "adjust", label: "Adjustment layer", hint: "Exposure, colour, levels, curves… of everything below it", icon: ICONS.slidersVertical, run: () => {
         s.addLayer(s.freshLayer({ kind: "adjust", adjust: {} }, named("Adjustment")), "New adjustment layer");
         renderAdjust();
@@ -592,8 +557,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     }
     const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
     if (act) void action(act, t.closest<HTMLElement>("[data-act]")!);
-    const tb = t.closest<HTMLElement>(".paint-rail [data-tool]");
-    if (tb) setTool(tb.dataset["tool"] as ToolId);
   });
 
   const newPainting = async (): Promise<void> => {
@@ -620,6 +583,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     listScreen.hidden = which !== "list";
     editor.hidden = which !== "editor";
     root.dataset["screen"] = which;
+    document.body.dataset["paintScreen"] = which; // (the bars are for an open painting: the list has none)
   };
   const close = async (): Promise<void> => {
     if (!session) return;
@@ -662,7 +626,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     renderBar();
     renderLayers();
     renderPages();
-    setTool(tool);
+    followTool();
     fit();
     void s.prepare();
   };
@@ -684,6 +648,17 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         return;
       case "page-size":
         if (s) await editPage(s.pageId);
+        return;
+      case "painting-menu":
+        if (s) {
+          const p = page();
+          openMoreMenu(el, [
+            { id: "rename", label: "Rename…", icon: ICONS.textCursorInput, run: () => void action("rename", el) },
+            { id: "page-size", label: "Page size and resolution…", hint: `${p.w} × ${p.h} px · ${p.dpi} DPI`, icon: ICONS.pageSize, run: () => void action("page-size", el) },
+            { id: "export", label: "Export the page as PNG", icon: ICONS.imageUp, run: () => void action("export", el) },
+            { id: "place", label: "Place the page on the canvas", hint: "A picture in the library, put in the middle of the canvas view", icon: ICONS.placeOnCanvas, run: () => void action("place", el) },
+          ], s.painting.name);
+        }
         return;
       case "undo":
         return s?.undo();
@@ -711,21 +686,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       case "place":
         if (s) await deps.placeOnCanvas(await pagePng(), `${fileName(`${s.painting.name} ${page().name}`)}.png`);
         return;
-      case "colour":
-        openColourPopover(el, {
-          name: "Paint colour",
-          value: colour,
-          onInput: (hex) => setColour(hex.slice(0, 7)),
-          onChange: (hex) => rememberColour(hex.slice(0, 7)),
-        });
-        return;
     }
-  };
-  const setColour = (hex: string): void => {
-    if (!/^#[0-9a-f]{6}$/i.test(hex)) return;
-    colour = hex.toLowerCase();
-    deps.settings.set("paint.colour", colour);
-    renderBar();
   };
 
   /** Draw until every picture the drawing needs is decoded (or two seconds have gone by): an export or a rasterized layer is never made half-drawn. */
@@ -750,26 +711,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   // ---- the pointer ----------------------------------------------------------------------------------------------------------------
 
   const pointers = new Map<number, { x: number; y: number }>();
-  /** A vector tool is chosen: the canvas's tools have the pointer and their keys (vector-host.ts). */
-  const vectorOn = (): boolean => !!session && !!vhost && canvasTool(tool) !== null;
-  /** The tool's options as the canvas's editor takes them: sizes in page px become screen px at this zoom; "" is the paint colour. */
-  const applyLook = (): void => {
-    if (!vhost) return;
-    const e = vhost.editor, v = toolValues(tool), k = cam.scale;
-    if (tool === "shape") {
-      if (v["shape"] !== "path") e.shapeKind = v["shape"] as typeof e.shapeKind;
-      e.shapeSides = Number(v["sides"]);
-      e.shapeTips = Number(v["points"]);
-      e.shapeFill = paintOf(String(v["fill"]));
-      e.shapeStroke = paintOf(String(v["outline"]));
-      e.shapeWidthPx = Number(v["width"]) * k;
-    } else if (tool === "pen") {
-      e.penKind = v["kind"] as typeof e.penKind;
-      e.penColor = colour;
-      e.penWidthPx = Number(v["width"]) * k;
-      e.lock = { px: Number(v["width"]), levels: 0n, frac: 0 }; // (the canvas's width lock: the same page width at any zoom)
-    } else if (tool === "text") e.textLook = { ...e.textLook, sizePx: Number(v["size"]) * k, color: colour };
-  };
+  /** Not a painting tool: the canvas's tools have the pointer (vector-host.ts). */
+  const vectorOn = (): boolean => !!session && paintTool() === null;
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
   let stroke: { id: number; started: boolean; queue: number[] } | null = null;
@@ -801,7 +744,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     setColour(`#${[d[0], d[1], d[2]].map((v) => v!.toString(16).padStart(2, "0")).join("")}`);
   };
 
-  canvas.addEventListener("pointerdown", () => { if (vectorOn()) applyLook(); }, { capture: true });
   canvas.addEventListener("pointerdown", (e) => {
     if (!session || vectorOn()) return;
     canvas.focus();
@@ -820,14 +762,14 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       return;
     }
     if (pointers.size > 2) return;
-    if (e.button === 1 || spaceDown || tool === "hand") {
+    if (e.button === 1 || spaceDown) {
       panning = { id: e.pointerId, x: p.x, y: p.y };
       stage.classList.add("is-panning");
       e.preventDefault();
       return;
     }
-    if (e.button !== 0) return;
-    if (!TOOLS[tool].action.paint) return;
+    const pt = paintTool();
+    if (e.button !== 0 || !pt) return;
     if (e.altKey) return pickColour(p);
     const why = session.cannotPaint();
     if (why) return deps.tell(why);
@@ -837,8 +779,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const first = sample(e);
     if (e.shiftKey && lastEnd) st.queue.push(lastEnd[0], lastEnd[1], first[2]!, 0, 0, 0, first[6]! - 1);
     st.queue.push(...first);
-    const a = TOOLS[tool].action;
-    void s.begin({ brush: brushOf(tool, toolValues(tool), colour), erase: a.paint && a.erase }).then((ok) => {
+    void s.begin({ brush: brushOf(pt, toolValues(pt), colour()), erase: TOOLS[pt].action.erase }).then((ok) => {
       if (stroke !== st) return; // (cancelled meanwhile)
       if (!ok) {
         stroke = null;
@@ -851,7 +792,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     });
   });
   const finish = (s: PaintSession, st: NonNullable<typeof stroke>): void => {
-    void s.end(tool === "eraser" ? "Erase" : "Paint").then(() => redraw());
+    void s.end(paintTool() === "eraser" ? "Erase" : "Paint").then(() => redraw());
     if (stroke === st) stroke = null;
   };
   canvas.addEventListener("pointermove", (e) => {
@@ -964,46 +905,38 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   // ---- keys -----------------------------------------------------------------------------------------------------------------------
 
+  // The tool letters, undo and redo, Delete, Enter, Escape and the Ctrl keys are the canvas's tools' (vector-host.ts, one keymap, ADR 0168);
+  // the Painting view keeps its zoom, the brush size and Space for the painting tools.
+  window.addEventListener("keydown", (e) => {
+    if (!session || !shortcutsActive(e, "paint") || e.key !== "Escape" || !stroke) return;
+    e.stopImmediatePropagation(); // (Escape drops the stroke being painted, and does nothing else)
+    session.cancel();
+    stroke = null;
+  }, { capture: true });
   window.addEventListener("keydown", (e) => {
     if (!session || !shortcutsActive(e, "paint")) return;
     const k = e.key;
     const mod = e.ctrlKey || e.metaKey;
-    // (with a vector tool the canvas's tools take undo and redo, Space, Delete, Escape, Enter and their Ctrl keys, as on the canvas)
-    if (vectorOn() && ((mod && !["0", "1"].includes(k)) || [" ", "Delete", "Backspace", "Escape", "Enter"].includes(k))) return;
-    if (mod && k.toLowerCase() === "z") {
-      e.preventDefault();
-      if (e.shiftKey) session.redo();
-      else session.undo();
-    } else if (mod && k.toLowerCase() === "y") {
-      e.preventDefault();
-      session.redo();
-    } else if (mod && k === "0") {
+    const pt = paintTool();
+    if (mod && k === "0") {
       e.preventDefault();
       fit();
     } else if (mod && k === "1") {
       e.preventDefault();
       void action("zoom-100", canvas);
     } else if (mod || e.altKey) return;
-    else if (k === " ") {
+    else if (k === " " && pt) {
       e.preventDefault();
       if (!spaceDown) stage.classList.add("is-hand");
       spaceDown = true;
     } else if (k === "+" || k === "=") void action("zoom-in", canvas);
     else if (k === "-") void action("zoom-out", canvas);
-    else if ((k === "[" || k === "]") && TOOLS[tool].action.paint) {
-      const v = Number(toolValues(tool)["size"]);
-      setToolValue(tool, "size", Math.min(1000, Math.max(1, Math.round(k === "]" ? Math.max(v + 1, v * 1.15) : Math.min(v - 1, v / 1.15)))));
+    else if ((k === "[" || k === "]") && pt) {
+      const v = Number(toolValues(pt)["size"]);
+      setToolValue(pt, "size", Math.min(1000, Math.max(1, Math.round(k === "]" ? Math.max(v + 1, v * 1.15) : Math.min(v - 1, v / 1.15)))));
+      optionsFor = undefined;
       renderOptions();
       drawCursor();
-    } else if (k === "Escape" && stroke) {
-      session.cancel();
-      stroke = null;
-    } else {
-      const t = toolForKey(k);
-      if (t) {
-        e.preventDefault();
-        setTool(t);
-      }
     }
   });
   window.addEventListener("keyup", (e) => {
@@ -1012,7 +945,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     stage.classList.remove("is-hand");
   });
 
-  setTool(tool);
+  if (deps.settings.get("paint.tool") !== vhost.editor.tool) vhost.editor.setTool(deps.settings.get("paint.tool"));
+  vhost.editor.penColor = deps.settings.get("paint.colour");
   screen("list");
 
   return {
@@ -1040,5 +974,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     get camera() {
       return cam;
     },
+    head,
+    vector: vhost,
+    fit,
   };
 }

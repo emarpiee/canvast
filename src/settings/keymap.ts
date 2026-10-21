@@ -85,7 +85,14 @@ export function eventInit(combo: Combo, repeat = false): KeyboardEventInit {
 /** How a combo reads in the interface ("Ctrl+Shift+F"; a bare letter as itself). */
 export const displayCombo = (c: Combo): string => c.replace("ArrowLeft", "Left").replace("ArrowRight", "Right").replace("ArrowUp", "Up").replace("ArrowDown", "Down");
 
-export type KeyScope = "canvas" | "global";
+/** `canvas`: on the canvas only; `paint`: in the Painting view only; `both`: on the canvas and in the Painting view (its vector tools are the
+ * canvas's, ADR 0168); `global`: also in the Library. */
+export type KeyScope = "canvas" | "paint" | "both" | "global";
+/** The view a key is pressed in, as commands are scoped. */
+export type KeyView = "canvas" | "paint" | "global" | "none";
+/** Whether a command works in a view. */
+export const inView = (scope: KeyScope, view: KeyView): boolean =>
+  view === "canvas" ? scope !== "paint" : view === "paint" ? scope !== "canvas" : view === "global" && scope === "global";
 
 export interface KeyCommand {
   readonly id: string;
@@ -95,7 +102,7 @@ export interface KeyCommand {
   readonly internal: readonly Combo[];
   /** What the command is bound to at first. */
   readonly defaults: readonly Combo[];
-  /** `canvas`: only on the canvas (the Library and Settings have their own keys); `global`: also in the Library. */
+  /** Where the command works (the Library and Settings have their own keys). */
   readonly scope: KeyScope;
 }
 
@@ -114,31 +121,33 @@ export const BOOKMARK_GROUP = "Bookmarks";
 
 /** Every command that has a key, in the order Settings lists them. */
 export const KEY_COMMANDS: readonly KeyCommand[] = [
-  cmd("tool.hand", "Hand (pan)", TOOLS_GROUP, "H"),
-  cmd("tool.select", "Select", TOOLS_GROUP, "V"),
-  cmd("tool.node", "Edit nodes", TOOLS_GROUP, "N"),
-  cmd("tool.pen", "Pen", TOOLS_GROUP, "P"),
-  cmd("tool.shape", "Shape", TOOLS_GROUP, "U"),
+  cmd("tool.hand", "Hand (pan)", TOOLS_GROUP, "H", undefined, "both"),
+  cmd("tool.select", "Select", TOOLS_GROUP, "V", undefined, "both"),
+  cmd("tool.node", "Edit nodes", TOOLS_GROUP, "N", undefined, "both"),
+  cmd("tool.pen", "Pen", TOOLS_GROUP, "P", undefined, "both"),
+  cmd("tool.shape", "Shape", TOOLS_GROUP, "U", undefined, "both"),
+  // (in the Painting view B is the Brush, as in painting programs; on the canvas it stays the Path tool: the first command a key is bound to in a view has it)
+  cmd("tool.brush", "Brush (Painting view)", TOOLS_GROUP, "B", undefined, "paint"),
   cmd("tool.path", "Path (curves)", TOOLS_GROUP, "B"),
   cmd("tool.sheet", "Sheet", TOOLS_GROUP, "C"),
-  cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L"),
-  cmd("tool.text", "Text", TOOLS_GROUP, "T"),
+  cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L", undefined, "both"),
+  cmd("tool.text", "Text", TOOLS_GROUP, "T", undefined, "both"),
   cmd("tool.note", "Note", TOOLS_GROUP, "M"),
-  cmd("tool.eraser", "Eraser", TOOLS_GROUP, "E"),
+  cmd("tool.eraser", "Eraser", TOOLS_GROUP, "E", undefined, "both"),
   cmd("nav.up", "Step up", STEP_GROUP, "W"),
   cmd("nav.left", "Step left", STEP_GROUP, "A"),
   cmd("nav.down", "Step down", STEP_GROUP, "S"),
   cmd("nav.right", "Step right", STEP_GROUP, "D"),
   cmd("view.focus", "Bring the selection into view; again: fit everything visible", VIEW_GROUP, "Ctrl+Space", "F"),
   cmd("view.zen", "Zen mode", VIEW_GROUP, "Z"),
-  cmd("view.zoomIn", "Zoom in", VIEW_GROUP, ["+", "="]),
-  cmd("view.zoomOut", "Zoom out", VIEW_GROUP, ["-", "_"]),
+  cmd("view.zoomIn", "Zoom in", VIEW_GROUP, ["+", "="], undefined, "both"),
+  cmd("view.zoomOut", "Zoom out", VIEW_GROUP, ["-", "_"], undefined, "both"),
   cmd("view.home", "Return to the origin", VIEW_GROUP, ["0", "Home"]),
   cmd("view.panLeft", "Pan left", VIEW_GROUP, "ArrowLeft"),
   cmd("view.panRight", "Pan right", VIEW_GROUP, "ArrowRight"),
   cmd("view.panUp", "Pan up", VIEW_GROUP, "ArrowUp"),
   cmd("view.panDown", "Pan down", VIEW_GROUP, "ArrowDown"),
-  cmd("view.panHold", "Pan with any tool (hold, and drag)", VIEW_GROUP, "Space"),
+  cmd("view.panHold", "Pan with any tool (hold, and drag)", VIEW_GROUP, "Space", undefined, "both"),
   cmd("view.back", "Previous view", VIEW_GROUP, "Alt+Shift+ArrowLeft"),
   cmd("view.forward", "Next view", VIEW_GROUP, "Alt+Shift+ArrowRight"),
   cmd("bookmark.prev", "Go to the previous bookmark", BOOKMARK_GROUP, "["),
@@ -151,16 +160,16 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("find.tag", "Search the canvas by tag", FIND_GROUP, "#"),
   cmd("find.bookmark", "Search the canvas for a bookmark", FIND_GROUP, "@"),
   cmd("find.help", "Open the shortcut list", FIND_GROUP, "?"),
-  cmd("edit.undo", "Undo", EDIT_GROUP, "Ctrl+Z"),
-  cmd("edit.redo", "Redo", EDIT_GROUP, ["Ctrl+Shift+Z", "Ctrl+Y"]),
-  cmd("edit.selectAll", "Select everything", EDIT_GROUP, "Ctrl+A"),
-  cmd("edit.duplicate", "Duplicate", EDIT_GROUP, "Ctrl+D"),
-  cmd("edit.group", "Group", EDIT_GROUP, "Ctrl+G"),
-  cmd("edit.ungroup", "Ungroup", EDIT_GROUP, "Ctrl+Shift+G"),
-  cmd("edit.front", "Bring to front", EDIT_GROUP, "Ctrl+]"),
-  cmd("edit.back", "Send to back", EDIT_GROUP, "Ctrl+["),
-  cmd("edit.flatten", "Flatten: text to paths, a boolean group to one path", EDIT_GROUP, "Ctrl+E"),
-  cmd("edit.delete", "Delete the selection", EDIT_GROUP, ["Delete", "Backspace"]),
+  cmd("edit.undo", "Undo", EDIT_GROUP, "Ctrl+Z", undefined, "both"),
+  cmd("edit.redo", "Redo", EDIT_GROUP, ["Ctrl+Shift+Z", "Ctrl+Y"], undefined, "both"),
+  cmd("edit.selectAll", "Select everything", EDIT_GROUP, "Ctrl+A", undefined, "both"),
+  cmd("edit.duplicate", "Duplicate", EDIT_GROUP, "Ctrl+D", undefined, "both"),
+  cmd("edit.group", "Group", EDIT_GROUP, "Ctrl+G", undefined, "both"),
+  cmd("edit.ungroup", "Ungroup", EDIT_GROUP, "Ctrl+Shift+G", undefined, "both"),
+  cmd("edit.front", "Bring to front", EDIT_GROUP, "Ctrl+]", undefined, "both"),
+  cmd("edit.back", "Send to back", EDIT_GROUP, "Ctrl+[", undefined, "both"),
+  cmd("edit.flatten", "Flatten: text to paths, a boolean group to one path", EDIT_GROUP, "Ctrl+E", undefined, "both"),
+  cmd("edit.delete", "Delete the selection", EDIT_GROUP, ["Delete", "Backspace"], undefined, "both"),
 ];
 
 const BY_ID = new Map(KEY_COMMANDS.map((c) => [c.id, c] as const));
@@ -315,14 +324,16 @@ export class Keymap {
     return b ? displayCombo(b) : "";
   }
 
-  /** The commands `combo` is bound to now, apart from `except`. */
+  /** The commands `combo` is bound to now, apart from `except` (and, with `except`, only those that work in a view it works in too). */
   owners(combo: Combo, except?: string): KeyCommand[] {
-    return KEY_COMMANDS.filter((c) => c.id !== except && this.bindings(c.id).includes(combo));
+    const mine = except ? BY_ID.get(except)?.scope : undefined;
+    const meet = (c: KeyCommand): boolean => !mine || (["canvas", "paint", "global"] as const).some((v) => inView(mine, v) && inView(c.scope, v));
+    return KEY_COMMANDS.filter((c) => c.id !== except && meet(c) && this.bindings(c.id).includes(combo));
   }
 
   /** What to do with a key press: leave it, swallow it, or let the handlers see `to` instead. */
-  resolve(combo: Combo, scope: KeyScope | "none"): { kind: "pass" } | { kind: "swallow" } | { kind: "to"; combo: Combo } {
-    const allowed = (c: KeyCommand): boolean => scope === "canvas" || (scope === "global" && c.scope === "global");
+  resolve(combo: Combo, view: KeyView): { kind: "pass" } | { kind: "swallow" } | { kind: "to"; combo: Combo } {
+    const allowed = (c: KeyCommand): boolean => inView(c.scope, view);
     const owner = KEY_COMMANDS.find((c) => allowed(c) && this.bindings(c.id).includes(combo));
     if (owner) return owner.internal.includes(combo) ? { kind: "pass" } : { kind: "to", combo: owner.internal[0]! };
     // an internal key of a command that has been given other keys no longer works
@@ -343,7 +354,7 @@ export class Keymap {
 export function installKeymap(map: Keymap, win: Window = window): void {
   let sending = false;
   const held = new Map<string, Combo>(); // event.code → the key sent on, so that its key up is sent on too
-  const scopeOf = (e: KeyboardEvent): KeyScope | "none" => {
+  const scopeOf = (e: KeyboardEvent): KeyView => {
     if (map.capturing) return "none";
     const t = e.target as HTMLElement | null;
     const view = document.body.dataset["view"] ?? "canvas";
@@ -351,7 +362,7 @@ export function installKeymap(map: Keymap, win: Window = window): void {
     const typing = !!t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)));
     if (typing && !modified) return "none";
     if (t?.closest?.("dialog") && !modified) return "none";
-    if (view === "canvas") return "canvas";
+    if (view === "canvas" || view === "paint") return view;
     return view === "assets" ? "global" : "none";
   };
   const onDown = (e: KeyboardEvent): void => {

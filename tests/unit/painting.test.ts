@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { LAYER_KINDS, clipBaseOf, fromPx, newPage, nextName, stackOf, toPx, validLayer, validPainting, type Layer } from "../../src/paint/model";
 import { History, inverse } from "../../src/paint/history";
-import { TOOLS, brushOf, toolForKey, valuesOf } from "../../src/paint/tools";
+import { brushOf, valuesOf } from "../../src/paint/tools";
+import { toolForKey } from "../../src/settings/shortcuts";
 import { clampCamera, fitCamera, toPage, zoomAt } from "../../src/paint/camera";
 import { deflate, hashOf, inflate, isEmpty, TILE_BYTES } from "../../src/paint/codec";
 
@@ -51,8 +52,8 @@ describe("painting tools", () => {
     const b = brushOf("eraser", valuesOf("eraser", { size: 40, hardness: 50 }), "#ff8000") as Record<string, unknown>;
     expect(b).toMatchObject({ size: 40, hardness: 0.5, erase: true });
     expect(b["color"]).toEqual([1, 128 / 255, 0, 1]);
-    expect(toolForKey("e")).toBe("eraser");
-    expect(Object.values(TOOLS).every((t) => t.key.length === 1)).toBe(true);
+    // one keymap for both views (ADR 0168): a key bound twice belongs to the command of the view it is pressed in
+    expect([toolForKey("b", "paint"), toolForKey("b", "canvas"), toolForKey("e", "paint"), toolForKey("e", "canvas")]).toEqual(["brush", "path", "eraser", "eraser"]);
   });
 });
 

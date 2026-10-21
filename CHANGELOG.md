@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.0 — One set of bars and tools for the canvas and the Paint view (2026-10-22)
+
+- **The Paint view has the canvas's bars:** the same tool rail, Properties bar, Actions bar, dock and view controls, in the same places. Picked shapes on a vector layer get the canvas's fill, outline, corners, align, boolean operations, masks, groups and export.
+- **One rail of tools for both views.** A tool in both views is one tool: Hand, Select, Edit nodes, Pen, Shape and Path, Lasso, Text, and the Eraser, which takes shapes on the canvas and on a vector layer, and paint on a paint layer. The Paint view adds the **Brush**; the canvas keeps Sheet, Note, Import, Screenshot and Search.
+- **One keymap for both views.** Tool keys can be changed once for both; a key can mean one thing in each view (`B`: the Brush in the Paint view, Path on the canvas).
+- The Brush's options and colour are in the Properties bar (the colour is the Pen's). The painting's name, page size and menu (rename, page size, export, place on the canvas) are beside the view tabs; Layers floats at the right (the dock's Layers button) and the pages at the bottom left.
+
 ## 0.30.0 — Vector layers with the canvas's tools (2026-10-22)
 
 - **Vector layers** in the Paint view: one layer holds any number of shapes, paths, pen strokes, texts and pictures (**+** > *Vector layer*, or just draw: with a paint layer picked, the first shape makes a vector layer).

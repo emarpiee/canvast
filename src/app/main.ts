@@ -74,6 +74,7 @@ import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
 import { mountPaintView } from "../ui/paint-view";
+import { Switch } from "./target";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
 import { goHome, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
@@ -94,7 +95,7 @@ import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_COMMAND, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey } from "../settings/shortcuts";
-import { KEY_COMMANDS, Keymap, comboOfEvent, displayCombo, installKeymap } from "../settings/keymap";
+import { KEY_COMMANDS, Keymap, commandById, comboOfEvent, displayCombo, installKeymap } from "../settings/keymap";
 import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
@@ -103,7 +104,7 @@ import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
 import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport } from "../ui/archive-ui";
-import { copyText, mountTextEditor } from "../ui/text-editor";
+import { copyText, mountTextEditor, type TextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
 import { describeFile } from "../assets/file-kind";
@@ -689,6 +690,14 @@ async function start(): Promise<void> {
     return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
   };
   const textEditor = mountTextEditor(host, view, doc, editor, libraryFonts);
+  // One chrome for both views (ADR 0168): the bars below work on these stand-ins, which are the canvas's or, in the Paint view, those of
+  // the picked vector layer (paint/vector-host.ts). Storage, the index sync, the tiles and the canvas's own tools keep the canvas's.
+  const docTarget = new Switch<DocumentStore>(doc, { subscribe: ["load", null] });
+  const editorTarget = new Switch<EditorState>(editor, { subscribe: [], subscribeRedraw: [] });
+  const viewTarget = new Switch<ViewState>(view, { subscribe: [] });
+  const indexTarget = new Switch<FrameIndex>(index, {});
+  const textTarget = new Switch<TextEditor>(textEditor, {});
+  const tdoc = docTarget.proxy, ted = editorTarget.proxy, tview = viewTarget.proxy, tindex = indexTarget.proxy, ttext = textTarget.proxy;
   const copySelectedMarkdown = (): void => {
     const md = doc.ordered().flatMap((o) => (o.kind === "text" && editor.selection.has(o.id) ? [o.md] : []));
     if (!md.length) return;
@@ -699,7 +708,7 @@ async function start(): Promise<void> {
   };
   /** Screen px per local unit of a text at this view (0 when it is not on screen). */
   const textPpu = (id: string): number => {
-    const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === id);
+    const po = visibleObjects(tdoc, tindex, null, tview.frameCamera, tview.viewport).find((p) => p.obj.id === id);
     return po && !po.cover ? po.proj.ppu : 0;
   };
   const bookmarkList = new BookmarkList(session, view, doc);
@@ -876,8 +885,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
     if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
-      for (const o of doc.ordered()) {
-        if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
+      for (const o of tdoc.ordered()) {
+        if (o.kind !== "image" || !ted.selection.has(o.id) || names.has(o.assetId)) continue;
         const e = await session.catalog.entry(o.assetId).catch(() => undefined);
         names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
       }
@@ -885,23 +894,26 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // The grid is laid out with the chosen space between items; the last grid is kept so a new spacing can lay it out again.
     const full: LayoutCommand = "grid" in cmd ? { grid: cmd.grid, gap: settings.get("arrange.gap") } : cmd;
     if ("grid" in full) lastGrid = { cmd: full, ids: [...editor.selection].sort().join() };
-    layoutSelection(doc, editor, full, names);
+    layoutSelection(tdoc, ted, full, names);
   };
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   const hintLine = { current: null as null | { refresh(): void } };
-  mountToolbar(document.getElementById("toolbar")!, editor, doc, {
+  mountToolbar(document.getElementById("toolbar")!, ted, tdoc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
     screenshot: () => void takeScreenshot(),
-    undo: () => undo(doc, editor),
-    redo: () => redo(doc, editor),
-    clearFlag: (flag) => clearFlag(doc, editor, flag),
-    depth: () => depthOf(view.frameCamera),
+    // (in the Painting view, undo is the painting's: its layers, pixels and pages, ADR 0168)
+    undo: () => (appView === "paint" ? paintView.session?.undo() : undo(doc, editor)),
+    redo: () => (appView === "paint" ? paintView.session?.redo() : redo(doc, editor)),
+    canUndo: () => (appView === "paint" ? !!paintView.session?.history.canUndo : doc.canUndo),
+    canRedo: () => (appView === "paint" ? !!paintView.session?.history.canRedo : doc.canRedo),
+    clearFlag: (flag) => clearFlag(tdoc, ted, flag),
+    depth: () => depthOf(tview.frameCamera),
     setSelectedWidth: (px, final = true) => {
       // Width in the stroke's own units: screen px / (screen px per local unit). Strokes and paths out of double range are skipped.
-      const next = visibleObjects(doc, index, null, view.frameCamera, view.viewport).flatMap((po): CanvasObject[] => {
+      const next = visibleObjects(tdoc, tindex, null, tview.frameCamera, tview.viewport).flatMap((po): CanvasObject[] => {
         const ppu = po.cover ? 0 : po.proj.ppu;
-        if (!((po.obj.kind === "stroke" || po.obj.kind === "path" || po.obj.kind === "image") && editor.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity)) return [];
+        if (!((po.obj.kind === "stroke" || po.obj.kind === "path" || po.obj.kind === "image") && ted.selection.has(po.obj.id) && !po.obj.locked && ppu > 0 && ppu < Infinity)) return [];
         // A picture's outline works as a shape's: 0 takes it away (the width is kept), a width turns one on (white, as a first outline).
         if (po.obj.kind === "image") {
           const { stroke: _s, ...bare } = po.obj;
@@ -911,126 +923,126 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (po.obj.kind === "path") return px > 0 ? [{ ...po.obj, width: px / ppu, ...(po.obj.stroke === null ? { stroke: newInk("#1f2329") } : {}) }] : po.obj.stroke === null ? [] : [{ ...po.obj, stroke: null }];
         return px > 0 ? [{ ...po.obj, width: px / ppu }] : [];
       });
-      if (!final) return showReplaced(editor, next);
-      editor.preview = { kind: "none" };
-      if (next.length) doc.commit(doc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
-      editor.changed();
+      if (!final) return showReplaced(ted, next);
+      ted.preview = { kind: "none" };
+      if (next.length) tdoc.commit(tdoc.transaction(next.length === 1 ? "Line thickness" : `Thickness of ${next.length} lines`, next));
+      ted.changed();
     },
-    selectedPaint: () => selectedPaint(doc, editor),
+    selectedPaint: () => selectedPaint(tdoc, ted),
     selectedOutline: () => {
-      const o = selectedOutline(doc, editor);
+      const o = selectedOutline(tdoc, ted);
       if (!o) return null;
-      const first = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "path" || x?.kind === "image") as PathObject | ImageObject | undefined;
-      const po = first && visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === first.id);
+      const first = [...editor.selection].map((id) => tdoc.get(id)).find((x) => x?.kind === "path" || x?.kind === "image") as PathObject | ImageObject | undefined;
+      const po = first && visibleObjects(tdoc, tindex, null, tview.frameCamera, tview.viewport).find((p) => p.obj.id === first.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
       const wLocal = first?.kind === "image" ? (first.stroke === undefined ? 0 : (first.width ?? 0)) : first?.width;
       return { ...o, widthPx: ppu > 0 && ppu < Infinity && wLocal !== undefined ? wLocal * ppu : null };
     },
-    outlineSelected: (patch) => commitOutline(doc, editor, patch),
-    selectedDashNumbers: () => selectedDashNumbers(doc, editor),
-    setDashNumbers: (n) => commitDashNumbers(doc, editor, n),
-    paintMask: (ink) => paintMask(editor, ink),
-    selectedMiterAngle: () => selectedMiterAngle(doc, editor),
-    setMiterAngle: (deg) => commitMiterAngle(doc, editor, deg),
-    selectedArrows: () => selectedArrows(doc, editor),
-    setArrows: (patch) => commitArrows(doc, editor, patch),
-    selectionPaints: () => selectionPaints(doc, editor),
-    recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
-    selectedPin: () => selectedPin(doc, editor),
+    outlineSelected: (patch) => commitOutline(tdoc, ted, patch),
+    selectedDashNumbers: () => selectedDashNumbers(tdoc, ted),
+    setDashNumbers: (n) => commitDashNumbers(tdoc, ted, n),
+    paintMask: (ink) => paintMask(ted, ink),
+    selectedMiterAngle: () => selectedMiterAngle(tdoc, ted),
+    setMiterAngle: (deg) => commitMiterAngle(tdoc, ted, deg),
+    selectedArrows: () => selectedArrows(tdoc, ted),
+    setArrows: (patch) => commitArrows(tdoc, ted, patch),
+    selectionPaints: () => selectionPaints(tdoc, ted),
+    recolourSelected: (from, to, final) => recolour(tdoc, ted, from, to, final),
+    selectedPin: () => selectedPin(tdoc, ted),
     fonts: libraryFonts,
     importFont: async (file) => {
       const why = await whyNotFont(new Uint8Array(await file.arrayBuffer()));
       if (why) {
-        editor.message = `Could not use “${file.name}”: ${why}`;
-        editor.changed();
+        ted.message = `Could not use “${file.name}”: ${why}`;
+        ted.changed();
         return null;
       }
       const { record } = await assets.importFileDetailed(file, false);
       await fontLoader.ensure(record.hash);
       return record.hash;
     },
-    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, newInk(editor.penColor)) : editor.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD }, newInk(editor.penColor)) : selectedTextStyle(doc, editor, textPpu)),
+    selectedTextStyle: () => (ttext.isOpen ? ttext.look() : ted.tool === "text" ? toolLook(ted.textLook, newInk(ted.penColor)) : ted.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: ted.textLook.card ?? NOTE_CARD }, newInk(ted.penColor)) : selectedTextStyle(tdoc, ted, textPpu)),
     setTextStyle: (look, final = true) => {
-      if (editor.tool === "text" || editor.tool === "note") editor.textLook = { ...editor.textLook, ...look };
-      if (textEditor.isOpen) textEditor.restyle(look);
-      else if (editor.tool !== "text" && editor.tool !== "note") setTextStyle(doc, editor, look, textPpu, final);
-      else editor.changed();
+      if (ted.tool === "text" || ted.tool === "note") ted.textLook = { ...editor.textLook, ...look };
+      if (ttext.isOpen) ttext.restyle(look);
+      else if (ted.tool !== "text" && ted.tool !== "note") setTextStyle(tdoc, ted, look, textPpu, final);
+      else ted.changed();
     },
-    setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
-    sheetRatio: () => sheetRatio(doc, editor),
-    setSheetRatio: (r, final) => setSheetRatio(doc, editor, r, final),
-    boxOnSheet: () => boxOnSheet(doc, editor),
-    moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
-    resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
-    sheetScale: () => sheetScalesContents(doc, editor),
-    setSheetScale: (on) => setSheetScale(doc, editor, on),
-    croppable: () => croppablePicture(doc, editor) !== null,
-    cropped: () => isCropped(doc, editor),
-    uncrop: () => uncropPicture(doc, editor),
-    selectedAdjust: () => selectedAdjust(doc, editor),
+    setPin: (patch) => setPin(tdoc, ted, patch as { h?: "left"; v?: "top" }),
+    sheetRatio: () => sheetRatio(tdoc, ted),
+    setSheetRatio: (r, final) => setSheetRatio(tdoc, ted, r, final),
+    boxOnSheet: () => boxOnSheet(tdoc, ted),
+    moveOnSheet: (x, y, final) => moveOnSheet(tdoc, ted, x, y, final),
+    resizeOnSheet: (w, h, final) => resizeOnSheet(tdoc, ted, w, h, final),
+    sheetScale: () => sheetScalesContents(tdoc, ted),
+    setSheetScale: (on) => setSheetScale(tdoc, ted, on),
+    croppable: () => croppablePicture(tdoc, ted) !== null,
+    cropped: () => isCropped(tdoc, ted),
+    uncrop: () => uncropPicture(tdoc, ted),
+    selectedAdjust: () => selectedAdjust(tdoc, ted),
     adjustStyles: adjustStylesApi,
-    previewAdjust: (a) => previewAdjust(doc, editor, a),
-    commitAdjust: (a, label) => commitAdjust(doc, editor, a, label),
-    copyAdjust: () => void copyAdjustments(doc, editor),
-    pasteAdjust: () => pasteAdjustments(doc, editor),
+    previewAdjust: (a) => previewAdjust(tdoc, ted, a),
+    commitAdjust: (a, label) => commitAdjust(tdoc, ted, a, label),
+    copyAdjust: () => void copyAdjustments(tdoc, ted),
+    pasteAdjust: () => pasteAdjustments(tdoc, ted),
     canPasteAdjust: () => canPasteAdjustments(),
-    copyRendered: () => void copyRenderedPicture(doc, editor, assets),
-    bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
+    copyRendered: () => void copyRenderedPicture(tdoc, ted, assets),
+    bake: () => void bakePicture(tdoc, ted, assets, (shot) => storeFrame(assets, session, settings, shot)),
     selectedShape: () => {
-      const o = selectedShape(doc, editor);
+      const o = selectedShape(tdoc, ted);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
     },
-    shapeSelected: (change, final = true) => commitShape(doc, editor, change, final),
-    selectedSmoothing: () => selectedSmoothing(doc, editor),
-    setSmoothing: (pct, final = true) => commitSmoothing(doc, editor, pct, final),
+    shapeSelected: (change, final = true) => commitShape(tdoc, ted, change, final),
+    selectedSmoothing: () => selectedSmoothing(tdoc, ted),
+    setSmoothing: (pct, final = true) => commitSmoothing(tdoc, ted, pct, final),
     selectedCorners: () => {
-      const o = selectedCorners(doc, editor);
+      const o = selectedCorners(tdoc, ted);
       if (!o) return null;
-      const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === o.id);
+      const po = visibleObjects(tdoc, tindex, null, tview.frameCamera, tview.viewport).find((p) => p.obj.id === o.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
       if (!(ppu > 0 && ppu < Infinity)) return { radiusPx: [0], nodes: o.nodes, mixed: false };
       return { radiusPx: typeof o.radius === "number" ? [o.radius * ppu] : o.radius.map((v) => v * ppu), nodes: o.nodes, mixed: o.mixed };
     },
     cornersSelected: (px, final = true) => {
-      const visible = visibleObjects(doc, index, null, view.frameCamera, view.viewport);
-      commitCorners(doc, editor, px, (id) => {
+      const visible = visibleObjects(tdoc, tindex, null, tview.frameCamera, tview.viewport);
+      commitCorners(tdoc, ted, px, (id) => {
         const po = visible.find((p) => p.obj.id === id);
         return po && !po.cover ? po.proj.ppu : 0;
       }, final);
     },
-    paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
+    paintSelected: (patch, final) => (final ? commitPaint(tdoc, ted, patch) : previewPaint(tdoc, ted, patch)),
   });
   // File something just saved in the library in the folder and with the tags the settings give for its kind (what is saved from the canvas has its own).
   const fileInLibraryAs = (hash: string, kind: "export" | "pattern" | "svg"): Promise<string> =>
     fileInLibrary(session, hash, settings.get(`${kind}.folder`).trim(), shotTags({ screenshot: false, board: false, canvas: false, items: false, custom: settings.get(`${kind}.tags`) }, "", "", []));
   /** Whether these objects include a pattern made by the Pattern panel (its shapes keep how it was made). */
-  const holdsPattern = (ids: Iterable<string>): boolean => [...ids].some((id) => doc.get(id)?.gen !== undefined);
+  const holdsPattern = (ids: Iterable<string>): boolean => [...ids].some((id) => tdoc.get(id)?.gen !== undefined);
   // Export… (ui/export-dialog.ts, ADR 0147): the picked sheet, picture or shapes as a picture file whose size is chosen there, from its shape.
   const openExport = (): void => {
-    const targets = exportTargets(doc, editor);
-    if (!targets.length || appView !== "canvas") {
-      editor.message = "Pick a sheet, a picture or some shapes to export.";
-      editor.changed();
+    const targets = exportTargets(tdoc, ted);
+    if (!targets.length || (appView !== "canvas" && appView !== "paint")) {
+      ted.message = "Pick a sheet, a picture or some shapes to export.";
+      ted.changed();
       return;
     }
     openExportDialog({
       targets,
-      render: (t, w, h, bg) => renderExport({ doc, index, assets, theme }, t, w, h, bg),
-      svg: (t, size) => svgOfTarget(doc, t, size),
+      render: (t, w, h, bg) => renderExport({ doc: tdoc, index: tindex, assets, theme }, t, w, h, bg),
+      svg: (t, size) => svgOfTarget(tdoc, t, size),
       svgWarning: (ts) => svgWarningOfTargets(ts),
-      pdfVector: (t, wPt, hPt) => pdfVectorOfTarget(doc, t, wPt, hPt),
-      say: (text) => { editor.message = text; editor.changed(); },
+      pdfVector: (t, wPt, hPt) => pdfVectorOfTarget(tdoc, t, wPt, hPt),
+      say: (text) => { ted.message = text; ted.changed(); },
       toLibrary: async (file, targets) => {
         if (!session.catalog) throw new Error("the library is not available in this tab");
         const { record } = await assets.importFileDetailed(file, false);
         const where = await fileInLibraryAs(record.hash, targets.some((t) => holdsPattern(t.ids)) ? "pattern" : "export");
-        editor.message = `Exported “${file.name}” in ${where}.`;
-        editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
-        editor.changed();
+        ted.message = `Exported “${file.name}” in ${where}.`;
+        ted.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+        ted.changed();
       },
     });
   };
-  // The dice (interaction/random-view.ts): the camera goes to a random place and zoom with nothing of the canvas near.
+  // The dice (interaction/random-tview.ts): the camera goes to a random place and zoom with nothing of the canvas near.
   const goRandomView = (): void => {
     const fc = randomEmptyView(doc.space, viewIsEmpty(index, view.viewport));
     if (fc) view.flyTo(fc);
@@ -1134,7 +1146,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
 
   // Texture fills (ADR 0154): the chooser's Image and Objects take their source from the canvas or a file.
   setTextureHooks(createTextureHooks({
-    editor,
+    editor: ted,
     host: textureHost,
     nameOf: (hash) => assetNames.get(hash),
     libraryPictures: async () => {
@@ -1144,34 +1156,34 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         .sort((a, b) => b.importedAt - a.importedAt)
         .map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
     },
-    say: (text) => { editor.message = text; editor.changed(); },
+    say: (text) => { ted.message = text; ted.changed(); },
     importPicture: async (file) => {
       try {
         const { record } = await assets.importFileDetailed(file, false);
         if (!record.type.startsWith("image/") || record.card) {
-          editor.message = "That file is not a picture.";
-          editor.changed();
+          ted.message = "That file is not a picture.";
+          ted.changed();
           return null;
         }
         if (session.catalog) await fileInLibrary(session, record.hash, "Fills", ["fill"]);
         return record.hash;
       } catch (err) {
-        editor.message = `Could not take that picture: ${err instanceof Error ? err.message : String(err)}`;
-        editor.changed();
+        ted.message = `Could not take that picture: ${err instanceof Error ? err.message : String(err)}`;
+        ted.changed();
         return null;
       }
     },
   }));
   setColourStyles({
     gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, gradient: s.data as Gradient })),
-    saveGradient: (g) => session.styles.add("gradient", "", g).then((made) => { if (made) { editor.message = "Saved the gradient to the Styles."; editor.changed(); } }),
+    saveGradient: (g) => session.styles.add("gradient", "", g).then((made) => { if (made) { ted.message = "Saved the gradient to the Styles."; ted.changed(); } }),
     showGradients: () => {
-      editor.stylesTab = "gradient";
-      editor.stylesOpen = true;
-      editor.changed();
+      ted.stylesTab = "gradient";
+      ted.stylesOpen = true;
+      ted.changed();
     },
     colours: () => session.styles.of("colour").map((s) => String(s.data)),
-    save: (hex) => session.styles.add("colour", "", hex).then((made) => { if (made) { editor.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`; editor.changed(); } }),
+    save: (hex) => session.styles.add("colour", "", hex).then((made) => { if (made) { ted.message = `Saved ${hex.toUpperCase()} to the Styles of the library.`; ted.changed(); } }),
   });
   const history = new CameraHistory(view);
   // A bookmark of the picked things: the view that brings them into the window, saved while the camera stays where it is; its picture follows.
@@ -1216,21 +1228,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       thumbsRunning = false;
     }
   };
-  editor.subscribe(() => {
-    if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
-    document.body.classList.toggle("is-cropping", editor.cropId !== null); // (the floating bars and panels step aside, ADR 0118)
+  ted.subscribe(() => {
+    if (ted.cropId && !(ted.selection.size === 1 && ted.selection.has(ted.cropId))) ted.cropId = null; // (cropping ends when the picture is let go)
+    document.body.classList.toggle("is-cropping", ted.cropId !== null); // (the floating bars and panels step aside, ADR 0118)
   });
-  mountHud(document.getElementById("hud")!, view, stats, debug, {
-    fit: (kind) => focusCycle.fit(kind),
+  mountHud(document.getElementById("hud")!, tview, stats, debug, {
+    fit: (kind) => (appView === "paint" ? paintView.fit() : focusCycle.fit(kind)),
     canCameraBack: () => history.canBack(),
     canCameraForward: () => history.canForward(),
     cameraBack: () => history.back(),
     cameraForward: () => history.forward(),
     subscribeCamera: (fn) => history.subscribe(fn),
-    hasSelection: () => editor.selection.size > 0,
+    hasSelection: () => ted.selection.size > 0,
     toggleZen: () => void settings.set("ui.zen", !settings.get("ui.zen")),
     randomView: () => goRandomView(),
-    subscribeSelection: (fn) => void editor.subscribe(fn),
+    subscribeSelection: (fn) => void ted.subscribe(fn),
     saveText: () => SAVE_TEXT[persistence.state] + (persistence.state === "error" && persistence.lastError ? ` (${persistence.lastError})` : ""),
     saveState: () => persistence.state,
     subscribe: (fn) => void persistence.subscribe(fn),
@@ -1246,116 +1258,116 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     infoMode: () => settings.get("ui.info"),
     setInfoMode: (m) => void settings.set("ui.info", m),
     subscribeInfo: (fn) => void settings.subscribe((key) => key === "ui.info" && fn()),
-    scene: () => ({ objects: doc.size, drawn: stats.last?.visibleCount ?? 0, indexing: indexSync.building() }),
+    scene: () => ({ objects: tdoc.size, drawn: stats.last?.visibleCount ?? 0, indexing: indexSync.building() }),
     quality: () => quality.level,
     diagnostics: () => {
       const mem = assets.stats();
       const q = assets.decodeLoad();
       const mib = (b: number): string => (b / 2 ** 20).toFixed(0);
       return [
-        `objects ${doc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
+        `objects ${tdoc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
         `decoded ${mem.count} images · ${mib(mem.bytes)} / ${mib(mem.budget)} MiB · decoding ${q.running} · waiting ${q.queued}`,
       ];
     },
     notify: (message) => {
-      editor.message = message;
-      editor.changed();
+      ted.message = message;
+      ted.changed();
     },
   });
   applyZen(); // the button beside Home exists now
-  if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
+  if (debug) mountDevPanel(document.getElementById("hud")!, tview, tdoc, () => pruneSelection(tdoc, ted), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
 
   /** Save the picked paths as an SVG picture in the library (the same file "Save as SVG" writes). */
   const saveSvgToLibrary = async (): Promise<void> => {
-    const text = svgOfSelection(doc, editor);
+    const text = svgOfSelection(tdoc, ted);
     if (text === null) {
-      editor.message = "These shapes cannot be put in one drawing (too far apart in size).";
-      editor.changed();
+      ted.message = "These shapes cannot be put in one drawing (too far apart in size).";
+      ted.changed();
       return;
     }
     try {
       const name = "canvast-shapes.svg";
       const { record } = await assets.importFileDetailed(new File([text], name, { type: "image/svg+xml" }), false);
-      const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(doc.all(), editor.selection)]) ? "pattern" : "svg");
-      editor.message = `Saved “${name}” in ${where}.${svgWarningOfSelection(doc, editor) ? ` ${svgWarningOfSelection(doc, editor)}` : ""}`;
-      editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
+      const where = await fileInLibraryAs(record.hash, holdsPattern([...editor.selection, ...descendantsOf(tdoc.all(), ted.selection)]) ? "pattern" : "svg");
+      ted.message = `Saved “${name}” in ${where}.${svgWarningOfSelection(tdoc, ted) ? ` ${svgWarningOfSelection(tdoc, ted)}` : ""}`;
+      ted.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
     } catch (e) {
-      editor.message = `Could not save to the library: ${(e as Error).message}`;
+      ted.message = `Could not save to the library: ${(e as Error).message}`;
     }
-    editor.changed();
+    ted.changed();
   };
   const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
-    const b = editor.selectionBoxOnScreen;
-    if (!b || editor.selection.size === 0) return null;
+    const b = ted.selectionBoxOnScreen;
+    if (!b || ted.selection.size === 0) return null;
     const xs = b.frame.corners.map((c) => c[0]);
     const ys = b.frame.corners.map((c) => c[1]);
     return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
   });
-  hintLine.current = mountHintLine(editor, doc, () => settings.get("ui.hints"));
+  hintLine.current = mountHintLine(ted, tdoc, () => settings.get("ui.hints"));
   const contextBar = mountContextBar(
     host,
-    editor,
-    doc,
+    ted,
+    tdoc,
     {
-      duplicate: () => duplicateSelection(doc, editor, view),
-      outline: () => convertTextToPath(doc, editor),
-      setOnPath: () => setTextOnPath(doc, editor),
-      canSetOnPath: () => canSetOnPath(doc, editor),
-      takeOffPath: () => takeTextOffPath(doc, editor),
-      canTakeOffPath: () => canTakeOffPath(doc, editor),
-      canOutline: () => canOutline(doc, editor),
-      simplify: () => simplifySelection(doc, editor),
-      canSimplify: () => canSimplify(doc, editor),
-      strokeToPath: () => strokeToPath(doc, editor),
-      outlineStroke: (profile) => outlineStroke(doc, editor, profile),
-      setWidthProfile: (profile) => setWidthProfile(doc, editor, profile),
-      makeNetwork: () => makeNetwork(doc, editor),
-      releaseNetwork: () => releaseNetwork(doc, editor),
-      canMakeNetwork: () => canMakeNetwork(doc, editor),
-      canReleaseNetwork: () => canReleaseNetwork(doc, editor),
-      divide: () => divide(doc, editor),
-      shapeBuilder: () => startShapeBuilder(doc, editor),
-      finishBuilder: (apply) => finishShapeBuilder(doc, editor, apply),
-      canDivide: () => canDivide(doc, editor),
-      makeMask: (mode) => makeMask(doc, editor, mode),
-      makeClippingMask: () => makeClippingMask(doc, editor),
-      canMakeMask: () => canMakeMask(doc, editor),
-      changeMask: (change) => changeMask(doc, editor, change),
-      selectMask: () => selectTheMask(doc, editor),
-      canReleaseMask: () => canReleaseMask(doc, editor),
-      selectedMask: () => selectedMask(doc, editor),
-      canOutlineStroke: () => canOutlineStroke(doc, editor),
-      canStrokeToPath: () => canStrokeToPath(doc, editor),
-      combine: (op) => combineSelection(doc, editor, op),
-      booleanState: () => booleanSelection(doc, editor)?.op ?? null,
-      groupJoin: () => groupJoinMode(doc, editor),
-      addToGroup: () => addToBooleanGroup(doc, editor),
-      takeOutOfGroup: () => takeOutOfBooleanGroup(doc, editor),
+      duplicate: () => duplicateSelection(tdoc, ted, tview),
+      outline: () => convertTextToPath(tdoc, ted),
+      setOnPath: () => setTextOnPath(tdoc, ted),
+      canSetOnPath: () => canSetOnPath(tdoc, ted),
+      takeOffPath: () => takeTextOffPath(tdoc, ted),
+      canTakeOffPath: () => canTakeOffPath(tdoc, ted),
+      canOutline: () => canOutline(tdoc, ted),
+      simplify: () => simplifySelection(tdoc, ted),
+      canSimplify: () => canSimplify(tdoc, ted),
+      strokeToPath: () => strokeToPath(tdoc, ted),
+      outlineStroke: (profile) => outlineStroke(tdoc, ted, profile),
+      setWidthProfile: (profile) => setWidthProfile(tdoc, ted, profile),
+      makeNetwork: () => makeNetwork(tdoc, ted),
+      releaseNetwork: () => releaseNetwork(tdoc, ted),
+      canMakeNetwork: () => canMakeNetwork(tdoc, ted),
+      canReleaseNetwork: () => canReleaseNetwork(tdoc, ted),
+      divide: () => divide(tdoc, ted),
+      shapeBuilder: () => startShapeBuilder(tdoc, ted),
+      finishBuilder: (apply) => finishShapeBuilder(tdoc, ted, apply),
+      canDivide: () => canDivide(tdoc, ted),
+      makeMask: (mode) => makeMask(tdoc, ted, mode),
+      makeClippingMask: () => makeClippingMask(tdoc, ted),
+      canMakeMask: () => canMakeMask(tdoc, ted),
+      changeMask: (change) => changeMask(tdoc, ted, change),
+      selectMask: () => selectTheMask(tdoc, ted),
+      canReleaseMask: () => canReleaseMask(tdoc, ted),
+      selectedMask: () => selectedMask(tdoc, ted),
+      canOutlineStroke: () => canOutlineStroke(tdoc, ted),
+      canStrokeToPath: () => canStrokeToPath(tdoc, ted),
+      combine: (op) => combineSelection(tdoc, ted, op),
+      booleanState: () => booleanSelection(tdoc, ted)?.op ?? null,
+      groupJoin: () => groupJoinMode(tdoc, ted),
+      addToGroup: () => addToBooleanGroup(tdoc, ted),
+      takeOutOfGroup: () => takeOutOfBooleanGroup(tdoc, ted),
       releaseBoolean: () => {
-        const b = booleanSelection(doc, editor);
-        if (b) releaseBoolean(doc, editor, b.gid);
+        const b = booleanSelection(tdoc, ted);
+        if (b) releaseBoolean(tdoc, ted, b.gid);
       },
       flattenBoolean: () => {
-        const b = booleanSelection(doc, editor);
-        if (b) flattenBoolean(doc, editor, b.gid);
+        const b = booleanSelection(tdoc, ted);
+        if (b) flattenBoolean(tdoc, ted, b.gid);
       },
-      canCombine: () => canCombine(doc, editor),
-      resetRotation: () => void resetRotation(doc, editor),
-      applyRotation: () => void applyRotation(doc, editor),
-      resetProportions: () => void resetProportions(doc, editor),
-      resettable: () => resettable(doc, editor),
+      canCombine: () => canCombine(tdoc, ted),
+      resetRotation: () => void resetRotation(tdoc, ted),
+      applyRotation: () => void applyRotation(tdoc, ted),
+      resetProportions: () => void resetProportions(tdoc, ted),
+      resettable: () => resettable(tdoc, ted),
       tag: () => {
-        editor.tagsOpen = true;
-        editor.changed();
+        ted.tagsOpen = true;
+        ted.changed();
         requestAnimationFrame(() => tagsPanel.focusAdd());
       },
       fileSelection: () => {
         const ids = [...editor.selection];
-        const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
+        const o = ids.length === 1 ? tdoc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return null;
         if (!fileKinds.has(o.assetId)) {
           fileKinds.set(o.assetId, { card: false, open: false, svg: false });
@@ -1369,16 +1381,16 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return k.card ? { hash: o.assetId, open: k.open } : null;
       },
       pictureTools: () => {
-        const sa = selectedAdjust(doc, editor);
-        return sa ? { still: sa.stills && [...editor.selection].some((id) => doc.get(id)?.kind === "image"), canPaste: canPasteAdjustments() } : null;
+        const sa = selectedAdjust(tdoc, ted);
+        return sa ? { still: sa.stills && [...editor.selection].some((id) => tdoc.get(id)?.kind === "image"), canPaste: canPasteAdjustments() } : null;
       },
-      copyAdjust: () => void copyAdjustments(doc, editor),
-      pasteAdjust: () => pasteAdjustments(doc, editor),
-      copyRendered: () => void copyRenderedPicture(doc, editor, assets),
-      bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
+      copyAdjust: () => void copyAdjustments(tdoc, ted),
+      pasteAdjust: () => pasteAdjustments(tdoc, ted),
+      copyRendered: () => void copyRenderedPicture(tdoc, ted, assets),
+      bake: () => void bakePicture(tdoc, ted, assets, (shot) => storeFrame(assets, session, settings, shot)),
       svgPicture: () => {
         const ids = [...editor.selection];
-        const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
+        const o = ids.length === 1 ? tdoc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return false;
         void session.catalog?.entry(o.assetId).then((e) => {
           if (e && !fileKinds.get(o.assetId)?.svg && e.type === "image/svg+xml") {
@@ -1389,47 +1401,47 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return fileKinds.get(o.assetId)?.svg === true;
       },
       vectorise: () => {
-        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
+        const o = [...editor.selection].map((id) => tdoc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind !== "image") return;
         void assets.record(o.assetId).then(async (rec) => {
-          if (rec) importSvg(doc, editor, view, await rec.blob.text()); // (the picture stays: this makes a vector copy)
+          if (rec) importSvg(tdoc, ted, tview, await rec.blob.text()); // (the picture stays: this makes a vector copy)
         });
       },
-      canExportSvg: () => canExportSvg(doc, editor),
+      canExportSvg: () => canExportSvg(tdoc, ted),
       saveSvgToLibrary: () => void saveSvgToLibrary(),
-      initialState: () => initialShapeState(doc, editor),
-      setInitialState: (onlyMissing) => setInitialShape(doc, editor, onlyMissing, settings.get("shape.initialPaint")),
-      resetInitialState: () => resetToInitialShape(doc, editor),
-      canExport: () => exportTarget(doc, editor) !== null,
+      initialState: () => initialShapeState(tdoc, ted),
+      setInitialState: (onlyMissing) => setInitialShape(tdoc, ted, onlyMissing, settings.get("shape.initialPaint")),
+      resetInitialState: () => resetToInitialShape(tdoc, ted),
+      canExport: () => exportTarget(tdoc, ted) !== null,
       exportPicture: () => openExport(),
-      canDownload: () => pickedFiles(doc, editor).length > 0,
-      downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
+      canDownload: () => pickedFiles(tdoc, ted).length > 0,
+      downloadFile: () => void downloadSelection(tdoc, ted, assets, session, settings),
       openFile: () => {
-        const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
+        const o = [...editor.selection].map((id) => tdoc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind === "image") void openOriginalInTab(assets, o.assetId);
       },
-      hasLibraryItems: () => [...editor.selection].some((id) => doc.get(id)?.kind === "image"),
+      hasLibraryItems: () => [...editor.selection].some((id) => tdoc.get(id)?.kind === "image"),
       showInLibrary: () => {
-        const hashes = [...new Set([...editor.selection].map((id) => doc.get(id)).flatMap((o) => (o?.kind === "image" ? [o.assetId] : [])))];
+        const hashes = [...new Set([...editor.selection].map((id) => tdoc.get(id)).flatMap((o) => (o?.kind === "image" ? [o.assetId] : [])))];
         if (!hashes.length) return;
         setView("assets");
         void assetsView.reveal(hashes);
       },
-      group: () => groupSelection(doc, editor),
-      putOnSheet: () => sheetSelection(doc, editor),
-      fitSheet: () => fitSheet(doc, editor),
-      canFitSheet: () => canFitSheet(doc, editor),
+      group: () => groupSelection(tdoc, ted),
+      putOnSheet: () => sheetSelection(tdoc, ted),
+      fitSheet: () => fitSheet(tdoc, ted),
+      canFitSheet: () => canFitSheet(tdoc, ted),
       attach: () => {
-        editor.attachMode = !editor.attachMode;
-        editor.changed();
+        ted.attachMode = !ted.attachMode;
+        ted.changed();
       },
-      detach: () => detachSelection(doc, editor),
-      canDetach: () => canDetach(doc, editor),
+      detach: () => detachSelection(tdoc, ted),
+      canDetach: () => canDetach(tdoc, ted),
       copyMarkdown: () => copySelectedMarkdown(),
-      releaseSheet: () => releaseSheets(doc, editor),
-      canReleaseSheet: () => [...editor.selection].some((id) => isContainer(doc.get(id))),
-      ungroup: () => ungroupSelection(doc, editor),
-      arrange: (to) => arrangeSelection(doc, editor, to),
+      releaseSheet: () => releaseSheets(tdoc, ted),
+      canReleaseSheet: () => [...editor.selection].some((id) => isContainer(tdoc.get(id))),
+      ungroup: () => ungroupSelection(tdoc, ted),
+      arrange: (to) => arrangeSelection(tdoc, ted, to),
       layout: (cmd) => void runLayout(cmd),
       gap: () => settings.get("arrange.gap"),
       setGap: (gap) => {
@@ -1437,10 +1449,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         // Choosing another space right after arranging the same items lays them out again with it (one more undo step).
         if (lastGrid && lastGrid.ids === [...editor.selection].sort().join()) void runLayout({ grid: lastGrid.cmd.grid });
       },
-      setFlag: (flag) => setFlag(doc, editor, flag),
-      deleteSelection: () => deleteSelection(doc, editor),
+      setFlag: (flag) => setFlag(tdoc, ted, flag),
+      deleteSelection: () => deleteSelection(tdoc, ted),
     },
-    () => appView !== "canvas" || textEditor.isOpen,
+    () => (appView !== "canvas" && appView !== "paint") || ttext.isOpen,
     () => settings.get("ui.actions"),
   );
   contextUpdate = contextBar.update;
@@ -1506,7 +1518,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     document.body.dataset["view"] = v;
     markTab(v);
     markNav(v);
-    host.inert = v !== "canvas";
+    host.inert = v !== "canvas" && v !== "paint"; // (the Painting view works with the canvas's bars, ADR 0168)
+    // The bars work on the picked vector layer in the Painting view, on the canvas elsewhere.
+    const pv = v === "paint" ? paintView.vector : null;
+    docTarget.use(pv?.doc ?? doc);
+    editorTarget.use(pv?.editor ?? editor);
+    viewTarget.use(pv?.view ?? view);
+    indexTarget.use(pv?.index ?? index);
+    textTarget.use(pv?.text ?? textEditor);
     closeMoreMenu(); // (a menu opened on the canvas, e.g. the long-press list, does not follow to another view)
     if (was === "assets") assetsView.hide();
     if (was === "settings") settingsView.hide();
@@ -1532,9 +1551,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     readOnly: () => session.readOnly,
     settings,
     tell: (text) => {
-      editor.message = text;
-      editor.changed();
+      ted.message = text;
+      ted.changed();
     },
+    optionsSlot: document.querySelector<HTMLElement>("[data-paint-options]")!,
     assets,
     theme: () => theme,
     styles: adjustStylesApi(),
@@ -1566,6 +1586,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       editor.changed();
     },
   });
+  // Its bar (the painting's name and page size) sits beside the view tabs, where the canvas has its board and canvas menu.
+  document.getElementById("nav")!.append(paintView.head);
+  document.getElementById("workspace")!.dataset["only"] = "canvas";
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
@@ -1775,7 +1798,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const onCanvas = appView === "canvas";
     const key = (k: string): string => k.toUpperCase();
     const list: Command[] = [
-      ...TOOL_ORDER.map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(keymap.display(TOOL_COMMAND[t])), enabled: () => onCanvas, run: () => editor.setTool(t) })),
+      ...TOOL_ORDER.filter((t) => commandById(TOOL_COMMAND[t])?.scope !== "paint").map((t): Command => ({ group: "Tool", title: TOOL_NAME[t], keys: key(keymap.display(TOOL_COMMAND[t])), enabled: () => onCanvas, run: () => editor.setTool(t) })),
       { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
       { group: "Edit", title: "Change the old default ink to the canvas ink", words: "recolour near-black dark outline theme light old drawings readable", enabled: () => onCanvas && newInk(DEFAULT_INK) !== DEFAULT_INK, run: () => void recolourOldInk(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },

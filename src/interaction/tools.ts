@@ -240,8 +240,10 @@ export interface ToolHooks {
   scope?: string;
   /** Undo and redo of the host's own history (default the document's). */
   history?: { undo(): void; redo(): void };
-  /** False: the pointer and keys are not these tools' now (the host's other tools have them). */
+  /** False: the pointer is not these tools' now (the host's other tools have it). */
   active?: () => boolean;
+  /** False: the keys are not these tools' now (default: as `active`). */
+  keysActive?: () => boolean;
 }
 
 export function attachTools(
@@ -2134,7 +2136,7 @@ export function attachTools(
 
   // ---- keyboard ----------------------------------------------------------
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!shortcutsActive(e, hooks.scope ?? "canvas") || off()) return;
+    if (!shortcutsActive(e, hooks.scope ?? "canvas") || (hooks.keysActive ? !hooks.keysActive() : off())) return;
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();

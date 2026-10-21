@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, normalizeCombo, parseCombo } from "../../src/settings/keymap";
+import { KEY_COMMANDS, Keymap, comboOfEvent, eventInit, judge, normalizeCombo, parseCombo, inView } from "../../src/settings/keymap";
 import { SettingsStore } from "../../src/settings/settings";
 
 function memory(initial: Record<string, string> = {}) {
@@ -27,16 +27,20 @@ describe("key combos (ADR 0158)", () => {
 });
 
 describe("the commands", () => {
-  it("each listen for a key of their own, and no two share one", () => {
-    const seen = new Map<string, string>();
-    for (const c of KEY_COMMANDS) for (const k of c.internal) {
-      expect(seen.get(k), `${c.id} and ${seen.get(k)} both listen for ${k}`).toBeUndefined();
-      seen.set(k, c.id);
-    }
-    const bound = new Map<string, string>();
-    for (const c of KEY_COMMANDS) for (const k of c.defaults) {
-      expect(bound.get(k), `${c.id} and ${bound.get(k)} are both bound to ${k}`).toBeUndefined();
-      bound.set(k, c.id);
+  it("each listen for a key of their own, and no two that work in the same view share one (ADR 0168)", () => {
+    for (const view of ["canvas", "paint", "global"] as const) {
+      const seen = new Map<string, string>();
+      const bound = new Map<string, string>();
+      for (const c of KEY_COMMANDS.filter((x) => inView(x.scope, view))) {
+        for (const k of c.internal) {
+          expect(seen.get(k), `${c.id} and ${seen.get(k)} both listen for ${k} in ${view}`).toBeUndefined();
+          seen.set(k, c.id);
+        }
+        for (const k of c.defaults) {
+          expect(bound.get(k), `${c.id} and ${bound.get(k)} are both bound to ${k} in ${view}`).toBeUndefined();
+          bound.set(k, c.id);
+        }
+      }
     }
   });
   it("start with F for the focus, not the Alt tap", () => {

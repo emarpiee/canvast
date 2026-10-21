@@ -38,6 +38,8 @@ export interface ToolbarActions {
   openSearch(prefix?: string): void;
   undo(): void;
   redo(): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
   /** Current zoom level, for the thickness lock. */
   depth(): { levels: bigint; frac: number };
   clearFlag(flag: "hidden" | "locked"): void;
@@ -112,18 +114,25 @@ export interface ToolbarActions {
   outlineSelected(patch: { join?: JoinChoice; cap?: CapChoice; align?: AlignChoice; dash?: DashChoice }): void;
 }
 
-const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
+/**
+ * The rail's tools (ADR 0168), one list for the canvas and the Painting view: `only` keeps a tool to one view (the Painting view's tools
+ * that work on pixels, the canvas's that make what only a canvas has); a tool in both views acts on what it is used on there (the Eraser:
+ * objects on the canvas and on a vector layer, paint on a paint layer).
+ */
+export const RAIL_TOOLS: ReadonlyArray<{ tool: Tool; icon: string; label: string; key: string; only?: "canvas" | "paint" }> = [
   { tool: "hand", icon: ICONS.hand, label: "Hand (pan)", key: "H" },
   { tool: "select", icon: ICONS.pointer, label: "Select", key: "V" },
   { tool: "node", icon: ICONS.nodeTool, label: "Edit nodes", key: "N" },
+  { tool: "brush", icon: ICONS.paintbrush, label: "Brush", key: "B", only: "paint" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "shape", icon: ICONS.shapeTool, label: "Shape and path", key: "U" },
-  { tool: "sheet", icon: ICONS.sheetTool, label: "Sheet", key: "C" },
+  { tool: "sheet", icon: ICONS.sheetTool, label: "Sheet", key: "C", only: "canvas" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
-  { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "M" },
+  { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "M", only: "canvas" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
+const TOOLS = RAIL_TOOLS;
 
 const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string }> = [
   { id: "fine", label: "Fine pen", title: "Fine pen: a clean line of one width", icon: ICONS.penTool },
@@ -210,11 +219,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         // (Import sits with the tools that put something on the canvas: after the Note tool)
-        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.only ? ` data-only="${t.only}"` : ""}${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" data-only="canvas" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
       ).join("")}
       </div>
-      <span class="rail-sep" role="separator"></span>
-      <div class="rail-tools" role="group" aria-label="Screenshot and search">
+      <span class="rail-sep" role="separator" data-only="canvas"></span>
+      <div class="rail-tools" role="group" aria-label="Screenshot and search" data-only="canvas">
         <button type="button" data-action="screenshot" aria-label="Screenshot" title="Screenshot: save the selection to the library, or the whole view when nothing is selected (format, folder and tags in Settings > Screenshot)">${ICONS.camera}</button>
         <button type="button" data-action="search" aria-label="Search the canvas" title="Search the canvas (Ctrl+F; # tag, @ bookmark)">${ICONS.search}</button>
       </div>
@@ -222,12 +231,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="Panels">
       <div class="tb-group">
-        <button type="button" class="layers-toggle" data-adjust-panel aria-pressed="false" aria-label="Adjust panel" title="Adjust: show or hide the panel for the exposure, contrast, colour and more of the picked pictures">${ICONS.slidersVertical}</button>
+        <button type="button" class="layers-toggle" data-only="canvas" data-adjust-panel aria-pressed="false" aria-label="Adjust panel" title="Adjust: show or hide the panel for the exposure, contrast, colour and more of the picked pictures">${ICONS.slidersVertical}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
-        <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
-        <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
-        <button type="button" class="layers-toggle" data-pattern-panel aria-pressed="false" aria-label="Pattern panel" title="Pattern: make waves, blobs, tiles and other patterns on a sheet or shape, with settings and a random button">${ICONS.mountainSnow}</button>
-        <button type="button" class="layers-toggle" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
+        <button type="button" class="layers-toggle" data-only="canvas" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
+        <button type="button" class="layers-toggle" data-only="canvas" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
+        <button type="button" class="layers-toggle" data-only="canvas" data-pattern-panel aria-pressed="false" aria-label="Pattern panel" title="Pattern: make waves, blobs, tiles and other patterns on a sheet or shape, with settings and a random button">${ICONS.mountainSnow}</button>
+        <button type="button" class="layers-toggle" data-only="canvas" data-bookmarks aria-pressed="false" aria-label="Bookmarks panel" title="Bookmarks: saved places and zooms on this canvas">${ICONS.bookmark}</button>
       </div>
     </div>
     <div class="toolbar" data-cmd-group="Properties" role="toolbar" aria-label="Tool options" hidden>
@@ -238,9 +247,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
         <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
       </div>
-      <div class="tb-group tb-options" data-for="pen" role="group" aria-label="Colour">
+      <div class="tb-group tb-options" data-for="pen brush" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
+      <div class="tb-group tb-options" data-for="brush eraser" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
@@ -1045,8 +1055,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
-    root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !doc.canUndo;
-    root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !doc.canRedo;
+    root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !actions.canUndo();
+    root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !actions.canRedo();
     // On Select the pen-size slider sets the thickness of selected strokes: with only shapes (or pictures, text) picked it is not theirs to set
     // (a shape's width is in Outline options), so it is not offered.
     const penSize = root.querySelector<HTMLElement>("[data-size]")!.closest<HTMLElement>(".tb-options")!;
