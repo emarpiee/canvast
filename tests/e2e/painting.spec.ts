@@ -183,6 +183,16 @@ test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector 
   await p.keyboard.press("Delete"); // (the canvas's keys: Delete takes the picked shape away)
   await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "Delete" }).toEqual(white);
   await p.keyboard.press("Control+z");
+  const del = p.locator('.ctx-bar [data-ctx="delete"]');
+  for (let i = 0; i < 2; i++) { // (a pick of a layer is followed at once, every time: once it was only on the next change of the painting)
+    await row(p, "Layer 1").locator(".layer-name").click();
+    await stroke(p, [600, 450], [600, 450]);
+    await expect(del, "on a paint layer the shapes are not picked").toBeHidden();
+    await row(p, "Vector 1").locator(".layer-name").click();
+    await stroke(p, [600, 450], [600, 450]);
+    await expect(del, "back on the vector layer they are").toBeVisible();
+    await p.keyboard.press("Escape");
+  }
   await p.keyboard.press("p"); // the canvas's Pen, into the same layer
   await stroke(p, [300, 900], [1600, 900]);
   await expect.poll(async () => (await state(p)).layers.map((l) => l.objs ?? null), { message: "the stroke is a third object of the one vector layer" }).toEqual([null, 3]);

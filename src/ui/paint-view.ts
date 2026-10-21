@@ -351,6 +351,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   const renderLayers = (): void => {
     if (!session) return;
+    vhost.sync(); // (a pick of a layer only sets activeId: the canvas's tools must follow it now, not on the next change)
     const s = session;
     const stack = s.stack().reverse(); // (top first, as a painting program lists them)
     const act = s.active();
