@@ -13,3 +13,8 @@ test-builds/
 
 # Rendered video, too big to commit for now
 docs/media/
+
+# The brush engine: its pinned source (fetched by scripts/build-engine.mjs) and Rust build output
+.engine-src/
+engine/target/
+engine/target-simd/

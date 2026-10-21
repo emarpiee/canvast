@@ -1,0 +1,36 @@
+# The brush engine of the Painting view, compiled to WebAssembly (SPIKE, P0). A thin wrapper over the pinned engine
+# source that scripts/build-engine.mjs fetches into .engine-src/; nothing of that source is kept in this repository.
+[package]
+name = "canvast-brush"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+# The engine's crates, under short names (the code says `paint`, `raster`, ...; see THIRD_PARTY_NOTICES.md for the source).
+paint = { package = "photocraft-paint", path = "../.engine-src/crates/paint" }
+raster = { package = "photocraft-raster", path = "../.engine-src/crates/raster" }
+color = { package = "photocraft-color", path = "../.engine-src/crates/color" }
+geom = { package = "photocraft-geom", path = "../.engine-src/crates/geom" }
+psd = { package = "photocraft-psd", path = "../.engine-src/crates/psd" }
+serde_json = "1"
+
+# Its own workspace: never part of the engine's.
+[workspace]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# The same, for the smallest file (measured against release in P0).
+[profile.small]
+inherits = "release"
+opt-level = "z"
