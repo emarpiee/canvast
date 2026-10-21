@@ -138,7 +138,7 @@ export function openExportDialog(deps: ExportDeps): void {
     <p class="ex-note" data-ex-note role="status" aria-live="polite"></p>
     <p class="ex-warn" data-ex-warn role="note" hidden></p>
     <footer class="ex-foot">
-      <button type="button" class="ex-btn" data-ex="library" title="Keep it in the library of this workspace">${ICONS.library}<span>Save to library</span></button>
+      <button type="button" class="ex-btn" data-ex="library" title="Keep it in the library of this workspace">${ICONS.save}<span>Save to library</span></button>
       <button type="button" class="ex-btn" data-ex="copy" title="Copy the picture to the clipboard (as PNG)">${ICONS.clipboardPlain}<span>Copy</span></button>
       <button type="button" class="ex-btn is-primary" data-ex="download">${ICONS.download}<span>Download</span></button>
     </footer>`;

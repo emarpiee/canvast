@@ -210,7 +210,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         // (Import sits with the tools that put something on the canvas: after the Note tool)
-        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.imagePlus}</button>` : ""}`,
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
       ).join("")}
       </div>
       <span class="rail-sep" role="separator"></span>

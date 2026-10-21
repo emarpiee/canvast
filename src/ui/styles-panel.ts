@@ -177,11 +177,11 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         : k.id === "colour"
           ? `<button type="button" class="styles-make" data-add-style-colour>${ICONS.droplet}<span>Add a colour</span></button>`
           : k.id === "gradient"
-            ? `<button type="button" class="styles-make" data-new-gradient>${ICONS.blend}<span>New gradient</span></button><button type="button" class="styles-make" data-import>${ICONS.fileUp}<span>Import .ggr</span></button>`
+            ? `<button type="button" class="styles-make" data-new-gradient>${ICONS.blend}<span>New gradient</span></button><button type="button" class="styles-make" data-import>${ICONS.arrowDownToLine}<span>Import .ggr</span></button>`
             : k.id === "pattern"
               ? `<button type="button" class="styles-make" data-open-pattern>${ICONS.mountainSnow}<span>Open the Pattern panel</span></button>`
               : k.id === "text"
-              ? `<button type="button" class="styles-make" data-save-text${deps.text.current() ? "" : " disabled"}>${ICONS.textStyle}<span>Save from the text</span></button>`
+              ? `<button type="button" class="styles-make" data-save-text${deps.text.current() ? "" : " disabled"}>${ICONS.save}<span>Save from the text</span></button>`
               : "";
     const empty =
       all.length === 0
@@ -192,7 +192,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     panel.innerHTML = panelHtml({
       title: "Styles",
       count: total,
-      tools: `<button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr), GIMP palettes (.gpl) and Adobe swatches (.ase, .aco)">${ICONS.fileUp}</button>`,
+      tools: `<button type="button" class="layer-btn" data-import aria-label="Import styles" title="Import GIMP gradients (.ggr), GIMP palettes (.gpl) and Adobe swatches (.ase, .aco)">${ICONS.arrowDownToLine}</button>`,
       sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div><div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>`,
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
@@ -355,13 +355,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     }
     if (item.kind === "adjustment")
       return [
-        { label: "Update from the picked picture", icon: ICONS.replace, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the picked picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        { label: "Update from the picked picture", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the picked picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
         ...common(item),
         del,
       ];
     if (item.kind === "pattern")
       return [
-        { label: "Update from the Pattern panel", icon: ICONS.replace, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
+        { label: "Update from the Pattern panel", icon: ICONS.refresh, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
         ...common(item),
         del,
       ];
@@ -506,7 +506,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         kindMore,
         [
           { label: `Export all as ${kind === "gradient" ? ".ggr" : ".gpl"}`, icon: ICONS.download, disabled: items.length === 0, aria: `Export all ${kind === "gradient" ? "gradients" : "palettes"}`, run: () => void exportItems(kind, items) },
-          { label: "Import files", icon: ICONS.fileUp, aria: "Import GIMP files", run: () => fileInput.click() },
+          { label: "Import files", icon: ICONS.arrowDownToLine, aria: "Import GIMP files", run: () => fileInput.click() },
         ],
         `Actions for ${kind === "gradient" ? "gradients" : "palettes"}`,
       );

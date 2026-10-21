@@ -151,8 +151,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
       <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <span class="assets-sep" role="separator"></span>
-      <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.fileInput}<span>Import</span></button>
-      <button type="button" class="assets-btn is-icon" data-action="import-folder" data-testid="assets-import-folder" aria-label="Import a folder" title="Import a folder: every file in it, put in library folders of the same names">${ICONS.folderInput}</button>
+      <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button>
+      <button type="button" class="assets-btn is-icon" data-action="import-folder" data-testid="assets-import-folder" aria-label="Import a folder" title="Import a folder: every file in it, put in library folders of the same names">${ICONS.arrowDownToLine}</button>
       <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you picked, as a slideshow">${ICONS.play}</button>
       <span class="assets-sep" role="separator"></span>

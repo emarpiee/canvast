@@ -12,7 +12,7 @@ const lib = () => {
 
 describe("styles (ADR 0120)", () => {
   it("has one registry: each kind says how to check, say and show its data", () => {
-    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text"]);
+    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text", "pattern"]);
     expect(kindById("adjustment")).toBe(ADJUSTMENT_KIND);
     expect(ADJUSTMENT_KIND.validate({ exposure: 20.4, blur: 0, grain: 500 })).toEqual({ exposure: 20, grain: 100 });
     expect(ADJUSTMENT_KIND.validate({ exposure: 0 })).toBeNull();

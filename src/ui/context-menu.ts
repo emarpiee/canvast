@@ -10,7 +10,7 @@ const ON_EMPTY = ["Paste", "Select everything", "Show all hidden", "Unlock all",
 const ICON: Record<string, string> = {
   Copy: ICONS.clipboardCopy, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
   "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
-  "Save the selection to the library as SVG": ICONS.bookDown, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
+  "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
   "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house,
 };
 const MENU_W = 240;

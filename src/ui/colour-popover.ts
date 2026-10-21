@@ -921,7 +921,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     levelsSection +
     curvesSection +
     (o.stills ? "" : `<p class="op-note">Sharpen and grain can slow the playback of a big video.</p>`) +
-    `<footer class="adj-foot"><div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" data-adj-save>Save</button></div><button type="button" class="adj-open" data-adj-open>${ICONS.swatchBook}<span>Saved adjustments</span></button></footer>`;
+    `<footer class="adj-foot"><div class="adj-save"><input type="text" class="adj-name" data-adj-name maxlength="60" placeholder="Name to save these as" autocomplete="off" spellcheck="false" aria-label="Name of the adjustment to save"><button type="button" class="layer-btn" data-adj-save aria-label="Save" title="Save these adjustments in the Styles panel">${ICONS.save}</button></div><button type="button" class="adj-open" data-adj-open>${ICONS.swatchBook}<span>Saved adjustments</span></button></footer>`;
   scrubNumbers(pop);
   if (o.subHost) o.subHost.replaceChildren(pop.querySelector(".adj-layers")!);
   if (o.footHost) o.footHost.replaceChildren(pop.querySelector(".adj-foot")!);

@@ -908,7 +908,7 @@ test("a video this browser cannot decode is still imported as a card of its own 
   await expect(bar.locator(".media-time")).toHaveText("Can't play in this browser");
   await expect(bar.getByRole("button", { name: "Play", exact: true })).toBeDisabled();
   const download = p.waitForEvent("download");
-  await bar.getByRole("button", { name: /Save the original file/ }).click();
+  await bar.getByRole("button", { name: /Download the original file/ }).click();
   expect((await download).suggestedFilename()).toBe("hevc.mp4");
   // A selected, unplayable instance has no black layer over its card.
   await expect(p.locator("video.media-video")).toBeHidden();

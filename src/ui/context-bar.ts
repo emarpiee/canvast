@@ -217,7 +217,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         const items = (): MenuItem[] => [
           ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "Choose a size and save it as a picture (PNG, WebP, JPEG, SVG or PDF)", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
           ...(actions.canDownload() ? [{ id: "download", label: "Download the original", hint: "The original file (several files: one ZIP; an edited picture comes with its original)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
-          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "The shapes as an SVG picture in the library, to place again", icon: ICONS.bookDown, run: () => actions.saveSvgToLibrary() }] : []),
+          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "The shapes as an SVG picture in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the picked text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
         openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
@@ -230,7 +230,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           if (!st) return [];
           return [
             ...(st.saved < st.count ? [{ id: "stateset", label: "Set initial state", hint: "Save the shape as it is now, to come back to it later", icon: ICONS.stateSet, run: () => actions.setInitialState(true) }] : []),
-            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Replace the saved state with the shape as it is now", icon: ICONS.stateUpdate, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Put the shape back as it was saved (its middle stays where it is)", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
+            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Replace the saved state with the shape as it is now", icon: ICONS.refresh, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Put the shape back as it was saved (its middle stays where it is)", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
           ];
         };
         openMoreMenu(b, items(), "Initial state", { keepOpen: true, refresh: items });

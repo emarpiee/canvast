@@ -45,7 +45,6 @@ import snowflakeSvg from "lucide-static/icons/snowflake.svg";
 import dicesSvg from "lucide-static/icons/dices.svg";
 import dice5Svg from "lucide-static/icons/dice-5.svg";
 import sparklesSvg from "lucide-static/icons/sparkles.svg";
-import packagePlusSvg from "lucide-static/icons/package-plus.svg";
 import imageUpSvg from "lucide-static/icons/image-up.svg";
 import arrowRightLeftSvg from "lucide-static/icons/arrow-right-left.svg";
 import cornerUpRightSvg from "lucide-static/icons/corner-up-right.svg";
@@ -80,6 +79,8 @@ import imagePlus from "lucide-static/icons/image-plus.svg";
 import undo from "lucide-static/icons/undo-2.svg";
 import redo from "lucide-static/icons/redo-2.svg";
 import trash from "lucide-static/icons/trash-2.svg";
+import saveSvg from "lucide-static/icons/save.svg";
+import arrowDownToLineSvg from "lucide-static/icons/arrow-down-to-line.svg";
 import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
 import refreshCw from "lucide-static/icons/refresh-cw.svg";
@@ -303,6 +304,8 @@ export const ICONS = {
   undo: clean(undo),
   redo: clean(redo),
   trash: clean(trash),
+  save: clean(saveSvg),
+  arrowDownToLine: clean(arrowDownToLineSvg),
   house: clean(house),
   plus: clean(plus),
   refresh: clean(refreshCw),
@@ -545,7 +548,6 @@ export const ICONS = {
   dices: clean(dicesSvg),
   dice5: clean(dice5Svg),
   sparkles: clean(sparklesSvg),
-  packagePlus: clean(packagePlusSvg),
   mountainSnow: clean(mountainSnowSvg),
   snowflake: clean(snowflakeSvg),
   imageUp: clean(imageUpSvg),

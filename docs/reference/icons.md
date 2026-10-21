@@ -1,9 +1,12 @@
 # Icon registry (checked 2026-10-17)
 
-One icon per function: two buttons that do different things never share an icon, and the icon says what the button does. Several buttons of the same function (every "close", every "delete") share one. Add a row here when you add an icon. Collected from the running app (canvas, panels, menus, Assets view and viewer); icons used only in states not opened then (media player, text editor, settings) are in `src/ui/icons.ts`.
+One icon per function: two buttons that do different things never share an icon, and the icon says what the button does. Several buttons of the same function (every "close", every "delete") share one. The common verbs have one common icon each, checked by `tests/e2e/icon-audit.spec.ts` (it reads the source: by the first word of a button's name, Save → `save`, Import → `arrow-down-to-line`, Download → `download`, Upload → `upload`, Delete → `trash-2`, Remove → `x`, Update → `refresh-cw`, Play → `play`; and `save`, `arrow-down-to-line` and `refresh-cw` belong to those alone). A new button of one of these verbs takes its icon; a different verb takes a different one. Add a row here when you add an icon. Collected from the running app (canvas, panels, menus, Assets view and viewer); icons used only in states not opened then (media player, text editor, settings) are in `src/ui/icons.ts`.
 
 | Icon (lucide) | Function(s) |
 | --- | --- |
+| `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
+| `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import a folder, Import styles (nothing else carries it) |
+| `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state (nothing else carries it) |
 | `expand` | Scale contents with the sheet (the sheet's size field) |
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
@@ -25,7 +28,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `route` | Set the picked text along the picked path (Actions bar) |
 | `route-off` | Take a text off its path (Actions bar) |
 | `case-sensitive` | Font options of a text (kerning, features, axes) |
-| `folder-input` | Import a folder (Assets view) |
 | `link-2` | Link of the selected words (text editor bar) |
 | `rows-3` | Paragraph and box options of a text (paragraph space, first line, case, most lines, height) |
 | `underline` | Underline the selected words (text editor bar) |
@@ -114,8 +116,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
-| `book-down` | Save the shapes to the library as an SVG picture |
-| `file-input` | Import a file…; Import |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |
 | `focus` | Fit the selection in view |
@@ -130,7 +130,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `highlighter` | Marker |
 | `house` | Return to origin |
 | `image-down` | Extract frame (media player) |
-| `image-plus` | Import image |
+| `image-plus` | Fill in the missing bookmark pictures; New palette from the picked picture |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |
 | `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much) |
@@ -180,7 +180,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `snowflake` | Pattern panel: keep this setting when randomizing (freeze) |
 | `arrow-right-left` | Turn the sheet on its side (sheet bar) |
 | `image-up` | Export… (Actions bar, command palette) |
-| `projector` | Play the bookmarks as a tour |
 | `clipboard-list` | Copy the adjustments of a picture |
 | `clipboard-paste` | Paste adjustments |
 | `clipboard` | Copy a picture to the clipboard as it looks |
@@ -188,12 +187,11 @@ One icon per function: two buttons that do different things never share an icon,
 | `list-restart` | Reset the adjustments of a picture |
 | `map-pinned` | Actions bar: Initial state (set, update, reset) |
 | `map-pin-plus` | Set initial state |
-| `map-pin-check` | Update initial state |
 | `map-pin-house` | Reset to initial state |
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
 | `pentagon` | Shape tool |
-| `play` | Slideshow |
+| `play` | Play (every media bar), Play the bookmarks as a tour, Slideshow |
 | `plus` | Zoom in |
 | `presentation` | Start the slideshow |
 | `rectangle-horizontal` | Rectangle shape |

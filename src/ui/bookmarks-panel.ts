@@ -51,8 +51,8 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
     panel.innerHTML = panelHtml({
       title: "Bookmarks",
       count: list.items.length,
-      tools: `<button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.projector}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button><button type="button" class="layer-btn" data-add-sel aria-label="Bookmark the picked things" title="Save a bookmark that brings the picked things into view"${editor.selection.size ? "" : " disabled"}>${ICONS.bookmarkCheck}</button>
-        <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.galleryThumbnails}</button>`,
+      tools: `<button type="button" class="layer-btn" data-tour aria-label="Play the bookmarks as a tour" title="Play the bookmarks as a tour: Right and Left step, Escape ends it"${list.items.length ? "" : " disabled"}>${ICONS.play}</button><button type="button" class="layer-btn" data-add aria-label="Add bookmark" title="Save the current view as a bookmark">${ICONS.bookmarkPlus}</button><button type="button" class="layer-btn" data-add-sel aria-label="Bookmark the picked things" title="Save a bookmark that brings the picked things into view"${editor.selection.size ? "" : " disabled"}>${ICONS.bookmarkCheck}</button>
+        <button type="button" class="layer-btn" data-thumbs aria-haspopup="menu" aria-label="Update the bookmark pictures" title="Update the pictures of the bookmarks: the canvas visits each place and takes a fresh picture of it"${list.items.length ? "" : " disabled"}>${ICONS.refresh}</button>`,
       sub: missing.length ? `<p class="bm-missing" data-testid="bm-missing"><span>${missing.length} bookmark${missing.length === 1 ? " has" : "s have"} no picture.</span><button type="button" data-fill>Fill in</button></p>` : "",
       body: `<ul aria-label="Saved views">${rows || `<li class="layers-empty">No bookmarks yet. Move to a place and zoom, then press ${ICONS.bookmarkPlus} to come back to it any time.</li>`}</ul>`,
     });
@@ -117,7 +117,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-thumbs]")!,
         [
-          { label: `Update all ${list.items.length} pictures`, icon: ICONS.galleryThumbnails, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
+          { label: `Update all ${list.items.length} pictures`, icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
           { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
         ],
         "Update the bookmark pictures",
@@ -144,7 +144,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
                 editor.changed();
               }),
           },
-          { label: "Update its picture", icon: ICONS.galleryThumbnails, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
+          { label: "Update its picture", icon: ICONS.refresh, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
           { label: "Move up", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, run: () => void list.move(id, at - 1) },
           { label: "Move down", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, run: () => void list.move(id, at + 1) },
           { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },

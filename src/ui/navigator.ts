@@ -108,7 +108,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          }
          <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.hardDriveDownload}<span>Export a backup (.canvast)</span></button>
          <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
-         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.fileInput}<span>Import a file…</span></button>
+         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.arrowDownToLine}<span>Import a file…</span></button>
          <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
        </section>`;
     // The row's actions float over the page like every other menu, kept inside the window.
