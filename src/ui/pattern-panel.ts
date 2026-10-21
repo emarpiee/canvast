@@ -6,6 +6,7 @@ import { openColourPopover } from "./colour-popover";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
+import { scrubNumbers } from "../colour-picker/scrub";
 import { panelHtml } from "./panel";
 
 /**
@@ -64,6 +65,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     </div>`,
   });
   host.appendChild(panel);
+  scrubNumbers(panel); // (drag a number to change it, as everywhere; the rows are built again for each generator, and are marked on the first pointer over)
   const q = <T extends HTMLElement>(s: string): T => panel.querySelector<T>(s)!;
   const body = q("[data-pg-body]"), grid = q("[data-pg-grid]"), pick = q("[data-pg-pick]"), seedBox = q<HTMLInputElement>("[data-pg-seed]");
 
@@ -97,7 +99,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   const lock = (s: Setting): string => `<button type="button" class="pg-lock" data-lock aria-pressed="${locks().has(s.k)}" aria-label="Keep ${esc(s.label)} when randomizing" title="Keep ${esc(s.label.toLowerCase())} when randomizing">${ICONS.snowflake}</button>`;
   const row = (s: Setting): string => {
     const v = values[s.k]!;
-    if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${lock(s)}</span><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
+    if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="pg-n-${s.k}">${esc(s.label)}${lock(s)}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="pg-n-${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
     if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${s.k}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${lock(s)}</label></div>`;
     if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${lock(s)}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${o}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
     const none = v === "";
