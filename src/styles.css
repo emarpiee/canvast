@@ -2774,6 +2774,7 @@ body[data-view="paint"] .hint-float { display: none; }
 .paint-head { display: flex; }
 /* The canvas's host (its bars) above the painting; only the bars take the pointer (they set it themselves), the page gets the rest. */
 body[data-view="paint"] #canvas-host { z-index: 3; pointer-events: none; }
+body[data-view="paint"] #canvas-host .ctx-bar { pointer-events: auto; } /* (the Actions bar is not a .toolbar, which sets it) */
 /* While the list of paintings is shown, the bars (which are for an open painting) are away; the canvas's own panels never show here. */
 body[data-view="paint"][data-paint-screen="list"] :is(#toolbar, .ctx-wrap, #hud, .paint-head, .paint-layers, .paint-adjust),
 body[data-view="paint"] :is(#canvas, .hud-readout, .hud-dev) { display: none !important; }

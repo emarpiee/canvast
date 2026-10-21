@@ -156,7 +156,7 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector layer; its Select moves one shape alone, its keys work, undo is the painting's; Rasterize makes it a paint layer", async ({ app }) => {
+test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector layer; its Select moves one shape alone, its keys and Actions bar work, undo is the painting's; Rasterize makes it a paint layer", async ({ app }) => {
   const p = app.page;
   await newPainting(p);
   const ink = [0x25, 0x63, 0xeb], white = [255, 255, 255]; // (the canvas's Shape tool and its fill: one tool for both views, ADR 0168)
@@ -176,6 +176,10 @@ test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector 
   expect((await screenPx(p, 1350, 450)).slice(0, 3), "the other stayed").toEqual(ink);
   await p.keyboard.press("Control+z");
   await expect.poll(async () => (await screenPx(p, 600, 350)).slice(0, 3), { message: "one undo puts it back" }).toEqual(ink);
+  await p.locator('.ctx-bar [data-ctx="delete"]').click(); // (the canvas's Actions bar takes the pointer over the page)
+  await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "Delete on the Actions bar" }).toEqual(white);
+  await p.keyboard.press("Control+z");
+  await stroke(p, [600, 450], [600, 450]); // (picked again: an undone delete brings the shape back unpicked)
   await p.keyboard.press("Delete"); // (the canvas's keys: Delete takes the picked shape away)
   await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "Delete" }).toEqual(white);
   await p.keyboard.press("Control+z");
