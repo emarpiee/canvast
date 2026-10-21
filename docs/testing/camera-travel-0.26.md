@@ -10,3 +10,8 @@ New tests (`bookmarks.spec.ts`, Chromium 10.4 s for the whole file):
 Not run: the full suite; a heavy canvas during a dive.
 
 v0.26.1: bookmarks.spec + settings.spec, all projects: 40 passed, 1.6 min (fade dip checked).
+
+Dive frame times (a far trip, 5000 levels away, 25 pen strokes on the canvas, 3.5 s, measured once with a throw-away spec, not kept):
+- Chromium: 214 frames, p50 16.7 ms, p95 16.8 ms, max 16.8 ms (steady 60 fps).
+- Firefox: 169 frames, p50 17.1 ms, p95 33.8 ms, max 72.4 ms (a few dropped frames, one hitch).
+Not measured: a canvas with thousands of objects or large pictures.

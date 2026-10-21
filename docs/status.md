@@ -480,7 +480,7 @@ visible strokes). Alternatives:
 
 - **Implemented:** `ViewState.flyTo` dives (24 levels out, then in) for other frames or trips over 8 levels of zoom-out, with `travel`, `distanceAware`, `maxGlideMs`, `ease`; settings `nav.travel/speed/maxSeconds/ease`, `tour.pause`; bookmark `move`, `step`, `goTo`; keys `bookmark.prev/next/1-9`; drag reorder; bookmark of the picked things; debug hook `setSetting`. ADR 0163.
 - **Tested:** three new tests in `bookmarks.spec` (see `docs/testing/camera-travel-0.26.md`).
-- **Unverified:** how the dive looks on a heavy canvas (frame hitches), Firefox, touch reorder (drag uses HTML drag-and-drop; Move up/down is the touch route).
+- **Unverified:** a dive on a canvas with thousands of objects (25 strokes: steady 60 fps in Chromium, a few dropped frames in Firefox), touch reorder (drag uses HTML drag-and-drop; Move up/down is the touch route).
 
 ## v0.25.11 — Colour names, palettes copy too (2026-10-21)
 
