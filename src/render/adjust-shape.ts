@@ -7,6 +7,7 @@ import type { Adjust } from "../doc/adjust";
 import { layersOf } from "../doc/adjust";
 import type { ProjectedObject } from "./projection";
 import { adjustInto } from "./adjust-image";
+import { playingFilter } from "./adjust-filter";
 
 /** Largest scratch layer (device px): a bigger one is drawn unadjusted rather than stalling the frame. */
 const MAX_PIXELS = 8_000_000;
@@ -48,19 +49,19 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   const c = (scratch ??= document.createElement("canvas"));
   c.width = w; // (also clears it)
   c.height = h;
-  const ok = adjustInto(
-    c,
-    (g) => {
-      g.setTransform(t.a, 0, 0, t.d, t.e - x0, t.f - y0);
-      body(g);
-      g.setTransform(1, 0, 0, 1, 0, 0);
-    },
-    a,
-    refCss * t.a,
-  );
-  if (!ok) return body(ctx);
+  const draw = (g: CanvasRenderingContext2D): void => {
+    g.setTransform(t.a, 0, 0, t.d, t.e - x0, t.f - y0);
+    body(g);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  };
+  // On the graphics card: the layer goes through the SVG filter of the adjustments as it is drawn (no pixels are read back, so zooming stays smooth).
+  // Where the canvas has no `filter`, the same adjustments are made on the pixels.
+  const gpu = "filter" in ctx;
+  if (gpu) draw(c.getContext("2d")!);
+  else if (!adjustInto(c, draw, a, refCss * t.a)) return body(ctx);
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (gpu) ctx.filter = playingFilter(a, refCss * t.a) || "none";
   ctx.globalAlpha = 1;
   if (po.obj.blend) ctx.globalCompositeOperation = po.obj.blend;
   ctx.drawImage(c, x0, y0);

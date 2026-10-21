@@ -2,7 +2,7 @@
  * Read an SVG as vector shapes (ADR 0107): paths, rectangles (with rounded corners), circles, ellipses, lines, polylines and polygons, in
  * groups and with transforms (matrix, translate, scale, rotate, skew), each with its fill, outline, width, ends, corners, dashes, fill rule
  * and opacity, and linear and radial gradients. Everything is turned into paths in SVG units; nothing is run (the text is parsed as an
- * image document, never inserted in the page). A `clip-path` is read as a clipping mask (the clip's shapes, in the outermost clip only). Left out: text, images, filters, masks, patterns, markers.
+ * image document, never inserted in the page). A `clip-path` is read as a clipping mask (the clip's shapes, in the outermost clip only). Left out: text, images, filters (except the adjustments this app wrote itself, `data-canvast-adjust`), masks, patterns, markers.
  */
 import type { Dash } from "../doc/stroke-look";
 import type { Gradient, Paint } from "../doc/paint";
@@ -10,6 +10,8 @@ import { isPaint } from "../doc/paint";
 import { NODE, geometryBounds, mapSubs } from "../doc/path";
 import type { Cap, Join, SubPath } from "../doc/path";
 import { parsePathData } from "../doc/svg-path";
+import { cleanAdjust, validAdjust } from "../doc/adjust";
+import type { Adjust } from "../doc/adjust";
 
 export interface SvgShape {
   sub: SubPath[];
@@ -22,6 +24,8 @@ export interface SvgShape {
   dash?: Dash;
   evenodd: boolean;
   opacity: number;
+  /** Adjustments this app wrote on the group the shape is in (`data-canvast-adjust`). */
+  adjust?: Adjust;
   name?: string;
   /** The clip (an index of `SvgImport.clips`) that cuts this shape, if any. */
   clip?: number;
@@ -186,6 +190,7 @@ interface Style {
   opacity: number;
   fillOpacity: number;
   strokeOpacity: number;
+  adjust?: Adjust;
 }
 const BASE_STYLE: Style = { fill: "black", stroke: "none", strokeWidth: 1, dash: [], evenodd: false, opacity: 1, fillOpacity: 1, strokeOpacity: 1 };
 
@@ -217,6 +222,11 @@ function readStyle(el: Element, parent: Style): Style {
   }
   if (decl.has("fill-rule")) s.evenodd = decl.get("fill-rule") === "evenodd";
   s.opacity = n("opacity") ?? 1;
+  try {
+    const adj = JSON.parse(el.getAttribute("data-canvast-adjust") ?? "null") as unknown;
+    const clean = validAdjust(adj) ? cleanAdjust(adj) : undefined;
+    if (clean) s.adjust = clean;
+  } catch { /* not ours: ignored */ }
   s.fillOpacity = (n("fill-opacity") ?? parent.fillOpacity);
   s.strokeOpacity = (n("stroke-opacity") ?? parent.strokeOpacity);
   return s;
@@ -345,7 +355,7 @@ export function parseSvg(text: string): SvgImport | null {
     const id = el.getAttribute("id");
     shapes.push({
       sub, fill, stroke, width, evenodd: st.evenodd, opacity: Math.min(1, Math.max(0.01, alpha)),
-      ...(activeClip !== undefined ? { clip: activeClip } : {}),
+      ...(activeClip !== undefined ? { clip: activeClip } : {}), ...(st.adjust ? { adjust: st.adjust } : {}),
       ...(st.join ? { join: st.join } : {}), ...(st.cap ? { cap: st.cap } : {}), ...(dash ? { dash } : {}), ...(id ? { name: id.slice(0, 80) } : {}),
     });
   };

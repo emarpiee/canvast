@@ -14,6 +14,8 @@ import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
 import { isTexture } from "../doc/texture";
 import { svgTexture } from "../render/texture";
+import { svgAdjustFilter } from "../render/adjust-filter";
+import { isNeutral, layersOf } from "../doc/adjust";
 import { regionSplit } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf, paintBounds } from "../doc/path";
 import type { Arrow } from "../doc/path";
@@ -423,12 +425,24 @@ export function exportSvg(
     }
     return id;
   };
+  let pad = 0; // room round the drawing for a blur, which spreads past the shapes (the file's box would cut it)
   const body = placed.map((p) => {
     const m = p.o.mask ? maskFor(p.o.mask.by, p.o.mask.mode, p.o.mask.invert === true) : null;
     let out = render(p);
+    const adj = p.o.adjust;
+    if (adj && !isNeutral(adj)) {
+      // the adjustments of a shape as an SVG filter (the same one the canvas draws it through)
+      const bb = geometryBounds(mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]));
+      const id = `a${defs.length}`;
+      const std = (Math.max(0, ...layersOf(adj).map((l) => l.blur ?? 0)) / 100) * 0.02 * Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
+      pad = Math.max(pad, 3 * std);
+      defs.push(svgAdjustFilter(adj, id, std));
+      // (the numbers ride on the group, so this app reads them back as adjustments when the file is made into shapes again)
+      out = `  <g filter="url(#${id})" data-canvast-adjust="${esc(JSON.stringify(adj))}">\n${out}\n  </g>`;
+    }
     if (m) out = `  <g mask="url(#${m})">\n${out}\n  </g>`;
     for (const c of lay.clips(p)) out = `  <g clip-path="url(#${clipFor(c)})">\n${out}\n  </g>`;
     return out;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg"${usesXlink ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ""} viewBox="0 0 ${num(w)} ${num(h)}" width="${size ? esc(size.w) : num(w)}" height="${size ? esc(size.h) : num(h)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${body.join("\n")}\n</svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg"${usesXlink ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ""} viewBox="0 0 ${num(w + 2 * pad)} ${num(h + 2 * pad)}" width="${size ? esc(size.w) : num(w + 2 * pad)}" height="${size ? esc(size.h) : num(h + 2 * pad)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${pad ? `  <g transform="translate(${num(pad)} ${num(pad)})">\n` : ""}${body.join("\n")}${pad ? "\n  </g>" : ""}\n</svg>\n`;
 }

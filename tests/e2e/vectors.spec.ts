@@ -3408,6 +3408,28 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
   const outside = await px(Math.round(box.maxX) + 3, 350);
   expect(await px(Math.round(box.maxX) + 60, 350), "far outside is the background").not.toEqual(outside);
   expect(await px(Math.round(box.maxX) + 3, 350), "the blur reaches past the edge").not.toEqual(await px(Math.round(box.maxX) + 60, 350));
+  // the SVG written for it carries the adjustments as a filter
+  await p.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })));
+  await p.keyboard.type("Copy the selection as SVG");
+  await key(app, "Enter");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.lastCopied())).toMatch(/<filter[\s\S]*<feComponentTransfer[\s\S]*<g filter="url\(#/);
+  // the blur is not cut by the file's box (it is wider than the shape), and pasting the text back gives a shape with the same adjustments
+  const svgText = await p.evaluate(() => window.__canvastDebug.lastCopied());
+  const vb = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svgText)!;
+  expect(Number(vb[1]), "room round the shape for the blur").toBeGreaterThan(0);
+  expect(svgText).toMatch(/<g transform="translate\(/);
+  if (test.info().project.name === "chromium") {
+    const n0 = (await objs(app)).length;
+    await p.evaluate((text) => {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", text);
+      window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, svgText);
+    await app.frame();
+    const back = (await objs(app)).slice(n0) as unknown as Array<{ adjust?: unknown }>;
+    expect(back.at(-1)?.adjust).toEqual({ exposure: 60, blur: 100 });
+    await key(app, "Control+z"); // (the paste first, then the blur)
+  }
   await key(app, "Control+z");
   expect((await objs(app)).find((o) => o.id === id) as unknown as { adjust?: unknown }).toMatchObject({ adjust: { exposure: 60 } });
   await reload(app);

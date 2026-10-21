@@ -39,11 +39,16 @@ function channelTable(levels: Array<Levels | undefined>, curves: Array<CurvePoin
   }).join(" ");
 }
 
-function build(top: Adjust, id: string): string {
+function build(top: Adjust, id: string, blurPx = 0): string {
   const f: string[] = [];
   layersOf(top).forEach((a, layer) => layerPrimitives(a, `${id}-${layer}`, f));
-  return `<filter id="${id}" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">${f.join("")}</filter>`;
+  if (blurPx) f.push(`<feGaussianBlur stdDeviation="${n(blurPx)}"/>`);
+  const room = blurPx ? ' x="-30%" y="-30%" width="160%" height="160%"' : ' x="0" y="0" width="100%" height="100%"';
+  return `<filter id="${id}" color-interpolation-filters="sRGB"${room}>${f.join("")}</filter>`;
 }
+
+/** An SVG `<filter>` of these adjustments for a file (the blur, if any, as `blurPx` of the object's size); "" when they change nothing. */
+export const svgAdjustFilter = (a: Adjust, id: string, blurPx: number): string => (isNeutral(a) ? "" : build(a, id, blurPx));
 
 /** The filter primitives of one layer of a stack (the blur of a layer is a CSS blur, taken from the first layer only). */
 function layerPrimitives(a: Adjust, id: string, f: string[]): void {
@@ -89,7 +94,8 @@ function layerPrimitives(a: Adjust, id: string, f: string[]): void {
 }
 
 /** The CSS `filter` for these adjustments: "" when there are none. */
-export function playingFilter(a: Adjust | undefined): string {
+/** `blurRef`: when given, a blur of 100 % is 2 % of it (px), as for stills; otherwise the fixed size a player uses. */
+export function playingFilter(a: Adjust | undefined, blurRef?: number): string {
   if (isNeutral(a) || !a) return "";
   const key = adjustKey(a);
   let id = made.get(key);
@@ -114,5 +120,5 @@ export function playingFilter(a: Adjust | undefined): string {
     host.insertAdjacentHTML("beforeend", build(a, id));
     made.set(key, id);
   }
-  return [needsSvg && id ? `url(#${id})` : "", a.blur ? `blur(${((a.blur / 100) * 8).toFixed(2)}px)` : ""].filter(Boolean).join(" ");
+  return [needsSvg && id ? `url(#${id})` : "", a.blur ? `blur(${(blurRef === undefined ? (a.blur / 100) * 8 : (a.blur / 100) * 0.02 * blurRef).toFixed(2)}px)` : ""].filter(Boolean).join(" ");
 }

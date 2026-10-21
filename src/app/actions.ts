@@ -1738,6 +1738,7 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
     ...(s.cap ? { cap: s.cap } : {}),
     ...(s.dash ? { dash: s.dash } : {}),
     ...(s.evenodd ? { evenodd: true as const } : {}),
+    ...(s.adjust ? { adjust: s.adjust } : {}),
     ...(s.name ? { name: s.name } : {}),
   } as PathObject), doc.space) as PathObject);
   objs = [...masks.filter((m): m is PathObject => m !== null), ...objs];
