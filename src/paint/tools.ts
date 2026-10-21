@@ -3,7 +3,9 @@
  * the options bar, checks a stored value, and, for the tools that paint, becomes the engine's brush (`brushOf`), so a new tool or a new
  * option is one entry here, not a new bar or a new reader.
  */
+import type { Tool } from "../app/editor-state";
 import { paintFromText } from "../doc/paint";
+import { PEN_KINDS } from "../interaction/pens";
 
 export type OptionSpec =
   | { readonly key: string; readonly label: string; readonly kind: "number"; readonly min: number; readonly max: number; readonly step: number; readonly def: number; readonly unit?: string; readonly hint: string; readonly percent?: true; /** Shown only when another option has this value. */ readonly when?: readonly [string, string] }
@@ -15,10 +17,10 @@ export type OptionSpec =
 export type Values = Readonly<Record<string, number | boolean | string>>;
 
 /**
- * What a tool does with the pointer: paint with the engine (erasing or not), move the view, or work on the layers that hold canvas objects
- * (vector-tools.ts).
+ * What a tool does with the pointer: paint with the engine (erasing or not), move the view, or be one of the canvas's own tools on a vector
+ * layer (ADR 0167, vector-host.ts).
  */
-export type ToolAction = { readonly paint: true; readonly erase: boolean } | { readonly paint: false; readonly vector?: true };
+export type ToolAction = { readonly paint: true; readonly erase: boolean } | { readonly paint: false; readonly canvas?: Tool };
 
 export interface ToolDef {
   readonly label: string;
@@ -46,11 +48,19 @@ export const TOOLS = {
   brush: { label: "Brush", icon: "paintbrush", key: "B", hint: "Paint on the picked layer · [ ] size · Alt-click a colour · Shift-click a straight line", action: { paint: true, erase: false }, options: BRUSH },
   eraser: { label: "Eraser", icon: "eraser", key: "E", hint: "Take paint away from the picked layer · [ ] size", action: { paint: true, erase: true }, options: BRUSH },
   hand: { label: "Hand", icon: "hand", key: "H", hint: "Drag to move the view (Space held does it with any tool) · wheel to zoom", action: { paint: false }, options: [] },
-  move: { label: "Move", icon: "moveTool", key: "V", hint: "Drag the picked shape, text or picture layer to move it, a handle to resize it (Shift keeps its proportions)", action: { paint: false, vector: true }, options: [] },
-  shape: {
-    label: "Shape", icon: "shapeTool", key: "U", hint: "Drag to draw a shape on a layer of its own (Shift: a square or circle)", action: { paint: false, vector: true },
+  select: { label: "Select", icon: "pointer", key: "V", hint: "The canvas's Select on the picked vector layer: click or drag a box to pick, drag to move, handles to resize and turn (Shift, Alt as on the canvas)", action: { paint: false, canvas: "select" }, options: [] },
+  node: { label: "Edit nodes", icon: "nodeTool", key: "N", hint: "The canvas's Edit nodes: drag nodes and handles of the picked shape, click its outline to add one, Alt-click: smooth or corner", action: { paint: false, canvas: "node" }, options: [] },
+  pen: {
+    label: "Pen", icon: "pencil", key: "P", hint: "The canvas's Pen: strokes as shapes on the picked vector layer (a new one when a paint layer is picked), in the paint colour", action: { paint: false, canvas: "pen" },
     options: [
-      { key: "shape", label: "Shape", kind: "choice", def: "rect", choices: [["rect", "Rectangle"], ["ellipse", "Ellipse"], ["polygon", "Polygon"], ["star", "Star"], ["line", "Line"]], hint: "The kind of shape" },
+      { key: "kind", label: "Pen", kind: "choice", def: "fine", choices: PEN_KINDS.map((k) => [k, k[0]!.toUpperCase() + k.slice(1)] as const), hint: "The kind of pen" },
+      { key: "width", label: "Width", kind: "number", min: 0.5, max: 500, step: 0.5, def: 4, unit: "px", hint: "Pen width in page pixels" },
+    ],
+  },
+  shape: {
+    label: "Shape", icon: "shapeTool", key: "U", hint: "The canvas's Shape and Path: drag a shape on the picked vector layer (Shift: a square or circle), or click and drag nodes of a path", action: { paint: false, canvas: "shape" },
+    options: [
+      { key: "shape", label: "Shape", kind: "choice", def: "rect", choices: [["rect", "Rectangle"], ["ellipse", "Ellipse"], ["polygon", "Polygon"], ["star", "Star"], ["line", "Line"], ["path", "Path (curves)"]], hint: "The kind of shape, or a path of curves" },
       { key: "sides", label: "Sides", kind: "number", min: 3, max: 24, step: 1, def: 6, hint: "Sides of a polygon", when: ["shape", "polygon"] },
       { key: "points", label: "Points", kind: "number", min: 3, max: 24, step: 1, def: 5, hint: "Points of a star", when: ["shape", "star"] },
       { key: "fill", label: "Fill", kind: "paint", def: "", none: "No fill", hint: "Fill: the paint colour, a colour, a gradient or a texture" },
@@ -58,8 +68,8 @@ export const TOOLS = {
       { key: "width", label: "Width", kind: "number", min: 0, max: 500, step: 1, def: 4, unit: "px", hint: "Outline width in page pixels" },
     ],
   },
-  text: { label: "Text", icon: "type", key: "T", hint: "Click to place a text on a layer of its own; click the picked text layer to change its words", action: { paint: false, vector: true }, options: [{ key: "size", label: "Size", kind: "number", min: 4, max: 2000, step: 1, def: 64, unit: "px", hint: "Text size in page pixels" }] },
-  node: { label: "Edit nodes", icon: "nodeTool", key: "N", hint: "Drag a node or a handle of the picked shape layer · click its outline to add a node · Alt-click a node: smooth or corner · Delete removes the picked node", action: { paint: false, vector: true }, options: [] },
+  lasso: { label: "Lasso", icon: "lasso", key: "L", hint: "The canvas's Lasso: draw round shapes of the picked vector layer to pick them", action: { paint: false, canvas: "lasso" }, options: [] },
+  text: { label: "Text", icon: "type", key: "T", hint: "The canvas's Text: click to write on the picked vector layer, drag for a box; click a text to change it", action: { paint: false, canvas: "text" }, options: [{ key: "size", label: "Size", kind: "number", min: 4, max: 2000, step: 1, def: 64, unit: "px", hint: "Text size in page pixels" }] },
 } as const satisfies Record<string, ToolDef>;
 
 export type ToolId = keyof typeof TOOLS;

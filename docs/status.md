@@ -33,8 +33,22 @@ Unverified / Committed / Next bounded task**.
 | 9 | Standalone release: slices 1 to 4 done (reproducible build, offline completeness, clean-machine test, portability; [testing/phase-9.md](testing/phase-9.md)); README and licences, and the release artifact wait for the owner; PDF page rendering and other 3D formats if wanted | in progress |
 | 5s | Sheets ([ADR 0108](adr/0108-sheets.md)): container with clipping, Sheet tool, put on a sheet, Layers rows and clip toggle | **first slice done (v0.17.0)**: E2E in both browsers; real units, constraints, auto layout next |
 | 5v+ | SVG in and out, dashes, node snapping, dragging a number's name, only a picked shape moves ([ADR 0107](adr/0107-svg-dashes-node-snapping-scrub.md)) | **done (v0.17.0)**: unit and E2E; two-browser sweep of the affected specs (see the commit); full suite not run |
-| PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1 and the first part of P2 done (v0.29.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); rest of P2 (presets and `.abr`, the Brush Settings sections) next |
+| PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, the first part of P2 and vector layers done (v0.30.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); rest of P2 (presets and `.abr`, the Brush Settings sections) next |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
+
+## Painting view, vector layers (v0.30.0, 2026-10-22)
+
+**Implemented:** ADR 0167: `paint/vector-host.ts` hosts the canvas's `DocumentStore`, `ViewState`, `EditorState`, `attachTools` and text editor on the picked vector layer; edits are painting history steps; `attachTools` hooks `scope`, `history`, `active`; tools Select, Edit nodes, Pen, Shape (+ Path), Lasso, Text from the canvas; copy, cut, paste; shared `ui/reveal-list.ts` and cursor rules; `paint/vector-tools.ts` and `paint/handles.ts` removed.
+
+**Tested:** E2E `painting.spec.ts` "vector layers" (two shapes in one layer, Select moves one, Delete, undo, Pen into the same layer, Rasterize), Chromium and Firefox; Text tool and gizmo checked by screenshots. Quick suite: see the commit.
+
+**Known failures:** none known.
+
+**Unverified:** touch gestures and the long-press list on a real touch screen in the Paint view; copy and paste between the canvas and the Paint view by hand; the Lasso and Edit nodes in the Paint view beyond the screenshots.
+
+**Committed:** see git log (feat(paint): ... (v0.30.0)).
+
+**Next bounded task:** rest of P2: brush presets as workspace data, the Brushes panel with `.abr` and JSON import and export, the Brush Settings sections from the engine's schema.
 
 ## Painting view, P2 first part (v0.29.0, 2026-10-22)
 

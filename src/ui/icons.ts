@@ -269,7 +269,7 @@ import maximize2Svg from "lucide-static/icons/maximize-2.svg";
 import pictureInPictureSvg from "lucide-static/icons/picture-in-picture-2.svg";
 import bookImageSvg from "lucide-static/icons/book-image.svg";
 import rulerDimensionSvg from "lucide-static/icons/ruler-dimension-line.svg";
-import moveSvg from "lucide-static/icons/move.svg";
+import vectorLayerSvg from "lucide-static/icons/vector-polygon.svg";
 import paintRollerSvg from "lucide-static/icons/paint-roller.svg";
 import grid2x2PlusSvg from "lucide-static/icons/grid-2x2-plus.svg";
 import x from "lucide-static/icons/x.svg";
@@ -461,7 +461,7 @@ export const ICONS = {
   placeOnCanvas: clean(pictureInPictureSvg),
   paintings: clean(bookImageSvg),
   pageSize: clean(rulerDimensionSvg),
-  moveTool: clean(moveSvg),
+  vectorLayer: clean(vectorLayerSvg),
   fillLayer: clean(paintRollerSvg),
   rasterize: clean(grid2x2PlusSvg),
   activity: clean(activity),

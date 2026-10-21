@@ -64,7 +64,7 @@ export interface RasterLayer extends LayerBase {
 }
 
 /**
- * Canvas objects on the page (ADR 0166): shapes, paths, texts, pictures, what was pasted from the canvas, a pattern. A page px is a world
+ * A vector layer (ADR 0166, 0167): canvas objects on the page (shapes, paths, pen strokes, texts, pictures, what was pasted from the canvas, a pattern). A page px is a world
  * unit of the canvas at zoom 0, so they are the canvas's own objects, stored as the canvas stores them and drawn by its renderer.
  */
 export interface ObjectLayer extends LayerBase {
@@ -113,7 +113,7 @@ export const LAYER_KINDS: { readonly [K in LayerKind]: { readonly label: string;
     valid: (o) => (o.alphaLock === undefined || o.alphaLock === true) && typeof o.tiles === "object" && o.tiles !== null && Object.entries(o.tiles).every(([k, h]) => KEY.test(k) && typeof h === "string" && HASH.test(h)),
     fresh: (b) => ({ ...b, name: "", kind: "raster", tiles: {} }),
   },
-  object: { label: "Shape layer", icon: "shapeTool", valid: (o) => validObjects(o.objs), fresh: (b) => ({ ...b, name: "", kind: "object", objs: [] }) },
+  object: { label: "Vector layer", icon: "vectorLayer", valid: (o) => validObjects(o.objs), fresh: (b) => ({ ...b, name: "", kind: "object", objs: [] }) },
   fill: { label: "Fill layer", icon: "fillLayer", valid: (o) => isPaint(o.paint, true), fresh: (b) => ({ ...b, name: "", kind: "fill", paint: "#ffffff" }) },
   adjust: { label: "Adjustment layer", icon: "slidersVertical", valid: (o) => validAdjust(o.adjust), fresh: (b) => ({ ...b, name: "", kind: "adjust", adjust: {} }) },
 };

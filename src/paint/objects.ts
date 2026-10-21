@@ -7,7 +7,7 @@
  */
 import * as D from "../core/dyadic";
 import { lookAt, type Camera, type Viewport, type WorldPoint } from "../core/camera";
-import type { CanvasObject, ImageObject, PathObject, SerializedObject, TextObject } from "../doc/model";
+import type { CanvasObject, ImageObject, PathObject, SerializedObject } from "../doc/model";
 import { deserializeObject, homeObject, newObjectId, serializeObject } from "../doc/model";
 import { FrameSpace } from "../core/frames";
 import { normalizeUnit, scaleAbout, translate, unionBounds } from "../doc/edit-ops";
@@ -58,7 +58,7 @@ export function objectsOf(list: readonly SerializedObject[]): CanvasObject[] {
 
 /** Whether every object of a list reads. */
 export function validObjects(list: unknown): list is SerializedObject[] {
-  if (!Array.isArray(list) || list.length === 0 || list.length > 10000) return false;
+  if (!Array.isArray(list) || list.length > 10000) return false;
   try {
     for (const s of list) deserializeObject(s as SerializedObject, SPACE);
     return true;
@@ -140,9 +140,6 @@ export const fillObject = (paint: Paint, w: number, h: number): PathObject =>
   ({ ...base(0, 0), id: "fill", kind: "path", sub: drawnSubs("rect", 0, 0, w, h, 4, 5), fill: paint, stroke: null, width: 1, shape: "rect" }) as PathObject;
 
 /** A line of text at (x, y), as wide as its words. */
-export const textObject = (text: string, x: number, y: number, size: number, color: string): TextObject =>
-  home({ ...base(x, y), kind: "text", md: text, w: size, size, color, autoWidth: true } as TextObject);
-
 /** A picture of the library on the page: its pixels at one page px each, made smaller to fit 80 % of the page, centred. */
 export function pictureObject(rec: { hash: string; pixelW: number; pixelH: number }, page: { w: number; h: number }): ImageObject {
   const k = Math.min(1, (0.8 * page.w) / rec.pixelW, (0.8 * page.h) / rec.pixelH);

@@ -124,7 +124,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `picture-in-picture-2` | Place the page on the canvas (Paint view) |
 | `book-image` | All paintings: the list of the workspace's paintings (Paint view) |
 | `ruler-dimension-line` | Page size and resolution (Paint view) |
-| `move` | Move tool: move and resize the picked shape, text or picture layer (Paint view) |
+| `vector-polygon` | Vector layer: shapes, paths, strokes, texts and pictures on one layer (Paint view's + menu and Layers rows) |
 | `paint-roller` | Fill layer: the page covered by a colour, gradient or texture (Paint view) |
 | `grid-2x2-plus` | Rasterize: make the layer a paint layer of the same look (Paint view) |
 | `external-link` | Open in a new tab |

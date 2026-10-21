@@ -2,8 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseFont } from "../../src/text/font";
 import { setFont } from "../../src/text/layout";
-import { handleAt, resized } from "../../src/paint/handles";
-import { boxOf, cameraFor, moved, objectsOf, placeOnPage, scaled, shapeObject, stored, textObject, validObjects } from "../../src/paint/objects";
+import { boxOf, cameraFor, moved, objectsOf, placeOnPage, scaled, shapeObject, stored, validObjects } from "../../src/paint/objects";
 import { worldToScreen } from "../../src/core/camera";
 import * as D from "../../src/core/dyadic";
 
@@ -26,9 +25,9 @@ describe("the canvas's objects on a page (ADR 0166)", () => {
     expect(boxOf(moved([r], 10, -5))).toEqual({ x: 110, y: 45, w: 200, h: 150 });
     const b = boxOf(scaled([r], 100, 50, 2, 0.5))!;
     expect([b.x, b.y, b.w, b.h].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([100, 50, 400, 75]);
-    const list = stored([r, textObject("Hi", 5, 5, 40, "#000000")]);
+    const list = stored([r, shapeObject("ellipse", 5, 5, 40, 40, look)]);
     expect(validObjects(list)).toBe(true);
-    expect(objectsOf(list).map((o) => o.kind)).toEqual(["path", "text"]);
+    expect(objectsOf(list).map((o) => o.kind)).toEqual(["path", "path"]);
     expect(validObjects([{ kind: "nonsense" }])).toBe(false);
   });
 
@@ -40,20 +39,5 @@ describe("the canvas's objects on a page (ADR 0166)", () => {
     expect(Math.round(b.x + b.w / 2)).toBe(500);
     const big = boxOf(placeOnPage([r], 10, { w: 1000, h: 1000 }))!; // 10240 px: fitted to 80 %
     expect(Math.round(big.w)).toBe(800);
-  });
-});
-
-describe("move handles", () => {
-  const b = { x: 0, y: 0, w: 100, h: 50 };
-  it("finds the handle under the pointer (a corner before a side)", () => {
-    expect(handleAt(b, 101, 49)).toBe("se");
-    expect(handleAt(b, 50, -3)).toBe("n");
-    expect(handleAt(b, 50, 25)).toBeNull();
-  });
-  it("resizes from the opposite side, keeps the proportions with Shift, and never turns over", () => {
-    expect(resized(b, "se", 50, 50, false)).toEqual({ x: 0, y: 0, w: 150, h: 100 });
-    expect(resized(b, "se", 100, 0, true)).toEqual({ x: 0, y: 0, w: 200, h: 100 });
-    expect(resized(b, "w", 30, 0, false)).toEqual({ x: 30, y: 0, w: 70, h: 50 });
-    expect(resized(b, "e", -500, 0, false).w).toBe(1);
   });
 });

@@ -29,6 +29,8 @@ export interface Scene {
   readonly live?: Live | null;
   /** What the canvas's renderer needs for shape, text, picture and fill layers. */
   readonly env?: ObjectEnv | null;
+  /** The vector layer being edited, drawn as the gesture going on shows it (vector-host.ts); null: not that layer. True: draw again soon. */
+  readonly vector?: ((id: string, g: CanvasRenderingContext2D, at: Placement) => boolean | null) | null;
 }
 
 /** Where the page is in the target: target px = page px · scale + (x, y). */
@@ -116,7 +118,7 @@ export const RENDER: { readonly [K in LayerKind]: (l: Extract<Layer, { kind: K }
   object(l, c) {
     if (!c.s.env) return null;
     const g = layerCtx(c.slot, c.below.canvas.width, c.below.canvas.height);
-    if (drawObjectsAt(g, objectsOf(l.objs), c.at, c.s.env)) c.pending = true;
+    if (c.s.vector?.(l.id, g, c.at) ?? drawObjectsAt(g, objectsOf(l.objs), c.at, c.s.env)) c.pending = true;
     return { img: g.canvas };
   },
   fill(l, c) {

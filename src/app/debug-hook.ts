@@ -121,7 +121,7 @@ export interface DebugHook {
   pixelAt(x: number, y: number): [number, number, number];
   /** The Painting view (ADR 0165): the open painting's records, a layer's pixel (r, g, b, a) at page px, the screen point of a page px, and a wait for the strokes and saves. */
   paint: {
-    state(): { paintingId: string; name: string; pageId: string; pages: Array<{ id: string; name: string; w: number; h: number; bg: string | null }>; activeId: string | null; layers: Array<{ id: string; name: string; pageId: string; z: number; tiles: number; kind: string; hidden?: true; locked?: true; clipBelow?: true; alphaLock?: true; opacity: number; blend?: string }>; canUndo: boolean } | null;
+    state(): { paintingId: string; name: string; pageId: string; pages: Array<{ id: string; name: string; w: number; h: number; bg: string | null }>; activeId: string | null; layers: Array<{ id: string; name: string; pageId: string; z: number; tiles: number; kind: string; objs?: number; hidden?: true; locked?: true; clipBelow?: true; alphaLock?: true; opacity: number; blend?: string }>; canUndo: boolean } | null;
     layerPixel(layerId: string, x: number, y: number): [number, number, number, number] | null;
     screenOf(x: number, y: number): { x: number; y: number } | null;
     settled(): Promise<void>;
@@ -403,7 +403,7 @@ export function installDebugHook(
           pageId: s.pageId,
           pages: s.painting.pages.map((p) => ({ id: p.id, name: p.name, w: p.w, h: p.h, bg: p.bg })),
           activeId: s.activeId,
-          layers: [...s.layers.values()].sort((a, b) => a.z - b.z).map((l) => ({ id: l.id, name: l.name, pageId: l.pageId, z: l.z, tiles: Object.keys(tilesOf(l)).length, kind: l.kind, opacity: l.opacity, ...(l.hidden ? { hidden: true as const } : {}), ...(l.locked ? { locked: true as const } : {}), ...(l.clipBelow ? { clipBelow: true as const } : {}), ...(l.kind === "raster" && l.alphaLock ? { alphaLock: true as const } : {}), ...(l.blend ? { blend: l.blend } : {}) })),
+          layers: [...s.layers.values()].sort((a, b) => a.z - b.z).map((l) => ({ id: l.id, name: l.name, pageId: l.pageId, z: l.z, tiles: Object.keys(tilesOf(l)).length, kind: l.kind, ...(l.kind === "object" ? { objs: l.objs.length } : {}), opacity: l.opacity, ...(l.hidden ? { hidden: true as const } : {}), ...(l.locked ? { locked: true as const } : {}), ...(l.clipBelow ? { clipBelow: true as const } : {}), ...(l.kind === "raster" && l.alphaLock ? { alphaLock: true as const } : {}), ...(l.blend ? { blend: l.blend } : {}) })),
           canUndo: s.history.canUndo,
         };
       },

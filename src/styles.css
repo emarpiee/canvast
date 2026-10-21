@@ -246,16 +246,17 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 
 #canvas[data-tool="select"] { cursor: default; }
 #canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"] { cursor: crosshair; }
-#canvas[data-hover="ew"] { cursor: ew-resize; }
-#canvas[data-hover="ns"] { cursor: ns-resize; }
-#canvas[data-hover="nwse"] { cursor: nwse-resize; }
-#canvas[data-hover="nesw"] { cursor: nesw-resize; }
+.paint-stage:is([data-tool="pen"], [data-tool="lasso"], [data-tool="node"], [data-tool="shape"], [data-tool="text"]) .paint-canvas { cursor: crosshair; }
+:is(#canvas, .paint-canvas)[data-hover="ew"] { cursor: ew-resize; }
+:is(#canvas, .paint-canvas)[data-hover="ns"] { cursor: ns-resize; }
+:is(#canvas, .paint-canvas)[data-hover="nwse"] { cursor: nwse-resize; }
+:is(#canvas, .paint-canvas)[data-hover="nesw"] { cursor: nesw-resize; }
 /* Over a rotate zone of the selection box: a turning-arrow cursor. */
-#canvas.is-rotate { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><g stroke='white' stroke-width='4'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g><g stroke='black' stroke-width='2'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g></svg>") 12 12, alias; }
-#canvas.is-add { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 3v15l4.5-4 3 7 2.5-1-3-7h6z' fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'/><circle cx='18' cy='18' r='5' fill='black' stroke='white' stroke-width='1.2'/><path d='M18 15.5v5M15.5 18h5' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>") 4 3, copy; }
-#canvas.is-node { cursor: move; }
-#canvas.is-hand { cursor: grab; }
-#canvas.is-panning { cursor: grabbing; }
+:is(#canvas, .paint-canvas).is-rotate { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><g stroke='white' stroke-width='4'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g><g stroke='black' stroke-width='2'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g></svg>") 12 12, alias; }
+:is(#canvas, .paint-canvas).is-add { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 3v15l4.5-4 3 7 2.5-1-3-7h6z' fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'/><circle cx='18' cy='18' r='5' fill='black' stroke='white' stroke-width='1.2'/><path d='M18 15.5v5M15.5 18h5' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>") 4 3, copy; }
+:is(#canvas, .paint-canvas).is-node { cursor: move; }
+:is(#canvas, .paint-canvas).is-hand { cursor: grab; }
+:is(#canvas, .paint-canvas).is-panning { cursor: grabbing; }
 
 #hud { position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; }
 

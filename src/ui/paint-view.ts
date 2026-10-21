@@ -27,7 +27,10 @@ import { PaintStore } from "../paint/store";
 import { PaintSession } from "../paint/session";
 import { BrushEngine } from "../paint/engine";
 import { composePage, drawLayerAlone, type Scene } from "../paint/compose";
-import { deleteNode, drawToolOverlay, startGesture, type Gesture, type Point, type VectorHost } from "../paint/vector-tools";
+import { createVectorHost, type VectorHost } from "../paint/vector-host";
+import { openRevealList } from "./reveal-list";
+import { copySelection, cutSelection, pasteObjects } from "../app/actions";
+import type { Tool } from "../app/editor-state";
 import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
 import { TOOLS, TOOL_IDS, brushOf, toolForKey, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
@@ -84,16 +87,12 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     deps.settings.set("paint.tools", all);
   };
 
-  /** What the vector tools work with (paint/vector-tools.ts). */
-  const host = (): VectorHost => ({
-    session: session!,
-    cam: () => cam,
-    view,
-    values: () => toolValues(tool),
-    colour: () => colour,
-    tell: deps.tell,
-    askText: async (title, value) => promptDialog({ title, lines: [], value, confirmLabel: value ? "Change" : "Add" }),
-  });
+  /** The canvas tool a Painting tool is (ADR 0167), if it is one: the vector tools are the canvas's own. */
+  const canvasTool = (t: ToolId): Tool | null => {
+    const a = TOOLS[t].action;
+    if (a.paint || !("canvas" in a) || !a.canvas) return null;
+    return a.canvas === "shape" && toolValues(t)["shape"] === "path" ? "path" : a.canvas;
+  };
   const nextLayerName = (s: PaintSession, stem: string): string => nextName(stem, [...s.layers.values()].map((l) => l.name));
 
   root.innerHTML = `
@@ -150,12 +149,38 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const optionsEl = $<HTMLElement>("[data-options]");
   const adjustEl = $<HTMLElement>("[data-adjust]");
   const pictureInput = $<HTMLInputElement>('[data-testid="paint-picture-input"]');
+  /** The canvas's own tools on the picked vector layer (ADR 0167). */
+  const vhost: VectorHost | null = deps.assets
+    ? createVectorHost({
+        el: canvas,
+        stage,
+        session: () => session,
+        active: () => vectorOn(),
+        camera: () => cam,
+        setCamera: (c) => {
+          if (!session) return;
+          cam = clampCamera(c, page(), view());
+          redraw();
+        },
+        size: () => view(),
+        redraw: () => redraw(),
+        toolChanged: (t) => {
+          const pt = t === "path" ? "shape" : TOOL_IDS.find((i) => { const a = TOOLS[i].action; return !a.paint && "canvas" in a && a.canvas === t; });
+          if (!pt) return;
+          if (t === "path") setToolValue("shape", "shape", "path");
+          setTool(pt);
+        },
+        assets: deps.assets,
+        theme: deps.theme,
+        revealList: (at, things, pick) => openRevealList(canvas, vhost!.editor, at, things, pick),
+      })
+    : null;
 
   const view = (): { w: number; h: number } => ({ w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
   const page = () => session!.page();
   const env = (): ObjectEnv | null => (deps.assets ? { assets: deps.assets, theme: deps.theme() } : null);
   /** The page as the session has it now, for drawing (the view, an export, a rasterized layer). */
-  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), live: live ? s.live : null, env: env() });
+  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), live: live ? s.live : null, env: env(), vector: live && vhost ? vhost.drawLayer : null });
 
   // ---- drawing ------------------------------------------------------------------------------------------------------------------------
 
@@ -176,8 +201,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, canvas.width, canvas.height);
     const s = session;
+    vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
+    vhost?.drawOverlay(g, dpr);
     $<HTMLElement>("[data-zoom]").textContent = `${Math.round(cam.scale * 100)} %`;
     drawCursor();
   };
@@ -192,7 +219,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cursor.width, cursor.height);
-    if (session && TOOLS[tool].action.paint === false && "vector" in TOOLS[tool].action) drawToolOverlay(tool, host(), g, dpr, { line: css.getPropertyValue("--canvas-selection").trim() || "#2b6cb0", fill: css.getPropertyValue("--canvas-handle-fill").trim() || "#ffffff" });
     if (!pointerAt || !TOOLS[tool].action.paint || panning) return;
     const r = (Number(toolValues(tool)["size"]) / 2) * cam.scale * dpr;
     g.lineWidth = 1;
@@ -234,7 +260,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     for (const c of optionsEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) c.addEventListener("change", () => setToolValue(tool, c.dataset["opt"]!, c.checked));
     for (const c of optionsEl.querySelectorAll<HTMLSelectElement>("select[data-opt]")) c.addEventListener("change", () => {
       setToolValue(tool, c.dataset["opt"]!, c.value);
-      renderOptions(); // (an option shown only for one choice comes or goes)
+      setTool(tool); // (Path is the canvas's other tool; an option shown only for one choice comes or goes)
     });
     for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-opt-paint]")) {
       const p = paintOf(String(vals[b.dataset["optPaint"]!]));
@@ -264,8 +290,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     deps.settings.set("paint.tool", t);
     for (const b of root.querySelectorAll<HTMLElement>(".paint-rail [data-tool]")) b.setAttribute("aria-checked", String(b.dataset["tool"] === t));
     stage.dataset["tool"] = t;
+    const ct = canvasTool(t);
+    if (ct) vhost?.setTool(ct);
     renderOptions();
-    drawCursor();
+    redraw();
   };
   const renderBar = (): void => {
     if (!session) return;
@@ -316,6 +344,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const named = (stem: string): string => nextLayerName(s, stem);
     const items: MenuItem[] = [
       { id: "paint", label: "Paint layer", hint: "An empty layer to paint on", icon: ICONS.newLayer, run: () => s.addLayer() },
+      { id: "vector", label: "Vector layer", hint: "An empty layer for shapes, paths, pen strokes and texts, edited with the canvas's tools", icon: ICONS.vectorLayer, run: () => {
+        s.addLayer(s.freshLayer({ kind: "object", objs: [] }, named("Vector")), "New vector layer");
+        if (!canvasTool(tool)) setTool("select");
+      } },
       { id: "fill", label: "Fill layer", hint: "The page covered by a colour, a gradient or a texture", icon: ICONS.fillLayer, run: () => s.addLayer(s.freshLayer({ kind: "fill", paint: colour }, named("Fill")), "New fill layer") },
       { id: "adjust", label: "Adjustment layer", hint: "Exposure, colour, levels, curves… of everything below it", icon: ICONS.slidersVertical, run: () => {
         s.addLayer(s.freshLayer({ kind: "adjust", adjust: {} }, named("Adjustment")), "New adjustment layer");
@@ -617,6 +649,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     session = s;
     s.onError = deps.tell;
     unsub = s.subscribe((what) => {
+      vhost?.sync();
       if (what === "records") {
         renderBar();
         renderLayers();
@@ -625,6 +658,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       redraw();
     });
     screen("editor");
+    vhost?.sync();
     renderBar();
     renderLayers();
     renderPages();
@@ -716,13 +750,25 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   // ---- the pointer ----------------------------------------------------------------------------------------------------------------
 
   const pointers = new Map<number, { x: number; y: number }>();
-  let gesture: Gesture | null = null;
-  let gestureId = -1;
-  /** The pointer as a vector tool takes it: page px and screen px, and the keys held. */
-  const point = (e: PointerEvent): Point => {
-    const q = local(e);
-    const [x, y] = toPage(cam, q.x, q.y);
-    return { x, y, sx: q.x, sy: q.y, shift: e.shiftKey, alt: e.altKey };
+  /** A vector tool is chosen: the canvas's tools have the pointer and their keys (vector-host.ts). */
+  const vectorOn = (): boolean => !!session && !!vhost && canvasTool(tool) !== null;
+  /** The tool's options as the canvas's editor takes them: sizes in page px become screen px at this zoom; "" is the paint colour. */
+  const applyLook = (): void => {
+    if (!vhost) return;
+    const e = vhost.editor, v = toolValues(tool), k = cam.scale;
+    if (tool === "shape") {
+      if (v["shape"] !== "path") e.shapeKind = v["shape"] as typeof e.shapeKind;
+      e.shapeSides = Number(v["sides"]);
+      e.shapeTips = Number(v["points"]);
+      e.shapeFill = paintOf(String(v["fill"]));
+      e.shapeStroke = paintOf(String(v["outline"]));
+      e.shapeWidthPx = Number(v["width"]) * k;
+    } else if (tool === "pen") {
+      e.penKind = v["kind"] as typeof e.penKind;
+      e.penColor = colour;
+      e.penWidthPx = Number(v["width"]) * k;
+      e.lock = { px: Number(v["width"]), levels: 0n, frac: 0 }; // (the canvas's width lock: the same page width at any zoom)
+    } else if (tool === "text") e.textLook = { ...e.textLook, sizePx: Number(v["size"]) * k, color: colour };
   };
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
@@ -755,8 +801,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     setColour(`#${[d[0], d[1], d[2]].map((v) => v!.toString(16).padStart(2, "0")).join("")}`);
   };
 
+  canvas.addEventListener("pointerdown", () => { if (vectorOn()) applyLook(); }, { capture: true });
   canvas.addEventListener("pointerdown", (e) => {
-    if (!session) return;
+    if (!session || vectorOn()) return;
     canvas.focus();
     const p = local(e);
     pointers.set(e.pointerId, p);
@@ -780,12 +827,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       return;
     }
     if (e.button !== 0) return;
-    if ("vector" in TOOLS[tool].action) {
-      // A vector tool (ADR 0166): a gesture on the layers of canvas objects, a preview while it moves, one step when it ends.
-      gesture = startGesture(tool, host(), point(e));
-      if (gesture) gestureId = e.pointerId;
-      return;
-    }
     if (!TOOLS[tool].action.paint) return;
     if (e.altKey) return pickColour(p);
     const why = session.cannotPaint();
@@ -827,8 +868,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       cam = clampCamera({ ...cam, x: cam.x + p.x - panning.x, y: cam.y + p.y - panning.y }, page(), view());
       panning = { ...panning, x: p.x, y: p.y };
       redraw();
-    } else if (gesture && gestureId === e.pointerId) {
-      gesture.move(point(e));
     } else if (stroke && stroke.id === e.pointerId) {
       const evs = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
       send((evs.length ? evs : [e]).flatMap(sample));
@@ -841,13 +880,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (panning?.id === e.pointerId) {
       panning = null;
       stage.classList.remove("is-panning");
-    }
-    if (gesture && gestureId === e.pointerId) {
-      const g = gesture;
-      gesture = null;
-      g.up(point(e), e.type === "pointercancel");
-      drawCursor();
-      return;
     }
     if (!stroke || stroke.id !== e.pointerId || !session) return;
     const st = stroke;
@@ -896,10 +928,22 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (f) void addPicture(f);
   });
   /** Pasted: objects copied on the canvas come as a shape layer, at the size they were seen at (fitted to the page); a picture as a picture layer. */
+  const typing = (e: Event): boolean => !!(e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], dialog");
+  // With a vector tool, copy, cut and paste are the canvas's own, on the picked vector layer (ADR 0167).
+  for (const kind of ["copy", "cut"] as const) {
+    document.addEventListener(kind, (e) => {
+      if (!visible || typing(e) || !vhost || !vectorOn()) return;
+      if ((kind === "copy" ? copySelection : cutSelection)(vhost.doc, vhost.editor, vhost.view, e)) e.preventDefault();
+    });
+  }
   document.addEventListener("paste", (e) => {
     const s = session;
-    if (!s || !visible || (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], dialog")) return;
+    if (!s || !visible || typing(e)) return;
     const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (vhost && vectorOn() && text && pasteObjects(vhost.doc, vhost.editor, vhost.view, text)) {
+      e.preventDefault();
+      return;
+    }
     const payload = parsePayload(text);
     if (payload) {
       e.preventDefault();
@@ -924,6 +968,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (!session || !shortcutsActive(e, "paint")) return;
     const k = e.key;
     const mod = e.ctrlKey || e.metaKey;
+    // (with a vector tool the canvas's tools take undo and redo, Space, Delete, Escape, Enter and their Ctrl keys, as on the canvas)
+    if (vectorOn() && ((mod && !["0", "1"].includes(k)) || [" ", "Delete", "Backspace", "Escape", "Enter"].includes(k))) return;
     if (mod && k.toLowerCase() === "z") {
       e.preventDefault();
       if (e.shiftKey) session.redo();
@@ -949,12 +995,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       setToolValue(tool, "size", Math.min(1000, Math.max(1, Math.round(k === "]" ? Math.max(v + 1, v * 1.15) : Math.min(v - 1, v / 1.15)))));
       renderOptions();
       drawCursor();
-    } else if ((k === "Delete" || k === "Backspace") && tool === "node") {
-      e.preventDefault();
-      deleteNode(host());
-    } else if (k === "Escape" && gesture) {
-      gesture.up({ x: 0, y: 0, sx: 0, sy: 0, shift: false, alt: false }, true);
-      gesture = null;
     } else if (k === "Escape" && stroke) {
       session.cancel();
       stroke = null;

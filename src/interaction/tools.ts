@@ -1,6 +1,6 @@
 import { lookFromChoices } from "../doc/stroke-look";
 import type { NavDir } from "./item-navigation";
-import { canvasShortcutsActive } from "./shortcut-scope";
+import { shortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
 import { screenToWorld } from "../core/camera";
@@ -236,6 +236,12 @@ export interface ToolHooks {
   openSearch(prefix: string): void;
   /** A long press with a finger (no hover, no Ctrl): everything under it, top first, to choose from; `pick` picks one (additive: added to or taken from the pick). */
   revealList(at: ScreenPoint, things: readonly CanvasObject[], pick: (id: ObjectId, additive: boolean) => void): void;
+  /** The view whose keys these are (default "canvas"; the Painting view hosts these tools on a vector layer, ADR 0167). */
+  scope?: string;
+  /** Undo and redo of the host's own history (default the document's). */
+  history?: { undo(): void; redo(): void };
+  /** False: the pointer and keys are not these tools' now (the host's other tools have them). */
+  active?: () => boolean;
 }
 
 export function attachTools(
@@ -247,6 +253,9 @@ export function attachTools(
   hooks: ToolHooks,
 ): () => void {
   const pan = new PanGesture(view);
+  const doUndo = (): void => (hooks.history ? hooks.history.undo() : void undo(doc, editor));
+  const doRedo = (): void => (hooks.history ? hooks.history.redo() : void redo(doc, editor));
+  const off = (): boolean => hooks.active?.() === false;
   let g: Gesture = { kind: "none" };
   let spaceDown = false;
   let cycleIndex = 0;
@@ -1504,6 +1513,7 @@ export function attachTools(
 
   // ---- pointer events ----------------------------------------------------
   const onPointerDown = (e: PointerEvent): void => {
+    if (off()) return;
     const s = local(e);
     if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 1) return;
     e.preventDefault();
@@ -1663,6 +1673,7 @@ export function attachTools(
   };
 
   const onPointerMove = (e: PointerEvent): void => {
+    if (off() && g.kind === "none") return;
     let boxLabel: string | null = null;
     const a = active.get(e.pointerId);
     if (a) a.p = local(e);
@@ -1865,8 +1876,8 @@ export function attachTools(
         el.classList.remove("is-panning");
         cancelGesture();
         const had = t.count === 2 ? doc.canUndo : doc.canRedo;
-        if (t.count === 2) undo(doc, editor);
-        else redo(doc, editor);
+        if (t.count === 2) doUndo();
+        else doRedo();
         navigator.vibrate?.(had ? 10 : [10, 40, 10]);
         editor.message = had ? (t.count === 2 ? "Undo" : "Redo") : t.count === 2 ? "Nothing to undo" : "Nothing to redo (an edit after an undo clears redo)";
         multiEndAt = performance.now();
@@ -2065,6 +2076,7 @@ export function attachTools(
   };
 
   const onDoubleClick = (e: MouseEvent): void => {
+    if (off()) return;
     if (performance.now() - editor.fingerListAt < 1500) return; // (the lift of a long press is not the second click of a double-click)
     if (effectiveTool() === "path" && editor.pathDraft) {
       // The two presses of the double-click each placed a node on the same spot: keep one, and end the path.
@@ -2122,7 +2134,7 @@ export function attachTools(
 
   // ---- keyboard ----------------------------------------------------------
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!canvasShortcutsActive(e)) return;
+    if (!shortcutsActive(e, hooks.scope ?? "canvas") || off()) return;
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
@@ -2133,10 +2145,10 @@ export function attachTools(
     }
     if (mod && key === "z") {
       if (g.kind !== "none") return;
-      if (e.shiftKey) redo(doc, editor);
-      else undo(doc, editor);
+      if (e.shiftKey) doRedo();
+      else doUndo();
     } else if (mod && key === "y") {
-      if (g.kind === "none") redo(doc, editor);
+      if (g.kind === "none") doRedo();
     } else if (mod && key === "a") {
       // everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it)
       const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));

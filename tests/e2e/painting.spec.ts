@@ -156,27 +156,40 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("the Shape tool draws a shape layer drawn as on the canvas; Move drags it and undoes; Rasterize makes it a paint layer of the same look", async ({ app }) => {
+test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector layer; its Select moves one shape alone, its keys work, undo is the painting's; Rasterize makes it a paint layer", async ({ app }) => {
   const p = app.page;
   await newPainting(p);
   const ink = [31, 35, 41], white = [255, 255, 255];
   await p.keyboard.press("u");
   await stroke(p, [400, 300], [800, 600]);
-  const shape = (await state(p)).layers.at(-1)!;
-  expect(shape.kind, "a layer of its own").toBe("object");
+  await stroke(p, [1200, 300], [1500, 600]);
+  const layers = (await state(p)).layers;
+  expect(layers.map((l) => [l.name, l.kind]), "both on one new vector layer").toEqual([["Layer 1", "raster"], ["Vector 1", "object"]]);
+  const vec = layers[1]!;
   await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "filled with the paint colour" }).toEqual(ink);
-  expect((await screenPx(p, 1000, 450)).slice(0, 3)).toEqual(white);
+  expect((await screenPx(p, 1350, 450)).slice(0, 3)).toEqual(ink);
   await p.keyboard.press("v");
-  await stroke(p, [600, 450], [1000, 450]);
-  await expect.poll(async () => (await screenPx(p, 1100, 450)).slice(0, 3), { message: "moved right by 400 px" }).toEqual(ink);
-  expect((await screenPx(p, 500, 450)).slice(0, 3)).toEqual(white);
+  await stroke(p, [600, 450], [600, 450]); // (as on the canvas: a click picks, then a drag moves what is picked)
+  await stroke(p, [600, 450], [600, 750]);
+  await expect.poll(async () => (await screenPx(p, 600, 850)).slice(0, 3), { message: "the first moved down 300 px" }).toEqual(ink);
+  expect((await screenPx(p, 600, 350)).slice(0, 3)).toEqual(white);
+  expect((await screenPx(p, 1350, 450)).slice(0, 3), "the other stayed").toEqual(ink);
   await p.keyboard.press("Control+z");
-  await expect.poll(async () => (await screenPx(p, 500, 450)).slice(0, 3), { message: "one undo puts it back" }).toEqual(ink);
-  await p.locator(`[data-layer-more="${shape.id}"]`).click();
+  await expect.poll(async () => (await screenPx(p, 600, 350)).slice(0, 3), { message: "one undo puts it back" }).toEqual(ink);
+  await p.keyboard.press("Delete"); // (the canvas's keys: Delete takes the picked shape away)
+  await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "Delete" }).toEqual(white);
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("p"); // the canvas's Pen, into the same layer
+  await stroke(p, [300, 900], [1600, 900]);
+  await expect.poll(async () => (await state(p)).layers.map((l) => l.objs ?? null), { message: "the stroke is a third object of the one vector layer" }).toEqual([null, 3]);
+  await p.locator(`[data-layer-more="${vec.id}"]`).click();
   await p.locator('.pop-menu [data-id="rasterize"]').click();
-  await expect.poll(async () => (await state(p)).layers.find((l) => l.id === shape.id)?.kind).toBe("raster");
+  await expect.poll(async () => (await state(p)).layers.find((l) => l.id === vec.id)?.kind).toBe("raster");
   await settled(p);
-  expect((await px(p, shape.id, 600, 450))![3], "its pixels are the shape").toBe(255);
-  expect((await px(p, shape.id, 1000, 450))![3]).toBe(0);
+  expect((await px(p, vec.id, 600, 450))![3], "its pixels are the shapes").toBe(255);
+  expect((await px(p, vec.id, 1350, 450))![3]).toBe(255);
+  expect((await px(p, vec.id, 1000, 450))![3]).toBe(0);
+  // (the pen line is 4 px; Firefox gives the pointer in whole CSS px, about 2 page px at this zoom, so the column round it is read)
+  expect(Math.max(...(await Promise.all([896, 898, 900, 902, 904].map(async (y) => (await px(p, vec.id, 950, y))![3]))))).toBe(255);
   expect(app.consoleErrors).toEqual([]);
 });

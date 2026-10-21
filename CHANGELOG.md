@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.0 — Vector layers with the canvas's tools (2026-10-22)
+
+- **Vector layers** in the Paint view: one layer holds any number of shapes, paths, pen strokes, texts and pictures (**+** > *Vector layer*, or just draw: with a paint layer picked, the first shape makes a vector layer).
+- **The canvas's own tools on them:** Select (`V`), Edit nodes (`N`), Pen (`P`), Shape (`U`, Path among its kinds), Lasso (`L`) and Text (`T`) are the canvas's, with its handles, rotate zone, node editing, text editor, modifier keys, touch gestures and keys (Delete, Ctrl+D, Ctrl+G, Ctrl+[ ], Esc, Enter); sizes are in page pixels. Every change is one step of the painting's undo.
+- **Copy, cut and paste** of shapes with a vector tool, as on the canvas (also between the canvas and the Paint view).
+- The Paint view's own Move tool is gone (Select does it); the canvas's cursors show on the page.
+
 ## 0.29.0 — Shape, text, picture, fill and adjustment layers in the Paint view (2026-10-22)
 
 - **New layer kinds** (the **+** of the Layers panel): a **fill layer** (the page in a colour, gradient or texture), an **adjustment layer** (the canvas's adjustments on everything below it; its numbers can be saved as a style), a **pattern** (any of the pattern generators over the page; *New seed* makes it again) and **a picture** imported from a file.
