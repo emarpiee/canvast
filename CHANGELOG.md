@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.0 — Brush presets, brush files and Brush settings (2026-10-22)
+
+- **Brushes panel** in the Paint view: brush presets in groups and folders with a picture of each tip; a press gives one to the Brush or Eraser. 36 presets to start with. **Save** the tool's brush as a preset; rename, delete, find by name.
+- **Brush files:** import Photoshop `.abr` files (tips and settings) and canvast brush files (`.json`); export a group or all presets as either.
+- **Brush settings panel:** the tool's whole brush, section by section (Tip, Shape dynamics, Scattering, Texture, Dual brush, Colour dynamics, Transfer, Pose, Noise, Wet edges, Build-up, Smoothing), with pen pressure, tilt, wheel, rotation, fade and direction as controls.
+- Spacing goes up to 1000 %.
+
 ## 0.31.0 — One set of bars and tools for the canvas and the Paint view (2026-10-22)
 
 - **The Paint view has the canvas's bars:** the same tool rail, Properties bar, Actions bar, dock and view controls, in the same places. Picked shapes on a vector layer get the canvas's fill, outline, corners, align, boolean operations, masks, groups and export.

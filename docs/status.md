@@ -33,8 +33,22 @@ Unverified / Committed / Next bounded task**.
 | 9 | Standalone release: slices 1 to 4 done (reproducible build, offline completeness, clean-machine test, portability; [testing/phase-9.md](testing/phase-9.md)); README and licences, and the release artifact wait for the owner; PDF page rendering and other 3D formats if wanted | in progress |
 | 5s | Sheets ([ADR 0108](adr/0108-sheets.md)): container with clipping, Sheet tool, put on a sheet, Layers rows and clip toggle | **first slice done (v0.17.0)**: E2E in both browsers; real units, constraints, auto layout next |
 | 5v+ | SVG in and out, dashes, node snapping, dragging a number's name, only a picked shape moves ([ADR 0107](adr/0107-svg-dashes-node-snapping-scrub.md)) | **done (v0.17.0)**: unit and E2E; two-browser sweep of the affected specs (see the commit); full suite not run |
-| PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, the first part of P2, vector layers and one chrome for both views done (v0.31.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); the canvas's bars, rail and keymap shared by both views ([ADR 0168](adr/0168-one-chrome.md)); rest of P2 (presets and `.abr`, the Brush Settings sections) next |
+| PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, most of P2, vector layers, one chrome for both views and brush presets done (v0.32.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); the canvas's bars, rail and keymap shared by both views ([ADR 0168](adr/0168-one-chrome.md)); brush presets, `.abr` and canvast brush files, Brush settings ([ADR 0169](adr/0169-brush-presets.md)); rest of P2 (Pencil and Eyedropper in the one rail, view rotate and mirror, raster layer masks) next |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
+
+## Painting view, brush presets (v0.32.0, 2026-10-22)
+
+**Implemented:** ADR 0169: engine calls `presets_builtin`, `abr_read` (the engine's `.abr` mapping compiled in), `abr_write` (v2: tip and spacing), `tip_put` and stored tiles filled when a stroke begins, `brush_default`; worker messages `tips`, `presets`, `abr-write`, `default`; `paint/brushes.ts` (presets, `cleanBrushes`, bitmaps by SHA-256, `brushOf` over the tool's brush, `BRUSH_SECTIONS`, paths); `PaintStore` `brushes`/`saveBrushes`/`tip`, GC keeps the presets' and tools' bitmaps; `ui/brush-panels.ts` (Brushes and Brush settings panels in the dock's left stack); `ui/setting-rows.ts` shared with the Pattern panel; tool state `paint.tools[t]` = values + brush + preset; two icons.
+
+**Tested:** unit `painting.test.ts` (cleaning, keys, picking, paths, every `BRUSH_SECTIONS` path checked against the engine's default brush); E2E `painting.spec.ts` "brush presets" (built-ins, a sampled tip paints, Brush settings, Save, .json and .abr out and back in, reload); `painting`, `pattern` (the shared setting rows), `icon-audit` and `scrub-audit` specs 34/34 in Chromium and Firefox (snapshot 172479cc); unit 563/563.
+
+**Known failures:** none known.
+
+**Unverified:** a large `.abr` set (hundreds of brushes, big tips) for speed and memory; pen tilt and rotation controls with a real pen; touch layout of the two panels.
+
+**Committed:** see git log (feat(paint): ... (v0.32.0)).
+
+**Next bounded task:** rest of P2 (P2c): Pencil and Eyedropper as tools of the one rail (the Eyedropper shared with the canvas), view rotate and mirror, raster layer masks.
 
 ## Painting view, one chrome for both views (v0.31.0, 2026-10-22)
 

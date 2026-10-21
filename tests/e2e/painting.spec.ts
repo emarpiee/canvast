@@ -193,3 +193,66 @@ test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector 
   expect(Math.max(...(await Promise.all([896, 898, 900, 902, 904].map(async (y) => (await px(p, vec.id, 950, y))![3]))))).toBe(255);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
+  const p = app.page;
+  const s = await newPainting(p);
+  const id = s.layers[0]!.id;
+  const brushes = () => p.evaluate(() => window.__canvastDebug.paint.brushes());
+  await p.locator('[data-brush-panel="brushes"]').click();
+  const panel = p.getByTestId("brushes-panel");
+  await expect(panel).toBeVisible();
+  const b0 = await brushes();
+  expect(b0.presets.length, "the engine's built-in presets, the first time").toBeGreaterThanOrEqual(30);
+  // a preset with a sampled tip: picked, named in the bar, and it paints (its bitmap comes from storage into the engine)
+  const sampled = b0.presets.find((x) => x.tips > 0)!;
+  await panel.locator(`[data-brush="${sampled.id}"]`).click();
+  expect((await brushes()).tool?.preset).toBe(sampled.id);
+  await expect(p.locator(".paint-preset-name")).toHaveText(sampled.name);
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("80");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [900, 400], [1700, 400]); // (right of the Brushes panel, which docks on the left)
+  const alphas = await Promise.all([1000, 1100, 1200, 1300, 1400, 1500, 1600].map(async (x) => (await px(p, id, x, 400))?.[3] ?? 0));
+  expect(Math.max(...alphas), "the sampled tip painted").toBeGreaterThan(0);
+  // Brush settings: a section switched on, a dynamic setting, and a Tip setting that is the bar's own value
+  await p.locator('[data-brush-panel="settings"]').click();
+  const set = p.getByTestId("brush-settings-panel");
+  await set.getByLabel("Scattering on").check();
+  await set.locator('[data-k="shapeDynamics.size.jitter"] input[type="number"]').fill("40");
+  await set.locator('[data-k="shapeDynamics.size.jitter"] input[type="number"]').press("Enter");
+  await set.locator('[data-k="size"] input[type="number"]').fill("33");
+  await set.locator('[data-k="size"] input[type="number"]').press("Enter");
+  await expect.poll(async () => (await brushes()).tool?.brush).toMatchObject({ scattering: { enabled: true }, shapeDynamics: { size: { jitter: 0.4 } } });
+  expect((await brushes()).tool?.values["size"], "the Tip's size is the bar's").toBe(33);
+  await expect(p.locator('[data-paint-options] input[data-opt="size"]')).toHaveValue("33");
+  // Save: a new preset in Saved, now the tool's
+  await panel.locator('[data-act="save"]').click();
+  await p.getByTestId("prompt-input").fill("Mine");
+  await p.getByTestId("prompt-ok").click();
+  await expect.poll(async () => (await brushes()).presets.filter((x) => x.name === "Mine").map((x) => x.group)).toEqual(["Saved"]);
+  const mine = (await brushes()).presets.find((x) => x.name === "Mine")!;
+  expect((await brushes()).tool?.preset).toBe(mine.id);
+  // export the Saved group both ways, and import both files back
+  const exported = async (item: string): Promise<{ name: string; buffer: Buffer }> => {
+    const dl = p.waitForEvent("download");
+    await panel.locator('[data-group-more="Saved"]').click();
+    await p.locator(`.pop-menu [data-id="${item}"]`).click();
+    const d = await dl;
+    return { name: d.suggestedFilename(), buffer: await readFile((await d.path())!) };
+  };
+  const json = await exported("export-json"), abr = await exported("export-abr");
+  expect([json.name, abr.name]).toEqual(["Saved.json", "Saved.abr"]);
+  const before = (await brushes()).presets.length;
+  await panel.getByTestId("brushes-import-input").setInputFiles([{ name: json.name, mimeType: "application/json", buffer: json.buffer }, { name: "From abr.abr", mimeType: "application/octet-stream", buffer: abr.buffer }]);
+  await expect.poll(async () => (await brushes()).presets.length).toBe(before + 2);
+  const after = (await brushes()).presets;
+  expect(after.filter((x) => x.name === "Mine" && x.group === "Saved"), "the canvast file keeps the name, group and tip").toHaveLength(2);
+  expect(after.find((x) => x.group === "From abr")?.tips, "the .abr keeps the sampled tip").toBe(1);
+  // kept over a reload, with the tool's brush
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.evaluate((i) => window.__canvastDebug.paint.open(i), s.paintingId);
+  await expect.poll(async () => (await brushes()).presets.length).toBe(before + 2);
+  expect((await brushes()).tool).toMatchObject({ preset: mine.id, brush: { scattering: { enabled: true } } });
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -2,12 +2,11 @@ import type { EditorState } from "../app/editor-state";
 import { GENERATORS, cleanValues, defaultValues, generate, generatorById, makeRng, randomValues, sectionsOf } from "../gen";
 import type { Generator, Setting, Values } from "../gen";
 import { thumbSvg } from "./pattern-thumb";
-import { openColourPopover } from "./colour-popover";
 import { esc } from "./format";
 import { ICONS } from "./icons";
-import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { panelHtml } from "./panel";
+import { settingRow, wireSettingRow } from "./setting-rows";
 
 /**
  * The Pattern panel (ADR 0162): pick a generator (a grid of small pictures), change the settings it declares, make it on the picked sheet or
@@ -97,14 +96,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   const locks = (): Set<string> => frozen.get(gen.id) ?? frozen.set(gen.id, new Set()).get(gen.id)!;
 
   const lock = (s: Setting): string => `<button type="button" class="pg-lock" data-lock aria-pressed="${locks().has(s.k)}" aria-label="Keep ${esc(s.label)} when randomizing" title="Keep ${esc(s.label.toLowerCase())} when randomizing">${ICONS.snowflake}</button>`;
-  const row = (s: Setting): string => {
-    const v = values[s.k]!;
-    if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="pg-n-${s.k}">${esc(s.label)}${lock(s)}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="pg-n-${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
-    if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${s.k}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${lock(s)}</label></div>`;
-    if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${lock(s)}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${o}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
-    const none = v === "";
-    return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${lock(s)}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? "none" : String(v).toUpperCase()}</code>${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
-  };
+  const row = (s: Setting): string => settingRow(s, values[s.k]!, `pg-n-${s.k}`, lock(s));
 
   // Small pictures of the generators, made when the grid is first opened, one at a time so the panel stays responsive.
   const thumbs = new Map<string, string>();
@@ -139,32 +131,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
         if (on) locks().add(s.k); else locks().delete(s.k);
         (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(on));
       });
-      if (s.t === "range") {
-        const range = r.querySelector<HTMLInputElement>("input[type=range]")!, num = r.querySelector<HTMLInputElement>("input[type=number]")!;
-        range.addEventListener("input", () => { num.value = range.value; set(s.k, Number(range.value)); });
-        liveNumber(num, (x) => { range.value = String(x); set(s.k, Math.min(s.max, Math.max(s.min, x))); });
-      } else if (s.t === "toggle") r.querySelector("input")!.addEventListener("change", (e) => set(s.k, (e.target as HTMLInputElement).checked));
-      else if (s.t === "choice") r.addEventListener("click", (e) => {
-        const b = (e.target as HTMLElement).closest<HTMLElement>("[data-v]");
-        if (!b) return;
-        for (const o of r.querySelectorAll("[data-v]")) o.setAttribute("aria-pressed", String(o === b));
-        set(s.k, b.dataset["v"]!);
-      });
-      else {
-        const sw = r.querySelector<HTMLElement>("[data-swatch]")!, code = r.querySelector("code")!;
-        let last = (values[s.k] as string) || s.def;
-        const paint = (): void => {
-          const c = values[s.k] as string;
-          sw.style.background = c || last;
-          sw.classList.toggle("is-none", c === "");
-          code.textContent = c ? c.toUpperCase() : "none";
-          const eye = r.querySelector<HTMLElement>("[data-eye]");
-          if (eye) { eye.setAttribute("aria-pressed", String(c !== "")); eye.innerHTML = c ? ICONS.eye : ICONS.eyeOff; }
-        };
-        paint();
-        sw.addEventListener("click", () => openColourPopover(sw, { name: s.label, value: last, onInput: (h) => { last = h.slice(0, 7); set(s.k, last); paint(); } }));
-        r.querySelector("[data-eye]")?.addEventListener("click", () => { set(s.k, values[s.k] === "" ? last : ""); paint(); });
-      }
+      wireSettingRow(r, s, () => values[s.k]!, (v) => set(s.k, v));
     }
   };
 

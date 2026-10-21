@@ -3,7 +3,7 @@
  * engine and the one layer being painted, and answers in the order it is asked (each message waits for the one before).
  */
 import { TILE_BYTES, deflate, hashOf, inflate, isEmpty } from "./codec";
-import type { EndedTile, FromWorker, LoadTile, ToWorker } from "./engine-protocol";
+import type { EndedTile, FromWorker, LoadTile, TipBitmap, ToWorker } from "./engine-protocol";
 import { TILE, tileKey, tileOf } from "./tiles";
 
 interface Engine {
@@ -23,6 +23,15 @@ interface Engine {
   stroke_end(): number;
   stroke_cancel(): number;
   dirty_ptr(): number;
+  out_ptr(): number;
+  out_len(): number;
+  out_tips_ptr(): number;
+  out_tips_len(): number;
+  presets_builtin(): number;
+  abr_read(data: number, len: number, group: number, glen: number): number;
+  abr_write(json: number, len: number): number;
+  tip_put(key: number, klen: number, w: number, h: number, data: number): number;
+  brush_default(): number;
 }
 
 const post = (m: FromWorker, transfer: Transferable[] = []): void => (self as unknown as Worker).postMessage(m, transfer);
@@ -114,6 +123,45 @@ async function end(): Promise<void> {
   post({ t: "ended", tiles }, tiles.flatMap((t) => (t.rgba ? [t.rgba.buffer] : [])));
 }
 
+// ---- presets (ADR 0169) -----------------------------------------------------------------------------------------------------------
+
+/** Run `f` with `bytes` copied into the engine's memory. */
+function withBytes<T>(bytes: Uint8Array, f: (ptr: number) => T): T {
+  const p = e.alloc(bytes.length);
+  new Uint8Array(e.memory.buffer, p, bytes.length).set(bytes);
+  try {
+    return f(p);
+  } finally {
+    e.dealloc(p, bytes.length);
+  }
+}
+const outBytes = (): Uint8Array => new Uint8Array(e.memory.buffer, e.out_ptr(), e.out_len()).slice();
+const outJson = (): unknown => JSON.parse(new TextDecoder().decode(outBytes()));
+
+function putTip(t: TipBitmap): void {
+  const key = new TextEncoder().encode(t.key);
+  withBytes(key, (k) => withBytes(new Uint8Array(t.data.buffer, t.data.byteOffset, t.data.byteLength), (d) => e.tip_put(k, key.length, t.w, t.h, d)));
+}
+
+/** A file's presets (or the built-in ones), their bitmaps hashed and kept in the engine; the presets still name them "#n" (n = index). */
+async function presets(id: number, abr?: Uint8Array, group?: string): Promise<void> {
+  const g = new TextEncoder().encode(group ?? "");
+  const n = abr ? withBytes(abr, (pa) => withBytes(g, (pg) => e.abr_read(pa, abr.length, pg, g.length))) : e.presets_builtin();
+  if (n < 0) return post({ t: "failed", id, message: new TextDecoder().decode(outBytes()) });
+  const j = outJson() as { presets: object[]; warnings: string[]; tips: Array<[number, number]> };
+  const all = new Uint8Array(e.memory.buffer, e.out_tips_ptr(), e.out_tips_len()).slice();
+  const tips: TipBitmap[] = [];
+  let at = 0;
+  for (const [w, h] of j.tips) {
+    const bytes = all.slice(at, at + w * h * 2);
+    at += w * h * 2;
+    const t = { key: await hashOf(bytes), w, h, data: new Uint16Array(bytes.buffer) };
+    putTip(t);
+    tips.push(t);
+  }
+  post({ t: "presets", id, presets: j.presets, tips, warnings: j.warnings }, tips.map((t) => t.data.buffer));
+}
+
 let queue: Promise<void> = Promise.resolve();
 self.onmessage = (ev: MessageEvent<ToWorker>) => {
   const m = ev.data;
@@ -145,6 +193,26 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
           break;
         case "cancel":
           e.stroke_cancel();
+          break;
+        case "tips":
+          for (const t of m.tips) putTip(t);
+          break;
+        case "presets":
+          await presets(m.id, m.abr, m.group);
+          break;
+        case "abr-write": {
+          const json = new TextEncoder().encode(JSON.stringify(m.presets));
+          const n = withBytes(json, (p) => e.abr_write(p, json.length));
+          if (n < 0) post({ t: "failed", id: m.id, message: "the brushes could not be written" });
+          else {
+            const bytes = outBytes();
+            post({ t: "file", id: m.id, bytes }, [bytes.buffer]);
+          }
+          break;
+        }
+        case "default":
+          e.brush_default();
+          post({ t: "presets", id: m.id, presets: [], tips: [], warnings: [], brush: outJson() as object });
           break;
       }
     } catch (err) {

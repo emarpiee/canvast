@@ -33,7 +33,10 @@ import { copySelection, cutSelection, pasteObjects } from "../app/actions";
 import type { Tool } from "../app/editor-state";
 import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
-import { TOOLS, brushOf, valuesOf, type OptionSpec, type ToolId } from "../paint/tools";
+import { TOOLS, TOOL_IDS, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { brushOf, cleanBrush, tipsOf, type Brush } from "../paint/brushes";
+import { mountBrushPanels, type BrushPanels } from "./brush-panels";
+import type { DockSpec } from "./panel-dock";
 import { LAYER_KINDS, nextName, type Layer, type Painting } from "../paint/model";
 
 export interface PaintViewDeps {
@@ -54,11 +57,17 @@ export interface PaintViewDeps {
   importPicture(file: File): Promise<{ hash: string; pixelW: number; pixelH: number } | null>;
   /** The saved styles (an adjustment layer's numbers can be saved as one, as in the Adjust panel). */
   styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
+  /** Put a panel in the panel dock (the Brushes and Brush settings panels; the dock is the canvas's, ADR 0123). */
+  dock(el: HTMLElement, spec: DockSpec): void;
 }
 
 export interface PaintView {
   show(): void;
   hide(): void;
+  /** The Brushes and Brush settings panels (the test hook reads the presets). */
+  readonly brushes: BrushPanels;
+  /** The painting tool in use and its brush (the test hook). */
+  brushState(): { tool: ToolId; preset: string; brush: Brush; values: Values } | null;
   /** For the test hook: the open painting's session, if any. */
   readonly session: PaintSession | null;
   /** The list of paintings shown (for the test hook). */
@@ -85,12 +94,24 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   let engineError: string | null = null;
   let visible = false;
   let cam: PaintCamera = { scale: 1, x: 0, y: 0 };
-  const toolValues = (t: ToolId): Record<string, number | boolean | string> => valuesOf(t, (deps.settings.get("paint.tools") as Record<string, unknown>)[t]);
-  const setToolValue = (t: ToolId, key: string, v: number | boolean | string): void => {
-    const all = { ...(deps.settings.get("paint.tools") as Record<string, unknown>) };
-    all[t] = { ...toolValues(t), [key]: v };
-    deps.settings.set("paint.tools", all);
+  /** A painting tool's state (setting paint.tools): its options bar's values, its brush (the preset's, changed in Brush settings, ADR 0169) and
+   * the preset it came from. */
+  const toolState = (t: ToolId): Record<string, unknown> => {
+    const v = (deps.settings.get("paint.tools") as Record<string, unknown>)[t];
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
   };
+  const toolValues = (t: ToolId): Record<string, number | boolean | string> => valuesOf(t, toolState(t));
+  const toolBrush = (t: ToolId): Brush => cleanBrush(toolState(t)["brush"]) ?? {};
+  const toolPreset = (t: ToolId): string => (typeof toolState(t)["preset"] === "string" ? (toolState(t)["preset"] as string) : "");
+  const setTool = (t: ToolId, patch: { values?: Values; brush?: Brush; preset?: string }): void => {
+    const all = { ...(deps.settings.get("paint.tools") as Record<string, unknown>) };
+    all[t] = { ...toolValues(t), ...patch.values, brush: patch.brush ?? toolBrush(t), preset: patch.preset ?? toolPreset(t) };
+    deps.settings.set("paint.tools", all);
+    renderOptions();
+    drawCursor();
+    brushPanels.changed();
+  };
+  const setToolValue = (t: ToolId, key: string, v: number | boolean | string): void => setTool(t, { values: { ...toolValues(t), [key]: v } });
 
   const nextLayerName = (s: PaintSession, stem: string): string => nextName(stem, [...s.layers.values()].map((l) => l.name));
 
@@ -230,20 +251,63 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     o.kind === "number"
       ? `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`
       : `<button type="button" data-opt="${o.key}" aria-pressed="${!!v}" title="${esc(o.hint)}">${esc(o.label)}</button>`; // (a switch: the bar's toggle, as the canvas's)
-  let optionsFor: ToolId | null | undefined;
+  let optionsFor: string | undefined;
   const renderOptions = (): void => {
     const t = paintTool();
-    if (t === optionsFor) return;
-    optionsFor = t;
+    const preset = t ? brushPanels.presetName(t) : "";
+    const key = t ? `${t}\n${preset}\n${JSON.stringify(toolValues(t))}` : "";
+    if (key === optionsFor) return;
+    optionsFor = key;
     if (!t) return void (optionsEl.innerHTML = "");
     const vals = toolValues(t);
-    optionsEl.innerHTML = TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("");
+    const panelBtn = (id: "brushes" | "settings", icon: string, label: string, title: string, text = ""): string => `<button type="button" data-brush-panel="${id}" aria-pressed="${brushPanels.isOpen(id)}" aria-label="${esc(label)}" title="${esc(title)}">${icon}${text ? `<span class="paint-preset-name">${esc(text)}</span>` : ""}</button>`;
+    optionsEl.innerHTML = panelBtn("brushes", ICONS.brushPresets, "Brushes", `Brushes: the presets${preset ? ` (now ${preset})` : ""}`, preset) + TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("") + panelBtn("settings", ICONS.brushSettings, "Brush settings", "Brush settings: the tip, its dynamics, scattering, texture and more");
+    for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-brush-panel]")) b.addEventListener("click", () => {
+      brushPanels.toggle(b.dataset["brushPanel"] as "brushes" | "settings");
+      b.setAttribute("aria-pressed", String(brushPanels.isOpen(b.dataset["brushPanel"] as "brushes" | "settings")));
+    });
     for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setToolValue(t, f.dataset["opt"]!, v));
     for (const b of optionsEl.querySelectorAll<HTMLElement>("button[data-opt]")) b.addEventListener("click", () => {
       const on = b.getAttribute("aria-pressed") !== "true";
       b.setAttribute("aria-pressed", String(on));
       setToolValue(t, b.dataset["opt"]!, on);
     });
+  };
+  const startEngine = async (): Promise<BrushEngine | null> => {
+    if (!engine && !engineError) {
+      try {
+        engine = await BrushEngine.start();
+        engine.onError = (m) => deps.tell(`The brush engine: ${m}`);
+        engine.onLive = (keys, px, side) => session?.showLive(keys, px, side);
+      } catch (e) {
+        engineError = (e as Error).message;
+        deps.tell(`The brush engine did not start (${engineError}): the painting opens, but cannot be painted here.`);
+      }
+    }
+    return engine;
+  };
+  const brushPanels = mountBrushPanels({
+    store,
+    engine: startEngine,
+    readOnly: deps.readOnly,
+    tell: deps.tell,
+    tool: () => paintTool(),
+    values: toolValues,
+    brush: toolBrush,
+    preset: toolPreset,
+    setTool,
+    dock: deps.dock,
+  });
+  /** The bitmaps the tools' brushes name: kept by the tile GC. */
+  const toolTips = (): string[] => TOOL_IDS.flatMap((t) => tipsOf(toolBrush(t)).map((x) => x.key));
+  /** Give the engine the bitmaps a brush names (from storage, once each); a missing one paints with its small preview. */
+  const ensureTips = async (b: Brush): Promise<void> => {
+    const eng = engine;
+    if (!eng || !store) return;
+    const want = tipsOf(b).filter((t) => !eng.hasTip(t.key));
+    if (!want.length) return;
+    const got = await Promise.all(want.map((t) => store.tip(t.key, t.w, t.h).catch(() => null)));
+    eng.putTips(got.filter((t) => t !== null));
   };
   scrubNumbers(optionsEl);
   /** The rail's tool changed (or the picked layer, which decides what the Eraser takes): the options, the cursor, what is remembered. */
@@ -254,6 +318,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     stage.dataset["tool"] = tool();
     document.body.dataset["paintTarget"] = session?.active()?.kind === "object" ? "vector" : "pixels";
     renderOptions();
+    brushPanels.sync(visible && !!session);
     if (deps.settings.get("paint.tool") !== tool()) deps.settings.set("paint.tool", tool());
     if (deps.settings.get("paint.colour") !== colour()) deps.settings.set("paint.colour", colour());
     drawCursor();
@@ -548,7 +613,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
           { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, run: () => void confirmDialog({ title: `Delete “${p.name}”?`, lines: ["The painting, its pages and their layers are deleted. This cannot be undone."], confirmLabel: "Delete" }).then(async (ok) => {
             if (!ok || deps.readOnly()) return;
             await store.write({ deletePaintings: [p.id] });
-            void store.collect(session?.roots() ?? new Set());
+            void store.collect(new Set([...(session?.roots() ?? []), ...toolTips()]));
             void renderList();
           }) },
         ], `Painting ${p.name}`);
@@ -593,21 +658,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     unsub?.();
     unsub = null;
     session = null;
-    if (store) void store.collect(new Set()).catch(() => undefined); // (the closed painting's undo can no longer bring tiles back)
+    brushPanels.sync(false);
+    if (store) void store.collect(new Set(toolTips())).catch(() => undefined); // (the closed painting's undo can no longer bring tiles back)
   };
   const open = async (id: string): Promise<void> => {
     if (!store) return;
     await close();
-    if (!engine && !engineError) {
-      try {
-        engine = await BrushEngine.start();
-        engine.onError = (m) => deps.tell(`The brush engine: ${m}`);
-        engine.onLive = (keys, px, side) => session?.showLive(keys, px, side);
-      } catch (e) {
-        engineError = (e as Error).message;
-        deps.tell(`The brush engine did not start (${engineError}): the painting opens, but cannot be painted here.`);
-      }
-    }
+    await startEngine();
     const s = await PaintSession.open(store, engine, id, deps.readOnly);
     if (!s) return deps.tell("That painting could not be opened (it was deleted, or its record is damaged).");
     session = s;
@@ -779,7 +836,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const first = sample(e);
     if (e.shiftKey && lastEnd) st.queue.push(lastEnd[0], lastEnd[1], first[2]!, 0, 0, 0, first[6]! - 1);
     st.queue.push(...first);
-    void s.begin({ brush: brushOf(pt, toolValues(pt), colour()), erase: TOOLS[pt].action.erase }).then((ok) => {
+    const brush = brushOf(pt, toolValues(pt), toolBrush(pt), colour());
+    void ensureTips(brush).then(() => s.begin({ brush, erase: TOOLS[pt].action.erase })).then((ok) => {
       if (stroke !== st) return; // (cancelled meanwhile)
       if (!ok) {
         stroke = null;
@@ -934,9 +992,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     else if ((k === "[" || k === "]") && pt) {
       const v = Number(toolValues(pt)["size"]);
       setToolValue(pt, "size", Math.min(1000, Math.max(1, Math.round(k === "]" ? Math.max(v + 1, v * 1.15) : Math.min(v - 1, v / 1.15)))));
-      optionsFor = undefined;
-      renderOptions();
-      drawCursor();
     }
   });
   window.addEventListener("keyup", (e) => {
@@ -959,11 +1014,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         renderPages();
         redraw();
       } else void renderList();
+      brushPanels.sync(!!session);
     },
     hide() {
       visible = false;
       root.hidden = true;
       closeMoreMenu();
+      brushPanels.sync(false);
     },
     get session() {
       return session;
@@ -977,5 +1034,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     head,
     vector: vhost,
     fit,
+    brushes: brushPanels,
+    brushState: () => {
+      const t = paintTool();
+      return t ? { tool: t, preset: toolPreset(t), brush: toolBrush(t), values: toolValues(t) } : null;
+    },
   };
 }

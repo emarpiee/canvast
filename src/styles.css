@@ -103,6 +103,8 @@
   --icon-md: 16px;
   --icon-lg: 18px;
   --icon-xl: 20px;
+  /** The picked brush preset's name in the painting tools' Properties bar (cut short beyond this). */
+  --preset-name-w: 12ch;
   /* Neutral overlays that do not follow the theme (over pictures and video) */
   --white: oklch(1 0 0);
   --black: oklch(0 0 0);
@@ -2767,7 +2769,9 @@ body[data-view="paint"] .hint-float { display: none; }
 body[data-view="paint"] #canvas-host { z-index: 3; pointer-events: none; }
 /* While the list of paintings is shown, the bars (which are for an open painting) are away; the canvas's own panels never show here. */
 body[data-view="paint"][data-paint-screen="list"] :is(#toolbar, .ctx-wrap, #hud, .paint-head),
-body[data-view="paint"] :is(#canvas, #side-panels, #side-panels-left, .hud-readout, .hud-dev) { display: none !important; }
+body[data-view="paint"] :is(#canvas, .hud-readout, .hud-dev) { display: none !important; }
+/* The dock's stacks hold the Paint view's own panels too (Brushes, Brush settings, ADR 0169): only those show there. */
+body[data-view="paint"] :is(#side-panels, #side-panels-left) > :not(:has([data-only="paint"])) { display: none !important; }
 /* The Eraser on a paint layer takes paint: the canvas's object eraser options are not its. */
 body[data-view="paint"][data-paint-target="pixels"] .tb-options[data-for="eraser"]:not([data-paint-options]) { display: none !important; }
 .paint-page { display: inline-flex; align-items: center; border-radius: var(--r-md); }
@@ -2778,5 +2782,12 @@ body[data-view="paint"][data-paint-target="pixels"] .tb-options[data-for="eraser
 .paint-page-dialog .paint-field-row .paint-field { flex: 1; min-width: 0; }
 .paint-page-dialog input, .paint-page-dialog select { font: inherit; min-height: var(--field-h); }
 .paint-dialog-note { color: var(--hud-danger); min-height: 1lh; }
+/* The Brushes and Brush settings panels (ADR 0169). */
+.brush-row .brush-thumb { flex: none; width: var(--ctl); height: var(--ctl); }
+.brush-find { width: 100%; box-sizing: border-box; }
+.brush-group .adj-group-head { padding: var(--sp-2) var(--sp-4) 0; }
+.brush-settings-panel .adj-group.is-off > .adj-row { opacity: 0.45; }
+[data-paint-options] [data-brush-panel] { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.paint-preset-name { max-width: var(--preset-name-w); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .paint-layer .layer-state[aria-pressed="false"]:not([data-eye]) { opacity: 0.45; }
 .paint-layer:hover .layer-state[aria-pressed="false"] { opacity: 0.9; }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { LAYER_KINDS, clipBaseOf, fromPx, newPage, nextName, stackOf, toPx, validLayer, validPainting, type Layer } from "../../src/paint/model";
 import { History, inverse } from "../../src/paint/history";
-import { brushOf, valuesOf } from "../../src/paint/tools";
+import { readFileSync } from "node:fs";
+import { valuesOf } from "../../src/paint/tools";
+import { BRUSH_SECTIONS, brushOf, cleanBrushes, engineValue, getPath, pickedValues, setPath, shown, tipsOf, withKeys, type BrushPreset } from "../../src/paint/brushes";
 import { toolForKey } from "../../src/settings/shortcuts";
 import { clampCamera, fitCamera, toPage, zoomAt } from "../../src/paint/camera";
 import { deflate, hashOf, inflate, isEmpty, TILE_BYTES } from "../../src/paint/codec";
@@ -49,11 +51,45 @@ describe("painting history", () => {
 describe("painting tools", () => {
   it("each tool's values are checked against its schema, and become the engine's brush", () => {
     expect(valuesOf("brush", { size: 5000, flow: "x" })).toMatchObject({ size: 1000, flow: 100 });
-    const b = brushOf("eraser", valuesOf("eraser", { size: 40, hardness: 50 }), "#ff8000") as Record<string, unknown>;
-    expect(b).toMatchObject({ size: 40, hardness: 0.5, erase: true });
+    const b = brushOf("eraser", valuesOf("eraser", { size: 40, hardness: 50 }), { size: 3, scattering: { enabled: true } }, "#ff8000");
+    expect(b).toMatchObject({ size: 40, hardness: 0.5, erase: true, scattering: { enabled: true } }); // (the bar's values over the tool's brush)
     expect(b["color"]).toEqual([1, 128 / 255, 0, 1]);
     // one keymap for both views (ADR 0168): a key bound twice belongs to the command of the view it is pressed in
     expect([toolForKey("b", "paint"), toolForKey("b", "canvas"), toolForKey("e", "paint"), toolForKey("e", "canvas")]).toEqual(["brush", "path", "eraser", "eraser"]);
+  });
+});
+
+describe("brush presets (ADR 0169)", () => {
+  const K = "b".repeat(64);
+  const tip = { stored: { key: K, width: 40, height: 20, preview: { width: 2, height: 1, data: "AAAAAA==" } } };
+  it("keep what checks: ids, names, a brush whose bitmaps are named by hash; the rest is left out", () => {
+    const ok = { id: "c".repeat(32), name: " Chalk ", brush: { size: 30, tip }, captures: { size: false } };
+    const list = cleanBrushes([ok, { ...ok }, { ...ok, id: "d".repeat(32), brush: { tip: { stored: { ...tip.stored, key: "#0" } } } }, { id: "e".repeat(32), name: "", brush: {} }, null]);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ name: "Chalk", group: "General", folder: [], captures: { size: false, toolSettings: true } });
+    expect(tipsOf(list[0]!.brush)).toEqual([{ key: K, w: 40, h: 20 }]);
+    expect(tipsOf(withKeys({ tip: { stored: { ...tip.stored, key: "#0" } }, texture: { pattern: { stored: { ...tip.stored, key: "#1" } } } }, [K, "f".repeat(64)])).map((t) => t.key)).toEqual([K, "f".repeat(64)]);
+  });
+  it("picking a preset brings its size and tool settings only when it captured them", () => {
+    const p: BrushPreset = { id: "c".repeat(32), name: "P", group: "G", folder: [], brush: { size: 50, hardness: 0.25, opacity: 0.5, pressureSize: false }, captures: { size: false, toolSettings: true } };
+    expect(pickedValues(p, valuesOf("brush", { size: 10 }))).toMatchObject({ size: 10, hardness: 25, opacity: 50, pressureSize: false });
+  });
+  it("a setting is read and written at its path, in the panel's units", () => {
+    const s = BRUSH_SECTIONS.flatMap((x) => x.items).find((x) => x.k === "shapeDynamics.size.jitter")!;
+    const b = setPath({ shapeDynamics: { enabled: true } }, s.k, engineValue(s, 40));
+    expect(b).toEqual({ shapeDynamics: { enabled: true, size: { jitter: 0.4 } } });
+    expect(shown(s, b)).toBe(40);
+    expect(shown(s, {})).toBeUndefined();
+  });
+  it("every Brush Settings path is a setting of the engine's brush (its default JSON), of the kind the panel shows", async () => {
+    const { instance } = await WebAssembly.instantiate(readFileSync("engine/out/brush.wasm"), {});
+    const e = instance.exports as unknown as { memory: WebAssembly.Memory; brush_default(): number; out_ptr(): number; out_len(): number };
+    e.brush_default();
+    const def = JSON.parse(new TextDecoder().decode(new Uint8Array(e.memory.buffer, e.out_ptr(), e.out_len())));
+    for (const sec of BRUSH_SECTIONS) {
+      if (sec.on) expect(typeof getPath(def, sec.on), sec.on).toBe("boolean");
+      for (const s of sec.items) expect(typeof getPath(def, s.k), s.k).toBe(s.t === "range" ? "number" : s.t === "toggle" ? "boolean" : "string");
+    }
   });
 });
 

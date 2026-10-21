@@ -2,10 +2,20 @@
 //! `WebAssembly.instantiate` and reads its memory directly. Layers are the engine's sparse surfaces (256 px tiles);
 //! one stroke at a time. Every call that can fail returns a negative number instead of panicking.
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+// (the engine's `.abr` mapping is compiled in from its source, which names these crates by their full names)
+extern crate paint as photocraft_paint;
+extern crate psd as photocraft_psd;
+extern crate raster as photocraft_raster;
+#[path = "../../.engine-src/crates/io/src/abr_map.rs"]
+#[allow(dead_code, clippy::all)]
+mod abr_map;
 
 use color::PixelFormat;
 use geom::{Rect, TILE_SIZE, TileCoord};
-use paint::{BrushSettings, StrokePoint, render::{COV_TILE, StrokeRenderer}};
+use paint::{BrushPreset, BrushSettings, GrayTile, Pattern, StoredTile, StrokePoint, TipShape, render::{COV_TILE, StrokeRenderer}};
 use raster::Surface;
 
 struct Stroke {
@@ -25,6 +35,11 @@ struct State {
     live: Vec<u8>,
     live_keys: Vec<i32>,
     cov: Vec<f32>,
+    /// Tip and texture bitmaps the page has put here, by its key (the SHA-256 of their samples): a brush names them as stored tiles.
+    tips: HashMap<String, Arc<GrayTile>>,
+    /// What the last preset call wrote: JSON, and the bitmaps it took out of the presets (u16 samples, one after another).
+    out: Vec<u8>,
+    out_tips: Vec<u8>,
 }
 
 thread_local! {
@@ -63,8 +78,9 @@ pub extern "C" fn layer_new() -> i32 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn stroke_begin(layer: i32, json: *const u8, len: usize, lock_alpha: i32) -> i32 {
     let bytes = unsafe { std::slice::from_raw_parts(json, len) };
-    let Ok(brush) = serde_json::from_slice::<BrushSettings>(bytes) else { return -2 };
+    let Ok(mut brush) = serde_json::from_slice::<BrushSettings>(bytes) else { return -2 };
     STATE.with_borrow_mut(|s| {
+        load_tips(&mut brush, &s.tips);
         let Some(surface) = s.layers.get(layer as usize) else { return -1 };
         let renderer = StrokeRenderer::new(&brush, Some(surface.format()), 1.0);
         s.stroke = Some(Stroke { layer: layer as usize, pre: surface.clone(), renderer, lock: lock_alpha != 0 });
@@ -299,4 +315,182 @@ pub extern "C" fn abr_roundtrip(n: i32) -> i32 {
         Ok(f) => f.legacy.len() as i32,
         Err(_) => -1,
     }
+}
+
+// ---- brush presets (P2): the built-in set, `.abr` in and out, tips kept outside the presets -----------------------------------------
+
+/// Where the last preset call wrote its JSON, and how long it is.
+#[unsafe(no_mangle)]
+pub extern "C" fn out_ptr() -> *const u8 {
+    STATE.with_borrow(|s| s.out.as_ptr())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn out_len() -> usize {
+    STATE.with_borrow(|s| s.out.len())
+}
+
+/// Where the last preset call wrote the bitmaps it took out (see `stash`), and how many bytes.
+#[unsafe(no_mangle)]
+pub extern "C" fn out_tips_ptr() -> *const u8 {
+    STATE.with_borrow(|s| s.out_tips.as_ptr())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn out_tips_len() -> usize {
+    STATE.with_borrow(|s| s.out_tips.len())
+}
+
+/// Larger side of the preview a stored tip keeps in the preset (what the Brushes panel draws; the engine paints with it while the full
+/// bitmap is missing).
+const PREVIEW: u32 = 32;
+
+/// Every bitmap a brush holds (its tip, the dual brush's tip, the texture's pattern).
+fn bitmaps(b: &mut BrushSettings) -> [Bitmap<'_>; 3] {
+    [Bitmap::Tip(&mut b.tip), Bitmap::Tip(&mut b.dual_brush.tip), Bitmap::Pattern(&mut b.texture.pattern)]
+}
+
+enum Bitmap<'a> {
+    Tip(&'a mut TipShape),
+    Pattern(&'a mut Pattern),
+}
+
+/// Give the brush's stored tiles their full bitmaps, from what the page has put here.
+fn load_tips(b: &mut BrushSettings, tips: &HashMap<String, Arc<GrayTile>>) {
+    for m in bitmaps(b) {
+        let r = match m {
+            Bitmap::Tip(TipShape::Stored(r)) | Bitmap::Pattern(Pattern::Stored(r)) => r,
+            _ => continue,
+        };
+        if let Some(g) = tips.get(&r.key) {
+            r.full = Some(g.clone());
+        }
+    }
+}
+
+/// Take every embedded bitmap out of the presets: each becomes a stored tile named "#n" (n counts from 0), with a small preview, and
+/// its samples go to `out_tips` (u16 little-endian); the JSON lists each one's size under "tips".
+fn stash(presets: &mut [BrushPreset], out_tips: &mut Vec<u8>) -> Vec<[u32; 2]> {
+    let mut sizes = Vec::new();
+    let mut take = |g: &GrayTile| -> StoredTile {
+        let key = format!("#{}", sizes.len());
+        sizes.push([g.width, g.height]);
+        out_tips.extend(g.data.iter().flat_map(|v| v.to_le_bytes()));
+        StoredTile { key, width: g.width, height: g.height, preview: Arc::new(g.preview(PREVIEW)), full: None }
+    };
+    for p in presets {
+        for m in bitmaps(&mut p.brush) {
+            match m {
+                Bitmap::Tip(t) => {
+                    if let TipShape::Sampled(g) = t {
+                        *t = TipShape::Stored(take(g));
+                    }
+                }
+                Bitmap::Pattern(t) => {
+                    if let Pattern::Tile(g) = t {
+                        *t = Pattern::Stored(take(g));
+                    }
+                }
+            }
+        }
+    }
+    sizes
+}
+
+fn put_presets(s: &mut State, mut presets: Vec<BrushPreset>, warnings: &[String]) -> i32 {
+    s.out_tips.clear();
+    let tips = stash(&mut presets, &mut s.out_tips);
+    let v = serde_json::json!({ "presets": presets, "warnings": warnings, "tips": tips });
+    s.out = serde_json::to_vec(&v).unwrap_or_default();
+    presets.len() as i32
+}
+
+/// The engine's built-in presets, as `abr_read` gives a file's. How many.
+#[unsafe(no_mangle)]
+pub extern "C" fn presets_builtin() -> i32 {
+    STATE.with_borrow_mut(|s| put_presets(s, paint::presets::builtin(), &[]))
+}
+
+/// Read an `.abr` file into presets in the group `group` (UTF-8): how many, with the JSON and the bitmaps in `out` and `out_tips`; -1
+/// when it does not read (the reason in `out`).
+///
+/// # Safety
+/// `data` points to `len` readable bytes, `group` to `glen`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn abr_read(data: *const u8, len: usize, group: *const u8, glen: usize) -> i32 {
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    let group = String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(group, glen) }).into_owned();
+    STATE.with_borrow_mut(|s| match abr_map::read_abr(bytes, &group) {
+        Ok(imp) => put_presets(s, imp.presets, &imp.warnings),
+        Err(e) => {
+            s.out = e.into_bytes();
+            -1
+        }
+    })
+}
+
+/// Put a bitmap the presets name: `w` × `h` u16 samples (little-endian) under `key` (UTF-8). -1: the sizes do not agree.
+///
+/// # Safety
+/// `key` points to `klen` readable bytes, `data` to `w * h * 2`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tip_put(key: *const u8, klen: usize, w: u32, h: u32, data: *const u8) -> i32 {
+    let n = w as usize * h as usize;
+    if n == 0 || n > 4096 * 4096 {
+        return -1;
+    }
+    let key = String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(key, klen) }).into_owned();
+    let raw = unsafe { std::slice::from_raw_parts(data, n * 2) };
+    let samples: Vec<u16> = raw.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    STATE.with_borrow_mut(|s| s.tips.insert(key, Arc::new(GrayTile { width: w, height: h, data: samples.into() })));
+    0
+}
+
+/// Write presets (a JSON array, their stored tips put with `tip_put`) as an `.abr` file of version 2 into `out`: each preset's tip
+/// (round, or sampled at 8 bits) and spacing, the part every program reads; its other settings stay in canvast's own brush file. The
+/// file's length, or -1 when the presets do not read.
+///
+/// # Safety
+/// `json` points to `len` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn abr_write(json: *const u8, len: usize) -> i32 {
+    use psd::abr::{AbrSample, LegacyBrush, LegacyTip, write_v12};
+    let bytes = unsafe { std::slice::from_raw_parts(json, len) };
+    let Ok(mut presets) = serde_json::from_slice::<Vec<BrushPreset>>(bytes) else { return -1 };
+    STATE.with_borrow_mut(|s| {
+        let brushes: Vec<LegacyBrush> = presets
+            .iter_mut()
+            .map(|p| {
+                load_tips(&mut p.brush, &s.tips);
+                let b = &p.brush;
+                let tip = match b.tip.bitmap() {
+                    Some(g) => LegacyTip::Sampled(AbrSample { id: String::new(), width: g.width, height: g.height, depth: 8, data: g.data.iter().map(|v| (v >> 8) as u8).collect() }),
+                    None => LegacyTip::Computed {
+                        diameter: b.size.clamp(1.0, 5000.0).round() as u16,
+                        hardness: (b.hardness.clamp(0.0, 1.0) * 100.0).round() as u16,
+                        angle: b.angle.clamp(-180.0, 180.0).round() as i16,
+                        roundness: (b.roundness.clamp(0.0, 1.0) * 100.0).round() as u16,
+                    },
+                };
+                let spacing = if b.spacing_enabled { (b.spacing.clamp(0.01, 10.0) * 100.0).round() as u16 } else { 0 };
+                LegacyBrush { name: p.name.clone(), spacing, anti_alias: !b.aliased, tip }
+            })
+            .collect();
+        match write_v12(2, &brushes, true) {
+            Ok(f) => {
+                s.out = f;
+                s.out.len() as i32
+            }
+            Err(_) => -1,
+        }
+    })
+}
+
+/// The engine's default brush as JSON in `out` (what a brush that leaves a setting out has): its length.
+#[unsafe(no_mangle)]
+pub extern "C" fn brush_default() -> i32 {
+    STATE.with_borrow_mut(|s| {
+        s.out = serde_json::to_vec(&BrushSettings::default()).unwrap_or_default();
+        s.out.len() as i32
+    })
 }

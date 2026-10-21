@@ -1555,6 +1555,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       ted.changed();
     },
     optionsSlot: document.querySelector<HTMLElement>("[data-paint-options]")!,
+    dock: (el, spec) => {
+      sideLeft.appendChild(el);
+      dock.add(el, spec);
+    },
     assets,
     theme: () => theme,
     styles: adjustStylesApi(),

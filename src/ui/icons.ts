@@ -259,6 +259,8 @@ import eraser from "lucide-static/icons/eraser.svg";
 // The Painting view (ADR 0165)
 import brushSvg from "lucide-static/icons/brush.svg";
 import paintbrushSvg from "lucide-static/icons/paintbrush.svg";
+import brushPresetsSvg from "lucide-static/icons/paintbrush-vertical.svg";
+import brushSettingsSvg from "lucide-static/icons/drafting-compass.svg";
 import dropletOffSvg from "lucide-static/icons/droplet-off.svg";
 import fileImageSvg from "lucide-static/icons/file-image.svg";
 import filePlusSvg from "lucide-static/icons/file-plus.svg";
@@ -451,6 +453,8 @@ export const ICONS = {
   eraser: clean(eraser),
   paintView: clean(brushSvg),
   paintbrush: clean(paintbrushSvg),
+  brushPresets: clean(brushPresetsSvg),
+  brushSettings: clean(brushSettingsSvg),
   paintEraser: clean(dropletOffSvg),
   newPainting: clean(fileImageSvg),
   newPage: clean(filePlusSvg),

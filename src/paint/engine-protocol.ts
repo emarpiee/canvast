@@ -11,6 +11,14 @@ export interface LoadTile {
   readonly data: Blob;
 }
 
+/** A bitmap a brush names (a sampled tip or a texture): its key (the SHA-256 of `data`'s bytes), size and u16 samples, row by row. */
+export interface TipBitmap {
+  readonly key: string;
+  readonly w: number;
+  readonly h: number;
+  readonly data: Uint16Array;
+}
+
 export type ToWorker =
   | { readonly t: "init"; readonly module: WebAssembly.Module }
   /** Make the engine's layer this one (`id` names the version: the same id twice loads nothing). */
@@ -21,7 +29,15 @@ export type ToWorker =
   /** Samples, 7 floats each: x, y (page px), pressure (0..1), tilt x, tilt y (degrees), rotation (degrees), time (ms). */
   | { readonly t: "points"; readonly pts: Float32Array }
   | { readonly t: "end" }
-  | { readonly t: "cancel" };
+  | { readonly t: "cancel" }
+  /** Bitmaps the next brushes name (kept in the engine from then on). */
+  | { readonly t: "tips"; readonly tips: readonly TipBitmap[] }
+  /** Presets: a brush file's (`abr`, listed under `group`), or the engine's built-in ones; answered by a `presets` reply. */
+  | { readonly t: "presets"; readonly id: number; readonly abr?: Uint8Array; readonly group?: string }
+  /** Presets (their bitmaps sent before with `tips`) as an `.abr` file; answered by a `file` reply. */
+  | { readonly t: "abr-write"; readonly id: number; readonly presets: readonly object[] }
+  /** The engine's default brush; answered by a `presets` reply with `brush`. */
+  | { readonly t: "default"; readonly id: number };
 
 /** A tile changed by a stroke: null pixels when it is empty now (it is then not stored). */
 export interface EndedTile {
@@ -37,4 +53,8 @@ export type FromWorker =
   /** The live stroke since the last message: `keys` (tx, ty pairs of live tiles), their pixels one after another. */
   | { readonly t: "live"; readonly keys: Int32Array; readonly px: Uint8Array }
   | { readonly t: "ended"; readonly tiles: readonly EndedTile[] }
-  | { readonly t: "error"; readonly message: string };
+  | { readonly t: "error"; readonly message: string }
+  /** Presets with their bitmaps taken out (each named by its hash in `tips`), and what could not be read of them. */
+  | { readonly t: "presets"; readonly id: number; readonly presets: readonly object[]; readonly tips: readonly TipBitmap[]; readonly warnings: readonly string[]; readonly brush?: object }
+  | { readonly t: "file"; readonly id: number; readonly bytes: Uint8Array }
+  | { readonly t: "failed"; readonly id: number; readonly message: string };

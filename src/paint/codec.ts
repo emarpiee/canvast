@@ -11,11 +11,11 @@ const pipe = async (bytes: Uint8Array, stream: CompressionStream | Decompression
 
 export const deflate = async (rgba: Uint8Array): Promise<Blob> => new Blob([(await pipe(rgba, new CompressionStream("deflate"))) as BlobPart]);
 
-/** The pixels of a stored tile; null when it is not a tile (wrong size or not deflate data). */
-export async function inflate(data: Blob): Promise<Uint8Array | null> {
+/** The pixels of a stored tile (or `len` bytes of a brush's bitmap); null when it is not that (wrong size or not deflate data). */
+export async function inflate(data: Blob, len = TILE_BYTES): Promise<Uint8Array | null> {
   try {
     const out = await pipe(new Uint8Array(await data.arrayBuffer()), new DecompressionStream("deflate"));
-    return out.length === TILE_BYTES ? out : null;
+    return out.length === len ? out : null;
   } catch {
     return null;
   }

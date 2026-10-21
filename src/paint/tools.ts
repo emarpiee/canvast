@@ -1,6 +1,6 @@
 /**
  * The Painting view's tools (ADR 0165). Each tool is an entry: its name, icon, key, hint and its options as a schema. The schema builds
- * the options bar, checks a stored value, and, for the tools that paint, becomes the engine's brush (`brushOf`), so a new tool or a new
+ * the options bar, checks a stored value, and, for the tools that paint, becomes the engine's brush (`brushOf` in brushes.ts), so a new tool or a new
  * option is one entry here, not a new bar or a new reader.
  */
 import { paintFromText } from "../doc/paint";
@@ -29,7 +29,7 @@ const BRUSH: readonly OptionSpec[] = [
   { key: "hardness", label: "Hard", kind: "number", min: 0, max: 100, step: 1, def: 80, percent: true, hint: "Hardness: 0 fades from the middle, 100 is a hard edge" },
   { key: "opacity", label: "Opacity", kind: "number", min: 1, max: 100, step: 1, def: 100, percent: true, hint: "The most one stroke covers, however often it passes over a place" },
   { key: "flow", label: "Flow", kind: "number", min: 1, max: 100, step: 1, def: 100, percent: true, hint: "How much each dab adds: a low flow builds up within the stroke's opacity" },
-  { key: "spacing", label: "Spacing", kind: "number", min: 1, max: 200, step: 1, def: 10, percent: true, hint: "Space between dabs, in per cent of the size" },
+  { key: "spacing", label: "Spacing", kind: "number", min: 1, max: 1000, step: 1, def: 10, percent: true, hint: "Space between dabs, in per cent of the size" },
   { key: "pressureSize", label: "Pressure size", kind: "switch", def: true, hint: "A pen's pressure changes the size" },
   { key: "pressureOpacity", label: "Pressure opacity", kind: "switch", def: false, hint: "A pen's pressure changes the opacity" },
 ];
@@ -56,15 +56,3 @@ export function valuesOf(tool: ToolId, stored: unknown): Record<string, number |
   }
   return out;
 }
-
-/** "#rrggbb" as the engine's colour (0..1). */
-const rgb = (hex: string): [number, number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).concat(1) as [number, number, number, number];
-
-/** The engine's brush (its JSON) for a painting tool's values and colour. */
-export function brushOf(tool: ToolId, v: Values, colour: string): object {
-  const a = TOOLS[tool].action;
-  const pct = (k: string): number => Number(v[k]) / 100;
-  return { size: Number(v["size"]), hardness: pct("hardness"), opacity: pct("opacity"), flow: pct("flow"), spacing: pct("spacing"), pressureSize: v["pressureSize"] === true, pressureOpacity: v["pressureOpacity"] === true, color: rgb(colour), erase: a.paint && a.erase };
-}
-
-

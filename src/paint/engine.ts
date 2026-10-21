@@ -3,7 +3,7 @@
  * and turns the message protocol (engine-protocol.ts) into calls. One stroke at a time; `end` resolves with the changed tiles.
  */
 import wasm from "../../engine/out/brush.wasm";
-import type { EndedTile, FromWorker, LoadTile, ToWorker } from "./engine-protocol";
+import type { EndedTile, FromWorker, LoadTile, TipBitmap, ToWorker } from "./engine-protocol";
 
 /** The worker's code, bundled on its own by scripts/build.mjs. */
 declare const __PAINT_WORKER__: string;
@@ -15,6 +15,11 @@ export class BrushEngine {
   private ended: ((tiles: readonly EndedTile[]) => void) | null = null;
   private loads = new Map<string, Array<() => void>>();
   private side = 64;
+  /** Calls waiting for their reply (presets, files), by id. */
+  private calls = new Map<number, (m: FromWorker) => void>();
+  private nextCall = 1;
+  /** The bitmaps the engine has (by key): sent once. */
+  private readonly tipsIn = new Set<string>();
 
   private constructor(private readonly w: Worker) {
     w.onmessage = (ev: MessageEvent<FromWorker>) => {
@@ -27,6 +32,10 @@ export class BrushEngine {
         for (const ok of this.loads.get(m.id) ?? []) ok();
         this.loads.delete(m.id);
       } else if (m.t === "error") this.onError?.(m.message);
+      else if (m.t === "presets" || m.t === "file" || m.t === "failed") {
+        this.calls.get(m.id)?.(m);
+        this.calls.delete(m.id);
+      }
     };
   }
 
@@ -88,5 +97,46 @@ export class BrushEngine {
 
   cancel(): void {
     this.send({ t: "cancel" });
+  }
+
+  private call(make: (id: number) => ToWorker, transfer: Transferable[] = []): Promise<FromWorker> {
+    const id = this.nextCall++;
+    return new Promise((ok) => {
+      this.calls.set(id, ok);
+      this.send(make(id), transfer);
+    });
+  }
+
+  /** A brush file's presets (`abr` given) or the built-in ones: their bitmaps (now in the engine too) and what could not be read. */
+  async presets(abr?: Uint8Array, group?: string): Promise<{ presets: object[]; tips: TipBitmap[]; warnings: string[] }> {
+    const m = await this.call((id) => ({ t: "presets", id, ...(abr ? { abr, group: group ?? "" } : {}) }));
+    if (m.t !== "presets") throw new Error(m.t === "failed" ? m.message : "no presets");
+    for (const t of m.tips) this.tipsIn.add(t.key);
+    return { presets: [...m.presets], tips: [...m.tips], warnings: [...m.warnings] };
+  }
+
+  /** The engine's default brush (every setting a brush leaves out). */
+  async defaultBrush(): Promise<object> {
+    const m = await this.call((id) => ({ t: "default", id }));
+    return m.t === "presets" && m.brush ? m.brush : {};
+  }
+
+  /** Presets as an `.abr` file (their bitmaps must be in the engine: `hasTip` / `putTips`). */
+  async writeAbr(presets: readonly object[]): Promise<Uint8Array> {
+    const m = await this.call((id) => ({ t: "abr-write", id, presets }));
+    if (m.t !== "file") throw new Error(m.t === "failed" ? m.message : "no file");
+    return m.bytes;
+  }
+
+  hasTip(key: string): boolean {
+    return this.tipsIn.has(key);
+  }
+
+  /** Give the engine bitmaps the next brushes name (in order with the strokes: a stroke begun after this has them). */
+  putTips(tips: readonly TipBitmap[]): void {
+    const fresh = tips.filter((t) => !this.tipsIn.has(t.key));
+    if (!fresh.length) return;
+    for (const t of fresh) this.tipsIn.add(t.key);
+    this.send({ t: "tips", tips: fresh });
   }
 }

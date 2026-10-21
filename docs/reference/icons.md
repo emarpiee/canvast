@@ -114,6 +114,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `eraser` | Object eraser |
 | `brush` | Paint view (the view switch) |
 | `paintbrush` | Brush tool (Paint view) |
+| `paintbrush-vertical` | Brushes panel: the brush presets (the painting tools' Properties bar) |
+| `drafting-compass` | Brush Settings panel: the brush's tip and dynamics (the painting tools' Properties bar) |
 | `droplet-off` | Eraser tool of the Paint view: takes paint away from a layer |
 | `file-image` | New painting (Paint view) |
 | `file-plus` | New page (Paint view) |

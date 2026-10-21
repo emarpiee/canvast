@@ -1,6 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import type { PaintView } from "../ui/paint-view";
 import { tilesOf } from "../paint/model";
+import { tipsOf } from "../paint/brushes";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
@@ -127,6 +128,8 @@ export interface DebugHook {
     settled(): Promise<void>;
     list(): Promise<Array<{ id: string; name: string }>>;
     open(id: string): Promise<void>;
+    /** The brush presets (ADR 0169) and the painting tool in use with its brush. */
+    brushes(): Promise<{ presets: Array<{ id: string; name: string; group: string; tips: number }>; tool: { tool: string; preset: string; brush: Record<string, unknown>; values: Record<string, unknown> } | null }>;
   };
   objects(): SerializedObject[];
   /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
@@ -426,6 +429,10 @@ export function installDebugHook(
       },
       list: async () => (await deps.paint.list()).map((p) => ({ id: p.id, name: p.name })),
       open: (id) => deps.paint.open(id),
+      brushes: async () => ({
+        presets: (await deps.paint.brushes.presets()).map((p) => ({ id: p.id, name: p.name, group: [p.group, ...p.folder].join(" / "), tips: tipsOf(p.brush).length })),
+        tool: deps.paint.brushState(),
+      }),
     },
     pixelAt: (x, y) => {
       const dpr = canvas.width / view.viewport.width;
