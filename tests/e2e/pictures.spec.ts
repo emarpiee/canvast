@@ -1153,6 +1153,22 @@ test("an adjustment's number can be dragged left or right to change it, like the
     await p.mouse.up();
     expect(Number(await f.inputValue()), `${key} follows the drag`).toBeGreaterThan(0);
   }
+  // with Shift the value lands on the round steps of its range (a range of 200 has steps of 10; a range of 100, of 5)
+  for (const [key, step] of [["contrast", 10], ["sharpen", 5]] as const) {
+    const f = p.locator(`.adjust-pop [data-adj-num="${key}"]`);
+    await f.scrollIntoViewIfNeeded();
+    const r = (await f.boundingBox())!;
+    const x = Math.round(r.x + r.width / 2), y = Math.round(r.y + r.height / 2);
+    await p.mouse.move(x, y);
+    await p.mouse.down();
+    await p.keyboard.down("Shift");
+    await p.mouse.move(x + 27, y, { steps: 9 });
+    await p.mouse.up();
+    await p.keyboard.up("Shift");
+    const v = Number(await f.inputValue());
+    expect(v, `${key} moved`).toBeGreaterThan(0);
+    expect(v % step, `${key} is on a step of ${step}`).toBe(0);
+  }
   const adj = (await objs(app)).find((o) => o.id === pic.id)!.adjust!;
   expect(adj["exposure"]).toBeGreaterThan(0);
   await p.keyboard.press("Control+z");

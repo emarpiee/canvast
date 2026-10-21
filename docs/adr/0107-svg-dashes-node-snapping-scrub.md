@@ -12,7 +12,7 @@ Accepted (v0.17.0).
 
 **Node snapping.** While a node (not a handle) is dragged in Edit nodes, with the Snap toggle on, its x and its y line up with the nearest node of the same shape or of another shape in view within `SNAP_PX`; guide lines show it (the object-snapping guides).
 
-**Dragging a number's name** (`src/colour-picker/scrub.ts`, shared by the colour package and the app). Every `<label>` of one `<input type="number">`, wrapped or by `for`, can be dragged left or right to change the value live (`input` events), with one `change` on release; Shift is ten times faster; a click on the name focuses the field. Numbers that sit beside a slider keep the slider. The toolbar's own scrub (Radius, Sides, Points, Ratio of a picked shape) is kept: it previews shapes.
+**Dragging a number's name** (`src/colour-picker/scrub.ts`, shared by the colour package and the app). Every `<label>` of one `<input type="number">`, wrapped or by `for`, can be dragged left or right to change the value live (`input` events), with one `change` on release; Shift snaps to round steps worked out from the range (100: steps of 5; no range: ten times faster); a click on the name focuses the field. Numbers that sit beside a slider keep the slider. The toolbar's own scrub (Radius, Sides, Points, Ratio of a picked shape) is kept: it previews shapes.
 
 **Only what is picked moves.** A press-and-slide on a shape, path or stroke that is not picked draws the selection box, like a picture; pick it first (click), then drag. Before, paths and strokes moved on the first slide.
 

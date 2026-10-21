@@ -2,8 +2,17 @@
  * Drag a number field left or right to change it (the quick way to a value, as in a design tool): every `<input type="number">` that has a
  * `<label>` (wrapped or by `for`) inside `root` becomes draggable. The field gets `input` events while dragging and one `change` on release (so one
  * undo step). A press on the field that does not move goes into it (to type); a press on its name is only a label click, which focuses the field.
- * Shift moves ten times faster.
+ * Shift snaps the value to round steps worked out from the range (`niceStep`: 100 has steps of 5, 255 of 10), so a round number is easy to land on;
+ * a field with no range moves ten times faster instead.
  */
+/** A round step (1, 2 or 5 times a power of ten) that divides `span` into about twenty: 100 gives 5, 255 gives 10, 5 gives 0.2. */
+export function niceStep(span: number): number {
+  const target = span / 20;
+  const pow = 10 ** Math.floor(Math.log10(target));
+  const m = target / pow;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * pow;
+}
+
 export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or right to change it"): void {
   let drag: { label: HTMLElement; input: HTMLInputElement; start: number; x: number; moved: boolean; id: number } | null = null;
   const numberOf = (label: HTMLElement): HTMLInputElement | null => {
@@ -60,9 +69,12 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
     // a short range (a count) moves a step every 8 px, a long one every 2 px; "any" is a hundredth of the range, or 1
     if (!st) st = Number.isFinite(span) ? span / 100 : 1;
     const perPx = perScreenPx ? 1 : span / st <= 60 ? 1 / 8 : 1 / 2;
-    let v = drag.start + Math.round(dx * perPx * (e.shiftKey ? 10 : 1)) * st;
+    // Shift, with a range: the value snaps to the round steps of the range; without one it moves ten times faster
+    const snap = e.shiftKey && !perScreenPx && Number.isFinite(span) ? niceStep(span) : 0;
+    let v = drag.start + Math.round(dx * perPx * (e.shiftKey && !snap ? 10 : 1)) * st;
+    if (snap) v = Math.round(v / snap) * snap;
     v = Math.min(max, Math.max(min, v));
-    const decimals = perScreenPx ? Math.max(0, Math.ceil(-Math.log10(st)) + 2) : (String(st).split(".")[1] ?? "").length;
+    const decimals = snap ? (String(Number(snap.toPrecision(6))).split(".")[1] ?? "").length : perScreenPx ? Math.max(0, Math.ceil(-Math.log10(st)) + 2) : (String(st).split(".")[1] ?? "").length;
     const text = v.toFixed(Math.min(decimals + (step(i) ? 0 : perScreenPx ? 0 : 2), perScreenPx ? 20 : 6));
     if (text === i.value) return;
     i.value = String(Number(text));
