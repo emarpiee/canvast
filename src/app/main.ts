@@ -88,7 +88,8 @@ import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
-import { patternTargetLabel, foundPattern, makePattern, newPatternSession } from "./pattern";
+import { patternTarget, patternTargetLabel, foundPattern, makePattern, newPatternSession } from "./pattern";
+import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
 import { FIXED_SHORTCUTS, TOOL_COMMAND, TOOL_NAME, TOOL_ORDER, navForKey, toolForKey } from "../settings/shortcuts";
@@ -775,11 +776,26 @@ async function start(): Promise<void> {
   });
   mountStylesPanel(side, editor, session.styles, {
     pattern: {
+      current: () => patternPanel.current(),
       apply: (d, label) => {
         editor.patternOpen = true;
         editor.changed();
         patternPanel.use(d.id, d.v, d.seed);
-        editor.message = `Pattern style “${label}”.`;
+        // Several sheets or shapes picked: the pattern is made on each of them (one undo step each), the panel holding its settings
+        const g = generatorById(d.id);
+        const picked = editor.selection;
+        const each = [...picked].filter((id) => {
+          editor.selection = new Set([id]);
+          return patternTarget(doc, editor) !== null;
+        });
+        editor.selection = picked;
+        if (g && each.length > 1) {
+          const made = each.filter((id) => {
+            editor.selection = new Set([id]);
+            return makePattern(doc, editor, view, newPatternSession(), g, cleanValues(g, d.v), d.seed);
+          });
+          editor.message = `Pattern style “${label}” made on ${made.length} of ${each.length} picked.`;
+        } else editor.message = `Pattern style “${label}”.`;
         editor.changed();
       },
     },

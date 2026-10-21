@@ -34,6 +34,8 @@ export interface PatternActions {
 /** What the Pattern panel can be handed: a saved pattern style is put into it (and made at once when something is picked to put it on). */
 export interface PatternHandle {
   use(id: string, values: Values, seed: number): void;
+  /** The generator, settings and seed in the panel now. */
+  current(): { id: string; v: Values; seed: number };
 }
 
 const SEED_MAX = 999_999;
@@ -247,6 +249,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     if ((e.target as HTMLElement).matches("input, select, textarea")) e.stopPropagation();
   });
   return {
+    current: () => ({ id: gen.id, v: cleanValues(gen, values), seed }),
     use(id, v, s) {
       const g = generatorById(id);
       if (!g) return;

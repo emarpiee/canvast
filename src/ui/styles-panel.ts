@@ -46,7 +46,7 @@ export interface StylesDeps {
   /** Text styles: how many texts are picked (or are being edited), the look of the first one, and putting a saved look on them. */
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
-  pattern: { apply(data: PatternData, label: string): void };
+  pattern: { apply(data: PatternData, label: string): void; /** What the Pattern panel holds now (to update a style from it). */ current(): PatternData };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
   picturePalette(): Promise<string[] | null>;
@@ -356,6 +356,12 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (item.kind === "adjustment")
       return [
         { label: "Update from the picked picture", icon: ICONS.replace, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the picked picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        ...common(item),
+        del,
+      ];
+    if (item.kind === "pattern")
+      return [
+        { label: "Update from the Pattern panel", icon: ICONS.replace, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
         ...common(item),
         del,
       ];

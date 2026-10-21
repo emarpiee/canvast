@@ -131,20 +131,17 @@ test("Saved to the library, each kind has its own folder and tags: a pattern, a 
   await choose(app, "dots");
   await make(app); // the new sheet is picked: Export… works on it
   await saveToLibrary();
-  await expect.poll(async () => (await filed()).length).toBe(1);
-  expect((await filed())[0]).toMatchObject({ tags: ["pattern"], folder: "Patterns" });
+  await expect.poll(async () => (await filed())[0]).toMatchObject({ tags: ["pattern"], folder: "Patterns" }); // (the folder and tags are written just after the entry: wait for them)
   // a plain shape exported as a picture: the folder and tag of exports
   await p.keyboard.press("u");
   await app.drag({ x: 100, y: 450 }, { x: 220, y: 550 }, 6); // (beside the new sheet, so the shape is not on it)
   await p.keyboard.press("v");
   await p.mouse.click(160, 500);
   await saveToLibrary();
-  await expect.poll(async () => (await filed()).length).toBe(2);
-  expect((await filed()).find((f) => f.folder === "Exports")?.tags).toEqual(["export"]);
+  await expect.poll(async () => (await filed()).find((f) => f.folder === "Exports")?.tags).toEqual(["export"]);
   // the same shape saved as SVG: the folder and tag of shapes
   await exportWith(p, "svglibrary");
-  await expect.poll(async () => (await filed()).length).toBe(3);
-  expect((await filed()).find((f) => f.name.endsWith(".svg"))).toMatchObject({ folder: "Shapes", tags: ["shape"] });
+  await expect.poll(async () => (await filed()).find((f) => f.name.endsWith(".svg"))).toMatchObject({ folder: "Shapes", tags: ["shape"] });
   // each is a setting of its own
   await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Media and playback" }).click();
@@ -153,8 +150,7 @@ test("Saved to the library, each kind has its own folder and tags: a pattern, a 
   await p.getByTestId("view-canvas").click();
   await p.keyboard.press("Control+a"); // the shape and the pattern: it holds a pattern, so it is filed as one
   await exportWith(p, "svglibrary");
-  await expect.poll(async () => (await filed()).length).toBe(4);
-  expect((await filed()).find((f) => f.folder === "Mine")?.tags).toEqual(["a", "b"]);
+  await expect.poll(async () => (await filed()).find((f) => f.folder === "Mine")?.tags).toEqual(["a", "b"]);
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -216,5 +212,36 @@ test("Pattern styles: Save as a style keeps the generator, settings and seed in 
   await expect(p.locator("[data-pg-name]")).toHaveText("Stripes");
   await expect(p.locator("[data-pg-seed]")).toHaveValue("77");
   await expect(p.locator('[data-k="jitter"] input[type=number]')).toHaveValue("40");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Pattern styles: update a style from the Pattern panel, and pressing one with several shapes picked makes it on each of them", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "stripes");
+  await p.locator("[data-pg-seed]").fill("11");
+  await p.locator("[data-pg-seed]").dispatchEvent("change");
+  await p.locator("[data-pg-style]").click();
+  await p.click("[data-styles]");
+  await p.locator('[data-tab="pattern"]').click();
+  const panel = p.getByTestId("styles-panel");
+  await expect(panel.locator(".style-card")).toContainText("Stripes · seed 11");
+  // the panel changes, and the style is brought up to date from it
+  await p.locator("[data-pg-seed]").fill("12");
+  await p.locator("[data-pg-seed]").dispatchEvent("change");
+  await panel.locator("[data-more]").click();
+  await p.getByRole("menuitem", { name: /with the generator, settings and seed in the Pattern panel/ }).click();
+  await expect(panel.locator(".style-card")).toContainText("Stripes · seed 12");
+  // two shapes picked: the pattern is made on both (each cuts its own pattern)
+  await p.keyboard.press("u");
+  await app.drag({ x: 480, y: 300 }, { x: 600, y: 380 }, 6);
+  await app.drag({ x: 700, y: 300 }, { x: 820, y: 380 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(540, 340);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(760, 340);
+  await p.keyboard.up("Shift");
+  await panel.locator(".style-card").click();
+  await expect.poll(async () => (await objs(app)).filter((o) => o.container?.mask).length).toBe(2);
   expect(app.consoleErrors).toEqual([]);
 });

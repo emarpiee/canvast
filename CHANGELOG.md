@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.27.0 — Adjustments on shapes, shadows, pattern styles (2026-10-21)
+
+- **Adjustments on shapes, pen strokes and texts:** the Adjust panel now works on them, as they look once drawn (fill, outline, gradient and texture together). Colour adjustments go through the SVG filter on the graphics card (no pixel readback); blur is a share of the object's own size, so it does not change with zoom, and keeps a width of at most about 330 px far inside an object.
+- **Drop shadow and inner shadow** (opacity, across, down, blur, spread, colour) for pictures, shapes, strokes and texts. A shadow turned on starts soft and a little below. A group's **Reset** button puts back that group of adjustments.
+- **Export** of a selection leaves room for a blur or a drop shadow (the picture is no longer cut at the shape's box); SVG export writes the adjustments as a filter with room for them, and importing that SVG brings the adjustments back.
+- **Fixed:** a view with a blurred shape is drawn directly, not from tiles (grid seams); zooming out from depth no longer shows a bare border while the exact view builds (a prebuilt set is swapped in).
+- **Scrubbing:** the adjustment numbers and the colour picker's opacity and channel numbers can be dragged; with **Shift** a dragged number snaps to round steps worked out from its range (100: 5, 255: 10).
+- **Pattern generator:** the seed works in all 39 generators (the regular ones got a *Looseness* setting; 0 stays exact), *New seed* says when it changes nothing, Scales no longer lose their lower rows past 600 shapes (Across up to 12), the actions are icons.
+- **Pattern styles** (Styles panel, Patterns tab): save a generator with its settings and seed from the Pattern panel, press a card to put it back and make it on what is picked (on each of several picked shapes), update it from the panel.
+
 ## 0.26.4 — A zoom in is just a zoom in (2026-10-21)
 
 - **Fixed:** going to a bookmark that was in view (or nearly: its centre within one view width of where you are, or the other way round) first zoomed out and then in (showcase bookmarks 8 to 12). Now it is one zoom about the point that maps one view to the other, like the wheel, in any direction. This holds at any depth, a million levels included (the numbers are kept in the deeper frame, so nothing grows with the depth).
