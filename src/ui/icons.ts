@@ -42,8 +42,8 @@ import projectorSvg from "lucide-static/icons/projector.svg";
 import cornerUpLeftSvg from "lucide-static/icons/corner-up-left.svg";
 import mountainSnowSvg from "lucide-static/icons/mountain-snow.svg";
 import snowflakeSvg from "lucide-static/icons/snowflake.svg";
-import dicesSvg from "lucide-static/icons/dices.svg";
 import dice5Svg from "lucide-static/icons/dice-5.svg";
+import shuffleSvg from "lucide-static/icons/shuffle.svg";
 import sparklesSvg from "lucide-static/icons/sparkles.svg";
 import imageUpSvg from "lucide-static/icons/image-up.svg";
 import arrowRightLeftSvg from "lucide-static/icons/arrow-right-left.svg";
@@ -545,8 +545,8 @@ export const ICONS = {
   slidersVertical: clean(slidersVerticalSvg),
   projector: clean(projectorSvg),
   cornerUpLeft: clean(cornerUpLeftSvg),
-  dices: clean(dicesSvg),
   dice5: clean(dice5Svg),
+  shuffle: clean(shuffleSvg),
   sparkles: clean(sparklesSvg),
   mountainSnow: clean(mountainSnowSvg),
   snowflake: clean(snowflakeSvg),

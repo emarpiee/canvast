@@ -282,6 +282,6 @@ test("Randomize buttons carry the dice icon (the Pattern panel's, and the random
   const p = app.page;
   await p.click("[data-pattern-panel]");
   const dice = await p.locator('[data-action="random-view"] svg').innerHTML();
-  expect(dice).toContain("rect"); // (the lucide "dices": a die and a tilted one)
+  expect(dice).toContain("rect"); // (the lucide "dice-5")
   expect(await p.locator("[data-pg-random] svg").innerHTML(), "Randomize is the same icon as the random view").toBe(dice);
 });

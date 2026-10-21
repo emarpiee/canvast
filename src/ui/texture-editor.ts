@@ -85,7 +85,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
       <p class="op-note" data-tex-note role="status"></p>
     </div>
     <div class="tex-fields">
-      <div class="tex-random"><button type="button" class="colour-save" data-tex-random title="Randomize the options: scale, turn, place, space and grid">${ICONS.dices}<span>Randomize</span></button></div>
+      <div class="tex-random"><button type="button" class="colour-save" data-tex-random title="Randomize the options: scale, turn, place, space and grid">${ICONS.dice5}<span>Randomize</span></button></div>
       ${o.kind === "image" ? select("mode", "Mode", TEXTURE_MODES.map((m) => [m, LABEL[m]] as const)) : ""}
       ${rows}
       ${select("tile", "Grid", TILE_TYPES.map((m) => [m, TILE_LABEL[m]] as const))}

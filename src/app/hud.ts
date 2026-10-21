@@ -131,7 +131,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
-      <button type="button" data-action="random-view" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dices}</button>
+      <button type="button" data-action="random-view" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dice5}</button>
       <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Shift+Right)">${ICONS.cornerUpRight}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
