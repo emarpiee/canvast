@@ -277,3 +277,11 @@ test("Names above picked items never overlap: a pattern's sheet and its pieces, 
   expect(labels.length).toBeGreaterThan(0);
   for (const a of labels) for (const b of labels) if (a !== b) expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h, `${a.text} and ${b.text} overlap`).toBe(false);
 });
+
+test("Randomize buttons carry the dice icon (the Pattern panel's, and the random view's)", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  const dice = await p.locator('[data-action="random-view"] svg').innerHTML();
+  expect(dice).toContain("rect"); // (the lucide "dices": a die and a tilted one)
+  expect(await p.locator("[data-pg-random] svg").innerHTML(), "Randomize is the same icon as the random view").toBe(dice);
+});

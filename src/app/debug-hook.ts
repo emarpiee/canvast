@@ -266,7 +266,7 @@ export interface DebugDeps {
   /** Resolves when the index of a big document has been built slice by slice. */
   indexReady: () => Promise<void>;
   /** The names above the items as last drawn. */
-  labels: () => readonly { id: string; text: string }[];
+  labels: () => readonly { id: string; text: string; x: number; y: number; w: number; h: number }[];
 }
 
 /**
