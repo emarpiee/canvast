@@ -1,6 +1,7 @@
 import type { Adjust } from "../doc/adjust";
 import type { EditorState } from "../app/editor-state";
-import type { StyleItem, StyleLibrary, PaletteData } from "../assets/styles";
+import type { StyleItem, StyleLibrary, PaletteData, PatternData } from "../assets/styles";
+import { styleThumbSvg } from "./pattern-thumb";
 import { STYLE_KINDS, gradientCss } from "../assets/styles";
 import type { TextLook } from "../text/text-style";
 import { parseGgr, serializeGgr } from "../assets/ggr";
@@ -44,6 +45,8 @@ export interface StylesDeps {
   map: { count(): number; apply(stops: Gradient["stops"], label: string): void };
   /** Text styles: how many texts are picked (or are being edited), the look of the first one, and putting a saved look on them. */
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
+  /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
+  pattern: { apply(data: PatternData, label: string): void };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
   picturePalette(): Promise<string[] | null>;
@@ -85,8 +88,21 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "pattern" ? true : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
+
+  /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
+  const thumbs = new Map<string, string>();
+  const patternThumb = (item: StyleItem): string => {
+    const d = item.data as PatternData;
+    const key = `${item.id}|${d.id}|${d.seed}|${JSON.stringify(d.v)}`;
+    let t = thumbs.get(key);
+    if (t === undefined) {
+      t = styleThumbSvg(d.id, d.v, d.seed);
+      thumbs.set(key, t);
+    }
+    return t;
+  };
 
   const card = (item: StyleItem, can: boolean): string => {
     const k = kindsShown.find((x) => x.id === item.kind)!;
@@ -99,7 +115,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
           ? `<span class="style-card-line"><span class="style-swatch" style="background:${esc(String(item.data))}"></span><span class="style-card-name">${esc(item.name)}</span></span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
           : item.kind === "palette"
             ? `<span class="style-card-name">${esc(item.name)}</span><span class="style-strip">${(look?.swatches ?? []).slice(0, 24).map((c) => `<span style="background:${esc(c)}"></span>`).join("")}</span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
-            : `<span class="style-card-name">${esc(item.name)}</span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`;
+            : item.kind === "pattern"
+              ? `<span class="style-card-name">${esc(item.name)}</span><span class="style-pattern" aria-hidden="true">${patternThumb(item)}</span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`
+              : `<span class="style-card-name">${esc(item.name)}</span><span class="style-card-sum">${esc(k.summary(item.data))}</span>`;
     if (renaming === item.id) return `<li><input class="style-rename" data-rename="${esc(item.id)}" value="${esc(item.name)}" maxlength="60" aria-label="New name for ${esc(item.name)}"></li>`;
     const more = moreButton(`More actions for style ${item.name}`, `data-more="${esc(item.id)}"`);
     if (item.kind === "palette") {
@@ -118,12 +136,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
+    pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the picked sheet or shape.",
     text: "A text style is a size, spacing, alignment and colour. Pick a text, save its style here, then press it to give other texts the same look.",
   };
 
@@ -159,7 +178,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
           ? `<button type="button" class="styles-make" data-add-style-colour>${ICONS.droplet}<span>Add a colour</span></button>`
           : k.id === "gradient"
             ? `<button type="button" class="styles-make" data-new-gradient>${ICONS.blend}<span>New gradient</span></button><button type="button" class="styles-make" data-import>${ICONS.fileUp}<span>Import .ggr</span></button>`
-            : k.id === "text"
+            : k.id === "pattern"
+              ? `<button type="button" class="styles-make" data-open-pattern>${ICONS.mountainSnow}<span>Open the Pattern panel</span></button>`
+              : k.id === "text"
               ? `<button type="button" class="styles-make" data-save-text${deps.text.current() ? "" : " disabled"}>${ICONS.textStyle}<span>Save from the text</span></button>`
               : "";
     const empty =
@@ -427,6 +448,11 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         deps.notify(`Saved ${h.toUpperCase()}.`);
       });
     }
+    if (t.closest("[data-open-pattern]")) {
+      editor.patternOpen = true;
+      editor.changed();
+      return;
+    }
     if (t.closest("[data-save-text]")) {
       const look = deps.text.current();
       if (look) void styles.add("text", "", look).then((made) => made && deps.notify(`Saved the text style “${made.name}”.`));
@@ -543,6 +569,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (!item || !canApply(item.kind)) return;
     if (item.kind === "adjustment") deps.adjustment.apply(item);
     else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
+    else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
     else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {

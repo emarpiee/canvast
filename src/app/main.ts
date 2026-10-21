@@ -774,6 +774,15 @@ async function start(): Promise<void> {
     names: assetNames,
   });
   mountStylesPanel(side, editor, session.styles, {
+    pattern: {
+      apply: (d, label) => {
+        editor.patternOpen = true;
+        editor.changed();
+        patternPanel.use(d.id, d.v, d.seed);
+        editor.message = `Pattern style “${label}”.`;
+        editor.changed();
+      },
+    },
     text: {
       count: () => [...editor.selection].filter((id) => doc.get(id)?.kind === "text").length,
       current: () => {
@@ -869,12 +878,19 @@ async function start(): Promise<void> {
   });
   dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
   const patternSession = newPatternSession();
-  mountPatternPanel(side, editor, {
+  const patternPanel = mountPatternPanel(side, editor, {
     make: (g, values, seed) => makePattern(doc, editor, view, patternSession, g, values, seed),
     live: () => (patternSession.top !== null && doc.lastTransaction === patternSession.top) || foundPattern(doc, editor) !== null,
     found: () => { const f = foundPattern(doc, editor); return f ? { id: f.info.id, gid: f.info.gid, seed: f.info.seed, v: f.info.v } : null; },
     end: () => { patternSession.top = null; patternSession.sheet = null; },
     target: () => patternTargetLabel(doc, editor),
+    hasTarget: () => patternTargetLabel(doc, editor) !== "A new sheet",
+    saveStyle: (g, values, seed) => {
+      void session.styles.add("pattern", "", { id: g.id, seed, v: values }).then((made) => {
+        editor.message = made ? `Saved the pattern style “${made.name}”. It is in the Styles panel.` : session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "The pattern could not be saved as a style.";
+        editor.changed();
+      });
+    },
   });
   dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {

@@ -25,12 +25,21 @@ export interface PatternActions {
   end(): void;
   /** What a result would go on, in words. */
   target(): string;
+  /** Whether a result would go on something picked (a sheet or a shape), not on a new sheet. */
+  hasTarget(): boolean;
+  /** Keep the generator, its settings and the seed as a style (Styles panel). */
+  saveStyle(g: Generator, values: Values, seed: number): void;
+}
+
+/** What the Pattern panel can be handed: a saved pattern style is put into it (and made at once when something is picked to put it on). */
+export interface PatternHandle {
+  use(id: string, values: Values, seed: number): void;
 }
 
 const SEED_MAX = 999_999;
 const newSeed = (): number => 1 + Math.floor(Math.random() * SEED_MAX);
 
-export function mountPatternPanel(host: HTMLElement, editor: EditorState, actions: PatternActions): void {
+export function mountPatternPanel(host: HTMLElement, editor: EditorState, actions: PatternActions): PatternHandle {
   const panel = document.createElement("aside");
   panel.className = "layers-panel adjust-panel pattern-panel";
   panel.setAttribute("aria-label", "Pattern");
@@ -49,7 +58,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     body: `<div data-pg-body></div>`,
     foot: `<div class="adj-foot pg-foot">
       <div class="pg-seed"><label>Seed <input type="number" class="adj-num" min="1" max="${SEED_MAX}" step="1" data-pg-seed aria-label="Seed"></label><button type="button" data-pg-newseed aria-label="New seed" title="New seed: keep the settings and try another arrangement">${ICONS.dice5}</button></div>
-      <div class="pg-actions"><button type="button" data-pg-random aria-label="Randomize" title="Randomize: random settings and a new seed; settings marked with a snowflake stay">${ICONS.shuffle}</button><button type="button" class="is-primary" data-pg-make data-testid="pattern-make" aria-label="Generate" title="Generate the pattern">${ICONS.sparkles}</button><button type="button" data-pg-done aria-label="Done" title="Done: keep the result and start a new one next time">${ICONS.check}</button></div>
+      <div class="pg-actions"><button type="button" data-pg-random aria-label="Randomize" title="Randomize: random settings and a new seed; settings marked with a snowflake stay">${ICONS.shuffle}</button><button type="button" class="is-primary" data-pg-make data-testid="pattern-make" aria-label="Generate" title="Generate the pattern">${ICONS.sparkles}</button><button type="button" data-pg-style aria-label="Save as a style" title="Save as a style: keep this generator, its settings and seed in the Styles panel">${ICONS.packagePlus}</button><button type="button" data-pg-done aria-label="Done" title="Done: keep the result and start a new one next time">${ICONS.check}</button></div>
     </div>`,
   });
   host.appendChild(panel);
@@ -210,6 +219,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     else if (t.hasAttribute("data-pg-pick")) { grid.hidden = !grid.hidden; pick.setAttribute("aria-expanded", String(!grid.hidden)); }
     else if (t.hasAttribute("data-gen")) { grid.hidden = true; pick.setAttribute("aria-expanded", "false"); choose(t.dataset["gen"]!); }
     else if (t.hasAttribute("data-pg-make")) run();
+    else if (t.hasAttribute("data-pg-style")) actions.saveStyle(gen, cleanValues(gen, values), seed);
     else if (t.hasAttribute("data-pg-done")) { actions.end(); started = false; seed = newSeed(); build(); editor.changed(); }
     else if (t.hasAttribute("data-pg-newseed")) {
       const before = seed;
@@ -236,4 +246,17 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   panel.addEventListener("keydown", (e) => {
     if ((e.target as HTMLElement).matches("input, select, textarea")) e.stopPropagation();
   });
+  return {
+    use(id, v, s) {
+      const g = generatorById(id);
+      if (!g) return;
+      gen = g;
+      values = cleanValues(g, v);
+      kept.set(g.id, values);
+      seed = s;
+      started = false; // (a style is a new result, not a change of the last one)
+      build();
+      if (actions.hasTarget()) run();
+    },
+  };
 }

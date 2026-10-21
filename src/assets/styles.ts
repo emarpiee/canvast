@@ -11,6 +11,8 @@ import { isColour, isGradient, isPaint } from "../doc/paint";
 import type { PaletteColour } from "./gpl";
 import { MAX_PALETTE } from "./gpl";
 import { cleanLook } from "../text/text-style";
+import { cleanValues, generatorById } from "../gen";
+import type { Values } from "../gen";
 import type { TextLook } from "../text/text-style";
 
 export interface StyleItem {
@@ -126,8 +128,31 @@ export const TEXT_KIND: StyleKind = {
   look: (d) => ({ swatches: (d as TextLook).color ? [(d as TextLook).color!] : [] }),
 };
 
+/** A pattern style: the generator, its settings and the seed (what the Pattern panel needs to make the same pattern again, on any sheet or shape). */
+export interface PatternData {
+  readonly id: string;
+  readonly seed: number;
+  readonly v: Values;
+}
+export const PATTERN_SEED_MAX = 999_999;
+
+export const PATTERN_KIND: StyleKind = {
+  id: "pattern",
+  label: "Pattern",
+  plural: "Patterns",
+  empty: "None yet. Save one from the Pattern panel.",
+  validate: (d) => {
+    const p = d as { id?: unknown; seed?: unknown; v?: unknown } | null;
+    const g = p && typeof p.id === "string" ? generatorById(p.id) : undefined;
+    if (!g || !p || typeof p.v !== "object" || p.v === null || typeof p.seed !== "number" || !Number.isFinite(p.seed)) return null;
+    return { id: g.id, seed: Math.min(PATTERN_SEED_MAX, Math.max(1, Math.round(p.seed))), v: cleanValues(g, p.v as Values) } satisfies PatternData;
+  },
+  summary: (d) => `${generatorById((d as PatternData).id)?.label ?? "Pattern"} · seed ${(d as PatternData).seed}`,
+  look: (d) => ({ swatches: Object.values((d as PatternData).v).filter((x): x is string => isColour(x)).slice(0, 6) }),
+};
+
 // Stroke styles come here as one more kind (ADR 0120).
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND];
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

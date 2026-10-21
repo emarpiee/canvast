@@ -2718,3 +2718,5 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .pg-foot button:disabled { opacity: 0.45; cursor: default; }
 .pg-foot button.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: transparent; }
 .pg-foot button svg { width: var(--icon-sm); height: var(--icon-sm); }
+.style-pattern { display: block; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hud-border); }
+.style-pattern svg { display: block; width: 100%; height: auto; }

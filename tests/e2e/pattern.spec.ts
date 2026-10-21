@@ -194,3 +194,27 @@ test("a pattern that runs past its sheet exports as the sheet's frame: the pictu
   }
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Pattern styles: Save as a style keeps the generator, settings and seed in the Styles panel, and pressing the card puts them back in the Pattern panel", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "stripes");
+  await setNumber(app, "jitter", "40");
+  await p.locator("[data-pg-seed]").fill("77");
+  await p.locator("[data-pg-seed]").dispatchEvent("change");
+  await make(app);
+  await p.locator("[data-pg-style]").click();
+  await choose(app, "tides"); // something else in the panel now
+  await expect(p.locator("[data-pg-name]")).toHaveText("Tides");
+  await p.click("[data-styles]");
+  await p.locator('[data-tab="pattern"]').click();
+  const card = p.getByTestId("styles-panel").locator(".style-card");
+  await expect(card).toHaveCount(1);
+  await expect(card.locator(".style-pattern svg")).toBeVisible();
+  await expect(card).toContainText("Stripes · seed 77");
+  await card.click();
+  await expect(p.locator("[data-pg-name]")).toHaveText("Stripes");
+  await expect(p.locator("[data-pg-seed]")).toHaveValue("77");
+  await expect(p.locator('[data-k="jitter"] input[type=number]')).toHaveValue("40");
+  expect(app.consoleErrors).toEqual([]);
+});
