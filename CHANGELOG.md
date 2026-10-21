@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.29.0 — Shape, text, picture, fill and adjustment layers in the Paint view (2026-10-22)
+
+- **New layer kinds** (the **+** of the Layers panel): a **fill layer** (the page in a colour, gradient or texture), an **adjustment layer** (the canvas's adjustments on everything below it; its numbers can be saved as a style), a **pattern** (any of the pattern generators over the page; *New seed* makes it again) and **a picture** imported from a file.
+- **Shape** (`U`: rectangle, ellipse, polygon, star, line, with fill, outline and width), **Text** (`T`), **Move** (`V`, with resize handles) and **Edit nodes** (`N`) tools, each on a layer of its own, measured in page pixels and drawn exactly as on the canvas.
+- **Rasterize** (a layer's ⋯ menu) turns any of them into a paint layer of the same look; the Brush says so when the picked layer is not a paint layer.
+- **Paste** objects copied on the canvas as a shape layer, a picture as a picture layer.
+- Pictures, fonts and textures used by paint layers are kept by the library's clean-up.
+
 ## 0.28.0 — The Paint view (2026-10-21)
 
 - **Paint view** (beside Library): paintings of the workspace, each with pages of a real size (px, or in, cm, mm at a DPI; presets for screens, A4 and Letter at 300 DPI), a background (white, transparent or a colour) and raster layers. Its own rules: no endless zoom (a sixteenth of the fitted page to 6400 %), square pixels from 200 %.

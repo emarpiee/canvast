@@ -2,7 +2,7 @@
  * A tile's pixels in and out of storage (ADR 0165), the same in the page and in the engine's worker: straight RGBA, deflated (exact: a
  * PNG through a canvas would premultiply and shift the colour of soft edges), named by the SHA-256 of the pixels themselves.
  */
-import { TILE } from "./model";
+import { TILE } from "./tiles";
 
 export const TILE_BYTES = TILE * TILE * 4;
 

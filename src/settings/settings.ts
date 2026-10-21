@@ -14,6 +14,7 @@
  * is not a setting: it lives in the object itself.
  */
 import { DOCK_PANEL_IDS } from "./panels";
+import { TOOL_IDS, type ToolId } from "../paint/tools";
 import { paintFromText } from "../doc/paint";
 
 export type Scope = "device" | "workspace" | "board";
@@ -98,7 +99,7 @@ export const SETTINGS = {
   "eraser.diameterPx": { scope: "device", default: 16, validate: range(4, 128), effect: "immediate" } as Def<number>,
   "eraser.parts": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   // The Painting view (ADR 0165): the tool, each tool's options (checked against its schema when read, paint/tools.ts), the colour.
-  "paint.tool": { scope: "device", default: "brush", validate: oneOf("brush", "eraser", "hand"), effect: "immediate" } as Def<"brush" | "eraser" | "hand">,
+  "paint.tool": { scope: "device", default: "brush", validate: oneOf(...TOOL_IDS), effect: "immediate" } as Def<ToolId>,
   "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
   "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   "eraser.wholeGroups": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,

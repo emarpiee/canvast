@@ -2768,7 +2768,11 @@ body[data-view="paint"] .hint-float { display: none; }
 .paint-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .paint-cursor { pointer-events: none; }
 .paint-canvas:focus { outline: none; }
-.paint-layers { flex: none; width: 280px; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); font: var(--font-control); }
+.paint-side { flex: none; width: 280px; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.paint-adjust { flex: 0 1 auto; max-height: 60%; }
+.paint-adjust[hidden] { display: none; }
+.paint-options .swatch-paint { min-height: var(--field-h); }
+.paint-layers { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); font: var(--font-control); }
 .paint-layers h2 { margin: 0; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
 .paint-layer-list { list-style: none; margin: 0; padding: var(--sp-2); }
 .paint-layer .more-btn { flex: none; }
@@ -2782,7 +2786,7 @@ body[data-view="paint"] .hint-float { display: none; }
 .paint-page-dialog input, .paint-page-dialog select { font: inherit; min-height: var(--field-h); }
 .paint-dialog-note { color: var(--hud-danger); min-height: 1lh; }
 @media (max-width: 760px) {
-  .paint-layers { width: 200px; }
+  .paint-side { width: 200px; }
   .paint-main { flex-wrap: wrap; }
 }
 .paint-layer .layer-state[aria-pressed="false"]:not([data-eye]) { opacity: 0.45; }

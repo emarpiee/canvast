@@ -7,7 +7,7 @@
 import { req } from "../storage/idb";
 import { hashOf, inflate } from "./codec";
 import type { Layer, Painting } from "./model";
-import { newId, validLayer, validPainting } from "./model";
+import { newId, tilesOf, validLayer, validPainting } from "./model";
 
 export const PAINTINGS_FILE = "paintings.json";
 export const TILE_DIR = "paint-tiles/";
@@ -28,7 +28,7 @@ export async function paintingsOf(tx: IDBTransaction, workspaceId: string): Prom
   for (const p of paintings) {
     for (const l of (await req(tx.objectStore("paintLayers").getAll(IDBKeyRange.bound([p.id], [p.id, []])) as IDBRequest<unknown[]>)).filter(validLayer)) {
       layers.push(l);
-      for (const h of Object.values(l.tiles)) hashes.add(h);
+      for (const h of Object.values(tilesOf(l))) hashes.add(h);
     }
   }
   const tiles: Array<{ name: string; data: Blob }> = [];
@@ -51,7 +51,7 @@ export async function readPaintings(json: unknown, file: (name: string) => Blob 
   for (const p of (d.paintings as unknown[]).filter(validPainting)) {
     const mine = layers.filter((l) => l.paintingId === p.id && p.pages.some((pg) => pg.id === l.pageId));
     let bad = false;
-    for (const h of new Set(mine.flatMap((l) => Object.values(l.tiles)))) {
+    for (const h of new Set(mine.flatMap((l) => Object.values(tilesOf(l))))) {
       if (out.tiles.has(h)) continue;
       const blob = file(`${TILE_DIR}${h}`);
       const rgba = blob && (await inflate(blob));

@@ -7,7 +7,8 @@
 import type { BrushEngine } from "./engine";
 import type { EndedTile, LoadTile } from "./engine-protocol";
 import { History, type Op, type Step } from "./history";
-import { LAYER_KINDS, TILE, type Layer, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
+import { LAYER_KINDS, TILE, tilesOf, type Layer, type LayerFields, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
+import { rasterize } from "./rasterize";
 import type { PaintStore, TileBlob } from "./store";
 import { inflate } from "./codec";
 import type { BlendMode } from "../doc/model";
@@ -54,6 +55,9 @@ export class PaintSession {
   /** The version of each layer's pixels the engine knows them by. */
   private readonly versions = new Map<string, string>();
   private readonly listeners = new Set<(what: "records" | "pixels") => void>();
+  /** Layers as a gesture would leave them, shown and never stored (ADR 0166): a move, a resize, a node; and a new layer being drawn. */
+  private readonly previews = new Map<string, Layer>();
+  private draftLayer: Layer | null = null;
   /** Told when storing fails (the edit stays on screen and in the history). */
   onError: ((text: string) => void) | null = null;
 
@@ -98,13 +102,55 @@ export class PaintSession {
   page(): Page {
     return this.painting.pages.find((p) => p.id === this.pageId) ?? this.painting.pages[0]!;
   }
-  /** The shown page's layers, bottom first. */
+  /** The shown page's layers, bottom first, as they are shown (with what a gesture would make of them). */
   stack(pageId = this.pageId): Layer[] {
-    return stackOf(this.layers.values(), pageId);
+    const shown = [...this.layers.values()].map((l) => this.previews.get(l.id) ?? l);
+    return stackOf(this.draftLayer ? [...shown, this.draftLayer] : shown, pageId);
   }
   active(): Layer | null {
     const l = this.activeId ? this.layers.get(this.activeId) : undefined;
     return l && l.pageId === this.pageId ? l : null;
+  }
+
+  // ---- previews (a gesture's result, shown, not stored) ----------------------------------------------------------------------------
+
+  preview(l: Layer): void {
+    this.previews.set(l.id, l);
+    this.tell("pixels");
+  }
+  /** A new layer being drawn (null: none). */
+  draft(l: Layer | null): void {
+    this.draftLayer = l;
+    this.tell("pixels");
+  }
+  dropPreview(): void {
+    this.previews.clear();
+    this.draftLayer = null;
+    this.tell("pixels");
+  }
+  /** What the gesture made becomes one step; a drawn layer is picked. */
+  endPreview(label: string): void {
+    const ops: Op[] = [...this.previews.values()].flatMap((l): Op[] => {
+      const before = this.layers.get(l.id);
+      return before ? [{ store: "layer", before, after: l }] : [];
+    });
+    const fresh = this.draftLayer;
+    if (fresh) ops.push({ store: "layer", before: null, after: fresh });
+    this.previews.clear();
+    this.draftLayer = null;
+    this.commit(label, ops);
+    if (fresh) this.activeId = fresh.id;
+    this.tell("records");
+    this.tell("pixels");
+  }
+
+  /** A new layer of this page with these fields, just above the picked one (or on top), not yet added. */
+  freshLayer(fields: LayerFields, name: string): Layer {
+    const stack = this.stack().filter((l) => l !== this.draftLayer);
+    const at = this.active();
+    const i = at ? stack.indexOf(at) : stack.length - 1;
+    const z = i < 0 ? 1 : i === stack.length - 1 ? stack[i]!.z + 1 : (stack[i]!.z + stack[i + 1]!.z) / 2;
+    return { opacity: 1, ...fields, paintingId: this.painting.id, id: newId(), pageId: this.pageId, z, name } as Layer;
   }
   image(l: Layer): HTMLCanvasElement | null {
     return this.surfaces.get(l.id) ?? null;
@@ -131,7 +177,7 @@ export class PaintSession {
   /** Draw tiles `keys` of a layer from its tile map (all of them when absent): what changed after an undo, a load, a page switch. */
   private async drawTiles(l: Layer, keys?: Iterable<string>): Promise<void> {
     const page = this.painting.pages.find((p) => p.id === l.pageId);
-    if (!page) return;
+    if (!page || l.kind !== "raster") return;
     let c = this.surfaces.get(l.id);
     if (!c) {
       c = document.createElement("canvas");
@@ -141,16 +187,16 @@ export class PaintSession {
       keys = undefined; // (a new surface needs every tile)
     }
     const g = c.getContext("2d")!;
-    const todo = keys ? [...keys] : Object.keys(l.tiles);
+    const todo = keys ? [...keys] : Object.keys(tilesOf(l));
     let missing = 0;
     await Promise.all(
       todo.map(async (k) => {
         const [tx, ty] = tileOf(k);
-        const hash = l.tiles[k];
+        const hash = tilesOf(l)[k];
         const d = hash ? await this.pixelsOf(hash) : null;
         if (hash && !d) missing++;
         // (the layer may have changed again while this tile was read: only its latest tile is drawn)
-        if ((this.layers.get(l.id) ?? l).tiles[k] !== hash) return;
+        if (tilesOf(this.layers.get(l.id) ?? l)[k] !== hash) return;
         g.clearRect(tx * TILE, ty * TILE, TILE, TILE);
         if (d) g.putImageData(d, tx * TILE, ty * TILE);
       }),
@@ -163,7 +209,7 @@ export class PaintSession {
     if (!this.painting.pages.some((p) => p.id === id)) return;
     this.pageId = id;
     for (const [lid] of this.surfaces) if (this.layers.get(lid)?.pageId !== id) this.surfaces.delete(lid);
-    await Promise.all(this.stack().map((l) => (this.surfaces.has(l.id) ? null : this.drawTiles(l))));
+    await Promise.all(this.stack().map((l) => (this.surfaces.has(l.id) || l.kind !== "raster" ? null : this.drawTiles(l))));
     if (!this.active()) this.activeId = this.stack().at(-1)?.id ?? null;
     this.tell("records");
     this.tell("pixels");
@@ -190,9 +236,11 @@ export class PaintSession {
         this.surfaces.delete(o.before.id);
         this.versions.delete(o.before.id);
       }
-      if (o.after && o.after.pageId === this.pageId) {
-        const changed = was ? [...new Set([...Object.keys(was.tiles), ...Object.keys(o.after.tiles)])].filter((k) => was.tiles[k] !== o.after!.tiles[k]) : undefined;
-        if (!was || changed!.length) {
+      if (o.after && o.after.kind !== "raster") this.surfaces.delete(o.after.id); // (only a paint layer has pixels of its own)
+      if (o.after && o.after.pageId === this.pageId && o.after.kind === "raster") {
+        const wt = was ? tilesOf(was) : {}, at = tilesOf(o.after);
+        const changed = was && was.kind === "raster" ? [...new Set([...Object.keys(wt), ...Object.keys(at)])].filter((k) => wt[k] !== at[k]) : undefined;
+        if (!was || was.kind !== "raster" || changed!.length) {
           redraw.push([o.after, changed]);
           this.versions.delete(o.after.id); // (the engine loads it again before painting it)
         }
@@ -278,16 +326,32 @@ export class PaintSession {
     this.commit(label, [{ store: "layer", before: l, after: next as unknown as Layer }]);
   }
 
-  /** A new empty paint layer just above the active one (or on top). */
-  addLayer(): void {
-    const stack = this.stack();
-    const at = this.active();
-    const i = at ? stack.indexOf(at) : stack.length - 1;
-    const z = i < 0 ? 1 : i === stack.length - 1 ? stack[i]!.z + 1 : (stack[i]!.z + stack[i + 1]!.z) / 2;
-    const l = { ...LAYER_KINDS.raster.fresh({ paintingId: this.painting.id, id: newId(), pageId: this.pageId, z, opacity: 1 }), name: nextName("Layer", [...this.layers.values()].map((x) => x.name)) };
-    this.commit("New layer", [{ store: "layer", before: null, after: l }]);
+  /** Add a layer (one step) and pick it; without one, a new empty paint layer just above the picked one. */
+  addLayer(l: Layer = this.freshLayer({ kind: "raster", tiles: {} }, nextName("Layer", [...this.layers.values()].map((x) => x.name))), label = "New layer"): void {
+    this.commit(label, [{ store: "layer", before: null, after: l }]);
     this.activeId = l.id;
     this.tell("records");
+  }
+
+  /** A layer replaced by `l` (the same id; its kind may change, as when it is rasterized). One step. */
+  replaceLayer(l: Layer, label: string): void {
+    const before = this.layers.get(l.id);
+    if (before) this.commit(label, [{ store: "layer", before, after: l }]);
+  }
+
+  /**
+   * A layer of any kind made a paint layer of the same look (one step): `draw` draws it at 1:1 on a page-sized canvas (its kind's own
+   * renderer, compose.ts), and the pixels become its tiles.
+   */
+  async rasterizeLayer(id: string, draw: (g: CanvasRenderingContext2D) => void): Promise<void> {
+    const l = this.layers.get(id);
+    const page = l && this.painting.pages.find((p) => p.id === l.pageId);
+    if (!l || !page || l.kind === "raster" || this.blocked()) return;
+    const r = await rasterize(page.w, page.h, draw);
+    for (const [k, d] of r.pixels) decoded.set(r.tiles[k]!, d);
+    for (const b of r.blobs) this.unsaved.set(b.hash, b.data);
+    const { objs: _o, gen: _g, paint: _p, adjust: _a, ...common } = l as Layer & Record<string, unknown>;
+    this.commit("Rasterize", [{ store: "layer", before: l, after: { ...(common as unknown as RasterLayer), kind: "raster", tiles: r.tiles } }], r.blobs);
   }
 
   deleteLayer(id: string): void {
@@ -355,6 +419,7 @@ export class PaintSession {
     const l = this.active();
     if (!this.engine) return "The brush engine did not start in this browser.";
     if (!l) return "Pick a layer to paint on.";
+    if (l.kind !== "raster") return `“${l.name}” is a ${LAYER_KINDS[l.kind].label.toLowerCase()}: pick a paint layer, or Rasterize this one (its ⋯ menu) to paint on it.`;
     if (l.hidden) return "The picked layer is hidden.";
     if (l.locked) return "The picked layer is locked.";
     return null;
@@ -363,7 +428,7 @@ export class PaintSession {
   /** The tiles of a layer as the engine loads them (stored form; the worker keeps the pixels it already has by hash). */
   private async loadTiles(l: Layer): Promise<LoadTile[]> {
     const out: LoadTile[] = [];
-    for (const [k, hash] of Object.entries(l.tiles)) {
+    for (const [k, hash] of Object.entries(tilesOf(l))) {
       const data = this.unsaved.get(hash) ?? (await this.store.tile(hash));
       if (data) out.push({ k, hash, data });
     }
@@ -470,7 +535,7 @@ export class PaintSession {
   /** Every tile this session can still bring back (kept by the tile GC). */
   roots(): Set<string> {
     const r = this.history.roots();
-    for (const l of this.layers.values()) for (const h of Object.values(l.tiles)) r.add(h);
+    for (const l of this.layers.values()) for (const h of Object.values(tilesOf(l))) r.add(h);
     for (const h of this.unsaved.keys()) r.add(h);
     return r;
   }

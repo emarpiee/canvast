@@ -78,6 +78,7 @@ test("a layer clipped to the one below shows only where that one has paint; alph
   await setColour(p, "#dd2222");
   await stroke(p, [200, 500], [1700, 500]); // red line across, on Layer 1
   await p.locator('#paint-view [data-act="new-layer"]').click();
+  await p.locator('.pop-menu [data-id="paint"]').click();
   await expect.poll(async () => (await state(p)).layers.length).toBe(2);
   const top = (await state(p)).activeId!;
   await row(p, "Layer 2").locator("[data-clip]").click();
@@ -152,5 +153,30 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).filter((o) => o["kind"] === "image").length).toBe(1);
   const img = (await p.evaluate(() => window.__canvastDebug.objects())).find((o) => o["kind"] === "image")!;
   expect([img["pixelW"], img["pixelH"]]).toEqual([1181, 591]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the Shape tool draws a shape layer drawn as on the canvas; Move drags it and undoes; Rasterize makes it a paint layer of the same look", async ({ app }) => {
+  const p = app.page;
+  await newPainting(p);
+  const ink = [31, 35, 41], white = [255, 255, 255];
+  await p.keyboard.press("u");
+  await stroke(p, [400, 300], [800, 600]);
+  const shape = (await state(p)).layers.at(-1)!;
+  expect(shape.kind, "a layer of its own").toBe("object");
+  await expect.poll(async () => (await screenPx(p, 600, 450)).slice(0, 3), { message: "filled with the paint colour" }).toEqual(ink);
+  expect((await screenPx(p, 1000, 450)).slice(0, 3)).toEqual(white);
+  await p.keyboard.press("v");
+  await stroke(p, [600, 450], [1000, 450]);
+  await expect.poll(async () => (await screenPx(p, 1100, 450)).slice(0, 3), { message: "moved right by 400 px" }).toEqual(ink);
+  expect((await screenPx(p, 500, 450)).slice(0, 3)).toEqual(white);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await screenPx(p, 500, 450)).slice(0, 3), { message: "one undo puts it back" }).toEqual(ink);
+  await p.locator(`[data-layer-more="${shape.id}"]`).click();
+  await p.locator('.pop-menu [data-id="rasterize"]').click();
+  await expect.poll(async () => (await state(p)).layers.find((l) => l.id === shape.id)?.kind).toBe("raster");
+  await settled(p);
+  expect((await px(p, shape.id, 600, 450))![3], "its pixels are the shape").toBe(255);
+  expect((await px(p, shape.id, 1000, 450))![3]).toBe(0);
   expect(app.consoleErrors).toEqual([]);
 });

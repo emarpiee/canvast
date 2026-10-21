@@ -12,7 +12,7 @@
  */
 import { done, req } from "../storage/idb";
 import type { Layer, Painting } from "./model";
-import { validLayer, validPainting } from "./model";
+import { tilesOf, validLayer, validPainting } from "./model";
 
 export interface TileBlob {
   readonly hash: string;
@@ -74,7 +74,7 @@ export class PaintStore {
     }
     for (const l of c.layers ?? []) {
       const r = await req(back.objectStore("paintLayers").get([l.paintingId, l.id]) as IDBRequest<Layer | undefined>);
-      if (!r || JSON.stringify(r.tiles) !== JSON.stringify(l.tiles) || r.z !== l.z) throw new Error("a layer did not read back as written");
+      if (!r || JSON.stringify(r) !== JSON.stringify(l)) throw new Error("a layer did not read back as written");
     }
   }
 
@@ -83,7 +83,7 @@ export class PaintStore {
     const tx = this.db.transaction(["paintLayers", "paintTiles"], "readwrite");
     const committed = done(tx);
     const used = new Set(roots);
-    for (const l of await req(tx.objectStore("paintLayers").getAll() as IDBRequest<Layer[]>)) for (const h of Object.values(l.tiles ?? {})) used.add(h);
+    for (const l of await req(tx.objectStore("paintLayers").getAll() as IDBRequest<Layer[]>)) for (const h of Object.values(tilesOf(l) ?? {})) used.add(h);
     const keys = await req(tx.objectStore("paintTiles").getAllKeys() as IDBRequest<IDBValidKey[]>);
     let n = 0;
     for (const k of keys) {

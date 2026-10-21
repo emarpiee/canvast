@@ -8,12 +8,12 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
+import { homeObject, newObjectId, strokePoints } from "../doc/model";
+import { bakedPath, rebuiltPath } from "../doc/node-edit";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
-import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
@@ -743,20 +743,8 @@ export function attachTools(
     const po = res && visible().find((p) => p.obj.id === res.id);
     return po && po.obj.kind === "path" && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
   };
-  /** The geometry as it is drawn (a turn baked in), and the object without its turn. */
-  const baked = (o: PathObject): { sub: readonly SubPath[]; flat: PathObject } => {
-    const { rot: _turn, ...flat } = o;
-    // (a rounded path is edited at its sharp corners: its base, turned)
-    const sub = editSubs(o);
-    return { sub, flat: { ...flat, sub } };
-  };
-  /** The path with its nodes replaced: a rounded path keeps its radius (the nodes are the sharp ones, the rounding is made again). */
-  const rebuilt = (o: PathObject, sub: readonly SubPath[]): PathObject => {
-    const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
-    // (a radius for each corner no longer fits when nodes were added or taken away: it becomes the largest of them)
-    const radius = o.radius !== undefined && typeof o.radius !== "number" && o.radius.length !== nodesIn(sub) ? Math.max(...o.radius) : o.radius;
-    return homeObject(normalizeUnit((o.base && radius !== undefined ? { ...flat, radius, base: sub, sub: roundCorners(sub, radius, o.smoothing) } : { ...flat, sub }) as PathObject), doc.space) as PathObject;
-  };
+  const baked = bakedPath;
+  const rebuilt = (o: PathObject, sub: readonly SubPath[]): PathObject => rebuiltPath(o, sub, doc.space);
   const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
     const next = rebuilt(o, sub);
     doc.commit(doc.transaction(label, [next]));

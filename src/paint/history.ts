@@ -4,7 +4,7 @@
  * a deleted one `after: null`. Undo applies the same ops backwards, so a new kind of edit gets undo by being a list of ops, nothing more.
  * Pixels are never copied: a tile map names tiles by hash, and the tiles stay stored while a step can bring them back (`roots`).
  */
-import type { Layer, Painting } from "./model";
+import { tilesOf, type Layer, type Painting } from "./model";
 
 export type Op = { readonly store: "layer"; readonly before: Layer | null; readonly after: Layer | null } | { readonly store: "painting"; readonly before: Painting; readonly after: Painting };
 
@@ -56,7 +56,7 @@ export class History {
   /** Every tile hash a step could bring back: kept by the tile GC while this history lives. */
   roots(): Set<string> {
     const out = new Set<string>();
-    for (const s of [...this.done, ...this.undone]) for (const o of s.ops) if (o.store === "layer") for (const l of [o.before, o.after]) if (l) for (const h of Object.values(l.tiles)) out.add(h);
+    for (const s of [...this.done, ...this.undone]) for (const o of s.ops) if (o.store === "layer") for (const l of [o.before, o.after]) if (l) for (const h of Object.values(tilesOf(l))) out.add(h);
     return out;
   }
 }

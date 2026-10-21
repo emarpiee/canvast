@@ -8,10 +8,12 @@
  *   the common layer fields (opacity, blend, hidden, locked, clipped to the layer below) and its kind's own fields. A raster layer's
  *   pixels are 256 px tiles named by the hash of their pixels (`tiles`), stored once each (store.ts).
  */
-import { BLEND_MODES, type BlendMode } from "../doc/model";
+import { BLEND_MODES, storedAssetOf, type BlendMode, type SerializedObject } from "../doc/model";
+import { isPaint, type Paint } from "../doc/paint";
+import { validAdjust, type Adjust } from "../doc/adjust";
+import { validObjects } from "./objects";
 
-/** The side of a stored tile in px (the engine's own tile). */
-export const TILE = 256;
+export { TILE, tileKey, tileOf } from "./tiles";
 /** Largest page side in px: 8192 × 8192 is 256 MB decoded per layer. */
 export const MAX_PAGE_PX = 8192;
 export const MAX_NAME = 80;
@@ -61,15 +63,59 @@ export interface RasterLayer extends LayerBase {
   readonly tiles: Readonly<Record<string, string>>;
 }
 
-export type Layer = RasterLayer;
+/**
+ * Canvas objects on the page (ADR 0166): shapes, paths, texts, pictures, what was pasted from the canvas, a pattern. A page px is a world
+ * unit of the canvas at zoom 0, so they are the canvas's own objects, stored as the canvas stores them and drawn by its renderer.
+ */
+export interface ObjectLayer extends LayerBase {
+  readonly kind: "object";
+  readonly objs: readonly SerializedObject[];
+  /** A pattern (the generator, its seed and settings), so a new seed makes it again. */
+  readonly gen?: { readonly id: string; readonly seed: number; readonly v: Readonly<Record<string, number | string | boolean>> };
+}
+
+/** The page covered by a paint: a colour, a gradient or a texture. */
+export interface FillLayer extends LayerBase {
+  readonly kind: "fill";
+  readonly paint: Paint;
+}
+
+/** An adjustment of everything below it on the page (exposure, colour, levels, curves, ... as the canvas's Adjust panel has them). */
+export interface AdjustLayer extends LayerBase {
+  readonly kind: "adjust";
+  readonly adjust: Adjust;
+}
+
+export type Layer = RasterLayer | ObjectLayer | FillLayer | AdjustLayer;
 export type LayerKind = Layer["kind"];
+/** A layer's own fields, as a new one is made (its painting, id, page and place come from where it goes). */
+export type LayerFields = { [K in LayerKind]: Omit<Extract<Layer, { kind: K }>, keyof LayerBase> & Partial<Pick<LayerBase, "opacity" | "blend">> }[LayerKind];
 
-export const tileKey = (tx: number, ty: number): string => `${tx},${ty}`;
-export const tileOf = (key: string): [number, number] => key.split(",").map(Number) as [number, number];
+const NO_TILES: Readonly<Record<string, string>> = Object.freeze({});
+/** A layer's tiles (only a paint layer has pixels of its own). */
+export const tilesOf = (l: Layer): Readonly<Record<string, string>> => (l.kind === "raster" ? l.tiles : NO_TILES);
 
-/** Every layer kind's own part: what it is called, its icon name, and how a new one is made. A kind without an entry does not compile. */
-export const LAYER_KINDS: { readonly [K in LayerKind]: { readonly label: string; readonly icon: string; fresh(base: Omit<LayerBase, "name">): Extract<Layer, { kind: K }> } } = {
-  raster: { label: "Paint layer", icon: "paintbrush", fresh: (b) => ({ ...b, name: "", kind: "raster", tiles: {} }) },
+/** The library assets a layer uses (pictures, fonts, textures): kept by the library's GC while a layer names them. */
+export function assetsOf(l: Layer): string[] {
+  if (l.kind === "object") return l.objs.flatMap((o) => storedAssetOf(o) ?? []);
+  if (l.kind === "fill") return [storedAssetOf({ kind: "path", fill: l.paint }) ?? []].flat();
+  return [];
+}
+
+/**
+ * Every layer kind's own part: what it is called, its icon (a key of ICONS), its fields checked, and how a new one is made. A kind without
+ * an entry does not compile.
+ */
+export const LAYER_KINDS: { readonly [K in LayerKind]: { readonly label: string; readonly icon: string; valid(l: Extract<Layer, { kind: K }>): boolean; fresh(base: Omit<LayerBase, "name">): Extract<Layer, { kind: K }> } } = {
+  raster: {
+    label: "Paint layer",
+    icon: "paintbrush",
+    valid: (o) => (o.alphaLock === undefined || o.alphaLock === true) && typeof o.tiles === "object" && o.tiles !== null && Object.entries(o.tiles).every(([k, h]) => KEY.test(k) && typeof h === "string" && HASH.test(h)),
+    fresh: (b) => ({ ...b, name: "", kind: "raster", tiles: {} }),
+  },
+  object: { label: "Shape layer", icon: "shapeTool", valid: (o) => validObjects(o.objs), fresh: (b) => ({ ...b, name: "", kind: "object", objs: [] }) },
+  fill: { label: "Fill layer", icon: "fillLayer", valid: (o) => isPaint(o.paint, true), fresh: (b) => ({ ...b, name: "", kind: "fill", paint: "#ffffff" }) },
+  adjust: { label: "Adjustment layer", icon: "slidersVertical", valid: (o) => validAdjust(o.adjust), fresh: (b) => ({ ...b, name: "", kind: "adjust", adjust: {} }) },
 };
 
 export const newId = (): string => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
@@ -95,9 +141,9 @@ export function validLayer(l: unknown): l is Layer {
   if (!o || typeof o.id !== "string" || typeof o.paintingId !== "string" || typeof o.pageId !== "string" || !Number.isFinite(o.z) || !isName(o.name)) return false;
   if (!(Number.isFinite(o.opacity) && o.opacity >= 0 && o.opacity <= 1)) return false;
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) return false;
-  for (const f of ["hidden", "locked", "clipBelow", "alphaLock"] as const) if (o[f] !== undefined && o[f] !== true) return false;
-  if (o.kind !== "raster") return false;
-  return typeof o.tiles === "object" && o.tiles !== null && Object.entries(o.tiles).every(([k, h]) => KEY.test(k) && typeof h === "string" && HASH.test(h));
+  for (const f of ["hidden", "locked", "clipBelow"] as const) if (o[f] !== undefined && o[f] !== true) return false;
+  const kind = (LAYER_KINDS as Record<string, { valid(l: unknown): boolean } | undefined>)[o.kind];
+  return !!kind && kind.valid(o);
 }
 
 /** A new page with sensible defaults (1920 × 1080 px, 72 DPI, white). */

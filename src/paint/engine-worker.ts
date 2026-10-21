@@ -4,7 +4,7 @@
  */
 import { TILE_BYTES, deflate, hashOf, inflate, isEmpty } from "./codec";
 import type { EndedTile, FromWorker, LoadTile, ToWorker } from "./engine-protocol";
-import { TILE, tileKey, tileOf } from "./model";
+import { TILE, tileKey, tileOf } from "./tiles";
 
 interface Engine {
   memory: WebAssembly.Memory;

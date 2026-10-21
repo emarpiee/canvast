@@ -9,7 +9,7 @@ import { esc } from "./format";
 import { panelHtml } from "./panel";
 import { closeMoreMenu, moreButton, openMoreMenu, type MenuItem } from "./more-menu";
 import { confirmDialog, promptDialog } from "./confirm";
-import { openColourPopover, rememberColour } from "./colour-popover";
+import { buildAdjustPanel, openColourPopover, openPaintPopover, rememberColour } from "./colour-popover";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { saveFile } from "./file-actions";
@@ -17,13 +17,21 @@ import { pageDialog, type PageSpec } from "./paint-dialogs";
 import { shortcutsActive } from "../interaction/shortcut-scope";
 import type { SettingsStore } from "../settings/settings";
 import { BLEND_MODES, type BlendMode } from "../doc/model";
+import { paintFromText, paintToText, type Paint, type GradientStop } from "../doc/paint";
+import type { Adjust } from "../doc/adjust";
+import { parsePayload, instantiate } from "../doc/clipboard";
+import type { AssetLibrary } from "../assets/asset-library";
+import type { SceneTheme } from "../render/scene-renderer";
+import { GENERATORS, defaultValues } from "../gen";
 import { PaintStore } from "../paint/store";
 import { PaintSession } from "../paint/session";
 import { BrushEngine } from "../paint/engine";
-import { composePage } from "../paint/compose";
+import { composePage, drawLayerAlone, type Scene } from "../paint/compose";
+import { deleteNode, drawToolOverlay, startGesture, type Gesture, type Point, type VectorHost } from "../paint/vector-tools";
+import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
-import { TOOLS, TOOL_IDS, brushOf, toolForKey, valuesOf, type OptionSpec, type ToolId } from "../paint/tools";
-import { LAYER_KINDS, type Layer, type Painting } from "../paint/model";
+import { TOOLS, TOOL_IDS, brushOf, toolForKey, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { LAYER_KINDS, nextName, type Layer, type Painting } from "../paint/model";
 
 export interface PaintViewDeps {
   readonly db: IDBDatabase | null;
@@ -34,6 +42,13 @@ export interface PaintViewDeps {
   tell(text: string): void;
   /** Put a picture on the canvas (through the library) and show the canvas. */
   placeOnCanvas(png: Blob, name: string): Promise<void>;
+  /** The library (pictures and fonts of shape, text and picture layers) and the theme the canvas's renderer draws with (ADR 0166). */
+  readonly assets: AssetLibrary | null;
+  theme(): SceneTheme;
+  /** Bring a file into the library (a picture for a picture layer); null when it is not a picture. */
+  importPicture(file: File): Promise<{ hash: string; pixelW: number; pixelH: number } | null>;
+  /** The saved styles (an adjustment layer's numbers can be saved as one, as in the Adjust panel). */
+  styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
 }
 
 export interface PaintView {
@@ -62,12 +77,24 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   let cam: PaintCamera = { scale: 1, x: 0, y: 0 };
   let tool: ToolId = deps.settings.get("paint.tool");
   let colour = deps.settings.get("paint.colour");
-  const toolValues = (t: ToolId): Record<string, number | boolean> => valuesOf(t, (deps.settings.get("paint.tools") as Record<string, unknown>)[t]);
-  const setToolValue = (t: ToolId, key: string, v: number | boolean): void => {
+  const toolValues = (t: ToolId): Record<string, number | boolean | string> => valuesOf(t, (deps.settings.get("paint.tools") as Record<string, unknown>)[t]);
+  const setToolValue = (t: ToolId, key: string, v: number | boolean | string): void => {
     const all = { ...(deps.settings.get("paint.tools") as Record<string, unknown>) };
     all[t] = { ...toolValues(t), [key]: v };
     deps.settings.set("paint.tools", all);
   };
+
+  /** What the vector tools work with (paint/vector-tools.ts). */
+  const host = (): VectorHost => ({
+    session: session!,
+    cam: () => cam,
+    view,
+    values: () => toolValues(tool),
+    colour: () => colour,
+    tell: deps.tell,
+    askText: async (title, value) => promptDialog({ title, lines: [], value, confirmLabel: value ? "Change" : "Add" }),
+  });
+  const nextLayerName = (s: PaintSession, stem: string): string => nextName(stem, [...s.layers.values()].map((l) => l.name));
 
   root.innerHTML = `
     <div class="paint-list" data-screen="list">
@@ -104,7 +131,11 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
           <canvas class="paint-canvas" data-testid="paint-canvas" tabindex="0" aria-label="The page: paint with the picked tool"></canvas>
           <canvas class="paint-cursor" aria-hidden="true"></canvas>
         </div>
-        <aside class="paint-layers" data-layers aria-label="Layers"></aside>
+        <div class="paint-side">
+          <aside class="paint-layers" data-paint-layers aria-label="Layers"></aside>
+          <aside class="paint-layers paint-adjust" data-adjust aria-label="Adjustment" hidden></aside>
+        </div>
+        <input type="file" accept="image/*" hidden data-testid="paint-picture-input">
       </div>
       <div class="paint-pages" data-pages role="tablist" aria-label="Pages"></div>
     </div>`;
@@ -114,12 +145,17 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const stage = $<HTMLElement>("[data-stage]");
   const canvas = $<HTMLCanvasElement>(".paint-canvas");
   const cursor = $<HTMLCanvasElement>(".paint-cursor");
-  const layersEl = $<HTMLElement>("[data-layers]");
+  const layersEl = $<HTMLElement>("[data-paint-layers]");
   const pagesEl = $<HTMLElement>("[data-pages]");
   const optionsEl = $<HTMLElement>("[data-options]");
+  const adjustEl = $<HTMLElement>("[data-adjust]");
+  const pictureInput = $<HTMLInputElement>('[data-testid="paint-picture-input"]');
 
   const view = (): { w: number; h: number } => ({ w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
   const page = () => session!.page();
+  const env = (): ObjectEnv | null => (deps.assets ? { assets: deps.assets, theme: deps.theme() } : null);
+  /** The page as the session has it now, for drawing (the view, an export, a rasterized layer). */
+  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), live: live ? s.live : null, env: env() });
 
   // ---- drawing ------------------------------------------------------------------------------------------------------------------------
 
@@ -140,8 +176,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, canvas.width, canvas.height);
     const s = session;
-    composePage(g, { page: s.page(), stack: s.stack(), image: (l) => s.image(l), live: s.live }, { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
+    const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
+    if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
     $<HTMLElement>("[data-zoom]").textContent = `${Math.round(cam.scale * 100)} %`;
+    drawCursor();
   };
   const redraw = (): void => {
     if (scheduled) return;
@@ -154,6 +192,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cursor.width, cursor.height);
+    if (session && TOOLS[tool].action.paint === false && "vector" in TOOLS[tool].action) drawToolOverlay(tool, host(), g, dpr, { line: css.getPropertyValue("--canvas-selection").trim() || "#2b6cb0", fill: css.getPropertyValue("--canvas-handle-fill").trim() || "#ffffff" });
     if (!pointerAt || !TOOLS[tool].action.paint || panning) return;
     const r = (Number(toolValues(tool)["size"]) / 2) * cam.scale * dpr;
     g.lineWidth = 1;
@@ -172,16 +211,53 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   // ---- the bar, the rail, the options --------------------------------------------------------------------------------------------------
 
-  const optionHtml = (o: OptionSpec, v: number | boolean): string =>
-    o.kind === "number"
-      ? `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`
-      : `<label class="tb-count" title="${esc(o.hint)}"><input type="checkbox" data-opt="${o.key}"${v ? " checked" : ""}> ${esc(o.label)}</label>`;
+  /** A paint option's value as the paint it is ("" is the paint colour). */
+  const paintOf = (v: string): Paint | null => (v === "" ? colour : (paintFromText(v) ?? null));
+  /** The options bar of a tool, from its schema (paint/tools.ts): each kind of option is one control here. */
+  const optionHtml = (o: OptionSpec, v: number | boolean | string, vals: Values): string => {
+    switch (o.kind) {
+      case "number":
+        if (o.when && vals[o.when[0]] !== o.when[1]) return "";
+        return `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`;
+      case "switch":
+        return `<label class="tb-count" title="${esc(o.hint)}"><input type="checkbox" data-opt="${o.key}"${v ? " checked" : ""}> ${esc(o.label)}</label>`;
+      case "choice":
+        return `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <select data-opt="${o.key}" aria-label="${esc(o.label)}">${o.choices.map(([c, label]) => `<option value="${c}"${c === v ? " selected" : ""}>${esc(label)}</option>`).join("")}</select></label>`;
+      case "paint":
+        return `<button type="button" class="swatch swatch-paint${v === "none" ? " is-none" : ""}" data-opt-paint="${o.key}" aria-haspopup="dialog" aria-label="${esc(o.label)}" title="${esc(o.hint)}"><span data-paint-chip></span><b class="swatch-name">${esc(o.label)}</b></button>`;
+    }
+  };
   const renderOptions = (): void => {
     const vals = toolValues(tool);
-    optionsEl.innerHTML = (TOOLS[tool].options as readonly OptionSpec[]).map((o) => optionHtml(o, vals[o.key]!)).join("");
+    optionsEl.innerHTML = (TOOLS[tool].options as readonly OptionSpec[]).map((o) => optionHtml(o, vals[o.key]!, vals)).join("");
     for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setToolValue(tool, f.dataset["opt"]!, v));
     for (const c of optionsEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) c.addEventListener("change", () => setToolValue(tool, c.dataset["opt"]!, c.checked));
+    for (const c of optionsEl.querySelectorAll<HTMLSelectElement>("select[data-opt]")) c.addEventListener("change", () => {
+      setToolValue(tool, c.dataset["opt"]!, c.value);
+      renderOptions(); // (an option shown only for one choice comes or goes)
+    });
+    for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-opt-paint]")) {
+      const p = paintOf(String(vals[b.dataset["optPaint"]!]));
+      b.querySelector<HTMLElement>("[data-paint-chip]")!.style.setProperty("--paint", p === null ? "transparent" : typeof p === "string" ? p : "var(--hud-muted)");
+    }
   };
+  optionsEl.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-opt-paint]");
+    if (!b) return;
+    const o = (TOOLS[tool].options as readonly OptionSpec[]).find((x) => x.key === b.dataset["optPaint"]);
+    if (!o || o.kind !== "paint") return;
+    const t = tool;
+    openPaintPopover(b, {
+      name: o.label,
+      paint: paintOf(String(toolValues(t)[o.key])),
+      noneLabel: o.none,
+      onInput: (p) => setToolValue(t, o.key, paintToText(p)),
+      onChange: (p) => {
+        setToolValue(t, o.key, paintToText(p));
+        renderOptions();
+      },
+    });
+  });
   scrubNumbers(optionsEl);
   const setTool = (t: ToolId): void => {
     tool = t;
@@ -217,7 +293,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         ${flag("data-eye", !!l.hidden, l.hidden ? ICONS.eyeOff : ICONS.eye, `${l.hidden ? "Show" : "Hide"} ${l.name}`, l.hidden ? "Hidden: show it" : "Hide it")}
         ${flag("data-lock", !!l.locked, ICONS.lockKeyhole, `Lock ${l.name}`, l.locked ? "Locked: it cannot be painted or changed. Press to unlock" : "Lock it: it cannot be painted or changed")}
         ${flag("data-clip", !!l.clipBelow, ICONS.clipBelow, `Clip ${l.name} to the layer below`, l.clipBelow ? "Clipped: shown only where the layer below has paint. Press to show it everywhere" : "Clip to the layer below: show it only where that layer has paint")}
-        ${flag("data-alpha", !!l.alphaLock, ICONS.alphaLock, `Alpha lock ${l.name}`, l.alphaLock ? "Alpha lock on: painting only colours what already has paint. Press to paint anywhere" : "Alpha lock: painting only colours what already has paint")}
+        ${l.kind === "raster" ? flag("data-alpha", !!l.alphaLock, ICONS.alphaLock, `Alpha lock ${l.name}`, l.alphaLock ? "Alpha lock on: painting only colours what already has paint. Press to paint anywhere" : "Alpha lock: painting only colours what already has paint") : ""}
         ${moreButton(`More actions for layer ${l.name}`, `data-layer-more="${l.id}"`)}
       </li>`;
     };
@@ -226,23 +302,126 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     layersEl.innerHTML = panelHtml({
       title: "Layers",
       count: stack.length,
-      tools: `<button type="button" class="layer-btn" data-act="new-layer" aria-label="New layer" title="New layer, above the picked one">${ICONS.newLayer}</button><button type="button" class="layer-btn" data-act="delete-layer" aria-label="Delete the layer" title="Delete the picked layer">${ICONS.trash}</button>`,
+      tools: `<button type="button" class="layer-btn" data-act="new-layer" aria-haspopup="menu" aria-expanded="false" aria-label="New layer" title="New layer, above the picked one: paint, fill, adjustment, pattern or picture">${ICONS.newLayer}</button><button type="button" class="layer-btn" data-act="delete-layer" aria-label="Delete the layer" title="Delete the picked layer">${ICONS.trash}</button>`,
       body: `<ul class="paint-layer-list" role="listbox" aria-label="Layers, top first">${stack.map(row).join("")}</ul>`,
       foot: act ? `<label class="layers-blend">Blend <select data-blend aria-label="Blend mode of the picked layer">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="0" max="100" step="1" value="${pct}" aria-label="Opacity of the picked layer"> <output>${pct}%</output></label>` : "",
     });
     layersEl.querySelector("[data-close]")?.remove(); // (part of the view, not a floating panel)
   };
 
+  /** What a new layer can be (ADR 0166): each kind of layer, made with the canvas's own makers (objects.ts). */
+  const newLayerMenu = (anchor: HTMLElement): void => {
+    const s = session!;
+    const p = s.page();
+    const named = (stem: string): string => nextLayerName(s, stem);
+    const items: MenuItem[] = [
+      { id: "paint", label: "Paint layer", hint: "An empty layer to paint on", icon: ICONS.newLayer, run: () => s.addLayer() },
+      { id: "fill", label: "Fill layer", hint: "The page covered by a colour, a gradient or a texture", icon: ICONS.fillLayer, run: () => s.addLayer(s.freshLayer({ kind: "fill", paint: colour }, named("Fill")), "New fill layer") },
+      { id: "adjust", label: "Adjustment layer", hint: "Exposure, colour, levels, curves… of everything below it", icon: ICONS.slidersVertical, run: () => {
+        s.addLayer(s.freshLayer({ kind: "adjust", adjust: {} }, named("Adjustment")), "New adjustment layer");
+        renderAdjust();
+      } },
+      { id: "pattern", label: "Pattern…", hint: "One of the pattern generators over the page, as shapes", icon: ICONS.mountainSnow, run: () => {
+        closeMoreMenu();
+        openMoreMenu(anchor, GENERATORS.map((g): MenuItem => ({ id: g.id, label: g.label, run: () => {
+          const seed = Math.floor(Math.random() * 2 ** 31);
+          const v = defaultValues(g);
+          s.addLayer(s.freshLayer({ kind: "object", objs: stored(patternObjects(g, v, seed, p.w, p.h)), gen: { id: g.id, seed, v } }, g.label), `Pattern: ${g.label}`);
+        } })), "Patterns", { compact: true });
+      } },
+      { id: "picture", label: "Import a picture…", hint: "A picture file, kept in the library, on a layer of its own", icon: ICONS.arrowDownToLine, run: () => pictureInput.click() },
+    ];
+    openMoreMenu(anchor, items, "New layer");
+  };
+
   const layerMenu = (anchor: HTMLElement, l: Layer): void => {
     const s = session!;
     const items: MenuItem[] = [
       { id: "rename", label: "Rename", icon: ICONS.textCursorInput, run: () => void renameLayer(l) },
+      ...(l.kind === "fill" ? [{ id: "fill", label: "Change the fill…", icon: ICONS.fillLayer, run: () => editFill(anchor, l) }] : []),
+      ...(l.kind === "adjust" ? [{ id: "adjust", label: "Change the adjustment", icon: ICONS.slidersVertical, run: () => {
+        s.activeId = l.id;
+        renderLayers();
+        renderAdjust();
+      } }] : []),
+      ...(l.kind === "object" && l.gen ? [{ id: "seed", label: "New seed", hint: "The same pattern, made again with another seed", icon: ICONS.shuffle, run: () => {
+        const g = GENERATORS.find((x) => x.id === l.gen!.id);
+        if (!g) return;
+        const seed = Math.floor(Math.random() * 2 ** 31);
+        const pg = s.painting.pages.find((x) => x.id === l.pageId)!;
+        s.replaceLayer({ ...l, objs: stored(patternObjects(g, l.gen!.v as never, seed, pg.w, pg.h)), gen: { ...l.gen!, seed } }, "New seed");
+      } }] : []),
+      ...(l.kind !== "raster" ? [{ id: "rasterize", label: "Rasterize", hint: "Make it a paint layer of the same look, to paint on", icon: ICONS.rasterize, run: () => void rasterize(s, l) }] : []),
       { id: "up", label: "Move up", icon: ICONS.arrowUp, disabled: s.stack().at(-1)?.id === l.id, run: () => s.moveLayer(l.id, 1) },
       { id: "down", label: "Move down", icon: ICONS.arrowDown, disabled: s.stack()[0]?.id === l.id, run: () => s.moveLayer(l.id, -1) },
       { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, disabled: s.stack().length <= 1, run: () => s.deleteLayer(l.id) },
     ];
     openMoreMenu(anchor, items, `Layer ${l.name}`);
   };
+  /** A layer of any kind made a paint layer (its pictures decoded first, so nothing is left out). */
+  const rasterize = async (s: PaintSession, l: Layer): Promise<void> => {
+    const p = s.page();
+    const probe = document.createElement("canvas");
+    probe.width = p.w;
+    probe.height = p.h;
+    await whenReady(() => drawLayerAlone(probe.getContext("2d")!, scene(s, false), l));
+    await s.rasterizeLayer(l.id, (g) => drawLayerAlone(g, scene(s, false), l));
+  };
+
+  /** A fill layer's paint, with the canvas's paint chooser (colour, gradient, texture): live while chosen, one step when chosen. */
+  const editFill = (anchor: HTMLElement, l: Extract<Layer, { kind: "fill" }>): void => {
+    const s = session!;
+    openPaintPopover(anchor, {
+      name: "Fill",
+      paint: l.paint,
+      noneLabel: "No fill",
+      modes: ["solid", "linear", "radial", "angular", "image", "objects"],
+      onInput: (p) => p && s.preview({ ...l, paint: p }),
+      onChange: (p) => {
+        if (p) s.preview({ ...l, paint: p });
+        s.endPreview("Change fill");
+      },
+      onClose: () => s.dropPreview(),
+    });
+  };
+
+  /** The adjustment layer picked: its numbers in the panel under the layers (the canvas's Adjust panel, the same controls). */
+  let adjustFor: string | null = null;
+  const renderAdjust = (): void => {
+    const a = session?.active();
+    if (!a || a.kind !== "adjust") {
+      adjustEl.hidden = true;
+      adjustFor = null;
+      return;
+    }
+    adjustEl.hidden = false;
+    if (adjustFor === a.id) return;
+    adjustFor = a.id;
+    adjustEl.innerHTML = panelHtml({ title: "Adjustment", body: `<div data-adjust-body></div>` });
+    adjustEl.querySelector("[data-close]")?.addEventListener("click", () => {
+      adjustEl.hidden = true;
+    });
+    const s = session!;
+    const id = a.id;
+    buildAdjustPanel(adjustEl.querySelector<HTMLElement>("[data-adjust-body]")!, {
+      adjust: a.adjust,
+      stills: true,
+      count: 1,
+      onInput: (adjust) => {
+        const l = s.layers.get(id);
+        if (l?.kind === "adjust") s.preview({ ...l, adjust });
+      },
+      onChange: (adjust, label) => {
+        const l = s.layers.get(id);
+        if (l?.kind !== "adjust") return;
+        s.preview({ ...l, adjust });
+        s.endPreview(label || "Adjust");
+      },
+      styles: deps.styles,
+      onStyles: () => deps.tell("Saved adjustments are in the Styles panel of the canvas."),
+    });
+  };
+
   const renameLayer = async (l: Layer): Promise<void> => {
     const name = await promptDialog({ title: "Rename the layer", lines: [], value: l.name, confirmLabel: "Rename" });
     if (name?.trim()) session?.setLayer(l.id, { name: name.trim().slice(0, 80) }, "Rename layer");
@@ -252,7 +431,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const s = session;
     if (!s) return;
     const t = e.target as HTMLElement;
-    if (t.closest('[data-act="new-layer"]')) return void s.addLayer();
+    const add = t.closest<HTMLElement>('[data-act="new-layer"]');
+    if (add) return newLayerMenu(add);
     if (t.closest('[data-act="delete-layer"]')) {
       const a = s.active();
       if (a) s.deleteLayer(a.id);
@@ -267,9 +447,11 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (t.closest("[data-eye]")) return s.setLayer(l.id, { hidden: !l.hidden }, l.hidden ? "Show layer" : "Hide layer");
     if (t.closest("[data-lock]")) return s.setLayer(l.id, { locked: !l.locked }, l.locked ? "Unlock layer" : "Lock layer");
     if (t.closest("[data-clip]")) return s.setLayer(l.id, { clipBelow: !l.clipBelow }, l.clipBelow ? "Release the clip" : "Clip to the layer below");
-    if (t.closest("[data-alpha]")) return s.setLayer(l.id, { alphaLock: !l.alphaLock }, l.alphaLock ? "Unlock transparency" : "Lock transparency");
+    if (t.closest("[data-alpha]") && l.kind === "raster") return s.setLayer(l.id, { alphaLock: !l.alphaLock }, l.alphaLock ? "Unlock transparency" : "Lock transparency");
     s.activeId = l.id;
     renderLayers();
+    renderAdjust();
+    drawCursor();
     void s.prepare(); // (the engine holds the layer before the first stroke)
   });
   layersEl.addEventListener("dblclick", (e) => {
@@ -512,6 +694,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     renderBar();
   };
 
+  /** Draw until every picture the drawing needs is decoded (or two seconds have gone by): an export or a rasterized layer is never made half-drawn. */
+  const whenReady = async (draw: () => boolean): Promise<void> => {
+    for (let i = 0; i < 40 && draw(); i++) await new Promise((r) => setTimeout(r, 50));
+  };
   /** The page at 1:1 as PNG: the same drawing as the view (ADR 0165: what is exported is what is seen), without the checkerboard. */
   const pagePng = async (): Promise<Blob> => {
     const s = session!;
@@ -519,13 +705,25 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const c = document.createElement("canvas");
     c.width = p.w;
     c.height = p.h;
-    composePage(c.getContext("2d")!, { page: p, stack: s.stack(), image: (l) => s.image(l) }, { scale: 1, x: 0, y: 0 });
+    await whenReady(() => {
+      const g = c.getContext("2d")!;
+      g.clearRect(0, 0, p.w, p.h);
+      return composePage(g, scene(s, false), { scale: 1, x: 0, y: 0 });
+    });
     return await new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error("the page could not be made into a PNG"))), "image/png"));
   };
 
   // ---- the pointer ----------------------------------------------------------------------------------------------------------------
 
   const pointers = new Map<number, { x: number; y: number }>();
+  let gesture: Gesture | null = null;
+  let gestureId = -1;
+  /** The pointer as a vector tool takes it: page px and screen px, and the keys held. */
+  const point = (e: PointerEvent): Point => {
+    const q = local(e);
+    const [x, y] = toPage(cam, q.x, q.y);
+    return { x, y, sx: q.x, sy: q.y, shift: e.shiftKey, alt: e.altKey };
+  };
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
   let stroke: { id: number; started: boolean; queue: number[] } | null = null;
@@ -581,7 +779,14 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       e.preventDefault();
       return;
     }
-    if (e.button !== 0 || !TOOLS[tool].action.paint) return;
+    if (e.button !== 0) return;
+    if ("vector" in TOOLS[tool].action) {
+      // A vector tool (ADR 0166): a gesture on the layers of canvas objects, a preview while it moves, one step when it ends.
+      gesture = startGesture(tool, host(), point(e));
+      if (gesture) gestureId = e.pointerId;
+      return;
+    }
+    if (!TOOLS[tool].action.paint) return;
     if (e.altKey) return pickColour(p);
     const why = session.cannotPaint();
     if (why) return deps.tell(why);
@@ -622,6 +827,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       cam = clampCamera({ ...cam, x: cam.x + p.x - panning.x, y: cam.y + p.y - panning.y }, page(), view());
       panning = { ...panning, x: p.x, y: p.y };
       redraw();
+    } else if (gesture && gestureId === e.pointerId) {
+      gesture.move(point(e));
     } else if (stroke && stroke.id === e.pointerId) {
       const evs = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
       send((evs.length ? evs : [e]).flatMap(sample));
@@ -634,6 +841,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (panning?.id === e.pointerId) {
       panning = null;
       stage.classList.remove("is-panning");
+    }
+    if (gesture && gestureId === e.pointerId) {
+      const g = gesture;
+      gesture = null;
+      g.up(point(e), e.type === "pointercancel");
+      drawCursor();
+      return;
     }
     if (!stroke || stroke.id !== e.pointerId || !session) return;
     const st = stroke;
@@ -666,6 +880,44 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     drawCursor();
   }, { passive: false });
 
+  // ---- pictures and pasting (ADR 0166) ----------------------------------------------------------------------------------------------
+
+  /** A picture file: into the library, then on a layer of its own. */
+  const addPicture = async (file: File): Promise<void> => {
+    const s = session;
+    if (!s) return;
+    const rec = await deps.importPicture(file);
+    if (!rec) return;
+    s.addLayer(s.freshLayer({ kind: "object", objs: stored([pictureObject(rec, s.page())]) }, file.name.replace(/\.[^.]*$/, "").slice(0, 60) || "Picture"), "Import a picture");
+  };
+  pictureInput.addEventListener("change", () => {
+    const f = pictureInput.files?.[0];
+    pictureInput.value = "";
+    if (f) void addPicture(f);
+  });
+  /** Pasted: objects copied on the canvas come as a shape layer, at the size they were seen at (fitted to the page); a picture as a picture layer. */
+  document.addEventListener("paste", (e) => {
+    const s = session;
+    if (!s || !visible || (e.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable], dialog")) return;
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    const payload = parsePayload(text);
+    if (payload) {
+      e.preventDefault();
+      try {
+        const objs = instantiate(payload, pageSpace(), 0).objects;
+        s.addLayer(s.freshLayer({ kind: "object", objs: stored(placeOnPage(objs, payload.depth, s.page())) }, nextLayerName(s, "Pasted")), "Paste");
+      } catch {
+        deps.tell("Those objects were copied deep inside a zoom of the canvas and cannot come to a page; copy them at the top level, or paste them as a picture.");
+      }
+      return;
+    }
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+    if (file) {
+      e.preventDefault();
+      void addPicture(file);
+    }
+  });
+
   // ---- keys -----------------------------------------------------------------------------------------------------------------------
 
   window.addEventListener("keydown", (e) => {
@@ -697,6 +949,12 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       setToolValue(tool, "size", Math.min(1000, Math.max(1, Math.round(k === "]" ? Math.max(v + 1, v * 1.15) : Math.min(v - 1, v / 1.15)))));
       renderOptions();
       drawCursor();
+    } else if ((k === "Delete" || k === "Backspace") && tool === "node") {
+      e.preventDefault();
+      deleteNode(host());
+    } else if (k === "Escape" && gesture) {
+      gesture.up({ x: 0, y: 0, sx: 0, sy: 0, shift: false, alt: false }, true);
+      gesture = null;
     } else if (k === "Escape" && stroke) {
       session.cancel();
       stroke = null;

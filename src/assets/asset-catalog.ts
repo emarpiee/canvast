@@ -1,4 +1,5 @@
 import { externalFolder } from "../storage/external-folder";
+import { assetsOf, validLayer } from "../paint/model";
 import type { ObjectId } from "../doc/model";
 import { plural } from "../doc/plural";
 import { cleanFileName } from "../doc/rename-rules";
@@ -484,12 +485,15 @@ export class AssetCatalog {
   async collect(roots: ReadonlySet<string>): Promise<GcReport> {
     const report: GcReport = { swept: [], bytesFreed: 0, retained: [], restored: [] };
     const files = new Map<string, string>(); // swept originals kept in the library folder, and their file names
-    const tx = this.db.transaction(["assetCatalog", "assets", "objects", "thumbs"], "readwrite", { durability: "strict" });
+    const tx = this.db.transaction(["assetCatalog", "assets", "objects", "thumbs", "paintLayers"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const catalog = tx.objectStore("assetCatalog");
     const deleted = (await req(catalog.getAll() as IDBRequest<CatalogEntry[]>)).filter((e) => e.state === "deleted");
+    // (a picture, font or texture used by a layer of a painting is in use too, ADR 0166: the Paint view's layers name assets as the canvas's objects do)
+    const painted = new Set<string>();
+    if (deleted.length) for (const l of await req(tx.objectStore("paintLayers").getAll() as IDBRequest<unknown[]>)) if (validLayer(l)) for (const h of assetsOf(l)) painted.add(h);
     for (const e of deleted) {
-      const refs = await req(tx.objectStore("objects").index("assetId").count(e.hash));
+      const refs = (await req(tx.objectStore("objects").index("assetId").count(e.hash))) + (painted.has(e.hash) ? 1 : 0);
       if (refs > 0) {
         catalog.put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
         report.restored.push(e.hash);

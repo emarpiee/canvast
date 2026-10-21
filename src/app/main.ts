@@ -1561,6 +1561,24 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       editor.message = text;
       editor.changed();
     },
+    assets,
+    theme: () => theme,
+    styles: adjustStylesApi(),
+    importPicture: async (file) => {
+      try {
+        const { record } = await assets.importFileDetailed(file, true);
+        if (!record.type.startsWith("image/") || record.card) {
+          editor.message = "That file is not a picture.";
+          editor.changed();
+          return null;
+        }
+        return record;
+      } catch (e) {
+        editor.message = `Could not take that picture: ${(e as Error).message}`;
+        editor.changed();
+        return null;
+      }
+    },
     placeOnCanvas: async (png, name) => {
       try {
         const { record } = await assets.importFileDetailed(new File([png], name, { type: "image/png" }), true);
