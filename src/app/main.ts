@@ -114,6 +114,7 @@ import { ADJUSTMENT_KIND } from "../assets/styles";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
 import { createTextureHooks } from "./texture-actions";
+import { needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
 import { mountCommandPalette } from "../ui/command-palette";
@@ -243,15 +244,17 @@ async function start(): Promise<void> {
     tiles.invalidate(sheets.length || more.length ? new Set([...changed!, ...more, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
   });
   // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.
+  // So is one with a blur, sharpen or grain on a shape or text: it needs what lies beyond a tile's edge, so a tile would show seams.
+  const needsDirect = (o: CanvasObject | undefined): boolean => !!o && (!!o.blend || (o.kind !== "image" && needsNeighbours(o.adjust)));
   const blended = new Set<string>();
   doc.subscribe((_source, changed) => {
     if (changed === null) {
       blended.clear();
-      for (const o of doc.all()) if (o.blend) blended.add(o.id);
+      for (const o of doc.all()) if (needsDirect(o)) blended.add(o.id);
       return;
     }
     for (const id of changed) {
-      if (doc.get(id)?.blend) blended.add(id);
+      if (needsDirect(doc.get(id))) blended.add(id);
       else blended.delete(id);
     }
   });

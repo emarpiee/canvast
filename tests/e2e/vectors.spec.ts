@@ -3408,6 +3408,21 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
   const outside = await px(Math.round(box.maxX) + 3, 350);
   expect(await px(Math.round(box.maxX) + 60, 350), "far outside is the background").not.toEqual(outside);
   expect(await px(Math.round(box.maxX) + 3, 350), "the blur reaches past the edge").not.toEqual(await px(Math.round(box.maxX) + 60, 350));
+  // a blur needs what lies beyond a tile's edge: with the tile cache on, the picture is the same as without it (no seams)
+  await key(app, "=");
+  await key(app, "=");
+  await app.frame();
+  const row = () => p.evaluate(() => Array.from({ length: 60 }, (_, i) => window.__canvastDebug.pixelAt(300 + i * 12, 350)));
+  await p.evaluate(() => window.__canvastDebug.setTileCache(true));
+  await app.frame();
+  const tiled = await row();
+  await p.evaluate(() => window.__canvastDebug.setTileCache(false));
+  await app.frame();
+  expect(tiled).toEqual(await row());
+  await p.evaluate(() => window.__canvastDebug.setTileCache(true));
+  await key(app, "-");
+  await key(app, "-");
+  await app.frame();
   // the SVG written for it carries the adjustments as a filter
   await p.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })));
   await p.keyboard.type("Copy the selection as SVG");
