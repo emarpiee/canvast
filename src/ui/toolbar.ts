@@ -72,8 +72,6 @@ export interface ToolbarActions {
   /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
   sheetScale(): boolean;
   setSheetScale(on: boolean): void;
-  /** Export…: the size is chosen there (ADR 0147). */
-  exportSelection(): void;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
   croppable(): boolean;
@@ -267,7 +265,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Sheet shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square), then Enter. Add portrait or landscape to turn it."></label>
           <select data-sheet-preset aria-label="Sheet shape preset" title="A common shape: the sheet takes it, keeping its area and its top-left corner"><option value="">Shapes…</option>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
           <button type="button" data-sheet-turn aria-label="Turn the sheet on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
-          <button type="button" data-sheet-export aria-label="Export…: choose a size and save the sheet as a picture" title="Export…: the shape becomes a size here: px, inches, cm or mm at a resolution, as PNG, WebP, JPEG or SVG">${ICONS.imageUp}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
@@ -591,7 +588,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const now = actions.sheetRatio();
     if (now !== null) actions.setSheetRatio(1 / now, true);
   });
-  root.querySelector<HTMLElement>("[data-sheet-export]")!.addEventListener("click", () => actions.exportSelection());
   root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
     actions.setSheetScale(!actions.sheetScale());
   });

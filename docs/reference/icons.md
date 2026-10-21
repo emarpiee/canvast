@@ -179,7 +179,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `mountain-snow` | Pattern panel (dock button) |
 | `snowflake` | Pattern panel: keep this setting when randomizing (freeze) |
 | `arrow-right-left` | Turn the sheet on its side (sheet bar) |
-| `image-up` | Export… (Actions bar, sheet bar, command palette) |
+| `image-up` | Export… (Actions bar, command palette) |
 | `projector` | Play the bookmarks as a tour |
 | `clipboard-list` | Copy the adjustments of a picture |
 | `clipboard-paste` | Paste adjustments |

@@ -987,7 +987,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     boxOnSheet: () => boxOnSheet(doc, editor),
     moveOnSheet: (x, y, final) => moveOnSheet(doc, editor, x, y, final),
     resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
-    exportSelection: () => openExport(),
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),
     croppable: () => croppablePicture(doc, editor) !== null,

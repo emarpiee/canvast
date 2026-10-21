@@ -434,7 +434,7 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await drag(app, [420, 320], [500, 380]);
   await key(app, "v");
   await pickSheet(app);
-  await p.locator("[data-sheet-export]").click();
+  await exportWith(p, "exportpic"); // (the Actions bar: the one place for Export…)
   const dlg = p.getByTestId("export-dialog");
   await expect(dlg).toBeVisible();
   await expect(p.getByTestId("export-shape")).toContainText("3 : 2");
@@ -516,7 +516,7 @@ test("Export… of picked shapes uses their box (with the outline) as the shape,
   await drag(app, [420, 320], [500, 380]);
   await key(app, "v");
   await pickSheet(app);
-  await p.locator("[data-sheet-export]").click();
+  await exportWith(p, "exportpic"); // (the Actions bar: the one place for Export…)
   await expect(p.getByTestId("export-shape")).toContainText("3 : 2");
   await dlg.locator('[data-ex="w"]').fill("1200");
   const deep = await exportPng();
