@@ -13,7 +13,7 @@ type Painted = Extract<CanvasObject, { kind: "path" | "text" | "stroke" | "image
 const paintOf = (s: StyleItem | undefined): Paint | undefined => (s && (s.kind === "colour" || s.kind === "gradient") ? (s.data as Paint) : undefined);
 
 /** What a paint edit can change on an object, as text (the position holds exact numbers that JSON cannot write). */
-const looks = (o: Painted): string => JSON.stringify([o.kind === "image" ? o.adjust : 0, o.styles, "fill" in o ? o.fill : 0, "stroke" in o ? o.stroke : 0, "color" in o ? o.color : 0, "gradient" in o ? o.gradient : 0, "outline" in o ? o.outline : 0]);
+const looks = (o: Painted): string => JSON.stringify([o.adjust, o.styles, "fill" in o ? o.fill : 0, "stroke" in o ? o.stroke : 0, "color" in o ? o.color : 0, "gradient" in o ? o.gradient : 0, "outline" in o ? o.outline : 0]);
 
 /**
  * The objects whose paint no longer matches the saved style they follow (ADR 0157), with the paint of the style put on them. A style that
@@ -25,14 +25,14 @@ export function linkedUpdates(doc: DocumentStore, styles: readonly StyleItem[]):
   for (const o of doc.all()) {
     if (!o.styles || (o.kind !== "path" && o.kind !== "text" && o.kind !== "stroke" && o.kind !== "image")) continue;
     let n: Painted = o;
-    if (o.kind === "image" && o.styles["adjust"] !== undefined) {
-      // a picture that follows a saved adjustment
+    if (o.styles["adjust"] !== undefined) {
+      // an object that follows a saved adjustment
       const style = byId.get(o.styles["adjust"]);
       const clean = style?.kind === "adjustment" ? cleanAdjust(style.data as Adjust) : undefined;
       if (!style || style.kind !== "adjustment") n = withStyleLinks(n, { adjust: null });
       else if (JSON.stringify(o.adjust ?? null) !== JSON.stringify(clean ?? null)) {
-        const { adjust: _a, ...rest } = n as ImageObject;
-        n = (clean ? { ...rest, adjust: clean } : rest) as ImageObject;
+        const { adjust: _a, ...rest } = n;
+        n = (clean ? { ...rest, adjust: clean } : rest) as Painted;
       }
     }
     for (const part of ["fill", "stroke"] as const) {

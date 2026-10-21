@@ -2360,19 +2360,23 @@ export function uncropPicture(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
-/** The adjustments of the first picked picture, and whether every picked picture is a still (video and GIF show only some of them). */
+/** What can be adjusted: pictures (stills, video, GIF), and shapes, pen strokes and texts (adjusted as they look once drawn). */
+const adjustables = (doc: DocumentStore, editor: EditorState): CanvasObject[] =>
+  selected(doc, editor).filter((o) => !o.locked && (o.kind === "path" || o.kind === "stroke" || o.kind === "text" || (o.kind === "image" && o.media?.kind !== "audio")));
+
+/** The adjustments of the first picked object, and whether every picked picture is a still (video and GIF show only some of them). */
 export function selectedAdjust(doc: DocumentStore, editor: EditorState): { adjust: Adjust; stills: boolean; count: number } | null {
-  const ps = pictures(doc, editor);
-  return ps.length ? { adjust: ps[0]!.adjust ?? {}, stills: ps.every((p) => !p.media), count: ps.length } : null;
+  const ps = adjustables(doc, editor);
+  return ps.length ? { adjust: ps[0]!.adjust ?? {}, stills: ps.every((p) => p.kind !== "image" || !p.media), count: ps.length } : null;
 }
 
 /** Show the adjustments on the picked pictures without storing them (a slider being dragged). */
 export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust): void {
-  const ps = pictures(doc, editor);
+  const ps = adjustables(doc, editor);
   if (!ps.length || editor.blockEdit()) return;
   const clean = cleanAdjust(adjust);
   setAdjustPreviewing(true);
-  const next = new Map(ps.map((p): [string, ImageObject] => {
+  const next = new Map(ps.map((p): [string, CanvasObject] => {
     const { adjust: _a, ...rest } = p;
     return [p.id, clean ? { ...rest, adjust: clean } : rest];
   }));
@@ -2382,14 +2386,14 @@ export function previewAdjust(doc: DocumentStore, editor: EditorState, adjust: A
 
 /** Store the adjustments on the picked pictures: one undo step. */
 export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Adjust | undefined, label = "Adjust picture", styleId?: string): void {
-  const ps = pictures(doc, editor);
+  const ps = adjustables(doc, editor);
   editor.preview = { kind: "none" };
   setAdjustPreviewing(false);
   if (!ps.length || editor.blockEdit()) return editor.changed();
   const clean = adjust ? cleanAdjust(adjust) : undefined;
   // The pictures follow the saved adjustment it came from (`styleId`); any other way of changing them unlinks them (ADR 0157).
   const next = ps
-    .map((p): ImageObject => {
+    .map((p): CanvasObject => {
       const { adjust: _a, ...rest } = p;
       return withStyleLinks(clean ? { ...rest, adjust: clean } : rest, { adjust: styleId ?? null });
     })
@@ -2399,13 +2403,13 @@ export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Ad
 }
 
 /** How many pictures (still, video, GIF) are picked: a gradient from the Styles goes on them as a gradient map (ADR 0122). */
-export const pictureCount = (doc: DocumentStore, editor: EditorState): number => pictures(doc, editor).length;
+export const pictureCount = (doc: DocumentStore, editor: EditorState): number => adjustables(doc, editor).length;
 
 /** Put a gradient map made of `stops` on the picked pictures, keeping their other adjustments (and the amount, when they had a map): one undo step. */
 export function applyGradientMap(doc: DocumentStore, editor: EditorState, stops: readonly GradientStop[], label: string): void {
-  const ps = pictures(doc, editor);
+  const ps = adjustables(doc, editor);
   if (!ps.length || editor.blockEdit()) return;
-  const next = ps.map((p): ImageObject => {
+  const next = ps.map((p): CanvasObject => {
     const { adjust: _a, ...rest } = p;
     const clean = cleanAdjust({ ...p.adjust, map: { stops, amount: p.adjust?.map?.amount ?? 100 } });
     return withStyleLinks(clean ? { ...rest, adjust: clean } : rest, { adjust: null }); // (changed by hand: no longer follows a saved adjustment)
@@ -2417,7 +2421,7 @@ export function applyGradientMap(doc: DocumentStore, editor: EditorState, stops:
 let copiedAdjust: Adjust | null = null;
 /** Remember the adjustments of the first picked picture, to paste on others. */
 export function copyAdjustments(doc: DocumentStore, editor: EditorState): boolean {
-  const ps = pictures(doc, editor);
+  const ps = adjustables(doc, editor);
   if (!ps.length) return false;
   copiedAdjust = ps[0]!.adjust ?? {};
   editor.message = isNeutral(ps[0]!.adjust) ? "That picture has no adjustments to copy." : "Adjustments copied: paste them on other pictures, video or GIFs.";

@@ -26,25 +26,26 @@ const single = (l: Adjust): Adjust => {
 };
 
 /** Draw into `c` what `draw` paints, adjusted: blur while drawing, then the colour of every pixel, sharpening and grain. */
-export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContext2D) => void, a: Adjust): boolean {
+/** `ref`: the size (px) a blur of 100 % is 2 % of; default the longer side of `c` (a shape passes its own, so blur does not depend on what part of it is drawn). */
+export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContext2D) => void, a: Adjust, ref?: number): boolean {
   // a stack: the first layer is made from the picture, each next one from the result before it
   const layers = layersOf(a);
   if (layers.length > 1) {
-    if (!adjustInto(c, draw, single(layers[0]!))) return false;
+    if (!adjustInto(c, draw, single(layers[0]!), ref)) return false;
     for (const l of layers.slice(1)) {
       const prev = document.createElement("canvas");
       prev.width = c.width;
       prev.height = c.height;
       prev.getContext("2d")!.drawImage(c, 0, 0);
       c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
-      if (!adjustInto(c, (g) => g.drawImage(prev, 0, 0), single(l))) return false;
+      if (!adjustInto(c, (g) => g.drawImage(prev, 0, 0), single(l), ref)) return false;
     }
     return true;
   }
   const g = c.getContext("2d", { willReadFrequently: true });
   if (!g) return false;
   const w = c.width, h = c.height;
-  if (a.blur) g.filter = `blur(${((a.blur / 100) * 0.02 * Math.max(w, h)).toFixed(2)}px)`;
+  if (a.blur) g.filter = `blur(${((a.blur / 100) * 0.02 * (ref ?? Math.max(w, h))).toFixed(2)}px)`;
   draw(g);
   g.filter = "none";
   const img = g.getImageData(0, 0, w, h);

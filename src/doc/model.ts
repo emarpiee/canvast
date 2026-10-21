@@ -81,6 +81,8 @@ interface ObjectBase {
   readonly groupNames?: Readonly<Record<string, string>>;
   /** Which of its groups are boolean groups (ADR 0103), and the operation of each; a member and the result of such a group both carry it. */
   readonly boolOps?: Readonly<Record<string, BoolOp>>;
+  /** Non-destructive adjustments (ADR 0118): of a picture's pixels, or of how a shape, stroke or text looks once drawn; absent = none. */
+  readonly adjust?: Adjust;
   /** How the object's paint mixes with what is behind it (ADR 0047); absent = normal. */
   readonly blend?: BlendMode;
   /** In-canvas tags (ADR 0062): labels of this instance, separate from an asset's library tags; absent = none. */
@@ -159,8 +161,6 @@ export interface ImageObject extends ObjectBase {
   readonly media?: MediaState;
   /** The window of the source pixels it shows (ADR 0118), whole pixels; absent = all of them. `w` and `h` (above) are the size of this window as shown. */
   readonly crop?: Crop;
-  /** Non-destructive adjustments (ADR 0118); absent = none. */
-  readonly adjust?: Adjust;
   /**
    * Rounded corners and an outline, as a shape has them (ADR 0148): the same fields, the same controls. `radius`: local units, one value or one
    * for each corner (top left, top right, bottom right, bottom left); absent = square. `stroke` is a colour or a gradient (placed on the picture's
@@ -542,6 +542,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.parent !== undefined && !(typeof o.parent === "string" && ID_RE.test(o.parent) && o.parent !== o.id)) throw new InvalidObjectError("bad parent");
   if (o.constraint !== undefined && !(typeof o.constraint === "object" && o.constraint !== null && ["left", "right", "both", "center", "scale"].includes(o.constraint.h) && ["top", "bottom", "both", "center", "scale"].includes(o.constraint.v))) throw new InvalidObjectError("bad constraint");
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
+  if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
   if (o.boolOps !== undefined && !(typeof o.boolOps === "object" && o.boolOps !== null && Object.keys(o.boolOps).length > 0 && Object.entries(o.boolOps).every(([k, v]) => (o.groups ?? []).includes(k) && ["union", "intersect", "subtract", "exclude"].includes(v)))) throw new InvalidObjectError("bad boolean groups");
   if (o.groupNames !== undefined && !(typeof o.groupNames === "object" && o.groupNames !== null && Object.entries(o.groupNames).every(([k, v]) => ID_RE.test(k) && typeof v === "string" && v.length > 0 && v.length <= MAX_NAME_LENGTH))) throw new InvalidObjectError("bad group names");
@@ -562,7 +563,6 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
-    if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
@@ -714,6 +714,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
     ...(s["boolOps"] !== undefined ? { boolOps: s["boolOps"] as Record<string, BoolOp> } : {}),
+    ...(s["adjust"] !== undefined ? { adjust: s["adjust"] as Adjust } : {}),
     ...(s["blend"] !== undefined ? { blend: s["blend"] as BlendMode } : {}),
     ...(Array.isArray(s["tags"]) && formatTags(s["tags"].filter((t): t is string => typeof t === "string")).length ? { tags: formatTags(s["tags"].filter((t): t is string => typeof t === "string")).slice(0, MAX_OBJECT_TAGS) } : {}), // tags stored in an older form are formatted (ADR 0084)
     ...(s["styles"] !== undefined && typeof s["styles"] === "object" && s["styles"] !== null ? { styles: cleanStyleLinks(s["styles"] as Record<string, unknown>) } : {}),
@@ -739,7 +740,6 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       pixelH: s["pixelH"] as number,
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
-      ...(s["adjust"] !== undefined ? { adjust: s["adjust"] as Adjust } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as number | number[] } : {}),
       ...(s["stroke"] !== undefined ? { stroke: s["stroke"] as string } : {}),
       ...(s["width"] !== undefined ? { width: s["width"] as number } : {}),

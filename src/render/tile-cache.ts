@@ -210,6 +210,8 @@ export class TileCache {
     if (this.gen && this.gen.key !== key) {
       // The preview scales the last tile set: only within the same frame.
       const preview = !stable && dense && this.gen.frameId === frameId;
+      // Zooming out, the scaled set leaves a bare border: a prebuilt set that reaches every edge is shown instead.
+      if (preview && !this.dirty.size && !this.covers(this.gen, cam, vp, dpr)) this.takeAhead(z, cam, vp, dpr);
       const pv = preview ? this.preview(ctx, cam, vp, dpr) : null;
       if (pv) return pv;
       // Beyond the bound: a prebuilt set within one level takes over (the old set becomes its neighbour).

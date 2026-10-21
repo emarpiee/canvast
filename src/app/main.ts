@@ -27,6 +27,7 @@ import { strokeLineWidth } from "../render/draw-objects";
 import type { ProjectedObject } from "../render/projection";
 import { coverObject, projectObject } from "../render/projection";
 import { TileCache } from "../render/tile-cache";
+import { adjustReach } from "../render/adjust-shape";
 import { DensityLayer } from "../render/density";
 import type { SceneTheme } from "../render/scene-renderer";
 import { hiddenInView, visibleObjects } from "../render/scene-view";
@@ -503,7 +504,7 @@ async function start(): Promise<void> {
             dpr,
             (infl) => visibleObjects(doc, index, null, fc, infl),
             (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
-            (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2),
+            (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2) + adjustReach(po),
             (o, infl) => {
               // A changed coarse object may cover any tile: drop them all.
               if (isCoarse(fc, o.frame ?? doc.space.world)) return coverObject(o, infl, {});
@@ -1372,7 +1373,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       pictureTools: () => {
         const sa = selectedAdjust(doc, editor);
-        return sa ? { still: sa.stills, canPaste: canPasteAdjustments() } : null;
+        return sa ? { still: sa.stills && [...editor.selection].some((id) => doc.get(id)?.kind === "image"), canPaste: canPasteAdjustments() } : null;
       },
       copyAdjust: () => void copyAdjustments(doc, editor),
       pasteAdjust: () => pasteAdjustments(doc, editor),

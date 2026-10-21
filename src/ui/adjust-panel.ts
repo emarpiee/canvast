@@ -69,7 +69,7 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
       if (shown?.ids !== "none") {
         closeAdjustChild();
         settle();
-        body.innerHTML = `<p class="adj-empty">Select a picture, video or GIF to adjust it. The original is never changed.</p>`;
+        body.innerHTML = `<p class="adj-empty">Select a picture, video, GIF, shape or text to adjust it. The original is never changed.</p>`;
         shown = { ids: "none", handle: null };
       }
       return;

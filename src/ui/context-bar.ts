@@ -172,7 +172,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   wrap.append(bar);
   host.appendChild(wrap);
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
-  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image", pasteadj: "image", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
+  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image,path,stroke,text", pasteadj: "image,path,stroke,text", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
   // With a mixed pick the kind chosen in the Properties bar (`editor.subject`, its chips: All, Picture, Shape ...) also chooses which tools show here: one set of chips, not two.
   const BAR_KINDS: Record<string, readonly string[]> = { picture: ["image", "media"], shape: ["path"], stroke: ["stroke"], text: ["text"], sheet: [] };

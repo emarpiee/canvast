@@ -89,7 +89,7 @@ export function pdfVectorOf(paths: readonly PathObject[], space: FrameSpace, wPt
   const out: string[] = [`${num(wPt / w)} 0 0 ${num(-hPt / h)} 0 ${num(hPt)} cm`];
   for (const p of placed) {
     const o = p.o;
-    if (o.mask || o.net || o.profile || o.arrowStart || o.arrowEnd || o.align || (o.blend && !BLENDS[o.blend])) return null;
+    if (o.mask || o.adjust || o.net || o.profile || o.arrowStart || o.arrowEnd || o.align || (o.blend && !BLENDS[o.blend])) return null;
     if (o.stroke !== null && isGradient(o.stroke)) return null;
     if (isTexture(o.fill)) return null; // (a picture or objects: this page is drawn as a picture)
     if (o.fill !== null && o.stroke !== null && o.opacity < 1) return null; // (a group's opacity is not two opacities)

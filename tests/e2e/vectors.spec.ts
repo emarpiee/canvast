@@ -3384,3 +3384,32 @@ test("Ctrl+C puts the shape on the system clipboard as SVG text and a PNG pictur
   expect(all.every((o) => o.shape === "ellipse"), "the shape itself, not a vector copy").toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("adjustments on a shape: drawn on what it looks like, blur spreads past its edge, one undo step, kept over a reload", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await drag(app, [560, 300], [760, 400]);
+  const id = (await last(app)).id;
+  await key(app, "v");
+  await click(app, 660, 350);
+  const before = await px(660, 350);
+  await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("60");
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
+  await app.frame();
+  expect((await last(app) as Obj & { adjust?: unknown }).adjust).toEqual({ exposure: 60 });
+  expect(await px(660, 350), "the fill is brighter").not.toEqual(before);
+  await p.locator('.adjust-pop [data-adj-num="blur"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="blur"]').blur();
+  await app.frame();
+  const box = await screenBox(app, id);
+  const outside = await px(Math.round(box.maxX) + 3, 350);
+  expect(await px(Math.round(box.maxX) + 60, 350), "far outside is the background").not.toEqual(outside);
+  expect(await px(Math.round(box.maxX) + 3, 350), "the blur reaches past the edge").not.toEqual(await px(Math.round(box.maxX) + 60, 350));
+  await key(app, "Control+z");
+  expect((await objs(app)).find((o) => o.id === id) as unknown as { adjust?: unknown }).toMatchObject({ adjust: { exposure: 60 } });
+  await reload(app);
+  expect(((await objs(app)).find((o) => o.id === id) as unknown as { adjust?: unknown }).adjust).toEqual({ exposure: 60 });
+});
