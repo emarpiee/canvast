@@ -23,7 +23,7 @@ import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { ancestorsOf, descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
-import { cleanAdjust, cropOf, isNeutral } from "../doc/adjust";
+import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { cropEdges, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
@@ -1623,7 +1623,11 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
     const clips = clipSheetsOf(doc);
     for (const o of sel) {
       const b = worldBounds(expressObjectIn(o, frame));
-      let [x0, y0, x1, y1] = [D.sub(b.min.x, pad), D.sub(b.min.y, pad), D.add(b.max.x, pad), D.add(b.max.y, pad)];
+      // a blur or a drop shadow spreads past the object: the picture leaves room for it, so it is not cut (a share of the object's own size, as on the canvas)
+      const spread = reachFraction(o.adjust, o.kind === "image");
+      const room = spread ? D.shift(D.fromNumber(spread * Math.max(D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -first.unit)), D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -first.unit)))), first.unit) : null;
+      const pad2 = room ? D.add(pad, room) : pad;
+      let [x0, y0, x1, y1] = [D.sub(b.min.x, pad2), D.sub(b.min.y, pad2), D.add(b.max.x, pad2), D.add(b.max.y, pad2)];
       const cuts = clips(o);
       for (const c of cuts) {
         const cb = worldBounds(expressObjectIn(c, frame));

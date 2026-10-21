@@ -3488,3 +3488,50 @@ test("shadows in the Adjust panel: a drop shadow is drawn below the shape (start
   await app.frame();
   expect(((await last(app)) as unknown as { adjust?: unknown }).adjust, "each is one undo step").toBeUndefined();
 });
+
+test("adjusted shapes at any zoom and in a picture file: deep inside a blurred shape it is the shape's colour (no sharp fallback, no vignette), and Export leaves room for the blur", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  const vp = p.viewportSize()!;
+  const cx = Math.round(vp.width / 2), cy = Math.round(vp.height / 2);
+  await key(app, "u");
+  await drag(app, [cx - 100, cy - 50], [cx + 100, cy + 50]);
+  await key(app, "v");
+  await click(app, cx, cy);
+  // Export: the shape of the picture is the shape's box; a blur makes it wider (the halo is not cut)
+  const ratio = async () => {
+    await p.getByTestId("context-bar").getByRole("button", { name: /^Export and copy out/ }).click();
+    await p.getByRole("menuitem").filter({ hasText: /picture/i }).first().click();
+    const t = await p.getByTestId("export-shape").innerText();
+    await p.getByTestId("export-dialog").locator('[data-ex="close"]').click();
+    return t;
+  };
+  const before = await ratio();
+  await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+  const centre0 = await px(cx, cy);
+  await p.locator('.adjust-pop [data-adj-num="blur"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="blur"]').blur();
+  await app.frame();
+  expect(await ratio(), "room for the blur in the picture").not.toBe(before);
+  // far inside it, the blur has nothing to blur: the colour of the fill, at the middle and at the corners alike
+  await p.evaluate(() => {
+    const h = window.__canvastDebug;
+    const c = h.camera();
+    h.setCamera({ ...c, zi: c.zi + 14, pz: c.zi + 14 });
+  });
+  await app.frame();
+  const mid = await px(cx, cy);
+  const corner = await px(cx - Math.round(vp.width / 2) + 80, cy - Math.round(vp.height / 2) + 120);
+  for (let i = 0; i < 3; i++) expect(Math.abs(mid[i]! - centre0[i]!), "the colour inside").toBeLessThan(20);
+  for (let i = 0; i < 3; i++) expect(Math.abs(corner[i]! - mid[i]!), "no vignette at the corners").toBeLessThan(20);
+  // a great deal deeper, where the object is drawn as one colour: still its colour, not a vignette or the unadjusted one
+  await p.evaluate(() => {
+    const h = window.__canvastDebug;
+    const c = h.camera();
+    h.setCamera({ ...c, zi: c.zi + 40, pz: c.zi + 40 });
+  });
+  await app.frame();
+  const deep = [await px(cx, cy), await px(30, vp.height - 30)];
+  for (const d of deep) for (let i = 0; i < 3; i++) expect(Math.abs(d[i]! - centre0[i]!), "deep inside: the colour").toBeLessThan(25);
+});

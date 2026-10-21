@@ -126,6 +126,31 @@ export function shadowOf(a: Adjust | undefined, kind: "drop" | "inner"): { opaci
   return l ? { opacity: l[`${kind}Opacity`]! / 100, x: (l[`${kind}X`] ?? 0) / 100, y: (l[`${kind}Y`] ?? 0) / 100, blur: (l[`${kind}Blur`] ?? 0) / 100, colour: (kind === "drop" ? l.dropColor : l.innerColor) ?? "#000000" } : null;
 }
 
+/** A full shadow offset is this share of the object's size, and a full shadow blur (its standard deviation) this share. */
+export const SHADOW_OFFSET = 0.1;
+export const SHADOW_SOFT = 0.05;
+
+/**
+ * How far past the object's own box the adjustments paint, as a share of the object's longer side: three standard deviations (twice over, to be
+ * safe) of the blur, and a drop shadow's offset and blur. A picture's blur is made in its own pixels and does not count.
+ */
+export function reachFraction(a: Adjust | undefined, picture: boolean): number {
+  if (!a) return 0;
+  const blur = picture ? 0 : Math.max(0, ...layersOf(a).map((l) => l.blur ?? 0));
+  const d = shadowOf(a, "drop");
+  return 3 * (blur / 100) * 0.02 * 2 + (d ? Math.max(Math.abs(d.x), Math.abs(d.y)) * SHADOW_OFFSET + 3 * d.blur * SHADOW_SOFT : 0);
+}
+
+/** A colour `#rrggbb` or `#rrggbbaa` with the colour adjustments made to it (anything else is returned as it is): what a coarse object seen from inside is drawn as. */
+export function adjustHex(hex: string, a: Adjust): string {
+  const m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(hex);
+  if (!m) return hex;
+  const v = parseInt(m[1]!, 16);
+  const [r, g, b] = adjustPixel((v >> 16) & 255, (v >> 8) & 255, v & 255, a);
+  const h = (x: number): string => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}${m[2] ?? ""}`;
+}
+
 /** What the panel puts in when a shadow is first turned on: a soft shadow a little below. */
 export const SHADOW_START = { X: 0, Y: 30, Blur: 30 } as const;
 

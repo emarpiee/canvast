@@ -10,7 +10,7 @@ import { ARROW_LEN, miterLimitOf } from "../doc/path";
 import type { Arrow, FlatPath } from "../doc/path";
 import { canvasPaint, pictureBox } from "./gradient";
 import { exactStrokeCoverage } from "./stroke-coverage";
-import { adjustPixel, cropOf, isNeutral } from "../doc/adjust";
+import { adjustHex, adjustPixel, cropOf, isNeutral } from "../doc/adjust";
 import { playingFilter } from "./adjust-filter";
 import { adjustedSource } from "./adjust-image";
 
@@ -44,8 +44,21 @@ export interface RasterSource {
   readPixels(x: number, y: number, w: number, h: number): Uint8ClampedArray;
 }
 
+/** Extra room (CSS px) every geometry clip leaves round the view: a blurred or shadowed object is drawn on a layer bigger than the view (render/adjust-shape.ts). */
+let clipExtra = 0;
+export const withClipExtra = <T>(px: number, f: () => T): T => {
+  const was = clipExtra;
+  clipExtra = px;
+  try {
+    return f();
+  } finally {
+    clipExtra = was;
+  }
+};
+
 function viewRect(vp: Viewport, margin: number): Rect {
-  return { minX: -margin, minY: -margin, maxX: vp.width + margin, maxY: vp.height + margin };
+  const m = margin + clipExtra;
+  return { minX: -m, minY: -m, maxX: vp.width + m, maxY: vp.height + m };
 }
 
 /** Apply per-object paint state: opacity and blend mode (ADR 0047). */
@@ -411,7 +424,9 @@ export function drawCover(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp
       }
       return;
     }
-    ctx.fillStyle = cover.color ? cover.color : placeholder;
+    // (seen from inside, a shape, stroke or text has no edge or neighbour in view to blur or shade: only the colour adjustments show)
+    const adj = po.obj.kind !== "image" ? po.obj.adjust : undefined;
+    ctx.fillStyle = cover.color ? (adj && !isNeutral(adj) ? adjustHex(cover.color, adj) : cover.color) : placeholder;
     ctx.fillRect(-1, -1, vp.width + 2, vp.height + 2);
   });
 }

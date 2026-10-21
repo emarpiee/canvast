@@ -170,8 +170,8 @@ export function drawObjects(
     const paintAdj = (c: CanvasRenderingContext2D): void => {
       const a = po.obj.adjust;
       // (a picture is adjusted in its own pixels: only its shadows are made here)
-      if (a && po.obj.kind !== "image" && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po));
-      else if (a && po.obj.kind === "image" && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po), false);
+      if (a && po.obj.kind !== "image" && !po.cover && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po));
+      else if (a && po.obj.kind === "image" && !po.cover && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po), false);
       else paintOne(c, po);
     };
     if (mask) drawMasked(ctx, paintAdj, (c) => { for (const m of mask) paintOne(c, m); }, po.obj.mask!.mode, po.obj.mask!.invert === true);

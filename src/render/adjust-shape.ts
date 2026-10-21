@@ -6,18 +6,26 @@
  * shadows are shares of the object's whole size on screen, so zooming does not change how they look.
  */
 import type { Adjust } from "../doc/adjust";
-import { hasShadow, layersOf, shadowOf } from "../doc/adjust";
+import { SHADOW_OFFSET, SHADOW_SOFT, hasShadow, layersOf, reachFraction, shadowOf } from "../doc/adjust";
 import type { ProjectedObject } from "./projection";
 import { adjustInto } from "./adjust-image";
 import { playingFilter } from "./adjust-filter";
+import { withClipExtra } from "./draw-objects";
 
-/** Largest scratch layer (device px): a bigger one is drawn unadjusted rather than stalling the frame. */
-const MAX_PIXELS = 8_000_000;
+/** Largest scratch layer (device px at its own resolution): a bigger one is made smaller and drawn scaled up (what is blurred is smooth). */
+const MAX_PIXELS = 4_000_000;
 /** Room for antialiasing and sharpening beyond the box (px). */
 const MARGIN = 6;
-/** A full offset is this share of the object's size, and a full shadow blur (the standard deviation) this share. */
-const OFFSET = 0.1;
-const SOFT = 0.05;
+/** Farthest from the view (CSS px) a layer reaches: shapes are only drawn so far out (draw-objects.ts), so there is nothing to blur from beyond. */
+const MAX_REACH = 2 ** 13 - 64;
+/**
+ * The size (CSS px) blur and shadows are shares of stops growing here. Zoomed far into an object it is millions of px wide, and a blur that wide would
+ * need the shape drawn that far out of the view (it is drawn only a few thousand px past it): from here the blur keeps the width it has (about 330 px
+ * at most), which is what the eye sees of it anyway: a soft edge near, and a flat colour once the edge is out of view.
+ */
+const REF_MAX = 2 ** 14;
+/** A blur of this many px at the layer's own resolution is smooth enough that the layer can be made smaller. */
+const SMOOTH_PX = 24;
 const layers: HTMLCanvasElement[] = [];
 
 /** A scratch canvas of this size, cleared (the context is plain: the pixels stay on the graphics card). */
@@ -34,18 +42,14 @@ const maxBlur = (a: Adjust): number => Math.max(0, ...layersOf(a).map((l) => l.b
 function refSize(po: ProjectedObject, fallback: number): number {
   const w = po.box.maxX - po.box.minX, h = po.box.maxY - po.box.minY;
   const m = Math.max(w, h);
-  return Number.isFinite(m) && m > 0 ? m : fallback;
+  return Math.min(REF_MAX, Number.isFinite(m) && m > 0 ? m : fallback);
 }
 
 /** How far (CSS px) the adjustments spread the object past its box: what a tile must also take in (see TileCache). */
 export function adjustReach(po: ProjectedObject, fallback = 1000): number {
   const a = po.obj.adjust;
   if (!a || (po.obj.kind === "image" && !hasShadow(a))) return 0;
-  const ref = refSize(po, fallback);
-  const b = po.obj.kind === "image" ? 0 : maxBlur(a);
-  const d = shadowOf(a, "drop");
-  const shadow = d ? (Math.max(Math.abs(d.x), Math.abs(d.y)) * OFFSET + 3 * d.blur * SOFT) * ref : 0;
-  return MARGIN + (b ? 3 * (b / 100) * 0.02 * ref * 2 : 0) + shadow;
+  return Math.min(MAX_REACH, MARGIN + reachFraction(a, po.obj.kind === "image") * refSize(po, fallback));
 }
 
 const rgba = (hex: string, a: number): string => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
@@ -53,6 +57,8 @@ const rgba = (hex: string, a: number): string => `rgba(${parseInt(hex.slice(1, 3
 /**
  * Draw `body` (which paints the object on the context it is given, with the canvas transform of `ctx`) adjusted. `colour`: the adjustments of the
  * colours and the blur are made here too (a picture has them made in its own pixels already: only its shadows are).
+ * A blur wider than SMOOTH_PX px (deep in, where it is as wide as the view) or a layer bigger than MAX_PIXELS is made at half, quarter ... the
+ * resolution and drawn scaled up: what is blurred has no detail to lose, and the cost stays the same at any zoom.
  */
 export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject, a: Adjust, body: (c: CanvasRenderingContext2D) => void, colour = true): void {
   const t = ctx.getTransform();
@@ -65,12 +71,18 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   const y0 = Math.max(Math.floor(po.box.minY * t.d + t.f - pad * t.d), Math.floor(-pad * t.d));
   const x1 = Math.min(Math.ceil(po.box.maxX * t.a + t.e + pad * t.a), Math.ceil(W + pad * t.a));
   const y1 = Math.min(Math.ceil(po.box.maxY * t.d + t.f + pad * t.d), Math.ceil(H + pad * t.d));
-  const w = x1 - x0, h = y1 - y0;
-  if (!(w > 0 && h > 0) || w * h > MAX_PIXELS) return w > 0 && h > 0 ? body(ctx) : undefined;
-  const refDev = refCss * t.a;
+  const fw = x1 - x0, fh = y1 - y0;
+  if (!(fw > 0 && fh > 0)) return;
+  const refFull = refCss * t.a;
+  // how many times smaller the layer is made
+  const sigma = colour ? (maxBlur(a) / 100) * 0.02 * refFull : 0;
+  let s = 1;
+  while ((sigma / s > SMOOTH_PX || (fw / s) * (fh / s) > MAX_PIXELS) && s < 1024) s *= 2;
+  const w = Math.ceil(fw / s), h = Math.ceil(fh / s);
+  const refDev = refFull / s; // (the size every blur and offset is a share of, at the layer's resolution)
   const draw = (g: CanvasRenderingContext2D): void => {
-    g.setTransform(t.a, 0, 0, t.d, t.e - x0, t.f - y0);
-    body(g);
+    g.setTransform(t.a / s, 0, 0, t.d / s, (t.e - x0) / s, (t.f - y0) / s);
+    withClipExtra(pad, () => body(g));
     g.setTransform(1, 0, 0, 1, 0, 0);
   };
   let out: HTMLCanvasElement;
@@ -102,9 +114,9 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     g2.fillStyle = rgba(inner.colour, 1);
     g2.fillRect(0, 0, w, h);
     g2.globalCompositeOperation = "destination-out";
-    g2.drawImage(out, inner.x * OFFSET * refDev, inner.y * OFFSET * refDev);
+    g2.drawImage(out, inner.x * SHADOW_OFFSET * refDev, inner.y * SHADOW_OFFSET * refDev);
     const g3 = layer(3, w, h);
-    if (inner.blur) g3.filter = `blur(${(inner.blur * SOFT * refDev).toFixed(2)}px)`;
+    if (inner.blur) g3.filter = `blur(${(inner.blur * SHADOW_SOFT * refDev).toFixed(2)}px)`;
     g3.drawImage(g2.canvas, 0, 0);
     g3.filter = "none";
     g3.globalCompositeOperation = "destination-in";
@@ -122,11 +134,13 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   const drop = shadowOf(a, "drop");
   if (drop) {
     ctx.shadowColor = rgba(drop.colour, drop.opacity);
-    ctx.shadowBlur = 2 * drop.blur * SOFT * refDev; // (the canvas takes twice the standard deviation)
-    ctx.shadowOffsetX = drop.x * OFFSET * refDev;
-    ctx.shadowOffsetY = drop.y * OFFSET * refDev;
+    ctx.shadowBlur = 2 * drop.blur * SHADOW_SOFT * refFull; // (the canvas takes twice the standard deviation)
+    ctx.shadowOffsetX = drop.x * SHADOW_OFFSET * refFull;
+    ctx.shadowOffsetY = drop.y * SHADOW_OFFSET * refFull;
   }
   if (po.obj.blend) ctx.globalCompositeOperation = po.obj.blend;
-  ctx.drawImage(out, x0, y0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(out, 0, 0, w, h, x0, y0, w * s, h * s);
   ctx.restore();
 }
