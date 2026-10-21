@@ -18,3 +18,4 @@ docs/media/
 .engine-src/
 engine/target/
 engine/target-simd/
+engine/out/

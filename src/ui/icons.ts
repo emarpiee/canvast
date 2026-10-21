@@ -256,6 +256,19 @@ import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
 import trash2 from "lucide-static/icons/trash-2.svg";
 import eraser from "lucide-static/icons/eraser.svg";
+// The Painting view (ADR 0165)
+import brushSvg from "lucide-static/icons/brush.svg";
+import paintbrushSvg from "lucide-static/icons/paintbrush.svg";
+import dropletOffSvg from "lucide-static/icons/droplet-off.svg";
+import fileImageSvg from "lucide-static/icons/file-image.svg";
+import filePlusSvg from "lucide-static/icons/file-plus.svg";
+import layersPlusSvg from "lucide-static/icons/layers-plus.svg";
+import cornerLeftDownSvg from "lucide-static/icons/corner-left-down.svg";
+import grid2x2CheckSvg from "lucide-static/icons/grid-2x2-check.svg";
+import maximize2Svg from "lucide-static/icons/maximize-2.svg";
+import pictureInPictureSvg from "lucide-static/icons/picture-in-picture-2.svg";
+import bookImageSvg from "lucide-static/icons/book-image.svg";
+import rulerDimensionSvg from "lucide-static/icons/ruler-dimension-line.svg";
 import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
@@ -433,6 +446,18 @@ export const ICONS = {
   lock: clean(lock),
   group: clean(group),
   eraser: clean(eraser),
+  paintView: clean(brushSvg),
+  paintbrush: clean(paintbrushSvg),
+  paintEraser: clean(dropletOffSvg),
+  newPainting: clean(fileImageSvg),
+  newPage: clean(filePlusSvg),
+  newLayer: clean(layersPlusSvg),
+  clipBelow: clean(cornerLeftDownSvg),
+  alphaLock: clean(grid2x2CheckSvg),
+  fitPage: clean(maximize2Svg),
+  placeOnCanvas: clean(pictureInPictureSvg),
+  paintings: clean(bookImageSvg),
+  pageSize: clean(rulerDimensionSvg),
   activity: clean(activity),
   boxSelect: clean(boxSelect),
   swatchBook: clean(swatchBookSvg),

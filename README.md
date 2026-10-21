@@ -181,7 +181,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 
 ### The Library
 
-Switch between **Canvas** and **Library** at the top left. The canvas keeps its view, selection and undo history while you are away.
+Switch between **Canvas**, **Library** and **Paint** at the top left. The canvas keeps its view, selection and undo history while you are away.
 
 - A gallery of every imported file with its size, type and usage ("4 uses · 3 canvases"), with search, filters by file type, sorting, list or grid layouts and adjustable thumbnails.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used, and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones.
@@ -196,6 +196,18 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | --- | --- |
 | ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
 | The Library, filled by six screenshots of the showcase | The viewer with its filmstrip and details |
+
+### Painting
+
+**Paint** (at the top left, beside Library) is a view of its own for painting pixels, with its own rules: nothing in it zooms endlessly, and sizes are real units, not shapes.
+
+- **Paintings.** The Paint view lists the workspace's paintings (open, rename, delete). **New painting** asks for a name and a page size: a preset (screen, 4K, square, A4 or Letter at 300 DPI, phone) or a width and height in px, in, cm or mm at a resolution (DPI); sizes are stored as whole pixels (100 × 50 mm at 300 DPI is 1181 × 591 px), up to 8192 px a side. The background is white, transparent or a colour.
+- **Pages.** A painting has one or more pages, each with its own size, resolution, background and layers, in the strip at the bottom: click one to show it, **+** adds one after it (the same size), and its ⋯ menu renames, resizes (*Size and resolution…*: the pixels stay where they are; a larger page has empty room right and below), moves or deletes it.
+- **Painting.** The **Brush** (`B`) and the **Eraser** (`E`) paint into the picked layer with pressure from a pen. Their options are in the bar under the top bar: size in page pixels, hardness, opacity (the most one stroke covers), flow (how much each dab adds, building up within the opacity), spacing, and whether the pen's pressure changes the size or the opacity. Each tool keeps its own values. `[` and `]` change the size; Alt-click picks a colour from the page; Shift-click draws a straight line from where the last stroke ended. The round button under the tools is the colour.
+- **Layers** (the panel on the right, top first): **+** adds a layer above the picked one, the bin deletes it; each row has an eye, a lock, **clip to the layer below** (the layer shows only where the nearest layer under it that is not clipped has paint; several clipped layers in a row share that base) and **alpha lock** (the Brush only colours what already has paint, and the Eraser leaves it). Double-click a name to rename it; the ⋯ menu also moves the layer up or down. Under the list: the picked layer's blend mode and opacity.
+- **View.** The wheel zooms at the pointer (`Shift`+wheel pans sideways), the **Hand** (`H`, or `Space` held, or the middle button) drags the view, two fingers pan and pinch. The zoom goes from a sixteenth of the fitted page to 6400 %; pixels show as squares from 200 %. The bar has zoom out, the zoom (click: 100 %), zoom in and **Fit** (`Ctrl+0`; `Ctrl+1` is 100 %).
+- **Undo** and **redo** (`Ctrl/⌘+Z`, `Ctrl/⌘+Shift+Z` or `Ctrl+Y`) have a history of their own for the open painting: strokes, layers, pages and names.
+- **To the canvas and out.** **Export** saves the page as a PNG of its size (what the view shows, without the checkerboard of a transparent page). **Place on the canvas** keeps the page as a picture in the library and puts it in the middle of the canvas view: from then on it is an ordinary picture there, and painting more does not change it.
 
 ### Exporting
 
@@ -235,6 +247,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Copy by dragging | `Alt` as the drag starts |
 | Layer selection | `Ctrl`+click toggles · `Shift`+click selects a range |
 | Jump to a zoom level | Click the zoom read-out, type `3000`, `2^-500` or `10^900`, Enter |
+| Paint view | `B` brush · `E` eraser · `H` hand (`Space` held) · `[` `]` brush size · Alt-click picks a colour · Shift-click a straight line · `Ctrl/⌘+0` fit · `Ctrl/⌘+1` 100 % · `+` / `−` zoom · `Esc` drops the stroke being painted |
 
 **Touch:** two-finger drag pans and pinches zooms; a two-finger tap is undo and a three-finger tap is redo; a long press on Select lists what is under the finger; a resting finger while another drags acts as `Shift`, two as `Alt`. Number fields change by dragging their name.
 
@@ -254,9 +267,9 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every original once, and your device settings (theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
+- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, every painting with its pages and layers, plus every original once, and your device settings (theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the originals it uses.
-- **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, shows what it contains and any problems, and only then adds the boards and canvases in a single transaction. Nothing existing is replaced and originals you already have are not stored twice.
+- **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, shows what it contains and any problems, and only then adds the boards, canvases and paintings in a single transaction. Nothing existing is replaced and originals you already have are not stored twice.
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
 - Backups made in one browser import into another (tested between Chromium and Firefox).
 - Incremental backups are available after the first full one.
@@ -328,6 +341,19 @@ canvast describes only what it does. These are the current limits.
 | Clipboard | Ctrl+C keeps the real objects for pasting back only while nothing else was copied: a picture copied for other apps pastes back as the objects only if the window kept the focus and the app copied nothing else in between (otherwise it comes back as a new picture, and shapes as an SVG import or a picture). A copy of a single picture, GIF or video is one PNG (a GIF or video is its current frame); files such as audio and PDF cannot be put on the system clipboard by a web page; Cut puts text only |
 | Video | H.265 video from phones shows as a card on Firefox for Android (it still plays from the player) |
 
+**Painting**
+
+| Area | Limitation |
+| --- | --- |
+| Tools | Brush and Eraser with size, hardness, opacity, flow, spacing and pressure only: no brush presets or brush files yet, no selections, fill, gradient, move or transform, no smudge or retouch tools, no shape, text or picture layers, no layer groups or masks, no rotate or mirror of the view |
+| Memory | Every layer of the page shown is held at its full size in memory (4 bytes a pixel: 8 MB per layer of a 1920 × 1080 page, 64 MB of a 4096 × 4096 one), and the brush engine holds the layer being painted once more |
+| Speed | Measured headless on one machine: up to a 200 px brush paints in about 1 ms per frame; a fully soft 500 px brush takes up to about 10 ms, and ending a long stroke with it about 0.2 s |
+| Pen | Pressure is read from the pen (Pointer Events); tilt and turn are passed to the engine but not used by these options. Not tested with a real tablet |
+| Several tabs | A read-only tab shows paintings but does not follow another tab's changes to an open painting until it is opened again |
+| Blend modes | The canvas's eleven (multiply, screen, overlay, darken, lighten, dodge, burn, hard and soft light, difference, exclusion) |
+| Backups | Every backup, incremental ones too, holds all the paintings |
+| On the canvas | A placed page is a copy: painting more does not update it |
+
 **Scale and precision**
 
 | Area | Limitation |
@@ -347,7 +373,7 @@ canvast describes only what it does. These are the current limits.
 | --- | --- |
 | Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB (a Chromium library folder is not counted). With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
 | Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
-| Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
+| Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path. The Paint view's brush engine runs in a worker, as WebAssembly |
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
 | Collaboration | None. There is no network by design |
 
@@ -389,9 +415,15 @@ Every object is validated before it enters the document or is loaded: finite num
 
 ### Storage
 
-Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 10) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection. With a library folder an original is a file named `<sha256>.<ext>` (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
+Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 11) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog, metadata, and the Paint view's paintings, layers and tiles. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection. With a library folder an original is a file named `<sha256>.<ext>` (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
 
-A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas and each original once under `assets/<sha256>`, with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files). Import is verified completely before one transaction writes it.
+A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas, each original once under `assets/<sha256>` and, in a workspace archive, `paintings.json` with each painting tile once under `paint-tiles/<sha256>` (checked by inflating and hashing it on import), with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files). Import is verified completely before one transaction writes it.
+
+### Painting
+
+The Paint view keeps its own documents and never uses the canvas's coordinates. A page is a size in pixels; a layer is a record of its own (its page, its place in the stack, opacity, blend, hidden, locked, clipped, alpha lock) whose pixels are 256 px tiles, each named by the SHA-256 of its RGBA pixels and stored once, deflated (exact, unlike a PNG through a canvas, which shifts the colour of soft edges). Every edit, from any tool or panel, is a list of record replacements: applying it changes the records, draws again only the tiles that changed and stores the change (in one transaction, read back); undo applies the same list backwards, and since tiles are named by their pixels no pixel is copied for undo. A tile is erased only when no stored layer and no step of the open painting's history names it.
+
+The brush engine is an open-source Rust engine (MIT; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) compiled to WebAssembly and inlined in the file, with the dab model of a professional painting program (tips, dynamics, opacity versus flow, lock transparency). It runs in a worker that holds only the layer being painted. While a stroke is painted the worker sends the stroke's coverage, 64 px at a time, and the view draws the layer with it; when the stroke ends the engine puts it on the layer once and the worker returns the changed tiles, hashed and deflated, as one undo step. Drawing a page (in the view and for an export, the same function) puts the background and the layers bottom to top with their opacity, blend and clipping.
 
 ### Source layout
 
@@ -411,7 +443,9 @@ src/
   gen/           the pattern generators, a standalone module that imports nothing from the app: seeded random, geometry helpers, one pure function per pattern, an SVG writer
   colour-picker/ the colour picker, a standalone module that imports nothing from the app
   ui/            toolbars, panels, library, settings view, menus, player
+  paint/         the Paint view's documents, history, storage, camera, drawing, tools, and the brush engine's worker
   app/           bootstrap, editor state, actions, debug hook
+engine/          the brush engine's thin Rust wrapper (built to WebAssembly) and patches to its pinned source
 scripts/         single-file build, offline check, naming and token checks
 tests/           unit (Vitest) and end-to-end (Playwright)
 docs/            reference notes, test logs, status
@@ -431,7 +465,7 @@ The colour picker can be built alone with `npm run build:picker`, and the patter
 
 ## Building and testing
 
-Requires Node.js 26.4 (see `.nvmrc`) and npm.
+Requires Node.js 26.4 (see `.nvmrc`) and npm, and for the Paint view's brush engine the Rust toolchain with the WebAssembly target (`rustup target add wasm32-unknown-unknown`). The first build fetches the engine's source at its pinned commit into `.engine-src/` (git, once) and applies `engine/patches/`; `npm run build` then compiles it with Cargo (about 50 s the first time, seconds after) and inlines it.
 
 ```sh
 npm ci            # install pinned dev dependencies
@@ -475,7 +509,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 
 ## Security and privacy
 
-- The page's Content Security Policy is `default-src 'none'` with no `connect-src`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
+- The page's Content Security Policy is `default-src 'none'` with no `connect-src`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers from `blob:`. `'wasm-unsafe-eval'` lets the page compile the brush engine's WebAssembly, which is inside the file; it does not allow `eval`.
 - canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build.
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
@@ -485,6 +519,6 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 
 ## Licences
 
-canvast is released under the [MIT licence](LICENSE), copyright (c) 2026 emarpiee. The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest and Playwright.
+canvast is released under the [MIT licence](LICENSE), copyright (c) 2026 emarpiee. The built file bundles the Lucide icons (ISC), the Inter font (SIL Open Font License 1.1) and the Paint view's brush engine (MIT); their notices are embedded at the top of `canvast.html` and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest and Playwright.
 
 A history of changes is in [CHANGELOG.md](CHANGELOG.md).

@@ -16,7 +16,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { placeImage, pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -72,6 +72,7 @@ import { BookmarkList, captureThumb } from "./bookmarks";
 import { updateThumbs } from "./bookmark-thumbs";
 import { mountDevPanel } from "../ui/dev-panel";
 import { mountAssetsView } from "../ui/assets-view";
+import { mountPaintView } from "../ui/paint-view";
 import { SETTINGS_TABS, mountSettingsView } from "../ui/settings-view";
 import { goHome, zoomByStep } from "../interaction/navigation";
 import { mountHintLine } from "../ui/hint-line";
@@ -1535,19 +1536,44 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     closeMoreMenu(); // (a menu opened on the canvas, e.g. the long-press list, does not follow to another view)
     if (was === "assets") assetsView.hide();
     if (was === "settings") settingsView.hide();
+    if (was === "paint") paintView.hide();
     if (v === "assets") assetsView.show();
     else if (v === "settings") settingsView.show();
+    else if (v === "paint") paintView.show();
     else {
       invalidate();
       canvas.focus();
     }
-    // The Settings view is not remembered: a reload opens the canvas or the Assets view.
+    // The Settings view is not remembered: a reload opens the canvas, the Assets view or the Paint view.
     if (v !== "settings") settings.set("ui.view", v);
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
+  // The Painting view (ADR 0165): a view of its own; a page comes to the canvas only as a picture, through the library.
+  const paintView = mountPaintView(document.getElementById("paint-view")!, {
+    db,
+    workspaceId: () => session.current?.workspaceId ?? null,
+    readOnly: () => session.readOnly,
+    settings,
+    tell: (text) => {
+      editor.message = text;
+      editor.changed();
+    },
+    placeOnCanvas: async (png, name) => {
+      try {
+        const { record } = await assets.importFileDetailed(new File([png], name, { type: "image/png" }), true);
+        setView("canvas");
+        const placed = placeImage(record, doc, view, 0, "Place a page");
+        editor.select([placed.id]);
+        editor.message = `“${name}” is on the canvas and in the library.`;
+      } catch (e) {
+        editor.message = `The page could not be placed: ${(e as Error).message}`;
+      }
+      editor.changed();
+    },
+  });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
@@ -1997,13 +2023,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels, paint: paintView },
     );
   }
   resize();
   canvas.focus();
   editor.changed();
   if (settings.get("ui.view") === "assets") setView("assets");
+  else if (settings.get("ui.view") === "paint") setView("paint");
 }
 
 startErrorLog();

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.0 — The Paint view (2026-10-21)
+
+- **Paint view** (beside Library): paintings of the workspace, each with pages of a real size (px, or in, cm, mm at a DPI; presets for screens, A4 and Letter at 300 DPI), a background (white, transparent or a colour) and raster layers. Its own rules: no endless zoom (a sixteenth of the fitted page to 6400 %), square pixels from 200 %.
+- **Brush and Eraser** on a new brush engine (WebAssembly, in a worker): size, hardness, opacity, flow, spacing, pen pressure on size or opacity; `[` `]` size, Alt-click picks a colour, Shift-click a straight line.
+- **Layers:** new, delete, rename, move, hide, lock, **clip to the layer below** and **alpha lock**, blend mode and opacity. **Pages:** new, rename, resize, move, delete. Undo and redo of their own.
+- **Export** a page as PNG, or **place it on the canvas** (it goes in the library as a picture).
+- **Backups** carry the paintings (archive format 5); imported paintings get new ids, and every tile is checked.
+- Storage schema 11; the page's security policy allows WebAssembly to be compiled (`'wasm-unsafe-eval'`, not `eval`). Building needs the Rust toolchain with the WebAssembly target.
+
 ## 0.27.0 — Adjustments on shapes, shadows, pattern styles (2026-10-21)
 
 - **Adjustments on shapes, pen strokes and texts:** the Adjust panel now works on them, as they look once drawn (fill, outline, gradient and texture together). Colour adjustments go through the SVG filter on the graphics card (no pixel readback); blur is a share of the object's own size, so it does not change with zoom, and keeps a width of at most about 330 px far inside an object.

@@ -33,8 +33,22 @@ Unverified / Committed / Next bounded task**.
 | 9 | Standalone release: slices 1 to 4 done (reproducible build, offline completeness, clean-machine test, portability; [testing/phase-9.md](testing/phase-9.md)); README and licences, and the release artifact wait for the owner; PDF page rendering and other 3D formats if wanted | in progress |
 | 5s | Sheets ([ADR 0108](adr/0108-sheets.md)): container with clipping, Sheet tool, put on a sheet, Layers rows and clip toggle | **first slice done (v0.17.0)**: E2E in both browsers; real units, constraints, auto layout next |
 | 5v+ | SVG in and out, dashes, node snapping, dragging a number's name, only a picked shape moves ([ADR 0107](adr/0107-svg-dashes-node-snapping-scrub.md)) | **done (v0.17.0)**: unit and E2E; two-browser sweep of the affected specs (see the commit); full suite not run |
-| PV | Painting view: a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0 spike done** ([ADR 0164](adr/0164-brush-engine-webassembly.md)): the engine builds to 799 KiB of WebAssembly, runs from `file://` in Chromium and Firefox, a 500 px brush fits a frame when we draw the live stroke ourselves; P1 (the view, pages, raster layers, a basic brush) next |
+| PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0 and P1 done (v0.28.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; P2 (presets and `.abr`, the Brush Settings sections, more layer kinds) next |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
+
+## Painting view, P1 (v0.28.0, 2026-10-21)
+
+**Implemented:** the Paint view (ADR 0165): paintings per workspace, pages in px with DPI and background, raster layers stored as 256 px tiles (SHA-256 of the pixels, deflated), one edit path (record replacements) for every change with undo and redo, the brush engine in a worker with a live stroke of 64 px coverage tiles (engine patch 0001), clip to the layer below, alpha lock, blend and opacity, Brush and Eraser with a schema of options, Hand, zoom and fit, pages strip, PNG export, place on the canvas, archive format 5 with paintings, storage schema 11, CSP `'wasm-unsafe-eval'`.
+
+**Tested:** unit `painting.test.ts` (7); E2E `painting.spec.ts` (3) and the paintings round trip in `archive.spec.ts`, Chromium and Firefox. Quick suite: see the commit.
+
+**Known failures:** none known.
+
+**Unverified:** a real pen tablet (pressure, tilt), headed browsers on real GPUs, touch (two-finger pan and pinch are written but not tested), large pages near 8192 px.
+
+**Committed:** see git log (feat(paint): ... (v0.28.0)).
+
+**Next bounded task:** P2: brush presets as workspace data, the Brushes panel with `.abr` and JSON import and export, the Brush Settings sections from the engine's schema.
 
 ## Nested frames redesign (branch `exp/nested-frames`)
 

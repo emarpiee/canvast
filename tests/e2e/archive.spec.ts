@@ -485,3 +485,41 @@ test("Settings > Storage holds the backup: the last backup, a full export, the c
   await p.getByTestId("confirm-cancel").click();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("paintings travel in a workspace backup: every tile checked, imported with new ids, painted as they were (ADR 0165)", async ({ app, browser }) => {
+  const p = app.page;
+  await p.getByTestId("view-paint").click();
+  await p.getByTestId("paint-new").click();
+  await p.getByTestId("page-dialog-ok").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.paint.state()?.layers.length ?? 0)).toBe(1);
+  const s = (await p.evaluate(() => window.__canvastDebug.paint.state()))!;
+  const a = await p.evaluate(() => window.__canvastDebug.paint.screenOf(300, 400)!), b = await p.evaluate(() => window.__canvastDebug.paint.screenOf(1200, 400)!);
+  await p.mouse.move(a.x, a.y);
+  await p.mouse.down();
+  await p.mouse.move(b.x, b.y, { steps: 12 });
+  await p.mouse.up();
+  await p.evaluate(() => window.__canvastDebug.paint.settled());
+  const tiles = s.layers[0]!.id;
+  await p.getByTestId("view-canvas").click();
+  await openPanel(p);
+  const file = await download(p, () => p.getByTestId("set-export-full").click());
+  const m = await manifestOf(file.bytes);
+  expect(m["paintings"]).toMatchObject({ file: "paintings.json", count: 1 });
+  const z = await readZip(new Blob([new Uint8Array(file.bytes)]));
+  expect([...z.keys()].filter((k) => k.startsWith("paint-tiles/")).length).toBe((m["paintings"] as { tiles: number }).tiles);
+
+  const other = await freshProfile(browser);
+  const q = other.page;
+  expect(await importArchive(q, file.name, file.bytes)).toContain("Import");
+  await expect(q.getByTestId("toast")).toContainText("1 painting added");
+  const list = await q.evaluate(() => window.__canvastDebug.paint.list());
+  expect(list.map((x) => x.name)).toEqual(["Painting 1"]);
+  expect(list[0]!.id).not.toBe(s.paintingId);
+  await q.getByTestId("view-paint").click();
+  await q.evaluate((id) => window.__canvastDebug.paint.open(id), list[0]!.id);
+  const layer = (await q.evaluate(() => window.__canvastDebug.paint.state()))!.layers[0]!;
+  expect(layer.id).not.toBe(tiles);
+  await expect.poll(async () => (await q.evaluate((l) => window.__canvastDebug.paint.layerPixel(l, 750, 400), layer.id))?.[3] ?? -1).toBe(255);
+  await other.context.close();
+  expect(app.consoleErrors).toEqual([]);
+});

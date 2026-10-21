@@ -1,4 +1,5 @@
 import { externalFolder } from "../storage/external-folder";
+import type { PaintView } from "../ui/paint-view";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
@@ -117,6 +118,15 @@ export interface DebugHook {
   inkedPixels(step?: number): number;
   /** RGB of the canvas pixel at CSS px (x, y). */
   pixelAt(x: number, y: number): [number, number, number];
+  /** The Painting view (ADR 0165): the open painting's records, a layer's pixel (r, g, b, a) at page px, the screen point of a page px, and a wait for the strokes and saves. */
+  paint: {
+    state(): { paintingId: string; name: string; pageId: string; pages: Array<{ id: string; name: string; w: number; h: number; bg: string | null }>; activeId: string | null; layers: Array<{ id: string; name: string; pageId: string; z: number; tiles: number; hidden?: true; locked?: true; clipBelow?: true; alphaLock?: true; opacity: number; blend?: string }>; canUndo: boolean } | null;
+    layerPixel(layerId: string, x: number, y: number): [number, number, number, number] | null;
+    screenOf(x: number, y: number): { x: number; y: number } | null;
+    settled(): Promise<void>;
+    list(): Promise<Array<{ id: string; name: string }>>;
+    open(id: string): Promise<void>;
+  };
   objects(): SerializedObject[];
   /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
   storedObjects(): SerializedObject[];
@@ -267,6 +277,7 @@ export interface DebugDeps {
   indexReady: () => Promise<void>;
   /** The names above the items as last drawn. */
   labels: () => readonly { id: string; text: string; x: number; y: number; w: number; h: number }[];
+  paint: PaintView;
 }
 
 /**
@@ -380,6 +391,40 @@ export function installDebugHook(
       let n = 0;
       for (const rgb of samples) if (channelDiff(rgb, bg) > 6) n++;
       return n;
+    },
+    paint: {
+      state: () => {
+        const s = deps.paint.session;
+        if (!s) return null;
+        return {
+          paintingId: s.painting.id,
+          name: s.painting.name,
+          pageId: s.pageId,
+          pages: s.painting.pages.map((p) => ({ id: p.id, name: p.name, w: p.w, h: p.h, bg: p.bg })),
+          activeId: s.activeId,
+          layers: [...s.layers.values()].sort((a, b) => a.z - b.z).map((l) => ({ id: l.id, name: l.name, pageId: l.pageId, z: l.z, tiles: Object.keys(l.tiles).length, opacity: l.opacity, ...(l.hidden ? { hidden: true as const } : {}), ...(l.locked ? { locked: true as const } : {}), ...(l.clipBelow ? { clipBelow: true as const } : {}), ...(l.alphaLock ? { alphaLock: true as const } : {}), ...(l.blend ? { blend: l.blend } : {}) })),
+          canUndo: s.history.canUndo,
+        };
+      },
+      layerPixel: (id, x, y) => {
+        const s = deps.paint.session;
+        const l = s?.layers.get(id);
+        const c = l && s!.image(l);
+        return c ? ([...c.getContext("2d")!.getImageData(x, y, 1, 1).data] as [number, number, number, number]) : null;
+      },
+      screenOf: (x, y) => {
+        const c = deps.paint.camera;
+        const el = document.querySelector<HTMLElement>(".paint-canvas");
+        if (!el || !deps.paint.session) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.left + c.x + x * c.scale, y: r.top + c.y + y * c.scale };
+      },
+      settled: async () => {
+        await deps.paint.session?.settled();
+        deps.paint.drawNow();
+      },
+      list: async () => (await deps.paint.list()).map((p) => ({ id: p.id, name: p.name })),
+      open: (id) => deps.paint.open(id),
     },
     pixelAt: (x, y) => {
       const dpr = canvas.width / view.viewport.width;

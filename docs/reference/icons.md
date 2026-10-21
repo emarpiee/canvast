@@ -112,6 +112,18 @@ One icon per function: two buttons that do different things never share an icon,
 | `download` | Download original (library details and selection bar) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
 | `eraser` | Object eraser |
+| `brush` | Paint view (the view switch) |
+| `paintbrush` | Brush tool (Paint view) |
+| `droplet-off` | Eraser tool of the Paint view: takes paint away from a layer |
+| `file-image` | New painting (Paint view) |
+| `file-plus` | New page (Paint view) |
+| `layers-plus` | New layer (Paint view) |
+| `corner-left-down` | Clip to the layer below (Paint view's Layers rows) |
+| `grid-2x2-check` | Alpha lock: painting keeps the layer's transparency (Paint view's Layers rows) |
+| `maximize-2` | Fit the page in the view (Paint view) |
+| `picture-in-picture-2` | Place the page on the canvas (Paint view) |
+| `book-image` | All paintings: the list of the workspace's paintings (Paint view) |
+| `ruler-dimension-line` | Page size and resolution (Paint view) |
 | `external-link` | Open in a new tab |
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |

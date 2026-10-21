@@ -2720,3 +2720,70 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .pg-foot button svg { width: var(--icon-sm); height: var(--icon-sm); }
 .style-pattern { display: block; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hud-border); }
 .style-pattern svg { display: block; width: 100%; height: auto; }
+
+/* ---- The Painting view (ADR 0165): a view of its own, like the Library ---- */
+#paint-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); color: var(--hud-fg); font: var(--text-md)/1.4 var(--font-ui); }
+#paint-view[hidden] { display: none; }
+body[data-view="paint"] #canvas-host { visibility: hidden; }
+body[data-view="paint"] .hint-float { display: none; }
+#paint-view button:focus-visible, #paint-view input:focus-visible, #paint-view select:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+#paint-view button { font: inherit; color: inherit; }
+.paint-list { display: flex; flex-direction: column; gap: var(--sp-6); max-width: 880px; width: 100%; margin: 0 auto; padding-top: calc(var(--bar-h) + var(--sp-6)); min-height: 0; overflow-y: auto; }
+.paint-list[hidden], .paint-editor[hidden] { display: none; }
+.paint-list-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); }
+.paint-list-head h1 { margin: 0; font-size: var(--text-2xl); font-weight: var(--weight-semibold); }
+.paint-list-head button, .paint-bar > button, .paint-pages button { display: inline-flex; align-items: center; gap: var(--sp-3); min-height: var(--ctl); padding: 0 var(--sp-5); background: transparent; border: 1px solid transparent; border-radius: var(--r-md); cursor: pointer; }
+.paint-list-head button.is-primary { background: var(--hud-accent); color: var(--hud-accent-fg); }
+#paint-view button svg { width: var(--icon-md); height: var(--icon-md); flex: none; }
+.paint-bar > button:hover:not(:disabled), .paint-pages button:hover { background: var(--hud-hover); }
+.paint-bar > button:disabled { opacity: 0.4; cursor: default; }
+.paint-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.paint-item { display: flex; align-items: center; gap: var(--sp-3); border: 1px solid var(--hud-border); border-radius: var(--r-md); background: var(--hud-bg); }
+.paint-item-open { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); padding: var(--sp-5) var(--sp-6); background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; text-align: start; }
+.paint-item-open:hover { background: var(--hud-hover); }
+.paint-item-open small, .paint-empty { color: var(--hud-muted); font-size: var(--text-sm); }
+.paint-empty { padding: var(--sp-6); }
+.paint-editor { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-3); padding-top: calc(var(--bar-h) + var(--sp-3)); }
+.paint-bar { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--bar-h); padding: var(--pad); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); overflow-x: auto; }
+.paint-name { flex: 0 1 auto; min-width: 64px; font-weight: var(--weight-semibold); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paint-bar > button { flex: none; }
+.paint-bar > .paint-name { flex: 0 1 auto; }
+.paint-size span, .paint-zoom { font-variant-numeric: tabular-nums; font-size: var(--text-sm); white-space: nowrap; }
+.paint-zoom { min-width: 64px; justify-content: center; }
+.paint-sep { width: 1px; align-self: stretch; margin: var(--sp-2) var(--sp-1); background: var(--hud-border); flex: none; }
+.paint-spacer { flex: 1; }
+.paint-options { gap: var(--sp-5); padding-inline: var(--sp-5); }
+.paint-options:empty { display: none; }
+.paint-options .tb-count { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--text-sm); white-space: nowrap; }
+.paint-options input[type="number"] { width: 64px; }
+.paint-main { flex: 1; min-height: 0; display: flex; gap: var(--sp-3); }
+.paint-rail { flex: none; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--pad); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); align-self: flex-start; }
+.paint-rail button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; background: transparent; border: 0; border-radius: var(--r-lg); cursor: pointer; }
+.paint-rail button:hover { background: var(--hud-hover); }
+.paint-rail button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.paint-rail [data-chip] { width: var(--icon-md); height: var(--icon-md); border-radius: var(--r-dot); background: var(--paint, var(--black)); box-shadow: 0 0 0 2px var(--hud-bg), 0 0 0 3px var(--hud-fg); }
+.paint-stage { position: relative; flex: 1; min-width: 0; border: 1px solid var(--hud-border); border-radius: var(--r-lg); overflow: hidden; background: var(--canvas-bg); touch-action: none; cursor: crosshair; }
+.paint-stage[data-tool="hand"], .paint-stage.is-hand { cursor: grab; }
+.paint-stage.is-panning { cursor: grabbing; }
+.paint-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.paint-cursor { pointer-events: none; }
+.paint-canvas:focus { outline: none; }
+.paint-layers { flex: none; width: 280px; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); font: var(--font-control); }
+.paint-layers h2 { margin: 0; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
+.paint-layer-list { list-style: none; margin: 0; padding: var(--sp-2); }
+.paint-layer .more-btn { flex: none; }
+.paint-pages { flex: none; display: flex; align-items: center; gap: var(--sp-2); min-height: var(--bar-h); padding: var(--pad); margin-bottom: var(--edge); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); overflow-x: auto; }
+.paint-page { display: inline-flex; align-items: center; border-radius: var(--r-md); }
+.paint-page.is-on { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.paint-page.is-on button:hover { background: transparent; }
+.paint-page-dialog .paint-field { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0 0 var(--sp-4); font-size: var(--text-sm); }
+.paint-page-dialog .paint-field-row { display: flex; gap: var(--sp-4); }
+.paint-page-dialog .paint-field-row .paint-field { flex: 1; min-width: 0; }
+.paint-page-dialog input, .paint-page-dialog select { font: inherit; min-height: var(--field-h); }
+.paint-dialog-note { color: var(--hud-danger); min-height: 1lh; }
+@media (max-width: 760px) {
+  .paint-layers { width: 200px; }
+  .paint-main { flex-wrap: wrap; }
+}
+.paint-layer .layer-state[aria-pressed="false"]:not([data-eye]) { opacity: 0.45; }
+.paint-layer:hover .layer-state[aria-pressed="false"] { opacity: 0.9; }

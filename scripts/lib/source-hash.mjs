@@ -14,7 +14,9 @@ async function walk(dir, out) {
 
 /** { files: { "src/x.ts": sha1... }, srcHash } for the repo at `root`. */
 export async function sourceHash(root) {
-  const paths = (await walk(resolve(root, "src"), [])).concat(resolve(root, "package.json")).sort();
+  // (and the brush engine's wrapper: it is compiled into the file too, ADR 0164)
+  const engine = ["engine/Cargo.toml", "engine/Cargo.lock"].map((f) => resolve(root, f));
+  const paths = (await walk(resolve(root, "src"), [])).concat(await walk(resolve(root, "engine/src"), []), await walk(resolve(root, "engine/patches"), []), engine, resolve(root, "package.json")).sort();
   const files = {};
   for (const p of paths) files[p.slice(root.length + 1)] = createHash("sha1").update(await readFile(p)).digest("hex");
   const srcHash = createHash("sha256").update(JSON.stringify(files)).digest("hex");

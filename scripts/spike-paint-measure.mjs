@@ -1,5 +1,5 @@
 // SPIKE measurements (P0 of the Painting view) on dist-spike/paint.html, in Chromium and Firefox.
-//   node scripts/build-engine.mjs && node scripts/build-spike-paint.mjs && node scripts/spike-paint-measure.mjs [chromium|firefox ...]
+//   node scripts/build-engine.mjs --spike && node scripts/build-spike-paint.mjs && node scripts/spike-paint-measure.mjs [chromium|firefox ...]
 import { chromium, firefox } from "@playwright/test";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";

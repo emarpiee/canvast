@@ -1209,7 +1209,7 @@ test("bookmarks: save the current place and zoom, go back to it exactly (a trill
   const mb = (await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).boundingBox())!;
   expect(mb.x + mb.width).toBeLessThanOrEqual(pbox.x + pbox.width - 4);
   await rows.nth(0).getByRole("button", { name: /^More actions for bookmark/ }).click();
-  await expect(p.getByRole("menuitem")).toHaveText(["Rename", "Update to the current view", "Update its picture", "Delete"]);
+  await expect(p.getByRole("menuitem")).toHaveText(["Rename", "Update to the current view", "Update its picture", "Move up", "Move down", "Delete"]);
   await p.keyboard.press("Escape");
   await expect(p.getByRole("menu")).toHaveCount(0);
   // Rename with the button (no double-click needed), and the card shows when it was saved.

@@ -4,8 +4,8 @@
 use std::cell::RefCell;
 
 use color::PixelFormat;
-use geom::Rect;
-use paint::{BrushSettings, StrokePoint, render::StrokeRenderer};
+use geom::{Rect, TILE_SIZE, TileCoord};
+use paint::{BrushSettings, StrokePoint, render::{COV_TILE, StrokeRenderer}};
 use raster::Surface;
 
 struct Stroke {
@@ -21,6 +21,10 @@ struct State {
     stroke: Option<Stroke>,
     /// The part of the layer the last call changed: x0, y0, x1, y1.
     dirty: [i32; 4],
+    /// What `stroke_live` wrote: the tiles' pixels, their (tx, ty), and one tile of coverage as scratch.
+    live: Vec<u8>,
+    live_keys: Vec<i32>,
+    cov: Vec<f32>,
 }
 
 thread_local! {
@@ -118,13 +122,131 @@ pub unsafe extern "C" fn stroke_feed(pts: *const f32, n: usize) -> i32 {
     })
 }
 
-/// End the stroke (smoothing catches up). Same result as `stroke_push`.
+/// End the stroke (smoothing catches up) and put all of it on the layer: 1 with the changed part in `dirty`, 0 when
+/// nothing changed, -1 without a stroke. (Whatever `stroke_live` already showed is put on the layer here, once.)
 #[unsafe(no_mangle)]
 pub extern "C" fn stroke_end() -> i32 {
     STATE.with_borrow_mut(|s| {
-        let r = composite(s, true);
-        s.stroke = None;
-        r
+        let Some(mut st) = s.stroke.take() else { return -1 };
+        st.renderer.finish();
+        let Some(target) = s.layers.get_mut(st.layer) else { return -1 };
+        let r = st.renderer.composite(&st.pre, target, None, st.lock, true);
+        s.dirty = [r.x0, r.y0, r.x1, r.y1];
+        i32::from(!r.is_empty())
+    })
+}
+
+/// Drop the stroke: the layer is as it was before it. 0, or -1 without a stroke.
+#[unsafe(no_mangle)]
+pub extern "C" fn stroke_cancel() -> i32 {
+    STATE.with_borrow_mut(|s| {
+        let Some(st) = s.stroke.take() else { return -1 };
+        if let Some(l) = s.layers.get_mut(st.layer) {
+            *l = st.pre;
+        }
+        0
+    })
+}
+
+/// The stroke as it is now, for a live view drawn outside the engine: the coverage tiles (`live_tile_size()` a side)
+/// touched since the last call, as straight 8-bit RGBA, the brush's colour with an alpha of coverage × opacity (put over
+/// the layer as it was: normally, inside its paint with alpha lock, or taken away when erasing). Returns how many tiles;
+/// `live_keys_ptr()` holds their (tx, ty) pairs and `live_ptr()` their pixels, one after another. -1: no stroke.
+#[unsafe(no_mangle)]
+pub extern "C" fn stroke_live() -> i32 {
+    STATE.with_borrow_mut(|s| {
+        let State { stroke, live, live_keys, cov, .. } = s;
+        let Some(st) = stroke.as_mut() else { return -1 };
+        let keys = st.renderer.take_dirty_tiles();
+        let n = (COV_TILE * COV_TILE) as usize;
+        live.resize(keys.len() * n * 4, 0);
+        live_keys.clear();
+        cov.resize(n, 0.0);
+        let b = &st.renderer.ctx.brush;
+        let rgb = [0, 1, 2].map(|i| (b.color[i].clamp(0.0, 1.0) * 255.0 + 0.5) as u8);
+        let k = b.opacity.clamp(0.0, 1.0) * b.color[3].clamp(0.0, 1.0) * 255.0;
+        for (i, &(tx, ty)) in keys.iter().enumerate() {
+            live_keys.extend([tx, ty]);
+            st.renderer.coverage_tile(tx, ty, cov);
+            for (o, &c) in live[i * n * 4..(i + 1) * n * 4].chunks_exact_mut(4).zip(cov.iter()) {
+                o[..3].copy_from_slice(&rgb);
+                o[3] = (c.min(1.0) * k + 0.5) as u8;
+            }
+        }
+        keys.len() as i32
+    })
+}
+
+/// The side of a live tile (see `stroke_live`).
+#[unsafe(no_mangle)]
+pub extern "C" fn live_tile_size() -> i32 {
+    COV_TILE
+}
+
+/// Where `stroke_live` wrote its tiles' pixels.
+#[unsafe(no_mangle)]
+pub extern "C" fn live_ptr() -> *const u8 {
+    STATE.with_borrow(|s| s.live.as_ptr())
+}
+
+/// Where `stroke_live` wrote its tiles' (tx, ty) pairs.
+#[unsafe(no_mangle)]
+pub extern "C" fn live_keys_ptr() -> *const i32 {
+    STATE.with_borrow(|s| s.live_keys.as_ptr())
+}
+
+/// Empty a layer (no tiles), for loading another one into it. -1: no such layer.
+#[unsafe(no_mangle)]
+pub extern "C" fn layer_clear(layer: i32) -> i32 {
+    STATE.with_borrow_mut(|s| match s.layers.get_mut(layer as usize) {
+        Some(l) => {
+            *l = Surface::new(PixelFormat::RGBA8);
+            0
+        }
+        None => -1,
+    })
+}
+
+/// The side of a tile in pixels (a tile is side × side × 4 bytes, straight RGBA, rows top to bottom).
+#[unsafe(no_mangle)]
+pub extern "C" fn tile_size() -> i32 {
+    TILE_SIZE
+}
+
+/// Put a tile's pixels into a layer. -1: no such layer.
+///
+/// # Safety
+/// `data` points to `tile_size()² × 4` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tile_put(layer: i32, tx: i32, ty: i32, data: *const u8) -> i32 {
+    let n = (TILE_SIZE * TILE_SIZE * 4) as usize;
+    let src = unsafe { std::slice::from_raw_parts(data, n) };
+    STATE.with_borrow_mut(|s| match s.layers.get_mut(layer as usize) {
+        Some(l) => {
+            l.tile_mut(TileCoord { tx, ty }).bytes_mut().copy_from_slice(src);
+            0
+        }
+        None => -1,
+    })
+}
+
+/// Copy a tile's pixels out of a layer: 1 copied, 0 the layer has no such tile (it is empty), -1 no such layer.
+///
+/// # Safety
+/// `out` points to `tile_size()² × 4` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tile_get(layer: i32, tx: i32, ty: i32, out: *mut u8) -> i32 {
+    let n = (TILE_SIZE * TILE_SIZE * 4) as usize;
+    let dst = unsafe { std::slice::from_raw_parts_mut(out, n) };
+    STATE.with_borrow(|s| match s.layers.get(layer as usize) {
+        Some(l) => match l.tile(TileCoord { tx, ty }) {
+            Some(t) => {
+                dst.copy_from_slice(t.bytes());
+                1
+            }
+            None => 0,
+        },
+        None => -1,
     })
 }
 

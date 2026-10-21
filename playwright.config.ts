@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test";
 // with the inspection hook enabled through the URL hash (#debug).
 // Logic and storage specs behave the same in every Chromium configuration: they run in `chromium` only.
 // The other two keep the specs that depend on the rasterizer or the pixel ratio (docs/testing/README.md).
-const LOGIC_ONLY = ["**/settings.spec.ts", "**/a11y.spec.ts", "**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts", "**/colour-picker.spec.ts", "**/colour-picker-package.spec.ts", "**/vectors.spec.ts", "**/scenarios.spec.ts", "**/upgrade.spec.ts", "**/lowmem.spec.ts", "**/release.spec.ts", "**/library-folder.spec.ts", "**/pattern.spec.ts", "**/patterns-package.spec.ts", "**/scrub-audit.spec.ts", "**/icon-audit.spec.ts"];
+const LOGIC_ONLY = ["**/settings.spec.ts", "**/a11y.spec.ts", "**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts", "**/colour-picker.spec.ts", "**/colour-picker-package.spec.ts", "**/vectors.spec.ts", "**/scenarios.spec.ts", "**/upgrade.spec.ts", "**/lowmem.spec.ts", "**/release.spec.ts", "**/library-folder.spec.ts", "**/pattern.spec.ts", "**/patterns-package.spec.ts", "**/scrub-audit.spec.ts", "**/icon-audit.spec.ts", "**/painting.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",

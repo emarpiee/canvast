@@ -1,5 +1,5 @@
 // SPIKE build (P0 of the Painting view): dist-spike/paint.html with the brush engine's two builds inlined (run
-// scripts/build-engine.mjs first). The app's CSP plus 'wasm-unsafe-eval'. Never writes dist/.
+// scripts/build-engine.mjs --spike first). The app's CSP plus 'wasm-unsafe-eval'. Never writes dist/.
 import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";

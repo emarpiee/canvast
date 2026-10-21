@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 10 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 11 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -20,6 +20,9 @@
  *   frames       keyPath [canvasId, id] → FrameRecord + canvasId (nested frames, ADR 0014; v4).
  *                                          Objects name their frame; absent = the world frame, which is
  *                                          the absolute form of earlier versions, so old data needs no conversion.
+ *   paintings    keyPath "id"      → Painting (the Painting view, ADR 0165; index "workspaceId"; v11)
+ *   paintLayers  keyPath [paintingId, id] → Layer (v11)
+ *   paintTiles   keyPath "hash"    → { hash, data }: a painting's 256 px tile (deflated RGBA), stored once (v11)
  *
  * Legacy (version 1, read-only after migration, never deleted here):
  *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
@@ -30,7 +33,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 10;
+export const DB_VERSION = 11;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -83,6 +86,10 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
       if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });
       if (!has("thumbs")) db.createObjectStore("thumbs", { keyPath: "hash" });
+      // v11: the Painting view (ADR 0165, paint/store.ts).
+      if (!has("paintings")) db.createObjectStore("paintings", { keyPath: "id" }).createIndex("workspaceId", "workspaceId");
+      if (!has("paintLayers")) db.createObjectStore("paintLayers", { keyPath: ["paintingId", "id"] });
+      if (!has("paintTiles")) db.createObjectStore("paintTiles", { keyPath: "hash" });
     };
     req.onsuccess = () => {
       const db = req.result;
