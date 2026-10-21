@@ -3,7 +3,7 @@
 Vector pattern generators for the web, with no dependencies and no link to the app they were made in (canvast). A generator is a pure function: the same settings and the same seed always give the same shapes. It makes plain vector shapes (Bézier paths with a fill and an outline, gradients included), and `toSvg` writes them as a standalone SVG. It runs anywhere JavaScript runs: a browser, a worker, Node, a server. It is small (about 36 KiB minified for all 39 generators), touches no page, and works from `file://`.
 
 * **39 generators** in six families (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
-* **A seed** for repeatable results, and **random settings** (`randomValues`) that stay inside the middle of each range, with colours that go together.
+* **A seed** for repeatable results (a regular pattern is exact until its *Looseness* is raised, and only then does the seed move things about), and **random settings** (`randomValues`) that stay inside the middle of each range, with colours that go together.
 * **Sizes are fractions of the box**, so a result looks the same at any size and ratio.
 * **Held to what is valid:** `cleanValues` holds every value to its range, choice or colour, so any stored or typed settings are safe to pass in. A result is at most 600 shapes (`MAX_SHAPES`), and several shapes of one colour are one path.
 

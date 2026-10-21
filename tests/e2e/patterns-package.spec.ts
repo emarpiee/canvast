@@ -49,3 +49,24 @@ test("pattern package: every generator is in the gallery, the same seed gives th
   expect(errors).toEqual([]);
   expect(requests).toEqual([]);
 });
+
+test("pattern package: the seed changes every generator (the exact ones too, once Looseness is raised), and exact settings stay exact", async ({ page }) => {
+  await page.goto(DEMO);
+  const r = await page.evaluate(() => {
+    const P = (window as unknown as { CanvastPatterns: { GENERATORS: Array<{ id: string; sections: Array<{ items: Array<{ k: string }> }> }>; defaultValues(g: unknown): Record<string, unknown>; generate(g: unknown, v: unknown, s: number, w: number, h: number): unknown } }).CanvastPatterns;
+    const sig = (g: unknown, v: unknown, s: number) => JSON.stringify(P.generate(g, v, s, 900, 600));
+    const same: string[] = [], loose: string[] = [];
+    for (const g of P.GENERATORS) {
+      const v = P.defaultValues(g);
+      const j = g.sections.some((x) => x.items.some((i) => i.k === "jitter"));
+      if (!j) { loose.push(g.id); continue; }
+      if (sig(g, { ...v, jitter: 60 }, 1) === sig(g, { ...v, jitter: 60 }, 2)) same.push(g.id);
+      if (sig(g, { ...v, jitter: 0 }, 1) !== sig(g, { ...v, jitter: 0 }, 2) && ["stripes", "chevrons", "checks", "rings", "spiral", "grid", "halftone", "scales", "weave"].includes(g.id)) same.push(`${g.id} (not exact at 0)`);
+    }
+    // the generators with no Looseness vary with the seed already
+    const stillSame = loose.filter((id) => { const g = P.GENERATORS.find((x) => x.id === id)!; return sig(g, P.defaultValues(g), 1) === sig(g, P.defaultValues(g), 2); });
+    return { same, stillSame };
+  });
+  expect(r.same, "the seed moves them once Looseness is up (and Looseness 0 is exact)").toEqual([]);
+  expect(r.stillSame, "no generator without Looseness ignores the seed").toEqual([]);
+});

@@ -1,6 +1,6 @@
 import { ellipse, merged, poly, regular, rotated, solid, line, star as starPts, curve } from "./geom";
 import type { P } from "./geom";
-import { C, Ch, R, T, reader } from "./kit";
+import { C, Ch, LOOSE, R, T, reader } from "./kit";
 import type { Rng } from "./rng";
 import type { Generator, GenShape, Values } from "./types";
 import { mix } from "./rng";
@@ -13,7 +13,7 @@ const geo = (w: number, h: number) => ({ cx: w / 2, cy: h / 2, d: Math.hypot(w, 
 const TWO_COLOURS = { title: "Colour", items: [C("fill", "Colour", "#ff5d73"), C("fill2", "Second colour", "#ffb703", true)] } as const;
 
 /** Bands of two colours across the box, turned by `angle`; `make(i, u0, u1)` returns the band's points in the unturned frame (u across, v along). */
-function bands(v: Values, w: number, h: number, count: number, make: (i: number, u0: number, u1: number, d: number) => P[]): GenShape[] {
+function bands(v: Values, rng: Rng, w: number, h: number, count: number, make: (i: number, u0: number, u1: number, d: number) => P[]): GenShape[] {
   const { c, n } = reader(v);
   const { cx, cy, d } = geo(w, h);
   const out: GenShape[] = [];
@@ -21,7 +21,9 @@ function bands(v: Values, w: number, h: number, count: number, make: (i: number,
   for (let i = 0; i < count; i++) {
     const col = i % 2 && c("fill2") ? c("fill2")! : i % 2 ? null : c("fill")!;
     if (!col) continue;
-    const u0 = cx - d + i * step, u1 = u0 + step * (1 - n("gap") / 100);
+    const j = n("jitter") / 100; // (looseness: the band moves and changes width)
+    const sh = j ? (rng() - 0.5) * step * j : 0, wd = j ? (rng() - 0.5) * step * j * 0.6 : 0;
+    const u0 = cx - d + i * step + sh, u1 = u0 + step * (1 - n("gap") / 100) + wd;
     out.push(solid([poly(rotated(make(i, u0, u1, d), cx, cy, a))], col));
   }
   return merged(out);
@@ -29,17 +31,17 @@ function bands(v: Values, w: number, h: number, count: number, make: (i: number,
 
 export const stripes: Generator = {
   id: "stripes", label: "Stripes", family: "Lines", about: "Parallel bands, straight or tilted",
-  sections: [TWO_COLOURS, { title: "Stripes", items: [R("count", "Count", 2, 60, 14), R("angle", "Angle", 0, 180, 30), R("gap", "Gap", 0, 90, 0)] }],
-  run: (v, _rng, w, h) => bands(v, w, h, reader(v).n("count") * 2, (_i, u0, u1, d) => [[u0, h / 2 - d], [u1, h / 2 - d], [u1, h / 2 + d], [u0, h / 2 + d]]),
+  sections: [TWO_COLOURS, { title: "Stripes", items: [R("count", "Count", 2, 60, 14), R("angle", "Angle", 0, 180, 30), R("gap", "Gap", 0, 90, 0), LOOSE] }],
+  run: (v, rng, w, h) => bands(v, rng, w, h, reader(v).n("count") * 2, (_i, u0, u1, d) => [[u0, h / 2 - d], [u1, h / 2 - d], [u1, h / 2 + d], [u0, h / 2 + d]]),
 };
 
 export const chevrons: Generator = {
   id: "chevrons", label: "Chevrons", family: "Lines", about: "Zigzag bands",
-  sections: [TWO_COLOURS, { title: "Chevrons", items: [R("count", "Bands", 2, 30, 8), R("teeth", "Zigzags", 1, 16, 5), R("depth", "Depth", 5, 100, 40), R("angle", "Angle", 0, 180, 0), R("gap", "Gap", 0, 90, 0)] }],
-  run(v, _rng, w, h) {
+  sections: [TWO_COLOURS, { title: "Chevrons", items: [R("count", "Bands", 2, 30, 8), R("teeth", "Zigzags", 1, 16, 5), R("depth", "Depth", 5, 100, 40), R("angle", "Angle", 0, 180, 0), R("gap", "Gap", 0, 90, 0), LOOSE] }],
+  run(v, rng, w, h) {
     const { n } = reader(v);
     const T2 = n("teeth") * 2, { d } = geo(w, h);
-    return bands(v, w, h, n("count") * 2, (_i, u0, u1) => {
+    return bands(v, rng, w, h, n("count") * 2, (_i, u0, u1) => {
       const vk = (k: number): number => h / 2 - d + (2 * d * k) / T2, off = (k: number): number => (k % 2 ? (n("depth") / 100) * (u1 - u0) : 0);
       const top = Array.from({ length: T2 + 1 }, (_, k): P => [u0 + off(k), vk(k)]);
       const bot = Array.from({ length: T2 + 1 }, (_, k): P => [u1 + off(k), vk(k)]).reverse();
@@ -69,12 +71,12 @@ export const dots: Generator = {
 
 export const checks: Generator = {
   id: "checks", label: "Checks", family: "Lines", about: "A checkerboard, straight or turned",
-  sections: [{ title: "Colour", items: [C("fill", "Squares", "#ff5d73")] }, { title: "Checks", items: [R("cells", "Across", 2, 30, 8), R("angle", "Angle", 0, 90, 0)] }],
-  run(v, _rng, w, h) {
+  sections: [{ title: "Colour", items: [C("fill", "Squares", "#ff5d73")] }, { title: "Checks", items: [R("cells", "Across", 2, 30, 8), R("angle", "Angle", 0, 90, 0), LOOSE] }],
+  run(v, rng, w, h) {
     const { n, c } = reader(v);
     const { cx, cy, d } = geo(w, h), cell = w / n("cells"), m = Math.ceil(d / cell) + 1, out: SubPath[] = [], a = rad(n("angle"));
     for (let j = -m; j <= m; j++)
-      for (let i = -m; i <= m; i++) if ((i + j) % 2 === 0) out.push(poly(rotated([[cx + i * cell, cy + j * cell], [cx + (i + 1) * cell, cy + j * cell], [cx + (i + 1) * cell, cy + (j + 1) * cell], [cx + i * cell, cy + (j + 1) * cell]], cx, cy, a)));
+      for (let i = -m; i <= m; i++) if (((i + j) % 2 === 0) !== (rng() < (n("jitter") / 100) * 0.5)) out.push(poly(rotated([[cx + i * cell, cy + j * cell], [cx + (i + 1) * cell, cy + j * cell], [cx + (i + 1) * cell, cy + (j + 1) * cell], [cx + i * cell, cy + (j + 1) * cell]], cx, cy, a)));
     return [solid(out, c("fill")!, "Squares")];
   },
 };
@@ -84,12 +86,13 @@ export const rings: Generator = {
   sections: [
     { title: "Variants", items: [Ch("style", "Style", [["bands", "Bands"], ["outline", "Outline"]], "bands")] },
     { title: "Colour", items: [C("from", "Inside", "#ff4d6d"), C("to", "Outside", "#3b2bff")] },
-    { title: "Rings", items: [R("count", "Count", 2, 30, 9), R("x", "Centre across", 0, 100, 50), R("y", "Centre down", 0, 100, 50), R("ease", "Spacing change", 0, 100, 0), R("line", "Outline width", 1, 20, 4)] },
+    { title: "Rings", items: [R("count", "Count", 2, 30, 9), R("x", "Centre across", 0, 100, 50), R("y", "Centre down", 0, 100, 50), R("ease", "Spacing change", 0, 100, 0), R("line", "Outline width", 1, 20, 4), LOOSE] },
   ],
-  run(v, _rng, w, h) {
+  run(v, rng, w, h) {
     const { n, s, c } = reader(v);
     const cx = (n("x") / 100) * w, cy = (n("y") / 100) * h, far = Math.max(cx, w - cx) ** 2 + Math.max(cy, h - cy) ** 2, R0 = Math.sqrt(far), out: GenShape[] = [];
-    const radius = (i: number): number => R0 * Math.pow((i + 1) / n("count"), 1 + (n("ease") / 100) * 1.5);
+    const wob = Array.from({ length: n("count") }, () => (rng() - 0.5) * 0.9 * (n("jitter") / 100)); // (looseness: each ring off its place by up to under half a step, so they never cross)
+    const radius = (i: number): number => R0 * Math.pow((i + 1 + wob[i]!) / n("count"), 1 + (n("ease") / 100) * 1.5);
     for (let i = n("count") - 1; i >= 0; i--) {
       const col = mix(c("from")!, c("to")!, n("count") === 1 ? 0 : i / (n("count") - 1));
       out.push(s("style") === "bands" ? solid([ellipse(cx, cy, radius(i), radius(i))], col) : line([ellipse(cx, cy, radius(i), radius(i))], col, (n("line") / 100) * Math.min(w, h) * 0.12));
@@ -118,13 +121,13 @@ export const spiral: Generator = {
   id: "spiral", label: "Spiral", family: "Lines", about: "A spiral line",
   sections: [
     { title: "Colour", items: [C("fill", "Line", "#ffd166")] },
-    { title: "Spiral", items: [R("turns", "Turns", 1, 14, 5), R("thick", "Thickness", 1, 40, 8), R("x", "Centre across", 0, 100, 50), R("y", "Centre down", 0, 100, 50), Ch("kind", "Kind", [["even", "Even"], ["grow", "Growing"]], "even"), T("cw", "Clockwise", true)] },
+    { title: "Spiral", items: [R("turns", "Turns", 1, 14, 5), R("thick", "Thickness", 1, 40, 8), R("x", "Centre across", 0, 100, 50), R("y", "Centre down", 0, 100, 50), Ch("kind", "Kind", [["even", "Even"], ["grow", "Growing"]], "even"), T("cw", "Clockwise", true), LOOSE] },
   ],
-  run(v, _rng, w, h) {
+  run(v, rng, w, h) {
     const { n, s, b, c } = reader(v);
     const cx = (n("x") / 100) * w, cy = (n("y") / 100) * h, R0 = geo(w, h).d / 2, N = Math.round(n("turns") * 16), pts: P[] = [];
     for (let i = 0; i <= N; i++) {
-      const t = i / N, rr = R0 * (s("kind") === "even" ? t : (Math.exp(2.2 * t) - 1) / (Math.exp(2.2) - 1)), a = (b("cw") ? 1 : -1) * t * n("turns") * TAU;
+      const t = i / N, rr = R0 * (s("kind") === "even" ? t : (Math.exp(2.2 * t) - 1) / (Math.exp(2.2) - 1)) * (1 + (rng() - 0.5) * 0.1 * (n("jitter") / 100) * (1 - t)), a = (b("cw") ? 1 : -1) * t * n("turns") * TAU;
       pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
     }
     return [line([curve(pts)], c("fill")!, (n("thick") / 100) * Math.min(w, h) * 0.2, "Spiral")];
@@ -199,14 +202,21 @@ export const grid: Generator = {
   id: "grid", label: "Grid", family: "Lines", about: "Lines in a lattice with stronger lines now and then",
   sections: [
     { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ffffff", true)] },
-    { title: "Grid", items: [R("cols", "Across", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), T("rowsToo", "Rows too", true)] },
+    { title: "Grid", items: [R("cols", "Across", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), T("rowsToo", "Rows too", true), LOOSE] },
   ],
-  run(v, _rng, w, h) {
+  run(v, rng, w, h) {
     const { n, b, c } = reader(v);
+    const off = (): number => (rng() - 0.5) * cell * 0.6 * (n("jitter") / 100); // (looseness: each line off its place)
     const cell = w / n("cols"), minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * cell * 0.5;
     const add = (i: number, sub: SubPath): void => void ((n("every") > 0 && c("major") && i % n("every") === 0 ? major : minor).push(sub));
-    for (let i = 0; i <= n("cols"); i++) add(i, poly([[i * cell, 0], [i * cell, h]], false));
-    if (b("rowsToo")) for (let j = 0; j * cell <= h + 1e-6; j++) add(j, poly([[0, j * cell], [w, j * cell]], false));
+    for (let i = 0; i <= n("cols"); i++) {
+      const o = off();
+      add(i, poly([[i * cell + o, 0], [i * cell + o, h]], false));
+    }
+    if (b("rowsToo")) for (let j = 0; j * cell <= h + 1e-6; j++) {
+      const o = off();
+      add(j, poly([[0, j * cell + o], [w, j * cell + o]], false));
+    }
     return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, wd * 1.8, "Strong lines")] : [])];
   },
 };

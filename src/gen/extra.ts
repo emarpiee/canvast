@@ -1,6 +1,6 @@
 import { curve, ellipse, line, merged, poly, rotated, solid } from "./geom";
 import type { P } from "./geom";
-import { C, Ch, R, reader } from "./kit";
+import { C, Ch, LOOSE, R, reader } from "./kit";
 import { alpha, makeNoise, mix, quant } from "./rng";
 import type { Generator, GenShape } from "./types";
 import type { SubPath } from "./core";
@@ -27,16 +27,18 @@ export const halftone: Generator = {
   sections: [
     { title: "Variants", items: [Ch("shape", "Mark", [["dot", "Dot"], ["square", "Square"], ["diamond", "Diamond"]], "dot")] },
     { title: "Colour", items: [C("fill", "Marks", "#ff5d73")] },
-    { title: "Halftone", items: [R("cols", "Across", 4, 60, 22), R("angle", "Direction", 0, 360, 30), R("min", "Smallest", 0, 60, 6), R("max", "Largest", 20, 100, 95), R("turn", "Grid angle", 0, 90, 45)] },
+    { title: "Halftone", items: [R("cols", "Across", 4, 60, 22), R("angle", "Direction", 0, 360, 30), R("min", "Smallest", 0, 60, 6), R("max", "Largest", 20, 100, 95), R("turn", "Grid angle", 0, 90, 45), LOOSE] },
   ],
-  run(v, _rng, w, h) {
+  run(v, rng, w, h) {
     const { n, s, c } = reader(v);
     const cell = w / n("cols"), cx = w / 2, cy = h / 2, d = Math.hypot(w, h), a = (n("angle") * Math.PI) / 180, g = (n("turn") * Math.PI) / 180, m = Math.ceil(d / cell / 2) + 1, out: SubPath[] = [];
     for (let j = -m; j <= m; j++) for (let i = -m; i <= m; i++) {
-      const [[x, y]] = rotated([[cx + i * cell, cy + j * cell]], cx, cy, g) as [P];
+      const lj = n("jitter") / 100; // (looseness: each mark off its place and its size)
+      const [[x0, y0]] = rotated([[cx + i * cell, cy + j * cell]], cx, cy, g) as [P];
+      const x = x0 + (lj ? (rng() - 0.5) * cell * 0.5 * lj : 0), y = y0 + (lj ? (rng() - 0.5) * cell * 0.5 * lj : 0), sz = 1 + (lj ? (rng() - 0.5) * 0.8 * lj : 0);
       if (x < -cell || y < -cell || x > w + cell || y > h + cell) continue;
       const t = Math.min(1, Math.max(0, 0.5 + ((x - cx) * Math.cos(a) + (y - cy) * Math.sin(a)) / d));
-      const r = (cell / 2) * (n("min") / 100 + (n("max") / 100 - n("min") / 100) * t) * 1.1;
+      const r = (cell / 2) * (n("min") / 100 + (n("max") / 100 - n("min") / 100) * t) * 1.1 * sz;
       if (r < cell * 0.01) continue;
       out.push(s("shape") === "dot" ? ellipse(x, y, r, r) : poly(rotated(s("shape") === "square" ? [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]] : [[x, y - r * 1.2], [x + r * 1.2, y], [x, y + r * 1.2], [x - r * 1.2, y]], x, y, s("shape") === "square" ? g : 0)));
     }

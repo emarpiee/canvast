@@ -15,4 +15,7 @@ export const reader = (v: Values) => ({
   c: (k: string): string | null => ((v[k] as string) || null),
 });
 
+/** How loose a regular pattern is: 0 is exact (and the seed changes nothing), more lets the seed move things about. */
+export const LOOSE = R("jitter", "Looseness", 0, 100, 0);
+
 export const STYLE = Ch("style", "Style", [["solid", "Solid"], ["outline", "Outline"]], "solid");

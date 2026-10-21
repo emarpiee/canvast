@@ -1,5 +1,5 @@
 import type { EditorState } from "../app/editor-state";
-import { GENERATORS, cleanValues, defaultValues, generatorById, makeRng, randomValues, sectionsOf } from "../gen";
+import { GENERATORS, cleanValues, defaultValues, generate, generatorById, makeRng, randomValues, sectionsOf } from "../gen";
 import type { Generator, Setting, Values } from "../gen";
 import { thumbSvg } from "./pattern-thumb";
 import { openColourPopover } from "./colour-popover";
@@ -211,7 +211,17 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     else if (t.hasAttribute("data-gen")) { grid.hidden = true; pick.setAttribute("aria-expanded", "false"); choose(t.dataset["gen"]!); }
     else if (t.hasAttribute("data-pg-make")) run();
     else if (t.hasAttribute("data-pg-done")) { actions.end(); started = false; seed = newSeed(); build(); editor.changed(); }
-    else if (t.hasAttribute("data-pg-newseed")) { seed = newSeed(); seedBox.value = String(seed); again(); }
+    else if (t.hasAttribute("data-pg-newseed")) {
+      const before = seed;
+      seed = newSeed();
+      seedBox.value = String(seed);
+      again();
+      // a pattern that is exact at these settings looks the same with any seed: say so, and where to change it
+      if (JSON.stringify(generate(gen, values, before, 900, 600)) === JSON.stringify(generate(gen, values, seed, 900, 600))) {
+        editor.message = `The seed changes nothing in ${gen.label} at these settings.${gen.sections.some((x) => x.items.some((i) => i.k === "jitter")) ? " Raise Looseness to let it." : ""}`;
+        editor.changed();
+      }
+    }
     else if (t.hasAttribute("data-pg-random")) {
       seed = newSeed();
       const r = randomValues(gen, makeRng(seed));
