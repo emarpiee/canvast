@@ -5,7 +5,7 @@
  * vibrance, sharpen, grain; blur is a CSS blur after it. The filters live in one hidden SVG in the page and are made as they are needed.
  */
 import type { Adjust } from "../doc/adjust";
-import { adjustKey, curveFn, isNeutral, layersOf } from "../doc/adjust";
+import { adjustKey, curveFn, isNeutral, layersOf, shadowOf } from "../doc/adjust";
 import type { CurvePoints, Levels } from "../doc/adjust";
 import { stopsAt } from "../doc/paint";
 
@@ -39,16 +39,38 @@ function channelTable(levels: Array<Levels | undefined>, curves: Array<CurvePoin
   }).join(" ");
 }
 
-function build(top: Adjust, id: string, blurPx = 0): string {
+function build(top: Adjust, id: string, blurPx = 0, ref = 0): string {
   const f: string[] = [];
   layersOf(top).forEach((a, layer) => layerPrimitives(a, `${id}-${layer}`, f));
   if (blurPx) f.push(`<feGaussianBlur stdDeviation="${n(blurPx)}"/>`);
-  const room = blurPx ? ' x="-30%" y="-30%" width="160%" height="160%"' : ' x="0" y="0" width="100%" height="100%"';
+  const inner = shadowOf(top, "inner"), drop = shadowOf(top, "drop");
+  if (ref && (inner || drop)) {
+    f.push(`<feMerge result="${id}-main"><feMergeNode/></feMerge>`);
+    const alphaOut = `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0`;
+    const shade = (s: NonNullable<typeof inner>, from: string, tag: string): string =>
+      `<feOffset in="${from}" dx="${n(s.x * 0.1 * ref)}" dy="${n(s.y * 0.1 * ref)}" result="${id}-${tag}o"/>` +
+      `<feGaussianBlur in="${id}-${tag}o" stdDeviation="${n(s.blur * 0.05 * ref)}" result="${id}-${tag}b"/>` +
+      `<feFlood flood-color="${s.colour.slice(0, 7)}" flood-opacity="${n(s.opacity)}" result="${id}-${tag}f"/>` +
+      `<feComposite in="${id}-${tag}f" in2="${id}-${tag}b" operator="in" result="${id}-${tag}"/>`;
+    if (inner) {
+      f.push(`<feColorMatrix in="${id}-main" type="matrix" values="${alphaOut}  0 0 0 -1 1" result="${id}-inv"/>` + shade(inner, `${id}-inv`, "i") + `<feComposite in="${id}-i" in2="${id}-main" operator="in" result="${id}-in"/><feMerge result="${id}-main2"><feMergeNode in="${id}-main"/><feMergeNode in="${id}-in"/></feMerge>`);
+    }
+    const mainName = inner ? `${id}-main2` : `${id}-main`;
+    if (drop) f.push(`<feColorMatrix in="${mainName}" type="matrix" values="${alphaOut}  0 0 0 1 0" result="${id}-al"/>` + shade(drop, `${id}-al`, "d") + `<feMerge><feMergeNode in="${id}-d"/><feMergeNode in="${mainName}"/></feMerge>`);
+  }
+  const room = ref && (inner || drop) ? ' x="-60%" y="-60%" width="220%" height="220%"' : blurPx ? ' x="-30%" y="-30%" width="160%" height="160%"' : ' x="0" y="0" width="100%" height="100%"';
   return `<filter id="${id}" color-interpolation-filters="sRGB"${room}>${f.join("")}</filter>`;
 }
 
-/** An SVG `<filter>` of these adjustments for a file (the blur, if any, as `blurPx` of the object's size); "" when they change nothing. */
-export const svgAdjustFilter = (a: Adjust, id: string, blurPx: number): string => (isNeutral(a) ? "" : build(a, id, blurPx));
+/** An SVG `<filter>` of these adjustments for a file, for an object whose longer side is `ref` units; "" when they change nothing. */
+export const svgAdjustFilter = (a: Adjust, id: string, ref: number): string => (isNeutral(a) ? "" : build(a, id, (Math.max(0, ...layersOf(a).map((l) => l.blur ?? 0)) / 100) * 0.02 * ref, ref));
+
+/** How far past the object (in its units) the filter paints: a blur and a drop shadow spread, so the file's box has to leave room. */
+export function svgAdjustReach(a: Adjust, ref: number): number {
+  const d = shadowOf(a, "drop");
+  const blur = (Math.max(0, ...layersOf(a).map((l) => l.blur ?? 0)) / 100) * 0.02 * ref;
+  return Math.max(3 * blur, d ? (Math.max(Math.abs(d.x), Math.abs(d.y)) * 0.1 + 3 * d.blur * 0.05) * ref : 0);
+}
 
 /** The filter primitives of one layer of a stack (the blur of a layer is a CSS blur, taken from the first layer only). */
 function layerPrimitives(a: Adjust, id: string, f: string[]): void {

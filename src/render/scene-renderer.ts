@@ -21,7 +21,7 @@ import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
 import { LABEL_FONT } from "./item-label";
 import type { ItemLabel } from "./item-label";
-import { cropOf, isNeutral } from "../doc/adjust";
+import { cropOf, hasShadow, isNeutral } from "../doc/adjust";
 import { drawAdjusted } from "./adjust-shape";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
@@ -168,8 +168,10 @@ export function drawObjects(
     const mask = po.obj.mask && po.maskPos?.length ? po.maskPos : null;
     // (a shape, stroke or text with adjustments is drawn on a scratch layer and adjusted there; a picture is adjusted in its pixels)
     const paintAdj = (c: CanvasRenderingContext2D): void => {
-      const a = po.obj.kind !== "image" ? po.obj.adjust : undefined;
-      if (a && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po));
+      const a = po.obj.adjust;
+      // (a picture is adjusted in its own pixels: only its shadows are made here)
+      if (a && po.obj.kind !== "image" && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po));
+      else if (a && po.obj.kind === "image" && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po), false);
       else paintOne(c, po);
     };
     if (mask) drawMasked(ctx, paintAdj, (c) => { for (const m of mask) paintOne(c, m); }, po.obj.mask!.mode, po.obj.mask!.invert === true);

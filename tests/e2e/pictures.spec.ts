@@ -1116,3 +1116,21 @@ test("Ctrl+C on a shape with a picture fill puts the picture of it on the system
   await expect.poll(async () => (await objs(app)).filter((o) => o.kind === "path").length).toBe(2);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a picture can have a drop shadow too: it is drawn beside the picture, and the picture's own pixels are not adjusted twice", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  const mid = [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)] as const;
+  const below = [mid[0], Math.round(b.maxY) + 5] as const;
+  const bg = await px(app, below[0], below[1]);
+  const inside = await px(app, mid[0], mid[1]);
+  await openAdjust(p);
+  await p.locator('.adjust-pop [data-adj-num="dropOpacity"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="dropOpacity"]').blur();
+  await app.frame();
+  expect(await px(app, below[0], below[1]), "a shadow below the picture").not.toEqual(bg);
+  expect(await px(app, mid[0], mid[1]), "the picture itself is as it was").toEqual(inside);
+});

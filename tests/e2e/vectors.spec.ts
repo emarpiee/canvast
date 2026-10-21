@@ -3450,3 +3450,41 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
   await reload(app);
   expect(((await objs(app)).find((o) => o.id === id) as unknown as { adjust?: unknown }).adjust).toEqual({ exposure: 60 });
 });
+
+test("shadows in the Adjust panel: a drop shadow is drawn below the shape (starting soft), an inner shadow darkens inside its edge, and both are in the SVG", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await drag(app, [560, 300], [760, 400]);
+  const id = (await last(app)).id;
+  await key(app, "v");
+  await click(app, 660, 350);
+  const box = await screenBox(app, id);
+  const below = [660, Math.round(box.maxY) + 6] as const;
+  const inside = [660, Math.round(box.minY) + 6] as const; // (the shadow goes down, so the inner one gathers at the top edge)
+  const bg = await px(below[0], below[1]);
+  const fill = await px(inside[0], inside[1]);
+  await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+  await p.locator('.adjust-pop [data-adj-num="dropOpacity"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="dropOpacity"]').blur();
+  await app.frame();
+  const adj = ((await last(app)) as unknown as { adjust: Record<string, number> }).adjust;
+  expect(adj.dropOpacity).toBe(100);
+  expect(adj.dropY, "turned on soft, a little below").toBeGreaterThan(0);
+  expect(await px(below[0], below[1]), "the shadow is under the shape").not.toEqual(bg);
+  await p.locator('.adjust-pop [data-adj-num="innerOpacity"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="innerOpacity"]').blur();
+  await app.frame();
+  expect(await px(inside[0], inside[1]), "the inner shadow changes the edge of the fill").not.toEqual(fill);
+  await p.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true })));
+  await p.keyboard.type("Copy the selection as SVG");
+  await key(app, "Enter");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.lastCopied())).toMatch(/<filter[\s\S]*feOffset[\s\S]*feFlood[\s\S]*<g filter="url\(#/);
+  await app.frame();
+  await key(app, "Control+z");
+  await app.frame();
+  await key(app, "Control+z");
+  await app.frame();
+  expect(((await last(app)) as unknown as { adjust?: unknown }).adjust, "each is one undo step").toBeUndefined();
+});

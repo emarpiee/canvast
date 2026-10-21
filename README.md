@@ -142,6 +142,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Pictures** are placed one source pixel to one screen pixel. Zooming in shows real pixels; nothing is invented and the original is never altered.
 - **Adjustments** are non-destructive stacks you can reorder, hide and copy between pictures, video, GIFs, shapes, pen strokes and texts: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, red/green/blue, levels, curves, gradient map, blur, sharpen and grain.
 - **Crop**, rounded corners and an outline work on pictures, video and GIFs. A picture can be masked by a shape, by opacity or by brightness, or by a brush mask painted with the Pen.
+- **Drop shadow and inner shadow** are in the Adjust panel, for pictures, shapes, strokes and texts: opacity, across, down, blur and a colour each. Turning a shadow on starts it soft and a little below. The offset and blur are shares of the object's own size (an offset of 100 is a tenth of it), so they look the same at any zoom. A picture's own pixels are not touched; its shadow is drawn beside it. A video that is playing shows no shadow while it plays (its paused frame does).
 - **Adjustments on shapes, strokes and text** are applied to how the object looks once drawn (fill, outline, gradient and texture together); a blur is a share of the object's own size, so it does not change with zoom. An exported SVG carries them as a filter on the shape, with room round the drawing for a blur, and making the SVG into shapes again brings the adjustments back (a vector PDF is drawn as a picture instead); see Limitations.
 - **Make a new picture** bakes the crop and adjustments into a new library item; **Copy as picture** puts the result on the clipboard. **Copy** and **Paste adjustments** move a whole stack between items. An SVG picture can be turned into editable shapes with **Make vector copy**. **Show in library** opens the Library with the original picked.
 - **Media player:** videos, audio and animated GIFs play on the canvas with a player right under the item. It has play and pause, a seek bar, step back and forward (seconds for video and audio, frames for GIFs), repeat, playback speed, volume, a waveform for audio, and a start and end to play only part of a file. The paused frame is saved. Playback continues when the item scrolls out of view.
@@ -301,7 +302,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 
 canvast describes only what it does. These are the current limits.
 
-- Adjustments are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape.
+- Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape.
 **Scale**
 
 | Area | Limitation |

@@ -15,7 +15,7 @@ import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
-import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
+import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, SHADOW_START, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
 import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
 import { swatchBackground } from "../render/ink";
@@ -872,7 +872,15 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     ["Light", ["exposure", "contrast", "highlights", "shadows"]],
     ["Colour", ["temperature", "tint", "saturation", "vibrance", "red", "green", "blue"]],
     ["Detail", ["blur", "sharpen", "grain"]],
+    ["Drop shadow", ["dropOpacity", "dropX", "dropY", "dropBlur"]],
+    ["Inner shadow", ["innerOpacity", "innerX", "innerY", "innerBlur"]],
   ];
+  /** The colour of a shadow: a row under its numbers. */
+  const SHADOW_COLOUR: Record<string, "dropColor" | "innerColor"> = { "Drop shadow": "dropColor", "Inner shadow": "innerColor" };
+  const colourRow = (name: string): string => {
+    const k = SHADOW_COLOUR[name];
+    return k ? `<div class="adj-row"><label class="adj-label" for="adj-${k}">Colour</label><input type="color" id="adj-${k}" data-adj-colour="${k}" value="${(cur[k] ?? "#000000").slice(0, 7)}" aria-label="${name} colour"></div>` : "";
+  };
   const row = (s: (typeof rows)[number]): string =>
     `<div class="adj-row${cur[s.key] ? " is-changed" : ""}" data-adj-row="${s.key}"><label class="adj-label" for="adj-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
   let saved = o.styles.gradients();
@@ -889,7 +897,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   pop.innerHTML =
     layerTabs +
     `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span></header>` +
-    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}</section>`).join("") +
+    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}${colourRow(name)}</section>`).join("") +
     mapSection() +
     levelsSection +
     curvesSection +
@@ -971,7 +979,10 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     const t = e.target as HTMLInputElement;
     const key = (t.dataset["adj"] ?? t.dataset["adjNum"]) as AdjustKey | undefined;
     if (!key || t.value === "" || !Number.isFinite(Number(t.value))) return;
+    const first = (key === "dropOpacity" || key === "innerOpacity") && !cur[key] && Number(t.value) > 0 && !cur[key.replace("Opacity", "X") as AdjustKey] && !cur[key.replace("Opacity", "Y") as AdjustKey] && !cur[key.replace("Opacity", "Blur") as AdjustKey];
     set(key, Number(t.value));
+    // a shadow turned on for the first time starts as a soft one a little below, not a hard one right behind
+    if (first) for (const [part, v] of Object.entries(SHADOW_START)) if (v) set(key.replace("Opacity", part) as AdjustKey, v);
     // one preview a frame, the latest numbers (a fast drag makes many more input events than a screen can show)
     schedulePreview();
   });
@@ -1013,8 +1024,20 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     cur = rest;
     emitChange("Adjust picture");
   });
+  pop.addEventListener("input", (e) => {
+    const t = e.target as HTMLInputElement;
+    const k = t.dataset["adjColour"] as "dropColor" | "innerColor" | undefined;
+    if (!k) return;
+    cur = { ...cur, [k]: t.value };
+    schedulePreview();
+  });
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
+    if (t.dataset["adjColour"]) {
+      cancelPreview();
+      emitChange("Adjust picture");
+      return;
+    }
     if (t.dataset["adj"] || t.dataset["adjNum"]) {
       cancelPreview();
       emitChange("Adjust picture");

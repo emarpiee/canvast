@@ -64,9 +64,24 @@ export interface Adjust {
   readonly blur?: number;
   readonly sharpen?: number;
   readonly grain?: number;
+  /**
+   * Shadows of what is drawn (not of a picture's pixels): a drop shadow behind it and an inner shadow inside its edge. Opacity 0 = none. The offset
+   * (`X`, `Y`: -100 to 100, a tenth of the object's size at the ends) and the `Blur` (0 to 100, a twentieth of its size) are shares of the object's own
+   * size, so they look the same at any zoom. The colour is `#rrggbb` (black when absent).
+   */
+  readonly dropOpacity?: number;
+  readonly dropX?: number;
+  readonly dropY?: number;
+  readonly dropBlur?: number;
+  readonly dropColor?: string;
+  readonly innerOpacity?: number;
+  readonly innerX?: number;
+  readonly innerY?: number;
+  readonly innerBlur?: number;
+  readonly innerColor?: string;
 }
 
-export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next">;
+export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next" | "dropColor" | "innerColor">;
 
 export interface AdjustSpec {
   readonly key: AdjustKey;
@@ -92,7 +107,27 @@ export const ADJUSTMENTS: readonly AdjustSpec[] = [
   { key: "blur", label: "Blur", min: 0, pointwise: false },
   { key: "sharpen", label: "Sharpen", min: 0, pointwise: false },
   { key: "grain", label: "Grain", min: 0, pointwise: false },
+  { key: "dropOpacity", label: "Opacity", min: 0, pointwise: false },
+  { key: "dropX", label: "Across", min: -100, pointwise: false },
+  { key: "dropY", label: "Down", min: -100, pointwise: false },
+  { key: "dropBlur", label: "Blur", min: 0, pointwise: false },
+  { key: "innerOpacity", label: "Opacity", min: 0, pointwise: false },
+  { key: "innerX", label: "Across", min: -100, pointwise: false },
+  { key: "innerY", label: "Down", min: -100, pointwise: false },
+  { key: "innerBlur", label: "Blur", min: 0, pointwise: false },
 ];
+
+/** Whether any layer has a drop or an inner shadow. */
+export const hasShadow = (a: Adjust | undefined): boolean => layersOf(a).some((l) => !!l.dropOpacity || !!l.innerOpacity);
+
+/** The shadow a layer stack makes of one kind: the first layer that has it on (null: none). */
+export function shadowOf(a: Adjust | undefined, kind: "drop" | "inner"): { opacity: number; x: number; y: number; blur: number; colour: string } | null {
+  const l = layersOf(a).find((v) => !!v[`${kind}Opacity`]);
+  return l ? { opacity: l[`${kind}Opacity`]! / 100, x: (l[`${kind}X`] ?? 0) / 100, y: (l[`${kind}Y`] ?? 0) / 100, blur: (l[`${kind}Blur`] ?? 0) / 100, colour: (kind === "drop" ? l.dropColor : l.innerColor) ?? "#000000" } : null;
+}
+
+/** What the panel puts in when a shadow is first turned on: a soft shadow a little below. */
+export const SHADOW_START = { X: 0, Y: 30, Blur: 30 } as const;
 
 /** Whether anything is changed (an adjustment of 0 is none). */
 export const isNeutral = (a: Adjust | undefined): boolean => !a || (!a.map && !a.levels && !a.curves && ADJUSTMENTS.every((s) => !a[s.key]) && isNeutral(a.next));
@@ -135,6 +170,7 @@ export function validAdjust(a: unknown, depth = 1): a is Adjust {
   return Object.entries(a).every(([k, v]) => {
     if (k === "map") return validMap(v);
     if (k === "next") return validAdjust(v, depth + 1);
+    if (k === "dropColor" || k === "innerColor") return isColour(v);
     if (k === "levels") return !!v && typeof v === "object" && Object.entries(v).every(([ch, l]) => CHANNELS.includes(ch as Channel) && cleanLevels(l as Levels) !== undefined);
     if (k === "curves") return !!v && typeof v === "object" && Object.entries(v).every(([ch, c]) => CHANNELS.includes(ch as Channel) && cleanCurve(c as CurvePoints) !== undefined);
     const s = ADJUSTMENTS.find((x) => x.key === k);
@@ -186,12 +222,14 @@ export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
     const c = Math.max(s.min, Math.min(100, Math.round(v)));
     if (c !== 0) out[s.key] = c;
   }
+  if (out["dropOpacity"] && isColour(a.dropColor) && a.dropColor.toLowerCase() !== "#000000") out["dropColor"] = a.dropColor.toLowerCase();
+  if (out["innerOpacity"] && isColour(a.innerColor) && a.innerColor.toLowerCase() !== "#000000") out["innerColor"] = a.innerColor.toLowerCase();
   return Object.keys(out).length ? (out as Adjust) : undefined;
 }
 
 /** A short text that differs whenever the adjustments do (to cache what was drawn with them). */
 export const adjustKey = (a: Adjust | undefined): string =>
-  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") : "";
+  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") + (a.dropColor ?? "") + (a.innerColor ?? "") : "";
 
 const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
 /** sRGB byte to linear light, and back (a table of 4096 steps): exposure works in linear light, and a table is far quicker than a power. */

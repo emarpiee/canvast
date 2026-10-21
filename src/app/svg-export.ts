@@ -14,8 +14,8 @@ import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
 import { isTexture } from "../doc/texture";
 import { svgTexture } from "../render/texture";
-import { svgAdjustFilter } from "../render/adjust-filter";
-import { isNeutral, layersOf } from "../doc/adjust";
+import { svgAdjustFilter, svgAdjustReach } from "../render/adjust-filter";
+import { isNeutral } from "../doc/adjust";
 import { regionSplit } from "../doc/network";
 import { ARROW_LEN, NODE, geometryBounds, mapSubs, miterLimitOf, paintBounds } from "../doc/path";
 import type { Arrow } from "../doc/path";
@@ -434,9 +434,9 @@ export function exportSvg(
       // the adjustments of a shape as an SVG filter (the same one the canvas draws it through)
       const bb = geometryBounds(mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]));
       const id = `a${defs.length}`;
-      const std = (Math.max(0, ...layersOf(adj).map((l) => l.blur ?? 0)) / 100) * 0.02 * Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
-      pad = Math.max(pad, 3 * std);
-      defs.push(svgAdjustFilter(adj, id, std));
+      const ref = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
+      pad = Math.max(pad, svgAdjustReach(adj, ref));
+      defs.push(svgAdjustFilter(adj, id, ref));
       // (the numbers ride on the group, so this app reads them back as adjustments when the file is made into shapes again)
       out = `  <g filter="url(#${id})" data-canvast-adjust="${esc(JSON.stringify(adj))}">\n${out}\n  </g>`;
     }
