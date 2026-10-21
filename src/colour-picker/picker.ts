@@ -673,10 +673,17 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
 
   // Unique ids so a slider's label can name it.
   const uid = `cp${Math.random().toString(36).slice(2, 8)}`;
-  sliders.forEach((s, i) => (s.id = `${uid}-s${i}`));
-  labels.forEach((l, i) => (l.htmlFor = `${uid}-s${i}`));
-  alphaSlider.id = `${uid}-a`;
-  q<HTMLLabelElement>("[data-alpha-label]").htmlFor = alphaSlider.id;
+  // (a name is for the number, so dragging the number scrubs it (scrub.ts); the slider is named by the label too)
+  const alphaLabel = q<HTMLLabelElement>("[data-alpha-label]");
+  rowNums.forEach((n, i) => {
+    n.id = `${uid}-n${i}`;
+    labels[i]!.htmlFor = n.id;
+    labels[i]!.id = `${uid}-l${i}`;
+    sliders[i]!.setAttribute("aria-labelledby", labels[i]!.id);
+  });
+  alphaNum.id = `${uid}-an`;
+  alphaLabel.htmlFor = alphaNum.id;
+
 
   place();
   renderGroups();

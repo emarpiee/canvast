@@ -175,3 +175,25 @@ test("gradient editor in the package: stops by bar, handle, field and key; kinds
   expect(r.stops.every((s) => /^#[0-9a-f]{6}$/.test(s.colour)), "no transparency in a random gradient").toBe(true);
   expect([r.stops[0]!.offset, r.stops[r.stops.length - 1]!.offset]).toEqual([0, 1]);
 });
+
+test("colour picker package: the opacity number and the channel numbers scrub by dragging, and Shift lands on round steps", async ({ page }) => {
+  await page.goto(DEMO);
+  const cp = page.locator("#host .cp");
+  await expect(cp.locator(".cp-alpha")).toBeVisible();
+  await cp.locator("[data-view-select]").selectOption("sliders");
+  for (const sel of ["[data-alpha-num]", '[data-num="1"]']) {
+    const f = cp.locator(sel);
+    const r = (await f.boundingBox())!;
+    const x = Math.round(r.x + r.width / 2), y = Math.round(r.y + r.height / 2);
+    const before = Number(await f.inputValue());
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.keyboard.down("Shift");
+    await page.mouse.move(x - 30, y, { steps: 6 });
+    await page.mouse.up();
+    await page.keyboard.up("Shift");
+    const after = Number(await f.inputValue());
+    expect(after, `${sel} follows the drag`).not.toBe(before);
+    expect(after % 5, `${sel} is on a step of 5`).toBe(0);
+  }
+});
