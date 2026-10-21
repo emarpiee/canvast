@@ -1134,3 +1134,27 @@ test("a picture can have a drop shadow too: it is drawn beside the picture, and 
   expect(await px(app, below[0], below[1]), "a shadow below the picture").not.toEqual(bg);
   expect(await px(app, mid[0], mid[1]), "the picture itself is as it was").toEqual(inside);
 });
+
+test("an adjustment's number can be dragged left or right to change it, like the other number fields: one undo step", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await openAdjust(p);
+  for (const key of ["exposure", "dropBlur"]) {
+    const f = p.locator(`.adjust-pop [data-adj-num="${key}"]`);
+    await f.scrollIntoViewIfNeeded();
+    const r = (await f.boundingBox())!;
+    const x = Math.round(r.x + r.width / 2), y = Math.round(r.y + r.height / 2);
+    await p.mouse.move(x, y);
+    await p.mouse.down();
+    await p.mouse.move(x + 40, y, { steps: 6 });
+    await p.mouse.up();
+    expect(Number(await f.inputValue()), `${key} follows the drag`).toBeGreaterThan(0);
+  }
+  const adj = (await objs(app)).find((o) => o.id === pic.id)!.adjust!;
+  expect(adj["exposure"]).toBeGreaterThan(0);
+  await p.keyboard.press("Control+z");
+  expect((await objs(app)).find((o) => o.id === pic.id)!.adjust?.["exposure"], "the first drag is its own undo step").toBeGreaterThan(0);
+});
