@@ -1,3 +1,4 @@
+import { curveCanvas, wireCurve } from "./curve-editor";
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { panelHtml } from "./panel";
@@ -13,7 +14,7 @@ import type { BrushEngine } from "../paint/engine";
 import type { TipBitmap } from "../paint/engine-protocol";
 import type { PaintStore } from "../paint/store";
 import type { ToolId, Values } from "../paint/tools";
-import { BRUSH_SECTIONS, MAX_BRUSHES, MAX_BRUSH_NAME, brushOf, cleanBrushes, engineValue, flatScale, getPath, isFlat, pickedValues, setPath, shown, tipsOf, withKeys, type Brush, type BrushPreset, type BrushSetting } from "../paint/brushes";
+import { BRUSH_SECTIONS, MAX_BRUSHES, MAX_BRUSH_NAME, PATTERN_STYLES, brushOf, cleanBrushes, lockOf, pickedBrush, presetBitmaps, engineValue, flatScale, getPath, isFlat, pickedValues, setPath, shown, tipsOf, withKeys, type Brush, type BrushPreset, type BrushSetting } from "../paint/brushes";
 
 /**
  * The Brushes panel and the Brush Settings panel of the Paint view (ADR 0169), both in the panel dock (ADR 0123) like the canvas's panels.
@@ -172,7 +173,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
   const pick = (p: BrushPreset): void => {
     const t = deps.tool();
     if (!t) return deps.tell("Pick the Brush or the Eraser to use a brush preset.");
-    deps.setTool(t, { values: pickedValues(p, deps.values(t)), brush: p.brush, preset: p.id });
+    deps.setTool(t, { values: pickedValues(p, deps.values(t)), brush: pickedBrush(p.brush, deps.brush(t)), preset: p.id });
     markCurrent();
     updateSettings();
   };
@@ -339,6 +340,37 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     else deps.setTool(t, { brush: setPath(deps.brush(t), path, v) });
     updateSettings();
   };
+  /** A dynamic's response curve: under its control, folded, shown while something controls it. */
+  const curveRow = (s: BrushSetting): string => {
+    const base = s.k.endsWith(".control") ? s.k.slice(0, -".control".length) : "";
+    return base ? `<details class="bs-curve" data-curve-of="${esc(base)}"><summary>${esc(s.label.replace(/ control$/, ""))} curve</summary>${curveCanvas(`${s.label.replace(/ control$/, "")} curve`, "")}</details>` : "";
+  };
+  const curves = new Map<HTMLElement, { draw(): void }>();
+  const curveOf = (t: ToolId, path: string): Array<[number, number]> => {
+    const v = getPath(effective(t), path);
+    return Array.isArray(v) && v.length >= 2 ? (v as Array<[number, number]>) : [[0, 0], [1, 1]];
+  };
+  /** What a tip or a texture can be: round, or a procedural pattern, then each bitmap of the presets. */
+  const picksOf = (path: string): Array<{ label: string; value: unknown; key: string }> => [
+    ...(path === "tip" ? [{ label: "Round", value: "round" as unknown, key: "round" }] : PATTERN_STYLES.map(([style, label]) => ({ label, value: { procedural: { ...(getPath(defaults, "texture.pattern.procedural") as object), style } } as unknown, key: style }))),
+    ...presetBitmaps(list).map((b, i) => ({ label: `Picture ${i + 1} (${String(b["width"])} × ${String(b["height"])} px)`, value: { stored: b } as unknown, key: String(b["key"]) })),
+  ];
+  /** Which pick a tip or texture is (its bitmap's key, its pattern's style, or "round"). */
+  const pickKey = (v: unknown): string => (typeof v === "string" ? v : String(getPath(v as Brush, "stored.key") ?? getPath(v as Brush, "procedural.style") ?? ""));
+  const fillPicks = (t: ToolId, d: HTMLElement): void => {
+    const box = d.querySelector(".bs-picks")!;
+    const ink = getComputedStyle(d).color;
+    box.innerHTML = picksOf(d.dataset["pick"]!).map((o, i) => `<button type="button" data-pick-i="${i}" data-key="${esc(o.key)}" aria-pressed="false" title="${esc(o.label)}" aria-label="${esc(o.label)}">${typeof o.value === "string" || getPath(o.value as Brush, "stored") ? `<canvas width="32" height="32" aria-hidden="true"></canvas>` : esc(o.label)}</button>`).join("");
+    for (const c of box.querySelectorAll("canvas")) {
+      const o = picksOf(d.dataset["pick"]!)[Number(c.parentElement!.dataset["pickI"])]!;
+      drawThumb(c, typeof o.value === "string" ? {} : { tip: o.value }, ink);
+    }
+    markPick(t, d);
+  };
+  const markPick = (t: ToolId, d: HTMLElement): void => {
+    const now = pickKey(getPath(effective(t), d.dataset["pick"]!) ?? getPath(defaults, d.dataset["pick"]!));
+    for (const b of d.querySelectorAll<HTMLElement>("[data-key]")) b.setAttribute("aria-pressed", String(b.dataset["key"] === now));
+  };
   const onOf = (t: ToolId, path: string): boolean => (getPath(effective(t), path) ?? getPath(defaults, path)) === true;
 
   const buildSettings = (): void => {
@@ -348,7 +380,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     settingsEl.innerHTML = panelHtml({
       title: "Brush settings",
       body: t
-        ? BRUSH_SECTIONS.map((sec, i) => `<div class="adj-group" data-section="${i}"><div class="adj-group-head"><h4>${esc(sec.title)}</h4>${sec.on ? `<label class="pg-check"><input type="checkbox" data-on="${esc(sec.on)}" aria-label="${esc(sec.title)} on"></label>` : ""}</div>${sec.items.map((s) => settingRow(s, valueOf(t, s) ?? s.def, `bs-${s.k}`)).join("")}</div>`).join("")
+        ? BRUSH_SECTIONS.map((sec, i) => `<div class="adj-group" data-section="${i}"><div class="adj-group-head"><h4>${esc(sec.title)}</h4>${lockOf(sec) ? `<button type="button" class="adj-pin" data-lock="${esc(lockOf(sec)!)}" aria-pressed="false" aria-label="Keep ${esc(sec.title.toLowerCase())}" title="Keep these settings when another brush is picked">${ICONS.pin}</button>` : ""}${sec.on ? `<label class="pg-check"><input type="checkbox" data-on="${esc(sec.on)}" aria-label="${esc(sec.title)} on"></label>` : ""}</div>${sec.pick ? `<details class="bs-curve" data-pick="${sec.pick}"><summary>${sec.pick === "tip" ? "Choose a tip" : "Choose a pattern"}</summary><div class="bs-picks" role="group" aria-label="${sec.pick === "tip" ? "Tips" : "Patterns"}"></div></details>` : ""}${sec.items.map((s) => settingRow(s, valueOf(t, s) ?? s.def, `bs-${s.k}`) + curveRow(s)).join("")}</div>`).join("")
         : `<p class="adj-note">Pick the Brush or the Eraser to set its brush.</p>`,
     });
     if (!t) return;
@@ -357,6 +389,27 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
       wireSettingRow(r, s, () => valueOf(t, s) ?? s.def, (v) => set(t, s.k, engineValue(s, v)));
     }
     for (const c of settingsEl.querySelectorAll<HTMLInputElement>("[data-on]")) c.addEventListener("change", () => set(t, c.dataset["on"]!, c.checked));
+    curves.clear();
+    for (const d of settingsEl.querySelectorAll<HTMLElement>("[data-curve-of]")) {
+      const path = `${d.dataset["curveOf"]}.curve`;
+      curves.set(d, wireCurve(d.querySelector("canvas")!, {
+        points: () => curveOf(t, path).map(([x, y]) => [Math.round(x * 255), Math.round(y * 255)]),
+        set: (pts) => set(t, path, pts.map(([x, y]) => [x / 255, y / 255])),
+        input: () => {},
+        commit: () => {},
+      }));
+      d.addEventListener("toggle", () => curves.get(d)?.draw());
+    }
+    for (const d of settingsEl.querySelectorAll<HTMLDetailsElement>("[data-pick]")) {
+      const path = d.dataset["pick"]!;
+      d.addEventListener("toggle", () => d.open && fillPicks(t, d));
+      d.addEventListener("click", (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pick-i]");
+        const o = b && picksOf(path)[Number(b.dataset["pickI"])];
+        if (o) set(t, path, o.value);
+      });
+    }
+    for (const b of settingsEl.querySelectorAll<HTMLElement>("[data-lock]")) b.addEventListener("click", () => set(t, `locks.${b.dataset["lock"]}`, b.getAttribute("aria-pressed") !== "true"));
     updateSettings();
   };
   /** Show the tool's values in the built rows (a change from elsewhere: the options bar, a preset), without building them again. */
@@ -374,11 +427,19 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
         else if (document.activeElement !== inp) inp.value = String(v);
       }
       for (const b of r.querySelectorAll<HTMLElement>("[data-v]")) b.setAttribute("aria-pressed", String(b.dataset["v"] === v));
+      const sel = r.querySelector("select");
+      if (sel) sel.value = String(v);
     }
     for (const c of settingsEl.querySelectorAll<HTMLInputElement>("[data-on]")) {
       c.checked = onOf(t, c.dataset["on"]!);
       c.closest(".adj-group")!.classList.toggle("is-off", !c.checked);
     }
+    for (const d of settingsEl.querySelectorAll<HTMLDetailsElement>("[data-pick]")) if (d.open) markPick(t, d);
+    for (const [d, c] of curves) {
+      d.hidden = getPath(effective(t), `${d.dataset["curveOf"]}.control`) === "off";
+      if ((d as HTMLDetailsElement).open) c.draw();
+    }
+    for (const b of settingsEl.querySelectorAll<HTMLElement>("[data-lock]")) b.setAttribute("aria-pressed", String(onOf(t, `locks.${b.dataset["lock"]}`)));
   };
   settingsEl.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).closest("[data-close]")) toggle("settings");

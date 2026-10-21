@@ -3,7 +3,7 @@ import { LAYER_KINDS, clipBaseOf, fromPx, newPage, nextName, stackOf, toPx, vali
 import { History, inverse } from "../../src/paint/history";
 import { readFileSync } from "node:fs";
 import { valuesOf } from "../../src/paint/tools";
-import { BRUSH_SECTIONS, brushOf, cleanBrushes, engineValue, getPath, pickedValues, setPath, shown, tipsOf, withKeys, type BrushPreset } from "../../src/paint/brushes";
+import { BRUSH_SECTIONS, brushOf, cleanBrushes, lockOf, pickedBrush, engineValue, getPath, pickedValues, setPath, shown, tipsOf, withKeys, type BrushPreset } from "../../src/paint/brushes";
 import { toolForKey } from "../../src/settings/shortcuts";
 import { clampCamera, fitCamera, toPage, zoomAt } from "../../src/paint/camera";
 import { deflate, hashOf, inflate, isEmpty, TILE_BYTES } from "../../src/paint/codec";
@@ -73,6 +73,10 @@ describe("brush presets (ADR 0169)", () => {
   it("picking a preset brings its size and tool settings only when it captured them", () => {
     const p: BrushPreset = { id: "c".repeat(32), name: "P", group: "G", folder: [], brush: { size: 50, hardness: 0.25, opacity: 0.5, pressureSize: false }, captures: { size: false, toolSettings: true } };
     expect(pickedValues(p, valuesOf("brush", { size: 10 }))).toMatchObject({ size: 10, hardness: 25, opacity: 50, pressureSize: false });
+    // Its sections, except the ones the tool pins, its smoothing, and a protected texture's pattern and scale.
+    const cur = { smoothing: { amount: 0.5 }, transfer: { enabled: true }, buildUp: true, locks: { transfer: true, buildUp: true }, protectTexture: true, texture: { enabled: true, pattern: "mine", scale: 2 } };
+    const preset = { size: 50, transfer: { enabled: false }, scattering: { enabled: true }, buildUp: false, buildUpRate: 9, texture: { enabled: true, pattern: "its", scale: 1, depth: 0.3 } };
+    expect(pickedBrush(preset, cur)).toEqual({ size: 50, scattering: { enabled: true }, transfer: { enabled: true }, buildUp: true, smoothing: { amount: 0.5 }, locks: cur.locks, protectTexture: true, texture: { enabled: true, pattern: "mine", scale: 2, depth: 0.3 } });
   });
   it("a setting is read and written at its path, in the panel's units", () => {
     const s = BRUSH_SECTIONS.flatMap((x) => x.items).find((x) => x.k === "shapeDynamics.size.jitter")!;
@@ -88,6 +92,7 @@ describe("brush presets (ADR 0169)", () => {
     const def = JSON.parse(new TextDecoder().decode(new Uint8Array(e.memory.buffer, e.out_ptr(), e.out_len())));
     for (const sec of BRUSH_SECTIONS) {
       if (sec.on) expect(typeof getPath(def, sec.on), sec.on).toBe("boolean");
+      if (lockOf(sec)) expect(typeof getPath(def, `locks.${lockOf(sec)}`), sec.title).toBe("boolean");
       for (const s of sec.items) expect(typeof getPath(def, s.k), s.k).toBe(s.t === "range" ? "number" : s.t === "toggle" ? "boolean" : "string");
     }
   });

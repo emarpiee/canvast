@@ -283,6 +283,7 @@ import layers from "lucide-static/icons/layers.svg";
 import lock from "lucide-static/icons/lock.svg";
 import lockKeyhole from "lucide-static/icons/lock-keyhole.svg";
 import lockKeyholeOpen from "lucide-static/icons/lock-keyhole-open.svg";
+import pin from "lucide-static/icons/pin.svg";
 import sendToBack from "lucide-static/icons/send-to-back.svg";
 import ungroup from "lucide-static/icons/ungroup.svg";
 import magnet from "lucide-static/icons/magnet.svg";
@@ -512,6 +513,7 @@ export const ICONS = {
   eyeOff: clean(eyeOff),
   lockKeyhole: clean(lockKeyhole),
   lockKeyholeOpen: clean(lockKeyholeOpen),
+  pin: clean(pin),
   ungroup: clean(ungroup),
   bringToFront: clean(bringToFront),
   sendToBack: clean(sendToBack),

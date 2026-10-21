@@ -36,6 +36,20 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, most of P2, vector layers, one chrome for both views and brush presets done (v0.32.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); the canvas's bars, rail and keymap shared by both views ([ADR 0168](adr/0168-one-chrome.md)); brush presets, `.abr` and canvast brush files, Brush settings ([ADR 0169](adr/0169-brush-presets.md)); rest of P2 (Pencil and Eyedropper in the one rail, view rotate and mirror, raster layer masks) next |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Painting view, brush settings complete (v0.32.1, 2026-10-22)
+
+**Implemented:** Brush settings edit the brush's blend `mode` (a menu: a choice row with more than six options is a select), section pins (`locks`, `pickedBrush` = the engine's `picked_over`: smoothing, protected texture, pinned sections), a response curve per controlled dynamic (`ui/curve-editor.ts`, the adjustments' Curves control moved out of `colour-popover.ts` and shared), Choose a tip / Choose a pattern (round or procedural, or any bitmap the presets name, `presetBitmaps`); one icon (`pin`).
+
+**Tested:** unit 563/563 (`pickedBrush`, lock paths against the engine's default brush); E2E `painting.spec.ts` "brush presets" extended (mode, pin kept over a pick, a curve point, tip and pattern chosen) in Chromium and Firefox; `pictures.spec.ts` curve tests, `pattern`, `icon-audit` in Chromium.
+
+**Known failures:** none known.
+
+**Unverified:** curves with a real pen.
+
+**Committed:** see git log (feat(paint): ... (v0.32.1)).
+
+**Next bounded task:** presets and saved styles in `.canvast` archives and backups; a large generated `.abr` test; then P2c tools.
+
 ## Painting view, brush presets (v0.32.0, 2026-10-22)
 
 **Implemented:** ADR 0169: engine calls `presets_builtin`, `abr_read` (the engine's `.abr` mapping compiled in), `abr_write` (v2: tip and spacing), `tip_put` and stored tiles filled when a stroke begins, `brush_default`; worker messages `tips`, `presets`, `abr-write`, `default`; `paint/brushes.ts` (presets, `cleanBrushes`, bitmaps by SHA-256, `brushOf` over the tool's brush, `BRUSH_SECTIONS`, paths); `PaintStore` `brushes`/`saveBrushes`/`tip`, GC keeps the presets' and tools' bitmaps; `ui/brush-panels.ts` (Brushes and Brush settings panels in the dock's left stack); `ui/setting-rows.ts` shared with the Pattern panel; tool state `paint.tools[t]` = values + brush + preset; two icons.

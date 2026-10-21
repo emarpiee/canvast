@@ -225,6 +225,34 @@ test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, B
   await expect.poll(async () => (await brushes()).tool?.brush).toMatchObject({ scattering: { enabled: true }, shapeDynamics: { size: { jitter: 0.4 } } });
   expect((await brushes()).tool?.values["size"], "the Tip's size is the bar's").toBe(33);
   await expect(p.locator('[data-paint-options] input[data-opt="size"]')).toHaveValue("33");
+  // the brush's blend mode, a pinned section, and a dynamic's response curve (shown once something controls it)
+  await set.locator('[data-k="mode"] select').selectOption("Multiply");
+  await set.getByLabel("Keep scattering").click();
+  const curve = set.locator('[data-curve-of="shapeDynamics.size"]');
+  await expect(curve).toBeHidden();
+  await set.locator('[data-k="shapeDynamics.size.control"] [data-v="penPressure"]').click();
+  await curve.locator("summary").click();
+  await curve.locator("canvas").click({ position: { x: 96, y: 150 } }); // (a point under the straight line)
+  await expect.poll(async () => (await brushes()).tool?.brush).toMatchObject({ mode: "Multiply", locks: { scattering: true }, shapeDynamics: { size: { control: "penPressure" } } });
+  const pts = (await brushes()).tool?.brush["shapeDynamics"] as { size: { curve: number[][] } };
+  expect(pts.size.curve.length, "a point added to the curve").toBe(3);
+  expect(pts.size.curve[1]![1]!, "under the line").toBeLessThan(pts.size.curve[1]![0]!);
+  // picking a preset again keeps only what is pinned
+  await panel.locator(`[data-brush="${sampled.id}"]`).click();
+  await expect.poll(async () => (await brushes()).tool?.brush["mode"]).not.toBe("Multiply");
+  expect((await brushes()).tool?.brush, "the pinned section stays").toMatchObject({ scattering: { enabled: true }, locks: { scattering: true } });
+  // a tip and a texture chosen from the presets' pictures and the procedural patterns
+  const tips = set.locator('[data-pick="tip"]');
+  await tips.locator("summary").click();
+  await tips.getByRole("button", { name: "Round" }).click();
+  await expect.poll(async () => (await brushes()).tool?.brush["tip"]).toBe("round");
+  await tips.locator('[data-pick-i="1"]').click();
+  await expect.poll(async () => typeof (await brushes()).tool?.brush["tip"]).toBe("object");
+  await expect(tips.locator('[data-pick-i="1"]')).toHaveAttribute("aria-pressed", "true");
+  const pats = set.locator('[data-pick="texture.pattern"]');
+  await pats.locator("summary").click();
+  await pats.getByRole("button", { name: "Dots" }).click();
+  await expect.poll(async () => (await brushes()).tool?.brush).toMatchObject({ texture: { pattern: { procedural: { style: "dots" } } } });
   // Save: a new preset in Saved, now the tool's
   await panel.locator('[data-act="save"]').click();
   await p.getByTestId("prompt-input").fill("Mine");

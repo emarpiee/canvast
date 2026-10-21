@@ -163,6 +163,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `lock-keyhole-open` | Unlock all |
 | `magnet` | Snap to other objects |
 | `map-pin` | Place on Board 1 › Canvas 1 |
+| `pin` | Brush settings: keep a section when another preset is picked (Paint view) |
 | `maximize` | Full screen |
 | `merge` | Flatten a boolean group into one path (Actions bar) |
 | `split` | Release the shapes of a boolean group (Actions bar) |

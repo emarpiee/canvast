@@ -81,6 +81,14 @@ function stored(b: Brush): Array<Record<string, unknown>> {
   return [at(b["tip"]), at(dual), at(tex)].filter((t): t is Record<string, unknown> => t !== null);
 }
 
+/** Every bitmap the presets name (tips, dual tips, textures), once each, as stored (`{ key, width, height, preview }`): what a tip or a
+ *  texture can be chosen from. */
+export function presetBitmaps(ps: readonly BrushPreset[]): Array<Record<string, unknown>> {
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const p of ps) for (const t of stored(p.brush)) if (!seen.has(String(t["key"]))) seen.set(String(t["key"]), t);
+  return [...seen.values()];
+}
+
 /** The bitmaps a brush names (their hashes), with their sizes. */
 export function tipsOf(b: Brush): Array<{ key: string; w: number; h: number }> {
   return stored(b).map((t) => ({ key: String(t["key"]), w: Number(t["width"]), h: Number(t["height"]) }));
@@ -113,6 +121,39 @@ export function pickedValues(p: BrushPreset, current: Values): Record<string, nu
   return out;
 }
 
+/**
+ * The brush of a preset picked while `current` is the tool's brush (the engine's `picked_over`): Smoothing stays the tool's, a protected
+ * texture keeps its pattern and scale, every section `current` pins (its `locks`) stays as it is, and the pins carry over.
+ */
+export function pickedBrush(preset: Brush, current: Brush): Brush {
+  const out: Brush = { ...preset };
+  const keep = (k: string): void => {
+    if (current[k] === undefined) delete out[k]; // (the engine's default, as the tool has it)
+    else out[k] = current[k];
+  };
+  const ct = current["texture"], pt = preset["texture"];
+  if (current["protectTexture"] === true && isObj(ct) && ct["enabled"] === true && isObj(pt) && pt["enabled"] === true) {
+    out["texture"] = { ...pt, pattern: ct["pattern"], scale: ct["scale"] };
+    out["protectTexture"] = true;
+  }
+  keep("smoothing");
+  const locks = isObj(current["locks"]) ? current["locks"] : {};
+  for (const [lock, keys] of Object.entries(LOCKED)) if (locks[lock] === true) keys.forEach(keep);
+  keep("locks");
+  return out;
+}
+
+/** The engine's section locks and the brush settings each keeps. */
+const LOCKED: Readonly<Record<string, readonly string[]>> = {
+  shapeDynamics: ["shapeDynamics"], scattering: ["scattering"], texture: ["texture"], dualBrush: ["dualBrush"], colorDynamics: ["colorDynamics"],
+  transfer: ["transfer"], pose: ["pose"], noise: ["noise"], wetEdges: ["wetEdges"], buildUp: ["buildUp", "buildUpRate"], protectTexture: ["protectTexture"],
+};
+/** The lock of a Brush Settings section (its switch's first key), or undefined when picking a preset never changes it or always does. */
+export function lockOf(sec: BrushSection): string | undefined {
+  const k = sec.on?.split(".")[0];
+  return k && k in LOCKED ? k : undefined;
+}
+
 /** The brush a tool paints with, as the engine reads it: the tool's brush, its options bar's values, the colour, and whether it erases. */
 export function brushOf(tool: ToolId, v: Values, brush: Brush, colour: string): Brush {
   const out: Brush = { ...brush };
@@ -131,6 +172,8 @@ export interface BrushSection {
   readonly title: string;
   /** The switch that turns the whole section on ("shapeDynamics.enabled"), shown in its heading. */
   readonly on?: string;
+  /** A picture it is made from, chosen from the presets' bitmaps (or the engine's procedural patterns): the brush's path to it. */
+  readonly pick?: "tip" | "texture.pattern";
   readonly items: readonly BrushSetting[];
 }
 
@@ -140,6 +183,10 @@ const tog = (k: string, label: string): BrushSetting => ({ k, label, t: "toggle"
 const CONTROLS: ReadonlyArray<readonly [string, string]> = [["off", "Off"], ["fade", "Fade"], ["penPressure", "Pressure"], ["penTilt", "Tilt"], ["stylusWheel", "Wheel"], ["rotation", "Rotation"]];
 const ANGLE_CONTROLS = [...CONTROLS, ["initialDirection", "First direction"], ["direction", "Direction"]] as const;
 const MASK_MODES: ReadonlyArray<readonly [string, string]> = [["multiply", "Multiply"], ["subtract", "Subtract"], ["darken", "Darken"], ["overlay", "Overlay"], ["colorDodge", "Colour dodge"], ["colorBurn", "Colour burn"], ["linearBurn", "Linear burn"], ["hardMix", "Hard mix"], ["linearHeight", "Linear height"], ["height", "Height"]];
+/** The engine's brush blend modes (its names), Photoshop's menu order. */
+const BRUSH_MODES: ReadonlyArray<readonly [string, string]> = ["Normal", "Dissolve", "Darken", "Multiply", "ColorBurn", "LinearBurn", "DarkerColor", "Lighten", "Screen", "ColorDodge", "LinearDodge", "LighterColor", "Overlay", "SoftLight", "HardLight", "VividLight", "LinearLight", "PinLight", "HardMix", "Difference", "Exclusion", "Subtract", "Divide", "Hue", "Saturation", "Color", "Luminosity"].map((m) => [m, m.replace(/(?<=.)([A-Z])/g, " $1").replace("Color", "Colour").replace(/ ([A-Z])/g, (_, c: string) => ` ${c.toLowerCase()}`)] as const);
+/** The engine's procedural texture patterns. */
+export const PATTERN_STYLES: ReadonlyArray<readonly [string, string]> = [["noise", "Noise"], ["canvas", "Canvas"], ["paper", "Paper"], ["dots", "Dots"]];
 /** A dynamic setting of the engine: its jitter, what controls it, and (when it has one) the least it may go down to. */
 const dyn = (k: string, label: string, opts: { min?: string; controls?: ReadonlyArray<readonly [string, string]>; max?: number } = {}): BrushSetting[] => [
   pct(`${k}.jitter`, `${label} jitter`, opts.max ?? 100),
@@ -148,10 +195,10 @@ const dyn = (k: string, label: string, opts: { min?: string; controls?: Readonly
 ];
 
 export const BRUSH_SECTIONS: readonly BrushSection[] = [
-  { title: "Tip", items: [num("size", "Size", 1, 1000), pct("hardness", "Hardness"), pct("spacing", "Spacing", 1000, 1), tog("spacingEnabled", "Spacing on"), num("angle", "Angle", -180, 180), pct("roundness", "Roundness"), tog("flipX", "Flip X"), tog("flipY", "Flip Y")] },
+  { title: "Tip", pick: "tip", items: [{ k: "mode", label: "Mode", t: "choice", opts: BRUSH_MODES, def: "Normal" }, num("size", "Size", 1, 1000), pct("hardness", "Hardness"), pct("spacing", "Spacing", 1000, 1), tog("spacingEnabled", "Spacing on"), num("angle", "Angle", -180, 180), pct("roundness", "Roundness"), tog("flipX", "Flip X"), tog("flipY", "Flip Y")] },
   { title: "Shape dynamics", on: "shapeDynamics.enabled", items: [...dyn("shapeDynamics.size", "Size", { min: "Minimum size" }), pct("shapeDynamics.tiltScale", "Tilt scale", 200), ...dyn("shapeDynamics.angle", "Angle", { controls: ANGLE_CONTROLS }), ...dyn("shapeDynamics.roundness", "Roundness", { min: "Minimum roundness" }), tog("shapeDynamics.flipXJitter", "Flip X jitter"), tog("shapeDynamics.flipYJitter", "Flip Y jitter"), tog("shapeDynamics.brushProjection", "Brush projection")] },
   { title: "Scattering", on: "scattering.enabled", items: [...dyn("scattering.scatter", "Scatter", { max: 1000 }), tog("scattering.bothAxes", "Both axes"), num("scattering.count", "Count", 1, 16), ...dyn("scattering.countJitter", "Count")] },
-  { title: "Texture", on: "texture.enabled", items: [{ k: "texture.pattern.procedural.style", label: "Pattern", t: "choice", opts: [["noise", "Noise"], ["canvas", "Canvas"], ["paper", "Paper"], ["dots", "Dots"]], def: "paper" }, pct("texture.scale", "Scale", 1000, 1), pct("texture.brightness", "Brightness", 100, -100), pct("texture.contrast", "Contrast", 100, -100), tog("texture.invert", "Invert"), tog("texture.eachTip", "Each tip"), { k: "texture.mode", label: "Mode", t: "choice", opts: MASK_MODES, def: "multiply" }, pct("texture.depth", "Depth"), ...dyn("texture.depthJitter", "Depth", { min: "Minimum depth" })] },
+  { title: "Texture", on: "texture.enabled", pick: "texture.pattern", items: [pct("texture.scale", "Scale", 1000, 1), pct("texture.brightness", "Brightness", 100, -100), pct("texture.contrast", "Contrast", 100, -100), tog("texture.invert", "Invert"), tog("texture.eachTip", "Each tip"), { k: "texture.mode", label: "Mode", t: "choice", opts: MASK_MODES, def: "multiply" }, pct("texture.depth", "Depth"), ...dyn("texture.depthJitter", "Depth", { min: "Minimum depth" })] },
   { title: "Dual brush", on: "dualBrush.enabled", items: [{ k: "dualBrush.mode", label: "Mode", t: "choice", opts: MASK_MODES, def: "multiply" }, num("dualBrush.size", "Size", 1, 1000), pct("dualBrush.hardness", "Hardness"), pct("dualBrush.roundness", "Roundness"), num("dualBrush.angle", "Angle", -180, 180), pct("dualBrush.spacing", "Spacing", 1000, 1), pct("dualBrush.scatter", "Scatter", 1000), tog("dualBrush.bothAxes", "Both axes"), num("dualBrush.count", "Count", 1, 16), tog("dualBrush.flip", "Flip")] },
   { title: "Colour dynamics", on: "colorDynamics.enabled", items: [tog("colorDynamics.perTip", "Each tip"), ...dyn("colorDynamics.fgBg", "Colour to white"), pct("colorDynamics.hueJitter", "Hue jitter"), pct("colorDynamics.saturationJitter", "Saturation jitter"), pct("colorDynamics.brightnessJitter", "Brightness jitter"), pct("colorDynamics.purity", "Purity", 100, -100)] },
   { title: "Transfer", on: "transfer.enabled", items: [...dyn("transfer.opacity", "Opacity", { min: "Minimum opacity" }), ...dyn("transfer.flow", "Flow", { min: "Minimum flow" })] },

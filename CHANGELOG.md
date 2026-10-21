@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.1 — Brush mode, pinned sections, response curves, choose a tip (2026-10-22)
+
+- **Brush settings:** the brush's blend **mode**; a **curve** for each controlled jitter (pressure, tilt, wheel, …), with the Curves control of the adjustments; a **pin** per section keeps it when another preset is picked; **Choose a tip** (round or a preset's picture) and **Choose a pattern** for the texture (procedural or a preset's picture).
+
 ## 0.32.0 — Brush presets, brush files and Brush settings (2026-10-22)
 
 - **Brushes panel** in the Paint view: brush presets in groups and folders with a picture of each tip; a press gives one to the Brush or Eraser. 36 presets to start with. **Save** the tool's brush as a preset; rename, delete, find by name.

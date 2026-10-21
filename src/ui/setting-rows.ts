@@ -11,6 +11,8 @@ import { liveNumber } from "./live";
 export function settingRow(s: Setting, v: number | string | boolean, id: string, extra = ""): string {
   if (s.t === "range") return `<div class="adj-row" data-k="${esc(s.k)}"><label class="adj-label" for="${esc(id)}">${esc(s.label)}${extra}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="${esc(id)}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
   if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${esc(s.k)}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${extra}</label></div>`;
+  // A long list of choices (a blend mode) is a menu; a short one a row of buttons.
+  if (s.t === "choice" && s.opts.length > 6) return `<div class="adj-row pg-line" data-k="${esc(s.k)}"><label class="adj-label" for="${esc(id)}">${esc(s.label)}${extra}</label><select id="${esc(id)}">${s.opts.map(([o, l]) => `<option value="${esc(o)}"${o === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
   if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${esc(s.k)}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${esc(o)}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
   const none = v === "";
   return `<div class="adj-row pg-line" data-k="${esc(s.k)}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? "none" : String(v).toUpperCase()}</code>${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
@@ -23,6 +25,7 @@ export function wireSettingRow(r: HTMLElement, s: Setting, get: () => number | s
     range.addEventListener("input", () => { num.value = range.value; set(Number(range.value)); });
     liveNumber(num, (x) => { range.value = String(x); set(Math.min(s.max, Math.max(s.min, x))); });
   } else if (s.t === "toggle") r.querySelector("input")!.addEventListener("change", (e) => set((e.target as HTMLInputElement).checked));
+  else if (s.t === "choice" && r.querySelector("select")) r.querySelector("select")!.addEventListener("change", (e) => set((e.target as HTMLSelectElement).value));
   else if (s.t === "choice") r.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-v]");
     if (!b) return;

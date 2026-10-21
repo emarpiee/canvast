@@ -2712,6 +2712,18 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .pg-swatch.is-none { opacity: 0.35; }
 .pg-eye { display: inline-flex; align-items: center; justify-content: center; width: var(--field-h); height: var(--field-h); padding: 0; color: var(--hud-fg); background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .pg-eye svg { width: var(--icon-sm); height: var(--icon-sm); }
+/* A brush dynamic's response curve, folded under its control. */
+.bs-curve { padding-block: var(--sp-2); }
+.bs-curve summary { cursor: pointer; font: var(--font-value); color: var(--hud-muted); }
+.bs-curve .adj-curve { margin-top: var(--sp-2); }
+.bs-picks { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); max-height: 12rem; overflow-y: auto; }
+.bs-picks button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-2); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.bs-picks button[aria-pressed="true"] { border-color: var(--hud-accent); outline: 1px solid var(--hud-accent); }
+.bs-picks canvas { width: var(--icon-md); height: var(--icon-md); }
+/* A Brush Settings section's pin: kept when another preset is picked. */
+.adj-pin { display: inline-flex; align-items: center; justify-content: center; margin-inline-start: auto; width: var(--field-h); height: var(--field-h); padding: 0; color: var(--hud-muted); background: none; border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer; }
+.adj-pin svg { width: var(--icon-sm); height: var(--icon-sm); }
+.adj-pin[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .pg-foot { gap: var(--sp-3); }
 .pg-seed, .pg-actions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 .pg-seed label { display: flex; align-items: center; gap: var(--sp-3); color: var(--hud-muted); font: var(--font-meta); }
