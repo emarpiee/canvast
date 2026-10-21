@@ -47,11 +47,15 @@ function build(top: Adjust, id: string, blurPx = 0, ref = 0): string {
   if (ref && (inner || drop)) {
     f.push(`<feMerge result="${id}-main"><feMergeNode/></feMerge>`);
     const alphaOut = `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0`;
-    const shade = (s: NonNullable<typeof inner>, from: string, tag: string): string =>
+    const shade = (s: NonNullable<typeof inner>, from0: string, tag: string): string => {
+      const grow = s.spread ? `<feMorphology in="${from0}" operator="dilate" radius="${n(s.spread * 0.05 * ref)}" result="${id}-${tag}m"/>` : "";
+      const from = s.spread ? `${id}-${tag}m` : from0;
+      return grow +
       `<feOffset in="${from}" dx="${n(s.x * 0.1 * ref)}" dy="${n(s.y * 0.1 * ref)}" result="${id}-${tag}o"/>` +
       `<feGaussianBlur in="${id}-${tag}o" stdDeviation="${n(s.blur * 0.05 * ref)}" result="${id}-${tag}b"/>` +
       `<feFlood flood-color="${s.colour.slice(0, 7)}" flood-opacity="${n(s.opacity)}" result="${id}-${tag}f"/>` +
       `<feComposite in="${id}-${tag}f" in2="${id}-${tag}b" operator="in" result="${id}-${tag}"/>`;
+    };
     if (inner) {
       f.push(`<feColorMatrix in="${id}-main" type="matrix" values="${alphaOut}  0 0 0 -1 1" result="${id}-inv"/>` + shade(inner, `${id}-inv`, "i") + `<feComposite in="${id}-i" in2="${id}-main" operator="in" result="${id}-in"/><feMerge result="${id}-main2"><feMergeNode in="${id}-main"/><feMergeNode in="${id}-in"/></feMerge>`);
     }
@@ -69,7 +73,7 @@ export const svgAdjustFilter = (a: Adjust, id: string, ref: number): string => (
 export function svgAdjustReach(a: Adjust, ref: number): number {
   const d = shadowOf(a, "drop");
   const blur = (Math.max(0, ...layersOf(a).map((l) => l.blur ?? 0)) / 100) * 0.02 * ref;
-  return Math.max(3 * blur, d ? (Math.max(Math.abs(d.x), Math.abs(d.y)) * 0.1 + 3 * d.blur * 0.05) * ref : 0);
+  return Math.max(3 * blur, d ? (Math.max(Math.abs(d.x), Math.abs(d.y)) * 0.1 + 3 * d.blur * 0.05 + d.spread * 0.05) * ref : 0);
 }
 
 /** The filter primitives of one layer of a stack (the blur of a layer is a CSS blur, taken from the first layer only). */
@@ -115,6 +119,37 @@ function layerPrimitives(a: Adjust, id: string, f: string[]): void {
   if (tabs.some(Boolean)) f.push(`<feComponentTransfer>${(["R", "G", "B"] as const).map((ch, k) => (tabs[k] ? `<feFunc${ch} type="table" tableValues="${tabs[k]}"/>` : "")).join("")}</feComponentTransfer>`);
 }
 
+/** Put a filter in the page's hidden SVG (made once per `key`, the oldest dropped past MAX_FILTERS) and return its id. */
+function register(key: string, prefix: string, markup: (id: string) => string): string {
+  const have = made.get(key);
+  if (have) return have;
+  if (!host) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    svg.setAttribute("aria-hidden", "true");
+    svg.style.position = "absolute";
+    host = document.createElementNS(NS, "defs");
+    svg.appendChild(host);
+    document.body.appendChild(svg);
+  }
+  const id = `${prefix}-${made.size}-${Math.abs([...key].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7))}`;
+  if (made.size >= MAX_FILTERS) {
+    const [oldKey, oldId] = made.entries().next().value as [string, string];
+    host.querySelector(`#${oldId}`)?.remove();
+    made.delete(oldKey);
+  }
+  host.insertAdjacentHTML("beforeend", markup(id));
+  made.set(key, id);
+  return id;
+}
+
+/** The CSS `filter` that grows (`dilate`) or shrinks (`erode`) what is drawn by `px` (a whole number of pixels, at least 1): the spread of a shadow. */
+export function morphFilter(op: "dilate" | "erode", px: number): string {
+  const r = Math.max(1, Math.round(px));
+  return `url(#${register(`m|${op}|${r}`, "morph", (id) => `<filter id="${id}" x="0" y="0" width="100%" height="100%"><feMorphology operator="${op}" radius="${r}"/></filter>`)})`;
+}
+
 /** The CSS `filter` for these adjustments: "" when there are none. */
 /** `blurRef`: when given, a blur of 100 % is 2 % of it (px), as for stills; otherwise the fixed size a player uses. */
 export function playingFilter(a: Adjust | undefined, blurRef?: number): string {
@@ -122,25 +157,6 @@ export function playingFilter(a: Adjust | undefined, blurRef?: number): string {
   const key = adjustKey(a);
   let id = made.get(key);
   const needsSvg = layersOf(a).some((l) => !!(l.exposure || l.contrast || l.highlights || l.shadows || l.temperature || l.tint || l.saturation || l.vibrance || l.red || l.green || l.blue || l.sharpen || l.grain || l.map || l.levels || l.curves));
-  if (needsSvg && !id) {
-    if (!host) {
-      const svg = document.createElementNS(NS, "svg");
-      svg.setAttribute("width", "0");
-      svg.setAttribute("height", "0");
-      svg.setAttribute("aria-hidden", "true");
-      svg.style.position = "absolute";
-      host = document.createElementNS(NS, "defs");
-      svg.appendChild(host);
-      document.body.appendChild(svg);
-    }
-    id = `adj-${made.size}-${Math.abs([...key].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7))}`;
-    if (made.size >= MAX_FILTERS) {
-      const [oldKey, oldId] = made.entries().next().value as [string, string];
-      host.querySelector(`#${oldId}`)?.remove();
-      made.delete(oldKey);
-    }
-    host.insertAdjacentHTML("beforeend", build(a, id));
-    made.set(key, id);
-  }
+  if (needsSvg && !id) id = register(key, "adj", (i) => build(a, i));
   return [needsSvg && id ? `url(#${id})` : "", a.blur ? `blur(${(blurRef === undefined ? (a.blur / 100) * 8 : (a.blur / 100) * 0.02 * blurRef).toFixed(2)}px)` : ""].filter(Boolean).join(" ");
 }

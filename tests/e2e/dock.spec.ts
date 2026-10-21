@@ -94,7 +94,7 @@ test("the Adjust panel is a dock panel: it follows the picked picture and can be
   await expect(item(app, "adjust")).toHaveAttribute("data-folded", "");
   await p.mouse.click(1100, 700); // nothing picked
   await titleOf(app, "adjust").click();
-  await expect(item(app, "adjust")).toContainText("Select a picture, video or GIF");
+  await expect(item(app, "adjust")).toContainText("Select a picture, video, GIF, shape or text");
   expect(app.consoleErrors).toEqual([]);
 });
 

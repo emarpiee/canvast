@@ -866,20 +866,39 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   host.replaceChildren(pop);
   const rows = ADJUSTMENTS;
   let cur: Adjust = { ...layers[idx]! };
-  const emitInput = (): void => o.onInput(compose(cur));
-  const emitChange = (label: string): void => o.onChange(compose(cur), label);
+  const emitInput = (): void => {
+    syncResets();
+    o.onInput(compose(cur));
+  };
+  const emitChange = (label: string): void => {
+    syncResets();
+    o.onChange(compose(cur), label);
+  };
   const GROUPS: Array<[string, readonly AdjustKey[]]> = [
     ["Light", ["exposure", "contrast", "highlights", "shadows"]],
     ["Colour", ["temperature", "tint", "saturation", "vibrance", "red", "green", "blue"]],
     ["Detail", ["blur", "sharpen", "grain"]],
-    ["Drop shadow", ["dropOpacity", "dropX", "dropY", "dropBlur"]],
-    ["Inner shadow", ["innerOpacity", "innerX", "innerY", "innerBlur"]],
+    ["Drop shadow", ["dropOpacity", "dropX", "dropY", "dropBlur", "dropSpread"]],
+    ["Inner shadow", ["innerOpacity", "innerX", "innerY", "innerBlur", "innerSpread"]],
   ];
   /** The colour of a shadow: a row under its numbers. */
   const SHADOW_COLOUR: Record<string, "dropColor" | "innerColor"> = { "Drop shadow": "dropColor", "Inner shadow": "innerColor" };
   const colourRow = (name: string): string => {
     const k = SHADOW_COLOUR[name];
     return k ? `<div class="adj-row"><label class="adj-label" for="adj-${k}">Colour</label><input type="color" id="adj-${k}" data-adj-colour="${k}" value="${(cur[k] ?? "#000000").slice(0, 7)}" aria-label="${name} colour"></div>` : "";
+  };
+  /** What each group holds, so its Reset can take it all off (a shadow's colour with it). */
+  const GROUP_FIELDS: Record<string, readonly (keyof Adjust)[]> = {
+    ...Object.fromEntries(GROUPS.map(([name, keys]) => [name, [...keys, ...(SHADOW_COLOUR[name] ? [SHADOW_COLOUR[name]!] : [])]])),
+    "Gradient map": ["map"],
+    Levels: ["levels"],
+    Curves: ["curves"],
+  };
+  const groupChanged = (name: string): boolean => GROUP_FIELDS[name]!.some((k) => (typeof cur[k] === "number" ? cur[k] !== 0 : k === "dropColor" || k === "innerColor" ? false : !!cur[k]));
+  /** The heading of a group, with the button that puts the whole group back. */
+  const head = (name: string): string => `<div class="adj-group-head"><h4>${name}</h4><button type="button" class="layer-btn adj-reset" data-group-reset="${name}" aria-label="Reset ${name.toLowerCase()}" title="Reset ${name.toLowerCase()}" ${groupChanged(name) ? "" : "disabled"}>${ICONS.listRestart}</button></div>`;
+  const syncResets = (): void => {
+    for (const b of pop.querySelectorAll<HTMLButtonElement>("[data-group-reset]")) b.disabled = !groupChanged(b.dataset["groupReset"]!);
   };
   const row = (s: (typeof rows)[number]): string =>
     `<div class="adj-row${cur[s.key] ? " is-changed" : ""}" data-adj-row="${s.key}"><label class="adj-label" for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" id="adj-num-${s.key}" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
@@ -888,16 +907,16 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
   const mapOptions = (): string => saved.map((g, i) => `<option value="${i}">${esc(g.name)}</option>`).join("");
   const mapSection = (): string =>
-    `<section class="adj-group" aria-label="Gradient map"><h4>Gradient map</h4><div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${mapOptions()}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
+    `<section class="adj-group" aria-label="Gradient map">${head("Gradient map")}<div class="adj-map"><select data-adj-map aria-label="Gradient map: a saved gradient that the brightness of the picture is mapped onto"><option value="">None</option><option value="custom">Make a custom gradient…</option><option value="keep" hidden>Custom gradient</option>${mapOptions()}</select><span class="adj-map-bar" data-map-bar></span><button type="button" class="adj-map-edit" data-map-edit hidden>Edit the gradient</button></div><div class="adj-row" data-map-amount-row${cur.map ? "" : " hidden"}><label class="adj-label" for="adj-map-amount">Amount</label><input type="range" id="adj-map-amount" data-map-amount min="1" max="100" step="1" value="${cur.map?.amount ?? 100}" aria-label="Gradient map amount"><output class="adj-map-out" data-map-out>${cur.map?.amount ?? 100}</output></div>${saved.length ? "" : `<p class="op-note">Save a gradient from the fill or outline picker to use it here.</p>`}</section>`;
   const CH: Array<[Channel, string]> = [["master", "All"], ["r", "Red"], ["g", "Green"], ["b", "Blue"]];
   const chSelect = (name: string): string => `<select data-${name} aria-label="${name === "lv-ch" ? "Levels" : "Curve"}: which channel">${CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
   const layerTabs = `<div class="adj-layers" role="group" aria-label="Layers of adjustments">${layers.map((_, i) => `<button type="button" data-layer="${i}" aria-pressed="${i === idx}">${i + 1}</button>`).join("")}${layers.length < MAX_LAYERS ? `<button type="button" data-layer-add aria-label="Add a layer of adjustments after this one" title="Add a layer: its numbers are applied to the result of the one before">+</button>` : ""}${layers.length > 1 ? `<button type="button" data-layer-del aria-label="Remove this layer" title="Remove this layer">${ICONS.x}</button>` : ""}</div>`;
-  const levelsSection = `<section class="adj-group" aria-label="Levels"><h4>Levels</h4><div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label" for="adj-lv-black">Black point</label><input type="number" class="adj-num" id="adj-lv-black" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label" for="adj-lv-white">White point</label><input type="number" class="adj-num" id="adj-lv-white" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label" for="adj-lv-gamma">Gamma</label><input type="number" class="adj-num" id="adj-lv-gamma" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
-  const curvesSection = `<section class="adj-group" aria-label="Curves"><h4>Curves</h4><div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
+  const levelsSection = `<section class="adj-group" aria-label="Levels">${head("Levels")}<div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label" for="adj-lv-black">Black point</label><input type="number" class="adj-num" id="adj-lv-black" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label" for="adj-lv-white">White point</label><input type="number" class="adj-num" id="adj-lv-white" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label" for="adj-lv-gamma">Gamma</label><input type="number" class="adj-num" id="adj-lv-gamma" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
+  const curvesSection = `<section class="adj-group" aria-label="Curves">${head("Curves")}<div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
     layerTabs +
     `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span></header>` +
-    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}"><h4>${name}</h4>${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}${colourRow(name)}</section>`).join("") +
+    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}${colourRow(name)}</section>`).join("") +
     mapSection() +
     levelsSection +
     curvesSection +
@@ -1046,7 +1065,13 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
-    if (b.hasAttribute("data-adj-open")) {
+    if (b.dataset["groupReset"]) {
+      const name = b.dataset["groupReset"];
+      const gone = new Set<string>(GROUP_FIELDS[name]!);
+      cur = Object.fromEntries(Object.entries(cur).filter(([k]) => !gone.has(k))) as Adjust;
+      o.onChange(compose(cur), `Reset ${name.toLowerCase()}`);
+      go(compose(cur), idx); // (the panel is built again, so every slider, curve and gradient shows it)
+    } else if (b.hasAttribute("data-adj-open")) {
       o.onStyles();
     } else if (b.hasAttribute("data-adj-save")) {
       const name = (o.footHost ?? pop).querySelector<HTMLInputElement>("[data-adj-name]")!;

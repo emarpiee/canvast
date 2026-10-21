@@ -48,8 +48,8 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     </div>`,
     body: `<div data-pg-body></div>`,
     foot: `<div class="adj-foot pg-foot">
-      <div class="pg-seed"><label>Seed <input type="number" class="adj-num" min="1" max="${SEED_MAX}" step="1" data-pg-seed aria-label="Seed"></label><button type="button" data-pg-newseed title="Keep the settings and try another arrangement">New seed</button></div>
-      <div class="pg-actions"><button type="button" data-pg-random title="Random settings and a new seed; settings marked with a snowflake stay">${ICONS.shuffle}<span>Randomize</span></button><button type="button" class="is-primary" data-pg-make data-testid="pattern-make">Generate</button><button type="button" data-pg-done title="Keep the result and start a new one next time">Done</button></div>
+      <div class="pg-seed"><label>Seed <input type="number" class="adj-num" min="1" max="${SEED_MAX}" step="1" data-pg-seed aria-label="Seed"></label><button type="button" data-pg-newseed aria-label="New seed" title="New seed: keep the settings and try another arrangement">${ICONS.dice5}</button></div>
+      <div class="pg-actions"><button type="button" data-pg-random aria-label="Randomize" title="Randomize: random settings and a new seed; settings marked with a snowflake stay">${ICONS.shuffle}</button><button type="button" class="is-primary" data-pg-make data-testid="pattern-make" aria-label="Generate" title="Generate the pattern">${ICONS.sparkles}</button><button type="button" data-pg-done aria-label="Done" title="Done: keep the result and start a new one next time">${ICONS.check}</button></div>
     </div>`,
   });
   host.appendChild(panel);

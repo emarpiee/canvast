@@ -3473,6 +3473,19 @@ test("shadows in the Adjust panel: a drop shadow is drawn below the shape (start
   expect(adj.dropOpacity).toBe(100);
   expect(adj.dropY, "turned on soft, a little below").toBeGreaterThan(0);
   expect(await px(below[0], below[1]), "the shadow is under the shape").not.toEqual(bg);
+  // centred on the shape (no offset, no blur) a shadow is hidden behind it: its Spread grows it into a glow all round
+  const above = [610, Math.round(box.minY) - 6] as const; // (off the handle and the turn stalk at the middle)
+  const bgAbove = await px(above[0], above[1]);
+  for (const k of ["dropY", "dropBlur"]) {
+    await p.locator(`.adjust-pop [data-adj-num="${k}"]`).fill("0");
+    await p.locator(`.adjust-pop [data-adj-num="${k}"]`).blur();
+  }
+  await app.frame();
+  expect(await px(above[0], above[1]), "behind the shape, nothing shows").toEqual(bgAbove);
+  await p.locator('.adjust-pop [data-adj-num="dropSpread"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="dropSpread"]').blur();
+  await app.frame();
+    expect(await px(above[0], above[1]), "the spread shows it all round").not.toEqual(bgAbove);
   await p.locator('.adjust-pop [data-adj-num="innerOpacity"]').fill("100");
   await p.locator('.adjust-pop [data-adj-num="innerOpacity"]').blur();
   await app.frame();
@@ -3481,12 +3494,12 @@ test("shadows in the Adjust panel: a drop shadow is drawn below the shape (start
   await p.keyboard.type("Copy the selection as SVG");
   await key(app, "Enter");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.lastCopied())).toMatch(/<filter[\s\S]*feOffset[\s\S]*feFlood[\s\S]*<g filter="url\(#/);
-  await app.frame();
-  await key(app, "Control+z");
-  await app.frame();
-  await key(app, "Control+z");
-  await app.frame();
-  expect(((await last(app)) as unknown as { adjust?: unknown }).adjust, "each is one undo step").toBeUndefined();
+  // every change was its own undo step: undoing them one by one takes the adjustments off
+  for (let i = 0; i < 8 && ((await last(app)) as unknown as { adjust?: unknown }).adjust !== undefined; i++) {
+    await key(app, "Control+z");
+    await app.frame();
+  }
+  expect(((await last(app)) as unknown as { adjust?: unknown }).adjust, "undone").toBeUndefined();
 });
 
 test("adjusted shapes at any zoom and in a picture file: deep inside a blurred shape it is the shape's colour (no sharp fallback, no vignette), and Export leaves room for the blur", async ({ app }) => {

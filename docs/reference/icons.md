@@ -98,7 +98,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `chevrons-down` | Hide the controls (library viewer) |
 | `chevrons-up` | Show the controls (library viewer) |
 | `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
-| `check` | Canvas 1empty |
+| `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |
 | `chevron-left` | Previous |
 | `chevron-right` | Next |
@@ -174,6 +174,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `dices` | Random empty view (bottom-right controls) |
+| `dice-5` | New seed: another arrangement with the same settings (Pattern panel) |
+| `sparkles` | Generate the pattern (Pattern panel) |
 | `mountain-snow` | Pattern panel (dock button) |
 | `snowflake` | Pattern panel: keep this setting when randomizing (freeze) |
 | `shuffle` | Randomize: the Pattern panel, the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |

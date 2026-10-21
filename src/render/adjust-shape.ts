@@ -9,7 +9,7 @@ import type { Adjust } from "../doc/adjust";
 import { SHADOW_OFFSET, SHADOW_SOFT, hasShadow, layersOf, reachFraction, shadowOf } from "../doc/adjust";
 import type { ProjectedObject } from "./projection";
 import { adjustInto } from "./adjust-image";
-import { playingFilter } from "./adjust-filter";
+import { morphFilter, playingFilter } from "./adjust-filter";
 import { withClipExtra } from "./draw-objects";
 
 /** Largest scratch layer (device px at its own resolution): a bigger one is made smaller and drawn scaled up (what is blurred is smooth). */
@@ -26,6 +26,8 @@ const MAX_REACH = 2 ** 13 - 64;
 const REF_MAX = 2 ** 14;
 /** A blur of this many px at the layer's own resolution is smooth enough that the layer can be made smaller. */
 const SMOOTH_PX = 24;
+/** The most a shadow is grown or shrunk by at the layer's own resolution (the filter that does it is slower the wider it is). */
+const MAX_SPREAD_PX = 48;
 const layers: HTMLCanvasElement[] = [];
 
 /** A scratch canvas of this size, cleared (the context is plain: the pixels stay on the graphics card). */
@@ -76,8 +78,9 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   const refFull = refCss * t.a;
   // how many times smaller the layer is made
   const sigma = colour ? (maxBlur(a) / 100) * 0.02 * refFull : 0;
+  const spreadFull = Math.max(shadowOf(a, "drop")?.spread ?? 0, shadowOf(a, "inner")?.spread ?? 0) * SHADOW_SOFT * refFull;
   let s = 1;
-  while ((sigma / s > SMOOTH_PX || (fw / s) * (fh / s) > MAX_PIXELS) && s < 1024) s *= 2;
+  while ((sigma / s > SMOOTH_PX || spreadFull / s > MAX_SPREAD_PX || (fw / s) * (fh / s) > MAX_PIXELS) && s < 1024) s *= 2;
   const w = Math.ceil(fw / s), h = Math.ceil(fh / s);
   const refDev = refFull / s; // (the size every blur and offset is a share of, at the layer's resolution)
   const draw = (g: CanvasRenderingContext2D): void => {
@@ -109,12 +112,20 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   }
   const inner = shadowOf(a, "inner");
   if (inner) {
-    // the inside of the edge: what is not under the object moved by the offset, blurred, kept where the object is
+    // the inside of the edge: what is not under the object (made smaller by the spread) moved by the offset, blurred, kept where the object is
+    let hole = out;
+    if (inner.spread) {
+      const e = layer(4, w, h);
+      e.filter = morphFilter("erode", inner.spread * SHADOW_SOFT * refDev);
+      e.drawImage(out, 0, 0);
+      e.filter = "none";
+      hole = e.canvas;
+    }
     const g2 = layer(2, w, h);
     g2.fillStyle = rgba(inner.colour, 1);
     g2.fillRect(0, 0, w, h);
     g2.globalCompositeOperation = "destination-out";
-    g2.drawImage(out, inner.x * SHADOW_OFFSET * refDev, inner.y * SHADOW_OFFSET * refDev);
+    g2.drawImage(hole, inner.x * SHADOW_OFFSET * refDev, inner.y * SHADOW_OFFSET * refDev);
     const g3 = layer(3, w, h);
     if (inner.blur) g3.filter = `blur(${(inner.blur * SHADOW_SOFT * refDev).toFixed(2)}px)`;
     g3.drawImage(g2.canvas, 0, 0);
@@ -128,19 +139,32 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     base.globalAlpha = 1;
     base.globalCompositeOperation = "source-over";
   }
+  const drop = shadowOf(a, "drop");
+  let shown = out;
+  if (drop) {
+    // behind it: its shape (grown by the spread) in the shadow colour, moved, blurred, then the object over it
+    const sh = layer(4, w, h);
+    if (drop.spread) sh.filter = morphFilter("dilate", drop.spread * SHADOW_SOFT * refDev);
+    sh.drawImage(out, 0, 0);
+    sh.filter = "none";
+    sh.globalCompositeOperation = "source-in";
+    sh.fillStyle = rgba(drop.colour, 1);
+    sh.fillRect(0, 0, w, h);
+    const fin = layer(5, w, h);
+    if (drop.blur) fin.filter = `blur(${(drop.blur * SHADOW_SOFT * refDev).toFixed(2)}px)`;
+    fin.globalAlpha = drop.opacity;
+    fin.drawImage(sh.canvas, drop.x * SHADOW_OFFSET * refDev, drop.y * SHADOW_OFFSET * refDev);
+    fin.filter = "none";
+    fin.globalAlpha = 1;
+    fin.drawImage(out, 0, 0);
+    shown = fin.canvas;
+  }
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
-  const drop = shadowOf(a, "drop");
-  if (drop) {
-    ctx.shadowColor = rgba(drop.colour, drop.opacity);
-    ctx.shadowBlur = 2 * drop.blur * SHADOW_SOFT * refFull; // (the canvas takes twice the standard deviation)
-    ctx.shadowOffsetX = drop.x * SHADOW_OFFSET * refFull;
-    ctx.shadowOffsetY = drop.y * SHADOW_OFFSET * refFull;
-  }
   if (po.obj.blend) ctx.globalCompositeOperation = po.obj.blend;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(out, 0, 0, w, h, x0, y0, w * s, h * s);
+  ctx.drawImage(shown, 0, 0, w, h, x0, y0, w * s, h * s);
   ctx.restore();
 }

@@ -66,18 +66,20 @@ export interface Adjust {
   readonly grain?: number;
   /**
    * Shadows of what is drawn (not of a picture's pixels): a drop shadow behind it and an inner shadow inside its edge. Opacity 0 = none. The offset
-   * (`X`, `Y`: -100 to 100, a tenth of the object's size at the ends) and the `Blur` (0 to 100, a twentieth of its size) are shares of the object's own
+   * (`X`, `Y`: -100 to 100, a tenth of the object's size at the ends), the `Blur` and the `Spread` (how far the shadow is grown, or the inner one shrunk: 0 to 100, a twentieth of its size) are shares of the object's own
    * size, so they look the same at any zoom. The colour is `#rrggbb` (black when absent).
    */
   readonly dropOpacity?: number;
   readonly dropX?: number;
   readonly dropY?: number;
   readonly dropBlur?: number;
+  readonly dropSpread?: number;
   readonly dropColor?: string;
   readonly innerOpacity?: number;
   readonly innerX?: number;
   readonly innerY?: number;
   readonly innerBlur?: number;
+  readonly innerSpread?: number;
   readonly innerColor?: string;
 }
 
@@ -111,19 +113,21 @@ export const ADJUSTMENTS: readonly AdjustSpec[] = [
   { key: "dropX", label: "Across", min: -100, pointwise: false },
   { key: "dropY", label: "Down", min: -100, pointwise: false },
   { key: "dropBlur", label: "Blur", min: 0, pointwise: false },
+  { key: "dropSpread", label: "Spread", min: 0, pointwise: false },
   { key: "innerOpacity", label: "Opacity", min: 0, pointwise: false },
   { key: "innerX", label: "Across", min: -100, pointwise: false },
   { key: "innerY", label: "Down", min: -100, pointwise: false },
   { key: "innerBlur", label: "Blur", min: 0, pointwise: false },
+  { key: "innerSpread", label: "Spread", min: 0, pointwise: false },
 ];
 
 /** Whether any layer has a drop or an inner shadow. */
 export const hasShadow = (a: Adjust | undefined): boolean => layersOf(a).some((l) => !!l.dropOpacity || !!l.innerOpacity);
 
 /** The shadow a layer stack makes of one kind: the first layer that has it on (null: none). */
-export function shadowOf(a: Adjust | undefined, kind: "drop" | "inner"): { opacity: number; x: number; y: number; blur: number; colour: string } | null {
+export function shadowOf(a: Adjust | undefined, kind: "drop" | "inner"): { opacity: number; x: number; y: number; blur: number; spread: number; colour: string } | null {
   const l = layersOf(a).find((v) => !!v[`${kind}Opacity`]);
-  return l ? { opacity: l[`${kind}Opacity`]! / 100, x: (l[`${kind}X`] ?? 0) / 100, y: (l[`${kind}Y`] ?? 0) / 100, blur: (l[`${kind}Blur`] ?? 0) / 100, colour: (kind === "drop" ? l.dropColor : l.innerColor) ?? "#000000" } : null;
+  return l ? { opacity: l[`${kind}Opacity`]! / 100, x: (l[`${kind}X`] ?? 0) / 100, y: (l[`${kind}Y`] ?? 0) / 100, blur: (l[`${kind}Blur`] ?? 0) / 100, spread: (l[`${kind}Spread`] ?? 0) / 100, colour: (kind === "drop" ? l.dropColor : l.innerColor) ?? "#000000" } : null;
 }
 
 /** A full shadow offset is this share of the object's size, and a full shadow blur (its standard deviation) this share. */
@@ -138,7 +142,7 @@ export function reachFraction(a: Adjust | undefined, picture: boolean): number {
   if (!a) return 0;
   const blur = picture ? 0 : Math.max(0, ...layersOf(a).map((l) => l.blur ?? 0));
   const d = shadowOf(a, "drop");
-  return 3 * (blur / 100) * 0.02 * 2 + (d ? Math.max(Math.abs(d.x), Math.abs(d.y)) * SHADOW_OFFSET + 3 * d.blur * SHADOW_SOFT : 0);
+  return 3 * (blur / 100) * 0.02 * 2 + (d ? Math.max(Math.abs(d.x), Math.abs(d.y)) * SHADOW_OFFSET + 3 * d.blur * SHADOW_SOFT + d.spread * SHADOW_SOFT : 0);
 }
 
 /** A colour `#rrggbb` or `#rrggbbaa` with the colour adjustments made to it (anything else is returned as it is): what a coarse object seen from inside is drawn as. */

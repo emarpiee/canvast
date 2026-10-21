@@ -1174,3 +1174,29 @@ test("an adjustment's number can be dragged left or right to change it, like the
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === pic.id)!.adjust?.["exposure"], "the first drag is its own undo step").toBeGreaterThan(0);
 });
+
+test("every group of adjustments has its own Reset: it takes that group off, one undo step, and is off while the group is untouched", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await openAdjust(p);
+  const adj = async () => (await objs(app)).find((o) => o.id === pic.id)!.adjust;
+  const reset = (name: string) => p.locator(`.adjust-pop [data-group-reset="${name}"]`);
+  await expect(reset("Light"), "nothing to reset yet").toBeDisabled();
+  for (const [key, v] of [["exposure", "30"], ["saturation", "-20"], ["blur", "10"]] as const) {
+    await p.locator(`.adjust-pop [data-adj-num="${key}"]`).fill(v);
+    await p.locator(`.adjust-pop [data-adj-num="${key}"]`).blur();
+  }
+  expect(await adj()).toEqual({ exposure: 30, saturation: -20, blur: 10 });
+  await expect(reset("Light")).toBeEnabled();
+  await reset("Light").click();
+  expect(await adj(), "only the Light group went").toEqual({ saturation: -20, blur: 10 });
+  await expect(reset("Light")).toBeDisabled();
+  await reset("Colour").click();
+  await reset("Detail").click();
+  expect(await adj(), "all gone").toBeUndefined();
+  await p.keyboard.press("Control+z");
+  expect(await adj(), "undo brings back the last group reset").toEqual({ blur: 10 });
+});
