@@ -245,3 +245,35 @@ test("Pattern styles: update a style from the Pattern panel, and pressing one wi
   await expect.poll(async () => (await objs(app)).filter((o) => o.container?.mask).length).toBe(2);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Pattern: with several shapes picked, Generate makes one pattern on each of them, and the pick stays", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("u");
+  await app.drag({ x: 480, y: 300 }, { x: 600, y: 380 }, 6);
+  await app.drag({ x: 700, y: 300 }, { x: 820, y: 380 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(540, 340);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(760, 340);
+  await p.keyboard.up("Shift");
+  await p.click("[data-pattern-panel]");
+  await choose(app, "tides");
+  await expect(p.locator("[data-pg-target]")).toContainText("2 picked shapes");
+  await make(app);
+  await expect.poll(async () => (await objs(app)).filter((o) => o.container?.mask).length).toBe(2);
+  expect(await p.evaluate(() => window.__canvastDebug.selection().length), "both shapes are still picked").toBe(2);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Names above picked items never overlap: a pattern's sheet and its pieces, all picked, write one name where they start together", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "tides");
+  await make(app);
+  await p.keyboard.press("v");
+  await p.keyboard.press("Control+a");
+  await app.frame();
+  const labels = await p.evaluate(() => window.__canvastDebug.itemLabels());
+  expect(labels.length).toBeGreaterThan(0);
+  for (const a of labels) for (const b of labels) if (a !== b) expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h, `${a.text} and ${b.text} overlap`).toBe(false);
+});

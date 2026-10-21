@@ -125,7 +125,7 @@ export interface DebugHook {
   setTool(t: Tool): void;
   setLassoFilter(f: LassoFilter): void;
   /** The names drawn above items at the last frame (sheets, pictures, named items). */
-  itemLabels(): Array<{ id: string; text: string }>;
+  itemLabels(): Array<{ id: string; text: string; x: number; y: number; w: number; h: number }>;
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
   /** Save the view and collect stored frames nothing refers to (normally done after many frames were written). */
@@ -395,7 +395,7 @@ export function installDebugHook(
       editor.lassoFilter = f;
       editor.changed();
     },
-    itemLabels: () => deps.labels().map((l) => ({ id: l.id, text: l.text })),
+    itemLabels: () => deps.labels().map((l) => ({ id: l.id, text: l.text, x: l.x, y: l.y, w: l.w, h: l.h })),
     objectScreen: (id) => {
       const o = doc.get(id);
       if (!o) throw new Error(`no object ${id}`);

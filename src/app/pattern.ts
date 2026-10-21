@@ -8,6 +8,7 @@ import { normalizeUnit } from "../doc/edit-ops";
 import { groupObjects } from "../doc/groups";
 import type { CanvasObject, GenInfo, PathObject } from "../doc/model";
 import { homeObject, newObjectId } from "../doc/model";
+import type { ObjectId } from "../doc/model";
 import { drawnParams, drawnSubs, geometryBounds, mapSubs } from "../doc/path";
 import type { Generator, Values } from "../gen";
 import { cleanValues, generate } from "../gen";
@@ -37,6 +38,39 @@ export function patternTarget(doc: DocumentStore, editor: EditorState): { kind: 
   return o.sub.some((s) => s.closed) ? { kind: "shape", obj: o } : null;
 }
 
+/** The picked sheets and closed shapes a pattern can go on, when two or more are picked (each gets its own); none when one or none is. */
+export function patternTargets(doc: DocumentStore, editor: EditorState): ObjectId[] {
+  const picked = editor.selection;
+  if (picked.size < 2 || foundPattern(doc, editor)) return []; // (the shapes of a pattern picked: the pattern is being edited, not given another)
+  try {
+    return [...picked].filter((id) => {
+      editor.selection = new Set([id]);
+      return patternTarget(doc, editor) !== null;
+    });
+  } finally {
+    editor.selection = picked;
+  }
+}
+
+/**
+ * Make the pattern on each of several picked sheets or shapes (one undo step each; the pick stays, so the next Generate goes on them again).
+ * Null when fewer than two can take one (`makePattern` then does the work); else how many were made.
+ */
+export function makePatternEach(doc: DocumentStore, editor: EditorState, view: ViewState, g: Generator, values: Values, seed: number): number | null {
+  const ids = patternTargets(doc, editor);
+  if (ids.length < 2) return null;
+  const picked = editor.selection;
+  let made = 0;
+  for (const id of ids) {
+    editor.selection = new Set([id]);
+    if (makePattern(doc, editor, view, newPatternSession(), g, values, seed)) made++;
+  }
+  editor.selection = new Set([...picked].filter((id) => !!doc.get(id)));
+  editor.message = `Made the pattern on ${made} of ${ids.length} picked.`;
+  editor.changed();
+  return made;
+}
+
 let memo: { doc: DocumentStore; rev: number; sel: string; out: ReturnType<typeof findPattern> } | null = null;
 
 function findPattern(doc: DocumentStore, editor: EditorState): { info: GenInfo; members: CanvasObject[]; host: PathObject } | null {
@@ -61,6 +95,8 @@ export function foundPattern(doc: DocumentStore, editor: EditorState): { info: G
 
 /** The words for what a result goes on, for the panel. */
 export function patternTargetLabel(doc: DocumentStore, editor: EditorState): string {
+  const many = patternTargets(doc, editor).length;
+  if (many > 1) return `${many} picked shapes: one pattern on each`;
   const f = foundPattern(doc, editor);
   if (f) return `This pattern (${f.info.id}): changes replace it`;
   const t = patternTarget(doc, editor);

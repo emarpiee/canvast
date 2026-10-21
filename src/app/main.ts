@@ -88,7 +88,7 @@ import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
-import { patternTarget, patternTargetLabel, foundPattern, makePattern, newPatternSession } from "./pattern";
+import { makePattern, makePatternEach, newPatternSession, patternTargetLabel, patternTargets, foundPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
@@ -783,19 +783,7 @@ async function start(): Promise<void> {
         patternPanel.use(d.id, d.v, d.seed);
         // Several sheets or shapes picked: the pattern is made on each of them (one undo step each), the panel holding its settings
         const g = generatorById(d.id);
-        const picked = editor.selection;
-        const each = [...picked].filter((id) => {
-          editor.selection = new Set([id]);
-          return patternTarget(doc, editor) !== null;
-        });
-        editor.selection = picked;
-        if (g && each.length > 1) {
-          const made = each.filter((id) => {
-            editor.selection = new Set([id]);
-            return makePattern(doc, editor, view, newPatternSession(), g, cleanValues(g, d.v), d.seed);
-          });
-          editor.message = `Pattern style “${label}” made on ${made.length} of ${each.length} picked.`;
-        } else editor.message = `Pattern style “${label}”.`;
+        if (!g || makePatternEach(doc, editor, view, g, cleanValues(g, d.v), d.seed) === null) editor.message = `Pattern style “${label}”.`;
         editor.changed();
       },
     },
@@ -895,12 +883,12 @@ async function start(): Promise<void> {
   dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
   const patternSession = newPatternSession();
   const patternPanel = mountPatternPanel(side, editor, {
-    make: (g, values, seed) => makePattern(doc, editor, view, patternSession, g, values, seed),
+    make: (g, values, seed) => (makePatternEach(doc, editor, view, g, values, seed) === null ? makePattern(doc, editor, view, patternSession, g, values, seed) : false),
     live: () => (patternSession.top !== null && doc.lastTransaction === patternSession.top) || foundPattern(doc, editor) !== null,
     found: () => { const f = foundPattern(doc, editor); return f ? { id: f.info.id, gid: f.info.gid, seed: f.info.seed, v: f.info.v } : null; },
     end: () => { patternSession.top = null; patternSession.sheet = null; },
     target: () => patternTargetLabel(doc, editor),
-    hasTarget: () => patternTargetLabel(doc, editor) !== "A new sheet",
+    hasTarget: () => patternTargetLabel(doc, editor) !== "A new sheet" && patternTargets(doc, editor).length < 2,
     saveStyle: (g, values, seed) => {
       void session.styles.add("pattern", "", { id: g.id, seed, v: values }).then((made) => {
         editor.message = made ? `Saved the pattern style “${made.name}”. It is in the Styles panel.` : session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "The pattern could not be saved as a style.";
