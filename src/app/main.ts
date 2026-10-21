@@ -371,6 +371,7 @@ async function start(): Promise<void> {
     view.distanceAware = settings.get("nav.speed") === "distance";
     view.maxGlideMs = settings.get("nav.maxSeconds") * 1000;
     view.ease = settings.get("nav.ease");
+    view.fade = settings.get("nav.fade") ? (o) => void (canvas.style.opacity = o >= 1 ? "" : String(o)) : null;
   };
   applyAppearance();
   applyZen();
@@ -1673,6 +1674,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "nav.speed":
       case "nav.maxSeconds":
       case "nav.ease":
+      case "nav.fade":
         applyAppearance();
         return;
       case "ui.zen":

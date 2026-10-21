@@ -60,6 +60,8 @@ export class ViewState {
   distanceAware = true;
   maxGlideMs = 3000;
   ease: "smooth" | "linear" | "out" = "smooth";
+  /** Called with the opacity (0 to 1) the canvas should have during a dive, so the switch in the middle is a quick dip, not a cut; null: off. */
+  fade: ((opacity: number) => void) | null = null;
   private glide = 0;
   private gliding = false;
 
@@ -102,6 +104,7 @@ export class ViewState {
       try {
         if (t >= 1) this.setFrameCamera(target);
         else if (dive) {
+          this.fade?.(Math.min(1, Math.abs(t - 0.5) / 0.08)); // dark for a moment around the switch
           // First half: out from here (speeding up); second half: in to there (slowing down); both linear when the easing is.
           const lin = this.ease === "linear";
           if (t < 0.5) {
@@ -120,12 +123,16 @@ export class ViewState {
         this.gliding = false;
       }
       this.glide = t >= 1 ? 0 : requestAnimationFrame(step);
-      if (t >= 1) done?.();
+      if (t >= 1) {
+        this.fade?.(1);
+        done?.();
+      }
     };
     this.glide = requestAnimationFrame(step);
   }
 
   private cancelGlide(): void {
+    if (this.glide) this.fade?.(1);
     if (this.glide) cancelAnimationFrame(this.glide);
     this.glide = 0;
   }

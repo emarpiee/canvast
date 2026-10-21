@@ -52,9 +52,10 @@ test("a far trip to a bookmark dives instead of cutting; Glide near only and Cut
   const level = () => p.evaluate(() => Number(window.__canvastDebug.depth()));
   const go = () => p.getByRole("button", { name: /Go to Bookmark 1/ }).click();
   await p.evaluate(() => {
-    const w = window as unknown as { __s: number[] };
+    const w = window as unknown as { __s: number[]; __o: string[] };
     w.__s = [];
-    const f = (): void => (w.__s.push(Number(window.__canvastDebug.depth())), void requestAnimationFrame(f));
+    w.__o = [];
+    const f = (): void => (w.__s.push(Number(window.__canvastDebug.depth())), w.__o.push(document.getElementById("canvas")!.style.opacity), void requestAnimationFrame(f));
     f();
   });
   await go();
@@ -63,6 +64,9 @@ test("a far trip to a bookmark dives instead of cutting; Glide near only and Cut
   expect(seen.some((d) => d > 0 && d < 100), "it passed through the levels between").toBe(true);
   // out first (below where it started), then in: the dive zooms out before it zooms in
   expect(Math.max(...seen)).toBeLessThanOrEqual(100);
+  const dips = await p.evaluate(() => (window as unknown as { __o: string[] }).__o);
+  expect(dips.some((o) => o !== "" && Number(o) < 0.5), "the canvas dips at the switch").toBe(true);
+  expect(dips[dips.length - 1], "and is whole again").toBe("");
   for (const mode of ["near", "cut"]) {
     await p.evaluate(() => window.__canvastDebug.setSetting("nav.travel", "fly"));
     await p.evaluate((m) => window.__canvastDebug.setSetting("nav.travel", m), mode);

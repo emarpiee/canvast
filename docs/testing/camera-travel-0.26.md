@@ -8,3 +8,5 @@ New tests (`bookmarks.spec.ts`, Chromium 10.4 s for the whole file):
 - `Alt+n`, `]`, `[`, reorder from the menu and by drag, a bookmark of the picked things (camera unchanged), a tour that moves on by itself.
 
 Not run: the full suite; a heavy canvas during a dive.
+
+v0.26.1: bookmarks.spec + settings.spec, all projects: 40 passed, 1.6 min (fade dip checked).

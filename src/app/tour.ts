@@ -26,7 +26,7 @@ export function mountTour(host: HTMLElement, view: ViewState, list: BookmarkList
     if (!items.length) return stop();
     at = Math.max(0, Math.min(items.length - 1, i));
     const b = items[at]!;
-    view.glideMs = glideBefore > 0 ? Math.max(glideBefore, 900) : 0; // a tour glides slowly enough to follow (or not at all with reduced motion)
+    view.glideMs = glideBefore > 0 ? Math.round(Math.max(glideBefore, 900) * { slow: 1.6, normal: 1, fast: 0.5 }[settings.get("tour.speed")]) : 0; // a tour glides slowly enough to follow (or not at all with reduced motion)
     clearTimeout(timer);
     // With a wait set, the tour moves on by itself once the view has arrived (a glide cut short by the person stops it).
     const wait = settings.get("tour.pause") * 1000;

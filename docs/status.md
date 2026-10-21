@@ -471,6 +471,11 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.26.1 — Fade at the switch, tour speed (2026-10-21)
+
+- **Implemented:** `ViewState.fade` (canvas opacity dip around the dive's switch), settings `nav.fade`, `tour.speed`. ADR 0163 updated.
+- **Tested:** the dive test in `bookmarks.spec` checks the dip and that opacity comes back.
+
 ## v0.26.0 — Camera travel and bookmark keys (2026-10-21)
 
 - **Implemented:** `ViewState.flyTo` dives (24 levels out, then in) for other frames or trips over 8 levels of zoom-out, with `travel`, `distanceAware`, `maxGlideMs`, `ease`; settings `nav.travel/speed/maxSeconds/ease`, `tour.pause`; bookmark `move`, `step`, `goTo`; keys `bookmark.prev/next/1-9`; drag reorder; bookmark of the picked things; debug hook `setSetting`. ADR 0163.

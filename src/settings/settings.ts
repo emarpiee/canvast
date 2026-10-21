@@ -186,6 +186,8 @@ export const SETTINGS = {
   "nav.speed": { scope: "device", default: "distance", validate: oneOf("distance", "fixed"), effect: "immediate" } as Def<"distance" | "fixed">,
   "nav.ease": { scope: "device", default: "smooth", validate: oneOf("smooth", "linear", "out"), effect: "immediate" } as Def<"smooth" | "linear" | "out">,
   "nav.maxSeconds": { scope: "device", default: 3, validate: range(0.5, 6), effect: "immediate" } as Def<number>,
+  "nav.fade": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "tour.speed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "tour.pause": { scope: "device", default: 0, validate: range(0, 10), effect: "immediate" } as Def<number>,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };

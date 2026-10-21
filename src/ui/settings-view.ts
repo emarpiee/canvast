@@ -157,6 +157,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "nav.speed", label: "Travel time", help: "Distance-aware: a short hop takes the base time (Animation speed), a long trip takes longer, up to the limit below. Fixed: every trip takes the base time.", control: { kind: "select", options: [["distance", "Grows with distance"], ["fixed", "Fixed"]] } },
       { key: "nav.maxSeconds", label: "Longest trip", help: "The most a trip may take with distance-aware time.", control: { kind: "range", min: 0.5, max: 6, step: 0.5, unit: "s" } },
       { key: "nav.ease", label: "Travel easing", help: "Smooth starts and ends slowly. Linear moves at one pace. Ease-out starts fast and settles.", control: { kind: "select", options: [["smooth", "Smooth"], ["linear", "Linear"], ["out", "Ease-out"]] } },
+      { key: "nav.fade", label: "Fade at the switch of a far trip", help: "A far trip zooms out from here and in to there; the switch happens in the middle. On: the canvas dips dark for a moment around it, so the switch is not seen as a cut.", control: { kind: "toggle" } },
+      { key: "tour.speed", label: "Tour: travel speed", help: "How fast a tour moves between stops, on top of the travel time. A tour always glides at least slowly enough to follow.", control: { kind: "select", options: [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]] } },
       { key: "tour.pause", label: "Tour: wait at each stop", help: "A tour of the bookmarks moves on by itself after this many seconds at a stop. 0: you step with the arrow keys.", control: { kind: "range", min: 0, max: 10, step: 1, unit: "s" } },
     ],
   },

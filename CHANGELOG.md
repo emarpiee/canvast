@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.1 — Fade at the switch, tour speed (2026-10-21)
+
+- **Fade at the switch** (Settings → Navigation, on): a far trip dips the canvas dark for a moment where it switches from the zoom-out to the zoom-in, so it is not seen as a cut.
+- **Tour: travel speed** (Slow / Normal / Fast) for the glides between tour stops.
+
 ## 0.26.0 — Camera travel and bookmark keys (2026-10-21)
 
 - **Camera travel** (Settings → Navigation): a far bookmark (another depth or frame, or too far to show the way) no longer cuts; the view zooms out from here and in to there. *Travel to a bookmark*: Fly / Glide near only / Cut. *Travel time*: grows with the distance or fixed, up to *Longest trip*. *Travel easing*: smooth, linear, ease-out.
