@@ -15,3 +15,5 @@ Dive frame times (a far trip, 5000 levels away, 25 pen strokes on the canvas, 3.
 - Chromium: 214 frames, p50 16.7 ms, p95 16.8 ms, max 16.8 ms (steady 60 fps).
 - Firefox: 169 frames, p50 17.1 ms, p95 33.8 ms, max 72.4 ms (a few dropped frames, one hitch).
 Not measured: a canvas with thousands of objects or large pictures.
+
+v0.26.2: bookmarks+settings+navigation, chromium+firefox: 56 passed, 4 skipped, 3.4 min. Real (non-debug) Chromium with emulated reduced motion: trip cuts and says why; with the setting off it glides (7 distinct frames).

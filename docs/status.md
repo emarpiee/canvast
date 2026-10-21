@@ -471,6 +471,11 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.26.2 — Why a trip cut (2026-10-21)
+
+- **Implemented:** `nav.baseSeconds`, `nav.respectMotion`, `ViewState.cutReason/onCut` (a once-only message). Checked in a real (non-debug) Chromium with reduced motion emulated: cuts and says so; with the setting off it glides.
+- **Tested:** `bookmarks.spec`, `settings.spec` (see the test log).
+
 ## v0.26.1 — Fade at the switch, tour speed (2026-10-21)
 
 - **Implemented:** `ViewState.fade` (canvas opacity dip around the dive's switch), settings `nav.fade`, `tour.speed`. ADR 0163 updated.

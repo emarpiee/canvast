@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.2 — Why a trip cut (2026-10-21)
+
+- **Found:** with Animation on System and the operating system asking for reduced motion, every trip cut. Now the view says so once ("The view jumped because your system asks for reduced motion"), and *Follow the system's reduced motion* (Settings → Navigation) can be turned off to glide anyway. Animation set to None still cuts.
+- **Travel time (base)** is its own setting (0.1 to 3 s, 0.5 s at first) and no longer follows *Animation speed*.
+
 ## 0.26.1 — Fade at the switch, tour speed (2026-10-21)
 
 - **Fade at the switch** (Settings → Navigation, on): a far trip dips the canvas dark for a moment where it switches from the zoom-out to the zoom-in, so it is not seen as a cut.

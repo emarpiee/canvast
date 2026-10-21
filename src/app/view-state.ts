@@ -62,6 +62,9 @@ export class ViewState {
   ease: "smooth" | "linear" | "out" = "smooth";
   /** Called with the opacity (0 to 1) the canvas should have during a dive, so the switch in the middle is a quick dip, not a cut; null: off. */
   fade: ((opacity: number) => void) | null = null;
+  /** Why trips cut because of the motion settings ("" when they do not), and who to tell (once). */
+  cutReason = "";
+  onCut: ((why: string) => void) | null = null;
   private glide = 0;
   private gliding = false;
 
@@ -76,6 +79,7 @@ export class ViewState {
     const a = this.frameCamera;
     this.cancelGlide();
     const land = (): void => {
+      if (!(this.glideMs > 0) && this.cutReason) this.onCut?.(this.cutReason);
       this.setFrameCamera(target);
       done?.();
     };

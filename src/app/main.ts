@@ -365,13 +365,22 @@ async function start(): Promise<void> {
     const speed = { slow: 1.6, normal: 1, fast: 0.6 }[settings.get("ui.animSpeed")];
     root.style.setProperty("--anim-speed", String(m === "subtle" ? speed * 0.6 : speed));
     // Gliding between views (ADR 0116): off for reduced motion, and in the test session (a test reads the camera the moment it asks).
-    const still = m === "reduce" || (m === "system" && matchMedia("(prefers-reduced-motion: reduce)").matches);
-    view.glideMs = debug || still ? 0 : Math.round(420 * (m === "subtle" ? speed * 0.6 : speed));
+    const still = m === "reduce" || (m === "system" && settings.get("nav.respectMotion") && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    view.glideMs = debug || still ? 0 : Math.round(settings.get("nav.baseSeconds") * 1000);
+    // Said once, when a trip cuts only because of the motion settings (so a cut is never a mystery).
+    view.cutReason = debug || !still ? "" : m === "reduce" ? "Animation is set to None" : "your system asks for reduced motion";
     view.travel = settings.get("nav.travel");
     view.distanceAware = settings.get("nav.speed") === "distance";
     view.maxGlideMs = settings.get("nav.maxSeconds") * 1000;
     view.ease = settings.get("nav.ease");
     view.fade = settings.get("nav.fade") ? (o) => void (canvas.style.opacity = o >= 1 ? "" : String(o)) : null;
+  };
+  let cutTold = false;
+  view.onCut = (why) => {
+    if (cutTold) return;
+    cutTold = true;
+    editor.message = `The view jumped because ${why}. Settings → Navigation (Camera travel) and Performance (Animation) change it.`;
+    editor.changed();
   };
   applyAppearance();
   applyZen();
@@ -1675,6 +1684,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "nav.maxSeconds":
       case "nav.ease":
       case "nav.fade":
+      case "nav.baseSeconds":
+      case "nav.respectMotion":
         applyAppearance();
         return;
       case "ui.zen":
