@@ -2,6 +2,7 @@
 
 ## 0.32.3 — Paint panels match the app (2026-10-22)
 
+- **A plain mouse wheel scrolls a bar sideways** when it is wider than the window (the Properties bar, the Actions bar, the dock, the view controls, the text format bar, the Settings tabs), in both views; Shift+wheel still works.
 - The Paint view's **Layers** and **Adjustment** panels are the dock's panels, like the canvas's Layers panel (title bar, fold, move, close).
 - **Brushes panel:** tips drawn in the theme's ink (some showed green); a **Thumbnails** view (the tips in a grid, with their sizes) beside the list. The Brushes button shows the tool's tip; the picked preset and the open button have a ring, not the accent fill.
 - **Brush settings** laid out as the other panels: padding, wider labels, menus for long choices (controls), switches two to a line, a curve only under a controlled jitter.

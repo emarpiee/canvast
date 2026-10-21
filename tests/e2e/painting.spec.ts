@@ -284,3 +284,19 @@ test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, B
   expect((await brushes()).tool).toMatchObject({ preset: mine.id, brush: { scattering: { enabled: true } } });
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a plain wheel over a bar's row that is wider than the window scrolls it sideways (every bar: bar.ts syncScroll), not the page", async ({ app }) => {
+  const p = app.page;
+  await newPainting(p);
+  await p.setViewportSize({ width: 600, height: 800 });
+  const row = p.locator("[data-paint-options]").locator("xpath=ancestor-or-self::*[contains(@class,'tb-options-row')][1]");
+  await expect(row).toHaveAttribute("data-scroll", "");
+  const at = () => p.evaluate(() => window.__canvastDebug.paint.screenOf(1000, 500));
+  const before = await at();
+  const b = (await row.boundingBox())!;
+  await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await p.mouse.wheel(0, 200);
+  await expect.poll(() => row.evaluate((r) => r.scrollLeft)).toBeGreaterThan(0);
+  expect(await at(), "the page did not move or zoom").toEqual(before);
+  expect(app.consoleErrors).toEqual([]);
+});

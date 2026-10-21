@@ -1,4 +1,5 @@
 import * as D from "../core/dyadic";
+import { syncScroll } from "./bar";
 import { newInk } from "../render/ink";
 import type { WorldPoint } from "../core/camera";
 import { lookAt, worldToScreen } from "../core/camera";
@@ -259,6 +260,7 @@ export function mountTextEditor(
     box.hidden = bar.hidden = false;
     editor.editingText = true;
     position();
+    syncScroll(bar); // (a narrow window: the bar scrolls, by wheel too, with the other bars' cue)
     box.focus({ preventScroll: true });
     // Caret at the end of the last text, inside its block (formatting applies to that block).
     let end: Node = box;

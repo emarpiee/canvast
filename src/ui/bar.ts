@@ -42,5 +42,12 @@ export function syncScroll(row: HTMLElement): void {
   if (!row.dataset["scrollBound"]) {
     row.dataset["scrollBound"] = "1";
     row.addEventListener("scroll", () => syncScroll(row), { passive: true });
+    // A plain wheel scrolls the row sideways too (Shift+wheel already does, natively), on every bar that uses this.
+    row.addEventListener("wheel", (e) => {
+      if (e.shiftKey || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX) || row.scrollWidth <= row.clientWidth + 1) return;
+      const before = row.scrollLeft;
+      row.scrollLeft += e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? e.deltaY * row.clientWidth : e.deltaY;
+      if (row.scrollLeft !== before) e.preventDefault();
+    }, { passive: false });
   }
 }
