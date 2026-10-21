@@ -486,7 +486,7 @@ test("Settings > Storage holds the backup: the last backup, a full export, the c
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("paintings travel in a workspace backup: every tile checked, imported with new ids, painted as they were (ADR 0165)", async ({ app, browser }) => {
+test("paintings and brush presets travel in a workspace backup: every tile and tip checked, imported with new ids, painted as they were (ADR 0165, 0169)", async ({ app, browser }) => {
   const p = app.page;
   await p.getByTestId("view-paint").click();
   await p.getByTestId("paint-new").click();
@@ -500,18 +500,22 @@ test("paintings travel in a workspace backup: every tile checked, imported with 
   await p.mouse.up();
   await p.evaluate(() => window.__canvastDebug.paint.settled());
   const tiles = s.layers[0]!.id;
+  const presets = (await p.evaluate(() => window.__canvastDebug.paint.brushes())).presets; // (the built-in ones, stored the first time)
   await p.getByTestId("view-canvas").click();
   await openPanel(p);
   const file = await download(p, () => p.getByTestId("set-export-full").click());
   const m = await manifestOf(file.bytes);
   expect(m["paintings"]).toMatchObject({ file: "paintings.json", count: 1 });
   const z = await readZip(new Blob([new Uint8Array(file.bytes)]));
-  expect([...z.keys()].filter((k) => k.startsWith("paint-tiles/")).length).toBe((m["paintings"] as { tiles: number }).tiles);
+  expect((m["brushes"] as unknown[]).length).toBe(presets.length);
+  expect([...z.keys()].filter((k) => k.startsWith("paint-tiles/")).length, "the painted tiles and the presets' tips").toBeGreaterThan((m["paintings"] as { tiles: number }).tiles);
 
   const other = await freshProfile(browser);
   const q = other.page;
   expect(await importArchive(q, file.name, file.bytes)).toContain("Import");
   await expect(q.getByTestId("toast")).toContainText("1 painting added");
+  await expect(q.getByTestId("toast")).toContainText(`${presets.length} brush presets added`);
+  expect((await q.evaluate(() => window.__canvastDebug.paint.brushes())).presets.map((x) => [x.id, x.tips])).toEqual(presets.map((x) => [x.id, x.tips]));
   const list = await q.evaluate(() => window.__canvastDebug.paint.list());
   expect(list.map((x) => x.name)).toEqual(["Painting 1"]);
   expect(list[0]!.id).not.toBe(s.paintingId);

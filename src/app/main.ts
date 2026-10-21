@@ -1592,7 +1592,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   // Its bar (the painting's name and page size) sits beside the view tabs, where the canvas has its board and canvas menu.
   document.getElementById("nav")!.append(paintView.head);
-  document.getElementById("workspace")!.dataset["only"] = "canvas";
+  // (the board and canvas menu is the canvas's; its crumb stays, the way back to the canvas)
+  document.querySelector<HTMLElement>("#workspace .nav-name-btn")!.dataset["only"] = "canvas";
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;

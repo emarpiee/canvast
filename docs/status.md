@@ -48,7 +48,9 @@ Unverified / Committed / Next bounded task**.
 
 **Committed:** see git log (feat(paint): ... (v0.32.1)).
 
-**Next bounded task:** presets and saved styles in `.canvast` archives and backups; a large generated `.abr` test; then P2c tools.
+**Next bounded task:** a large generated `.abr` test; then P2c tools.
+
+**v0.32.2:** brush presets in workspace archives (format 6; `brushesOf`/`readBrushes`/`importBrushes` in `paint/archive-part.ts`, tips checked by inflate + SHA-256); the canvas crumb stays in the Paint view (only the board menu is canvas-only). Tested: `archive.spec.ts` + `painting.spec.ts` 13/13 Chromium, the archive paintings test in Firefox.
 
 ## Painting view, brush presets (v0.32.0, 2026-10-22)
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.32.2 — Brush presets in backups (2026-10-22)
+
+- **Workspace backups carry the brush presets** with their tips (archive format 6); importing adds the presets the library does not have yet.
+- The Canvas button (∞) stays beside the painting's name in the Paint view, the way back to the canvas.
+
 ## 0.32.1 — Brush mode, pinned sections, response curves, choose a tip (2026-10-22)
 
 - **Brush settings:** the brush's blend **mode**; a **curve** for each controlled jitter (pressure, tilt, wheel, …), with the Curves control of the adjustments; a **pin** per section keeps it when another preset is picked; **Choose a tip** (round or a preset's picture) and **Choose a pattern** for the texture (procedural or a preset's picture).
