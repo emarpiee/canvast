@@ -17,8 +17,12 @@
 
 ## Not done
 
-A straight flight across frames.
+Nothing open here.
 
 ## Added later (v0.26.1)
 
 `nav.fade` (default on): `ViewState.fade(opacity)` dips the canvas to dark within 8% of the trip either side of the switch and restores it on arrival or interruption. `tour.speed` (slow / normal / fast) scales the tour's glide.
+
+## Continuous flight (v0.26.3)
+
+The dive jumped from one view to the other at the switch, which looked bad. Every trip (up to 20,000 levels apart, the bits of the target's exact position in this frame) now follows one path (van Wijk and Nuij 2003), computed in units of the distance `d` between the centres: zoom out at the start position until the width of the view is within [2^-2, 2^40] of `d`, cross with the paper's constant-speed path (ρ = √2), zoom in at the target. The time is distributed over the path in e-folds, easing applies to it, and the duration grows with the levels travelled as before. Past the middle the distance still to go is computed from the target end (`1 - u(s)` as `u` of the reversed path), so a remainder of 2^-500 keeps its digits. The dive (24 levels out, a dip, 24 levels in) stays for trips over 20,000 levels, where the exact position would take too many bits for Firefox.

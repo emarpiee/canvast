@@ -471,6 +471,11 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.26.3 — One continuous flight between views (2026-10-21)
+
+- **Implemented:** `flightPlan` in `view-state.ts`: the target is expressed exactly in the current frame (`expressExactIn`, up to 20,000 levels apart), zoom widths are clamped to [2^-2, 2^40] of the distance, and the camera follows the van Wijk path (zoom out, cross at constant speed, zoom in); the part of the way still to go is computed from the target end so its digits are kept. The old dive stays as the fallback beyond 20,000 levels.
+- **Tested:** the far-trip test in `bookmarks.spec` (100 levels: no frame jumps by more than 25 levels, never past the start; 100,000: the dive with its dip). Real Chromium run with screenshots: a smooth zoom out to a speck and in. Frame times in `docs/testing/camera-travel-0.26.md`.
+
 ## v0.26.2 — Why a trip cut (2026-10-21)
 
 - **Implemented:** `nav.baseSeconds`, `nav.respectMotion`, `ViewState.cutReason/onCut` (a once-only message). Checked in a real (non-debug) Chromium with reduced motion emulated: cuts and says so; with the setting off it glides.

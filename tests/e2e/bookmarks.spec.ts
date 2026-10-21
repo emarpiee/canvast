@@ -42,13 +42,11 @@ test("the bookmark pictures are filled in and updated by visiting each place, an
 });
 
 /** Camera travel (ADR 0163): near and far trips, the three travel choices, and the keys and order of the bookmarks. */
-test("a far trip to a bookmark dives instead of cutting; Glide near only and Cut arrive at once", async ({ app }) => {
+test("a far trip to a bookmark flies smoothly (a dive when too far to compute); Glide near only and Cut arrive at once", async ({ app }) => {
   const p = app.page;
   await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
   await p.getByRole("button", { name: "Add bookmark" }).click(); // at home
   const home = await p.evaluate(() => window.__canvastDebug.camera());
-  await p.evaluate(() => window.__canvastDebug.jump(100)); // another frame, far from a glide's reach
-  await p.evaluate(() => window.__canvastDebug.glide(300));
   const level = () => p.evaluate(() => Number(window.__canvastDebug.depth()));
   const go = () => p.getByRole("button", { name: /Go to Bookmark 1/ }).click();
   await p.evaluate(() => {
@@ -58,15 +56,25 @@ test("a far trip to a bookmark dives instead of cutting; Glide near only and Cut
     const f = (): void => (w.__s.push(Number(window.__canvastDebug.depth())), w.__o.push(document.getElementById("canvas")!.style.opacity), void requestAnimationFrame(f));
     f();
   });
-  await go();
-  await expect.poll(async () => JSON.stringify(await p.evaluate(() => window.__canvastDebug.camera())), { timeout: 8000 }).toBe(JSON.stringify(home));
-  const seen = await p.evaluate(() => (window as unknown as { __s: number[] }).__s);
-  expect(seen.some((d) => d > 0 && d < 100), "it passed through the levels between").toBe(true);
-  // out first (below where it started), then in: the dive zooms out before it zooms in
-  expect(Math.max(...seen)).toBeLessThanOrEqual(100);
-  const dips = await p.evaluate(() => (window as unknown as { __o: string[] }).__o);
-  expect(dips.some((o) => o !== "" && Number(o) < 0.5), "the canvas dips at the switch").toBe(true);
-  expect(dips[dips.length - 1], "and is whole again").toBe("");
+  // 100 levels: another frame, one continuous flight (no frame of it is far from the one before); 100000: too far to compute, so a dive with a dip
+  for (const far of [100, 100000]) {
+    await p.evaluate(() => window.__canvastDebug.glide(300));
+    await p.evaluate((n) => window.__canvastDebug.jump(n), far);
+    await p.evaluate(() => ((window as unknown as { __s: number[]; __o: string[] }).__s = [], (window as unknown as { __o: string[] }).__o = []));
+    await go();
+    await expect.poll(async () => JSON.stringify(await p.evaluate(() => window.__canvastDebug.camera())), { timeout: 12000 }).toBe(JSON.stringify(home));
+    const seen = await p.evaluate(() => (window as unknown as { __s: number[] }).__s);
+    expect(seen.some((d) => d > 0 && d < far), `${far}: it passed through the levels between`).toBe(true);
+    const dips = await p.evaluate(() => (window as unknown as { __o: string[] }).__o);
+    if (far === 100) {
+      const steps = seen.slice(1).map((d, i) => Math.abs(d - seen[i]!));
+      expect(Math.max(...steps), "no frame jumps").toBeLessThan(25);
+      expect(Math.max(...seen), "it never zooms past where it started").toBeLessThanOrEqual(100);
+    } else {
+      expect(dips.some((o) => o !== "" && Number(o) < 0.5), "the canvas dips at the switch").toBe(true);
+      expect(dips[dips.length - 1], "and is whole again").toBe("");
+    }
+  }
   for (const mode of ["near", "cut"]) {
     await p.evaluate(() => window.__canvastDebug.setSetting("nav.travel", "fly"));
     await p.evaluate((m) => window.__canvastDebug.setSetting("nav.travel", m), mode);

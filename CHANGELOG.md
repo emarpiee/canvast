@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.3 — One continuous flight between views (2026-10-21)
+
+- **Fixed:** going to a bookmark in another frame or depth jumped out of one view and into the other. The camera now flies one continuous path (van Wijk and Nuij's "smooth and efficient zooming and panning"): it zooms out through every level until the two places are about a view apart, crosses at constant speed and zooms in to the other, exactly, up to 20,000 levels apart; beyond that it still dives with a dip to dark. Near trips use the same path.
+
 ## 0.26.2 — Why a trip cut (2026-10-21)
 
 - **Found:** with Animation on System and the operating system asking for reduced motion, every trip cut. Now the view says so once ("The view jumped because your system asks for reduced motion"), and *Follow the system's reduced motion* (Settings → Navigation) can be turned off to glide anyway. Animation set to None still cuts.
