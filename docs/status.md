@@ -471,6 +471,11 @@ visible strokes). Alternatives:
 
 **Next bounded task:** Phase 2 (layers and groups, object eraser, per-canvas cameras).
 
+## v0.26.4 — A zoom in is just a zoom in (2026-10-21)
+
+- **Implemented:** `flightPlan` judges the trip in the deeper end's frame (`approxIn`, offsets kept short): within one view it is a pure zoom about the fixed point (fraction `(2^(zD-z)-1)/(2^(zD-zS)-1)` from the deeper end, as exact digits; the camera is built with `normalize` so any depth costs the same); farther apart it is the van Wijk path as before (exact, up to 20,000 levels); the view width (px) now enters the widths.
+- **Tested:** the far-trip test (three cases: zoom only, van Wijk, dive), real Chromium on `showcase.canvast` bookmarks 8 to 13, 1 to 6, 18 to 19 and back (monotone zoom read-outs, one million levels included); frame times in the test log.
+
 ## v0.26.3 — One continuous flight between views (2026-10-21)
 
 - **Implemented:** `flightPlan` in `view-state.ts`: the target is expressed exactly in the current frame (`expressExactIn`, up to 20,000 levels apart), zoom widths are clamped to [2^-2, 2^40] of the distance, and the camera follows the van Wijk path (zoom out, cross at constant speed, zoom in); the part of the way still to go is computed from the target end so its digits are kept. The old dive stays as the fallback beyond 20,000 levels.

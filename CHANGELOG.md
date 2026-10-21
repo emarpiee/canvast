@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.4 — A zoom in is just a zoom in (2026-10-21)
+
+- **Fixed:** going to a bookmark that was in view (or nearly: its centre within one view width of where you are, or the other way round) first zoomed out and then in (showcase bookmarks 8 to 12). Now it is one zoom about the point that maps one view to the other, like the wheel, in any direction. This holds at any depth, a million levels included (the numbers are kept in the deeper frame, so nothing grows with the depth).
+- **Fixed:** the zoom-out of a flight between far places was about ten levels too deep (the width of the window was left out).
+- **Flights over 20,000 levels** now only dive (dip to dark) when the two places are also more than a view apart.
+
 ## 0.26.3 — One continuous flight between views (2026-10-21)
 
 - **Fixed:** going to a bookmark in another frame or depth jumped out of one view and into the other. The camera now flies one continuous path (van Wijk and Nuij's "smooth and efficient zooming and panning"): it zooms out through every level until the two places are about a view apart, crosses at constant speed and zooms in to the other, exactly, up to 20,000 levels apart; beyond that it still dives with a dip to dark. Near trips use the same path.

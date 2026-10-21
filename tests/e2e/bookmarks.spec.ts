@@ -56,9 +56,11 @@ test("a far trip to a bookmark flies smoothly (a dive when too far to compute); 
     const f = (): void => (w.__s.push(Number(window.__canvastDebug.depth())), w.__o.push(document.getElementById("canvas")!.style.opacity), void requestAnimationFrame(f));
     f();
   });
-  // 100 levels: another frame, one continuous flight (no frame of it is far from the one before); 100000: too far to compute, so a dive with a dip
-  for (const far of [100, 100000]) {
+  // 100 levels straight above: just a zoom (no zoom out first); 100 levels and a pan of many views: the van Wijk path; 100000 levels and a pan:
+  // too far to compute exactly, so a dive with a dip. No frame of the first two is far from the one before.
+  for (const [far, pans] of [[100, 0], [100, 40], [100000, 40]] as const) {
     await p.evaluate(() => window.__canvastDebug.glide(300));
+    for (let i = 0; i < pans; i++) await p.keyboard.press("Shift+ArrowRight");
     await p.evaluate((n) => window.__canvastDebug.jump(n), far);
     await p.evaluate(() => ((window as unknown as { __s: number[]; __o: string[] }).__s = [], (window as unknown as { __o: string[] }).__o = []));
     await go();
@@ -67,9 +69,9 @@ test("a far trip to a bookmark flies smoothly (a dive when too far to compute); 
     expect(seen.some((d) => d > 0 && d < far), `${far}: it passed through the levels between`).toBe(true);
     const dips = await p.evaluate(() => (window as unknown as { __o: string[] }).__o);
     if (far === 100) {
+      if (pans === 0) expect(Math.max(...seen), "a zoom in: never out past where it started").toBeLessThanOrEqual(100);
       const steps = seen.slice(1).map((d, i) => Math.abs(d - seen[i]!));
       expect(Math.max(...steps), "no frame jumps").toBeLessThan(25);
-      expect(Math.max(...seen), "it never zooms past where it started").toBeLessThanOrEqual(100);
     } else {
       expect(dips.some((o) => o !== "" && Number(o) < 0.5), "the canvas dips at the switch").toBe(true);
       expect(dips[dips.length - 1], "and is whole again").toBe("");

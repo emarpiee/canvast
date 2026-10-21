@@ -23,3 +23,9 @@ Flight frame times (25 strokes, 3.6 s, throw-away spec): 300, 5,000 and 19,000 l
 - Chromium: p50 16.7, p95 16.7 to 16.8, max 16.8 ms at every distance (steady 60 fps, nothing grows with the depth).
 - Firefox: p50 17.1, p95 33.3, max 86 to 100 ms at every distance (the same as before the change: not a depth cost).
 A real (non-debug) Chromium run, 116 levels in, with screenshots every 100 ms: the zoom read-out falls 10^35 → 10^11 → 1× → 0.014× (a speck) → 1×, no jump.
+
+v0.26.4 (a zoom in is just a zoom in): bookmarks + navigation + settings, all projects: 89 passed, 7 skipped, 6.8 min.
+Real Chromium, `showcase.canvast` imported, zoom read-out sampled every 60 ms while going between bookmarks: 8→9, 9→10, 10→11, 11→12, 12→13 (each: one monotone zoom in, no zoom out first), 13→9, 1→6, 6→1, 7→8, 8→7 (1,000 levels), 17→18, 18→19 and 19→8 (one million levels): continuous.
+Flight frame times (25 strokes, 3.8 s, throw-away spec), a zoom from 300, 100,000 and 1,000,000 levels and a pan of 40 steps at 300:
+- Chromium: p50 16.7, p95 16.7 to 16.8, max 16.8 ms in every case.
+- Firefox: p50 17.1, p95 33.3 to 33.4, max 81 to 100 ms in every case (as before).

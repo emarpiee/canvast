@@ -1,7 +1,7 @@
 import type { Camera, ScreenPoint, Viewport } from "../core/camera";
 import { HOME, zoomAt } from "../core/camera";
 import type { Frame, FrameCamera, FrameSpace } from "../core/frames";
-import { K, expressExactIn, fjump, fromAbsoluteCamera, fromLocal, levelsBetween, localCamera, normalize, toAbsoluteCamera } from "../core/frames";
+import { K, approxIn, expressExactIn, fjump, fromAbsoluteCamera, fromLocal, levelsBetween, localCamera, normalize, toAbsoluteCamera } from "../core/frames";
 import * as D from "../core/dyadic";
 
 /** Levels of zoom-out a smooth glide may use before the trip dives instead; and how far out a dive goes (both under a frame step). */
@@ -23,8 +23,52 @@ interface Flight {
  * (bits as long as the levels between), so the way is one continuous camera and nothing cuts. `d` is the distance, the unit of the maths;
  * widths are clamped to [2^-2, 2^40] of it so the numbers stay small whatever the depth.
  */
-function flightPlan(space: FrameSpace, a: FrameCamera, target: FrameCamera): Flight | null {
+function flightPlan(space: FrameSpace, a: FrameCamera, target: FrameCamera, viewWidth: number): Flight | null {
   const L = levelsBetween(a.f, target.f);
+  const z1 = target.z + L; // the target's zoom in the units of this frame
+  // Everything is first judged in the units of the deeper end's frame (D), where the numbers stay small whatever the depth: the shallower
+  // end's centre is expressed there to 2^-63 of itself (approxIn), which is far more than the judgement needs.
+  const deepIsA = a.z >= z1;
+  const fD = deepIsA ? a.f : target.f;
+  const cD = deepIsA ? { x: a.x, y: a.y } : { x: target.x, y: target.y };
+  const sEnd = deepIsA ? target : a;
+  const cSD = sEnd.f === fD ? { x: sEnd.x, y: sEnd.y } : approxIn(space, sEnd.f, { x: sEnd.x, y: sEnd.y }, fD);
+  const Ld = deepIsA ? 0 : L; // a zoom in this frame's units, in D's units: minus Ld
+  const zSd = (deepIsA ? z1 : a.z) - Ld;
+  const zDd = (deepIsA ? a.z : z1) - Ld;
+  // The offset from the deeper centre to the shallower one; the deeper centre is dropped when it is far below the offset's digits (a sum of
+  // numbers whose exponents are a million apart would have a million bits).
+  const off = (s: D.Dyadic, c: D.Dyadic): D.Dyadic => (D.log2Abs(s) - D.log2Abs(c) > 200 ? s : D.sub(s, c));
+  const ox = off(cSD.x, cD.x), oy = off(cSD.y, cD.y);
+  const dlogD = Math.max(D.log2Abs(ox), D.log2Abs(oy));
+  const hD = dlogD === -Infinity ? 1 : Math.hypot(D.toNumber(D.shift(ox, -dlogD)), D.toNumber(D.shift(oy, -dlogD)));
+  // log2 of the wider view over the distance between the centres
+  const lwTop = dlogD === -Infinity ? Infinity : Math.log2(viewWidth) - zSd - dlogD - Math.log2(hD);
+  if (lwTop >= 0) {
+    // One place within a view of the other (the target's centre is on or near the screen at the start, or the start's at the end): just a
+    // zoom about the fixed point that maps one view to the other, with no zoom out first (the pan is part of the zoom, as with the wheel).
+    const dz = zDd - zSd;
+    const efolds = dz * Math.LN2 + 2 ** -lwTop;
+    const e = dz, ei = Math.floor(e), ef = e - ei;
+    const scale = D.shift(D.fromNumber(2 ** -ef * (e < 60 ? 1 / (1 - 2 ** -e) : 1)), -ei);
+    return {
+      efolds,
+      at(q) {
+        const u = Math.min(1, q / efolds);
+        const zd = deepIsA ? zDd - dz * u : zSd + dz * u; // along the way from the start, in D's units
+        // The fraction of the way from the deeper end, exact in its digits: (2^(zDd - z) - 1) / (2^(zDd - zSd) - 1).
+        const a1 = zDd - zd, a1i = Math.floor(a1);
+        const m = D.shift(D.fromNumber(2 ** (a1 - a1i)), a1i);
+        const g = e < 1e-6 ? D.fromNumber(deepIsA ? u : 1 - u) : D.mul(a1 < 60 ? D.sub(m, D.fromNumber(1)) : m, scale);
+        const P = { x: D.add(cD.x, D.mul(ox, g)), y: D.add(cD.y, D.mul(oy, g)) };
+        // The camera in the frame that suits this zoom (normalize rebases up any number of steps at once), and the point in that frame.
+        const n = normalize(space, { f: fD, x: D.ZERO, y: D.ZERO, z: zd, pz: Math.ceil(zd) + 12 });
+        const at = n.f === fD ? P : approxIn(space, fD, P, n.f);
+        return { f: n.f, x: at.x, y: at.y, z: n.z, pz: n.pz };
+      },
+    };
+  }
+  // Farther apart than a view: the way is shown by the van Wijk path, which needs the target's exact position in this frame's units.
   if (Math.abs(L) > MAX_FLIGHT_LEVELS) return null;
   let T: { x: D.Dyadic; y: D.Dyadic };
   try {
@@ -32,17 +76,11 @@ function flightPlan(space: FrameSpace, a: FrameCamera, target: FrameCamera): Fli
   } catch {
     return null;
   }
-  const z1 = target.z + L; // the target's zoom in the units of this frame
   const dx = D.sub(T.x, a.x), dy = D.sub(T.y, a.y);
   const dlog = Math.max(D.log2Abs(dx), D.log2Abs(dy));
   const cam = (x: D.Dyadic, y: D.Dyadic, z: number, pz: number): FrameCamera => ({ f: a.f, x, y, z, pz: Math.max(pz, Math.ceil(z)) });
-  if (dlog === -Infinity) {
-    // The same place: only the zoom changes.
-    const efolds = Math.abs(z1 - a.z) * Math.LN2;
-    return { efolds, at: (q) => cam(a.x, a.y, a.z + (z1 - a.z) * (efolds > 0 ? q / efolds : 1), a.pz) };
-  }
   const h = Math.hypot(D.toNumber(D.shift(dx, -dlog)), D.toNumber(D.shift(dy, -dlog)));
-  const base = -dlog - Math.log2(h); // z = base - log2(width / d)
+  const base = Math.log2(viewWidth) - dlog - Math.log2(h); // z = base - log2(width / d), the width of the view in frame units
   const clampW = (z: number): number => Math.min(40, Math.max(-2, base - z));
   const lw0 = clampW(a.z), lw1 = clampW(z1);
   const zc0 = base - lw0, zc1 = base - lw1;
@@ -154,7 +192,7 @@ export class ViewState {
       done?.();
     };
     if (!(this.glideMs > 0) || this.travel === "cut") return land();
-    const plan = this.travel === "near" && !(a.f === target.f && Math.abs(target.z - a.z) <= K) ? null : flightPlan(this.space(), a, target);
+    const plan = this.travel === "near" && !(a.f === target.f && Math.abs(target.z - a.z) <= K) ? null : flightPlan(this.space(), a, target, Math.max(1, this.vp.width));
     if (plan) {
       if (plan.efolds < 0.01 * Math.LN2 && a.f === target.f) return land();
       const levels = plan.efolds / Math.LN2;
