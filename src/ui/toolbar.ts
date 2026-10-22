@@ -267,7 +267,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen brush pencil eyedropper fill gradient" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
-      <div class="tb-group tb-options" data-for="brush pencil eraser marquee marqueeEllipse lasso lassoPoly wand fill gradient" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
+      <div class="tb-group tb-options" data-for="brush pencil eraser select marquee marqueeEllipse lasso lassoPoly wand fill gradient" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>

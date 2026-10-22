@@ -532,6 +532,65 @@ test("the fill bucket (G) fills the region joined to the click, inside a selecti
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("free transform with the Select tool on pixels: move, a side scales, Ctrl on a corner distorts, Escape puts back, Enter applies; with a selection only it moves", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const alpha = async (x: number, y: number): Promise<number> => (await px(p, id, x, y))![3]!;
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("200");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await p.locator('[data-paint-options] input[data-opt="hardness"]').fill("100");
+  await p.locator('[data-paint-options] input[data-opt="hardness"]').press("Enter");
+  await stroke(p, [1000, 500], [1000, 500]); // (a hard disc, 900 to 1100 by 400 to 600: its box's corners are where they are pressed)
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("v");
+  await stroke(p, [1000, 500], [1200, 500]); // (inside the box: a move)
+  expect(await alpha(1000, 500), "shown moved, not yet applied").toBe(255);
+  await expect(p.locator('[data-paint-options] [data-act="transform-apply"]')).toBeVisible();
+  await p.keyboard.press("Enter");
+  await settled(p);
+  expect(await alpha(1200, 500), "applied: moved 200 px").toBe(255);
+  expect(await alpha(950, 500)).toBe(0);
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  expect(await alpha(1000, 500), "one undo puts it back").toBe(255);
+  await stroke(p, [1100, 500], [1300, 500]); // (the right side's handle: twice as wide)
+  await p.keyboard.press("Enter");
+  await settled(p);
+  expect(await alpha(1250, 500), "stretched to the right").toBe(255);
+  expect(await alpha(1000, 380), "not taller").toBe(0);
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  await p.keyboard.down("Control");
+  await stroke(p, [900, 400], [700, 250]); // (Ctrl on the top left corner: that corner alone moves)
+  await p.keyboard.up("Control");
+  await p.keyboard.press("Enter");
+  await settled(p);
+  // (by the square-to-quad map, the disc's point at 950, 450 goes to about 891, 417, where nothing was; 1060, 560 stays inside)
+  expect(await alpha(891, 417), "pulled out toward the corner (resampled)").toBeGreaterThan(200);
+  expect(await alpha(1066, 571), "the far corner stays").toBeGreaterThan(200);
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  await stroke(p, [1000, 500], [1000, 800]);
+  await p.keyboard.press("Escape");
+  await settled(p);
+  expect(await alpha(1000, 800), "Escape: nothing moved").toBe(0);
+  expect(await alpha(1000, 500)).toBe(255);
+  await p.keyboard.press("m");
+  await stroke(p, [850, 350], [1000, 650]); // (the left half)
+  const half = await p.evaluate(() => window.__canvastDebug.paint.selected());
+  await p.keyboard.press("v");
+  await stroke(p, [950, 500], [950, 750]);
+  await p.keyboard.press("Enter");
+  await settled(p);
+  expect(await alpha(950, 750), "the selected half moved down").toBe(255);
+  expect(await alpha(1050, 500), "the other half stayed").toBe(255);
+  expect(await alpha(950, 500), "and left room").toBe(0);
+  expect(await p.evaluate(() => window.__canvastDebug.paint.selected()), "the selection went with it").toBe(half);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

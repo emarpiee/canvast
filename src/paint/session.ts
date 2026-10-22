@@ -12,6 +12,7 @@ import { rasterize } from "./rasterize";
 import type { PaintStore, TileBlob } from "./store";
 import { deflate, hashOf, inflate, isEmpty } from "./codec";
 import { edgeOf } from "./selection";
+import { drawWarp, type Quad } from "./warp";
 import { moved, objectsOf, scaled, stored } from "./objects";
 import type { BlendMode } from "../doc/model";
 
@@ -57,6 +58,9 @@ export class PaintSession {
   /** The pixels selected on the shown page (alpha = how much), and its outline; null: none (painting goes everywhere).
    * shortcut: a selection is not a step of the history (undo does not bring one back), add it to the steps if people miss it. */
   selection: { readonly mask: HTMLCanvasElement; readonly edge: HTMLCanvasElement } | null = null;
+  /** Pixels lifted to be moved, scaled, turned or distorted (free transform): the layer (or its mask) without them, them cut to their box,
+   * the selection's part in that box, and the four corners they go to. Shown, not stored, until applied. */
+  float: { readonly layerId: string; readonly mask: boolean; readonly rest: HTMLCanvasElement; readonly src: HTMLCanvasElement; readonly sel: HTMLCanvasElement | null; q: Quad } | null = null;
   /** The stroke being painted: its layer, its live overlay, how it goes over the layer, and whether it is the mask's. */
   live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation; mask?: true } | null = null;
   private overlay: HTMLCanvasElement | null = null;
@@ -693,6 +697,85 @@ export class PaintSession {
     const cur = this.layers.get(l.id) ?? l;
     const after: Layer = mask ? { ...cur, mask: { ...cur.mask!, tiles: r.tiles } } : { ...(cur as RasterLayer), tiles: r.tiles };
     this.commit(label, [{ store: "layer", before: cur, after }], r.blobs);
+  }
+
+  /** Lift the active layer's pixels (or its mask's), the selected ones when there is a selection, for a free transform. False: nothing to lift. */
+  startFloat(): boolean {
+    const why = this.cannotPaint();
+    if (why) return this.onError?.(why), false;
+    if (this.live || this.float) return !!this.float;
+    const l = this.active()!;
+    const mask = this.editsMask();
+    const surface = (mask ? this.maskSurfaces : this.surfaces).get(l.id);
+    if (!surface) return false;
+    const page = this.page();
+    const canvas = (w: number, h: number): HTMLCanvasElement => Object.assign(document.createElement("canvas"), { width: w, height: h });
+    const lifted = canvas(page.w, page.h);
+    const lg = lifted.getContext("2d", { willReadFrequently: true })!;
+    lg.drawImage(surface, 0, 0);
+    const sel = this.selection?.mask;
+    if (sel) {
+      lg.globalCompositeOperation = "destination-in";
+      lg.drawImage(sel, 0, 0);
+    }
+    // (the box of the selection, which moves whole; without one, of what has paint)
+    const d = (sel ? sel.getContext("2d", { willReadFrequently: true })! : lg).getImageData(0, 0, page.w, page.h).data;
+    let x0 = page.w, y0 = page.h, x1 = -1, y1 = -1;
+    for (let y = 0; y < page.h; y++) for (let x = 0; x < page.w; x++) if (d[(y * page.w + x) * 4 + 3]) (x < x0 && (x0 = x), x > x1 && (x1 = x), y < y0 && (y0 = y), y > y1 && (y1 = y));
+    if (x1 < 0) return false;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    const src = canvas(w, h);
+    src.getContext("2d")!.drawImage(lifted, -x0, -y0);
+    const rest = canvas(page.w, page.h);
+    const rg = rest.getContext("2d")!;
+    rg.drawImage(surface, 0, 0);
+    rg.globalCompositeOperation = "destination-out";
+    rg.drawImage(sel ?? surface, 0, 0);
+    let selBox: HTMLCanvasElement | null = null;
+    if (sel) {
+      selBox = canvas(w, h);
+      selBox.getContext("2d")!.drawImage(sel, -x0, -y0);
+    }
+    this.float = { layerId: l.id, mask, rest, src, sel: selBox, q: [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]] };
+    this.tell("pixels");
+    return true;
+  }
+  /** Where the lifted pixels go now (shown at once). */
+  moveFloat(q: Quad): void {
+    if (!this.float) return;
+    this.float.q = q;
+    this.tell("pixels");
+  }
+  /** Put the lifted pixels back as they are not moved. */
+  cancelFloat(): void {
+    if (!this.float) return;
+    this.float = null;
+    this.tell("pixels");
+  }
+  /** Apply the free transform: the layer (or mask) becomes what is shown, one step; the selection goes with the pixels. */
+  applyFloat(label = "Transform"): Promise<void> {
+    const f = this.float;
+    if (!f) return Promise.resolve();
+    this.ending = this.ending.then(async () => {
+      this.float = null;
+      const l = this.layers.get(f.layerId);
+      const page = this.page();
+      if (!l || this.blocked()) return void this.tell("pixels");
+      const r = await rasterize(page.w, page.h, (g) => {
+        g.drawImage(f.rest, 0, 0);
+        drawWarp(g, f.src, f.q);
+      });
+      for (const [k, d] of r.pixels) decoded.set(r.tiles[k]!, d);
+      for (const b of r.blobs) this.unsaved.set(b.hash, b.data);
+      const after: Layer = f.mask ? { ...l, mask: { ...l.mask!, tiles: r.tiles } } : { ...(l as RasterLayer), tiles: r.tiles };
+      this.commit(label, [{ store: "layer", before: l, after }], r.blobs);
+      if (f.sel) {
+        const m = Object.assign(document.createElement("canvas"), { width: page.w, height: page.h });
+        drawWarp(m.getContext("2d")!, f.sel, f.q);
+        this.select(m);
+      }
+    });
+    return this.ending;
   }
 
   /** Drop the stroke being painted: the layer is as it was. */

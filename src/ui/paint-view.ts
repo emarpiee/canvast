@@ -35,6 +35,7 @@ import type { Tool } from "../app/editor-state";
 import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
 import { FILL_OPTIONS, GRADIENT_OPTIONS, SELECT_OPTIONS, TOOLS, TOOL_IDS, valuesFor, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { isAffine, type Pt, type Quad } from "../paint/warp";
 import { blankMask, combine, feathered, grown, inverted, shapeMask, wandMask, type SelectMode } from "../paint/selection";
 import { brushOf, cleanBrush, tipsOf, type Brush } from "../paint/brushes";
 import { drawThumb, mountBrushPanels, type BrushPanels } from "./brush-panels";
@@ -271,6 +272,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (t === "marquee" || t === "marqueeEllipse" || t === "lassoPoly" || t === "wand") return t;
     return t === "lasso" && (session?.active()?.kind !== "object" || session.editsMask()) ? "lasso" : null;
   };
+  /** The Select tool on pixels (a paint layer, or a mask being painted): it lifts them for a free transform. */
+  const transformOn = (): boolean => !!session && tool() === "select" && (session.active()?.kind === "raster" || session.editsMask());
   /** The fill bucket or the gradient, when one is the tool. */
   const fillTool = (): "fill" | "gradient" | null => (tool() === "fill" || tool() === "gradient" ? (tool() as "fill" | "gradient") : null);
   /** The paint colour: the canvas's pen colour (the Properties bar's colour, ADR 0168). */
@@ -295,7 +298,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const page = () => session!.page();
   const env = (): ObjectEnv | null => (deps.assets ? { assets: deps.assets, theme: deps.theme() } : null);
   /** The page as the session has it now, for drawing (the view, an export, a rasterized layer). */
-  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), mask: (l) => s.mask(l), live: live ? s.live : null, env: env(), vector: live && vhost ? vhost.drawLayer : null });
+  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), mask: (l) => s.mask(l), float: live ? s.float : null, live: live ? s.live : null, env: env(), vector: live && vhost ? vhost.drawLayer : null });
 
   // ---- drawing ------------------------------------------------------------------------------------------------------------------------
 
@@ -320,7 +323,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
-    if (s.selection) {
+    if (s.selection && !s.float) {
       // (the selection's outline, at its pixels, in the difference of what is under it: it shows on light and dark)
       g.save();
       g.setTransform(cam.scale * dpr, 0, 0, cam.scale * dpr, cam.x * dpr, cam.y * dpr);
@@ -343,6 +346,30 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cursor.width, cursor.height);
+    const fq = session?.float?.q;
+    if (fq) {
+      // (the transform box: its outline and its eight handles)
+      const s = fq.map(onScreen).map(([x, y]) => [x * dpr, y * dpr] as const);
+      const r = (HANDLE / 2) * dpr;
+      for (const [c, w] of [[css.getPropertyValue("--black").trim() || "#000", 3], [css.getPropertyValue("--white").trim() || "#fff", 1]] as const) {
+        g.strokeStyle = c;
+        g.lineWidth = w * dpr;
+        g.beginPath();
+        s.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.closePath();
+        g.stroke();
+      }
+      g.fillStyle = css.getPropertyValue("--white").trim() || "#fff";
+      g.strokeStyle = css.getPropertyValue("--black").trim() || "#000";
+      g.lineWidth = dpr;
+      for (let i = 0; i < 4; i++) {
+        const a = s[i]!, b = s[(i + 1) % 4]!;
+        for (const [x, y] of [a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as const]) {
+          g.fillRect(x - r, y - r, 2 * r, 2 * r);
+          g.strokeRect(x - r, y - r, 2 * r, 2 * r);
+        }
+      }
+    }
     if (draft) {
       // (what is being drawn to select: a dashed line, light over dark, so it shows on anything)
       const k = cam.scale * dpr;
@@ -390,6 +417,18 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       : `<button type="button" data-opt="${o.key}" aria-pressed="${!!v}" title="${esc(o.hint)}">${esc(o.label)}</button>`; // (a switch: the bar's toggle, as the canvas's)
   let optionsFor: string | undefined;
   const renderOptions = (): void => {
+    if (transformOn()) {
+      const lifted = !!session?.float;
+      const key = `transform ${lifted}`;
+      if (key === optionsFor) return;
+      optionsFor = key;
+      optionsEl.innerHTML = lifted
+        ? `<button type="button" data-act="transform-apply" title="Apply the transform (Enter)">Apply</button><button type="button" data-act="transform-cancel" title="Put the pixels back as they were (Escape)">Cancel</button>`
+        : `<span class="paint-hint">Drag the layer's pixels (or the selected ones) to move them; their box scales, turns, and with Ctrl on a corner, distorts</span>`;
+      optionsEl.querySelector('[data-act="transform-apply"]')?.addEventListener("click", () => void session?.applyFloat());
+      optionsEl.querySelector('[data-act="transform-cancel"]')?.addEventListener("click", () => session?.cancelFloat());
+      return;
+    }
     const sel = pixelTool();
     const set: SetId | null = sel ? "select" : fillTool();
     if (set) {
@@ -540,6 +579,72 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     ], "Selection");
   };
 
+  // ---- free transform (paint/warp.ts) ------------------------------------------------------------------------------------------------
+
+  type BoxPart = { kind: "move" } | { kind: "rotate" } | { kind: "corner"; i: number; free: boolean } | { kind: "side"; i: number };
+  let gesture: ({ id: number; q0: Quad; p0: Pt } & BoxPart) | null = null;
+  /** A page point of the box on screen (CSS px of the page box). */
+  const onScreen = ([x, y]: Pt): Pt => [cam.x + x * cam.scale, cam.y + y * cam.scale];
+  const HANDLE = 8;
+  /** What a press at screen point `p` takes of the box: a corner (free with Ctrl: perspective), a side, the inside (move) or the outside (turn). */
+  const hitBox = (q: Quad, p: { x: number; y: number }, ctrl: boolean): BoxPart => {
+    const s = q.map(onScreen);
+    for (let i = 0; i < 4; i++) if (Math.hypot(s[i]![0] - p.x, s[i]![1] - p.y) <= HANDLE) return { kind: "corner", i, free: ctrl || !isAffine(q) };
+    for (let i = 0; i < 4; i++) {
+      const a = s[i]!, b = s[(i + 1) % 4]!;
+      if (Math.hypot((a[0] + b[0]) / 2 - p.x, (a[1] + b[1]) / 2 - p.y) <= HANDLE) return { kind: "side", i };
+    }
+    // (inside: the point is on the same side of every edge)
+    let pos = 0, neg = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = s[i]!, b = s[(i + 1) % 4]!;
+      const c = (b[0] - a[0]) * (p.y - a[1]) - (b[1] - a[1]) * (p.x - a[0]);
+      if (c > 0) pos++;
+      else if (c < 0) neg++;
+    }
+    return !pos || !neg ? { kind: "move" } : { kind: "rotate" };
+  };
+  /** The box after a drag to page point `p`. */
+  const dragBox = (gs: NonNullable<typeof gesture>, p: Pt, keep: boolean): Quad => {
+    const q = gs.q0.map((v) => [v[0], v[1]] as [number, number]);
+    const dx = p[0] - gs.p0[0], dy = p[1] - gs.p0[1];
+    const add = (a: Pt, b: Pt, k = 1): [number, number] => [a[0] + b[0] * k, a[1] + b[1] * k];
+    const sub = (a: Pt, b: Pt): [number, number] => [a[0] - b[0], a[1] - b[1]];
+    if (gs.kind === "move") return q.map((v) => add(v, [Math.round(dx), Math.round(dy)])) as unknown as Quad; // (by whole pixels: they stay sharp)
+    if (gs.kind === "rotate") {
+      const c: Pt = [(q[0]![0] + q[2]![0]) / 2, (q[0]![1] + q[2]![1]) / 2];
+      let t = Math.atan2(p[1] - c[1], p[0] - c[0]) - Math.atan2(gs.p0[1] - c[1], gs.p0[0] - c[0]);
+      if (keep) t = Math.round(t / (Math.PI / 12)) * (Math.PI / 12); // (Shift: steps of 15 degrees)
+      const cs = Math.cos(t), sn = Math.sin(t);
+      return q.map(([x, y]) => [c[0] + (x - c[0]) * cs - (y - c[1]) * sn, c[1] + (x - c[0]) * sn + (y - c[1]) * cs]) as unknown as Quad;
+    }
+    if (gs.kind === "corner" && gs.free) {
+      q[gs.i] = add(gs.q0[gs.i]!, [dx, dy]); // (perspective: the corner goes where it is dragged)
+      return q as unknown as Quad;
+    }
+    if (gs.kind === "corner") {
+      // the opposite corner stays; the dragged one follows the pointer along the box's own two sides (Shift: in proportion)
+      const i = gs.i, o = gs.q0[(i + 2) % 4]!, ea = sub(gs.q0[(i + 1) % 4]!, o), eb = sub(gs.q0[(i + 3) % 4]!, o);
+      const d = sub(add(gs.q0[i]!, [dx, dy]), o);
+      const det = ea[0] * eb[1] - ea[1] * eb[0];
+      if (!det) return gs.q0;
+      let a = (d[0] * eb[1] - d[1] * eb[0]) / det, b = (ea[0] * d[1] - ea[1] * d[0]) / det;
+      if (keep) a = b = (Math.abs(a) + Math.abs(b)) / 2 * Math.sign(a + b || 1);
+      q[(i + 1) % 4] = add(o, ea, a);
+      q[(i + 3) % 4] = add(o, eb, b);
+      q[i] = add(add(o, ea, a), eb, b);
+      return q as unknown as Quad;
+    }
+    // a side: it moves along the line from the opposite side, the opposite side stays
+    const i = gs.i, j = (i + 1) % 4;
+    const e = sub(gs.q0[i]!, gs.q0[(i + 3) % 4]!);
+    const l2 = e[0] * e[0] + e[1] * e[1] || 1;
+    const t = (dx * e[0] + dy * e[1]) / l2;
+    q[i] = add(gs.q0[i]!, e, t);
+    q[j] = add(gs.q0[j]!, e, t);
+    return q as unknown as Quad;
+  };
+
   const startEngine = async (): Promise<BrushEngine | null> => {
     if (!engine && !engineError) {
       try {
@@ -582,6 +687,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   /** The rail's tool changed (or the picked layer, which decides what the Eraser takes): the options, the cursor, what is remembered. */
   vhost.editor.layersOpen = true;
   const followTool = (): void => {
+    if (session?.float && !transformOn()) void session.applyFloat(); // (another tool: the transform is applied, as a painting program does)
     layersEl.hidden = !vhost.editor.layersOpen; // (the dock's Layers button: the canvas's, ADR 0168)
     stage.dataset["tool"] = tool();
     document.body.dataset["paintTarget"] = session?.active()?.kind === "object" && !session.editsMask() ? "vector" : "pixels";
@@ -811,6 +917,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (t.closest("[data-lock]")) return s.setLayer(l.id, { locked: !l.locked }, l.locked ? "Unlock layer" : "Lock layer");
     if (t.closest("[data-clip]")) return s.setLayer(l.id, { clipBelow: !l.clipBelow }, l.clipBelow ? "Release the clip" : "Clip to the layer below");
     if (t.closest("[data-alpha]") && l.kind === "raster") return s.setLayer(l.id, { alphaLock: !l.alphaLock }, l.alphaLock ? "Unlock transparency" : "Lock transparency");
+    if (s.float) void s.applyFloat(); // (another layer: the transform is applied first)
     s.maskEdit = !!t.closest("[data-mask]"); // (the mask's picture paints the mask; the rest of the row, the layer)
     s.activeId = l.id;
     renderLayers();
@@ -979,6 +1086,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     unsub = s.subscribe((what) => {
       vhost?.sync();
       drawMaskThumbs();
+      renderOptions(); // (the transform's Apply and Cancel come and go with the lifted pixels)
+      drawCursor();
       if (what === "records") {
         renderBar();
         renderLayers();
@@ -1077,7 +1186,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   const pointers = new Map<number, { x: number; y: number }>();
   /** Not a painting tool: the canvas's tools have the pointer (vector-host.ts). */
-  const vectorOn = (): boolean => !!session && paintTool() === null && pixelTool() === null && fillTool() === null;
+  const vectorOn = (): boolean => !!session && paintTool() === null && pixelTool() === null && fillTool() === null && !transformOn();
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
   let stroke: { id: number; started: boolean; queue: number[]; erase: boolean } | null = null;
@@ -1140,6 +1249,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       stage.classList.add("is-panning");
       e.preventDefault();
       return;
+    }
+    if (transformOn() && e.button === 0) {
+      if (!session.float && !session.startFloat()) return;
+      const q0 = session.float!.q;
+      const [x, y] = toPage(cam, p.x, p.y);
+      gesture = { id: e.pointerId, ...hitBox(q0, p, e.ctrlKey || e.metaKey), q0, p0: [x, y] };
+      return drawCursor();
     }
     const ft = fillTool();
     if (ft && e.button === 0) {
@@ -1210,6 +1326,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     } else if (stroke && stroke.id === e.pointerId) {
       const evs = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
       send((evs.length ? evs : [e]).flatMap(sample));
+    } else if (gesture && gesture.id === e.pointerId && session?.float) {
+      session.moveFloat(dragBox(gesture, toPage(cam, p.x, p.y), e.shiftKey));
     } else if (draft && draft.id === e.pointerId && pointers.has(e.pointerId) && draft.kind !== "lassoPoly") {
       const q = toPage(cam, p.x, p.y);
       if (draft.kind === "lasso") draft.pts.push(q);
@@ -1218,6 +1336,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     drawCursor();
   });
   const up = (e: PointerEvent): void => {
+    if (gesture?.id === e.pointerId) gesture = null;
     if (draft && draft.id === e.pointerId && draft.kind !== "lassoPoly" && pointers.has(e.pointerId)) {
       if (e.type === "pointercancel") draft = null;
       else finishDraft();
@@ -1316,6 +1435,12 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   window.addEventListener("keydown", (e) => {
     if (!session || !shortcutsActive(e, "paint")) return;
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (session.float && (e.key === "Escape" || e.key === "Enter")) {
+      e.stopImmediatePropagation();
+      if (e.key === "Enter") void session.applyFloat();
+      else session.cancelFloat();
+      return drawCursor();
+    }
     if (draft && (e.key === "Escape" || e.key === "Enter")) {
       e.stopImmediatePropagation();
       if (e.key === "Enter") finishDraft();

@@ -11,6 +11,7 @@ import { clipBaseOf } from "./model";
 import { drawObjectsAt, fillObject, objectsOf, type ObjectEnv } from "./objects";
 import { adjustInto } from "../render/adjust-image";
 import { isNeutral } from "../doc/adjust";
+import { drawWarp, type Quad } from "./warp";
 
 export interface Live {
   readonly layerId: string;
@@ -31,6 +32,8 @@ export interface Scene {
   /** A layer's mask, page-sized in page px: its alpha is how much is hidden (null: none drawn yet). */
   mask?(l: Layer): CanvasImageSource | null;
   readonly live?: Live | null;
+  /** Pixels lifted for a free transform: the layer (or its mask) shows `rest`, and `src` drawn into the corners `q`. */
+  readonly float?: { readonly layerId: string; readonly mask: boolean; readonly rest: CanvasImageSource; readonly src: HTMLCanvasElement; readonly q: Quad } | null;
   /** What the canvas's renderer needs for shape, text, picture and fill layers. */
   readonly env?: ObjectEnv | null;
   /** The vector layer being edited, drawn as the gesture going on shows it (vector-host.ts); null: not that layer. True: draw again soon. */
@@ -107,12 +110,14 @@ const place = (g: CanvasRenderingContext2D, at: Placement): void => {
 
 export const RENDER: { readonly [K in LayerKind]: (l: Extract<Layer, { kind: K }>, c: Ctx) => Look } = {
   raster(l, c) {
-    const img = c.s.image(l);
+    const fl = c.s.float && c.s.float.layerId === l.id && !c.s.float.mask ? c.s.float : null;
+    const img = fl ? fl.rest : c.s.image(l);
     const live = c.s.live && c.s.live.layerId === l.id && !c.s.live.mask ? c.s.live : null;
     if (!img && !live) return null;
     const g = layerCtx(c.slot, c.below.canvas.width, c.below.canvas.height);
     place(g, c.at);
     if (img) g.drawImage(img, 0, 0);
+    if (fl) drawWarp(g, fl.src, fl.q);
     if (live) {
       g.globalCompositeOperation = live.op;
       g.drawImage(live.overlay, 0, 0);
@@ -201,12 +206,14 @@ export function composePage(ctx: CanvasRenderingContext2D, s: Scene, at: Placeme
 /** A layer's look with its mask (and the mask stroke being painted) taken out of it, or null when it has no mask in use. */
 function maskInto(img: HTMLCanvasElement, l: Layer, s: Scene, at: Placement): HTMLCanvasElement | null {
   const live = s.live?.mask && s.live.layerId === l.id ? s.live : null;
-  const surface = l.mask && !l.mask.off ? s.mask?.(l) : null;
+  const fl = s.float?.mask && s.float.layerId === l.id ? s.float : null;
+  const surface = l.mask && !l.mask.off ? (fl ? fl.rest : s.mask?.(l)) : null;
   if (!surface && !live) return null;
   const W = img.width, H = img.height;
   const m = layerCtx(3, W, H);
   place(m, at);
   if (surface) m.drawImage(surface, 0, 0);
+  if (fl && surface) drawWarp(m, fl.src, fl.q);
   if (live) {
     m.globalCompositeOperation = live.op;
     m.drawImage(live.overlay, 0, 0);

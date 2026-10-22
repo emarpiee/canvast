@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.1 — Free transform of pixels (2026-10-22)
+
+- **Free transform** in the Paint view: the Select tool on a paint layer (or a mask) lifts its pixels, or the selected ones, into a box to move (by whole pixels), scale, turn, and with Ctrl on a corner distort in perspective; Enter applies, Escape puts back; the selection goes with them.
+
 ## 0.34.0 — Selections, fill bucket, gradient, canvas and image size (2026-10-22)
 
 - **Selections** in the Paint view: Rectangle and Ellipse marquee (`M`, `Shift+M`, in the Select button's flyout), the Lasso on a paint layer, the Polygonal lasso (`Shift+L`) and the Magic wand (`W`) in the Lasso's flyout; new, add (Shift), take away (Alt), intersect (Shift+Alt); feather; the Selection menu (select all, deselect, invert, grow, shrink, feather) and `Ctrl+A`, `Ctrl+D`, `Ctrl+Shift+I`. Painting, filling and the gradient stay inside the selection; `Delete` clears it.
