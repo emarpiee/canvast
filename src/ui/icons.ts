@@ -90,6 +90,8 @@ import marqueeRectSvg from "lucide-static/icons/squircle-dashed.svg";
 import marqueeEllipseSvg from "lucide-static/icons/circle-dot-dashed.svg";
 import lassoPolySvg from "lucide-static/icons/triangle-dashed.svg";
 import wandSvg from "lucide-static/icons/wand.svg";
+import smudgeSvg from "lucide-static/icons/fingerprint.svg";
+import cloneStampSvg from "lucide-static/icons/files.svg";
 import referencePictureSvg from "lucide-static/icons/picture-in-picture.svg";
 import stickerSvg from "lucide-static/icons/sticker.svg";
 import fillToolSvg from "lucide-static/icons/beaker.svg";
@@ -353,6 +355,8 @@ export const ICONS = {
   marqueeEllipse: clean(marqueeEllipseSvg),
   lassoPoly: clean(lassoPolySvg),
   wand: clean(wandSvg),
+  smudge: clean(smudgeSvg),
+  cloneStamp: clean(cloneStampSvg),
   referencePicture: clean(referencePictureSvg),
   sticker: clean(stickerSvg),
   fillTool: clean(fillToolSvg),

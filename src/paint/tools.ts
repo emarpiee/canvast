@@ -15,7 +15,7 @@ export type OptionSpec =
 export type Values = Readonly<Record<string, number | boolean | string>>;
 
 /** What a painting tool does with the pointer: paint with the engine, or erase. (Every other tool of the rail is the canvas's, ADR 0168.) */
-export type ToolAction = { readonly paint: true; readonly erase: boolean; /** No anti-aliasing: every pixel is covered or not (the Pencil). */ readonly aliased?: true };
+export type ToolAction = { readonly paint: true; readonly erase: boolean; /** No anti-aliasing: every pixel is covered or not (the Pencil). */ readonly aliased?: true; /** It drags the paint under it along instead of laying down colour (the Smudge). */ readonly smudge?: true; /** It lays down the layer's own pixels from a source point (the Clone stamp). */ readonly clone?: true };
 
 export interface ToolDef {
   readonly label: string;
@@ -40,9 +40,25 @@ const PENCIL: readonly OptionSpec[] = [
   { key: "autoErase", label: "Auto erase", kind: "switch", def: false, hint: "A stroke that starts on the paint colour erases instead" },
 ];
 
+/** The Smudge's: the brush's size and edge, and how much colour it drags; Finger painting starts each stroke with the paint colour. */
+const SMUDGE: readonly OptionSpec[] = [
+  ...BRUSH.filter((o) => ["size", "hardness", "spacing", "pressureSize"].includes(o.key)),
+  { key: "strength", label: "Strength", kind: "number", min: 1, max: 100, step: 1, def: 50, percent: true, hint: "How much of the colour it carries each dab lays down and keeps: high drags paint far" },
+  { key: "finger", label: "Finger painting", kind: "switch", def: false, hint: "Start each stroke with the paint colour, as a finger dipped in it" },
+  { key: "opacity", label: "Opacity", kind: "number", min: 1, max: 100, step: 1, def: 100, percent: true, hint: "How much of the smudged result is kept over the layer as it was" },
+];
+
+/** The Clone stamp's: the brush's, and whether the source keeps its distance from stroke to stroke. */
+const CLONE: readonly OptionSpec[] = [
+  ...BRUSH.filter((o) => o.key !== "pressureOpacity"),
+  { key: "aligned", label: "Aligned", kind: "switch", def: true, hint: "The source keeps its distance from the brush from stroke to stroke; off: each stroke starts from the source point again" },
+];
+
 export const TOOLS = {
   brush: { label: "Brush", action: { paint: true, erase: false }, options: BRUSH },
   pencil: { label: "Pencil", action: { paint: true, erase: false, aliased: true }, options: PENCIL },
+  smudge: { label: "Smudge", action: { paint: true, erase: false, smudge: true }, options: SMUDGE },
+  clone: { label: "Clone stamp", action: { paint: true, erase: false, clone: true }, options: CLONE },
   eraser: { label: "Eraser", action: { paint: true, erase: true }, options: BRUSH },
 } as const satisfies Record<string, ToolDef>;
 

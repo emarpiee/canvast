@@ -117,6 +117,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `sunset` | Gradient tool (Paint view, the Fill bucket's flyout) |
 | `sticker` | New brush from the selection (Paint view, the Selection menu) |
 | `picture-in-picture` | Add a reference picture (Paint view, the painting's menu) |
+| `fingerprint` | Smudge tool (Paint view, the Brush flyout) |
+| `files` | Clone stamp tool (Paint view, the Brush flyout) |
 | `eclipse` | Add a mask to a Paint view layer (the layer's ⋯ menu) |
 | `eye-closed` | Turn a Paint view layer's mask off or on (the layer's ⋯ menu) |
 | `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |

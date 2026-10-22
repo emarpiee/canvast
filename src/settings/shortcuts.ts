@@ -6,13 +6,13 @@ import { commandById, inView, type KeyView } from "./keymap";
  * Keyboard shortcuts (ADR 0049, 0158). Every key that does something is a command of the keymap (settings/keymap.ts) and can be changed in Settings >
  * Shortcuts; what is listed here is what cannot be: the browser's clipboard keys, Escape and Enter, and the gestures that use a modifier key with the pointer.
  */
-export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "node", "pen", "brush", "pencil", "shape", "path", "sheet", "marquee", "marqueeEllipse", "lasso", "lassoPoly", "wand", "fill", "gradient", "text", "note", "eyedropper", "eraser"];
+export const TOOL_ORDER: readonly Tool[] = ["hand", "select", "node", "pen", "brush", "pencil", "smudge", "clone", "shape", "path", "sheet", "marquee", "marqueeEllipse", "lasso", "lassoPoly", "wand", "fill", "gradient", "text", "note", "eyedropper", "eraser"];
 
-export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", node: "Edit nodes", pen: "Pen", shape: "Shape", path: "Path (curves)", sheet: "Sheet", lasso: "Lasso", text: "Text", note: "Note", eraser: "Object eraser", brush: "Brush", pencil: "Pencil", eyedropper: "Eyedropper", marquee: "Rectangle marquee", marqueeEllipse: "Ellipse marquee", lassoPoly: "Polygonal lasso", wand: "Magic wand", fill: "Fill bucket", gradient: "Gradient" };
+export const TOOL_NAME: Record<Tool, string> = { hand: "Hand (pan)", select: "Select", node: "Edit nodes", pen: "Pen", shape: "Shape", path: "Path (curves)", sheet: "Sheet", lasso: "Lasso", text: "Text", note: "Note", eraser: "Object eraser", brush: "Brush", pencil: "Pencil", eyedropper: "Eyedropper", marquee: "Rectangle marquee", marqueeEllipse: "Ellipse marquee", lassoPoly: "Polygonal lasso", wand: "Magic wand", fill: "Fill bucket", gradient: "Gradient", smudge: "Smudge", clone: "Clone stamp" };
 
 /** The command of each tool in the keymap (settings/keymap.ts). */
 export const TOOL_COMMAND: Record<Tool, string> = {
-  hand: "tool.hand", select: "tool.select", node: "tool.node", pen: "tool.pen", shape: "tool.shape", path: "tool.path", sheet: "tool.sheet", lasso: "tool.lasso", text: "tool.text", note: "tool.note", eraser: "tool.eraser", brush: "tool.brush", pencil: "tool.pencil", eyedropper: "tool.eyedropper", marquee: "tool.marquee", marqueeEllipse: "tool.marqueeEllipse", lassoPoly: "tool.lassoPoly", wand: "tool.wand", fill: "tool.fill", gradient: "tool.gradient",
+  hand: "tool.hand", select: "tool.select", node: "tool.node", pen: "tool.pen", shape: "tool.shape", path: "tool.path", sheet: "tool.sheet", lasso: "tool.lasso", text: "tool.text", note: "tool.note", eraser: "tool.eraser", brush: "tool.brush", pencil: "tool.pencil", eyedropper: "tool.eyedropper", marquee: "tool.marquee", marqueeEllipse: "tool.marqueeEllipse", lassoPoly: "tool.lassoPoly", wand: "tool.wand", fill: "tool.fill", gradient: "tool.gradient", smudge: "tool.smudge", clone: "tool.clone",
 };
 
 /** The tool a key picks in a view, as the tool handler hears it: the keymap has already turned the person's binding into the tool's own key. */

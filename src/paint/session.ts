@@ -5,7 +5,7 @@
  * engine's worker; the layer is shown with its live stroke while it is painted, and the stroke is one step when it ends.
  */
 import type { BrushEngine } from "./engine";
-import type { EndedTile, LoadTile, Symmetry } from "./engine-protocol";
+import type { EndedTile, LoadTile, StrokeKind } from "./engine-protocol";
 import { History, type Op, type Step } from "./history";
 import { LAYER_KINDS, TILE, hashesOf, tilesOf, type Layer, type LayerFields, type LayerMask, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
 import { rasterize } from "./rasterize";
@@ -29,11 +29,11 @@ export interface LayerPatch {
   readonly mask?: LayerMask | null;
 }
 
-export interface StrokeStart {
+/** A stroke to begin: its brush, whether it erases, and what kind it is (symmetry; a smudge or a clone stamp, whose live tiles are the layer's
+ * own pixels where they changed, shown in place of the layer's). */
+export interface StrokeStart extends StrokeKind {
   readonly brush: object;
   readonly erase: boolean;
-  /** Painting symmetry for this stroke (the engine paints its mirrors with it, as one stroke). */
-  readonly sym?: Symmetry;
 }
 
 /** The engine's name for a layer's mask (its pixels go by the layer's id). */
@@ -64,7 +64,7 @@ export class PaintSession {
    * the selection's part in that box, and the four corners they go to. Shown, not stored, until applied. */
   float: { readonly layerId: string; readonly mask: boolean; readonly rest: HTMLCanvasElement; readonly src: HTMLCanvasElement; readonly sel: HTMLCanvasElement | null; q: Quad } | null = null;
   /** The stroke being painted: its layer, its live overlay, how it goes over the layer, and whether it is the mask's. */
-  live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation; mask?: true } | null = null;
+  live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation; mask?: true; /** Where `overlay` replaces the layer (a smudge). */ cut?: HTMLCanvasElement } | null = null;
   private overlay: HTMLCanvasElement | null = null;
   private strokeBefore: { layer: Layer; mask: boolean } | null = null;
   /** The stroke that ended and is being turned into tiles, or a pixel edit being made (a new stroke waits for it). */
@@ -555,8 +555,9 @@ export class PaintSession {
     overlay.width = page.w; // (and cleared)
     overlay.height = page.h;
     this.strokeBefore = { layer: l, mask };
-    this.live = { layerId: l.id, overlay, op: s.erase ? "destination-out" : lock ? "source-atop" : "source-over", ...(mask ? { mask: true as const } : {}) };
-    this.engine!.begin(s.brush, lock, page, s.sym);
+    const cut = s.smudge || s.clone ? Object.assign(document.createElement("canvas"), { width: page.w, height: page.h }) : undefined;
+    this.live = { layerId: l.id, overlay, op: s.erase ? "destination-out" : lock ? "source-atop" : "source-over", ...(mask ? { mask: true as const } : {}), ...(cut ? { cut } : {}) };
+    this.engine!.begin(s.brush, lock, page, { ...(s.sym ? { sym: s.sym } : {}), ...(s.smudge ? { smudge: s.smudge } : {}), ...(s.clone ? { clone: s.clone } : {}) });
     return true;
   }
 
@@ -571,14 +572,21 @@ export class PaintSession {
     const g = this.live.overlay.getContext("2d")!;
     const n = side * side * 4;
     const sel = this.selection?.mask;
+    const cut = this.live.cut?.getContext("2d");
     for (let i = 0; i < keys.length / 2; i++) {
       const x = keys[2 * i]! * side, y = keys[2 * i + 1]! * side;
       g.putImageData(new ImageData(new Uint8ClampedArray(px.buffer as ArrayBuffer, px.byteOffset + i * n, n), side, side), x, y);
+      if (cut) {
+        cut.fillStyle = "#000";
+        cut.fillRect(x, y, side, side);
+      }
       if (!sel) continue;
       // (painted only inside the selection, as it will be when the stroke ends)
-      g.globalCompositeOperation = "destination-in";
-      g.drawImage(sel, x, y, side, side, x, y, side, side);
-      g.globalCompositeOperation = "source-over";
+      for (const k of cut ? [g, cut] : [g]) {
+        k.globalCompositeOperation = "destination-in";
+        k.drawImage(sel, x, y, side, side, x, y, side, side);
+        k.globalCompositeOperation = "source-over";
+      }
     }
     this.tell("pixels");
   }

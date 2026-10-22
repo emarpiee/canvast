@@ -21,6 +21,8 @@ export interface Live {
   readonly op: GlobalCompositeOperation;
   /** Painted into the layer's mask, not its pixels (a stroke that hides goes over, one that shows takes away). */
   readonly mask?: true;
+  /** Where the overlay takes the place of the layer's pixels (a smudge sends them as they now are), not goes over them. */
+  readonly cut?: CanvasImageSource;
 }
 
 export interface Scene {
@@ -118,10 +120,7 @@ export const RENDER: { readonly [K in LayerKind]: (l: Extract<Layer, { kind: K }
     place(g, c.at);
     if (img) g.drawImage(img, 0, 0);
     if (fl) drawWarp(g, fl.src, fl.q);
-    if (live) {
-      g.globalCompositeOperation = live.op;
-      g.drawImage(live.overlay, 0, 0);
-    }
+    if (live) putLive(g, live);
     return { img: g.canvas };
   },
   object(l, c) {
@@ -214,15 +213,22 @@ function maskInto(img: HTMLCanvasElement, l: Layer, s: Scene, at: Placement): HT
   place(m, at);
   if (surface) m.drawImage(surface, 0, 0);
   if (fl && surface) drawWarp(m, fl.src, fl.q);
-  if (live) {
-    m.globalCompositeOperation = live.op;
-    m.drawImage(live.overlay, 0, 0);
-  }
+  if (live) putLive(m, live);
   const g = layerCtx(4, W, H);
   g.drawImage(img, 0, 0);
   g.globalCompositeOperation = "destination-out";
   g.drawImage(m.canvas, 0, 0);
   return g.canvas;
+}
+
+/** The stroke being painted over its layer (or mask), drawn in page px: over it by its op, or in place of it where it is cut. */
+function putLive(g: CanvasRenderingContext2D, live: Live): void {
+  if (live.cut) {
+    g.globalCompositeOperation = "destination-out";
+    g.drawImage(live.cut, 0, 0);
+    g.globalCompositeOperation = "source-over";
+  } else g.globalCompositeOperation = live.op;
+  g.drawImage(live.overlay, 0, 0);
 }
 
 /** One layer alone at 1:1 on a transparent page-sized target (Rasterize; ADR 0166): the same renderer as the view and exports. */

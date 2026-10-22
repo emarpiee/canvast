@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.36.0 — Smudge, Clone stamp, OpenRaster: P4 begins (2026-10-22)
+
+- **Smudge** (`R`, in the Brush flyout): drags the paint under it along, live; strength and finger painting.
+- **Clone stamp** (`S`): Alt-click a source, then paint its pixels elsewhere; Aligned keeps the distance.
+- **OpenRaster (`.ora`)**: export a page with its layers for other painting programs; import an `.ora` (compressed or not) as a new painting.
+
 ## 0.35.2 — A sheet's ratio from a size (2026-10-22)
 
 - The sheet's **Ratio** field shows a size typed in px as its ratio: `2000 x 1920` (or `2000x1920`, `2000x1920px`, `2000 px x 1920 px`) becomes `25 : 24`, `1920 x 1080` becomes `16 : 9` (it was shown as a decimal when the ratio needed more than 20 on its smaller side).

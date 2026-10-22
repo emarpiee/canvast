@@ -131,6 +131,8 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("tool.path", "Path (curves)", TOOLS_GROUP, "B"),
   // (Shift+B as in painting programs; the handlers hear Y, a key no command has)
   cmd("tool.pencil", "Pencil (Painting view)", TOOLS_GROUP, "Y", "Shift+B", "paint"),
+  cmd("tool.smudge", "Smudge (Painting view)", TOOLS_GROUP, "R", undefined, "paint"),
+  cmd("tool.clone", "Clone stamp (Painting view)", TOOLS_GROUP, "S", undefined, "paint"),
   cmd("tool.sheet", "Sheet", TOOLS_GROUP, "C"),
   // (the Painting view's selection tools, with the letters of painting programs; Shift+M and Shift+L reach keys no command has)
   cmd("tool.marquee", "Rectangle marquee (Painting view)", TOOLS_GROUP, "M", undefined, "paint"),

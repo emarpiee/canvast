@@ -142,7 +142,7 @@ const TOOLS = RAIL_TOOLS;
  * button while one of them is the tool (the button stays lit and wears the icon of the one in use). The first is the button's.
  */
 const FAMILIES = {
-  brush: [{ tool: "brush", icon: ICONS.paintbrush, label: "Brush", title: "Brush (B)" }, { tool: "pencil", icon: ICONS.pencilPixel, label: "Pencil", title: "Pencil: hard pixel edges, no smoothing; Auto erase in its options (Shift+B)" }],
+  brush: [{ tool: "brush", icon: ICONS.paintbrush, label: "Brush", title: "Brush (B)" }, { tool: "pencil", icon: ICONS.pencilPixel, label: "Pencil", title: "Pencil: hard pixel edges, no smoothing; Auto erase in its options (Shift+B)" }, { tool: "smudge", icon: ICONS.smudge, label: "Smudge", title: "Smudge: drag the paint under the brush along (R)" }, { tool: "clone", icon: ICONS.cloneStamp, label: "Clone stamp", title: "Clone stamp: Alt-click where to copy from, then paint the layer's pixels from there (S)" }],
   select: [{ tool: "select", icon: ICONS.pointer, label: "Select", title: "Select (V)" }, { tool: "marquee", icon: ICONS.marqueeRect, label: "Rectangle marquee", title: "Rectangle marquee: select pixels in a rectangle; Shift adds, Alt takes away (M)" }, { tool: "marqueeEllipse", icon: ICONS.marqueeEllipse, label: "Ellipse marquee", title: "Ellipse marquee: select pixels in an ellipse; Shift adds, Alt takes away (Shift+M)" }],
   fill: [{ tool: "fill", icon: ICONS.fillTool, label: "Fill bucket", title: "Fill bucket: fill the region of about the colour clicked (G)" }, { tool: "gradient", icon: ICONS.gradientTool, label: "Gradient", title: "Gradient: drag from where the paint colour is to where it is clear (Shift+G)" }],
   lasso: [{ tool: "lasso", icon: ICONS.lasso, label: "Lasso", title: "Lasso: on a paint layer, select pixels inside a line drawn round them (L)" }, { tool: "lassoPoly", icon: ICONS.lassoPoly, label: "Polygonal lasso", title: "Polygonal lasso: click the corners; click the first one, double-click or Enter to close (Shift+L)" }, { tool: "wand", icon: ICONS.wand, label: "Magic wand", title: "Magic wand: select the pixels of about the colour clicked (W)" }],
@@ -267,7 +267,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="tb-group tb-options" data-for="pen brush pencil eyedropper fill gradient" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
-      <div class="tb-group tb-options" data-for="brush pencil eraser select marquee marqueeEllipse lasso lassoPoly wand fill gradient" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
+      <div class="tb-group tb-options" data-for="brush pencil smudge clone eraser select marquee marqueeEllipse lasso lassoPoly wand fill gradient" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>

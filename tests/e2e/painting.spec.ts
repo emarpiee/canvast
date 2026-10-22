@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { crc32, deflateRawSync } from "node:zlib";
 import { LIMITS, expect, reps, setPenColour, test } from "./harness";
 import type { Page } from "@playwright/test";
 import { makePng } from "./png";
@@ -689,6 +690,65 @@ test("reference pictures: a library picture floats over the view (not a layer), 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the Smudge (R, in the Brush flyout) drags the paint under it along, shown as it goes; one undo puts it back", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const a = async (x: number, y: number): Promise<number> => (await px(p, id, x, y))![3]!;
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("80");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [950, 400], [950, 600]); // (a red bar, about 910 to 990)
+  expect(await a(1150, 500), "no paint there yet").toBe(0);
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("r");
+  await expect(p.locator('.rail-fly[data-fly="brush"] [data-tool="smudge"]')).toHaveAttribute("aria-checked", "true");
+  await p.locator('[data-paint-options] input[data-opt="strength"]').fill("90");
+  await p.locator('[data-paint-options] input[data-opt="strength"]').press("Enter");
+  const s0 = await at(p, 950, 500), s1 = await at(p, 1250, 500);
+  await p.mouse.move(s0.x, s0.y);
+  await p.mouse.down();
+  await p.mouse.move((s0.x + s1.x) / 2, s0.y, { steps: 10 });
+  await expect.poll(async () => (await screenPx(p, 1060, 500))[1]!, { message: "shown while it is dragged (red over the white page)" }).toBeLessThan(250);
+  await p.mouse.move(s1.x, s1.y, { steps: 10 });
+  await p.mouse.up();
+  await settled(p);
+  expect(await a(1150, 500), "red dragged onto clear paper").toBeGreaterThan(0);
+  expect(await a(950, 450), "the bar is still there off the drag").toBe(255);
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  expect(await a(1150, 500), "one undo").toBe(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the Clone stamp (S): Alt-click a source, paint its pixels elsewhere; Aligned keeps the distance for the next stroke", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("60");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [1000, 400], [1000, 400]); // (a red dab)
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("s");
+  await expect(p.locator('.rail-fly[data-fly="brush"] [data-tool="clone"]')).toHaveAttribute("aria-checked", "true");
+  await p.locator('[data-paint-options] input[data-opt="hardness"]').fill("100");
+  await p.locator('[data-paint-options] input[data-opt="hardness"]').press("Enter");
+  const src = await at(p, 1000, 400);
+  await p.keyboard.down("Alt");
+  await p.mouse.click(src.x, src.y);
+  await p.keyboard.up("Alt");
+  await stroke(p, [1400, 700], [1400, 700]);
+  expect((await px(p, id, 1400, 700))!, "the source's red, stamped").toEqual([255, 0, 0, 255]);
+  await stroke(p, [1600, 700], [1600, 700]); // (aligned: from 1200, 400, where nothing is)
+  expect((await px(p, id, 1600, 700))![3], "aligned: the same distance, onto empty paper").toBe(0);
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  expect((await px(p, id, 1400, 700))![3], "undone").toBe(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);
@@ -835,6 +895,66 @@ test("patterns (.pat): each becomes a preset with it as its texture, in a group 
   await panel.locator('.brush-cell[aria-label="Water"]').click({ button: "right" });
   await p.locator('.pop-menu [data-id="delete"]').click();
   await expect.poll(async () => (await brushes()).presets.filter((x) => x.group === "Patterns").map((x) => x.name)).toEqual(["Stripes"]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+/** A ZIP whose entries are deflated (as other programs write `.ora` files; the app's own archives are stored). */
+function makeDeflatedZip(entries: ReadonlyArray<{ name: string; data: Buffer }>): Buffer {
+  const u16 = (v: number): Buffer => { const b = Buffer.alloc(2); b.writeUInt16LE(v); return b; };
+  const u32 = (v: number): Buffer => { const b = Buffer.alloc(4); b.writeUInt32LE(v >>> 0); return b; };
+  const locals: Buffer[] = [], central: Buffer[] = [];
+  let off = 0;
+  for (const e of entries) {
+    const name = Buffer.from(e.name), body = deflateRawSync(e.data), crc = crc32(e.data);
+    const head = Buffer.concat([u32(0x04034b50), u16(20), u16(0), u16(8), u16(0), u16(0), u32(crc), u32(body.length), u32(e.data.length), u16(name.length), u16(0), name]);
+    central.push(Buffer.concat([u32(0x02014b50), u16(20), u16(20), u16(0), u16(8), u16(0), u16(0), u32(crc), u32(body.length), u32(e.data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(off), name]));
+    locals.push(head, body);
+    off += head.length + body.length;
+  }
+  const cd = Buffer.concat(central);
+  return Buffer.concat([...locals, cd, u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length), u32(cd.length), u32(off), u16(0)]);
+}
+
+test("OpenRaster (.ora): a page exports with its layers, and imports as a new painting; a compressed file from another program imports too", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  await setColour(p, "#ff0000");
+  await stroke(p, [1000, 300], [1300, 300]);
+  await p.locator('[data-paint-layers] [data-act="new-layer"]').click();
+  await p.locator('.pop-menu [data-id="paint"]').click();
+  await setColour(p, "#0000ff");
+  await stroke(p, [1000, 600], [1300, 600]);
+  const top = (await state(p)).layers[1]!;
+  await p.locator(`[data-layer-more="${top.id}"]`).click();
+  await p.locator('.pop-menu [data-id="rename"]').click();
+  await p.getByRole("dialog").locator("input").fill("Blue");
+  await p.getByRole("dialog").locator("input").press("Enter");
+  await settled(p);
+  const dl = p.waitForEvent("download");
+  await fromPaintingMenu(p, "export-ora");
+  const d = await dl;
+  expect(d.suggestedFilename()).toMatch(/\.ora$/);
+  const ora = await readFile((await d.path())!);
+  expect(ora.subarray(30, 38).toString(), "mimetype first, stored").toBe("mimetype");
+  await p.getByTestId("paint-list").click();
+  await p.getByTestId("paint-import-input").setInputFiles({ name: "Round trip.ora", mimeType: "image/openraster", buffer: ora });
+  await expect.poll(async () => (await state(p))?.name ?? "").toBe("Round trip");
+  const s = await state(p);
+  expect(s.layers.map((l) => [l.name, l.kind])).toEqual([["Layer 1", "raster"], ["Blue", "raster"]]);
+  expect(s.layers[0]!.id).not.toBe(layers[0]!.id);
+  await expect.poll(async () => (await px(p, s.layers[0]!.id, 1150, 300))?.[3] ?? -1, { message: "the red layer's pixels" }).toBe(255);
+  expect((await px(p, s.layers[1]!.id, 1150, 600))!).toEqual([0, 0, 255, 255]);
+  // a file another program wrote: deflated, a layer placed at an offset, half opacity, multiply
+  const stackXml = `<?xml version="1.0"?><image w="400" h="200"><stack><layer name="Moved" src="data/a.png" x="100" y="50" opacity="0.5" composite-op="svg:multiply"/></stack></image>`;
+  const other = makeDeflatedZip([{ name: "mimetype", data: Buffer.from("image/openraster") }, { name: "stack.xml", data: Buffer.from(stackXml) }, { name: "data/a.png", data: makePng(20, 10, () => [0, 200, 0, 255]) }]);
+  await p.getByTestId("paint-list").click();
+  await p.getByTestId("paint-import-input").setInputFiles({ name: "From elsewhere.ora", mimeType: "image/openraster", buffer: other });
+  await expect.poll(async () => (await state(p))?.name ?? "").toBe("From elsewhere");
+  const e = await state(p);
+  expect(e.pages[0]).toMatchObject({ w: 400, h: 200 });
+  expect(e.layers.map((l) => [l.name, l.opacity, l.blend])).toEqual([["Moved", 0.5, "multiply"]]);
+  await expect.poll(async () => (await px(p, e.layers[0]!.id, 105, 55))?.[1] ?? -1, { message: "placed at its offset" }).toBe(200);
+  expect((await px(p, e.layers[0]!.id, 95, 55))![3]).toBe(0);
   expect(app.consoleErrors).toEqual([]);
 });
 

@@ -20,6 +20,19 @@ export interface Symmetry {
   readonly rotation: number;
 }
 
+/** A smudge stroke: how much of the carried colour each dab lays down, and whether it starts with the brush's colour. */
+export interface Smudge {
+  readonly strength: number;
+  readonly finger: boolean;
+}
+
+/** What a stroke is besides a plain one: painted with symmetry, a smudge, or a clone stamp from (dx, dy) away. */
+export interface StrokeKind {
+  readonly sym?: Symmetry;
+  readonly smudge?: Smudge;
+  readonly clone?: { readonly dx: number; readonly dy: number };
+}
+
 export interface TipBitmap {
   readonly key: string;
   readonly w: number;
@@ -33,7 +46,7 @@ export type ToWorker =
   | { readonly t: "load"; readonly id: string; readonly tiles: readonly LoadTile[] }
   /** The engine's layer, as the last stroke left it, is now the version `id` (nothing to load). */
   | { readonly t: "adopt"; readonly id: string }
-  | { readonly t: "begin"; readonly brush: object; readonly lock: boolean; readonly w: number; readonly h: number; readonly sym?: Symmetry }
+  | { readonly t: "begin"; readonly brush: object; readonly lock: boolean; readonly w: number; readonly h: number; readonly sym?: Symmetry; /** A smudge (0..1 strength; finger: start with the brush's colour). */ readonly smudge?: Smudge; /** A clone stamp: from (dx, dy) away. */ readonly clone?: { readonly dx: number; readonly dy: number } }
   /** Samples, 7 floats each: x, y (page px), pressure (0..1), tilt x, tilt y (degrees), rotation (degrees), time (ms). */
   | { readonly t: "points"; readonly pts: Float32Array }
   | { readonly t: "end" }

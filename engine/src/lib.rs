@@ -15,7 +15,7 @@ mod abr_map;
 
 use color::PixelFormat;
 use geom::{Rect, TILE_SIZE, TileCoord};
-use paint::{BrushPreset, BrushSettings, GrayTile, Pattern, StoredTile, StrokePoint, TipShape, render::{COV_TILE, StrokeRenderer}, symmetry::{PresetSymmetry, SymmetryMode}};
+use paint::{BrushPreset, BrushSettings, GrayTile, Pattern, StoredTile, StrokePoint, TipShape, render::{COV_TILE, StrokeRenderer}, retouch::{Region, Smudge, alpha_index, mix_back, mix_premultiplied}, symmetry::{PresetSymmetry, SymmetryMode}};
 use raster::Surface;
 
 struct Stroke {
@@ -26,6 +26,26 @@ struct Stroke {
     /// Painting symmetry: its axes, and a pass of the stroke for each mirror (put on the layer with the stroke as one).
     sym: Option<PresetSymmetry>,
     mirrors: Vec<StrokeRenderer>,
+    /// A smudge: each dab works on a copy of the layer in order, and what changed is mixed back onto the layer as it goes.
+    dab: Option<DabRun>,
+}
+
+/// What each dab of a dab stroke does to the working copy.
+enum DabEffect {
+    Smudge(Smudge),
+    /// Clone stamp: the layer as it was before the stroke, from (dx, dy) away, laid down by the dab's coverage.
+    Clone { dx: i32, dy: i32, alpha: usize },
+}
+
+struct DabRun {
+    effect: DabEffect,
+    /// The layer as the dabs leave it (before the mix at the brush's opacity).
+    work: Surface,
+    /// How many of the renderer's dabs are done.
+    done: usize,
+    /// Changed since the live view last looked, and in all.
+    dirty: Rect,
+    bounds: Rect,
 }
 
 impl Stroke {
@@ -37,6 +57,45 @@ impl Stroke {
             }
         }
     }
+    /// Run a smudge's new dabs, and mix what they changed onto `target`.
+    fn run_dabs(&mut self, target: &mut Surface) {
+        let Some(run) = self.dab.as_mut() else { return };
+        let ctx = self.renderer.ctx.clone();
+        let new: Vec<_> = self.renderer.dabs().get(run.done..).unwrap_or_default().to_vec();
+        let mut dmg = Rect::EMPTY;
+        for (k, d) in new.iter().enumerate() {
+            let r = ctx.dab_rect(d, false);
+            if r.is_empty() {
+                continue;
+            }
+            let mut region = Region::read(&run.work, r);
+            let fp = ctx.footprint(d, run.done + k);
+            match &mut run.effect {
+                DabEffect::Smudge(sm) => sm.dab(&mut region, &fp),
+                DabEffect::Clone { dx, dy, alpha } => {
+                    let src = Region::read(&self.pre, Rect::new(r.x0 + *dx, r.y0 + *dy, r.x1 + *dx, r.y1 + *dy));
+                    let a = fp.rect.intersect(&r);
+                    for y in a.y0..a.y1 {
+                        for x in a.x0..a.x1 {
+                            let c = fp.at(x, y);
+                            if c > 0.0 {
+                                mix_premultiplied(region.px_mut(x, y), src.px(x + *dx, y + *dy), *alpha, c.min(1.0));
+                            }
+                        }
+                    }
+                }
+            }
+            region.write(&mut run.work);
+            dmg = dmg.union(&r);
+        }
+        run.done += new.len();
+        if dmg.is_empty() {
+            return;
+        }
+        mix_back(target, &Region::read(&self.pre, dmg), &Region::read(&run.work, dmg), dmg, ctx.brush.opacity, None, self.lock);
+        run.dirty = run.dirty.union(&dmg);
+        run.bounds = run.bounds.union(&dmg);
+    }
     fn finish(&mut self) {
         self.renderer.finish();
         for r in &mut self.mirrors {
@@ -44,6 +103,10 @@ impl Stroke {
         }
     }
     fn composite(&mut self, target: &mut Surface, all: bool) -> Rect {
+        if self.dab.is_some() {
+            self.run_dabs(target);
+            return self.dab.as_ref().map_or(Rect::EMPTY, |r| r.bounds);
+        }
         if self.mirrors.is_empty() { self.renderer.composite(&self.pre, target, None, self.lock, all) } else { self.renderer.composite_union_many(self.mirrors.iter(), &self.pre, target, None, self.lock) }
     }
 }
@@ -106,7 +169,38 @@ pub unsafe extern "C" fn stroke_begin(layer: i32, json: *const u8, len: usize, l
         load_tips(&mut brush, &s.tips);
         let Some(surface) = s.layers.get(layer as usize) else { return -1 };
         let renderer = StrokeRenderer::new(&brush, Some(surface.format()), 1.0);
-        s.stroke = Some(Stroke { layer: layer as usize, pre: surface.clone(), renderer, lock: lock_alpha != 0, sym: None, mirrors: Vec::new() });
+        s.stroke = Some(Stroke { layer: layer as usize, pre: surface.clone(), renderer, lock: lock_alpha != 0, sym: None, mirrors: Vec::new(), dab: None });
+        0
+    })
+}
+
+/// Make the stroke begun a smudge: each dab drags the colour under it along (`strength` 0..1 of the carried colour it lays down and
+/// keeps); with `finger`, it starts with the brush's colour. Call it before the first points. 0, or -1 without a stroke.
+#[unsafe(no_mangle)]
+pub extern "C" fn stroke_smudge(strength: f32, finger: i32) -> i32 {
+    STATE.with_borrow_mut(|s| {
+        let Some(st) = s.stroke.as_mut() else { return -1 };
+        let fmt = st.pre.format();
+        let brush = st.renderer.ctx.brush.clone();
+        let fg = (finger != 0).then(|| raster::from_rgba(&fmt, brush.color));
+        st.renderer = StrokeRenderer::new(&brush, Some(fmt), 1.0).record_dabs();
+        st.mirrors.clear();
+        st.dab = Some(DabRun { effect: DabEffect::Smudge(Smudge::new(strength.clamp(0.01, 1.0), fg, brush.size).with_alpha(alpha_index(&fmt))), work: st.pre.clone(), done: 0, dirty: Rect::EMPTY, bounds: Rect::EMPTY });
+        0
+    })
+}
+
+/// Make the stroke begun a clone stamp: each dab lays down the layer as it was before the stroke, from (dx, dy) away (the source minus
+/// where the stroke is). Call it before the first points. 0, or -1 without a stroke.
+#[unsafe(no_mangle)]
+pub extern "C" fn stroke_clone(dx: i32, dy: i32) -> i32 {
+    STATE.with_borrow_mut(|s| {
+        let Some(st) = s.stroke.as_mut() else { return -1 };
+        let fmt = st.pre.format();
+        let brush = st.renderer.ctx.brush.clone();
+        st.renderer = StrokeRenderer::new(&brush, Some(fmt), 1.0).record_dabs();
+        st.mirrors.clear();
+        st.dab = Some(DabRun { effect: DabEffect::Clone { dx, dy, alpha: alpha_index(&fmt).unwrap_or(3) }, work: st.pre.clone(), done: 0, dirty: Rect::EMPTY, bounds: Rect::EMPTY });
         0
     })
 }
@@ -173,12 +267,18 @@ pub unsafe extern "C" fn stroke_push(pts: *const f32, n: usize) -> i32 {
 pub unsafe extern "C" fn stroke_feed(pts: *const f32, n: usize) -> i32 {
     let f = unsafe { std::slice::from_raw_parts(pts, n * 7) };
     let points: Vec<StrokePoint> = f.chunks_exact(7).map(point).collect();
-    STATE.with_borrow_mut(|s| match s.stroke.as_mut() {
-        Some(st) => {
-            st.push(&points);
-            0
+    STATE.with_borrow_mut(|s| {
+        let State { stroke, layers, .. } = s;
+        match stroke.as_mut() {
+            Some(st) => {
+                st.push(&points);
+                if let Some(target) = layers.get_mut(st.layer) {
+                    st.run_dabs(target);
+                }
+                0
+            }
+            None => -1,
         }
-        None => -1,
     })
 }
 
@@ -215,8 +315,32 @@ pub extern "C" fn stroke_cancel() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn stroke_live() -> i32 {
     STATE.with_borrow_mut(|s| {
-        let State { stroke, live, live_keys, cov, .. } = s;
+        let State { stroke, live, live_keys, cov, layers, .. } = s;
         let Some(st) = stroke.as_mut() else { return -1 };
+        if let Some(run) = st.dab.as_mut() {
+            // (a smudge changes the layer's pixels: the live view gets them, tile by tile, to put in place of the layer's)
+            let d = std::mem::replace(&mut run.dirty, Rect::EMPTY);
+            live_keys.clear();
+            if d.is_empty() {
+                return 0;
+            }
+            let Some(target) = layers.get(st.layer) else { return -1 };
+            let n = (COV_TILE * COV_TILE) as usize;
+            let (tx0, ty0, tx1, ty1) = (d.x0.div_euclid(COV_TILE), d.y0.div_euclid(COV_TILE), (d.x1 - 1).div_euclid(COV_TILE), (d.y1 - 1).div_euclid(COV_TILE));
+            let count = ((tx1 - tx0 + 1) * (ty1 - ty0 + 1)) as usize;
+            live.resize(count * n * 4, 0);
+            let mut i = 0;
+            for ty in ty0..=ty1 {
+                for tx in tx0..=tx1 {
+                    live_keys.extend([tx, ty]);
+                    let px = &mut live[i * n * 4..(i + 1) * n * 4];
+                    let px = unsafe { std::slice::from_raw_parts_mut(px.as_mut_ptr().cast::<[u8; 4]>(), n) };
+                    target.read_rgba8_into(Rect { x0: tx * COV_TILE, y0: ty * COV_TILE, x1: (tx + 1) * COV_TILE, y1: (ty + 1) * COV_TILE }, px);
+                    i += 1;
+                }
+            }
+            return count as i32;
+        }
         let mut keys = st.renderer.take_dirty_tiles();
         for r in &mut st.mirrors {
             keys.extend(r.take_dirty_tiles());

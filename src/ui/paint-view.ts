@@ -16,6 +16,7 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import { saveFile } from "./file-actions";
 import { pageDialog, type PageSpec } from "./paint-dialogs";
 import { mountReferences } from "./paint-references";
+import { importOra, writeOra } from "../paint/ora";
 import { openLibraryPicker, type LibraryPicture } from "./library-picker";
 import { shortcutsActive } from "../interaction/shortcut-scope";
 import type { SettingsStore } from "../settings/settings";
@@ -106,6 +107,17 @@ const fileName = (s: string): string => s.replace(/[\\/:*?"<>|]+/g, " ").trim() 
 
 export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintView {
   const store = deps.db ? new PaintStore(deps.db) : null;
+  /** An OpenRaster file chosen in the list: a new painting, opened. */
+  const importFile = async (file: File): Promise<void> => {
+    const ws = deps.workspaceId();
+    if (!store || !ws) return deps.tell("Paintings need the browser's storage, which is not available here.");
+    if (deps.readOnly()) return deps.tell("This tab is read-only (canvast is open in another tab that saves).");
+    try {
+      await open(await importOra(store, ws, file.name.replace(/\.[^.]+$/, "").slice(0, 80) || "Imported", file));
+    } catch (e) {
+      deps.tell(`“${file.name}” could not be imported: ${(e as Error).message}.`);
+    }
+  };
   let session: PaintSession | null = null;
   let unsub: (() => void) | null = null;
   let engine: BrushEngine | null = null;
@@ -144,7 +156,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     <div class="paint-list" data-screen="list">
       <header class="paint-list-head">
         <h1>Paintings</h1>
+        <button type="button" data-act="import-ora" data-testid="paint-import" title="Import an OpenRaster file (.ora, from other painting programs) as a new painting">${ICONS.arrowDownToLine}<span>Import</span></button>
         <button type="button" class="is-primary" data-act="new" data-testid="paint-new">${ICONS.newPainting}<span>New painting</span></button>
+        <input type="file" accept=".ora,image/openraster" hidden data-testid="paint-import-input">
       </header>
       <ul class="paint-items" data-items aria-label="Paintings"></ul>
     </div>
@@ -165,6 +179,12 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const editor = $<HTMLElement>('[data-screen="editor"]');
   const stage = $<HTMLElement>("[data-stage]");
   const references = mountReferences(stage, { assets: deps.assets, settings: deps.settings });
+  $<HTMLInputElement>('[data-testid="paint-import-input"]').addEventListener("change", (e) => {
+    const i = e.target as HTMLInputElement;
+    const f = i.files?.[0];
+    i.value = "";
+    if (f) void importFile(f);
+  });
   /** The box the page is drawn in, turned and mirrored inside the still stage (the view only, not the pixels): big enough to cover it. */
   const turnEl = $<HTMLElement>("[data-turn]");
   let turn = 0;
@@ -273,7 +293,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
    * (whose shapes the canvas's Eraser takes, as on the canvas). Every other tool is the canvas's. */
   const paintTool = (): ToolId | null => {
     const t = tool();
-    return t === "brush" || t === "pencil" ? t : t === "eraser" && (session?.active()?.kind !== "object" || session.editsMask()) ? "eraser" : null;
+    return t === "brush" || t === "pencil" || t === "smudge" || t === "clone" ? t : t === "eraser" && (session?.active()?.kind !== "object" || session.editsMask()) ? "eraser" : null;
   };
   /** The selection tool in use, when it selects pixels here: the marquees, the polygonal lasso and the wand always; the Lasso when what is
    * worked on is pixels (on a vector layer it picks shapes, as on the canvas). */
@@ -374,6 +394,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     requestAnimationFrame(draw);
   };
   let pointerAt: { x: number; y: number } | null = null;
+  /** The Clone stamp's source (page px, set by Alt-click) and, once a stroke has begun from it, its distance from the brush (kept while Aligned). */
+  let cloneSrc: [number, number] | null = null;
+  let cloneOff: [number, number] | null = null;
   const drawCursor = (): void => {
     const g = cursor.getContext("2d")!;
     const dpr = window.devicePixelRatio || 1;
@@ -422,6 +445,21 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       g.setLineDash([]);
     }
     const t = paintTool();
+    if (t === "clone" && cloneSrc && pointerAt) {
+      // (where the Clone stamp copies from: a cross, following the brush once the distance is set)
+      const [px0, py0] = cloneOff ? toPage(cam, pointerAt.x, pointerAt.y).map((v, i) => v + cloneOff![i]!) : cloneSrc;
+      const sx = (cam.x + px0! * cam.scale) * dpr, sy = (cam.y + py0! * cam.scale) * dpr, r = 6 * dpr;
+      for (const [c, w] of [[css.getPropertyValue("--black").trim() || "#000", 3], [css.getPropertyValue("--white").trim() || "#fff", 1]] as const) {
+        g.strokeStyle = c;
+        g.lineWidth = w * dpr;
+        g.beginPath();
+        g.moveTo(sx - r, sy);
+        g.lineTo(sx + r, sy);
+        g.moveTo(sx, sy - r);
+        g.lineTo(sx, sy + r);
+        g.stroke();
+      }
+    }
     if (!pointerAt || !t || panning) return;
     const r = (Number(toolValues(t)["size"]) / 2) * cam.scale * dpr;
     g.lineWidth = 1;
@@ -1200,6 +1238,11 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     switch (act) {
       case "new":
         return newPainting();
+      case "import-ora":
+        return $<HTMLInputElement>('[data-testid="paint-import-input"]').click();
+      case "export-ora":
+        if (s) saveFile(`${fileName(`${s.painting.name} ${page().name}`)}.ora`, await pageOra());
+        return;
       case "list":
         await close();
         screen("list");
@@ -1220,6 +1263,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
             { id: "rename", label: "Rename…", icon: ICONS.textCursorInput, run: () => void action("rename", el) },
             { id: "page-size", label: "Page size and resolution…", hint: `${p.w} × ${p.h} px · ${p.dpi} DPI`, icon: ICONS.pageSize, run: () => void action("page-size", el) },
             { id: "export", label: "Export the page as PNG", icon: ICONS.imageUp, run: () => void action("export", el) },
+            { id: "export-ora", label: "Export the page as OpenRaster (.ora)…", hint: "Its layers, for other painting programs (each as it looks; adjustment layers are left out)", icon: ICONS.fileOutput, run: () => void action("export-ora", el) },
             { id: "place", label: "Place the page on the canvas", hint: "A picture in the library, put in the middle of the canvas view", icon: ICONS.placeOnCanvas, run: () => void action("place", el) },
             { id: "reference", label: "Add a reference picture…", hint: "A picture of the library floating over the view, to paint from (not part of the page)", icon: ICONS.referencePicture, run: () => void deps.libraryPictures().then((items) => openLibraryPicker(el, items)).then((hash) => hash && references.add(hash)) },
           ], s.painting.name);
@@ -1271,6 +1315,27 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       return composePage(g, scene(s, false), { scale: 1, x: 0, y: 0 });
     });
     return await new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error("the page could not be made into a PNG"))), "image/png"));
+  };
+
+  /** The page as an OpenRaster file: each layer drawn alone as it looks, at 1:1 (an adjustment layer has no look of its own: left out). */
+  const pageOra = async (): Promise<Blob> => {
+    const s = session!;
+    const p = s.page();
+    const layers = [];
+    for (const l of [...s.stack()].reverse()) {
+      if (l.kind === "adjust") continue;
+      const c = Object.assign(document.createElement("canvas"), { width: p.w, height: p.h });
+      await whenReady(() => {
+        const g = c.getContext("2d")!;
+        g.clearRect(0, 0, p.w, p.h);
+        // (alone, at full opacity, normal and unclipped: the file keeps its opacity, visibility and blend itself)
+        const { hidden: _h, blend: _b, clipBelow: _c, ...plain } = l;
+        return drawLayerAlone(g, scene(s, false), { ...plain, opacity: 1 } as Layer);
+      });
+      const png = await new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error("a layer could not be made into a PNG"))), "image/png"));
+      layers.push({ name: l.name, png, x: 0, y: 0, opacity: l.opacity, hidden: !!l.hidden, blend: l.blend ?? null });
+    }
+    return writeOra(p, layers, await pagePng());
   };
 
   // ---- the pointer ----------------------------------------------------------------------------------------------------------------
@@ -1371,7 +1436,14 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     }
     const pt = paintTool();
     if (e.button !== 0 || !pt) return;
+    if (e.altKey && pt === "clone") {
+      // (Alt-click with the Clone stamp: where it copies from; the distance is taken at the next stroke)
+      cloneSrc = toPage(cam, p.x, p.y);
+      cloneOff = null;
+      return drawCursor();
+    }
     if (e.altKey) return pickColour(p);
+    if (pt === "clone" && !cloneSrc) return deps.tell("Alt-click where the Clone stamp copies from, first.");
     const why = session.cannotPaint();
     if (why) return deps.tell(why);
     const s = session;
@@ -1386,7 +1458,11 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     st.queue.push(...first);
     const sm = SYMMETRY.find(([k]) => k === deps.settings.get("paint.symmetry"))?.[2] ?? 0;
     const sym = sm ? { mode: sm, cx: page().w / 2, cy: page().h / 2, rotation: 0 } : undefined;
-    void ensureTips(brush).then(() => s.begin({ brush, erase: st.erase, ...(sym ? { sym } : {}) })).then((ok) => {
+    const sv = toolValues(pt);
+    const smudge = "smudge" in TOOLS[pt].action ? { strength: Number(sv["strength"]) / 100, finger: sv["finger"] === true } : undefined;
+    if (pt === "clone" && cloneSrc && (!cloneOff || sv["aligned"] !== true)) cloneOff = [Math.round(cloneSrc[0] - first[0]!), Math.round(cloneSrc[1] - first[1]!)];
+    const clone = pt === "clone" && cloneOff ? { dx: cloneOff[0], dy: cloneOff[1] } : undefined;
+    void ensureTips(brush).then(() => s.begin({ brush, erase: st.erase, ...(sym && !smudge && !clone ? { sym } : {}), ...(smudge ? { smudge } : {}), ...(clone ? { clone } : {}) })).then((ok) => {
       if (stroke !== st) return; // (cancelled meanwhile)
       if (!ok) {
         stroke = null;
@@ -1399,7 +1475,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     });
   });
   const finish = (s: PaintSession, st: NonNullable<typeof stroke>): void => {
-    void s.end(st.erase ? "Erase" : "Paint").then(() => redraw());
+    void s.end(st.erase ? "Erase" : paintTool() === "smudge" ? "Smudge" : paintTool() === "clone" ? "Clone" : "Paint").then(() => redraw());
     if (stroke === st) stroke = null;
   };
   canvas.addEventListener("pointermove", (e) => {
