@@ -349,7 +349,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await pick(p, HASH);
   await p.getByTestId("asset-folders").getByLabel("Refs").check();
   await p.getByTestId("view-canvas").click();
-  const crumb = p.locator(".nav-crumb");
+  const crumb = p.getByTestId("view-canvas"); // (the canvas's crumb; the Paint view has a crumb of its own)
   const zipPaths = async (choice: RegExp): Promise<string[]> => {
     await crumb.click();
     const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {
@@ -375,7 +375,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await q.setViewportSize({ width: 1280, height: 800 });
   await q.goto(APP_URL);
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  await q.locator(".nav-crumb").click();
+  await q.getByTestId("view-canvas").click();
   await q.getByTestId("nav-import-input").setInputFiles({ name: bk.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
   await q.getByTestId("confirm-ok").click();
   await expect(q.getByTestId("toast")).toContainText("Imported");
