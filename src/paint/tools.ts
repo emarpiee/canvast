@@ -15,7 +15,7 @@ export type OptionSpec =
 export type Values = Readonly<Record<string, number | boolean | string>>;
 
 /** What a painting tool does with the pointer: paint with the engine, or erase. (Every other tool of the rail is the canvas's, ADR 0168.) */
-export type ToolAction = { readonly paint: true; readonly erase: boolean };
+export type ToolAction = { readonly paint: true; readonly erase: boolean; /** No anti-aliasing: every pixel is covered or not (the Pencil). */ readonly aliased?: true };
 
 export interface ToolDef {
   readonly label: string;
@@ -34,8 +34,15 @@ const BRUSH: readonly OptionSpec[] = [
   { key: "pressureOpacity", label: "Pressure opacity", kind: "switch", def: false, hint: "A pen's pressure changes the opacity" },
 ];
 
+/** The Pencil's: the brush's without what an aliased tip has no use for (hardness, spacing), one pixel wide at first, and Auto erase. */
+const PENCIL: readonly OptionSpec[] = [
+  ...BRUSH.filter((o) => o.key !== "hardness" && o.key !== "spacing").map((o): OptionSpec => (o.key === "size" && o.kind === "number" ? { ...o, def: 1 } : o.key === "pressureSize" && o.kind === "switch" ? { ...o, def: false } : o)),
+  { key: "autoErase", label: "Auto erase", kind: "switch", def: false, hint: "A stroke that starts on the paint colour erases instead" },
+];
+
 export const TOOLS = {
   brush: { label: "Brush", action: { paint: true, erase: false }, options: BRUSH },
+  pencil: { label: "Pencil", action: { paint: true, erase: false, aliased: true }, options: PENCIL },
   eraser: { label: "Eraser", action: { paint: true, erase: true }, options: BRUSH },
 } as const satisfies Record<string, ToolDef>;
 

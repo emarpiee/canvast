@@ -187,9 +187,12 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       });
   /** The rail's tool, as the canvas's tools keep it (one rail for both views, ADR 0168). */
   const tool = (): Tool => vhost.editor.tool;
-  /** The painting tool in use, when the rail's tool paints here: the Brush, or the Eraser on a layer that is not a vector layer (whose
-   * shapes the canvas's Eraser takes, as on the canvas). Every other tool is the canvas's. */
-  const paintTool = (): ToolId | null => (tool() === "brush" ? "brush" : tool() === "eraser" && session?.active()?.kind !== "object" ? "eraser" : null);
+  /** The painting tool in use, when the rail's tool paints here: the Brush, the Pencil, or the Eraser on a layer that is not a vector layer
+   * (whose shapes the canvas's Eraser takes, as on the canvas). Every other tool is the canvas's. */
+  const paintTool = (): ToolId | null => {
+    const t = tool();
+    return t === "brush" || t === "pencil" ? t : t === "eraser" && session?.active()?.kind !== "object" ? "eraser" : null;
+  };
   /** The paint colour: the canvas's pen colour (the Properties bar's colour, ADR 0168). */
   const colour = (): string => vhost.editor.penColor;
 
@@ -788,7 +791,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const vectorOn = (): boolean => !!session && paintTool() === null;
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
-  let stroke: { id: number; started: boolean; queue: number[] } | null = null;
+  let stroke: { id: number; started: boolean; queue: number[]; erase: boolean } | null = null;
   let spaceDown = false;
   /** Where the last stroke ended, in page px (Shift-click draws a straight line from it). */
   let lastEnd: [number, number] | null = null;
@@ -815,6 +818,15 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     const d = canvas.getContext("2d")!.getImageData(Math.round(p.x * dpr), Math.round(p.y * dpr), 1, 1).data;
     setColour(`#${[d[0], d[1], d[2]].map((v) => v!.toString(16).padStart(2, "0")).join("")}`);
+  };
+
+  /** Whether the active layer's pixel at page px (x, y) is the paint colour (the Pencil's Auto erase). */
+  const onColour = (s: PaintSession, x: number, y: number): boolean => {
+    const l = s.active();
+    const c = l && s.image(l);
+    if (!c || x < 0 || y < 0 || x >= c.width || y >= c.height) return false;
+    const d = c.getContext("2d")!.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    return d[3]! > 0 && `#${[d[0], d[1], d[2]].map((v) => v!.toString(16).padStart(2, "0")).join("")}` === colour().toLowerCase();
   };
 
   canvas.addEventListener("pointerdown", (e) => {
@@ -847,13 +859,14 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const why = session.cannotPaint();
     if (why) return deps.tell(why);
     const s = session;
-    const st = { id: e.pointerId, started: false, queue: [] as number[] };
-    stroke = st;
     const first = sample(e);
+    const brush = brushOf(pt, toolValues(pt), toolBrush(pt), colour());
+    if (toolValues(pt)["autoErase"] === true && onColour(s, first[0]!, first[1]!)) brush["erase"] = true;
+    const st = { id: e.pointerId, started: false, queue: [] as number[], erase: brush["erase"] === true };
+    stroke = st;
     if (e.shiftKey && lastEnd) st.queue.push(lastEnd[0], lastEnd[1], first[2]!, 0, 0, 0, first[6]! - 1);
     st.queue.push(...first);
-    const brush = brushOf(pt, toolValues(pt), toolBrush(pt), colour());
-    void ensureTips(brush).then(() => s.begin({ brush, erase: TOOLS[pt].action.erase })).then((ok) => {
+    void ensureTips(brush).then(() => s.begin({ brush, erase: st.erase })).then((ok) => {
       if (stroke !== st) return; // (cancelled meanwhile)
       if (!ok) {
         stroke = null;
@@ -866,7 +879,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     });
   });
   const finish = (s: PaintSession, st: NonNullable<typeof stroke>): void => {
-    void s.end(paintTool() === "eraser" ? "Erase" : "Paint").then(() => redraw());
+    void s.end(st.erase ? "Erase" : "Paint").then(() => redraw());
     if (stroke === st) stroke = null;
   };
   canvas.addEventListener("pointermove", (e) => {

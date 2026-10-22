@@ -99,7 +99,7 @@ export const SETTINGS = {
   "eraser.diameterPx": { scope: "device", default: 16, validate: range(4, 128), effect: "immediate" } as Def<number>,
   "eraser.parts": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   // The Painting view (ADR 0165): the tool, each tool's options (checked against its schema when read, paint/tools.ts), the colour.
-  "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
+  "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "pencil", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
   "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
   "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   "paint.brushView": { scope: "device", default: "list", validate: oneOf("list", "grid"), effect: "immediate" } as Def<"list" | "grid">,

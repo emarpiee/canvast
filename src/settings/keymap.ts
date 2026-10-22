@@ -129,6 +129,8 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   // (in the Painting view B is the Brush, as in painting programs; on the canvas it stays the Path tool: the first command a key is bound to in a view has it)
   cmd("tool.brush", "Brush (Painting view)", TOOLS_GROUP, "B", undefined, "paint"),
   cmd("tool.path", "Path (curves)", TOOLS_GROUP, "B"),
+  // (Shift+B as in painting programs; the handlers hear Y, a key no command has)
+  cmd("tool.pencil", "Pencil (Painting view)", TOOLS_GROUP, "Y", "Shift+B", "paint"),
   cmd("tool.sheet", "Sheet", TOOLS_GROUP, "C"),
   cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L", undefined, "both"),
   cmd("tool.text", "Text", TOOLS_GROUP, "T", undefined, "both"),

@@ -157,7 +157,8 @@ export function lockOf(sec: BrushSection): string | undefined {
 /** The brush a tool paints with, as the engine reads it: the tool's brush, its options bar's values, the colour, and whether it erases. */
 export function brushOf(tool: ToolId, v: Values, brush: Brush, colour: string): Brush {
   const out: Brush = { ...brush };
-  for (const [k, scale] of FLAT) out[k] = typeof v[k] === "number" ? Number(v[k]) / scale : v[k] === true;
+  for (const [k, scale] of FLAT) if (k in v) out[k] = typeof v[k] === "number" ? Number(v[k]) / scale : v[k] === true; // (a tool without an option keeps its brush's)
+  if ("aliased" in TOOLS[tool].action) out["aliased"] = true;
   out["color"] = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16) / 255).concat(1);
   out["erase"] = TOOLS[tool].action.erase;
   return out;

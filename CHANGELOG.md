@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.33.0 — The Pencil (2026-10-22)
+
+- **Pencil** in the Paint view (`Shift+B`, or the Brush button's flyout on the rail): whole pixels, no smoothing, one pixel wide at first. **Auto erase**: a stroke that starts on the paint colour erases.
+- Picking a layer in the Layers panel now takes the canvas's tools to it at once (Select sometimes picked a vector layer's shapes on a paint layer, or nothing on the vector layer).
+
 ## 0.32.3 — Paint panels match the app (2026-10-22)
 
 - The **Actions bar** works in the Paint view again (its buttons did not take the pointer over the page).

@@ -208,6 +208,29 @@ test("vector layers (ADR 0167): the canvas's Shape and Pen draw into one vector 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the Pencil (Shift+B, in the Brush flyout) paints whole pixels only; with Auto erase a stroke that starts on the paint colour erases", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  await p.keyboard.press("Shift+B");
+  await expect(p.locator('.rail-fly[data-fly="brush"] [data-tool="pencil"]')).toHaveAttribute("aria-checked", "true");
+  await expect(p.locator('.rail-tools [data-tool="brush"]'), "the rail's Brush button stands for its flyout").toHaveAttribute("aria-checked", "true");
+  const size = p.locator('[data-paint-options] input[data-opt="size"]');
+  await expect(size, "one pixel at first").toHaveValue("1");
+  await size.fill("9");
+  await size.press("Enter");
+  await stroke(p, [950, 300], [1400, 340]);
+  const column = await Promise.all([...Array(30).keys()].map(async (i) => (await px(p, id, 1100, 305 + i))![3]));
+  expect(column.some((a) => a === 255), "it painted").toBe(true);
+  expect(column.filter((a) => a !== 0 && a !== 255), "no soft edge").toEqual([]);
+  await p.locator('[data-paint-options] [data-opt="autoErase"]').click();
+  await stroke(p, [1175, 320], [1175, 320]); // (on the line: erased)
+  expect((await px(p, id, 1175, 320))![3]).toBe(0);
+  await stroke(p, [1200, 600], [1300, 600]); // (off it: painted)
+  expect((await px(p, id, 1250, 600))![3]).toBe(255);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

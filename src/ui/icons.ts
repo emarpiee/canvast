@@ -163,6 +163,7 @@ import type from "lucide-static/icons/type.svg";
 import layoutGrid from "lucide-static/icons/layout-grid.svg";
 import penTool from "lucide-static/icons/pen-tool.svg";
 import pencilLine from "lucide-static/icons/pencil-line.svg";
+import pencilPixelSvg from "lucide-static/icons/pen.svg";
 import penLine from "lucide-static/icons/pen-line.svg";
 import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
@@ -421,6 +422,7 @@ export const ICONS = {
   layoutGrid: clean(layoutGrid),
   penTool: clean(penTool),
   pencilLine: clean(pencilLine),
+  pencilPixel: clean(pencilPixelSvg),
   penLine: clean(penLine),
   highlighter: clean(highlighter),
   bold: clean(bold),

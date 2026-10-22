@@ -208,6 +208,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
         <button type="button" role="radio" class="shape-kind" data-tool="path" aria-label="Path (curves)" title="Path (curves): click corners, drag for a curve, click the first node to close (B)">${ICONS.pathTool}</button>
       </div>
+      <div class="rail-fly" data-fly="brush" data-only="paint" hidden role="radiogroup" aria-label="Brush or pencil">
+        <button type="button" role="radio" data-tool="brush" aria-label="Brush" title="Brush (B)">${ICONS.paintbrush}</button>
+        <button type="button" role="radio" data-tool="pencil" aria-label="Pencil" title="Pencil: hard pixel edges, no smoothing; Auto erase in its options (Shift+B)">${ICONS.pencilPixel}</button>
+      </div>
       <div class="rail-fly" data-fly="pen" hidden role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
@@ -219,7 +223,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         // (Import sits with the tools that put something on the canvas: after the Note tool)
-        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.only ? ` data-only="${t.only}"` : ""}${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" data-only="canvas" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.only ? ` data-only="${t.only}"` : ""}${t.tool === "shape" || t.tool === "pen" || t.tool === "brush" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" data-only="canvas" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
       ).join("")}
       </div>
       <span class="rail-sep" role="separator" data-only="canvas"></span>
@@ -247,10 +251,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
         <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
       </div>
-      <div class="tb-group tb-options" data-for="pen brush" role="group" aria-label="Colour">
+      <div class="tb-group tb-options" data-for="pen brush pencil" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
-      <div class="tb-group tb-options" data-for="brush eraser" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
+      <div class="tb-group tb-options" data-for="brush pencil eraser" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
@@ -675,7 +679,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
   /** The tool whose kinds were closed by pressing its own button (until the tool changes). */
-  let flyShut: "shape" | "pen" | null = null;
+  let flyShut: "shape" | "pen" | "brush" | null = null;
   let colourEditing = false;
   // The first colours of the selection have a chip each; the others are one button, "+N", that opens them as a list (so the row stays short, and none is lost).
   const SEL_CHIPS = 7;
@@ -784,10 +788,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.penKind = d["penKind"] as PenKind;
       editor.changed();
     } else if (d["tool"]) {
-      // the button of a tool with kinds (Shape, Pen), pressed while it is the tool, closes its kinds; pressed again, opens them
+      // the button of a tool with kinds (Shape, Pen, Brush), pressed while it is the tool, closes its kinds; pressed again, opens them
       const t = d["tool"] as Tool;
-      const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : null;
-      const same = fam !== null && !!b.closest(".rail") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : editor.tool === "pen");
+      const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : t === "brush" ? "brush" : null;
+      const same = fam !== null && !!b.closest(".rail-tools") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : fam === "brush" ? editor.tool === "brush" || editor.tool === "pencil" : editor.tool === "pen");
       flyShut = same ? (flyShut === fam ? null : fam) : null;
       editor.setTool(t);
       editor.changed();
@@ -882,13 +886,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const update = (): void => {
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
       // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
-      const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options"));
+      const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options")) || (b.dataset["tool"] === "brush" && editor.tool === "pencil" && !b.closest(".rail-fly"));
       b.setAttribute("aria-checked", String(on));
     }
     // The tools with kinds: their kinds open beside the button while the tool is active, and the button wears the icon of the kind in use.
-    const flyAt = (name: "shape" | "pen", tool: string, on: boolean, icon: string): void => {
+    const flyAt = (name: "shape" | "pen" | "brush", tool: string, on: boolean, icon: string): void => {
       const fly = root.querySelector<HTMLElement>(`[data-fly="${name}"]`)!;
-      const btn = root.querySelector<HTMLElement>(`.rail [data-tool="${tool}"]`)!;
+      const btn = root.querySelector<HTMLElement>(`.rail-tools [data-tool="${tool}"]`)!;
       if (!on && flyShut === name) flyShut = null; // (another tool: the kinds open again next time)
       fly.hidden = !on || flyShut === name;
       if (!fly.hidden) fly.style.top = `${btn.offsetTop + (btn.offsetHeight - fly.offsetHeight) / 2}px`; // (centred on its button, whatever the bar's own padding)
@@ -900,6 +904,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     };
     flyAt("shape", "shape", editor.tool === "shape" || editor.tool === "path", editor.tool === "path" ? ICONS.pathTool : (SHAPE_MENU.find((k) => k.id === editor.shapeKind)?.icon ?? ICONS.shapeTool));
     flyAt("pen", "pen", editor.tool === "pen", PEN_MENU.find((k) => k.id === editor.penKind)?.icon ?? ICONS.pencil);
+    flyAt("brush", "brush", editor.tool === "brush" || editor.tool === "pencil", editor.tool === "pencil" ? ICONS.pencilPixel : ICONS.paintbrush);
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
     root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = newInk(editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));

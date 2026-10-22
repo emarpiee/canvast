@@ -1635,7 +1635,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const updateToolTitles = (): void => {
     for (const t of TOOL_ORDER) {
       const k = keymap.display(TOOL_COMMAND[t]);
-      document.querySelector<HTMLElement>(`button[data-tool="${t}"]`)?.setAttribute("title", k ? `${TOOL_NAME[t]} (${k})` : TOOL_NAME[t]);
+      for (const b of document.querySelectorAll<HTMLElement>(`:is(.rail-tools, .rail-fly) button[data-tool="${t}"]`)) b.setAttribute("title", k ? `${TOOL_NAME[t]} (${k})` : TOOL_NAME[t]);
     }
   };
   updateToolTitles();
