@@ -124,6 +124,8 @@ export interface DebugHook {
   paint: {
     state(): { paintingId: string; name: string; pageId: string; pages: Array<{ id: string; name: string; w: number; h: number; bg: string | null }>; activeId: string | null; layers: Array<{ id: string; name: string; pageId: string; z: number; tiles: number; kind: string; objs?: number; hidden?: true; locked?: true; clipBelow?: true; alphaLock?: true; opacity: number; blend?: string; mask?: number }>; canUndo: boolean } | null;
     layerPixel(layerId: string, x: number, y: number): [number, number, number, number] | null;
+    /** How many pixels of the shown page are selected (at least half), 0 with no selection. */
+    selected(): number;
     screenOf(x: number, y: number): { x: number; y: number } | null;
     settled(): Promise<void>;
     list(): Promise<Array<{ id: string; name: string }>>;
@@ -409,6 +411,14 @@ export function installDebugHook(
           layers: [...s.layers.values()].sort((a, b) => a.z - b.z).map((l) => ({ id: l.id, name: l.name, pageId: l.pageId, z: l.z, tiles: Object.keys(tilesOf(l)).length, kind: l.kind, ...(l.kind === "object" ? { objs: l.objs.length } : {}), opacity: l.opacity, ...(l.hidden ? { hidden: true as const } : {}), ...(l.locked ? { locked: true as const } : {}), ...(l.clipBelow ? { clipBelow: true as const } : {}), ...(l.kind === "raster" && l.alphaLock ? { alphaLock: true as const } : {}), ...(l.blend ? { blend: l.blend } : {}), ...(l.mask ? { mask: Object.keys(l.mask.tiles).length } : {}) })),
           canUndo: s.history.canUndo,
         };
+      },
+      selected: () => {
+        const m = deps.paint.session?.selection?.mask;
+        if (!m) return 0;
+        const d = m.getContext("2d")!.getImageData(0, 0, m.width, m.height).data;
+        let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i]! >= 128) n++;
+        return n;
       },
       layerPixel: (id, x, y) => {
         const s = deps.paint.session;

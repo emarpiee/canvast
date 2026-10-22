@@ -23,7 +23,15 @@ export const PAGE_PRESETS: ReadonlyArray<{ readonly label: string; readonly w: n
   { label: "Phone, 1080 × 1920", w: 1080, h: 1920, dpi: 72 },
 ];
 
-export function pageDialog(o: { title: string; confirmLabel: string; withName: boolean; value: PageSpec }): Promise<PageSpec | null> {
+/** How a page already painted takes a new size: its pixels kept and placed by an anchor (0 to 1 on each axis), or everything scaled. */
+export interface PageResize {
+  readonly how: "canvas" | "image";
+  readonly anchor: readonly [number, number];
+}
+
+const ANCHORS: ReadonlyArray<readonly [string, number, number]> = [["Top left", 0, 0], ["Top", 0.5, 0], ["Top right", 1, 0], ["Left", 0, 0.5], ["Middle", 0.5, 0.5], ["Right", 1, 0.5], ["Bottom left", 0, 1], ["Bottom", 0.5, 1], ["Bottom right", 1, 1]];
+
+export function pageDialog(o: { title: string; confirmLabel: string; withName: boolean; value: PageSpec; resize?: true }): Promise<(PageSpec & { resize?: PageResize }) | null> {
   const dlg = document.createElement("dialog");
   dlg.className = "confirm paint-page-dialog";
   dlg.dataset["testid"] = "page-dialog";
@@ -38,6 +46,10 @@ export function pageDialog(o: { title: string; confirmLabel: string; withName: b
       <label class="paint-field">Height <input type="number" data-f="h" min="0" step="any" inputmode="decimal"></label>
       <label class="paint-field">Unit <select data-f="unit">${Object.keys(UNITS).map((u) => `<option value="${u}">${u}</option>`).join("")}</select></label>
     </div>
+    ${o.resize ? `<div class="paint-field-row">
+      <label class="paint-field">A new size <select data-f="how"><option value="canvas">Keeps the pixels (canvas size)</option><option value="image">Scales the picture (image size)</option></select></label>
+      <label class="paint-field" data-anchor-wrap>Pixels placed <select data-f="anchor">${ANCHORS.map(([l], i) => `<option value="${i}"${i === 4 ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+    </div>` : ""}
     <label class="paint-field">Resolution (DPI) <input type="number" data-f="dpi" min="1" max="10000" step="1" inputmode="numeric" value="${v.dpi}"></label>
     <div class="paint-field-row">
       <label class="paint-field">Background <select data-f="bg"><option value="white">White</option><option value="none">Transparent</option><option value="colour">Colour</option></select></label>
@@ -76,8 +88,13 @@ export function pageDialog(o: { title: string; confirmLabel: string; withName: b
     f<HTMLInputElement>("dpi").value = String(p.dpi);
     show(p.w, p.h);
   });
+  if (o.resize) {
+    const sync = (): void => void (dlg.querySelector<HTMLElement>("[data-anchor-wrap]")!.hidden = f<HTMLSelectElement>("how").value !== "canvas");
+    f<HTMLSelectElement>("how").addEventListener("change", sync);
+    sync();
+  }
   const note = dlg.querySelector<HTMLElement>("[data-note]")!;
-  const read = (): PageSpec | null => {
+  const read = (): (PageSpec & { resize?: PageResize }) | null => {
     const w = px("w"), h = px("h");
     if (!(w >= 1 && h >= 1 && w <= MAX_PAGE_PX && h <= MAX_PAGE_PX)) {
       note.textContent = `Width and height must be from 1 to ${MAX_PAGE_PX} px.`;
@@ -89,10 +106,11 @@ export function pageDialog(o: { title: string; confirmLabel: string; withName: b
       return null;
     }
     const name = o.withName ? f<HTMLInputElement>("name").value.trim().slice(0, 80) || "Painting" : v.name;
-    return { name, w, h, dpi: dpi(), bg: bgSel.value === "none" ? null : bgSel.value === "white" ? "#ffffff" : hex };
+    const a = ANCHORS[Number(o.resize ? f<HTMLSelectElement>("anchor").value : 0)]!;
+    return { name, w, h, dpi: dpi(), bg: bgSel.value === "none" ? null : bgSel.value === "white" ? "#ffffff" : hex, ...(o.resize ? { resize: { how: f<HTMLSelectElement>("how").value as "canvas" | "image", anchor: [a[1], a[2]] as const } } : {}) };
   };
   return new Promise((resolve) => {
-    let answer: PageSpec | null = null;
+    let answer: (PageSpec & { resize?: PageResize }) | null = null;
     const ok = (): void => {
       answer = read();
       if (answer) dlg.close();

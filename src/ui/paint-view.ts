@@ -34,7 +34,8 @@ import { copySelection, cutSelection, pasteObjects } from "../app/actions";
 import type { Tool } from "../app/editor-state";
 import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type ObjectEnv } from "../paint/objects";
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
-import { TOOLS, TOOL_IDS, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { FILL_OPTIONS, GRADIENT_OPTIONS, SELECT_OPTIONS, TOOLS, TOOL_IDS, valuesFor, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
+import { blankMask, combine, feathered, grown, inverted, shapeMask, wandMask, type SelectMode } from "../paint/selection";
 import { brushOf, cleanBrush, tipsOf, type Brush } from "../paint/brushes";
 import { drawThumb, mountBrushPanels, type BrushPanels } from "./brush-panels";
 import type { DockSpec } from "./panel-dock";
@@ -88,6 +89,9 @@ export interface PaintView {
 }
 
 const ZOOM_STEP = 1.25;
+/** The option sets of the Painting view's tools that are not brushes (paint/tools.ts). */
+const SETS = { select: SELECT_OPTIONS, fill: FILL_OPTIONS, gradient: GRADIENT_OPTIONS } as const;
+type SetId = keyof typeof SETS;
 const fileName = (s: string): string => s.replace(/[\\/:*?"<>|]+/g, " ").trim() || "page";
 
 export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintView {
@@ -100,7 +104,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   let cam: PaintCamera = { scale: 1, x: 0, y: 0 };
   /** A painting tool's state (setting paint.tools): its options bar's values, its brush (the preset's, changed in Brush settings, ADR 0169) and
    * the preset it came from. */
-  const toolState = (t: ToolId): Record<string, unknown> => {
+  const toolState = (t: ToolId | SetId): Record<string, unknown> => {
     const v = (deps.settings.get("paint.tools") as Record<string, unknown>)[t];
     return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
   };
@@ -116,6 +120,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     brushPanels.changed();
   };
   const setToolValue = (t: ToolId, key: string, v: number | boolean | string): void => setTool(t, { values: { ...toolValues(t), [key]: v } });
+  /** The options of the tools that are not brushes (kept in setting paint.tools under the set's name): one set for the selection tools. */
+  const setValues = (id: SetId): Record<string, number | boolean | string> => valuesFor(SETS[id], toolState(id));
+  const setSetValue = (id: SetId, key: string, v: number | boolean | string): void => {
+    deps.settings.set("paint.tools", { ...(deps.settings.get("paint.tools") as Record<string, unknown>), [id]: { ...setValues(id), [key]: v } });
+    renderOptions();
+  };
+  const selValues = (): Record<string, number | boolean | string> => setValues("select");
 
   const nextLayerName = (s: PaintSession, stem: string): string => nextName(stem, [...s.layers.values()].map((l) => l.name));
 
@@ -190,7 +201,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const items = (): MenuItem[] => [
       { id: "turn-left", label: `Turn left ${TURN_STEP}°`, hint: "4", icon: ICONS.rotateCcwSquare, run: () => setTurn(turn - TURN_STEP) },
       { id: "turn-right", label: `Turn right ${TURN_STEP}°`, hint: "6", icon: ICONS.rotateCw, run: () => setTurn(turn + TURN_STEP) },
-      { id: "mirror", label: "Mirror", hint: "M: left and right swapped, to check a drawing", icon: ICONS.flipHorizontal, checked: mirror, run: () => setTurn(turn, !mirror) },
+      { id: "mirror", label: "Mirror", hint: "Left and right swapped, to check a drawing", icon: ICONS.flipHorizontal, checked: mirror, run: () => setTurn(turn, !mirror) },
       { id: "reset", label: "Reset rotation", hint: "5", icon: ICONS.rotateCcw, disabled: !turn && !mirror, run: () => setTurn(0, false) },
     ];
     openMoreMenu(anchor, items(), "View rotation", { keepOpen: true, refresh: items });
@@ -253,6 +264,15 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const t = tool();
     return t === "brush" || t === "pencil" ? t : t === "eraser" && (session?.active()?.kind !== "object" || session.editsMask()) ? "eraser" : null;
   };
+  /** The selection tool in use, when it selects pixels here: the marquees, the polygonal lasso and the wand always; the Lasso when what is
+   * worked on is pixels (on a vector layer it picks shapes, as on the canvas). */
+  const pixelTool = (): "marquee" | "marqueeEllipse" | "lasso" | "lassoPoly" | "wand" | null => {
+    const t = tool();
+    if (t === "marquee" || t === "marqueeEllipse" || t === "lassoPoly" || t === "wand") return t;
+    return t === "lasso" && (session?.active()?.kind !== "object" || session.editsMask()) ? "lasso" : null;
+  };
+  /** The fill bucket or the gradient, when one is the tool. */
+  const fillTool = (): "fill" | "gradient" | null => (tool() === "fill" || tool() === "gradient" ? (tool() as "fill" | "gradient") : null);
   /** The paint colour: the canvas's pen colour (the Properties bar's colour, ADR 0168). */
   const colour = (): string => vhost.editor.penColor;
 
@@ -300,6 +320,15 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
+    if (s.selection) {
+      // (the selection's outline, at its pixels, in the difference of what is under it: it shows on light and dark)
+      g.save();
+      g.setTransform(cam.scale * dpr, 0, 0, cam.scale * dpr, cam.x * dpr, cam.y * dpr);
+      g.imageSmoothingEnabled = false;
+      g.globalCompositeOperation = "difference";
+      g.drawImage(s.selection.edge, 0, 0);
+      g.restore();
+    }
     vhost.drawOverlay(g, dpr);
     drawCursor();
   };
@@ -314,6 +343,24 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const dpr = window.devicePixelRatio || 1;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cursor.width, cursor.height);
+    if (draft) {
+      // (what is being drawn to select: a dashed line, light over dark, so it shows on anything)
+      const k = cam.scale * dpr;
+      const pts = draft.pts.map(([x, y]) => [x * k + cam.x * dpr, y * k + cam.y * dpr] as const);
+      if (draft.kind === "lassoPoly" && pointerAt) pts.push([pointerAt.x * dpr, pointerAt.y * dpr]);
+      const [a, b = a] = pts;
+      for (const [c, dash] of [[css.getPropertyValue("--black").trim() || "#000", []], [css.getPropertyValue("--white").trim() || "#fff", [4 * dpr, 4 * dpr]]] as const) {
+        g.strokeStyle = c;
+        g.lineWidth = dpr;
+        g.setLineDash(dash);
+        g.beginPath();
+        if (draft.kind === "marquee") g.rect(a![0], a![1], b![0] - a![0], b![1] - a![1]);
+        else if (draft.kind === "marqueeEllipse") g.ellipse((a![0] + b![0]) / 2, (a![1] + b![1]) / 2, Math.abs(b![0] - a![0]) / 2, Math.abs(b![1] - a![1]) / 2, 0, 0, Math.PI * 2);
+        else pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+        g.stroke();
+      }
+      g.setLineDash([]);
+    }
     const t = paintTool();
     if (!pointerAt || !t || panning) return;
     const r = (Number(toolValues(t)["size"]) / 2) * cam.scale * dpr;
@@ -335,12 +382,29 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   // ---- the painting tools' options (in the Properties bar, ADR 0168) ------------------------------------------------------------------
 
   /** One option of a painting tool, from its schema (paint/tools.ts): each kind of option is one control. */
-  const optionHtml = (o: OptionSpec, v: number | boolean): string =>
-    o.kind === "number"
+  const optionHtml = (o: OptionSpec, v: number | boolean | string): string =>
+    o.kind === "choice"
+      ? `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <select data-opt="${o.key}" aria-label="${esc(o.label)}">${o.choices.map(([c, l]) => `<option value="${c}"${c === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`
+      : o.kind === "number"
       ? `<label class="tb-count" title="${esc(o.hint)}">${esc(o.label)} <input type="number" data-opt="${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" inputmode="numeric" value="${v}" aria-label="${esc(o.label)}${o.percent ? " (%)" : o.unit ? ` (${o.unit})` : ""}"></label>`
       : `<button type="button" data-opt="${o.key}" aria-pressed="${!!v}" title="${esc(o.hint)}">${esc(o.label)}</button>`; // (a switch: the bar's toggle, as the canvas's)
   let optionsFor: string | undefined;
   const renderOptions = (): void => {
+    const sel = pixelTool();
+    const set: SetId | null = sel ? "select" : fillTool();
+    if (set) {
+      const vals = setValues(set);
+      const key = `${set} ${sel}\n${JSON.stringify(vals)}`;
+      if (key === optionsFor) return;
+      optionsFor = key;
+      const opts = (SETS[set] as ReadonlyArray<OptionSpec & { wand?: true }>).filter((o) => !o.wand || sel === "wand");
+      optionsEl.innerHTML = opts.map((o) => optionHtml(o, vals[o.key]!)).join("") + (set === "select" ? `<button type="button" data-act="selection-menu" aria-haspopup="menu" aria-expanded="false" title="The selection: select all, deselect, invert, grow, shrink, feather">Selection</button>` : "");
+      for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setSetValue(set, f.dataset["opt"]!, v));
+      for (const f of optionsEl.querySelectorAll<HTMLSelectElement>("select[data-opt]")) f.addEventListener("change", () => setSetValue(set, f.dataset["opt"]!, f.value));
+      for (const b of optionsEl.querySelectorAll<HTMLElement>("button[data-opt]")) b.addEventListener("click", () => setSetValue(set, b.dataset["opt"]!, b.getAttribute("aria-pressed") !== "true"));
+      optionsEl.querySelector<HTMLElement>('[data-act="selection-menu"]')?.addEventListener("click", (e) => selectionMenu(e.currentTarget as HTMLElement));
+      return;
+    }
     const t = paintTool();
     const preset = t ? brushPanels.presetName(t) : "";
     const key = t ? `${t}\n${preset}\n${JSON.stringify(toolValues(t))}\n${JSON.stringify(toolBrush(t)["tip"] ?? "")}` : "";
@@ -364,6 +428,118 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       setToolValue(t, b.dataset["opt"]!, on);
     });
   };
+  // ---- selections (paint/selection.ts) -----------------------------------------------------------------------------------------------
+
+  /** What is being drawn to select: its kind, its points in page px, and the mode it will join in. */
+  let draft: { kind: "marquee" | "marqueeEllipse" | "lasso" | "lassoPoly" | "gradient"; pts: Array<[number, number]>; mode: SelectMode; id: number } | null = null;
+  const modeOf = (e: { shiftKey: boolean; altKey: boolean }): SelectMode => (e.shiftKey && e.altKey ? "intersect" : e.shiftKey ? "add" : e.altKey ? "subtract" : (selValues()["mode"] as SelectMode));
+  /** Put a new selection (a mask) in in `mode`, feathered by the option. */
+  const selectWith = (m: HTMLCanvasElement, mode: SelectMode): void => {
+    if (!session) return;
+    session.select(combine(session.selection?.mask ?? null, feathered(m, Number(selValues()["feather"])), mode));
+  };
+  const finishDraft = (): void => {
+    const d = draft;
+    draft = null;
+    drawCursor();
+    if (!d || !session) return;
+    if (d.kind === "gradient") return gradientAlong(d.pts[0]!, d.pts[1] ?? d.pts[0]!);
+    const p = page();
+    const [x0, y0] = d.pts[0]!, [x1, y1] = d.pts[1] ?? d.pts[0]!;
+    if ((d.kind === "marquee" || d.kind === "marqueeEllipse") && (Math.abs(x1 - x0) < 1 || Math.abs(y1 - y0) < 1)) {
+      if (d.mode === "new") session.select(null); // (a click with a marquee lets the selection go)
+      return;
+    }
+    if ((d.kind === "lasso" || d.kind === "lassoPoly") && d.pts.length < 3) return;
+    selectWith(shapeMask(p.w, p.h, (g) => {
+      if (d.kind === "marquee") g.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+      else if (d.kind === "marqueeEllipse") g.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
+      else d.pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    }), d.mode);
+  };
+  /** The magic wand at page px (x, y): the picked layer's pixels, or the page as it looks. */
+  const wandAt = (x: number, y: number, mode: SelectMode): void => {
+    const s = session;
+    if (!s) return;
+    const p = page(), v = selValues();
+    if (x < 0 || y < 0 || x >= p.w || y >= p.h) return;
+    const c = blankMask(p.w, p.h);
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    const l = s.active();
+    if (v["allLayers"]) composePage(g, scene(s, false), { scale: 1, x: 0, y: 0 });
+    else if (l) drawLayerAlone(g, scene(s, false), l);
+    selectWith(wandMask(g.getImageData(0, 0, p.w, p.h), x, y, Number(v["tolerance"]), v["contiguous"] === true), mode);
+  };
+  /** Ink of the paint colour (on a mask, black: what a light colour does there is to take the ink away). */
+  const inkColour = (): string => (session?.editsMask() ? "#000000" : colour());
+  const rgba = (hex: string, a: number): string => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")}, ${a})`;
+  /** The fill bucket at page px (x, y): the region of about that colour (on the picked layer, its mask, or the page) in the paint colour. */
+  const fillAt = (x: number, y: number): void => {
+    const s = session;
+    const l = s?.active();
+    if (!s || !l) return;
+    const p = page(), v = setValues("fill");
+    if (x < 0 || y < 0 || x >= p.w || y >= p.h) return;
+    const c = blankMask(p.w, p.h);
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    const m = s.editsMask() ? s.mask(l) : null;
+    if (m) g.drawImage(m, 0, 0);
+    else if (v["allLayers"]) composePage(g, scene(s, false), { scale: 1, x: 0, y: 0 });
+    else drawLayerAlone(g, scene(s, false), l);
+    const region = wandMask(g.getImageData(0, 0, p.w, p.h), x, y, Number(v["tolerance"]), v["contiguous"] === true);
+    const ink = blankMask(p.w, p.h);
+    const k = ink.getContext("2d")!;
+    k.fillStyle = rgba(inkColour(), Number(v["opacity"]) / 100);
+    k.fillRect(0, 0, p.w, p.h);
+    k.globalCompositeOperation = "destination-in";
+    k.drawImage(region, 0, 0);
+    void s.editPixels(ink, "Fill", s.editsMask() && light(colour()));
+  };
+  /** The gradient from a to b (page px): the paint colour at a, clear at b (reversed: the other way). */
+  const gradientAlong = (a: [number, number], b: [number, number]): void => {
+    const s = session;
+    if (!s || (a[0] === b[0] && a[1] === b[1])) return;
+    const p = page(), v = setValues("gradient");
+    const ink = blankMask(p.w, p.h);
+    const k = ink.getContext("2d")!;
+    const r = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const gr = v["shape"] === "radial" ? k.createRadialGradient(a[0], a[1], 0, a[0], a[1], r) : v["shape"] === "angle" ? k.createConicGradient(Math.atan2(b[1] - a[1], b[0] - a[0]), a[0], a[1]) : k.createLinearGradient(a[0], a[1], b[0], b[1]);
+    const full = rgba(inkColour(), Number(v["opacity"]) / 100), clear = rgba(inkColour(), 0);
+    gr.addColorStop(0, v["reverse"] ? clear : full);
+    gr.addColorStop(1, v["reverse"] ? full : clear);
+    k.fillStyle = gr;
+    k.fillRect(0, 0, p.w, p.h);
+    void s.editPixels(ink, "Gradient", s.editsMask() && light(colour()));
+  };
+  /** A whole-page mask. */
+  const allMask = (): HTMLCanvasElement => shapeMask(page().w, page().h, (g) => g.rect(0, 0, page().w, page().h));
+  const selectAll = (): void => session?.select(allMask());
+  const deselect = (): void => session?.select(null);
+  const invertSelection = (): void => {
+    if (!session) return;
+    session.select(session.selection ? inverted(session.selection.mask) : allMask());
+  };
+  /** Grow, shrink or feather the selection by a number of page px asked for. */
+  const reshape = async (how: "grow" | "shrink" | "feather"): Promise<void> => {
+    const m = session?.selection?.mask;
+    if (!m) return;
+    const v = await promptDialog({ title: how === "feather" ? "Feather the selection" : `${how === "grow" ? "Grow" : "Shrink"} the selection`, lines: ["By how many page pixels (1 to 250)"], value: "4", confirmLabel: how === "feather" ? "Feather" : how === "grow" ? "Grow" : "Shrink" });
+    const n = Math.round(Number(v));
+    if (!v || !(n >= 1 && n <= 250) || !session) return;
+    session.select(how === "feather" ? feathered(m, n) : grown(m, how === "grow" ? n : -n));
+  };
+  const selectionMenu = (anchor: HTMLElement): void => {
+    const has = !!session?.selection;
+    openMoreMenu(anchor, [
+      { id: "select-all", label: "Select all", hint: "Ctrl+A", icon: ICONS.selectAll, run: selectAll },
+      { id: "deselect", label: "Deselect", hint: "Ctrl+D", icon: ICONS.squareX, disabled: !has, run: deselect },
+      { id: "invert", label: "Invert", hint: "Ctrl+Shift+I: what was not selected", icon: ICONS.invertSelection, run: invertSelection },
+      { id: "grow", label: "Grow…", hint: "Move the edge out", icon: ICONS.growSelection, disabled: !has, run: () => void reshape("grow") },
+      { id: "shrink", label: "Shrink…", hint: "Move the edge in", icon: ICONS.shrinkSelection, disabled: !has, run: () => void reshape("shrink") },
+      { id: "feather", label: "Feather…", hint: "Soften the edge", icon: ICONS.featherSelection, disabled: !has, run: () => void reshape("feather") },
+    ], "Selection");
+  };
+
   const startEngine = async (): Promise<BrushEngine | null> => {
     if (!engine && !engineError) {
       try {
@@ -692,14 +868,15 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (b) void s.showPage(b.dataset["page"]!).then(() => fit());
   });
 
-  /** The page's size, resolution and background: a new size keeps the pixels where they are (a larger page has empty room right and below). */
+  /** The page's size, resolution and background: a new size keeps the pixels (placed by the anchor chosen: canvas size) or scales them (image size). */
   const editPage = async (id: string): Promise<void> => {
     const s = session!;
     const p = s.painting.pages.find((x) => x.id === id);
     if (!p) return;
-    const r = await pageDialog({ title: "Page size and resolution", confirmLabel: "Apply", withName: false, value: { name: p.name, w: p.w, h: p.h, dpi: p.dpi, bg: p.bg } });
+    const r = await pageDialog({ title: "Page size and resolution", confirmLabel: "Apply", withName: false, value: { name: p.name, w: p.w, h: p.h, dpi: p.dpi, bg: p.bg }, resize: true });
     if (!r) return;
-    s.setPage(id, { w: r.w, h: r.h, dpi: r.dpi, bg: r.bg }, "Page size");
+    if (r.w === p.w && r.h === p.h) s.setPage(id, { dpi: r.dpi, bg: r.bg }, "Page settings");
+    else await s.resizePage(id, r.w, r.h, r.resize!.how, r.resize!.anchor, { dpi: r.dpi, bg: r.bg }, r.resize!.how === "image" ? "Image size" : "Canvas size");
     fit();
   };
 
@@ -900,7 +1077,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   const pointers = new Map<number, { x: number; y: number }>();
   /** Not a painting tool: the canvas's tools have the pointer (vector-host.ts). */
-  const vectorOn = (): boolean => !!session && paintTool() === null;
+  const vectorOn = (): boolean => !!session && paintTool() === null && pixelTool() === null && fillTool() === null;
   let panning: { id: number; x: number; y: number } | null = null;
   let pinch: { d: number; mx: number; my: number } | null = null;
   let stroke: { id: number; started: boolean; queue: number[]; erase: boolean } | null = null;
@@ -964,6 +1141,27 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       e.preventDefault();
       return;
     }
+    const ft = fillTool();
+    if (ft && e.button === 0) {
+      const [x, y] = toPage(cam, p.x, p.y);
+      if (ft === "fill") return fillAt(x, y);
+      draft = { kind: "gradient", pts: [[x, y]], mode: "new", id: e.pointerId };
+      return drawCursor();
+    }
+    const st0 = pixelTool();
+    if (st0 && e.button === 0) {
+      const [x, y] = toPage(cam, p.x, p.y);
+      if (st0 === "wand") return wandAt(x, y, modeOf(e));
+      if (st0 === "lassoPoly" && draft) {
+        // (a click on the first corner closes the shape; elsewhere it adds a corner)
+        const [fx, fy] = draft.pts[0]!;
+        if (draft.pts.length > 2 && Math.hypot((fx - x) * cam.scale, (fy - y) * cam.scale) <= 8) return finishDraft();
+        draft.pts.push([x, y]);
+        return drawCursor();
+      }
+      draft = { kind: st0, pts: [[x, y]], mode: modeOf(e), id: e.pointerId };
+      return drawCursor();
+    }
     const pt = paintTool();
     if (e.button !== 0 || !pt) return;
     if (e.altKey) return pickColour(p);
@@ -1012,10 +1210,18 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     } else if (stroke && stroke.id === e.pointerId) {
       const evs = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
       send((evs.length ? evs : [e]).flatMap(sample));
+    } else if (draft && draft.id === e.pointerId && pointers.has(e.pointerId) && draft.kind !== "lassoPoly") {
+      const q = toPage(cam, p.x, p.y);
+      if (draft.kind === "lasso") draft.pts.push(q);
+      else draft.pts[1] = q;
     }
     drawCursor();
   });
   const up = (e: PointerEvent): void => {
+    if (draft && draft.id === e.pointerId && draft.kind !== "lassoPoly" && pointers.has(e.pointerId)) {
+      if (e.type === "pointercancel") draft = null;
+      else finishDraft();
+    }
     pointers.delete(e.pointerId);
     if (pinch && pointers.size < 2) pinch = null;
     if (panning?.id === e.pointerId) {
@@ -1108,6 +1314,34 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   // The tool letters, undo and redo, Delete, Enter, Escape and the Ctrl keys are the canvas's tools' (vector-host.ts, one keymap, ADR 0168);
   // the Painting view keeps its zoom, the brush size and Space for the painting tools.
   window.addEventListener("keydown", (e) => {
+    if (!session || !shortcutsActive(e, "paint")) return;
+    const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (draft && (e.key === "Escape" || e.key === "Enter")) {
+      e.stopImmediatePropagation();
+      if (e.key === "Enter") finishDraft();
+      else (draft = null), drawCursor();
+      return;
+    }
+    // (on pixels Ctrl+A, Ctrl+D and Ctrl+Shift+I are the selection's, as in painting programs; on a vector layer they stay the canvas's)
+    const onPixels = session.active()?.kind !== "object" || session.editsMask();
+    if (!mod && !e.altKey && onPixels && session.selection && (e.key === "Delete" || e.key === "Backspace")) {
+      // (Delete clears what is selected of the layer, or shows it on a mask)
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void session.editPixels(session.selection.mask, "Clear", true);
+      return;
+    }
+    if (!mod || e.altKey || !onPixels || !((k === "a" && !e.shiftKey) || (k === "d" && !e.shiftKey) || (k === "i" && e.shiftKey))) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (k === "a") selectAll();
+    else if (k === "d") deselect();
+    else invertSelection();
+  }, { capture: true });
+  canvas.addEventListener("dblclick", () => {
+    if (draft?.kind === "lassoPoly") finishDraft();
+  });
+  window.addEventListener("keydown", (e) => {
     if (!session || !shortcutsActive(e, "paint") || e.key !== "Escape" || !stroke) return;
     e.stopImmediatePropagation(); // (Escape drops the stroke being painted, and does nothing else)
     session.cancel();
@@ -1131,7 +1365,6 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       spaceDown = true;
     } else if (k === "4" || k === "6") setTurn(turn + (k === "4" ? -TURN_STEP : TURN_STEP));
     else if (k === "5") setTurn(0, false);
-    else if (k === "m" || k === "M") setTurn(turn, !mirror);
     else if (k === "+" || k === "=") void action("zoom-in", canvas);
     else if (k === "-") void action("zoom-out", canvas);
     else if ((k === "[" || k === "]") && pt) {

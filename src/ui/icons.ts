@@ -86,6 +86,17 @@ import plus from "lucide-static/icons/plus.svg";
 import refreshCw from "lucide-static/icons/refresh-cw.svg";
 import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
 import eclipseSvg from "lucide-static/icons/eclipse.svg";
+import marqueeRectSvg from "lucide-static/icons/squircle-dashed.svg";
+import marqueeEllipseSvg from "lucide-static/icons/circle-dot-dashed.svg";
+import lassoPolySvg from "lucide-static/icons/triangle-dashed.svg";
+import wandSvg from "lucide-static/icons/wand.svg";
+import fillToolSvg from "lucide-static/icons/beaker.svg";
+import gradientToolSvg from "lucide-static/icons/sunset.svg";
+import squareXSvg from "lucide-static/icons/square-x.svg";
+import invertSelectionSvg from "lucide-static/icons/arrow-left-right.svg";
+import growSelectionSvg from "lucide-static/icons/unfold-horizontal.svg";
+import shrinkSelectionSvg from "lucide-static/icons/fold-horizontal.svg";
+import featherSelectionSvg from "lucide-static/icons/cloud-fog.svg";
 import eyeClosedSvg from "lucide-static/icons/eye-closed.svg";
 import rotateCcwSquareSvg from "lucide-static/icons/rotate-ccw-square.svg";
 import rotateCwSvg from "lucide-static/icons/rotate-cw.svg";
@@ -336,6 +347,17 @@ export const ICONS = {
   refresh: clean(refreshCw),
   rotateCcw: clean(rotateCcw),
   eclipse: clean(eclipseSvg),
+  marqueeRect: clean(marqueeRectSvg),
+  marqueeEllipse: clean(marqueeEllipseSvg),
+  lassoPoly: clean(lassoPolySvg),
+  wand: clean(wandSvg),
+  fillTool: clean(fillToolSvg),
+  gradientTool: clean(gradientToolSvg),
+  squareX: clean(squareXSvg),
+  invertSelection: clean(invertSelectionSvg),
+  growSelection: clean(growSelectionSvg),
+  shrinkSelection: clean(shrinkSelectionSvg),
+  featherSelection: clean(featherSelectionSvg),
   eyeClosed: clean(eyeClosedSvg),
   rotateCcwSquare: clean(rotateCcwSquareSvg),
   rotateCw: clean(rotateCwSvg),

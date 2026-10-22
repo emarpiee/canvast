@@ -132,6 +132,13 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   // (Shift+B as in painting programs; the handlers hear Y, a key no command has)
   cmd("tool.pencil", "Pencil (Painting view)", TOOLS_GROUP, "Y", "Shift+B", "paint"),
   cmd("tool.sheet", "Sheet", TOOLS_GROUP, "C"),
+  // (the Painting view's selection tools, with the letters of painting programs; Shift+M and Shift+L reach keys no command has)
+  cmd("tool.marquee", "Rectangle marquee (Painting view)", TOOLS_GROUP, "M", undefined, "paint"),
+  cmd("tool.marqueeEllipse", "Ellipse marquee (Painting view)", TOOLS_GROUP, "Q", "Shift+M", "paint"),
+  cmd("tool.lassoPoly", "Polygonal lasso (Painting view)", TOOLS_GROUP, "J", "Shift+L", "paint"),
+  cmd("tool.wand", "Magic wand (Painting view)", TOOLS_GROUP, "W", undefined, "paint"),
+  cmd("tool.fill", "Fill bucket (Painting view)", TOOLS_GROUP, "G", undefined, "paint"),
+  cmd("tool.gradient", "Gradient (Painting view)", TOOLS_GROUP, "K", "Shift+G", "paint"),
   cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L", undefined, "both"),
   cmd("tool.text", "Text", TOOLS_GROUP, "T", undefined, "both"),
   cmd("tool.note", "Note", TOOLS_GROUP, "M"),

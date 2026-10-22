@@ -32,7 +32,7 @@ describe("tool keys (ADR 0049, 0158)", () => {
     const { commandById, inView } = await import("../../src/settings/keymap");
     const keysIn = (view: "canvas" | "paint"): string[] => TOOL_ORDER.filter((t) => inView(commandById(TOOL_COMMAND[t])!.scope, view)).map((t) => commandById(TOOL_COMMAND[t])!.defaults[0]!);
     expect(keysIn("canvas")).toEqual(["H", "V", "N", "P", "U", "B", "C", "L", "T", "M", "I", "E"]);
-    expect(keysIn("paint")).toEqual(["H", "V", "N", "P", "B", "Shift+B", "U", "L", "T", "I", "E"]);
+    expect(keysIn("paint")).toEqual(["H", "V", "N", "P", "B", "Shift+B", "U", "M", "Shift+M", "L", "Shift+L", "W", "G", "Shift+G", "T", "I", "E"]);
     for (const v of ["canvas", "paint"] as const) expect(new Set(keysIn(v)).size).toBe(keysIn(v).length);
   });
 });

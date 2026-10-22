@@ -131,10 +131,24 @@ export const RAIL_TOOLS: ReadonlyArray<{ tool: Tool; icon: string; label: string
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "M", only: "canvas" },
+  { tool: "fill", icon: ICONS.fillTool, label: "Fill bucket", key: "G", only: "paint" },
   { tool: "eyedropper", icon: ICONS.pipette, label: "Eyedropper", key: "I" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
 const TOOLS = RAIL_TOOLS;
+
+/**
+ * Tools that share one place on the rail with a tool of both views (ADR 0168): the Painting view's own, chosen in a flyout beside the
+ * button while one of them is the tool (the button stays lit and wears the icon of the one in use). The first is the button's.
+ */
+const FAMILIES = {
+  brush: [{ tool: "brush", icon: ICONS.paintbrush, label: "Brush", title: "Brush (B)" }, { tool: "pencil", icon: ICONS.pencilPixel, label: "Pencil", title: "Pencil: hard pixel edges, no smoothing; Auto erase in its options (Shift+B)" }],
+  select: [{ tool: "select", icon: ICONS.pointer, label: "Select", title: "Select (V)" }, { tool: "marquee", icon: ICONS.marqueeRect, label: "Rectangle marquee", title: "Rectangle marquee: select pixels in a rectangle; Shift adds, Alt takes away (M)" }, { tool: "marqueeEllipse", icon: ICONS.marqueeEllipse, label: "Ellipse marquee", title: "Ellipse marquee: select pixels in an ellipse; Shift adds, Alt takes away (Shift+M)" }],
+  fill: [{ tool: "fill", icon: ICONS.fillTool, label: "Fill bucket", title: "Fill bucket: fill the region of about the colour clicked (G)" }, { tool: "gradient", icon: ICONS.gradientTool, label: "Gradient", title: "Gradient: drag from where the paint colour is to where it is clear (Shift+G)" }],
+  lasso: [{ tool: "lasso", icon: ICONS.lasso, label: "Lasso", title: "Lasso: on a paint layer, select pixels inside a line drawn round them (L)" }, { tool: "lassoPoly", icon: ICONS.lassoPoly, label: "Polygonal lasso", title: "Polygonal lasso: click the corners; click the first one, double-click or Enter to close (Shift+L)" }, { tool: "wand", icon: ICONS.wand, label: "Magic wand", title: "Magic wand: select the pixels of about the colour clicked (W)" }],
+} as const satisfies Record<string, ReadonlyArray<{ tool: Tool; icon: string; label: string; title: string }>>;
+type Family = keyof typeof FAMILIES;
+const familyOf = (t: Tool): Family | undefined => (Object.keys(FAMILIES) as Family[]).find((f) => FAMILIES[f].some((m) => m.tool === t));
 
 const PEN_MENU: Array<{ id: PenKind; label: string; title: string; icon: string }> = [
   { id: "fine", label: "Fine pen", title: "Fine pen: a clean line of one width", icon: ICONS.penTool },
@@ -210,10 +224,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${SHAPE_MENU.map((k) => `<button type="button" role="radio" class="shape-kind" data-shape-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
         <button type="button" role="radio" class="shape-kind" data-tool="path" aria-label="Path (curves)" title="Path (curves): click corners, drag for a curve, click the first node to close (B)">${ICONS.pathTool}</button>
       </div>
-      <div class="rail-fly" data-fly="brush" data-only="paint" hidden role="radiogroup" aria-label="Brush or pencil">
-        <button type="button" role="radio" data-tool="brush" aria-label="Brush" title="Brush (B)">${ICONS.paintbrush}</button>
-        <button type="button" role="radio" data-tool="pencil" aria-label="Pencil" title="Pencil: hard pixel edges, no smoothing; Auto erase in its options (Shift+B)">${ICONS.pencilPixel}</button>
-      </div>
+      ${(Object.keys(FAMILIES) as Family[]).map((f) => `<div class="rail-fly" data-fly="${f}" data-only="paint" hidden role="radiogroup" aria-label="${FAMILIES[f].map((m) => m.label).join(", ")}">${FAMILIES[f].map((m) => `<button type="button" role="radio" data-tool="${m.tool}" aria-label="${m.label}" title="${m.title}">${m.icon}</button>`).join("")}</div>`).join("")}
       <div class="rail-fly" data-fly="pen" hidden role="radiogroup" aria-label="Pen">
         ${PEN_MENU.map((k) => `<button type="button" role="radio" class="pen-kind" data-pen-kind="${k.id}" aria-label="${k.label}" title="${k.title}">${k.icon}</button>`).join("")}
       </div>
@@ -225,7 +236,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <div class="rail-tools" role="radiogroup" aria-label="Tool" aria-orientation="vertical">
       ${TOOLS.map(
         // (Import sits with the tools that put something on the canvas: after the Note tool)
-        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.only ? ` data-only="${t.only}"` : ""}${t.tool === "shape" || t.tool === "pen" || t.tool === "brush" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" data-only="canvas" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
+        (t) => `<button type="button" role="radio" data-tool="${t.tool}"${t.only ? ` data-only="${t.only}"` : ""}${t.tool === "shape" || t.tool === "pen" ? ' aria-haspopup="true" aria-expanded="false"' : ""} aria-label="${t.label}" title="${t.label} (${t.key})">${t.icon}</button>${t.tool === "note" ? `<button type="button" data-action="import" data-only="canvas" aria-label="Import files" title="Import files: pictures, video, audio, or any other file (kept as a card you can download)">${ICONS.arrowDownToLine}</button>` : ""}`,
       ).join("")}
       </div>
       <span class="rail-sep" role="separator" data-only="canvas"></span>
@@ -253,10 +264,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
         <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
       </div>
-      <div class="tb-group tb-options" data-for="pen brush pencil eyedropper" role="group" aria-label="Colour">
+      <div class="tb-group tb-options" data-for="pen brush pencil eyedropper fill gradient" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
-      <div class="tb-group tb-options" data-for="brush pencil eraser" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
+      <div class="tb-group tb-options" data-for="brush pencil eraser marquee marqueeEllipse lasso lassoPoly wand fill gradient" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
       <div class="tb-group tb-options" data-for="shape">
         <label class="tb-count" data-sides-wrap hidden>Sides <input type="number" data-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
@@ -688,7 +699,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.addEventListener("pointercancel", (e) => endScrub(e, true));
 
   /** The tool whose kinds were closed by pressing its own button (until the tool changes). */
-  let flyShut: "shape" | "pen" | "brush" | null = null;
+  let flyShut: "shape" | "pen" | Family | null = null;
   let colourEditing = false;
   // The first colours of the selection have a chip each; the others are one button, "+N", that opens them as a list (so the row stays short, and none is lost).
   const SEL_CHIPS = 7;
@@ -803,8 +814,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     } else if (d["tool"]) {
       // the button of a tool with kinds (Shape, Pen, Brush), pressed while it is the tool, closes its kinds; pressed again, opens them
       const t = d["tool"] as Tool;
-      const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : t === "brush" ? "brush" : null;
-      const same = fam !== null && !!b.closest(".rail-tools") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : fam === "brush" ? editor.tool === "brush" || editor.tool === "pencil" : editor.tool === "pen");
+      const fam = t === "shape" ? "shape" : t === "pen" ? "pen" : (familyOf(t) ?? null);
+      const same = fam !== null && !!b.closest(".rail-tools") && (fam === "shape" ? editor.tool === "shape" || editor.tool === "path" : fam === "pen" ? editor.tool === "pen" : familyOf(editor.tool) === fam);
       flyShut = same ? (flyShut === fam ? null : fam) : null;
       editor.setTool(t);
       editor.changed();
@@ -902,13 +913,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   const update = (): void => {
     for (const b of root.querySelectorAll<HTMLElement>("[data-tool]")) {
       // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
-      const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options")) || (b.dataset["tool"] === "brush" && editor.tool === "pencil" && !b.closest(".rail-fly"));
+      const t = b.dataset["tool"] as Tool;
+      const on = t === editor.tool || (t === "shape" && editor.tool === "path" && !b.closest(".tb-options")) || (!!b.closest(".rail-tools") && familyOf(t) !== undefined && familyOf(t) === familyOf(editor.tool));
       b.setAttribute("aria-checked", String(on));
     }
     // The tools with kinds: their kinds open beside the button while the tool is active, and the button wears the icon of the kind in use.
-    const flyAt = (name: "shape" | "pen" | "brush", tool: string, on: boolean, icon: string): void => {
+    const flyAt = (name: "shape" | "pen" | Family, tool: string, on: boolean, icon: string): void => {
       const fly = root.querySelector<HTMLElement>(`[data-fly="${name}"]`)!;
       const btn = root.querySelector<HTMLElement>(`.rail-tools [data-tool="${tool}"]`)!;
+      if (fly.dataset["only"] === "paint") {
+        // (the Painting view's kinds: on the canvas the button is a plain tool)
+        on &&= document.body.dataset["view"] === "paint";
+        btn.toggleAttribute("aria-haspopup", document.body.dataset["view"] === "paint");
+      }
       if (!on && flyShut === name) flyShut = null; // (another tool: the kinds open again next time)
       fly.hidden = !on || flyShut === name;
       if (!fly.hidden) fly.style.top = `${btn.offsetTop + (btn.offsetHeight - fly.offsetHeight) / 2}px`; // (centred on its button, whatever the bar's own padding)
@@ -920,7 +937,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     };
     flyAt("shape", "shape", editor.tool === "shape" || editor.tool === "path", editor.tool === "path" ? ICONS.pathTool : (SHAPE_MENU.find((k) => k.id === editor.shapeKind)?.icon ?? ICONS.shapeTool));
     flyAt("pen", "pen", editor.tool === "pen", PEN_MENU.find((k) => k.id === editor.penKind)?.icon ?? ICONS.pencil);
-    flyAt("brush", "brush", editor.tool === "brush" || editor.tool === "pencil", editor.tool === "pencil" ? ICONS.pencilPixel : ICONS.paintbrush);
+    for (const f of Object.keys(FAMILIES) as Family[]) {
+      const m = FAMILIES[f].find((x) => x.tool === editor.tool);
+      flyAt(f, FAMILIES[f][0].tool, !!m, (m ?? FAMILIES[f][0]).icon);
+    }
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-kind]")) b.setAttribute("aria-checked", String(b.dataset["penKind"] === editor.penKind));
     root.querySelector<HTMLElement>("[data-colour-chip]")!.style.background = newInk(editor.penColor);
     for (const b of root.querySelectorAll<HTMLElement>("[data-shape-kind]")) b.setAttribute("aria-checked", String(editor.tool === "shape" && b.dataset["shapeKind"] === editor.shapeKind));

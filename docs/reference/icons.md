@@ -81,7 +81,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `paintImage` | Paint chooser: a picture as the fill (Image) |
 | `paintObjects` | Paint chooser: objects repeated over the shape (Objects) |
 | `markdown` | Copy Markdown (the text format bar, the Export menu) |
-| `selectAll` | Context menu: Select everything |
+| `selectAll` | Select everything: the context menu, and Select all of the Paint view's Selection menu |
 | `paste` | Context menu: Paste |
 | `exportMenu` | Actions bar: Export and copy out (Export…, Save to library, Copy Markdown) |
 | `sheetMenu` | Actions bar: Sheets (put on a sheet, release, fit to contents) |
@@ -104,6 +104,17 @@ One icon per function: two buttons that do different things never share an icon,
 | `rotate-ccw-square` | Turn the Paint view left (View rotation menu) |
 | `rotate-cw` | Turn the Paint view right (View rotation menu) |
 | `flip-horizontal` | Mirror the Paint view (View rotation menu) |
+| `squircle-dashed` | Rectangle marquee tool (Paint view, the Select flyout) |
+| `circle-dot-dashed` | Ellipse marquee tool (Paint view, the Select flyout) |
+| `triangle-dashed` | Polygonal lasso tool (Paint view, the Lasso flyout) |
+| `wand` | Magic wand tool (Paint view, the Lasso flyout) |
+| `square-x` | Deselect (Paint view, the Selection menu) |
+| `arrow-left-right` | Invert the selection (Paint view, the Selection menu) |
+| `unfold-horizontal` | Grow the selection (Paint view, the Selection menu) |
+| `fold-horizontal` | Shrink the selection (Paint view, the Selection menu) |
+| `cloud-fog` | Feather the selection (Paint view, the Selection menu) |
+| `beaker` | Fill bucket tool (Paint view) |
+| `sunset` | Gradient tool (Paint view, the Fill bucket's flyout) |
 | `eclipse` | Add a mask to a Paint view layer (the layer's ⋯ menu) |
 | `eye-closed` | Turn a Paint view layer's mask off or on (the layer's ⋯ menu) |
 | `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |

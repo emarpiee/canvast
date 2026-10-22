@@ -10,7 +10,9 @@ import { History, type Op, type Step } from "./history";
 import { LAYER_KINDS, TILE, hashesOf, tilesOf, type Layer, type LayerFields, type LayerMask, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
 import { rasterize } from "./rasterize";
 import type { PaintStore, TileBlob } from "./store";
-import { inflate } from "./codec";
+import { deflate, hashOf, inflate, isEmpty } from "./codec";
+import { edgeOf } from "./selection";
+import { moved, objectsOf, scaled, stored } from "./objects";
 import type { BlendMode } from "../doc/model";
 
 /** Fields of a layer to change: false or null takes a flag or the blend mode away; a field left out stays as it is. */
@@ -52,12 +54,17 @@ export class PaintSession {
   private readonly maskSurfaces = new Map<string, HTMLCanvasElement>();
   /** The tools paint the active layer's mask, not its pixels (when it has one). */
   maskEdit = false;
+  /** The pixels selected on the shown page (alpha = how much), and its outline; null: none (painting goes everywhere).
+   * shortcut: a selection is not a step of the history (undo does not bring one back), add it to the steps if people miss it. */
+  selection: { readonly mask: HTMLCanvasElement; readonly edge: HTMLCanvasElement } | null = null;
   /** The stroke being painted: its layer, its live overlay, how it goes over the layer, and whether it is the mask's. */
   live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation; mask?: true } | null = null;
   private overlay: HTMLCanvasElement | null = null;
   private strokeBefore: { layer: Layer; mask: boolean } | null = null;
-  /** The stroke that ended and is being turned into tiles (a new stroke waits for it). */
+  /** The stroke that ended and is being turned into tiles, or a pixel edit being made (a new stroke waits for it). */
   private ending: Promise<void> = Promise.resolve();
+  /** Tiles being drawn again after a step (an undo, an edit): what `settled` also waits for. */
+  private drawing: Promise<unknown> = Promise.resolve();
   /** Tiles made here and not yet known to be stored (the engine may need them again before the write ends). */
   private readonly unsaved = new Map<string, Blob>();
   private writes: Promise<void> = Promise.resolve();
@@ -167,6 +174,11 @@ export class PaintSession {
   mask(l: Layer): HTMLCanvasElement | null {
     return this.maskSurfaces.get(l.id) ?? null;
   }
+  /** Select these pixels (a mask of the page's size), or nothing. */
+  select(mask: HTMLCanvasElement | null): void {
+    this.selection = mask ? { mask, edge: edgeOf(mask) } : null;
+    this.tell("pixels");
+  }
   /** Whether the tools paint the active layer's mask now. */
   editsMask(): boolean {
     return this.maskEdit && !!this.active()?.mask;
@@ -225,6 +237,7 @@ export class PaintSession {
   /** Show a page: its layers' pixels are made (and the other pages' let go, to keep memory to one page). */
   async showPage(id: string): Promise<void> {
     if (!this.painting.pages.some((p) => p.id === id)) return;
+    if (id !== this.pageId) this.selection = null; // (a selection belongs to its page)
     this.pageId = id;
     for (const m of [this.surfaces, this.maskSurfaces]) for (const [lid] of m) if (this.layers.get(lid)?.pageId !== id) m.delete(lid);
     await Promise.all(this.stack().flatMap((l) => [this.surfaces.has(l.id) || l.kind !== "raster" ? null : this.drawTiles(l), this.maskSurfaces.has(l.id) || !l.mask ? null : this.drawTiles(l, undefined, true)]));
@@ -287,7 +300,7 @@ export class PaintSession {
     }
     if (this.activeId && !this.layers.has(this.activeId)) this.activeId = this.stack().at(-1)?.id ?? null;
     this.tell("records");
-    if (redraw.length) void Promise.all(redraw.map(([l, k, m]) => this.drawTiles(l, k, m))).then(() => this.tell("pixels"));
+    if (redraw.length) this.drawing = Promise.all([this.drawing, ...redraw.map(([l, k, m]) => this.drawTiles(l, k, m))]).then(() => this.tell("pixels"));
   }
 
   /** Store a step's records, in order after the ones before; tiles made here go with them. */
@@ -311,7 +324,7 @@ export class PaintSession {
 
   /** Resolves when everything changed so far is stored. */
   settled(): Promise<void> {
-    return this.ending.then(() => this.writes);
+    return this.ending.then(() => this.drawing).then(() => this.writes);
   }
 
   private blocked(): boolean {
@@ -420,6 +433,47 @@ export class PaintSession {
     this.setPainting({ ...this.painting, pages: this.painting.pages.map((p) => (p.id === id ? { ...p, ...patch } : p)) }, label);
   }
 
+  /**
+   * A new size for a page, as one step: `canvas` keeps the pixels at their size (cut or given room, placed by `anchor`, 0 to 1 on each
+   * axis); `image` scales everything to the new size (resampled). Every paint layer and mask is made again, vector layers are moved or
+   * scaled; fill and adjustment layers cover any page. `patch` is the rest of the page's settings. The selection goes.
+   */
+  resizePage(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number], patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
+    this.ending = this.ending.then(() => this.resizePageNow(id, w, h, how, anchor, patch, label));
+    return this.ending;
+  }
+  private async resizePageNow(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number], patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
+    if (this.blocked() || this.live) return;
+    if (id !== this.pageId) await this.showPage(id);
+    const page = this.page();
+    const dx = Math.round((w - page.w) * anchor[0]), dy = Math.round((h - page.h) * anchor[1]);
+    const blobs: TileBlob[] = [];
+    const again = async (src: HTMLCanvasElement | undefined): Promise<Record<string, string>> => {
+      const r = await rasterize(w, h, (g) => {
+        if (!src) return;
+        if (how === "canvas") return g.drawImage(src, dx, dy);
+        g.imageSmoothingQuality = "high";
+        g.drawImage(src, 0, 0, w, h);
+      });
+      for (const [k, d] of r.pixels) decoded.set(r.tiles[k]!, d);
+      for (const b of r.blobs) {
+        this.unsaved.set(b.hash, b.data);
+        blobs.push(b);
+      }
+      return r.tiles;
+    };
+    const ops: Op[] = [{ store: "painting", before: this.painting, after: { ...this.painting, pages: this.painting.pages.map((p) => (p.id === id ? { ...p, ...patch, w, h } : p)) } }];
+    for (const l of stackOf(this.layers.values(), id)) {
+      let after: Layer = l;
+      if (l.kind === "raster") after = { ...l, tiles: await again(this.surfaces.get(l.id)) };
+      else if (l.kind === "object") after = { ...l, objs: stored(how === "canvas" ? moved(objectsOf(l.objs), dx, dy) : scaled(objectsOf(l.objs), 0, 0, w / page.w, h / page.h)) };
+      if (l.mask) after = { ...after, mask: { ...l.mask, tiles: await again(this.maskSurfaces.get(l.id)) } };
+      if (after !== l) ops.push({ store: "layer", before: l, after });
+    }
+    this.selection = null;
+    this.commit(label, ops, blobs);
+  }
+
   /** A new page after the shown one, the same size, resolution and background, with one empty layer; it is shown. */
   addPage(): void {
     const cur = this.page();
@@ -509,7 +563,16 @@ export class PaintSession {
     if (!this.live) return;
     const g = this.live.overlay.getContext("2d")!;
     const n = side * side * 4;
-    for (let i = 0; i < keys.length / 2; i++) g.putImageData(new ImageData(new Uint8ClampedArray(px.buffer as ArrayBuffer, px.byteOffset + i * n, n), side, side), keys[2 * i]! * side, keys[2 * i + 1]! * side);
+    const sel = this.selection?.mask;
+    for (let i = 0; i < keys.length / 2; i++) {
+      const x = keys[2 * i]! * side, y = keys[2 * i + 1]! * side;
+      g.putImageData(new ImageData(new Uint8ClampedArray(px.buffer as ArrayBuffer, px.byteOffset + i * n, n), side, side), x, y);
+      if (!sel) continue;
+      // (painted only inside the selection, as it will be when the stroke ends)
+      g.globalCompositeOperation = "destination-in";
+      g.drawImage(sel, x, y, side, side, x, y, side, side);
+      g.globalCompositeOperation = "source-over";
+    }
     this.tell("pixels");
   }
 
@@ -518,8 +581,10 @@ export class PaintSession {
     if (!this.live || !this.strokeBefore) return Promise.resolve();
     const before = this.strokeBefore;
     this.ending = (async () => {
-      const tiles = await this.engine!.end();
-      this.applyStroke(before, tiles, label);
+      const sel = this.selection?.mask;
+      const ended = await this.engine!.end();
+      const tiles = sel ? await this.clipped(before, ended, sel) : ended;
+      this.applyStroke(before, tiles, label, !!sel);
       this.live = null;
       this.strokeBefore = null;
       this.tell("pixels");
@@ -527,7 +592,32 @@ export class PaintSession {
     return this.ending;
   }
 
-  private applyStroke(before: { layer: Layer; mask: boolean }, ended: readonly EndedTile[], label: string): void {
+  /** The stroke's tiles kept only inside the selection: outside it each pixel is as it was, on a feathered edge it is mixed by how much is selected. */
+  private async clipped(before: { layer: Layer; mask: boolean }, ended: readonly EndedTile[], sel: HTMLCanvasElement): Promise<EndedTile[]> {
+    const was = (before.mask ? this.maskSurfaces : this.surfaces).get(before.layer.id);
+    const sg = sel.getContext("2d", { willReadFrequently: true })!;
+    const wg = was?.getContext("2d", { willReadFrequently: true });
+    return Promise.all(
+      ended.map(async (t): Promise<EndedTile> => {
+        const [tx, ty] = tileOf(t.k);
+        const s = sg.getImageData(tx * TILE, ty * TILE, TILE, TILE).data;
+        const old = wg ? wg.getImageData(tx * TILE, ty * TILE, TILE, TILE).data : new Uint8ClampedArray(TILE * TILE * 4);
+        const now = t.rgba ?? new Uint8Array(TILE * TILE * 4);
+        const out = new Uint8Array(TILE * TILE * 4);
+        for (let i = 0; i < out.length; i += 4) {
+          const k = s[i + 3]! / 255;
+          // (mixed premultiplied, so a soft edge over a clear pixel does not darken)
+          const ao = old[i + 3]!, an = now[i + 3]!, a = ao + (an - ao) * k;
+          out[i + 3] = Math.round(a);
+          if (a > 0) for (let c = 0; c < 3; c++) out[i + c] = Math.round((old[i + c]! * ao + (now[i + c]! * an - old[i + c]! * ao) * k) / a);
+        }
+        if (isEmpty(out)) return { k: t.k, hash: null, rgba: null, data: null };
+        return { k: t.k, hash: await hashOf(out), rgba: out, data: await deflate(out) };
+      }),
+    );
+  }
+
+  private applyStroke(before: { layer: Layer; mask: boolean }, ended: readonly EndedTile[], label: string, clipped = false): void {
     if (!ended.length) return;
     const cur = this.layers.get(before.layer.id);
     const mask = before.mask;
@@ -554,13 +644,55 @@ export class PaintSession {
     const after: Layer = mask ? { ...cur, mask: { ...cur.mask!, tiles } } : { ...(cur as RasterLayer), tiles };
     // (drawn here already: the step is applied without drawing these tiles again, and the engine keeps what it has)
     this.layers.set(cur.id, after);
-    const v = newId();
-    this.versions.set(mask ? maskKey(cur.id) : cur.id, v);
-    this.engine!.adopt(v);
+    if (clipped) this.versions.delete(mask ? maskKey(cur.id) : cur.id); // (the engine holds the stroke unclipped: it loads the layer again)
+    else {
+      const v = newId();
+      this.versions.set(mask ? maskKey(cur.id) : cur.id, v);
+      this.engine!.adopt(v);
+    }
     const s = { label, ops: [{ store: "layer" as const, before: cur, after }] };
     this.persist(s, blobs);
     this.history.push(s);
     this.tell("records");
+  }
+
+  /**
+   * Put `ink` (page-sized, in page px) on the active layer, or on its mask when that is what is painted, inside the selection: over it,
+   * inside its paint with alpha lock, or taking away with `erase` (on a mask: hiding, or showing with `erase`). One step. The fill bucket,
+   * the gradient and clearing the selection use it; the engine is not involved.
+   */
+  editPixels(ink: HTMLCanvasElement, label: string, erase = false): Promise<void> {
+    this.ending = this.ending.then(() => this.editPixelsNow(ink, label, erase));
+    return this.ending;
+  }
+  private async editPixelsNow(ink: HTMLCanvasElement, label: string, erase: boolean): Promise<void> {
+    const why = this.cannotPaint();
+    if (why) return void this.onError?.(why);
+    if (this.blocked() || this.live) return;
+    const l = this.active()!;
+    const mask = this.editsMask();
+    const page = this.page();
+    const surface = (mask ? this.maskSurfaces : this.surfaces).get(l.id);
+    let src = ink;
+    if (this.selection) {
+      src = document.createElement("canvas");
+      src.width = page.w;
+      src.height = page.h;
+      const k = src.getContext("2d")!;
+      k.drawImage(ink, 0, 0);
+      k.globalCompositeOperation = "destination-in";
+      k.drawImage(this.selection.mask, 0, 0);
+    }
+    const r = await rasterize(page.w, page.h, (g) => {
+      if (surface) g.drawImage(surface, 0, 0);
+      g.globalCompositeOperation = erase ? "destination-out" : !mask && l.kind === "raster" && l.alphaLock ? "source-atop" : "source-over";
+      g.drawImage(src, 0, 0);
+    });
+    for (const [k, d] of r.pixels) decoded.set(r.tiles[k]!, d);
+    for (const b of r.blobs) this.unsaved.set(b.hash, b.data);
+    const cur = this.layers.get(l.id) ?? l;
+    const after: Layer = mask ? { ...cur, mask: { ...cur.mask!, tiles: r.tiles } } : { ...(cur as RasterLayer), tiles: r.tiles };
+    this.commit(label, [{ store: "layer", before: cur, after }], r.blobs);
   }
 
   /** Drop the stroke being painted: the layer is as it was. */

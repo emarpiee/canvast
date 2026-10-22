@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.34.0 — Selections, fill bucket, gradient, canvas and image size (2026-10-22)
+
+- **Selections** in the Paint view: Rectangle and Ellipse marquee (`M`, `Shift+M`, in the Select button's flyout), the Lasso on a paint layer, the Polygonal lasso (`Shift+L`) and the Magic wand (`W`) in the Lasso's flyout; new, add (Shift), take away (Alt), intersect (Shift+Alt); feather; the Selection menu (select all, deselect, invert, grow, shrink, feather) and `Ctrl+A`, `Ctrl+D`, `Ctrl+Shift+I`. Painting, filling and the gradient stay inside the selection; `Delete` clears it.
+- **Fill bucket** (`G`) and **Gradient** (`Shift+G`): fill a region of about one colour; a linear, radial or angle gradient from the paint colour to clear.
+- **Canvas size and image size:** a page's new size keeps the pixels (placed by an anchor, the middle at first) or scales the whole picture.
+- Mirroring the view is in the View rotation menu only (`M` is the Rectangle marquee now).
+
 ## 0.33.2 — Rotate and mirror the view, layer masks (2026-10-22)
 
 - **Layer masks** in the Paint view, on any kind of layer: *Add a mask* in its ⋯ menu; press the mask's picture in the row to paint it (dark paint hides, light paint or the Eraser shows), the name to paint the layer again; turn it off and on, or delete it. Kept in the painting, in undo and in archives.

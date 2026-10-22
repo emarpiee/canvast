@@ -2782,7 +2782,8 @@ body[data-view="paint"] :is(#canvas, .hud-readout, .hud-dev) { display: none !im
 /* The dock's stacks hold the Paint view's own panels too (Brushes, Brush settings, ADR 0169): only those show there. */
 body[data-view="paint"] :is(#side-panels, #side-panels-left) > :not(:has([data-only="paint"])) { display: none !important; }
 /* The Eraser on a paint layer takes paint: the canvas's object eraser options are not its. */
-body[data-view="paint"][data-paint-target="pixels"] .tb-options[data-for="eraser"]:not([data-paint-options]) { display: none !important; }
+body[data-view="paint"][data-paint-target="pixels"] :is(.tb-options[data-for="eraser"], .tb-options[data-for="lasso"]):not([data-paint-options]) { display: none !important; }
+[data-paint-options]:empty { display: none !important; }
 .paint-page { display: inline-flex; align-items: center; border-radius: var(--r-md); }
 .paint-page.is-on { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .paint-page.is-on button:hover { background: transparent; }

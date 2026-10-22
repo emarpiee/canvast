@@ -130,15 +130,35 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   await p.locator(".paint-page button", { hasText: "Page 1" }).click();
   await expect.poll(async () => (await state(p)).pageId).toBe(s.pages[0]!.id);
 
-  // A larger page keeps the pixels where they are, with empty room on the right; undo gives the old size back.
+  // A larger page (canvas size, anchored top left) keeps the pixels where they are, with empty room on the right; undo gives the old size back.
   const layer1 = s.layers.find((l) => l.pageId === s.pages[0]!.id)!.id;
   await fromPaintingMenu(p, "page-size");
   await p.locator('[data-f="unit"]').selectOption("px");
   await p.locator('[data-f="w"]').fill("1500");
+  await p.locator('[data-f="anchor"]').selectOption({ label: "Top left" });
   await p.getByTestId("page-dialog-ok").click();
   await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1500);
   await expect.poll(async () => (await px(p, layer1, 500, 300))?.[3] ?? -1).toBe(255);
   expect((await px(p, layer1, 1400, 300))![3]).toBe(0);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
+  // Image size scales the pixels with the page; anchored in the middle, a canvas size moves them by half the room.
+  await fromPaintingMenu(p, "page-size");
+  await p.locator('[data-f="unit"]').selectOption("px");
+  await p.locator('[data-f="how"]').selectOption("image");
+  await p.locator('[data-f="w"]').fill("590");
+  await p.locator('[data-f="h"]').fill("295");
+  await p.getByTestId("page-dialog-ok").click();
+  await expect.poll(async () => (await px(p, layer1, 250, 150))?.[3] ?? -1, { message: "image size: the stroke at half the size" }).toBe(255);
+  expect((await px(p, layer1, 560, 150))![3]).toBe(0);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
+  await fromPaintingMenu(p, "page-size");
+  await p.locator('[data-f="unit"]').selectOption("px");
+  await p.locator('[data-f="w"]').fill("1381");
+  await p.getByTestId("page-dialog-ok").click();
+  await expect.poll(async () => (await px(p, layer1, 150, 300))?.[3] ?? -1, { message: "canvas size, middle: moved 100 px right" }).toBe(0);
+  expect((await px(p, layer1, 1100, 300))![3]).toBe(255);
   await p.keyboard.press("Control+z");
   await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
   await expect.poll(async () => (await px(p, layer1, 500, 300))?.[3] ?? -1).toBe(255);
@@ -281,7 +301,7 @@ test("the Eyedropper (I, one tool for both views) picks the colour under it: the
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("view rotate and mirror (4, 6, M, 5 and the View rotation menu): the screen, the brush, the wheel, the canvas's tools and Fit follow the turn; Reset puts it back", async ({ app }) => {
+test("view rotate and mirror (4, 6, 5 and the View rotation menu): the screen, the brush, the wheel, the canvas's tools and Fit follow the turn; Reset puts it back", async ({ app }) => {
   const p = app.page;
   /** The window's own pixel at a point (what the browser shows of the turned box): checks the forward mapping against the real rendering. */
   const shot = async (q: { x: number; y: number }): Promise<number[]> => {
@@ -306,8 +326,15 @@ test("view rotate and mirror (4, 6, M, 5 and the View rotation menu): the screen
   const turnBtn = p.locator('.hud-controls [data-action="view-turn"]');
   await p.locator(".paint-canvas").focus(); // (the keys are the view's, not the size field's)
   // both directions, then the mirror on top of a turn
-  for (const [keys, label, y] of [[["6", "6", "6"], "45°", 470], [["4", "4", "4", "4", "4", "4", "4", "4"], "-75°", 520], [["m"], "-75° ⇋", 570]] as const) {
-    for (const k of keys) await p.keyboard.press(k);
+  for (const [keys, label, y] of [[["6", "6", "6"], "45°", 470], [["4", "4", "4", "4", "4", "4", "4", "4"], "-75°", 520], [["mirror"], "-75° ⇋", 570]] as const) {
+    for (const k of keys) {
+      if (k !== "mirror") await p.keyboard.press(k);
+      else {
+        await turnBtn.click(); // (the mirror is in the View rotation menu)
+        await p.locator('.pop-menu [data-id="mirror"]').click();
+        await p.keyboard.press("Escape");
+      }
+    }
     await expect(turnBtn).toHaveText(label);
     await stroke(p, [960, y], [1100, y]);
     expect((await px(p, id, 1030, y))![3], `${label}: the stroke is where the pointer was on the page`).toBe(255);
@@ -391,6 +418,117 @@ test("a layer mask: black hides, white or the Eraser shows, undo, off and on, th
   await expect.poll(async () => (await state(p)).layers[0]!.mask ?? -1, { message: "the mask is kept" }).toBeGreaterThan(0);
   await expect.poll(() => red(1150, 500), { message: "and still hides" }).toBe(false);
   expect(await red(1300, 500)).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("selections (M, Shift+M, L, Shift+L, W): marquees, lassos and the wand, with add, take away and the menu; painting stays inside", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const selected = (): Promise<number> => p.evaluate(() => window.__canvastDebug.paint.selected());
+  const drag = async (a: [number, number], b: [number, number], mods: string[] = []): Promise<void> => {
+    for (const m of mods) await p.keyboard.down(m);
+    await stroke(p, a, b);
+    for (const m of mods) await p.keyboard.up(m);
+  };
+  const clickAt = async (x: number, y: number): Promise<void> => {
+    const q = await at(p, x, y);
+    await p.mouse.click(q.x, q.y);
+  };
+  const ALL = 1920 * 1080;
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("m");
+  await expect(p.locator('.rail-fly[data-fly="select"] [data-tool="marquee"]')).toHaveAttribute("aria-checked", "true");
+  await drag([1000, 400], [1200, 600]);
+  const rect = await selected();
+  expect(Math.abs(rect - 200 * 200), `a 200 px square (${rect})`).toBeLessThan(2 * 200 * 4);
+  await p.keyboard.press("b");
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("60");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [950, 500], [1300, 500]);
+  expect((await px(p, id, 1100, 500))![3], "painted inside").toBe(255);
+  expect((await px(p, id, 980, 500))![3], "not left of it").toBe(0);
+  expect((await px(p, id, 1250, 500))![3], "not right of it").toBe(0);
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("Shift+M");
+  await drag([1300, 400], [1400, 500], ["Shift"]); // (Shift at the press adds)
+  const both = await selected();
+  expect(Math.abs(both - rect - Math.PI * 50 * 50), `an ellipse added (${both - rect})`).toBeLessThan(600);
+  await p.keyboard.press("Shift+L");
+  await p.keyboard.down("Alt");
+  await clickAt(1000, 400); // (Alt at the first corner takes away)
+  await p.keyboard.up("Alt");
+  await clickAt(1100, 400);
+  await clickAt(1000, 500);
+  await clickAt(1000, 400);
+  const less = await selected();
+  expect(Math.abs(both - less - 5000), `a triangle taken away (${both - less})`).toBeLessThan(600);
+  await p.keyboard.press("Control+d");
+  expect(await selected()).toBe(0);
+  await p.keyboard.press("l"); // the Lasso selects pixels on a paint layer
+  const pts = await Promise.all([[1000, 700], [1200, 700], [1100, 900], [1000, 700]].map(([x, y]) => at(p, x!, y!)));
+  await p.mouse.move(pts[0]!.x, pts[0]!.y);
+  await p.mouse.down();
+  for (const q of pts.slice(1)) await p.mouse.move(q.x, q.y, { steps: 8 });
+  await p.mouse.up();
+  const tri = await selected();
+  expect(Math.abs(tri - 20000), `a lasso triangle (${tri})`).toBeLessThan(1500);
+  await p.keyboard.press("w");
+  await clickAt(1100, 500); // (the wand on the red, inside the first square)
+  const red = await selected();
+  expect(red > 5000 && red < 20000, `the wand takes the red joined to it (${red})`).toBe(true);
+  await p.keyboard.press("Control+Shift+I");
+  expect(await selected(), "invert").toBe(ALL - red);
+  await p.keyboard.press("Control+a");
+  expect(await selected(), "select all").toBe(ALL);
+  await p.keyboard.press("m");
+  await drag([500, 300], [600, 400]);
+  await p.locator('[data-paint-options] [data-act="selection-menu"]').click();
+  await p.locator('.pop-menu [data-id="grow"]').click();
+  await p.getByRole("dialog").locator("input").fill("4");
+  await p.getByRole("dialog").locator("input").press("Enter");
+  await expect.poll(selected, { message: "grown by 4 px on each side" }).toBeGreaterThan(104 * 104);
+  expect(await selected()).toBeLessThan(110 * 110);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the fill bucket (G) fills the region joined to the click, inside a selection; the gradient (Shift+G) goes from the colour to clear; Delete clears the selection", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const clickAt = async (x: number, y: number): Promise<void> => {
+    const q = await at(p, x, y);
+    await p.mouse.click(q.x, q.y);
+  };
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("20");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [1000, 0], [1000, 1080]); // (a wall from top to bottom)
+  await setColour(p, "#0000ff");
+  await p.keyboard.press("g");
+  await expect(p.locator('[data-paint-options] input[data-opt="tolerance"]')).toBeVisible();
+  await clickAt(500, 500);
+  await settled(p);
+  expect((await px(p, id, 500, 500))!, "filled left of the wall").toEqual([0, 0, 255, 255]);
+  expect((await px(p, id, 1500, 500))![3], "not past it").toBe(0);
+  await p.keyboard.press("Control+z");
+  await settled(p);
+  await p.keyboard.press("m");
+  await stroke(p, [1200, 300], [1400, 500]);
+  await p.keyboard.press("g");
+  await clickAt(1300, 400);
+  await settled(p);
+  expect((await px(p, id, 1300, 400))![3], "inside the selection").toBe(255);
+  expect((await px(p, id, 1500, 400))![3], "outside it, though joined").toBe(0);
+  await p.keyboard.press("Delete");
+  await settled(p);
+  expect((await px(p, id, 1300, 400))![3], "Delete clears what is selected").toBe(0);
+  await p.keyboard.press("Control+d");
+  await p.keyboard.press("Shift+G");
+  await stroke(p, [1100, 800], [1900, 800]);
+  const a0 = (await px(p, id, 1150, 800))![3]!, a1 = (await px(p, id, 1850, 800))![3]!;
+  expect(a0 > 200 && a1 < 40, `strong at the start, clear at the end (${a0}, ${a1})`).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
 
