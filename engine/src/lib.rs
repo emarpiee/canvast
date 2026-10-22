@@ -462,6 +462,75 @@ fn put_presets(s: &mut State, mut presets: Vec<BrushPreset>, warnings: &[String]
     presets.len() as i32
 }
 
+/// The longest side of a pattern a `.pat` file may bring (a larger one is left out, with a warning).
+const MAX_PAT_EDGE: u32 = 2048;
+
+/// A `.pat` pattern as a grayscale texture tile: luminance, transparent areas white (as the `.abr` mapping reads patterns).
+fn pat_gray(p: &photocraft_psd::patterns::PsdPattern) -> Option<GrayTile> {
+    let n = p.width as usize * p.height as usize;
+    if n == 0 || p.width > MAX_PAT_EDGE || p.height > MAX_PAT_EDGE {
+        return None;
+    }
+    let plane = |ch: Option<&Vec<u8>>| -> Option<Vec<f32>> {
+        let ch = ch?;
+        let v: Vec<f32> = match p.depth {
+            8 => ch.iter().take(n).map(|&b| f32::from(b) / 255.0).collect(),
+            16 => ch.chunks_exact(2).take(n).map(|b| f32::from(u16::from_be_bytes([b[0], b[1]])) / 65535.0).collect(),
+            _ => return None,
+        };
+        (v.len() == n).then_some(v)
+    };
+    let gray: Vec<f32> = match p.mode {
+        3 => {
+            let (r, g, b) = (plane(p.channels.first())?, plane(p.channels.get(1))?, plane(p.channels.get(2))?);
+            (0..n).map(|i| 0.299 * r[i] + 0.587 * g[i] + 0.114 * b[i]).collect()
+        }
+        2 => {
+            let pal = p.palette.as_deref()?;
+            let idx = p.channels.first()?;
+            (0..n).map(|i| { let k = usize::from(idx.get(i).copied().unwrap_or(0)) * 3; (0..3).map(|o| f32::from(pal.get(k + o).copied().unwrap_or(0)) / 255.0 * [0.299, 0.587, 0.114][o]).sum() }).collect()
+        }
+        _ => plane(p.channels.first())?,
+    };
+    let alpha = p.alpha.as_ref().and_then(|a| plane(Some(a)));
+    let data = (0..n).map(|i| { let a = alpha.as_ref().map_or(1.0, |a| a[i]); ((gray[i] * a + 1.0 - a).clamp(0.0, 1.0) * 65535.0 + 0.5) as u16 }).collect();
+    Some(GrayTile { width: p.width, height: p.height, data })
+}
+
+/// Read a `.pat` file: each pattern becomes a preset in `group` (UTF-8) whose brush has it as its texture, so it can be chosen for any
+/// brush in Brush settings. How many, as `abr_read` gives them; -1 when the file does not read (the reason in `out`).
+///
+/// # Safety
+/// `data` points to `len` readable bytes, `group` to `glen`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn pat_read(data: *const u8, len: usize, group: *const u8, glen: usize) -> i32 {
+    let bytes = unsafe { std::slice::from_raw_parts(data, len) };
+    let group = String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(group, glen) }).into_owned();
+    STATE.with_borrow_mut(|s| match photocraft_psd::patterns::parse_pat_file(bytes) {
+        Ok(pats) => {
+            let mut warnings = Vec::new();
+            let presets = pats
+                .iter()
+                .filter_map(|p| {
+                    // (built-in names look like "$$$/Patterns/…=Water": the part after the last "=")
+                    let name = p.name.rsplit('=').next().unwrap_or(&p.name).trim().to_string();
+                    let Some(tile) = pat_gray(p) else {
+                        warnings.push(format!("{name}: not read (too big, or an unknown colour mode)"));
+                        return None;
+                    };
+                    let texture = paint::Texture { enabled: true, pattern: paint::Pattern::Tile(tile), ..Default::default() };
+                    Some(BrushPreset { name: if name.is_empty() { "Pattern".into() } else { name }, brush: BrushSettings { texture, ..Default::default() }, builtin: false, group: group.clone(), folder: Vec::new(), captures: Default::default() })
+                })
+                .collect();
+            put_presets(s, presets, &warnings)
+        }
+        Err(e) => {
+            s.out = e.to_string().into_bytes();
+            -1
+        }
+    })
+}
+
 /// The engine's built-in presets, as `abr_read` gives a file's. How many.
 #[unsafe(no_mangle)]
 pub extern "C" fn presets_builtin() -> i32 {

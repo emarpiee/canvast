@@ -108,8 +108,8 @@ export class BrushEngine {
   }
 
   /** A brush file's presets (`abr` given) or the built-in ones: their bitmaps (now in the engine too) and what could not be read. */
-  async presets(abr?: Uint8Array, group?: string): Promise<{ presets: object[]; tips: TipBitmap[]; warnings: string[] }> {
-    const m = await this.call((id) => ({ t: "presets", id, ...(abr ? { abr, group: group ?? "" } : {}) }));
+  async presets(abr?: Uint8Array, group?: string, pat = false): Promise<{ presets: object[]; tips: TipBitmap[]; warnings: string[] }> {
+    const m = await this.call((id) => ({ t: "presets", id, ...(abr ? { abr, group: group ?? "", ...(pat ? { pat: true as const } : {}) } : {}) }));
     if (m.t !== "presets") throw new Error(m.t === "failed" ? m.message : "no presets");
     for (const t of m.tips) this.tipsIn.add(t.key);
     return { presets: [...m.presets], tips: [...m.tips], warnings: [...m.warnings] };

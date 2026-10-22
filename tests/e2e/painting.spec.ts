@@ -750,6 +750,42 @@ test("a plain wheel over a bar's row that is wider than the window scrolls it si
 });
 
 /** An ABR v2 file (the format's own layout, big-endian): `n` sampled brushes, each a `size` px tip of seeded noise in a round fade. */
+/** A `.pat` file of grey 8-bit patterns (as the engine writes them, samples raw): name and grey value 0 to 255 at (x, y). */
+function makePat(pats: ReadonlyArray<{ name: string; w: number; h: number; grey: (x: number, y: number) => number }>): Buffer {
+  const u32 = (v: number): Buffer => { const b = Buffer.alloc(4); b.writeUInt32BE(v >>> 0); return b; };
+  const u16 = (v: number): Buffer => { const b = Buffer.alloc(2); b.writeUInt16BE(v); return b; };
+  const parts: Buffer[] = [Buffer.from("8BPT"), u16(1), u32(pats.length)];
+  for (const p of pats) {
+    const units = [...p.name].map((c) => c.charCodeAt(0)).concat(0);
+    const plane = Buffer.alloc(p.w * p.h);
+    for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) plane[y * p.w + x] = p.grey(x, y);
+    const rect = Buffer.concat([u32(0), u32(0), u32(p.h), u32(p.w)]);
+    const channel = Buffer.concat([u32(1), u32(23 + plane.length), u32(8), rect, u16(8), Buffer.from([0]), plane]);
+    const body = Buffer.concat([rect, u32(24), channel, ...Array.from({ length: 23 }, () => u32(0)), u32(0), u32(0)]);
+    parts.push(u32(1), u32(1), u16(p.h), u16(p.w), u32(units.length), ...units.map(u16), Buffer.from([2]), Buffer.from("id"), u32(3), u32(body.length), body);
+  }
+  return Buffer.concat(parts);
+}
+
+test("patterns (.pat): each becomes a preset with it as its texture, in a group named after the file, and paints", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const brushes = () => p.evaluate(() => window.__canvastDebug.paint.brushes());
+  await p.locator('[data-brush-panel="brushes"]').click();
+  const panel = p.getByTestId("brushes-panel");
+  const pat = makePat([
+    { name: "Stripes", w: 16, h: 16, grey: (x) => (x < 8 ? 0 : 255) },
+    { name: "$$$/Patterns/Water=Water", w: 8, h: 8, grey: (x, y) => ((x + y) % 2 ? 40 : 200) },
+  ]);
+  await panel.getByTestId("brushes-import-input").setInputFiles({ name: "Patterns.pat", mimeType: "application/octet-stream", buffer: pat });
+  await expect.poll(async () => (await brushes()).presets.filter((x) => x.group === "Patterns").map((x) => [x.name, x.tips])).toEqual([["Stripes", 1], ["Water", 1]]);
+  await panel.locator(".brush-row, [data-brush]", { hasText: "Stripes" }).first().click();
+  await expect.poll(async () => (await brushes()).tool?.preset ?? "").not.toBe("");
+  await stroke(p, [1000, 500], [1300, 500]);
+  expect((await px(p, layers[0]!.id, 1150, 500))![3], "it paints").toBeGreaterThan(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 function makeAbr(n: number, size: number): Buffer {
   const parts: Buffer[] = [];
   const head = Buffer.alloc(4);

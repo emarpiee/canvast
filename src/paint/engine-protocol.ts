@@ -41,7 +41,7 @@ export type ToWorker =
   /** Bitmaps the next brushes name (kept in the engine from then on). */
   | { readonly t: "tips"; readonly tips: readonly TipBitmap[] }
   /** Presets: a brush file's (`abr`, listed under `group`), or the engine's built-in ones; answered by a `presets` reply. */
-  | { readonly t: "presets"; readonly id: number; readonly abr?: Uint8Array; readonly group?: string }
+  | { readonly t: "presets"; readonly id: number; readonly abr?: Uint8Array; readonly group?: string; /** The file is a `.pat` (patterns), not an `.abr`. */ readonly pat?: true }
   /** Presets (their bitmaps sent before with `tips`) as an `.abr` file; answered by a `file` reply. */
   | { readonly t: "abr-write"; readonly id: number; readonly presets: readonly object[] }
   /** The engine's default brush; answered by a `presets` reply with `brush`. */

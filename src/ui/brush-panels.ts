@@ -19,7 +19,7 @@ import { BRUSH_SECTIONS, MAX_BRUSHES, MAX_BRUSH_NAME, PATTERN_STYLES, brushOf, c
 /**
  * The Brushes panel and the Brush Settings panel of the Paint view (ADR 0169), both in the panel dock (ADR 0123) like the canvas's panels.
  * Brushes: the presets of the library, in groups and folders, with a picture of each tip; a press picks one for the painting tool in use;
- * Save, Rename, Delete, Import (.abr, canvast brush files) and Export. Brush Settings: the tool's brush, one section per section of the
+ * Save, Rename, Delete, Import (.abr, .pat patterns, canvast brush files) and Export. Brush Settings: the tool's brush, one section per section of the
  * engine, built from `BRUSH_SECTIONS`. Both change the tool's brush (its values, its brush, the preset it came from), which paint-view keeps.
  */
 export interface BrushPanelDeps {
@@ -132,7 +132,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
   brushesEl.hidden = true;
   const fileInput = document.createElement("input");
   fileInput.type = "file";
-  fileInput.accept = ".abr,.json,application/json";
+  fileInput.accept = ".abr,.pat,.json,application/json";
   fileInput.multiple = true;
   fileInput.hidden = true;
   fileInput.dataset["testid"] = "brushes-import-input";
@@ -152,7 +152,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     brushesEl.innerHTML = panelHtml({
       title: "Brushes",
       count: list.length,
-      tools: `<button type="button" class="layer-btn" data-act="save" aria-label="Save the brush" title="Save the brush: the tool's brush as a new preset">${ICONS.save}</button><button type="button" class="layer-btn" data-act="import" aria-label="Import brushes" title="Import brushes: .abr files, or canvast brush files (.json)">${ICONS.arrowDownToLine}</button><button type="button" class="layer-btn" data-act="more" aria-haspopup="menu" aria-expanded="false" aria-label="More brush actions" title="Export all the brushes, or bring back the built-in ones">${ICONS.ellipsis}</button>`,
+      tools: `<button type="button" class="layer-btn" data-act="save" aria-label="Save the brush" title="Save the brush: the tool's brush as a new preset">${ICONS.save}</button><button type="button" class="layer-btn" data-act="import" aria-label="Import brushes" title="Import brushes: .abr files, canvast brush files (.json), or patterns (.pat: each a brush with that texture, to choose for any brush)">${ICONS.arrowDownToLine}</button><button type="button" class="layer-btn" data-act="more" aria-haspopup="menu" aria-expanded="false" aria-label="More brush actions" title="Export all the brushes, or bring back the built-in ones">${ICONS.ellipsis}</button>`,
       sub: `<div class="brush-sub"><input type="search" class="brush-find" data-find placeholder="Find a brush" aria-label="Find a brush" value="${esc(filter)}"><button type="button" class="layer-btn" data-brush-view="grid" aria-pressed="${grid}" aria-label="Thumbnails" title="Thumbnails: the tips in a grid, with their sizes">${ICONS.layoutGrid}</button><button type="button" class="layer-btn" data-brush-view="list" aria-pressed="${!grid}" aria-label="List" title="List: the tips with their names">${ICONS.layoutList}</button></div>${t ? "" : `<p class="adj-note">Pick the Brush or the Eraser to use a preset.</p>`}`,
       body: [...groups].map(([g, ps]) => `<div class="brush-group" data-group="${esc(g)}"><div class="adj-group-head"><h4>${esc(g)}</h4>${moreButton(`More actions for the group ${g}`, `data-group-more="${esc(g)}"`)}</div><ul class="${grid ? "brush-grid" : "paint-layer-list"}" role="listbox" aria-label="${esc(g)}">${ps.map(row).join("")}</ul></div>`).join("") || `<p class="adj-note">${list.length ? "No brush has that name." : "No brushes yet."}</p>`,
     });
@@ -249,7 +249,7 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
         } else {
           const eng = await deps.engine();
           if (!eng) throw new Error("the brush engine is not running");
-          const r = await eng.presets(new Uint8Array(await file.arrayBuffer()), stem(file.name));
+          const r = await eng.presets(new Uint8Array(await file.arrayBuffer()), stem(file.name), /\.pat$/i.test(file.name));
           const hashes = r.tips.map((t) => t.key);
           added = [...added, ...cleanBrushes(r.presets.map((p) => fromEngine(p, hashes)))];
           tips.push(...r.tips);

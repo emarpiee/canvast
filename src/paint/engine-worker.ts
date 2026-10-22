@@ -30,6 +30,7 @@ interface Engine {
   out_tips_len(): number;
   presets_builtin(): number;
   abr_read(data: number, len: number, group: number, glen: number): number;
+  pat_read(data: number, len: number, group: number, glen: number): number;
   abr_write(json: number, len: number): number;
   tip_put(key: number, klen: number, w: number, h: number, data: number): number;
   brush_default(): number;
@@ -146,9 +147,9 @@ function putTip(t: TipBitmap): void {
 }
 
 /** A file's presets (or the built-in ones), their bitmaps hashed and kept in the engine; the presets still name them "#n" (n = index). */
-async function presets(id: number, abr?: Uint8Array, group?: string): Promise<void> {
+async function presets(id: number, abr?: Uint8Array, group?: string, pat?: boolean): Promise<void> {
   const g = new TextEncoder().encode(group ?? "");
-  const n = abr ? withBytes(abr, (pa) => withBytes(g, (pg) => e.abr_read(pa, abr.length, pg, g.length))) : e.presets_builtin();
+  const n = abr ? withBytes(abr, (pa) => withBytes(g, (pg) => (pat ? e.pat_read : e.abr_read)(pa, abr.length, pg, g.length))) : e.presets_builtin();
   if (n < 0) return post({ t: "failed", id, message: new TextDecoder().decode(outBytes()) });
   const j = outJson() as { presets: object[]; warnings: string[]; tips: Array<[number, number]> };
   const all = new Uint8Array(e.memory.buffer, e.out_tips_ptr(), e.out_tips_len()).slice();
@@ -200,7 +201,7 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
           for (const t of m.tips) putTip(t);
           break;
         case "presets":
-          await presets(m.id, m.abr, m.group);
+          await presets(m.id, m.abr, m.group, m.pat);
           break;
         case "abr-write": {
           const json = new TextEncoder().encode(JSON.stringify(m.presets));

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.4 — Pattern files (2026-10-22)
+
+- **Import `.pat` patterns** in the Brushes panel: each becomes a preset with it as its texture (a group named after the file), and can be chosen as the texture of any brush.
+
 ## 0.34.3 — Symmetry (2026-10-22)
 
 - **Symmetry** for the painting tools: left and right, top and bottom, four ways or diagonal, about the page's middle; the mirrors are one stroke with it.
