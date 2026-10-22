@@ -100,6 +100,12 @@ One icon per function: two buttons that do different things never share an icon,
 | `chevrons-down` | Hide the controls (library viewer) |
 | `chevrons-up` | Show the controls (library viewer) |
 | `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
+| `rotate-ccw` | Reset rotation: of a shape (Actions bar) and of the Paint view (its View rotation menu) |
+| `rotate-ccw-square` | Turn the Paint view left (View rotation menu) |
+| `rotate-cw` | Turn the Paint view right (View rotation menu) |
+| `flip-horizontal` | Mirror the Paint view (View rotation menu) |
+| `eclipse` | Add a mask to a Paint view layer (the layer's ⋯ menu) |
+| `eye-closed` | Turn a Paint view layer's mask off or on (the layer's ⋯ menu) |
 | `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |
 | `chevron-left` | Previous |

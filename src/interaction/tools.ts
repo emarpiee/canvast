@@ -247,6 +247,8 @@ export interface ToolHooks {
   keysActive?: () => boolean;
   /** The Eyedropper's colour at a point of `el` (CSS px), averaged over `size` px; default: the pixels on screen. */
   sample?: (at: ScreenPoint, size: number) => string | null;
+  /** A point of the window in `el`'s own px (default: from its box; the Painting view turns and mirrors its page box). */
+  toLocal?: (e: { clientX: number; clientY: number }) => ScreenPoint;
 }
 
 export function attachTools(
@@ -301,6 +303,7 @@ export function attachTools(
   /** Where the pointer was last (canvas px): where a move lets go, to find the frame it lands in. */
   let pointer: ScreenPoint = { x: 0, y: 0 };
   const local = (e: { clientX: number; clientY: number }): ScreenPoint => {
+    if (hooks.toLocal) return (pointer = hooks.toLocal(e));
     const r = el.getBoundingClientRect();
     return (pointer = { x: e.clientX - r.left, y: e.clientY - r.top });
   };

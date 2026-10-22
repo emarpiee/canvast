@@ -43,6 +43,7 @@ export interface VectorHostDeps {
   fonts?: () => Promise<Array<{ hash: string; name: string; unusable: string }>>;
   revealList: ToolHooks["revealList"];
   sample: NonNullable<ToolHooks["sample"]>;
+  toLocal: NonNullable<ToolHooks["toLocal"]>;
 }
 
 const isVector = (l: Layer | null | undefined): l is ObjectLayer => !!l && l.kind === "object";
@@ -144,6 +145,7 @@ export function createVectorHost(deps: VectorHostDeps) {
     active: deps.active,
     keysActive: deps.keysActive,
     sample: deps.sample,
+    toLocal: deps.toLocal,
   });
 
   return {

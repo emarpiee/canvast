@@ -7,7 +7,7 @@
 import type { BrushEngine } from "./engine";
 import type { EndedTile, LoadTile } from "./engine-protocol";
 import { History, type Op, type Step } from "./history";
-import { LAYER_KINDS, TILE, tilesOf, type Layer, type LayerFields, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
+import { LAYER_KINDS, TILE, hashesOf, tilesOf, type Layer, type LayerFields, type LayerMask, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
 import { rasterize } from "./rasterize";
 import type { PaintStore, TileBlob } from "./store";
 import { inflate } from "./codec";
@@ -22,12 +22,17 @@ export interface LayerPatch {
   readonly locked?: boolean;
   readonly clipBelow?: boolean;
   readonly alphaLock?: boolean;
+  /** null: no mask. */
+  readonly mask?: LayerMask | null;
 }
 
 export interface StrokeStart {
   readonly brush: object;
   readonly erase: boolean;
 }
+
+/** The engine's name for a layer's mask (its pixels go by the layer's id). */
+const maskKey = (id: string): string => `${id}#mask`;
 
 /** Decoded tiles by hash, for drawing a layer again (undo, opening) without reading storage: a small, most-recently-used cache. */
 const decoded = new Map<string, ImageData>();
@@ -43,10 +48,14 @@ export class PaintSession {
   activeId: string | null = null;
   /** Each layer's pixels, page-sized (made when its page is shown). */
   private readonly surfaces = new Map<string, HTMLCanvasElement>();
-  /** The stroke being painted: its layer, its live overlay and how it goes over the layer. */
-  live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation } | null = null;
+  /** Each layer's mask, page-sized, alpha = hidden (made when its page is shown). */
+  private readonly maskSurfaces = new Map<string, HTMLCanvasElement>();
+  /** The tools paint the active layer's mask, not its pixels (when it has one). */
+  maskEdit = false;
+  /** The stroke being painted: its layer, its live overlay, how it goes over the layer, and whether it is the mask's. */
+  live: { layerId: string; overlay: HTMLCanvasElement; op: GlobalCompositeOperation; mask?: true } | null = null;
   private overlay: HTMLCanvasElement | null = null;
-  private strokeBefore: RasterLayer | null = null;
+  private strokeBefore: { layer: Layer; mask: boolean } | null = null;
   /** The stroke that ended and is being turned into tiles (a new stroke waits for it). */
   private ending: Promise<void> = Promise.resolve();
   /** Tiles made here and not yet known to be stored (the engine may need them again before the write ends). */
@@ -155,6 +164,13 @@ export class PaintSession {
   image(l: Layer): HTMLCanvasElement | null {
     return this.surfaces.get(l.id) ?? null;
   }
+  mask(l: Layer): HTMLCanvasElement | null {
+    return this.maskSurfaces.get(l.id) ?? null;
+  }
+  /** Whether the tools paint the active layer's mask now. */
+  editsMask(): boolean {
+    return this.maskEdit && !!this.active()?.mask;
+  }
 
   // ---- pixels ------------------------------------------------------------------------------------------------------------------------
 
@@ -174,29 +190,31 @@ export class PaintSession {
     return d;
   }
 
-  /** Draw tiles `keys` of a layer from its tile map (all of them when absent): what changed after an undo, a load, a page switch. */
-  private async drawTiles(l: Layer, keys?: Iterable<string>): Promise<void> {
+  /** Draw tiles `keys` of a layer's pixels or mask from its tile map (all of them when absent): what changed after an undo, a load, a page switch. */
+  private async drawTiles(l: Layer, keys?: Iterable<string>, mask = false): Promise<void> {
     const page = this.painting.pages.find((p) => p.id === l.pageId);
-    if (!page || l.kind !== "raster") return;
-    let c = this.surfaces.get(l.id);
+    if (!page || (mask ? !l.mask : l.kind !== "raster")) return;
+    const tilesFor = (x: Layer): Readonly<Record<string, string>> => (mask ? (x.mask?.tiles ?? {}) : tilesOf(x));
+    const surfaces = mask ? this.maskSurfaces : this.surfaces;
+    let c = surfaces.get(l.id);
     if (!c) {
       c = document.createElement("canvas");
       c.width = page.w;
       c.height = page.h;
-      this.surfaces.set(l.id, c);
+      surfaces.set(l.id, c);
       keys = undefined; // (a new surface needs every tile)
     }
     const g = c.getContext("2d")!;
-    const todo = keys ? [...keys] : Object.keys(tilesOf(l));
+    const todo = keys ? [...keys] : Object.keys(tilesFor(l));
     let missing = 0;
     await Promise.all(
       todo.map(async (k) => {
         const [tx, ty] = tileOf(k);
-        const hash = tilesOf(l)[k];
+        const hash = tilesFor(l)[k];
         const d = hash ? await this.pixelsOf(hash) : null;
         if (hash && !d) missing++;
         // (the layer may have changed again while this tile was read: only its latest tile is drawn)
-        if (tilesOf(this.layers.get(l.id) ?? l)[k] !== hash) return;
+        if (tilesFor(this.layers.get(l.id) ?? l)[k] !== hash) return;
         g.clearRect(tx * TILE, ty * TILE, TILE, TILE);
         if (d) g.putImageData(d, tx * TILE, ty * TILE);
       }),
@@ -208,8 +226,8 @@ export class PaintSession {
   async showPage(id: string): Promise<void> {
     if (!this.painting.pages.some((p) => p.id === id)) return;
     this.pageId = id;
-    for (const [lid] of this.surfaces) if (this.layers.get(lid)?.pageId !== id) this.surfaces.delete(lid);
-    await Promise.all(this.stack().map((l) => (this.surfaces.has(l.id) || l.kind !== "raster" ? null : this.drawTiles(l))));
+    for (const m of [this.surfaces, this.maskSurfaces]) for (const [lid] of m) if (this.layers.get(lid)?.pageId !== id) m.delete(lid);
+    await Promise.all(this.stack().flatMap((l) => [this.surfaces.has(l.id) || l.kind !== "raster" ? null : this.drawTiles(l), this.maskSurfaces.has(l.id) || !l.mask ? null : this.drawTiles(l, undefined, true)]));
     if (!this.active()) this.activeId = this.stack().at(-1)?.id ?? null;
     this.tell("records");
     this.tell("pixels");
@@ -219,7 +237,7 @@ export class PaintSession {
 
   /** Change the records (the only place that does): memory, then what must be drawn again. */
   private apply(s: Step): void {
-    const redraw: Array<[Layer, string[] | undefined]> = [];
+    const redraw: Array<[Layer, string[] | undefined, boolean?]> = [];
     let resized = false;
     for (const o of s.ops) {
       if (o.store === "painting") {
@@ -234,7 +252,22 @@ export class PaintSession {
       else if (o.before) {
         this.layers.delete(o.before.id);
         this.surfaces.delete(o.before.id);
+        this.maskSurfaces.delete(o.before.id);
         this.versions.delete(o.before.id);
+        this.versions.delete(maskKey(o.before.id));
+      }
+      if (o.after && o.after.pageId === this.pageId) {
+        // (the mask's tiles that changed are drawn again; a mask taken away goes)
+        const wm = was?.mask?.tiles ?? {}, am = o.after.mask?.tiles;
+        const has = this.maskSurfaces.has(o.after.id);
+        if (!am) this.maskSurfaces.delete(o.after.id);
+        else {
+          const changed = [...new Set([...Object.keys(wm), ...Object.keys(am)])].filter((k) => wm[k] !== am[k]);
+          if (!has || changed.length) {
+            redraw.push([o.after, has ? changed : undefined, true]);
+            this.versions.delete(maskKey(o.after.id));
+          }
+        }
       }
       if (o.after && o.after.kind !== "raster") this.surfaces.delete(o.after.id); // (only a paint layer has pixels of its own)
       if (o.after && o.after.pageId === this.pageId && o.after.kind === "raster") {
@@ -254,7 +287,7 @@ export class PaintSession {
     }
     if (this.activeId && !this.layers.has(this.activeId)) this.activeId = this.stack().at(-1)?.id ?? null;
     this.tell("records");
-    if (redraw.length) void Promise.all(redraw.map(([l, k]) => this.drawTiles(l, k))).then(() => this.tell("pixels"));
+    if (redraw.length) void Promise.all(redraw.map(([l, k, m]) => this.drawTiles(l, k, m))).then(() => this.tell("pixels"));
   }
 
   /** Store a step's records, in order after the ones before; tiles made here go with them. */
@@ -351,6 +384,7 @@ export class PaintSession {
     for (const [k, d] of r.pixels) decoded.set(r.tiles[k]!, d);
     for (const b of r.blobs) this.unsaved.set(b.hash, b.data);
     const { objs: _o, gen: _g, paint: _p, adjust: _a, ...common } = l as Layer & Record<string, unknown>;
+    if (l.mask && !l.mask.off) delete common["mask"]; // (drawn into the pixels already)
     this.commit("Rasterize", [{ store: "layer", before: l, after: { ...(common as unknown as RasterLayer), kind: "raster", tiles: r.tiles } }], r.blobs);
   }
 
@@ -419,16 +453,18 @@ export class PaintSession {
     const l = this.active();
     if (!this.engine) return "The brush engine did not start in this browser.";
     if (!l) return "Pick a layer to paint on.";
-    if (l.kind !== "raster") return `“${l.name}” is a ${LAYER_KINDS[l.kind].label.toLowerCase()}: pick a paint layer, or Rasterize this one (its ⋯ menu) to paint on it.`;
+    if (this.editsMask()) {
+      if (l.mask!.off) return "The mask is turned off: turn it on (the layer's ⋯ menu) to paint it.";
+    } else if (l.kind !== "raster") return `“${l.name}” is a ${LAYER_KINDS[l.kind].label.toLowerCase()}: pick a paint layer, or Rasterize this one (its ⋯ menu) to paint on it.`;
     if (l.hidden) return "The picked layer is hidden.";
     if (l.locked) return "The picked layer is locked.";
     return null;
   }
 
   /** The tiles of a layer as the engine loads them (stored form; the worker keeps the pixels it already has by hash). */
-  private async loadTiles(l: Layer): Promise<LoadTile[]> {
+  private async loadTiles(l: Layer, mask = false): Promise<LoadTile[]> {
     const out: LoadTile[] = [];
-    for (const [k, hash] of Object.entries(tilesOf(l))) {
+    for (const [k, hash] of Object.entries(mask ? (l.mask?.tiles ?? {}) : tilesOf(l))) {
       const data = this.unsaved.get(hash) ?? (await this.store.tile(hash));
       if (data) out.push({ k, hash, data });
     }
@@ -439,24 +475,27 @@ export class PaintSession {
   async prepare(): Promise<void> {
     const l = this.active();
     if (!l || !this.engine) return;
-    let v = this.versions.get(l.id);
-    if (!v) this.versions.set(l.id, (v = newId()));
-    await this.engine.load(v, await this.loadTiles(l));
+    const mask = this.editsMask(), key = mask ? maskKey(l.id) : l.id;
+    let v = this.versions.get(key);
+    if (!v) this.versions.set(key, (v = newId()));
+    await this.engine.load(v, await this.loadTiles(l, mask));
   }
 
   /** Start a stroke on the active layer (false: it cannot be painted; `cannotPaint` says why). */
   async begin(s: StrokeStart): Promise<boolean> {
     await this.ending;
     if (this.cannotPaint() || this.blocked() || this.live) return false;
-    const l = this.active() as RasterLayer;
+    const l = this.active()!;
+    const mask = this.editsMask();
+    const lock = !mask && l.kind === "raster" && l.alphaLock === true;
     await this.prepare();
     const page = this.page();
     const overlay = (this.overlay ??= document.createElement("canvas"));
     overlay.width = page.w; // (and cleared)
     overlay.height = page.h;
-    this.strokeBefore = l;
-    this.live = { layerId: l.id, overlay, op: s.erase ? "destination-out" : l.alphaLock ? "source-atop" : "source-over" };
-    this.engine!.begin(s.brush, l.alphaLock === true, page);
+    this.strokeBefore = { layer: l, mask };
+    this.live = { layerId: l.id, overlay, op: s.erase ? "destination-out" : lock ? "source-atop" : "source-over", ...(mask ? { mask: true as const } : {}) };
+    this.engine!.begin(s.brush, lock, page);
     return true;
   }
 
@@ -488,13 +527,14 @@ export class PaintSession {
     return this.ending;
   }
 
-  private applyStroke(before: RasterLayer, ended: readonly EndedTile[], label: string): void {
+  private applyStroke(before: { layer: Layer; mask: boolean }, ended: readonly EndedTile[], label: string): void {
     if (!ended.length) return;
-    const cur = this.layers.get(before.id) as RasterLayer | undefined;
-    if (!cur) return;
-    const tiles: Record<string, string> = { ...cur.tiles };
+    const cur = this.layers.get(before.layer.id);
+    const mask = before.mask;
+    if (!cur || (mask ? !cur.mask : cur.kind !== "raster")) return;
+    const tiles: Record<string, string> = { ...(mask ? cur.mask!.tiles : tilesOf(cur)) };
     const blobs: TileBlob[] = [];
-    const c = this.surfaces.get(cur.id);
+    const c = (mask ? this.maskSurfaces : this.surfaces).get(cur.id);
     const g = c?.getContext("2d");
     for (const t of ended) {
       const [tx, ty] = tileOf(t.k);
@@ -511,11 +551,11 @@ export class PaintSession {
         g?.clearRect(tx * TILE, ty * TILE, TILE, TILE);
       }
     }
-    const after: RasterLayer = { ...cur, tiles };
+    const after: Layer = mask ? { ...cur, mask: { ...cur.mask!, tiles } } : { ...(cur as RasterLayer), tiles };
     // (drawn here already: the step is applied without drawing these tiles again, and the engine keeps what it has)
     this.layers.set(cur.id, after);
     const v = newId();
-    this.versions.set(cur.id, v);
+    this.versions.set(mask ? maskKey(cur.id) : cur.id, v);
     this.engine!.adopt(v);
     const s = { label, ops: [{ store: "layer" as const, before: cur, after }] };
     this.persist(s, blobs);
@@ -535,7 +575,7 @@ export class PaintSession {
   /** Every tile this session can still bring back (kept by the tile GC). */
   roots(): Set<string> {
     const r = this.history.roots();
-    for (const l of this.layers.values()) for (const h of Object.values(tilesOf(l))) r.add(h);
+    for (const l of this.layers.values()) for (const h of hashesOf(l)) r.add(h);
     for (const h of this.unsaved.keys()) r.add(h);
     return r;
   }

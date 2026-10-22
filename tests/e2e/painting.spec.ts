@@ -281,6 +281,119 @@ test("the Eyedropper (I, one tool for both views) picks the colour under it: the
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("view rotate and mirror (4, 6, M, 5 and the View rotation menu): the screen, the brush, the wheel, the canvas's tools and Fit follow the turn; Reset puts it back", async ({ app }) => {
+  const p = app.page;
+  /** The window's own pixel at a point (what the browser shows of the turned box): checks the forward mapping against the real rendering. */
+  const shot = async (q: { x: number; y: number }): Promise<number[]> => {
+    const b = await p.screenshot({ clip: { x: Math.round(q.x), y: Math.round(q.y), width: 1, height: 1 } });
+    return p.evaluate(async (s) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${s}`;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      const g = c.getContext("2d")!;
+      g.drawImage(img, 0, 0);
+      return [...g.getImageData(0, 0, 1, 1).data];
+    }, b.toString("base64"));
+  };
+  const red = (c: number[]): boolean => c[0]! > 200 && c[1]! < 80 && c[2]! < 80;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("40");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  const turnBtn = p.locator('.hud-controls [data-action="view-turn"]');
+  await p.locator(".paint-canvas").focus(); // (the keys are the view's, not the size field's)
+  // both directions, then the mirror on top of a turn
+  for (const [keys, label, y] of [[["6", "6", "6"], "45°", 470], [["4", "4", "4", "4", "4", "4", "4", "4"], "-75°", 520], [["m"], "-75° ⇋", 570]] as const) {
+    for (const k of keys) await p.keyboard.press(k);
+    await expect(turnBtn).toHaveText(label);
+    await stroke(p, [960, y], [1100, y]);
+    expect((await px(p, id, 1030, y))![3], `${label}: the stroke is where the pointer was on the page`).toBe(255);
+    expect(red(await shot(await at(p, 1030, y))), `${label}: and it shows there on screen`).toBe(true);
+  }
+  // the wheel zooms about the pointer, through the turn: a dab off the middle stays under it
+  await stroke(p, [1150, 650], [1150, 650]);
+  const q = await at(p, 1150, 650);
+  await p.mouse.move(q.x, q.y);
+  for (let i = 0; i < 3; i++) await p.mouse.wheel(0, -100);
+  await settled(p);
+  expect(red(await shot(q)), "the wheel zooms about the pointer").toBe(true);
+  await p.keyboard.press("Control+0");
+  const r = (await p.locator(".paint-stage").boundingBox())!;
+  for (const [x, y] of [[0, 0], [1920, 0], [0, 1080], [1920, 1080]] as const) {
+    const c = await at(p, x, y);
+    expect(c.x >= r.x && c.x <= r.x + r.width && c.y >= r.y && c.y <= r.y + r.height, `Fit: corner ${x},${y} in view`).toBe(true);
+  }
+  // the canvas's tools on a vector layer, turned and mirrored
+  await p.keyboard.press("u");
+  await stroke(p, [980, 600], [1080, 700]);
+  await expect.poll(async () => (await state(p)).layers.map((l) => l.objs ?? null)).toEqual([null, 1]);
+  expect(await shot(await at(p, 1030, 650)), "the shape is drawn where it was dragged").toEqual(expect.arrayContaining([0x25, 0x63, 0xeb]));
+  await p.keyboard.press("v");
+  await stroke(p, [1030, 650], [1030, 650]);
+  await expect(p.locator('.ctx-bar [data-ctx="delete"]'), "a click on it picks it").toBeVisible();
+  await p.keyboard.press("Escape");
+  await turnBtn.click();
+  await p.locator('.pop-menu [data-id="reset"]').click();
+  await p.keyboard.press("Escape");
+  await expect(turnBtn).toHaveText("0°");
+  await expect(p.locator(".paint-turn")).toHaveAttribute("style", /transform: ;|^(?!.*transform: rotate)/);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a layer mask: black hides, white or the Eraser shows, undo, off and on, the layer painted again from its row, kept over a reload", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const red = async (x: number, y: number): Promise<boolean> => {
+    const c = await screenPx(p, x, y);
+    return c[0]! > 200 && c[1]! < 80;
+  };
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("80");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [950, 500], [1400, 500]);
+  await p.locator(`[data-layer-more="${id}"]`).click();
+  await p.locator('.pop-menu [data-id="mask-add"]').click();
+  await expect(row(p, "Layer 1").locator("[data-mask]"), "the new mask is what is painted").toHaveAttribute("aria-pressed", "true");
+  await setColour(p, "#000000");
+  await stroke(p, [1150, 420], [1150, 580]);
+  await expect.poll(() => red(1150, 500), { message: "black hides" }).toBe(false);
+  expect(await red(1300, 500), "only there").toBe(true);
+  expect((await px(p, id, 1150, 500))![3], "the layer's own pixels are kept").toBe(255);
+  await setColour(p, "#ffffff");
+  await stroke(p, [1150, 420], [1150, 580]);
+  await expect.poll(() => red(1150, 500), { message: "white shows again" }).toBe(true);
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => red(1150, 500), { message: "undo: hidden again" }).toBe(false);
+  await p.keyboard.press("e");
+  await stroke(p, [1150, 420], [1150, 580]);
+  await expect.poll(() => red(1150, 500), { message: "the Eraser on a mask shows" }).toBe(true);
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("b");
+  await p.locator(`[data-layer-more="${id}"]`).click();
+  await p.locator('.pop-menu [data-id="mask-off"]').click();
+  await expect.poll(() => red(1150, 500), { message: "turned off: all shows" }).toBe(true);
+  await p.locator(`[data-layer-more="${id}"]`).click();
+  await p.locator('.pop-menu [data-id="mask-off"]').click();
+  await expect.poll(() => red(1150, 500), { message: "on again" }).toBe(false);
+  await row(p, "Layer 1").locator(".layer-name").click(); // (the row's name: the layer, not its mask)
+  await expect(row(p, "Layer 1").locator("[data-mask]")).toHaveAttribute("aria-pressed", "false");
+  await stroke(p, [1000, 750], [1000, 750]);
+  expect((await px(p, id, 1000, 750))!.slice(0, 4), "white paint on the layer").toEqual([255, 255, 255, 255]);
+  await settled(p);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  const list = await p.evaluate(() => window.__canvastDebug.paint.list());
+  await p.evaluate((i) => window.__canvastDebug.paint.open(i), list[0]!.id);
+  await expect.poll(async () => (await state(p)).layers[0]!.mask ?? -1, { message: "the mask is kept" }).toBeGreaterThan(0);
+  await expect.poll(() => red(1150, 500), { message: "and still hides" }).toBe(false);
+  expect(await red(1300, 500)).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

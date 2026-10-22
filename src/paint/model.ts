@@ -53,6 +53,14 @@ interface LayerBase {
   readonly locked?: true;
   /** Shown only where the nearest layer below it that is not clipped itself has paint (a clipping mask). */
   readonly clipBelow?: true;
+  /** A layer mask, painted in black to hide and white to show: tiles like a paint layer's, whose alpha is how much is hidden (a tile not
+   * listed hides nothing); `off`: kept but not applied. */
+  readonly mask?: LayerMask;
+}
+
+export interface LayerMask {
+  readonly tiles: Readonly<Record<string, string>>;
+  readonly off?: true;
 }
 
 export interface RasterLayer extends LayerBase {
@@ -94,6 +102,8 @@ export type LayerFields = { [K in LayerKind]: Omit<Extract<Layer, { kind: K }>, 
 const NO_TILES: Readonly<Record<string, string>> = Object.freeze({});
 /** A layer's tiles (only a paint layer has pixels of its own). */
 export const tilesOf = (l: Layer): Readonly<Record<string, string>> => (l.kind === "raster" ? l.tiles : NO_TILES);
+/** Every tile a layer stands on, its pixels' and its mask's (what GC keeps and an archive carries). */
+export const hashesOf = (l: Layer): string[] => [...Object.values(tilesOf(l)), ...Object.values(l.mask?.tiles ?? NO_TILES)];
 
 /** The library assets a layer uses (pictures, fonts, textures): kept by the library's GC while a layer names them. */
 export function assetsOf(l: Layer): string[] {
@@ -110,7 +120,7 @@ export const LAYER_KINDS: { readonly [K in LayerKind]: { readonly label: string;
   raster: {
     label: "Paint layer",
     icon: "paintbrush",
-    valid: (o) => (o.alphaLock === undefined || o.alphaLock === true) && typeof o.tiles === "object" && o.tiles !== null && Object.entries(o.tiles).every(([k, h]) => KEY.test(k) && typeof h === "string" && HASH.test(h)),
+    valid: (o) => (o.alphaLock === undefined || o.alphaLock === true) && validTiles(o.tiles),
     fresh: (b) => ({ ...b, name: "", kind: "raster", tiles: {} }),
   },
   object: { label: "Vector layer", icon: "vectorLayer", valid: (o) => validObjects(o.objs), fresh: (b) => ({ ...b, name: "", kind: "object", objs: [] }) },
@@ -124,6 +134,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const HASH = /^[0-9a-f]{64}$/;
 const KEY = /^-?\d+,-?\d+$/;
 const isName = (v: unknown): v is string => typeof v === "string" && v.length <= MAX_NAME;
+const validTiles = (t: unknown): boolean => typeof t === "object" && t !== null && Object.entries(t).every(([k, h]) => KEY.test(k) && typeof h === "string" && HASH.test(h));
 const isSide = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_PAGE_PX;
 
 export function validPage(p: unknown): p is Page {
@@ -142,6 +153,7 @@ export function validLayer(l: unknown): l is Layer {
   if (!(Number.isFinite(o.opacity) && o.opacity >= 0 && o.opacity <= 1)) return false;
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) return false;
   for (const f of ["hidden", "locked", "clipBelow"] as const) if (o[f] !== undefined && o[f] !== true) return false;
+  if (o.mask !== undefined && !(o.mask && validTiles(o.mask.tiles) && (o.mask.off === undefined || o.mask.off === true))) return false;
   const kind = (LAYER_KINDS as Record<string, { valid(l: unknown): boolean } | undefined>)[o.kind];
   return !!kind && kind.valid(o);
 }

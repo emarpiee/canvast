@@ -18,7 +18,7 @@ import { cleanBrushes, tipsOf, type BrushPreset } from "./brushes";
 import { inflate } from "./codec";
 import type { TipBitmap } from "./engine-protocol";
 import type { Layer, Painting } from "./model";
-import { tilesOf, validLayer, validPainting } from "./model";
+import { hashesOf, validLayer, validPainting } from "./model";
 
 export interface TileBlob {
   readonly hash: string;
@@ -112,7 +112,7 @@ export class PaintStore {
     const tx = this.db.transaction(["paintLayers", "paintTiles", "meta"], "readwrite");
     const committed = done(tx);
     const used = new Set(roots);
-    for (const l of await req(tx.objectStore("paintLayers").getAll() as IDBRequest<Layer[]>)) for (const h of Object.values(tilesOf(l) ?? {})) used.add(h);
+    for (const l of await req(tx.objectStore("paintLayers").getAll() as IDBRequest<Layer[]>)) for (const h of hashesOf(l)) used.add(h);
     for (const p of cleanBrushes(await req(tx.objectStore("meta").get("brushes") as IDBRequest<unknown>))) for (const t of tipsOf(p.brush)) used.add(t.key);
     const keys = await req(tx.objectStore("paintTiles").getAllKeys() as IDBRequest<IDBValidKey[]>);
     let n = 0;

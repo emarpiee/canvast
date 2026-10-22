@@ -1535,7 +1535,7 @@ test("Place on…: the open canvas, another existing canvas, a new canvas in a b
   await toAssets(p);
   await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: GREEN });
   await card(p, GREEN_HASH).click();
-  const crumb = p.locator(".nav-name-btn");
+  const crumb = p.getByTestId("workspace-chevron");
   const count = () => p.evaluate(() => window.__canvastDebug.objects().length);
   // A new canvas in Board 1: it opens and holds the picture; the first canvas stays empty.
   await p.getByTestId("asset-place-menu").click();

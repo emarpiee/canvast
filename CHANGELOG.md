@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.33.2 — Rotate and mirror the view, layer masks (2026-10-22)
+
+- **Layer masks** in the Paint view, on any kind of layer: *Add a mask* in its ⋯ menu; press the mask's picture in the row to paint it (dark paint hides, light paint or the Eraser shows), the name to paint the layer again; turn it off and on, or delete it. Kept in the painting, in undo and in archives.
+
+- **Rotate and mirror the Paint view:** `4` and `6` turn it 15°, `M` mirrors it, `5` resets; the angle button among the view controls opens the same choices. Every tool works on the turned view (the Brush, the Pencil, the Eyedropper and the canvas's tools on vector layers); Fit fits the turned page. Only the view turns, not the pixels.
+
 ## 0.33.1 — The Eyedropper (2026-10-22)
 
 - **Eyedropper** (`I`), one tool for the canvas and the Paint view: a click makes the colour under it the pen (or paint) colour, one pixel or the mean of a square up to 101 px. In the Paint view it reads the page as it looks (**All layers**, without the checkerboard) or the picked layer alone (**Layer**); Alt-click with a painting tool makes the same pick.

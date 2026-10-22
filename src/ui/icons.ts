@@ -85,6 +85,11 @@ import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
 import refreshCw from "lucide-static/icons/refresh-cw.svg";
 import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
+import eclipseSvg from "lucide-static/icons/eclipse.svg";
+import eyeClosedSvg from "lucide-static/icons/eye-closed.svg";
+import rotateCcwSquareSvg from "lucide-static/icons/rotate-ccw-square.svg";
+import rotateCwSvg from "lucide-static/icons/rotate-cw.svg";
+import flipHorizontalSvg from "lucide-static/icons/flip-horizontal.svg";
 import rotateCwSquare from "lucide-static/icons/rotate-cw-square.svg";
 import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
@@ -330,6 +335,11 @@ export const ICONS = {
   plus: clean(plus),
   refresh: clean(refreshCw),
   rotateCcw: clean(rotateCcw),
+  eclipse: clean(eclipseSvg),
+  eyeClosed: clean(eyeClosedSvg),
+  rotateCcwSquare: clean(rotateCcwSquareSvg),
+  rotateCw: clean(rotateCwSvg),
+  flipHorizontal: clean(flipHorizontalSvg),
   rotateCwSquare: clean(rotateCwSquare),
   ratio: clean(ratioIcon),
   focus: clean(focusIcon),

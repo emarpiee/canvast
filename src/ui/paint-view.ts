@@ -82,6 +82,9 @@ export interface PaintView {
   /** The picked vector layer's document, editor, view, index and text editor: what the shared bars work on in this view (ADR 0168). */
   readonly vector: VectorHost;
   fit(): void;
+  /** The view's turn and mirror menu (the view controls' button) and, for the test hook, where a page px is in the window. */
+  turnMenu(anchor: HTMLElement): void;
+  clientOf(x: number, y: number): { x: number; y: number };
 }
 
 const ZOOM_STEP = 1.25;
@@ -127,8 +130,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     <div class="paint-editor" data-screen="editor" hidden>
       <div class="paint-main">
         <div class="paint-stage" data-stage>
-          <canvas class="paint-canvas" data-testid="paint-canvas" tabindex="0" aria-label="The page: paint with the picked tool"></canvas>
-          <canvas class="paint-cursor" aria-hidden="true"></canvas>
+          <div class="paint-turn" data-turn>
+            <canvas class="paint-canvas" data-testid="paint-canvas" tabindex="0" aria-label="The page: paint with the picked tool"></canvas>
+            <canvas class="paint-cursor" aria-hidden="true"></canvas>
+          </div>
         </div>
         <input type="file" accept="image/*" hidden data-testid="paint-picture-input">
       </div>
@@ -138,6 +143,58 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const listScreen = $<HTMLElement>('[data-screen="list"]');
   const editor = $<HTMLElement>('[data-screen="editor"]');
   const stage = $<HTMLElement>("[data-stage]");
+  /** The box the page is drawn in, turned and mirrored inside the still stage (the view only, not the pixels): big enough to cover it. */
+  const turnEl = $<HTMLElement>("[data-turn]");
+  let turn = 0;
+  let mirror = false;
+  /** The page box's size, from the stage as it is now (not from the box's own layout, which follows a frame later). */
+  const view = (): { w: number; h: number } => {
+    const W = stage.clientWidth || 1, H = stage.clientHeight || 1;
+    const a = (turn * Math.PI) / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+    return { w: Math.ceil(W * c + H * s), h: Math.ceil(W * s + H * c) };
+  };
+  const layoutTurn = (): void => {
+    const W = stage.clientWidth || 1, H = stage.clientHeight || 1;
+    const { w, h } = view();
+    Object.assign(turnEl.style, { width: `${w}px`, height: `${h}px`, left: `${(W - w) / 2}px`, top: `${(H - h) / 2}px`, transform: turn || mirror ? `rotate(${turn}deg)${mirror ? " scaleX(-1)" : ""}` : "" });
+  };
+  /** A point of the window in the page box's own px (what the camera places the page in), and back: through the turn and the mirror. */
+  const toLocal = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
+    const r = stage.getBoundingClientRect(), v = view();
+    const dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
+    const a = (-turn * Math.PI) / 180;
+    const x = dx * Math.cos(a) - dy * Math.sin(a), y = dx * Math.sin(a) + dy * Math.cos(a);
+    return { x: (mirror ? -x : x) + v.w / 2, y: y + v.h / 2 };
+  };
+  const clientOf = (lx: number, ly: number): { x: number; y: number } => {
+    const r = stage.getBoundingClientRect(), v = view();
+    const dx = (mirror ? -1 : 1) * (lx - v.w / 2), dy = ly - v.h / 2;
+    const a = (turn * Math.PI) / 180;
+    return { x: r.left + r.width / 2 + dx * Math.cos(a) - dy * Math.sin(a), y: r.top + r.height / 2 + dx * Math.sin(a) + dy * Math.cos(a) };
+  };
+  /** Turn (degrees, clockwise) and mirror the view about its middle: the page pixel there stays there. */
+  const setTurn = (deg: number, mir = mirror): void => {
+    const v0 = view();
+    const [px, py] = toPage(cam, v0.w / 2, v0.h / 2);
+    turn = ((((Math.round(deg) % 360) + 540) % 360) - 180) || 0;
+    mirror = mir;
+    layoutTurn();
+    const v = view();
+    if (session) cam = clampCamera({ ...cam, x: v.w / 2 - px * cam.scale, y: v.h / 2 - py * cam.scale }, page(), v);
+    const b = document.querySelector<HTMLElement>('.hud-controls [data-action="view-turn"]');
+    if (b) b.textContent = `${turn}°${mirror ? " ⇋" : ""}`;
+    redraw();
+  };
+  const TURN_STEP = 15;
+  const turnMenu = (anchor: HTMLElement): void => {
+    const items = (): MenuItem[] => [
+      { id: "turn-left", label: `Turn left ${TURN_STEP}°`, hint: "4", icon: ICONS.rotateCcwSquare, run: () => setTurn(turn - TURN_STEP) },
+      { id: "turn-right", label: `Turn right ${TURN_STEP}°`, hint: "6", icon: ICONS.rotateCw, run: () => setTurn(turn + TURN_STEP) },
+      { id: "mirror", label: "Mirror", hint: "M: left and right swapped, to check a drawing", icon: ICONS.flipHorizontal, checked: mirror, run: () => setTurn(turn, !mirror) },
+      { id: "reset", label: "Reset rotation", hint: "5", icon: ICONS.rotateCcw, disabled: !turn && !mirror, run: () => setTurn(0, false) },
+    ];
+    openMoreMenu(anchor, items(), "View rotation", { keepOpen: true, refresh: items });
+  };
   const canvas = $<HTMLCanvasElement>(".paint-canvas");
   const cursor = $<HTMLCanvasElement>(".paint-cursor");
   /** A panel of the view in the canvas's dock (ADR 0123), shown only in the Paint view. */
@@ -170,7 +227,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   /** The canvas's own tools on the picked vector layer (ADR 0167). */
   const vhost: VectorHost = createVectorHost({
         el: canvas,
-        stage,
+        stage: turnEl,
         session: () => session,
         active: () => vectorOn(),
         camera: () => cam,
@@ -186,6 +243,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         revealList: (at, things, pick) => openRevealList(canvas, vhost.editor, at, things, pick),
         keysActive: () => !!session && visible,
         sample: (at, size) => samplePage(at, size),
+        toLocal: (e) => toLocal(e),
       });
   /** The rail's tool, as the canvas's tools keep it (one rail for both views, ADR 0168). */
   const tool = (): Tool => vhost.editor.tool;
@@ -193,12 +251,11 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
    * (whose shapes the canvas's Eraser takes, as on the canvas). Every other tool is the canvas's. */
   const paintTool = (): ToolId | null => {
     const t = tool();
-    return t === "brush" || t === "pencil" ? t : t === "eraser" && session?.active()?.kind !== "object" ? "eraser" : null;
+    return t === "brush" || t === "pencil" ? t : t === "eraser" && (session?.active()?.kind !== "object" || session.editsMask()) ? "eraser" : null;
   };
   /** The paint colour: the canvas's pen colour (the Properties bar's colour, ADR 0168). */
   const colour = (): string => vhost.editor.penColor;
 
-  const view = (): { w: number; h: number } => ({ w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
   /** The Eyedropper's colour under a point of the view (CSS px), in page px: the page as it looks (no checkerboard, no overlays) or the
    * picked layer alone. */
   const samplePage = (at: { x: number; y: number }, size: number): string | null => {
@@ -218,7 +275,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const page = () => session!.page();
   const env = (): ObjectEnv | null => (deps.assets ? { assets: deps.assets, theme: deps.theme() } : null);
   /** The page as the session has it now, for drawing (the view, an export, a rasterized layer). */
-  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), live: live ? s.live : null, env: env(), vector: live && vhost ? vhost.drawLayer : null });
+  const scene = (s: PaintSession, live = true): Scene => ({ page: s.page(), stack: s.stack(), image: (l) => s.image(l), mask: (l) => s.mask(l), live: live ? s.live : null, env: env(), vector: live && vhost ? vhost.drawLayer : null });
 
   // ---- drawing ------------------------------------------------------------------------------------------------------------------------
 
@@ -239,6 +296,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, canvas.width, canvas.height);
     const s = session;
+    layoutTurn();
     vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
@@ -268,6 +326,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     }
   };
   new ResizeObserver(() => {
+    layoutTurn();
     if (!session) return;
     cam = clampCamera(cam, page(), view());
     redraw();
@@ -349,7 +408,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const followTool = (): void => {
     layersEl.hidden = !vhost.editor.layersOpen; // (the dock's Layers button: the canvas's, ADR 0168)
     stage.dataset["tool"] = tool();
-    document.body.dataset["paintTarget"] = session?.active()?.kind === "object" ? "vector" : "pixels";
+    document.body.dataset["paintTarget"] = session?.active()?.kind === "object" && !session.editsMask() ? "vector" : "pixels";
     renderOptions();
     brushPanels.sync(visible && !!session);
     if (deps.settings.get("paint.tool") !== tool()) deps.settings.set("paint.tool", tool());
@@ -387,6 +446,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         ${flag("data-eye", !!l.hidden, l.hidden ? ICONS.eyeOff : ICONS.eye, `${l.hidden ? "Show" : "Hide"} ${l.name}`, l.hidden ? "Hidden: show it" : "Hide it")}
         ${flag("data-lock", !!l.locked, ICONS.lockKeyhole, `Lock ${l.name}`, l.locked ? "Locked: it cannot be painted or changed. Press to unlock" : "Lock it: it cannot be painted or changed")}
         ${flag("data-clip", !!l.clipBelow, ICONS.clipBelow, `Clip ${l.name} to the layer below`, l.clipBelow ? "Clipped: shown only where the layer below has paint. Press to show it everywhere" : "Clip to the layer below: show it only where that layer has paint")}
+        ${l.mask ? `<button type="button" class="layer-mask${l.mask.off ? " is-off" : ""}" data-mask aria-pressed="${on && s.maskEdit}" aria-label="Paint the mask of ${esc(l.name)}" title="${l.mask.off ? "The mask (turned off). " : "The mask: "}press to paint it (black hides, white shows); press the name to paint the layer again"><canvas data-mask-thumb width="32" height="20" aria-hidden="true"></canvas></button>` : ""}
         ${l.kind === "raster" ? flag("data-alpha", !!l.alphaLock, ICONS.alphaLock, `Alpha lock ${l.name}`, l.alphaLock ? "Alpha lock on: painting only colours what already has paint. Press to paint anywhere" : "Alpha lock: painting only colours what already has paint") : ""}
         ${moreButton(`More actions for layer ${l.name}`, `data-layer-more="${l.id}"`)}
       </li>`;
@@ -400,6 +460,20 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       body: `<ul class="paint-layer-list" role="listbox" aria-label="Layers, top first">${stack.map(row).join("")}</ul>`,
       foot: act ? `<label class="layers-blend">Blend <select data-blend aria-label="Blend mode of the picked layer">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="0" max="100" step="1" value="${pct}" aria-label="Opacity of the picked layer"> <output>${pct}%</output></label>` : "",
     });
+    drawMaskThumbs();
+  };
+
+  /** The masks' small pictures in the Layers rows: white shows, black hides. */
+  const drawMaskThumbs = (): void => {
+    if (!session) return;
+    for (const c of layersEl.querySelectorAll<HTMLCanvasElement>("[data-mask-thumb]")) {
+      const l = session.layers.get(c.closest<HTMLElement>("[data-layer]")!.dataset["layer"]!);
+      const m = l && session.mask(l);
+      const g = c.getContext("2d")!;
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, c.width, c.height);
+      if (m) g.drawImage(m, 0, 0, c.width, c.height);
+    }
   };
 
   /** What a new layer can be (ADR 0166): each kind of layer, made with the canvas's own makers (objects.ts). */
@@ -452,6 +526,18 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       { id: "up", label: "Move up", icon: ICONS.arrowUp, disabled: s.stack().at(-1)?.id === l.id, run: () => s.moveLayer(l.id, 1) },
       { id: "down", label: "Move down", icon: ICONS.arrowDown, disabled: s.stack()[0]?.id === l.id, run: () => s.moveLayer(l.id, -1) },
       { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, disabled: s.stack().length <= 1, run: () => s.deleteLayer(l.id) },
+      ...(l.mask
+        ? [
+            { id: "mask-off", label: l.mask.off ? "Turn the mask on" : "Turn the mask off", hint: "Kept as it is, shown or not", icon: ICONS.eyeClosed, run: () => s.setLayer(l.id, { mask: l.mask!.off ? { tiles: l.mask!.tiles } : { ...l.mask!, off: true } }, l.mask!.off ? "Turn the mask on" : "Turn the mask off") },
+            { id: "mask-delete", label: "Delete the mask", hint: "The whole layer shows again", icon: ICONS.trash, run: () => s.setLayer(l.id, { mask: null }, "Delete the mask") },
+          ]
+        : [{ id: "mask-add", label: "Add a mask", hint: "Paint it black to hide parts of the layer, white to show them again", icon: ICONS.eclipse, run: () => {
+            s.setLayer(l.id, { mask: { tiles: {} } }, "Add a mask");
+            s.activeId = l.id;
+            s.maskEdit = true;
+            renderLayers();
+            void s.prepare();
+          } }]),
     ];
     openMoreMenu(anchor, items, `Layer ${l.name}`);
   };
@@ -549,6 +635,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (t.closest("[data-lock]")) return s.setLayer(l.id, { locked: !l.locked }, l.locked ? "Unlock layer" : "Lock layer");
     if (t.closest("[data-clip]")) return s.setLayer(l.id, { clipBelow: !l.clipBelow }, l.clipBelow ? "Release the clip" : "Clip to the layer below");
     if (t.closest("[data-alpha]") && l.kind === "raster") return s.setLayer(l.id, { alphaLock: !l.alphaLock }, l.alphaLock ? "Unlock transparency" : "Lock transparency");
+    s.maskEdit = !!t.closest("[data-mask]"); // (the mask's picture paints the mask; the rest of the row, the layer)
     s.activeId = l.id;
     renderLayers();
     renderAdjust();
@@ -678,9 +765,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
 
   // ---- opening and closing --------------------------------------------------------------------------------------------------------
 
+  /** The whole page in view, as it is turned: its turned box fits the stage, and it is centred in the page box. */
   const fit = (): void => {
     if (!session) return;
-    cam = fitCamera(page(), view());
+    const p = page(), a = (turn * Math.PI) / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+    const { scale } = fitCamera({ w: p.w * c + p.h * s, h: p.w * s + p.h * c }, { w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
+    const v = view();
+    cam = { scale, x: (v.w - p.w * scale) / 2, y: (v.h - p.h * scale) / 2 };
     redraw();
   };
   const screen = (which: "list" | "editor"): void => {
@@ -710,6 +801,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     s.onError = deps.tell;
     unsub = s.subscribe((what) => {
       vhost?.sync();
+      drawMaskThumbs();
       if (what === "records") {
         renderBar();
         renderLayers();
@@ -815,10 +907,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   let spaceDown = false;
   /** Where the last stroke ended, in page px (Shift-click draws a straight line from it). */
   let lastEnd: [number, number] | null = null;
-  const local = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
+  const local = toLocal;
   const sample = (e: PointerEvent): number[] => {
     const p = local(e);
     const [x, y] = toPage(cam, p.x, p.y);
@@ -840,6 +929,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (c) setColour(c);
   };
 
+  /** Whether a colour (#rrggbb) is light: on a mask it shows rather than hides. */
+  const light = (hex: string): boolean => [1, 3, 5].reduce((a, i, n) => a + parseInt(hex.slice(i, i + 2), 16) * [0.2126, 0.7152, 0.0722][n]!, 0) >= 128;
   /** Whether the active layer's pixel at page px (x, y) is the paint colour (the Pencil's Auto erase). */
   const onColour = (s: PaintSession, x: number, y: number): boolean => {
     const l = s.active();
@@ -880,8 +971,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (why) return deps.tell(why);
     const s = session;
     const first = sample(e);
-    const brush = brushOf(pt, toolValues(pt), toolBrush(pt), colour());
-    if (toolValues(pt)["autoErase"] === true && onColour(s, first[0]!, first[1]!)) brush["erase"] = true;
+    const onMask = s.editsMask();
+    const brush = brushOf(pt, toolValues(pt), toolBrush(pt), onMask ? "#000000" : colour());
+    if (onMask) brush["erase"] = pt === "eraser" || light(colour()); // (on a mask dark paint hides and light paint, or the Eraser, shows)
+    else if (toolValues(pt)["autoErase"] === true && onColour(s, first[0]!, first[1]!)) brush["erase"] = true;
     const st = { id: e.pointerId, started: false, queue: [] as number[], erase: brush["erase"] === true };
     stroke = st;
     if (e.shiftKey && lastEnd) st.queue.push(lastEnd[0], lastEnd[1], first[2]!, 0, 0, 0, first[6]! - 1);
@@ -1036,7 +1129,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       e.preventDefault();
       if (!spaceDown) stage.classList.add("is-hand");
       spaceDown = true;
-    } else if (k === "+" || k === "=") void action("zoom-in", canvas);
+    } else if (k === "4" || k === "6") setTurn(turn + (k === "4" ? -TURN_STEP : TURN_STEP));
+    else if (k === "5") setTurn(0, false);
+    else if (k === "m" || k === "M") setTurn(turn, !mirror);
+    else if (k === "+" || k === "=") void action("zoom-in", canvas);
     else if (k === "-") void action("zoom-out", canvas);
     else if ((k === "[" || k === "]") && pt) {
       const v = Number(toolValues(pt)["size"]);
@@ -1083,6 +1179,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     head,
     vector: vhost,
     fit,
+    turnMenu,
+    clientOf: (x, y) => clientOf(cam.x + x * cam.scale, cam.y + y * cam.scale),
     brushes: brushPanels,
     brushState: () => {
       const t = paintTool();

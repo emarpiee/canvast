@@ -88,6 +88,8 @@ export interface HudStatus {
   quality(): number;
   /** Bring the selection, or everything visible at this zoom, into view (the buttons beside zoom in and out). */
   fit(kind: "selection" | "all"): void;
+  /** The Painting view's turn and mirror menu (its button is there only in that view). */
+  turnMenu(anchor: HTMLElement): void;
   hasSelection(): boolean;
   /** Previous view and next view (ADR 0116): whether each is there, going, and a way to hear that they changed. */
   canCameraBack(): boolean;
@@ -129,6 +131,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
+      <button type="button" class="hud-turn" data-action="view-turn" data-only="paint" aria-haspopup="menu" aria-expanded="false" aria-label="View rotation" title="Turn or mirror the view (4, 6, M; 5 resets)">0°</button>
       <span class="hud-sep" data-only="canvas" role="separator"></span>
       <button type="button" data-action="cam-back" data-only="canvas" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
       <button type="button" data-action="random-view" data-only="canvas" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dice5}</button>
@@ -180,6 +183,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "zoom-out") zoomByStep(view, -1);
     else if (action === "fit-selection") status.fit("selection");
     else if (action === "fit-all") status.fit("all");
+    else if (action === "view-turn") status.turnMenu((e.target as HTMLElement).closest("button")!);
     else if (action === "random-view") status.randomView();
     else if (action === "cam-back") status.cameraBack();
     else if (action === "cam-fwd") status.cameraForward();

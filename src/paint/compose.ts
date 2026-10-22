@@ -18,6 +18,8 @@ export interface Live {
   readonly overlay: CanvasImageSource;
   /** How it goes over its layer: normally, inside its paint (alpha lock), or taking it away (erasing). */
   readonly op: GlobalCompositeOperation;
+  /** Painted into the layer's mask, not its pixels (a stroke that hides goes over, one that shows takes away). */
+  readonly mask?: true;
 }
 
 export interface Scene {
@@ -26,6 +28,8 @@ export interface Scene {
   readonly stack: readonly Layer[];
   /** A paint layer's pixels, page-sized in page px (null: nothing to draw yet). */
   image(l: Layer): CanvasImageSource | null;
+  /** A layer's mask, page-sized in page px: its alpha is how much is hidden (null: none drawn yet). */
+  mask?(l: Layer): CanvasImageSource | null;
   readonly live?: Live | null;
   /** What the canvas's renderer needs for shape, text, picture and fill layers. */
   readonly env?: ObjectEnv | null;
@@ -104,7 +108,7 @@ const place = (g: CanvasRenderingContext2D, at: Placement): void => {
 export const RENDER: { readonly [K in LayerKind]: (l: Extract<Layer, { kind: K }>, c: Ctx) => Look } = {
   raster(l, c) {
     const img = c.s.image(l);
-    const live = c.s.live && c.s.live.layerId === l.id ? c.s.live : null;
+    const live = c.s.live && c.s.live.layerId === l.id && !c.s.live.mask ? c.s.live : null;
     if (!img && !live) return null;
     const g = layerCtx(c.slot, c.below.canvas.width, c.below.canvas.height);
     place(g, c.at);
@@ -182,14 +186,36 @@ export function composePage(ctx: CanvasRenderingContext2D, s: Scene, at: Placeme
       g.drawImage(b.img, 0, 0);
       img = g.canvas;
     }
+    const masked = maskInto(img, l, s, at);
+    if (masked) img = masked;
     pending ||= c.pending;
     ctx.globalAlpha = l.opacity;
-    // (an adjustment at full opacity, not clipped, takes the place of what is below; otherwise it goes over it)
-    ctx.globalCompositeOperation = look.replaces && !base && l.opacity >= 1 && !l.blend ? "copy" : (l.blend ?? "source-over");
+    // (an adjustment at full opacity, not clipped or masked, takes the place of what is below; otherwise it goes over it)
+    ctx.globalCompositeOperation = look.replaces && !base && !masked && l.opacity >= 1 && !l.blend ? "copy" : (l.blend ?? "source-over");
     ctx.drawImage(img, 0, 0);
   }
   ctx.restore();
   return pending;
+}
+
+/** A layer's look with its mask (and the mask stroke being painted) taken out of it, or null when it has no mask in use. */
+function maskInto(img: HTMLCanvasElement, l: Layer, s: Scene, at: Placement): HTMLCanvasElement | null {
+  const live = s.live?.mask && s.live.layerId === l.id ? s.live : null;
+  const surface = l.mask && !l.mask.off ? s.mask?.(l) : null;
+  if (!surface && !live) return null;
+  const W = img.width, H = img.height;
+  const m = layerCtx(3, W, H);
+  place(m, at);
+  if (surface) m.drawImage(surface, 0, 0);
+  if (live) {
+    m.globalCompositeOperation = live.op;
+    m.drawImage(live.overlay, 0, 0);
+  }
+  const g = layerCtx(4, W, H);
+  g.drawImage(img, 0, 0);
+  g.globalCompositeOperation = "destination-out";
+  g.drawImage(m.canvas, 0, 0);
+  return g.canvas;
 }
 
 /** One layer alone at 1:1 on a transparent page-sized target (Rasterize; ADR 0166): the same renderer as the view and exports. */

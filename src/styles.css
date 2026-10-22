@@ -2763,6 +2763,7 @@ body[data-view="paint"] .hint-float { display: none; }
 .paint-stage { overflow: hidden; background: var(--canvas-bg); touch-action: none; }
 .paint-stage[data-tool="hand"], .paint-stage.is-hand { cursor: grab; }
 .paint-stage.is-panning { cursor: grabbing; }
+.paint-turn { position: absolute; inset: 0; }
 .paint-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .paint-cursor { pointer-events: none; }
 .paint-canvas:focus { outline: none; }
@@ -2820,4 +2821,8 @@ body[data-view="paint"][data-paint-target="pixels"] .tb-options[data-for="eraser
 /* The Brushes button and the picked preset: a ring, not the accent fill (the tip is drawn in the ink colour). */
 [data-paint-options] [data-brush-panel="brushes"][aria-pressed="true"] { background: var(--hud-hover); color: var(--hud-fg); box-shadow: inset 0 0 0 1px var(--hud-accent); }
 .paint-layer .layer-state[aria-pressed="false"]:not([data-eye]) { opacity: 0.45; }
+.layer-mask { flex: none; display: inline-grid; place-items: center; padding: var(--sp-1); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.layer-mask canvas { width: var(--icon-xl); height: var(--icon-md); display: block; box-shadow: 0 0 0 1px var(--hud-muted); }
+.layer-mask[aria-pressed="true"] canvas { box-shadow: 0 0 0 2px var(--hud-accent); }
+.layer-mask.is-off canvas { opacity: 0.45; }
 .paint-layer:hover .layer-state[aria-pressed="false"] { opacity: 0.9; }

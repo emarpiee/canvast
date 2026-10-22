@@ -1238,6 +1238,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   mountHud(document.getElementById("hud")!, tview, stats, debug, {
     fit: (kind) => (appView === "paint" ? paintView.fit() : focusCycle.fit(kind)),
+    turnMenu: (anchor) => paintView.turnMenu(anchor),
     canCameraBack: () => history.canBack(),
     canCameraForward: () => history.canForward(),
     cameraBack: () => history.back(),
