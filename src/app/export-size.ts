@@ -46,9 +46,10 @@ export const RATIO_PRESETS: readonly RatioPreset[] = [
   { id: "banner", short: "Banner", label: "Banner 3 : 1", ratio: 3, group: "Social" },
 ];
 
-/** A ratio from what was typed: "16:9", "16/9", "16 x 9", "1.5", "A4", "letter", "square", "3:2 portrait". null when it is not one. */
+/** A ratio from what was typed: "16:9", "16/9", "16 x 9", "1.5", "A4", "letter", "square", "3:2 portrait", a size "2000x1920px" or
+ * "2000 px x 1920 px" (px after a number is left out). null when it is not one. */
 export function parseRatio(text: string): number | null {
-  const t = text.trim().toLowerCase().replace(/[×x*÷]/g, ":").replace(/\s+/g, " ");
+  const t = text.trim().toLowerCase().replace(/(\d)\s*px\b/g, "$1").replace(/[×x*÷]/g, ":").replace(/\s+/g, " ");
   if (!t) return null;
   const portrait = /\bportrait\b/.test(t);
   const landscape = /\blandscape\b/.test(t);

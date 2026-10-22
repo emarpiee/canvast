@@ -2,7 +2,7 @@
 
 ## 0.35.2 — A sheet's ratio from a size (2026-10-22)
 
-- The sheet's **Ratio** field shows a size typed in px as its ratio: `2000 x 1920` (or `2000x1920`) becomes `25 : 24`, `1920 x 1080` becomes `16 : 9` (it was shown as a decimal when the ratio needed more than 20 on its smaller side).
+- The sheet's **Ratio** field shows a size typed in px as its ratio: `2000 x 1920` (or `2000x1920`, `2000x1920px`, `2000 px x 1920 px`) becomes `25 : 24`, `1920 x 1080` becomes `16 : 9` (it was shown as a decimal when the ratio needed more than 20 on its smaller side).
 
 ## 0.35.1 — Brushes panel and backups (2026-10-22)
 
