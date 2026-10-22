@@ -71,13 +71,17 @@ export function parseRatio(text: string): number | null {
   return r;
 }
 
-/** A ratio as short words: "16 : 9" when it is a small whole-number ratio, else "1 : 1.414" (the longer side as 1.000 to the shorter side). */
+/**
+ * A ratio as short words: "16 : 9" when it is a small whole-number ratio (or exactly a larger one, as sizes typed in px give: 2000 × 1920 is
+ * "25 : 24"), else "1 : 1.414" (the longer side as 1.000 to the shorter side).
+ */
 export function formatRatio(r: number): string {
   if (!(r > 0) || !Number.isFinite(r)) return "";
   const long = Math.max(r, 1 / r);
-  for (let d = 1; d <= 20; d++) {
+  for (let d = 1; d <= 100; d++) {
     const n = Math.round(long * d);
-    if (n >= 1 && Math.abs(n / d - long) / long < 0.0005) {
+    // (up to 20 a near match will do; past it only an exact one, so a shape dragged to any width keeps its decimals)
+    if (n >= 1 && Math.abs(n / d - long) / long < (d <= 20 ? 0.0005 : 1e-7)) {
       const [a, b] = reduce(n, d);
       return r >= 1 ? `${a} : ${b}` : `${b} : ${a}`;
     }

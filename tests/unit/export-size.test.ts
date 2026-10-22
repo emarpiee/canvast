@@ -20,6 +20,9 @@ describe("ratios", () => {
     expect(formatRatio(1.5)).toBe("3 : 2");
     expect(formatRatio(Math.SQRT2)).toBe("1.414 : 1");
     expect(formatRatio(1 / Math.SQRT2)).toBe("1 : 1.414");
+    expect(formatRatio(parseRatio("2000x1920")!), "px typed: the reduced ratio").toBe("25 : 24");
+    expect(formatRatio(parseRatio("1920 x 1080")!)).toBe("16 : 9");
+    expect(formatRatio(1.989), "a dragged shape keeps its decimals").toBe("1.989 : 1");
     expect(presetOf(16 / 9)?.id).toBe("16:9");
     expect(presetOf(9 / 16)?.id).toBe("16:9"); // (upright is the same shape)
     expect(presetOf(1.234)).toBeNull();
