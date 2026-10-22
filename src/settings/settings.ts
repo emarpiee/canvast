@@ -16,6 +16,7 @@
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 import type { Tool } from "../app/editor-state";
+import { SAMPLE_SIZES } from "../interaction/eyedropper";
 
 export type Scope = "device" | "workspace" | "board";
 
@@ -99,7 +100,7 @@ export const SETTINGS = {
   "eraser.diameterPx": { scope: "device", default: 16, validate: range(4, 128), effect: "immediate" } as Def<number>,
   "eraser.parts": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   // The Painting view (ADR 0165): the tool, each tool's options (checked against its schema when read, paint/tools.ts), the colour.
-  "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "pencil", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
+  "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "pencil", "eyedropper", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
   "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
   "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   "paint.brushView": { scope: "device", default: "list", validate: oneOf("list", "grid"), effect: "immediate" } as Def<"list" | "grid">,
@@ -197,6 +198,8 @@ export const SETTINGS = {
   "nav.fade": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "tour.speed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "tour.pause": { scope: "device", default: 0, validate: range(0, 10), effect: "immediate" } as Def<number>,
+  "eyedropper.size": { scope: "device", default: 1, validate: (v: unknown) => ((SAMPLE_SIZES as readonly unknown[]).includes(v) ? (v as number) : undefined), effect: "immediate" } as Def<number>,
+  "eyedropper.layer": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

@@ -135,6 +135,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("tool.lasso", "Lasso", TOOLS_GROUP, "L", undefined, "both"),
   cmd("tool.text", "Text", TOOLS_GROUP, "T", undefined, "both"),
   cmd("tool.note", "Note", TOOLS_GROUP, "M"),
+  cmd("tool.eyedropper", "Eyedropper", TOOLS_GROUP, "I", undefined, "both"),
   cmd("tool.eraser", "Eraser", TOOLS_GROUP, "E", undefined, "both"),
   cmd("nav.up", "Step up", STEP_GROUP, "W"),
   cmd("nav.left", "Step left", STEP_GROUP, "A"),

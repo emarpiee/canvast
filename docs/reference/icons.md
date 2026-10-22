@@ -68,7 +68,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `droplets` | Styles panel: Change colour (menu item) |
 | `rainbow` | Styles panel: New palette from a colour (harmony) |
-| `pipette` | Colour picker: pick a colour from the screen (the picker module draws its own copy, `src/colour-picker/picker.ts`) |
+| `pipette` | Pick a colour from what is shown: the colour picker's screen pick (the picker module draws its own copy, `src/colour-picker/picker.ts`) and the Eyedropper tool of the rail (both views) |
 | `listChecks` | Under your finger menu (long press): Add to the pick |
 | `pathMenu` | Actions bar: Path tools (simplify, outline stroke, taper, network, divide, shape builder, text to path) |
 | `boolMenu` | Actions bar: Shapes (the boolean operations and their group) |

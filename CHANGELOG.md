@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.33.1 — The Eyedropper (2026-10-22)
+
+- **Eyedropper** (`I`), one tool for the canvas and the Paint view: a click makes the colour under it the pen (or paint) colour, one pixel or the mean of a square up to 101 px. In the Paint view it reads the page as it looks (**All layers**, without the checkerboard) or the picked layer alone (**Layer**); Alt-click with a painting tool makes the same pick.
+- The colour button is in the Properties bar for the Eyedropper too.
+
 ## 0.33.0 — The Pencil (2026-10-22)
 
 - **Pencil** in the Paint view (`Shift+B`, or the Brush button's flyout on the rail): whole pixels, no smoothing, one pixel wide at first. **Auto erase**: a stroke that starts on the paint colour erases.

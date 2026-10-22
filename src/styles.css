@@ -246,8 +246,8 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 }
 
 #canvas[data-tool="select"] { cursor: default; }
-#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"] { cursor: crosshair; }
-.paint-stage:is([data-tool="pen"], [data-tool="lasso"], [data-tool="node"], [data-tool="shape"], [data-tool="text"]) .paint-canvas { cursor: crosshair; }
+#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"], #canvas[data-tool="eyedropper"] { cursor: crosshair; }
+.paint-stage:is([data-tool="pen"], [data-tool="lasso"], [data-tool="node"], [data-tool="shape"], [data-tool="text"], [data-tool="eyedropper"]) .paint-canvas { cursor: crosshair; }
 :is(#canvas, .paint-canvas)[data-hover="ew"] { cursor: ew-resize; }
 :is(#canvas, .paint-canvas)[data-hover="ns"] { cursor: ns-resize; }
 :is(#canvas, .paint-canvas)[data-hover="nwse"] { cursor: nwse-resize; }

@@ -70,7 +70,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   const panel = p.locator("#settings-view");
   const note = panel.locator("[data-key-note]");
   const tool = () => p.evaluate(() => window.__canvastDebug.tool());
-  const change = (name: string) => panel.getByRole("button", { name: `Change the keys for ${name}` });
+  const change = (name: string) => panel.getByRole("button", { name: `Change the keys for ${name}`, exact: true });
   // "?" opens the list on the Shortcuts tab; the editable keys and the fixed shortcuts are there.
   await p.keyboard.press("?");
   await expect(panel).toBeVisible();

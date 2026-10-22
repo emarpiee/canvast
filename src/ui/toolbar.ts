@@ -1,4 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
+import { SAMPLE_SIZES } from "../interaction/eyedropper";
 import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
 import { openMoreMenu } from "./more-menu";
@@ -130,6 +131,7 @@ export const RAIL_TOOLS: ReadonlyArray<{ tool: Tool; icon: string; label: string
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
   { tool: "note", icon: ICONS.stickyNote, label: "Note", key: "M", only: "canvas" },
+  { tool: "eyedropper", icon: ICONS.pipette, label: "Eyedropper", key: "I" },
   { tool: "eraser", icon: ICONS.eraser, label: "Object eraser", key: "E" },
 ];
 const TOOLS = RAIL_TOOLS;
@@ -251,7 +253,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-mask-ink="hide" aria-label="Paint the mask in black: the Pen hides" title="Paint the mask in black: the Pen hides">${ICONS.moon}</button>
         <button type="button" data-mask-ink="done" aria-label="Done painting the mask" title="Done painting the mask">${ICONS.check}</button>
       </div>
-      <div class="tb-group tb-options" data-for="pen brush pencil" role="group" aria-label="Colour">
+      <div class="tb-group tb-options" data-for="pen brush pencil eyedropper" role="group" aria-label="Colour">
         <button type="button" class="swatch swatch-current" data-colour-open aria-haspopup="dialog" aria-expanded="false" aria-label="Pen colour" title="Pen colour: open the colour picker (new text takes it too, until its own colour is set)"><span data-colour-chip></span></button>
       </div>
       <div class="tb-group tb-options" data-for="brush pencil eraser" data-paint-options data-only="paint" role="group" aria-label="Brush"></div>
@@ -338,6 +340,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <span class="size-out" data-eraser-out></span>
         <button type="button" class="snap" data-erase-parts aria-pressed="false" aria-label="Erase parts of strokes" title="On: the eraser cuts out only what it sweeps over of a freehand stroke. Off: it takes whole objects.">${ICONS.scissors}</button>
         <button type="button" class="snap" data-erase-groups aria-pressed="true" aria-label="Erase whole groups" title="On: a swipe takes a group as one object. Off: it takes only the members it touches.">${ICONS.shapes}</button>
+      </div>
+      <div class="tb-group tb-options" data-for="eyedropper" role="group" aria-label="Eyedropper">
+        <select data-sample-size aria-label="Sample size" title="Sample size: the colour of one pixel, or the mean of a square round it">${SAMPLE_SIZES.map((n) => `<option value="${n}">${n === 1 ? "Point" : `${n} × ${n} mean`}</option>`).join("")}</select>
+      </div>
+      <div class="tb-group tb-options" data-for="eyedropper" data-only="paint" role="radiogroup" aria-label="Sample from">
+        <button type="button" role="radio" data-sample-layer="all" title="Sample the page as it looks, every layer">All layers</button>
+        <button type="button" role="radio" data-sample-layer="layer" title="Sample the picked layer alone">Layer</button>
       </div>
       <div class="tb-group tb-options" data-for="lasso" role="radiogroup" aria-label="Lasso selects">
         <button type="button" role="radio" data-filter="strokes" title="Lasso selects strokes only">Strokes</button>
@@ -765,6 +774,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     });
   };
 
+  root.querySelector<HTMLSelectElement>("[data-sample-size]")!.addEventListener("change", (e) => {
+    editor.sampleSize = Number((e.target as HTMLSelectElement).value);
+    editor.changed();
+  });
   root.querySelector<HTMLInputElement>("[data-eraser-size]")!.addEventListener("input", (e) => {
     editor.eraserPx = Number((e.target as HTMLInputElement).value);
     editor.changed();
@@ -870,6 +883,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["lock"] !== undefined) {
       editor.lock = editor.lock ? null : { ...actions.depth(), px: editor.penWidthPx };
+      editor.changed();
+    } else if (d["sampleLayer"]) {
+      editor.sampleLayer = d["sampleLayer"] === "layer";
       editor.changed();
     } else if (d["filter"]) {
       editor.lassoFilter = d["filter"] as "strokes" | "all";
@@ -1057,6 +1073,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const lockR = pq("[data-lock-radius]");
     lockR.setAttribute("aria-pressed", String(editor.lockRadius));
     if (editor.preview.kind === "none") lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
+    root.querySelector<HTMLSelectElement>("[data-sample-size]")!.value = String(editor.sampleSize);
+    for (const b of root.querySelectorAll<HTMLElement>("[data-sample-layer]")) b.setAttribute("aria-checked", String((b.dataset["sampleLayer"] === "layer") === editor.sampleLayer));
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }

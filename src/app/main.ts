@@ -299,6 +299,8 @@ async function start(): Promise<void> {
   editor.eraserPx = settings.get("eraser.diameterPx");
   editor.eraseWholeGroups = settings.get("eraser.wholeGroups");
   editor.eraseParts = settings.get("eraser.parts");
+  editor.sampleSize = settings.get("eyedropper.size");
+  editor.sampleLayer = settings.get("eyedropper.layer");
   editor.subscribe(() => {
     settings.set("pen.color", editor.penColor);
     settings.set("pen.widthPx", editor.penWidthPx);
@@ -328,6 +330,8 @@ async function start(): Promise<void> {
     settings.set("eraser.diameterPx", editor.eraserPx);
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
     settings.set("eraser.parts", editor.eraseParts);
+    settings.set("eyedropper.size", editor.sampleSize);
+    settings.set("eyedropper.layer", editor.sampleLayer);
   });
   // Theme chosen in Settings (ui.theme): "system" leaves the attribute off so the operating system decides.
   const applyThemeAttribute = (): void => {
@@ -1522,7 +1526,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // The bars work on the picked vector layer in the Painting view, on the canvas elsewhere.
     const pv = v === "paint" ? paintView.vector : null;
     docTarget.use(pv?.doc ?? doc);
-    editorTarget.use(pv?.editor ?? editor);
+    const ed = pv?.editor ?? editor;
+    // (the options a tool of both views keeps go with the bars; the Painting view stores its own, paint-view.ts followTool)
+    ed.sampleSize = editorTarget.current.sampleSize;
+    ed.sampleLayer = editorTarget.current.sampleLayer;
+    editorTarget.use(ed);
     viewTarget.use(pv?.view ?? view);
     indexTarget.use(pv?.index ?? index);
     textTarget.use(pv?.text ?? textEditor);

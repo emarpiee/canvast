@@ -13,7 +13,7 @@ import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
 /** The tools of the rail (ADR 0168): the canvas's, and the Brush, which only the Painting view has. */
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet" | "brush" | "pencil";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet" | "brush" | "pencil" | "eyedropper";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -120,6 +120,9 @@ export class EditorState {
   /** The kind of picked item the Properties bar shows when the selection mixes kinds (a chip chooses it; ADR 0128), or `all`: the tools of everything picked. The Actions bar follows it (ADR 0152). */
   subject: string | null = null;
   lassoFilter: LassoFilter = "strokes";
+  /** The Eyedropper: the side of the square it averages (px), and, in the Painting view, whether it reads the picked layer alone. */
+  sampleSize = 1;
+  sampleLayer = false;
   penColor: string = PEN_COLORS[0];
   /** What the Text tool makes (ADR 0126): the look of the next text; a colour left out is the pen colour. */
   textLook: TextLook = {};

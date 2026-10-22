@@ -4,6 +4,7 @@
  * tools, the page, its layers and its pages). Built from the registries (paint/tools.ts TOOLS, paint/model.ts LAYER_KINDS), the shared
  * panel shape, menus, dialogs and colour picker; nothing here is copied from the canvas.
  */
+import { sampleAt } from "../interaction/eyedropper";
 import { ICONS } from "./icons";
 import { esc } from "./format";
 import { panelHtml } from "./panel";
@@ -184,6 +185,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
         theme: deps.theme,
         revealList: (at, things, pick) => openRevealList(canvas, vhost.editor, at, things, pick),
         keysActive: () => !!session && visible,
+        sample: (at, size) => samplePage(at, size),
       });
   /** The rail's tool, as the canvas's tools keep it (one rail for both views, ADR 0168). */
   const tool = (): Tool => vhost.editor.tool;
@@ -197,6 +199,22 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const colour = (): string => vhost.editor.penColor;
 
   const view = (): { w: number; h: number } => ({ w: stage.clientWidth || 1, h: stage.clientHeight || 1 });
+  /** The Eyedropper's colour under a point of the view (CSS px), in page px: the page as it looks (no checkerboard, no overlays) or the
+   * picked layer alone. */
+  const samplePage = (at: { x: number; y: number }, size: number): string | null => {
+    if (!session) return null;
+    const [x, y] = toPage(cam, at.x, at.y);
+    if (vhost.editor.sampleLayer) {
+      const l = session.active();
+      const c = l && session.image(l);
+      return c ? sampleAt(c, x, y, size) : null;
+    }
+    const h = Math.floor(size / 2);
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    composePage(c.getContext("2d")!, scene(session, false), { scale: 1, x: h - Math.floor(x), y: h - Math.floor(y), checker: false });
+    return sampleAt(c, h, h, size);
+  };
   const page = () => session!.page();
   const env = (): ObjectEnv | null => (deps.assets ? { assets: deps.assets, theme: deps.theme() } : null);
   /** The page as the session has it now, for drawing (the view, an export, a rasterized layer). */
@@ -336,6 +354,8 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     brushPanels.sync(visible && !!session);
     if (deps.settings.get("paint.tool") !== tool()) deps.settings.set("paint.tool", tool());
     if (deps.settings.get("paint.colour") !== colour()) deps.settings.set("paint.colour", colour());
+    if (deps.settings.get("eyedropper.size") !== vhost.editor.sampleSize) deps.settings.set("eyedropper.size", vhost.editor.sampleSize);
+    if (deps.settings.get("eyedropper.layer") !== vhost.editor.sampleLayer) deps.settings.set("eyedropper.layer", vhost.editor.sampleLayer);
     drawCursor();
   };
   vhost.editor.subscribe(followTool);
@@ -814,10 +834,10 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     session?.points(new Float32Array(nums));
   };
 
+  /** Alt-click with a painting tool: the Eyedropper's pick. */
   const pickColour = (p: { x: number; y: number }): void => {
-    const dpr = window.devicePixelRatio || 1;
-    const d = canvas.getContext("2d")!.getImageData(Math.round(p.x * dpr), Math.round(p.y * dpr), 1, 1).data;
-    setColour(`#${[d[0], d[1], d[2]].map((v) => v!.toString(16).padStart(2, "0")).join("")}`);
+    const c = samplePage(p, vhost.editor.sampleSize);
+    if (c) setColour(c);
   };
 
   /** Whether the active layer's pixel at page px (x, y) is the paint colour (the Pencil's Auto erase). */

@@ -1,4 +1,5 @@
 import { lookFromChoices } from "../doc/stroke-look";
+import { sampleAt } from "./eyedropper";
 import type { NavDir } from "./item-navigation";
 import { shortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
@@ -244,6 +245,8 @@ export interface ToolHooks {
   active?: () => boolean;
   /** False: the keys are not these tools' now (default: as `active`). */
   keysActive?: () => boolean;
+  /** The Eyedropper's colour at a point of `el` (CSS px), averaged over `size` px; default: the pixels on screen. */
+  sample?: (at: ScreenPoint, size: number) => string | null;
 }
 
 export function attachTools(
@@ -1525,6 +1528,16 @@ export function attachTools(
       // choosing the source of a texture fill: what is under the press is given to it, nothing is picked or started
       const top = pickAll(visible(), s.x, s.y)[0]?.obj;
       editor.sourcePick.take(top ? expandToUnits(doc.ordered(), [top], editor.entered).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o) : []);
+      return;
+    }
+    if (editor.tool === "eyedropper" && e.button === 0 && !spaceDown) {
+      const dpr = window.devicePixelRatio || 1;
+      // shortcut: on screen the square is in device px and includes what is drawn over the canvas (guides, handles); a host that can read its page does
+      const c = hooks.sample ? hooks.sample(s, editor.sampleSize) : sampleAt(el as HTMLCanvasElement, s.x * dpr, s.y * dpr, editor.sampleSize);
+      if (c) {
+        editor.penColor = c;
+        editor.changed();
+      }
       return;
     }
     // A gesture whose pointer is gone (its release was lost) must not block this press, nor undo and redo.

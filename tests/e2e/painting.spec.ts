@@ -231,6 +231,56 @@ test("the Pencil (Shift+B, in the Brush flyout) paints whole pixels only; with A
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the Eyedropper (I, one tool for both views) picks the colour under it: the page or the picked layer alone, one pixel or a mean; Alt-click with a painting tool is the same pick", async ({ app }) => {
+  const p = app.page;
+  const colourNow = async (): Promise<string> => {
+    await p.locator("[data-colour-open]").click();
+    const v = (await p.locator(".colour-pop [data-hex]").inputValue()).toLowerCase();
+    await p.keyboard.press("Escape");
+    return v;
+  };
+  const pick = async (x: number, y: number): Promise<void> => {
+    const s = await at(p, x, y);
+    await p.mouse.click(s.x, s.y);
+  };
+  await newPainting(p);
+  await setColour(p, "#ff0000");
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("80");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await stroke(p, [1000, 500], [1300, 500]);
+  await setColour(p, "#00ff00");
+  await stroke(p, [1000, 800], [1000, 800]); // (a green dab, for Alt-click)
+  await p.keyboard.press("i");
+  await pick(1150, 500);
+  expect(await colourNow(), "the page's colour there").toBe("ff0000");
+  await p.keyboard.press("b");
+  const g = await at(p, 1000, 800);
+  await p.keyboard.down("Alt");
+  await p.mouse.click(g.x, g.y);
+  await p.keyboard.up("Alt");
+  expect(await colourNow(), "Alt-click with the Brush").toBe("00ff00");
+  await p.locator('[data-paint-layers] [data-act="new-layer"]').click();
+  await p.locator('.pop-menu [data-id="paint"]').click();
+  await p.keyboard.press("i");
+  await p.locator('[data-sample-layer="layer"]').click();
+  await pick(1150, 500);
+  expect(await colourNow(), "the new layer is clear there: nothing picked").toBe("00ff00");
+  await p.locator('[data-sample-layer="all"]').click();
+  await p.locator("[data-sample-size]").selectOption("101");
+  await pick(1150, 560); // (just past the stroke's edge: the square takes in some of it)
+  const mean = await colourNow();
+  expect(mean === "ff0000" || mean === "00ff00", `a mean, not one pixel (${mean})`).toBe(false);
+  await p.getByTestId("view-canvas").click(); // one tool: on the canvas it reads the screen
+  await expect(p.locator('.rail-tools [data-tool="eyedropper"]')).toBeVisible();
+  await p.keyboard.press("u");
+  await app.drag({ x: 500, y: 300 }, { x: 700, y: 450 });
+  await p.keyboard.press("i");
+  await p.locator("[data-sample-size]").selectOption("1");
+  await p.mouse.click(600, 375);
+  expect(await colourNow(), "the new shape's fill").toBe("2563eb");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

@@ -42,6 +42,7 @@ export interface VectorHostDeps {
   theme(): SceneTheme;
   fonts?: () => Promise<Array<{ hash: string; name: string; unusable: string }>>;
   revealList: ToolHooks["revealList"];
+  sample: NonNullable<ToolHooks["sample"]>;
 }
 
 const isVector = (l: Layer | null | undefined): l is ObjectLayer => !!l && l.kind === "object";
@@ -142,6 +143,7 @@ export function createVectorHost(deps: VectorHostDeps) {
     history: { undo: () => deps.session()?.undo(), redo: () => deps.session()?.redo() },
     active: deps.active,
     keysActive: deps.keysActive,
+    sample: deps.sample,
   });
 
   return {
