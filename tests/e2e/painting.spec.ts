@@ -591,6 +591,34 @@ test("free transform with the Select tool on pixels: move, a side scales, Ctrl o
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a new brush from the selection: its pixels become the tip of a preset in Saved, which the Brush paints with", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  await setColour(p, "#000000");
+  for (const [k, v] of [["size", "40"], ["hardness", "100"]] as const) {
+    await p.locator(`[data-paint-options] input[data-opt="${k}"]`).fill(v);
+    await p.locator(`[data-paint-options] input[data-opt="${k}"]`).press("Enter");
+  }
+  await stroke(p, [1000, 420], [1000, 580]); // (a bar, 40 wide and 200 tall)
+  await p.locator(".paint-canvas").focus();
+  await p.keyboard.press("m");
+  await stroke(p, [900, 390], [1100, 610]);
+  await p.locator('[data-paint-options] [data-act="selection-menu"]').click();
+  await p.locator('.pop-menu [data-id="brush-from"]').click();
+  await p.getByRole("dialog").locator("input").fill("Bar");
+  await p.getByRole("dialog").locator("input").press("Enter");
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.paint.brushes())).tool?.preset ?? "", { message: "the Brush has the new preset" }).not.toBe("");
+  const b = await p.evaluate(() => window.__canvastDebug.paint.brushes());
+  expect(b.tool!.tool).toBe("brush");
+  expect(b.presets.find((x) => x.id === b.tool!.preset), "kept in Saved, with its tip").toMatchObject({ name: "Bar", group: "Saved", tips: 1 });
+  await p.keyboard.press("Control+d");
+  await stroke(p, [500, 500], [500, 500]);
+  expect((await px(p, id, 500, 500))![3], "the tip's bar paints").toBeGreaterThan(200);
+  expect((await px(p, id, 560, 500))![3], "beside the bar the tip is clear").toBeLessThan(30);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

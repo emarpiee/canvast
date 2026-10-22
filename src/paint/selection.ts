@@ -90,6 +90,22 @@ export function edgeOf(m: HTMLCanvasElement): HTMLCanvasElement {
   return c;
 }
 
+/** The box of what is selected (any amount), or null. */
+export function boxOf(m: HTMLCanvasElement): { x: number; y: number; w: number; h: number } | null {
+  const d = m.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, m.width, m.height).data;
+  let x0 = m.width, y0 = m.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < m.height; y++) {
+    for (let x = 0; x < m.width; x++) {
+      if (!d[(y * m.width + x) * 4 + 3]) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
 /** Whether nothing is selected in a mask. */
 export function isClear(m: HTMLCanvasElement): boolean {
   const d = m.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, m.width, m.height).data;

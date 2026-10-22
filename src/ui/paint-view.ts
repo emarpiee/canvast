@@ -36,7 +36,8 @@ import { pageSpace, patternObjects, pictureObject, placeOnPage, stored, type Obj
 import { clampCamera, fitCamera, toPage, zoomAt, zoomTo, type PaintCamera } from "../paint/camera";
 import { FILL_OPTIONS, GRADIENT_OPTIONS, SELECT_OPTIONS, TOOLS, TOOL_IDS, valuesFor, valuesOf, type OptionSpec, type ToolId, type Values } from "../paint/tools";
 import { isAffine, type Pt, type Quad } from "../paint/warp";
-import { blankMask, combine, feathered, grown, inverted, shapeMask, wandMask, type SelectMode } from "../paint/selection";
+import { hashOf } from "../paint/codec";
+import { blankMask, boxOf, combine, feathered, grown, inverted, shapeMask, wandMask, type SelectMode } from "../paint/selection";
 import { brushOf, cleanBrush, tipsOf, type Brush } from "../paint/brushes";
 import { drawThumb, mountBrushPanels, type BrushPanels } from "./brush-panels";
 import type { DockSpec } from "./panel-dock";
@@ -90,6 +91,8 @@ export interface PaintView {
 }
 
 const ZOOM_STEP = 1.25;
+/** The longest side of a brush tip made from a selection (px); a larger selection is scaled down to it. */
+const MAX_TIP = 1000;
 /** The option sets of the Painting view's tools that are not brushes (paint/tools.ts). */
 const SETS = { select: SELECT_OPTIONS, fill: FILL_OPTIONS, gradient: GRADIENT_OPTIONS } as const;
 type SetId = keyof typeof SETS;
@@ -567,6 +570,48 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     if (!v || !(n >= 1 && n <= 250) || !session) return;
     session.select(how === "feather" ? feathered(m, n) : grown(m, how === "grow" ? n : -n));
   };
+  /** A new brush preset whose tip is the selected pixels of the picked layer (dark and opaque paint most), given to the Brush. */
+  const brushFromSelection = async (): Promise<void> => {
+    const s = session;
+    const sel = s?.selection?.mask;
+    const l = s?.active();
+    const box = sel && boxOf(sel);
+    if (!s || !sel || !l || !box) return;
+    const name = (await promptDialog({ title: "New brush from the selection", lines: ["The selected pixels of the picked layer become a brush tip: dark, opaque paint paints most. The new preset goes in the group Saved."], value: "Brush from selection", confirmLabel: "Make the brush" }))?.trim();
+    if (!name) return;
+    const p = page();
+    const full = blankMask(p.w, p.h);
+    drawLayerAlone(full.getContext("2d", { willReadFrequently: true })!, scene(s, false), l);
+    const px = full.getContext("2d", { willReadFrequently: true })!.getImageData(box.x, box.y, box.w, box.h).data;
+    const sp = sel.getContext("2d", { willReadFrequently: true })!.getImageData(box.x, box.y, box.w, box.h).data;
+    const ink = new ImageData(box.w, box.h);
+    for (let i = 0; i < px.length; i += 4) ink.data[i + 3] = Math.round((1 - (0.2126 * px[i]! + 0.7152 * px[i + 1]! + 0.0722 * px[i + 2]!) / 255) * px[i + 3]! * (sp[i + 3]! / 255));
+    const src = blankMask(box.w, box.h);
+    src.getContext("2d")!.putImageData(ink, 0, 0);
+    /** The tip at most `side` px on its longer side, as u16 samples. */
+    const samples = (side: number): { w: number; h: number; data: Uint16Array } => {
+      const k = Math.min(1, side / Math.max(box.w, box.h));
+      const w = Math.max(1, Math.round(box.w * k)), h = Math.max(1, Math.round(box.h * k));
+      const c = blankMask(w, h);
+      const g = c.getContext("2d", { willReadFrequently: true })!;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(src, 0, 0, w, h);
+      const a = g.getImageData(0, 0, w, h).data;
+      const data = new Uint16Array(w * h);
+      for (let i = 0; i < data.length; i++) data[i] = a[i * 4 + 3]! * 257;
+      return { w, h, data };
+    };
+    const tip = samples(MAX_TIP), pre = samples(32);
+    const bytes = (d: Uint16Array): Uint8Array => new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
+    const key = await hashOf(bytes(tip.data));
+    let b64 = "";
+    for (const c of bytes(pre.data)) b64 += String.fromCharCode(c);
+    const brush = { ...toolBrush("brush"), tip: { stored: { key, width: tip.w, height: tip.h, preview: { width: pre.w, height: pre.h, data: btoa(b64) } } }, size: Math.max(tip.w, tip.h), spacing: 0.25 };
+    const made = await brushPanels.addPreset(name, brush, [{ key, w: tip.w, h: tip.h, data: tip.data }]);
+    if (!made) return;
+    vhost.editor.setTool("brush");
+    setTool("brush", { brush: made.brush, preset: made.id, values: { ...toolValues("brush"), size: Math.min(1000, Math.max(tip.w, tip.h)) } });
+  };
   const selectionMenu = (anchor: HTMLElement): void => {
     const has = !!session?.selection;
     openMoreMenu(anchor, [
@@ -576,6 +621,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       { id: "grow", label: "Grow…", hint: "Move the edge out", icon: ICONS.growSelection, disabled: !has, run: () => void reshape("grow") },
       { id: "shrink", label: "Shrink…", hint: "Move the edge in", icon: ICONS.shrinkSelection, disabled: !has, run: () => void reshape("shrink") },
       { id: "feather", label: "Feather…", hint: "Soften the edge", icon: ICONS.featherSelection, disabled: !has, run: () => void reshape("feather") },
+      { id: "brush-from", label: "New brush from the selection…", hint: "Its pixels on the picked layer become a brush tip", icon: ICONS.sticker, disabled: !has, run: () => void brushFromSelection() },
     ], "Selection");
   };
 

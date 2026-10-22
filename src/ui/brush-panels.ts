@@ -54,6 +54,8 @@ export interface BrushPanels {
   presets(): Promise<readonly BrushPreset[]>;
   /** The name of the preset the tool's brush came from, or "". */
   presetName(t: ToolId): string;
+  /** Keep a new preset in the group Saved, with the bitmaps it names (a tip made from a selection); null when it could not be stored. */
+  addPreset(name: string, brush: Brush, tips: readonly TipBitmap[]): Promise<BrushPreset | null>;
 }
 
 /** A canvast brush file: presets and the bitmaps they name (u16 samples, deflated, base64). */
@@ -481,6 +483,14 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
   return {
     toggle,
     isOpen: (which) => open[which],
+    addPreset: async (name, brush, tips) => {
+      await load();
+      if (list.length >= MAX_BRUSHES) return null;
+      const p: BrushPreset = { id: newObjectId(), name: name.slice(0, MAX_BRUSH_NAME), group: "Saved", folder: [], brush, captures: { size: true, toolSettings: false } };
+      if (!(await save([...list, p], tips))) return null;
+      (await deps.engine())?.putTips(tips);
+      return p;
+    },
     sync: (v) => {
       const t = deps.tool();
       if (v === visible && t === lastTool) return;

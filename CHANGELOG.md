@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.2 — A brush from the selection (2026-10-22)
+
+- **New brush from the selection** (the Selection menu): the selected pixels become a sampled tip, kept as a preset in Saved with its bitmap, and given to the Brush.
+
 ## 0.34.1 — Free transform of pixels (2026-10-22)
 
 - **Free transform** in the Paint view: the Select tool on a paint layer (or a mask) lifts its pixels, or the selected ones, into a box to move (by whole pixels), scale, turn, and with Ctrl on a corner distort in perspective; Enter applies, Escape puts back; the selection goes with them.
