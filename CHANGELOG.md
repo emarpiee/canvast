@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.35.1 — Brushes panel and backups (2026-10-22)
+
+- A right-click (or a long press) on a brush preset opens its actions, in the Thumbnails view too.
+- Layer masks are checked to travel in workspace backups.
+
 ## 0.35.0 — Reference pictures, crop to the selection: P3 done (2026-10-22)
 
 - **Reference pictures** in the Paint view: library pictures floating over the view to paint from (not part of the page), moved, sized, faded, kept per painting.

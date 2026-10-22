@@ -486,7 +486,7 @@ test("Settings > Storage holds the backup: the last backup, a full export, the c
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("paintings and brush presets travel in a workspace backup: every tile and tip checked, imported with new ids, painted as they were (ADR 0165, 0169)", async ({ app, browser }) => {
+test("paintings (with layer masks) and brush presets travel in a workspace backup: every tile and tip checked, imported with new ids, painted as they were (ADR 0165, 0169)", async ({ app, browser }) => {
   const p = app.page;
   await p.getByTestId("view-paint").click();
   await p.getByTestId("paint-new").click();
@@ -500,6 +500,16 @@ test("paintings and brush presets travel in a workspace backup: every tile and t
   await p.mouse.up();
   await p.evaluate(() => window.__canvastDebug.paint.settled());
   const tiles = s.layers[0]!.id;
+  // a layer mask, painted (the dark paint colour hides): its tiles go in the backup too
+  await p.locator(`[data-layer-more="${tiles}"]`).click();
+  await p.locator('.pop-menu [data-id="mask-add"]').click();
+  const c = await p.evaluate(() => window.__canvastDebug.paint.screenOf(700, 400)!);
+  await p.mouse.move(c.x, c.y - 20);
+  await p.mouse.down();
+  await p.mouse.move(c.x, c.y + 20, { steps: 6 });
+  await p.mouse.up();
+  await p.evaluate(() => window.__canvastDebug.paint.settled());
+  expect((await p.evaluate(() => window.__canvastDebug.paint.state()))!.layers[0]!.mask ?? 0, "the mask has tiles").toBeGreaterThan(0);
   const presets = (await p.evaluate(() => window.__canvastDebug.paint.brushes())).presets; // (the built-in ones, stored the first time)
   await p.getByTestId("view-canvas").click();
   await openPanel(p);
@@ -524,6 +534,7 @@ test("paintings and brush presets travel in a workspace backup: every tile and t
   const layer = (await q.evaluate(() => window.__canvastDebug.paint.state()))!.layers[0]!;
   expect(layer.id).not.toBe(tiles);
   await expect.poll(async () => (await q.evaluate((l) => window.__canvastDebug.paint.layerPixel(l, 750, 400), layer.id))?.[3] ?? -1).toBe(255);
+  expect(layer.mask ?? 0, "the mask came with it").toBeGreaterThan(0);
   await other.context.close();
   expect(app.consoleErrors).toEqual([]);
 });

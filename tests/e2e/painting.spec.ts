@@ -814,7 +814,7 @@ function makePat(pats: ReadonlyArray<{ name: string; w: number; h: number; grey:
   return Buffer.concat(parts);
 }
 
-test("patterns (.pat): each becomes a preset with it as its texture, in a group named after the file, and paints", async ({ app }) => {
+test("patterns (.pat): each becomes a preset with it as its texture, in a group named after the file, and paints; a right-click on a thumbnail opens its actions", async ({ app }) => {
   const p = app.page;
   const { layers } = await newPainting(p);
   const brushes = () => p.evaluate(() => window.__canvastDebug.paint.brushes());
@@ -830,6 +830,11 @@ test("patterns (.pat): each becomes a preset with it as its texture, in a group 
   await expect.poll(async () => (await brushes()).tool?.preset ?? "").not.toBe("");
   await stroke(p, [1000, 500], [1300, 500]);
   expect((await px(p, layers[0]!.id, 1150, 500))![3], "it paints").toBeGreaterThan(0);
+  // the Thumbnails view has no ⋯ buttons: a right-click on a preset opens its actions
+  await panel.locator('[data-brush-view="grid"]').click();
+  await panel.locator('.brush-cell[aria-label="Water"]').click({ button: "right" });
+  await p.locator('.pop-menu [data-id="delete"]').click();
+  await expect.poll(async () => (await brushes()).presets.filter((x) => x.group === "Patterns").map((x) => x.name)).toEqual(["Stripes"]);
   expect(app.consoleErrors).toEqual([]);
 });
 

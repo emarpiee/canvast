@@ -36,6 +36,12 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, most of P2, vector layers, one chrome for both views and brush presets done (v0.32.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); the canvas's bars, rail and keymap shared by both views ([ADR 0168](adr/0168-one-chrome.md)); brush presets, `.abr` and canvast brush files, Brush settings ([ADR 0169](adr/0169-brush-presets.md)); the Pencil, the Eyedropper, view rotate and mirror, layer masks (v0.33.2): **P2 done**; **P3 done (v0.35.0)**: selections, fill bucket, gradient, canvas and image size, free and perspective transform, brush from a selection, symmetry, `.pat` patterns, reference pictures, crop; the full suite runs once for P2 and P3 |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## P2 loose ends (v0.35.1, 2026-10-22)
+
+**Implemented:** the Brushes panel's preset menu on a right-click in both views (`presetMenu`); the backup test now carries a painted layer mask. Still open: backups carry every preset's tips (the built-in ones too); undoing a delete brings a shape back unpicked (a question for the owner).
+**Tested:** painting + archive 51 passed, 1 skipped (Chromium + Firefox).
+**Next bounded task:** the full suite, once for P2 and P3.
+
 ## Painting view, P3 done: reference pictures, crop (v0.35.0, 2026-10-22)
 
 **Implemented:** `ui/paint-references.ts` (library pictures over the stage, drag to move, corner to size, ⋯ opacity / remove; setting `paint.refs` per painting, checked); the painting's menu *Add a reference picture…* (the library chooser, shared with texture fills through `main.ts` `libraryPictures`); the Selection menu's *Crop to the selection* (`resizePage` takes an offset as well as an anchor).

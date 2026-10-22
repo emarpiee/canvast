@@ -78,6 +78,15 @@ const fromEngine = (raw: object, hashes: readonly string[]): unknown => {
 };
 
 export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
+  /** A preset's actions: its row's ⋯ button, or a right-click (a long press) on it in either view (the Thumbnails view has no ⋯ buttons). */
+  const presetMenu = (anchor: HTMLElement, p: BrushPreset): void =>
+    openMoreMenu(anchor, [
+      { id: "rename", label: "Rename", icon: ICONS.textCursorInput, run: () => void promptDialog({ title: "Rename the brush", lines: [], value: p.name, confirmLabel: "Rename" }).then((n) => {
+        const name = n?.trim().slice(0, MAX_BRUSH_NAME);
+        if (name) void save(list.map((x) => (x.id === p.id ? { ...x, name } : x)));
+      }) },
+      { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, run: () => void save(list.filter((x) => x.id !== p.id)) },
+    ], `Brush ${p.name}`);
   const open = { brushes: false, settings: false };
   let visible = false;
   let list: BrushPreset[] = [];
@@ -130,6 +139,13 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
   brushesEl.dataset["testid"] = "brushes-panel";
   brushesEl.dataset["only"] = "paint";
   brushesEl.hidden = true;
+  brushesEl.addEventListener("contextmenu", (e) => {
+    const cell = (e.target as HTMLElement).closest<HTMLElement>("[data-brush]");
+    const p = cell && list.find((x) => x.id === cell.dataset["brush"]);
+    if (!cell || !p) return;
+    e.preventDefault();
+    presetMenu(cell, p);
+  });
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = ".abr,.pat,.json,application/json";
@@ -303,15 +319,8 @@ export function mountBrushPanels(deps: BrushPanelDeps): BrushPanels {
     }
     const more = el.closest<HTMLElement>("[data-brush-more]");
     if (more) {
-      const p = list.find((x) => x.id === more.dataset["brushMore"]);
-      if (!p) return;
-      return openMoreMenu(more, [
-        { id: "rename", label: "Rename", icon: ICONS.textCursorInput, run: () => void promptDialog({ title: "Rename the brush", lines: [], value: p.name, confirmLabel: "Rename" }).then((n) => {
-          const name = n?.trim().slice(0, MAX_BRUSH_NAME);
-          if (name) void save(list.map((x) => (x.id === p.id ? { ...x, name } : x)));
-        }) },
-        { id: "delete", label: "Delete", icon: ICONS.trash, danger: true, run: () => void save(list.filter((x) => x.id !== p.id)) },
-      ], `Brush ${p.name}`);
+      const mp = list.find((x) => x.id === more.dataset["brushMore"]);
+      return void (mp && presetMenu(more, mp));
     }
     const vb = el.closest<HTMLElement>("[data-brush-view]");
     if (vb) {
