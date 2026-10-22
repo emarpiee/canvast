@@ -91,6 +91,8 @@ export interface PaintView {
 }
 
 const ZOOM_STEP = 1.25;
+/** Painting symmetry about the page's middle: the setting's choices, and the engine's mode for each. */
+const SYMMETRY = [["off", "Off", 0], ["vertical", "Left and right", 1], ["horizontal", "Top and bottom", 2], ["dual", "Four ways", 3], ["diagonal", "Diagonal", 4]] as const;
 /** The longest side of a brush tip made from a selection (px); a larger selection is scaled down to it. */
 const MAX_TIP = 1000;
 /** The option sets of the Painting view's tools that are not brushes (paint/tools.ts). */
@@ -326,6 +328,29 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     vhost?.syncCamera();
     const pending = composePage(g, scene(s), { scale: cam.scale * dpr, x: cam.x * dpr, y: cam.y * dpr, checker: true }, { light: css.getPropertyValue("--check-a").trim() || "#ffffff", dark: css.getPropertyValue("--check-b").trim() || "#d9d9d9" });
     if (pending) window.setTimeout(redraw, 120); // (a picture of a layer is still being decoded)
+    const sy = deps.settings.get("paint.symmetry");
+    if (sy !== "off" && paintTool()) {
+      // (the symmetry's axes through the page's middle, dashed, while a painting tool is in use)
+      const p = page(), k = cam.scale * dpr, cx = (cam.x + (p.w / 2) * cam.scale) * dpr, cy = (cam.y + (p.h / 2) * cam.scale) * dpr;
+      const ends: Array<[number, number, number, number]> = [];
+      if (sy === "vertical" || sy === "dual") ends.push([cx, cam.y * dpr, cx, cam.y * dpr + p.h * k]);
+      if (sy === "horizontal" || sy === "dual") ends.push([cam.x * dpr, cy, cam.x * dpr + p.w * k, cy]);
+      if (sy === "diagonal") ends.push([cx - (p.h / 2) * k, cy - (p.h / 2) * k, cx + (p.h / 2) * k, cy + (p.h / 2) * k]);
+      g.save();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.lineWidth = dpr;
+      for (const [c, dash] of [[css.getPropertyValue("--black").trim() || "#000", []], [css.getPropertyValue("--white").trim() || "#fff", [6 * dpr, 6 * dpr]]] as const) {
+        g.strokeStyle = c;
+        g.setLineDash(dash);
+        for (const [x0, y0, x1, y1] of ends) {
+          g.beginPath();
+          g.moveTo(x0, y0);
+          g.lineTo(x1, y1);
+          g.stroke();
+        }
+      }
+      g.restore();
+    }
     if (s.selection && !s.float) {
       // (the selection's outline, at its pixels, in the difference of what is under it: it shows on light and dark)
       g.save();
@@ -456,12 +481,16 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     const vals = toolValues(t);
     const panelBtn = (id: "brushes" | "settings", icon: string, label: string, title: string): string => `<button type="button" data-brush-panel="${id}" aria-pressed="${brushPanels.isOpen(id)}" aria-label="${esc(label)}" title="${esc(title)}">${icon}</button>`;
     // (the Brushes button shows the tool's tip, as the presets do)
-    optionsEl.innerHTML = panelBtn("brushes", `<canvas class="paint-tip" width="56" height="56" aria-hidden="true"></canvas>`, preset ? `Brushes: ${preset}` : "Brushes", `Brushes: the presets${preset ? ` (now ${preset})` : ""}`) + TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("") + panelBtn("settings", ICONS.brushSettings, "Brush settings", "Brush settings: the tip, its dynamics, scattering, texture and more");
+    optionsEl.innerHTML = panelBtn("brushes", `<canvas class="paint-tip" width="56" height="56" aria-hidden="true"></canvas>`, preset ? `Brushes: ${preset}` : "Brushes", `Brushes: the presets${preset ? ` (now ${preset})` : ""}`) + TOOLS[t].options.map((o) => optionHtml(o, vals[o.key] as number | boolean)).join("") + `<label class="tb-count" title="Paint mirrored about the page's middle: each stroke is painted again across the axes">Symmetry <select data-sym aria-label="Symmetry">${SYMMETRY.map(([k, l]) => `<option value="${k}"${k === deps.settings.get("paint.symmetry") ? " selected" : ""}>${l}</option>`).join("")}</select></label>` + panelBtn("settings", ICONS.brushSettings, "Brush settings", "Brush settings: the tip, its dynamics, scattering, texture and more");
     const tipEl = optionsEl.querySelector<HTMLCanvasElement>(".paint-tip")!;
     drawThumb(tipEl, brushOf(t, vals, toolBrush(t), "#000000"), getComputedStyle(tipEl.parentElement!).color);
     for (const b of optionsEl.querySelectorAll<HTMLElement>("[data-brush-panel]")) b.addEventListener("click", () => {
       brushPanels.toggle(b.dataset["brushPanel"] as "brushes" | "settings");
       b.setAttribute("aria-pressed", String(brushPanels.isOpen(b.dataset["brushPanel"] as "brushes" | "settings")));
+    });
+    optionsEl.querySelector<HTMLSelectElement>("[data-sym]")!.addEventListener("change", (e) => {
+      deps.settings.set("paint.symmetry", (e.target as HTMLSelectElement).value as "off");
+      redraw();
     });
     for (const f of optionsEl.querySelectorAll<HTMLInputElement>('input[type="number"]')) liveNumber(f, (v) => setToolValue(t, f.dataset["opt"]!, v));
     for (const b of optionsEl.querySelectorAll<HTMLElement>("button[data-opt]")) b.addEventListener("click", () => {
@@ -1339,7 +1368,9 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     stroke = st;
     if (e.shiftKey && lastEnd) st.queue.push(lastEnd[0], lastEnd[1], first[2]!, 0, 0, 0, first[6]! - 1);
     st.queue.push(...first);
-    void ensureTips(brush).then(() => s.begin({ brush, erase: st.erase })).then((ok) => {
+    const sm = SYMMETRY.find(([k]) => k === deps.settings.get("paint.symmetry"))?.[2] ?? 0;
+    const sym = sm ? { mode: sm, cx: page().w / 2, cy: page().h / 2, rotation: 0 } : undefined;
+    void ensureTips(brush).then(() => s.begin({ brush, erase: st.erase, ...(sym ? { sym } : {}) })).then((ok) => {
       if (stroke !== st) return; // (cancelled meanwhile)
       if (!ok) {
         stroke = null;

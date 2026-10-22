@@ -5,7 +5,7 @@
  * engine's worker; the layer is shown with its live stroke while it is painted, and the stroke is one step when it ends.
  */
 import type { BrushEngine } from "./engine";
-import type { EndedTile, LoadTile } from "./engine-protocol";
+import type { EndedTile, LoadTile, Symmetry } from "./engine-protocol";
 import { History, type Op, type Step } from "./history";
 import { LAYER_KINDS, TILE, hashesOf, tilesOf, type Layer, type LayerFields, type LayerMask, type Page, type Painting, type RasterLayer, newId, nextName, newPage, stackOf, tileOf } from "./model";
 import { rasterize } from "./rasterize";
@@ -32,6 +32,8 @@ export interface LayerPatch {
 export interface StrokeStart {
   readonly brush: object;
   readonly erase: boolean;
+  /** Painting symmetry for this stroke (the engine paints its mirrors with it, as one stroke). */
+  readonly sym?: Symmetry;
 }
 
 /** The engine's name for a layer's mask (its pixels go by the layer's id). */
@@ -553,7 +555,7 @@ export class PaintSession {
     overlay.height = page.h;
     this.strokeBefore = { layer: l, mask };
     this.live = { layerId: l.id, overlay, op: s.erase ? "destination-out" : lock ? "source-atop" : "source-over", ...(mask ? { mask: true as const } : {}) };
-    this.engine!.begin(s.brush, lock, page);
+    this.engine!.begin(s.brush, lock, page, s.sym);
     return true;
   }
 

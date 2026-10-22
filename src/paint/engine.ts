@@ -3,7 +3,7 @@
  * and turns the message protocol (engine-protocol.ts) into calls. One stroke at a time; `end` resolves with the changed tiles.
  */
 import wasm from "../../engine/out/brush.wasm";
-import type { EndedTile, FromWorker, LoadTile, TipBitmap, ToWorker } from "./engine-protocol";
+import type { EndedTile, FromWorker, LoadTile, Symmetry, TipBitmap, ToWorker } from "./engine-protocol";
 
 /** The worker's code, bundled on its own by scripts/build.mjs. */
 declare const __PAINT_WORKER__: string;
@@ -80,8 +80,8 @@ export class BrushEngine {
     this.send({ t: "adopt", id });
   }
 
-  begin(brush: object, lock: boolean, page: { w: number; h: number }): void {
-    this.send({ t: "begin", brush, lock, w: page.w, h: page.h });
+  begin(brush: object, lock: boolean, page: { w: number; h: number }, sym?: Symmetry): void {
+    this.send({ t: "begin", brush, lock, w: page.w, h: page.h, ...(sym ? { sym } : {}) });
   }
 
   points(pts: Float32Array): void {

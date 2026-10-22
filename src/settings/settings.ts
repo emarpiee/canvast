@@ -103,6 +103,7 @@ export const SETTINGS = {
   "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "pencil", "eyedropper", "marquee", "marqueeEllipse", "lassoPoly", "wand", "fill", "gradient", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
   "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
   "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
+  "paint.symmetry": { scope: "device", default: "off", validate: oneOf("off", "vertical", "horizontal", "dual", "diagonal"), effect: "immediate" } as Def<"off" | "vertical" | "horizontal" | "dual" | "diagonal">,
   "paint.brushView": { scope: "device", default: "list", validate: oneOf("list", "grid"), effect: "immediate" } as Def<"list" | "grid">,
   "eraser.wholeGroups": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "media.volume": { scope: "device", default: 100, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

@@ -36,6 +36,13 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md), [ADR 0165](adr/0165-painting-view.md)): a separate view for raster painting (pages in px, a bounded camera, raster layers with clip to the layer below and alpha lock, the brush engine as WebAssembly, brush presets per workspace, `.abr` in and out) | **P0, P1, most of P2, vector layers, one chrome for both views and brush presets done (v0.32.0)**: the view, paintings and pages, raster layers in tiles, Brush and Eraser on the engine in a worker, clip and alpha lock, undo, PNG export, place on the canvas, archives; shape, text, picture, pattern, fill and adjustment layers ([ADR 0166](adr/0166-painting-layer-kinds.md)); vector layers with the canvas's own tools ([ADR 0167](adr/0167-vector-layers.md)); the canvas's bars, rail and keymap shared by both views ([ADR 0168](adr/0168-one-chrome.md)); brush presets, `.abr` and canvast brush files, Brush settings ([ADR 0169](adr/0169-brush-presets.md)); the Pencil, the Eyedropper, view rotate and mirror, layer masks (v0.33.2): **P2 done**; quick and full suites at the phase end, on the owner's signal |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Painting view, P3 slice 4: symmetry (v0.34.3, 2026-10-22)
+
+**Implemented:** engine glue (`engine/src/lib.rs`): `stroke_symmetry(mode, cx, cy, rotation)` gives the stroke a renderer per mirror; points are reflected into them (`PresetSymmetry::reflected_passes`); `stroke_live` takes the most coverage of the passes; `stroke_end` puts them on with `composite_union_many` (one opacity ceiling). Protocol `begin.sym`, `BrushEngine.begin(…, sym)`, `StrokeStart.sym`. Setting `paint.symmetry` (off, vertical, horizontal, dual, diagonal) about the page's middle, the Symmetry choice in the painting tools' options, the axes drawn over the page.
+**Tested:** new `painting.spec.ts` symmetry test; painting 31 passed, 1 skipped (Chromium + Firefox); unit 565/565.
+**Unverified:** the axis at another point or angle (the engine takes them; the UI keeps the middle, 0°).
+**Next bounded task:** `.pat` patterns, reference images, crop.
+
 ## Painting view, P3 slice 3: brush from a selection (v0.34.2, 2026-10-22)
 
 **Implemented:** the Selection menu's *New brush from the selection*: the picked layer's pixels in the selection's box, darkness × alpha × selection as u16 samples (at most 1000 px), named by their SHA-256, a 32 px preview (base64 little-endian u16) in the brush's `tip.stored`; `BrushPanels.addPreset` stores it in Saved with its bitmap and hands it to the engine; the Brush gets the preset. `selection.ts` `boxOf`.

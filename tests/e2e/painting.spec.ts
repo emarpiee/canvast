@@ -619,6 +619,29 @@ test("a new brush from the selection: its pixels become the tip of a preset in S
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("symmetry: a stroke is painted again across the page's middle (left and right, four ways, diagonal), as one stroke", async ({ app }) => {
+  const p = app.page;
+  const { layers } = await newPainting(p);
+  const id = layers[0]!.id;
+  const a = async (x: number, y: number): Promise<number> => (await px(p, id, x, y))![3]!;
+  await p.locator('[data-paint-options] input[data-opt="size"]').fill("40");
+  await p.locator('[data-paint-options] input[data-opt="size"]').press("Enter");
+  await p.locator("[data-paint-options] [data-sym]").selectOption("vertical");
+  await stroke(p, [500, 300], [500, 300]);
+  expect(await a(1420, 300), "left and right: the mirror across x = 960").toBe(255);
+  expect(await a(500, 780), "not top and bottom").toBe(0);
+  await p.locator("[data-paint-options] [data-sym]").selectOption("dual");
+  await stroke(p, [1100, 200], [1100, 200]);
+  for (const [x, y] of [[820, 200], [1100, 880], [820, 880]] as const) expect(await a(x, y), `four ways: ${x}, ${y}`).toBe(255);
+  await p.locator("[data-paint-options] [data-sym]").selectOption("diagonal");
+  await stroke(p, [600, 700], [600, 700]); // (across the line through the middle from top left to bottom right: dx -360, dy 160 -> 1120, 180)
+  expect(await a(1120, 180), "diagonal").toBe(255);
+  await p.locator("[data-paint-options] [data-sym]").selectOption("off");
+  await stroke(p, [300, 900], [300, 900]);
+  expect(await a(1620, 900), "off: one stroke").toBe(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("brush presets (ADR 0169): the built-in ones, a pick paints with its tip, Brush settings change the tool's brush, Save, export and import (.json and .abr), kept over a reload", async ({ app }) => {
   const p = app.page;
   const s = await newPainting(p);

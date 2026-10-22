@@ -15,7 +15,7 @@ mod abr_map;
 
 use color::PixelFormat;
 use geom::{Rect, TILE_SIZE, TileCoord};
-use paint::{BrushPreset, BrushSettings, GrayTile, Pattern, StoredTile, StrokePoint, TipShape, render::{COV_TILE, StrokeRenderer}};
+use paint::{BrushPreset, BrushSettings, GrayTile, Pattern, StoredTile, StrokePoint, TipShape, render::{COV_TILE, StrokeRenderer}, symmetry::{PresetSymmetry, SymmetryMode}};
 use raster::Surface;
 
 struct Stroke {
@@ -23,6 +23,29 @@ struct Stroke {
     pre: Surface,
     renderer: StrokeRenderer,
     lock: bool,
+    /// Painting symmetry: its axes, and a pass of the stroke for each mirror (put on the layer with the stroke as one).
+    sym: Option<PresetSymmetry>,
+    mirrors: Vec<StrokeRenderer>,
+}
+
+impl Stroke {
+    fn push(&mut self, points: &[StrokePoint]) {
+        self.renderer.push(points);
+        if let Some(sym) = self.sym {
+            for (r, pass) in self.mirrors.iter_mut().zip(sym.reflected_passes(points)) {
+                r.push(&pass);
+            }
+        }
+    }
+    fn finish(&mut self) {
+        self.renderer.finish();
+        for r in &mut self.mirrors {
+            r.finish();
+        }
+    }
+    fn composite(&mut self, target: &mut Surface, all: bool) -> Rect {
+        if self.mirrors.is_empty() { self.renderer.composite(&self.pre, target, None, self.lock, all) } else { self.renderer.composite_union_many(self.mirrors.iter(), &self.pre, target, None, self.lock) }
+    }
 }
 
 #[derive(Default)]
@@ -83,7 +106,28 @@ pub unsafe extern "C" fn stroke_begin(layer: i32, json: *const u8, len: usize, l
         load_tips(&mut brush, &s.tips);
         let Some(surface) = s.layers.get(layer as usize) else { return -1 };
         let renderer = StrokeRenderer::new(&brush, Some(surface.format()), 1.0);
-        s.stroke = Some(Stroke { layer: layer as usize, pre: surface.clone(), renderer, lock: lock_alpha != 0 });
+        s.stroke = Some(Stroke { layer: layer as usize, pre: surface.clone(), renderer, lock: lock_alpha != 0, sym: None, mirrors: Vec::new() });
+        0
+    })
+}
+
+/// Paint the stroke begun with symmetry: `mode` 1 vertical, 2 horizontal, 3 both (dual), 4 diagonal, about (cx, cy) turned by
+/// `rotation` degrees (0: none). 0, or -1 without a stroke, -2 for an unknown mode or axis.
+#[unsafe(no_mangle)]
+pub extern "C" fn stroke_symmetry(mode: i32, cx: f64, cy: f64, rotation: f64) -> i32 {
+    let mode = match mode {
+        1 => SymmetryMode::Vertical,
+        2 => SymmetryMode::Horizontal,
+        3 => SymmetryMode::Dual,
+        4 => SymmetryMode::Diagonal,
+        _ => return -2,
+    };
+    let Some(sym) = PresetSymmetry::new(mode, [cx, cy], rotation) else { return -2 };
+    STATE.with_borrow_mut(|s| {
+        let Some(st) = s.stroke.as_mut() else { return -1 };
+        let fmt = st.pre.format();
+        st.mirrors = (0..sym.mirror_count()).map(|_| StrokeRenderer::new(&st.renderer.ctx.brush, Some(fmt), 1.0)).collect();
+        st.sym = Some(sym);
         0
     })
 }
@@ -96,10 +140,10 @@ fn point(p: &[f32]) -> StrokePoint {
 fn composite(s: &mut State, finish: bool) -> i32 {
     let Some(st) = s.stroke.as_mut() else { return -1 };
     if finish {
-        st.renderer.finish();
+        st.finish();
     }
     let Some(target) = s.layers.get_mut(st.layer) else { return -1 };
-    let r: Rect = st.renderer.composite(&st.pre, target, None, st.lock, false);
+    let r: Rect = st.composite(target, false);
     s.dirty = [r.x0, r.y0, r.x1, r.y1];
     i32::from(!r.is_empty())
 }
@@ -115,7 +159,7 @@ pub unsafe extern "C" fn stroke_push(pts: *const f32, n: usize) -> i32 {
     let points: Vec<StrokePoint> = f.chunks_exact(7).map(point).collect();
     STATE.with_borrow_mut(|s| {
         let Some(st) = s.stroke.as_mut() else { return -1 };
-        st.renderer.push(&points);
+        st.push(&points);
         composite(s, false)
     })
 }
@@ -131,7 +175,7 @@ pub unsafe extern "C" fn stroke_feed(pts: *const f32, n: usize) -> i32 {
     let points: Vec<StrokePoint> = f.chunks_exact(7).map(point).collect();
     STATE.with_borrow_mut(|s| match s.stroke.as_mut() {
         Some(st) => {
-            st.renderer.push(&points);
+            st.push(&points);
             0
         }
         None => -1,
@@ -144,9 +188,9 @@ pub unsafe extern "C" fn stroke_feed(pts: *const f32, n: usize) -> i32 {
 pub extern "C" fn stroke_end() -> i32 {
     STATE.with_borrow_mut(|s| {
         let Some(mut st) = s.stroke.take() else { return -1 };
-        st.renderer.finish();
+        st.finish();
         let Some(target) = s.layers.get_mut(st.layer) else { return -1 };
-        let r = st.renderer.composite(&st.pre, target, None, st.lock, true);
+        let r = st.composite(target, true);
         s.dirty = [r.x0, r.y0, r.x1, r.y1];
         i32::from(!r.is_empty())
     })
@@ -173,7 +217,13 @@ pub extern "C" fn stroke_live() -> i32 {
     STATE.with_borrow_mut(|s| {
         let State { stroke, live, live_keys, cov, .. } = s;
         let Some(st) = stroke.as_mut() else { return -1 };
-        let keys = st.renderer.take_dirty_tiles();
+        let mut keys = st.renderer.take_dirty_tiles();
+        for r in &mut st.mirrors {
+            keys.extend(r.take_dirty_tiles());
+        }
+        keys.sort_unstable();
+        keys.dedup();
+        let mut more = vec![0.0f32; (COV_TILE * COV_TILE) as usize];
         let n = (COV_TILE * COV_TILE) as usize;
         live.resize(keys.len() * n * 4, 0);
         live_keys.clear();
@@ -184,6 +234,13 @@ pub extern "C" fn stroke_live() -> i32 {
         for (i, &(tx, ty)) in keys.iter().enumerate() {
             live_keys.extend([tx, ty]);
             st.renderer.coverage_tile(tx, ty, cov);
+            // (with symmetry the passes are one stroke: the most any of them covers)
+            for r in &st.mirrors {
+                r.coverage_tile(tx, ty, &mut more);
+                for (c, m) in cov.iter_mut().zip(&more) {
+                    *c = c.max(*m);
+                }
+            }
             for (o, &c) in live[i * n * 4..(i + 1) * n * 4].chunks_exact_mut(4).zip(cov.iter()) {
                 o[..3].copy_from_slice(&rgb);
                 o[3] = (c.min(1.0) * k + 0.5) as u8;

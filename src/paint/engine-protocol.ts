@@ -12,6 +12,14 @@ export interface LoadTile {
 }
 
 /** A bitmap a brush names (a sampled tip or a texture): its key (the SHA-256 of `data`'s bytes), size and u16 samples, row by row. */
+/** Painting symmetry (the engine's modes, 1 vertical axis, 2 horizontal, 3 both, 4 diagonal) about a point of the page, turned by degrees. */
+export interface Symmetry {
+  readonly mode: 1 | 2 | 3 | 4;
+  readonly cx: number;
+  readonly cy: number;
+  readonly rotation: number;
+}
+
 export interface TipBitmap {
   readonly key: string;
   readonly w: number;
@@ -25,7 +33,7 @@ export type ToWorker =
   | { readonly t: "load"; readonly id: string; readonly tiles: readonly LoadTile[] }
   /** The engine's layer, as the last stroke left it, is now the version `id` (nothing to load). */
   | { readonly t: "adopt"; readonly id: string }
-  | { readonly t: "begin"; readonly brush: object; readonly lock: boolean; readonly w: number; readonly h: number }
+  | { readonly t: "begin"; readonly brush: object; readonly lock: boolean; readonly w: number; readonly h: number; readonly sym?: Symmetry }
   /** Samples, 7 floats each: x, y (page px), pressure (0..1), tilt x, tilt y (degrees), rotation (degrees), time (ms). */
   | { readonly t: "points"; readonly pts: Float32Array }
   | { readonly t: "end" }

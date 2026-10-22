@@ -3,7 +3,7 @@
  * engine and the one layer being painted, and answers in the order it is asked (each message waits for the one before).
  */
 import { TILE_BYTES, deflate, hashOf, inflate, isEmpty } from "./codec";
-import type { EndedTile, FromWorker, LoadTile, TipBitmap, ToWorker } from "./engine-protocol";
+import type { EndedTile, FromWorker, LoadTile, Symmetry, TipBitmap, ToWorker } from "./engine-protocol";
 import { TILE, tileKey, tileOf } from "./tiles";
 
 interface Engine {
@@ -16,6 +16,7 @@ interface Engine {
   tile_get(layer: number, tx: number, ty: number, out: number): number;
   stroke_begin(layer: number, json: number, len: number, lock: number): number;
   stroke_feed(pts: number, n: number): number;
+  stroke_symmetry(mode: number, cx: number, cy: number, rotation: number): number;
   stroke_live(): number;
   live_tile_size(): number;
   live_ptr(): number;
@@ -67,7 +68,7 @@ async function load(id: string, tiles: readonly LoadTile[]): Promise<void> {
   loaded = id;
 }
 
-function begin(brush: object, lock: boolean, w: number, h: number): void {
+function begin(brush: object, lock: boolean, w: number, h: number, sym?: Symmetry): void {
   page = { w, h };
   const j = new TextEncoder().encode(JSON.stringify(brush));
   const p = e.alloc(j.length);
@@ -75,6 +76,7 @@ function begin(brush: object, lock: boolean, w: number, h: number): void {
   const r = e.stroke_begin(layer, p, j.length, lock ? 1 : 0);
   e.dealloc(p, j.length);
   if (r !== 0) throw new Error(`the brush could not be read (${r})`);
+  if (sym && e.stroke_symmetry(sym.mode, sym.cx, sym.cy, sym.rotation) !== 0) throw new Error("the symmetry could not be set");
   loaded = ""; // (the layer changes: it is the stroke's now, whatever id the page gives it next)
 }
 
@@ -183,7 +185,7 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
           loaded = m.id;
           break;
         case "begin":
-          begin(m.brush, m.lock, m.w, m.h);
+          begin(m.brush, m.lock, m.w, m.h, m.sym);
           break;
         case "points":
           points(m.pts);

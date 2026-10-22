@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.3 — Symmetry (2026-10-22)
+
+- **Symmetry** for the painting tools: left and right, top and bottom, four ways or diagonal, about the page's middle; the mirrors are one stroke with it.
+
 ## 0.34.2 — A brush from the selection (2026-10-22)
 
 - **New brush from the selection** (the Selection menu): the selected pixels become a sampled tip, kept as a preset in Saved with its bitmap, and given to the Brush.
