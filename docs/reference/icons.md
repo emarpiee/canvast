@@ -116,6 +116,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `beaker` | Fill bucket tool (Paint view) |
 | `sunset` | Gradient tool (Paint view, the Fill bucket's flyout) |
 | `sticker` | New brush from the selection (Paint view, the Selection menu) |
+| `picture-in-picture` | Add a reference picture (Paint view, the painting's menu) |
 | `eclipse` | Add a mask to a Paint view layer (the layer's ⋯ menu) |
 | `eye-closed` | Turn a Paint view layer's mask off or on (the layer's ⋯ menu) |
 | `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |
@@ -198,7 +199,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `square-dashed` | Put the picked objects on a sheet |
 | `square-dashed-x` | Release the sheet (keep what is inside) |
 | `scissors-line-dashed` | Clip content of a sheet (Layers) |
-| `crop` | Crop the picture |
+| `crop` | Crop: the picture (canvas), and the page to the selection (Paint view, the Selection menu) |
 | `fullscreen` | Show the whole picture (remove the crop) |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |

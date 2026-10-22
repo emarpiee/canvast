@@ -29,6 +29,12 @@ export interface Def<T> {
   readonly effect: "immediate" | "restart";
 }
 
+/** Reference pictures by painting: each `{ id, hash, x, y, w, opacity }`, checked (anything else: the setting is kept as it was). */
+const validRefs = (v: unknown): Record<string, unknown[]> | undefined => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const ok = (r: Record<string, unknown>): boolean => typeof r["id"] === "string" && typeof r["hash"] === "string" && /^[0-9a-f]{64}$/.test(r["hash"]) && [r["x"], r["y"], r["w"]].every((n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) < 1e5) && typeof r["opacity"] === "number" && r["opacity"] > 0 && r["opacity"] <= 1;
+  return Object.values(v).every((l) => Array.isArray(l) && l.length <= 50 && l.every((r) => !!r && typeof r === "object" && ok(r as Record<string, unknown>))) ? (v as Record<string, unknown[]>) : undefined;
+};
 const oneOf = <T extends string>(...allowed: T[]) => (v: unknown): T | undefined => (allowed.includes(v as T) ? (v as T) : undefined);
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 const range = (lo: number, hi: number) => (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
@@ -104,6 +110,8 @@ export const SETTINGS = {
   "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
   "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   "paint.symmetry": { scope: "device", default: "off", validate: oneOf("off", "vertical", "horizontal", "dual", "diagonal"), effect: "immediate" } as Def<"off" | "vertical" | "horizontal" | "dual" | "diagonal">,
+  // Reference pictures per painting (ui/paint-references.ts): where each floats over the view, its width and how visible it is.
+  "paint.refs": { scope: "device", default: {}, validate: validRefs, effect: "immediate" } as Def<Record<string, unknown[]>>,
   "paint.brushView": { scope: "device", default: "list", validate: oneOf("list", "grid"), effect: "immediate" } as Def<"list" | "grid">,
   "eraser.wholeGroups": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "media.volume": { scope: "device", default: 100, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

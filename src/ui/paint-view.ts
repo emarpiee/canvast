@@ -15,6 +15,8 @@ import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { saveFile } from "./file-actions";
 import { pageDialog, type PageSpec } from "./paint-dialogs";
+import { mountReferences } from "./paint-references";
+import { openLibraryPicker, type LibraryPicture } from "./library-picker";
 import { shortcutsActive } from "../interaction/shortcut-scope";
 import type { SettingsStore } from "../settings/settings";
 import { BLEND_MODES, type BlendMode } from "../doc/model";
@@ -63,6 +65,8 @@ export interface PaintViewDeps {
   styles: { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
   /** Put a panel in the panel dock (the Brushes and Brush settings panels; the dock is the canvas's, ADR 0123). */
   dock(el: HTMLElement, spec: DockSpec): void;
+  /** The library's pictures, for a reference picture. */
+  libraryPictures(): Promise<LibraryPicture[]>;
 }
 
 export interface PaintView {
@@ -160,6 +164,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
   const listScreen = $<HTMLElement>('[data-screen="list"]');
   const editor = $<HTMLElement>('[data-screen="editor"]');
   const stage = $<HTMLElement>("[data-stage]");
+  const references = mountReferences(stage, { assets: deps.assets, settings: deps.settings });
   /** The box the page is drawn in, turned and mirrored inside the still stage (the view only, not the pixels): big enough to cover it. */
   const turnEl = $<HTMLElement>("[data-turn]");
   let turn = 0;
@@ -641,6 +646,13 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     vhost.editor.setTool("brush");
     setTool("brush", { brush: made.brush, preset: made.id, values: { ...toolValues("brush"), size: Math.min(1000, Math.max(tip.w, tip.h)) } });
   };
+  /** The page cut to the selection's box: every layer and mask cut, vector layers moved with it (a canvas size with an offset). */
+  const cropToSelection = (): void => {
+    const s = session;
+    const box = s?.selection && boxOf(s.selection.mask);
+    if (!s || !box) return;
+    void s.resizePage(s.pageId, box.w, box.h, "canvas", { dx: -box.x, dy: -box.y }, {}, "Crop").then(() => fit());
+  };
   const selectionMenu = (anchor: HTMLElement): void => {
     const has = !!session?.selection;
     openMoreMenu(anchor, [
@@ -650,6 +662,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       { id: "grow", label: "Grow…", hint: "Move the edge out", icon: ICONS.growSelection, disabled: !has, run: () => void reshape("grow") },
       { id: "shrink", label: "Shrink…", hint: "Move the edge in", icon: ICONS.shrinkSelection, disabled: !has, run: () => void reshape("shrink") },
       { id: "feather", label: "Feather…", hint: "Soften the edge", icon: ICONS.featherSelection, disabled: !has, run: () => void reshape("feather") },
+      { id: "crop", label: "Crop to the selection", hint: "The page becomes the selection's box; what is outside it goes (one undo)", icon: ICONS.crop, disabled: !has, run: () => cropToSelection() },
       { id: "brush-from", label: "New brush from the selection…", hint: "Its pixels on the picked layer become a brush tip", icon: ICONS.sticker, disabled: !has, run: () => void brushFromSelection() },
     ], "Selection");
   };
@@ -1147,6 +1160,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
     unsub?.();
     unsub = null;
     session = null;
+    references.show(null);
     brushPanels.sync(false);
     if (store) void store.collect(new Set(toolTips())).catch(() => undefined); // (the closed painting's undo can no longer bring tiles back)
   };
@@ -1171,6 +1185,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
       redraw();
     });
     screen("editor");
+    references.show(s.painting.id);
     vhost?.sync();
     renderBar();
     renderLayers();
@@ -1206,6 +1221,7 @@ export function mountPaintView(root: HTMLElement, deps: PaintViewDeps): PaintVie
             { id: "page-size", label: "Page size and resolution…", hint: `${p.w} × ${p.h} px · ${p.dpi} DPI`, icon: ICONS.pageSize, run: () => void action("page-size", el) },
             { id: "export", label: "Export the page as PNG", icon: ICONS.imageUp, run: () => void action("export", el) },
             { id: "place", label: "Place the page on the canvas", hint: "A picture in the library, put in the middle of the canvas view", icon: ICONS.placeOnCanvas, run: () => void action("place", el) },
+            { id: "reference", label: "Add a reference picture…", hint: "A picture of the library floating over the view, to paint from (not part of the page)", icon: ICONS.referencePicture, run: () => void deps.libraryPictures().then((items) => openLibraryPicker(el, items)).then((hash) => hash && references.add(hash)) },
           ], s.painting.name);
         }
         return;

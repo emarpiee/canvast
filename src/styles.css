@@ -2784,6 +2784,11 @@ body[data-view="paint"] :is(#side-panels, #side-panels-left) > :not(:has([data-o
 /* The Eraser on a paint layer takes paint: the canvas's object eraser options are not its. */
 body[data-view="paint"][data-paint-target="pixels"] :is(.tb-options[data-for="eraser"], .tb-options[data-for="lasso"]):not([data-paint-options]) { display: none !important; }
 [data-paint-options]:empty { display: none !important; }
+.paint-refs { position: absolute; inset: 0; pointer-events: none; }
+.paint-ref { position: absolute; pointer-events: auto; cursor: move; touch-action: none; box-shadow: var(--hud-lift); border-radius: var(--r-sm); }
+.paint-stage .paint-ref canvas { position: static; display: block; border-radius: var(--r-sm); } /* (not the stage's own canvases' rule) */
+.paint-ref .more-btn { position: absolute; top: var(--sp-1); right: var(--sp-1); background: var(--hud-bg); }
+.paint-ref-grip { position: absolute; right: 0; bottom: 0; width: var(--icon-md); height: var(--icon-md); cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--hud-fg) 50%); border-bottom-right-radius: var(--r-sm); }
 [data-paint-options] .paint-hint { color: var(--hud-muted); white-space: nowrap; padding: 0 var(--sp-2); }
 .paint-page { display: inline-flex; align-items: center; border-radius: var(--r-md); }
 .paint-page.is-on { background: var(--hud-accent); color: var(--hud-accent-fg); }

@@ -444,15 +444,16 @@ export class PaintSession {
    * axis); `image` scales everything to the new size (resampled). Every paint layer and mask is made again, vector layers are moved or
    * scaled; fill and adjustment layers cover any page. `patch` is the rest of the page's settings. The selection goes.
    */
-  resizePage(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number], patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
+  resizePage(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number] | { readonly dx: number; readonly dy: number }, patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
     this.ending = this.ending.then(() => this.resizePageNow(id, w, h, how, anchor, patch, label));
     return this.ending;
   }
-  private async resizePageNow(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number], patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
+  private async resizePageNow(id: string, w: number, h: number, how: "canvas" | "image", anchor: readonly [number, number] | { readonly dx: number; readonly dy: number }, patch: Partial<Omit<Page, "id" | "w" | "h">>, label: string): Promise<void> {
     if (this.blocked() || this.live) return;
     if (id !== this.pageId) await this.showPage(id);
     const page = this.page();
-    const dx = Math.round((w - page.w) * anchor[0]), dy = Math.round((h - page.h) * anchor[1]);
+    // (an anchor places the old page in the new one; an offset moves it exactly, as a crop does)
+    const [dx, dy] = "dx" in anchor ? [anchor.dx, anchor.dy] : [Math.round((w - page.w) * anchor[0]), Math.round((h - page.h) * anchor[1])];
     const blobs: TileBlob[] = [];
     const again = async (src: HTMLCanvasElement | undefined): Promise<Record<string, string>> => {
       const r = await rasterize(w, h, (g) => {

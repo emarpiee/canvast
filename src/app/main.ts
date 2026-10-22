@@ -46,6 +46,7 @@ import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-in
 import type { Frame } from "../core/frames";
 import { depthOf, localCamera, normalize } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
+import type { LibraryPicture } from "../ui/library-picker";
 import { openDb } from "../storage/idb";
 import { WorkspaceRepo } from "../storage/workspace-repo";
 import type { SaveState } from "../storage/canvas-persistence";
@@ -1148,18 +1149,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
   };
 
+  /** The library's pictures, newest first, as a chooser lists them (a texture fill's picture, a reference picture). */
+  const libraryPictures = async (): Promise<LibraryPicture[]> => {
+    const list = await session.catalog?.list().catch(() => undefined);
+    return (list?.entries ?? [])
+      .filter((e) => e.type.startsWith("image/") && !e.card && e.present)
+      .sort((a, b) => b.importedAt - a.importedAt)
+      .map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
+  };
   // Texture fills (ADR 0154): the chooser's Image and Objects take their source from the canvas or a file.
   setTextureHooks(createTextureHooks({
     editor: ted,
     host: textureHost,
     nameOf: (hash) => assetNames.get(hash),
-    libraryPictures: async () => {
-      const list = await session.catalog?.list().catch(() => undefined);
-      return (list?.entries ?? [])
-        .filter((e) => e.type.startsWith("image/") && !e.card && e.present)
-        .sort((a, b) => b.importedAt - a.importedAt)
-        .map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
-    },
+    libraryPictures,
     say: (text) => { ted.message = text; ted.changed(); },
     importPicture: async (file) => {
       try {
@@ -1564,6 +1567,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       ted.changed();
     },
     optionsSlot: document.querySelector<HTMLElement>("[data-paint-options]")!,
+    libraryPictures,
     dock: (el, spec) => {
       sideLeft.appendChild(el);
       dock.add(el, spec);

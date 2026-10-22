@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.35.0 — Reference pictures, crop to the selection: P3 done (2026-10-22)
+
+- **Reference pictures** in the Paint view: library pictures floating over the view to paint from (not part of the page), moved, sized, faded, kept per painting.
+- **Crop to the selection** (the Selection menu): the page becomes the selection's box.
+
 ## 0.34.4 — Pattern files (2026-10-22)
 
 - **Import `.pat` patterns** in the Brushes panel: each becomes a preset with it as its texture (a group named after the file), and can be chosen as the texture of any brush.

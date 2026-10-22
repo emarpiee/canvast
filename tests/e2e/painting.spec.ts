@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { LIMITS, expect, reps, setPenColour, test } from "./harness";
 import type { Page } from "@playwright/test";
+import { makePng } from "./png";
 
 /**
  * The Painting view (ADR 0164, 0165): real mouse and keyboard input on the page; assertions read the layers' own pixels (what the
@@ -110,7 +111,7 @@ test("a layer clipped to the one below shows only where that one has paint; alph
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a resize keeps the pixels; a page exports as PNG and is placed on the canvas as a picture", async ({ app }) => {
+test("pages: a size in mm at a DPI is whole px; a new page has its own layer; canvas size, image size and crop to the selection; a page exports as PNG and is placed on the canvas as a picture", async ({ app }) => {
   const p = app.page;
   await newPainting(p, async (d) => {
     await d.locator('[data-f="unit"]').selectOption("mm");
@@ -161,6 +162,17 @@ test("pages: a size in mm at a DPI is whole px; a new page has its own layer; a 
   expect((await px(p, layer1, 1100, 300))![3]).toBe(255);
   await p.keyboard.press("Control+z");
   await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
+  // Crop to the selection: the page is the selection's box, the pixels moved with it.
+  await p.keyboard.press("m");
+  await stroke(p, [400, 250], [700, 350]);
+  await p.locator('[data-paint-options] [data-act="selection-menu"]').click();
+  await p.locator('.pop-menu [data-id="crop"]').click();
+  // (Firefox gives the pointer in whole CSS px: the box may be a page px larger or smaller)
+  await expect.poll(async () => { const g = (await state(p)).pages[0]!; return Math.abs(g.w - 300) <= 1 && Math.abs(g.h - 100) <= 1; }, { message: "cropped to 300 x 100" }).toBe(true);
+  expect((await px(p, layer1, 150, 50))![3], "the stroke at y 300 is at y 50 now").toBe(255);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await state(p)).pages[0]!.w).toBe(1181);
+  await p.keyboard.press("b");
   await expect.poll(async () => (await px(p, layer1, 500, 300))?.[3] ?? -1).toBe(255);
 
   const [dl] = await Promise.all([p.waitForEvent("download"), fromPaintingMenu(p, "export")]);
@@ -639,6 +651,41 @@ test("symmetry: a stroke is painted again across the page's middle (left and rig
   await p.locator("[data-paint-options] [data-sym]").selectOption("off");
   await stroke(p, [300, 900], [300, 900]);
   expect(await a(1620, 900), "off: one stroke").toBe(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("reference pictures: a library picture floats over the view (not a layer), moves, fades, is kept over a reload where it was, and goes", async ({ app }) => {
+  const p = app.page;
+  await newPainting(p);
+  await p.getByTestId("paint-picture-input").setInputFiles({ name: "ref.png", mimeType: "image/png", buffer: makePng(64, 32, (x) => (x < 32 ? [255, 0, 0, 255] : [0, 0, 255, 255])) });
+  await expect.poll(async () => (await state(p)).layers.length, { message: "the import made a picture layer (and put the picture in the library)" }).toBe(2);
+  await fromPaintingMenu(p, "reference");
+  await p.locator(".lib-pick .lib-item").first().click();
+  const ref = p.getByTestId("paint-ref");
+  await expect(ref).toHaveCount(1);
+  expect((await state(p)).layers.length, "not a layer of the page").toBe(2);
+  await expect.poll(async () => (await ref.locator("canvas").boundingBox())?.height ?? 0, { message: "drawn, as wide as twice its height" }).toBeGreaterThan(0);
+  const b0 = (await ref.boundingBox())!;
+  expect(Math.round(b0.width / b0.height)).toBe(2);
+  await p.mouse.move(b0.x + 20, b0.y + b0.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(b0.x + 120, b0.y + b0.height / 2 + 60, { steps: 6 });
+  await p.mouse.up();
+  const b1 = (await ref.boundingBox())!;
+  expect([Math.round(b1.x - b0.x), Math.round(b1.y - b0.y)], "moved").toEqual([100, 60]);
+  await ref.locator("[data-ref-more]").click();
+  await p.locator('.pop-menu [data-id="opacity-50"]').click();
+  await expect(ref).toHaveCSS("opacity", "0.5");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  const list = await p.evaluate(() => window.__canvastDebug.paint.list());
+  await p.evaluate((i) => window.__canvastDebug.paint.open(i), list[0]!.id);
+  await expect(p.getByTestId("paint-ref"), "kept over a reload").toHaveCount(1);
+  const b2 = (await p.getByTestId("paint-ref").boundingBox())!;
+  expect([Math.round(b2.x), Math.round(b2.y)], "where it was").toEqual([Math.round(b1.x), Math.round(b1.y)]);
+  await p.getByTestId("paint-ref").locator("[data-ref-more]").click();
+  await p.locator('.pop-menu [data-id="remove"]').click();
+  await expect(p.getByTestId("paint-ref")).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
 
