@@ -125,19 +125,16 @@ export function svgTexture(o: PathObject, t: TexturePaint, toSvg: (x: number, y:
   // local units to the SVG's: from where three local points go
   const [x0, y0] = toSvg(0, 0), [x1, y1] = toSvg(1, 0), [x2, y2] = toSvg(0, 1);
   const tilePx = Math.max(lay.tw, lay.th) * Math.hypot(x1 - x0, y1 - y0);
-  if (isVaried(t) && t.vary) {
-    // varied copies: the block they repeat after, as one tile of a plain grid
-    const n = t.src.kind === "objects" && t.vary.each ? t.src.ids.length : 1;
-    const lv = layoutOf(t, { w: bw, h: bh }, t.src.kind === "objects" && t.vary.each ? 1 : aspect);
-    const period = varyPeriod(t.vary, n);
+  const vl = isVaried(t) ? variedLayout(o, t) : null;
+  if (vl) {
+    // varied copies: one cell's layout, and the block they repeat after as a picture (for many copies)
+    const { n, lay0: lv, period } = vl;
     const got = withTile ? piecesOf(o, t, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
     if (withTile && (!got || got.pending)) return null;
     const k = Math.min(Math.min(Math.max(pow2(tilePx * 2), 64), 1024) / Math.max(lv.tw, lv.th), MAX_BLOCK_PX / (period * Math.max(lv.cw, lv.ch)));
-    const block = got ? blockCanvas(`svg|${got.version}|${JSON.stringify(t.vary)}|${period}|${lv.cw}|${lv.ch}|${Math.round(k * 1e6)}`, lv, t.vary, got.pieces, period, k) : null;
-    const [mx, my] = boxToLocal(o, 0.5, 0.5);
-    const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
-    const m = new DOMMatrix([x1 - x0, y1 - y0, x2 - x0, y2 - y0, x0, y0]).translateSelf(mx, my).rotateSelf((theta * 180) / Math.PI).translateSelf(lv.ox, lv.oy);
-    return { cw: lv.cw, ch: lv.ch, tw: lv.tw, th: lv.th, tiles: lv.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: block ? block.toDataURL("image/png") : "", repeat: true, vary: { v: t.vary, n, period } };
+    const block = got ? blockCanvas(`svg|${got.version}|${JSON.stringify(vl.v)}|${period}|${lv.cw}|${lv.ch}|${Math.round(k * 1e6)}`, lv, vl.v, got.pieces, period, k) : null;
+    const m = new DOMMatrix([x1 - x0, y1 - y0, x2 - x0, y2 - y0, x0, y0]).translateSelf(vl.mx, vl.my).rotateSelf((vl.theta * 180) / Math.PI).translateSelf(lv.ox, lv.oy);
+    return { cw: lv.cw, ch: lv.ch, tw: lv.tw, th: lv.th, tiles: lv.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: block ? block.toDataURL("image/png") : "", repeat: true, vary: { v: vl.v, n, period } };
   }
   const tile = withTile && t.src.kind === "objects" ? host.objects(t.src.ids, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
   if (withTile && t.src.kind === "objects" && (!tile || tile.version.endsWith("p"))) return null;
@@ -191,6 +188,7 @@ function pixelsOf(key: string, source: CanvasImageSource, w: number, h: number):
  */
 export function textureColourAt(o: PathObject, t: TexturePaint, x: number, y: number): string {
   if (!host) return flat(t);
+  if (isVaried(t)) return variedColourAt(o, t, x, y);
   const box = geometryBounds(o.base ?? o.sub);
   const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
   if (!(bw > 0 && bh > 0)) return flat(t);
@@ -445,23 +443,14 @@ function blockCanvas(key: string, l: Layout, v: TextureVary, pieces: readonly Pi
 
 /** A varied texture (ADR 0173): a repeated block of varied cells, or, when its copies are shown larger than the block can hold, the copies in view drawn one by one. */
 function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePaint, p: Projection, vp: Viewport): CanvasPattern | string {
-  const v = t.vary!;
-  const box = geometryBounds(o.base ?? o.sub);
-  const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
+  const vl = variedLayout(o, t);
   const ppu = p.ppu;
-  if (!(bw > 0 && bh > 0 && ppu > 0 && Number.isFinite(ppu))) return flat(t);
+  if (!vl || !(ppu > 0 && Number.isFinite(ppu))) return flat(t);
+  const { v, lay0, period, mx, my, theta } = vl;
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
-  // each object in a square cell of its own; else the cell has the shape of the arrangement (or picture), as without Vary
-  const n = t.src.kind === "objects" && v.each ? t.src.ids.length : 1;
-  const pic = t.src.kind === "asset" ? host!.picture(t.src.hash, 64) : null;
-  const aspect = t.src.kind === "asset" ? (pic ? pic.w / pic.h : null) : v.each ? 1 : host!.aspect(t.src.ids);
-  if (aspect === null) return flat(t);
-  const lay0 = layoutOf(t, { w: bw, h: bh }, aspect);
   const tilePx = Math.max(lay0.tw, lay0.th) * ppu;
-  if (!(tilePx >= MIN_TILE_PX) || !Number.isFinite(tilePx)) return flat(t);
-  const period = varyPeriod(v, n);
-  const [mx, my] = boxToLocal(o, 0.5, 0.5);
-  const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
+  // copies too small to see one by one: the block is still drawn while it is a few px, so the shape keeps its pattern's look far out
+  if (!(period * tilePx >= MIN_TILE_PX) || !Number.isFinite(tilePx)) return flat(t);
   const vx = D.toNumber(p.lx) + (vp.width / 2 - p.cx) / ppu - mx, vy = D.toNumber(p.ly) + (vp.height / 2 - p.cy) / ppu - my;
   const cs = Math.cos(theta), sn = Math.sin(theta);
   const lay = nearOrigin(lay0, cs * vx + sn * vy, -sn * vx + cs * vy, period);
@@ -472,7 +461,7 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
     .translateSelf(mx, my)
     .rotateSelf((theta * 180) / Math.PI)
     .translateSelf(lay.ox, lay.oy);
-  const res = Math.min(pow2(tilePx * dpr), 2048);
+  const res = Math.min(Math.max(pow2(tilePx * dpr), 8), 2048);
   const got = piecesOf(o, t, res);
   if (!got) return lastPattern.get(o.id) ?? flat(t);
   if (got.pending) notReady = true;
@@ -510,4 +499,56 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
     if (lastPattern.size > KEEP_PATTERNS) lastPattern.delete(lastPattern.keys().next().value!);
   }
   return pat;
+}
+
+/** How a varied texture lies in its shape: the plain layout of its cells (square cells for each object), the block, the box's middle and turn. */
+function variedLayout(o: PathObject, t: TexturePaint): { v: TextureVary; n: number; lay0: Layout; period: number; mx: number; my: number; theta: number } | null {
+  const v = t.vary!;
+  const box = geometryBounds(o.base ?? o.sub);
+  const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
+  if (!host || !(bw > 0 && bh > 0)) return null;
+  // each object in a square cell of its own; else the cell has the shape of the arrangement (or picture), as without Vary
+  const n = t.src.kind === "objects" && v.each ? t.src.ids.length : 1;
+  const pic = t.src.kind === "asset" ? host.picture(t.src.hash, 64) : null;
+  const aspect = t.src.kind === "asset" ? (pic ? pic.w / pic.h : null) : v.each ? 1 : host.aspect(t.src.ids);
+  if (aspect === null) return null;
+  const [mx, my] = boxToLocal(o, 0.5, 0.5);
+  return { v, n, lay0: layoutOf(t, { w: bw, h: bh }, aspect), period: varyPeriod(v, n), mx, my, theta: (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180 };
+}
+
+/**
+ * The colour of a varied texture at a point (shape units), for the places too deep to draw it: the copy that is on top there, as `drawCopies`
+ * puts it (later cells over earlier ones), read from a small picture of its piece; "transparent" between copies.
+ */
+function variedColourAt(o: PathObject, t: TexturePaint, x: number, y: number): string {
+  const vl = variedLayout(o, t);
+  const got = vl && piecesOf(o, t, 64);
+  if (!vl || !got) return flat(t);
+  const { v, lay0: l, mx, my, theta } = vl;
+  const cs = Math.cos(theta), sn = Math.sin(theta);
+  const pu = cs * (x - mx) + sn * (y - my) - l.ox, pv = -sn * (x - mx) + cs * (y - my) - l.oy;
+  const ci = Math.floor(pu / l.cw), cj = Math.floor(pv / l.ch);
+  let hit = "transparent";
+  for (let j = cj - MARGIN; j <= cj + MARGIN; j++) {
+    for (let i = ci - MARGIN; i <= ci + MARGIN; i++) {
+      l.tiles.forEach(([tx, ty], slot) => {
+        const c = copyAt(v, got.pieces.length, i, j, slot);
+        const pc = c.src >= 0 ? got.pieces[c.src] : undefined;
+        if (!pc) return;
+        // the point in the copy's own frame: back from its place, turn and scale
+        const dx = pu - (i * l.cw + tx + l.tw / 2 + c.dx * l.cw), dy = pv - (j * l.ch + ty + l.th / 2 + c.dy * l.ch);
+        const r = (-c.rot * Math.PI) / 180;
+        const qx = ((Math.cos(r) * dx - Math.sin(r) * dy) / c.k) * (c.flip ? -1 : 1), qy = (Math.sin(r) * dx + Math.cos(r) * dy) / c.k;
+        const [w, h] = pc.aspect >= l.tw / l.th ? [l.tw, l.tw / pc.aspect] : [l.th * pc.aspect, l.th];
+        if (Math.abs(qx) >= w / 2 || Math.abs(qy) >= h / 2) return;
+        const s = pc.img as { width?: number; height?: number };
+        const px = pixelsOf(`vary|${got.version}|${c.src}`, pc.img, s.width ?? 64, s.height ?? 64);
+        if (!px) return;
+        const a = Math.min(px.width - 1, Math.floor(((qx + w / 2) / w) * px.width)), b = Math.min(px.height - 1, Math.floor(((qy + h / 2) / h) * px.height));
+        const d = px.data, n = (b * px.width + a) * 4;
+        if (d[n + 3]! >= 8) hit = `#${[d[n]!, d[n + 1]!, d[n + 2]!].map((q) => q.toString(16).padStart(2, "0")).join("")}`;
+      });
+    }
+  }
+  return hit;
 }

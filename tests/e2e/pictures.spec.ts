@@ -1067,6 +1067,65 @@ test("Vary each copy: turned copies differ from plain ones, stay the same after 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a varied fill deep in shows the copy that is there, not the plain layout's; far out it is still a pattern, not one flat colour (ADR 0173)", async ({ app }) => {
+  const p = app.page;
+  // a red ellipse and a yellow star, grouped: the source
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 950, y: 300 }, { x: 1010, y: 360 }, 6);
+  await p.locator('[data-shape-kind="star"]').click();
+  await app.drag({ x: 1030, y: 300 }, { x: 1090, y: 360 }, 6);
+  await p.keyboard.press("v");
+  for (const [x, hex] of [[980, "e02020"], [1060, "f0d020"]] as const) {
+    await openFill(app, [x, 330]);
+    await p.locator(".colour-pop [data-hex]").fill(hex);
+    await p.locator(".colour-pop [data-hex]").press("Enter");
+  }
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(980, 330);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(1060, 330);
+  await p.keyboard.up("Shift");
+  await p.keyboard.press("Control+g");
+  await pickedRect(app, [420, 200], [800, 580]);
+  await objectsFill(app, [780, 560], [980, 330]);
+  await openFill(app, [780, 560]);
+  for (const [k, v] of [["vrot", "45"], ["vsize", "40"], ["vjit", "20"]] as const) {
+    await p.locator(`.colour-pop #tex-${k}`).fill(v);
+    await p.locator(`.colour-pop #tex-${k}`).press("Enter");
+  }
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  // a point well inside a red copy and one well inside a yellow one (the middle of a run of the same colour)
+  const kind = (c: number[]) => (c[0]! > 200 && c[1]! < 80 ? "red" : c[0]! > 200 && c[1]! > 180 && c[2]! < 100 ? "yellow" : "");
+  const find = async (want: string) => {
+    for (let y = 230; y < 560; y += 6) for (let x = 450; x < 780; x += 6) {
+      const ring = await Promise.all([[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]].map(([dx, dy]) => px(app, x + dx!, y + dy!)));
+      if (ring.every((c) => kind(c) === want)) return [x, y] as const;
+    }
+    throw new Error(`no ${want} copy found`);
+  };
+  for (const want of ["red", "yellow"]) {
+    const [x, y] = await find(want);
+    // far in at that point (the wheel keeps it under the pointer), past where the texture is drawn as a pattern
+    for (let i = 0; i < 50; i++) await app.wheel(x, y, -800);
+    await app.frame();
+    expect(kind(await px(app, x, y)), `${want} deep in`).toBe(want);
+    for (let i = 0; i < 50; i++) await app.wheel(x, y, 800);
+    await app.frame();
+  }
+  // far out: about 12 px wide, still copies of both colours, not one flat average
+  await p.evaluate(() => window.__canvastDebug.jump(-5));
+  await app.frame();
+  const vp = p.viewportSize()!;
+  const seen = new Set<string>();
+  for (let y = vp.height / 2 - 40; y < vp.height / 2 + 40; y++) for (let x = vp.width / 2 - 40; x < vp.width / 2 + 40; x++) seen.add(kind(await px(app, x, y)));
+  expect(seen.has("red") && seen.has("yellow"), "both colours far out").toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a sparse objects fill (small shapes far apart) far out is the colour of its shapes, not pale or white", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");

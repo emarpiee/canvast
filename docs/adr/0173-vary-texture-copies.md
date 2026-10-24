@@ -18,4 +18,4 @@ A texture may carry `vary` (`doc/texture.ts`): turn ± degrees (optionally in wh
 
 ## Consequences
 
-The pattern repeats after a block of 16 to 31 cells. The deep-zoom colour of a varied texture (far inside one copy) is read from the plain layout, not the varied one.
+The pattern repeats after a block of 16 to 31 cells. Far inside one copy (past where the texture is drawn), the colour is the copy on top at that point (`variedColourAt`, v0.41.2). Far out, the block is drawn while it is at least 2 px, so the shape stays a pattern after a single copy is too small to see.

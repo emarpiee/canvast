@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.41.2 — Varied fills deep in and far out (2026-10-25)
+
+- **Fixed:** zoomed very far into a varied fill (past where it is drawn as a pattern), the colour shown was the one the plain layout has there, often another copy's (yellow inside a red copy); it is now the colour of the copy that is on top at that point.
+- **Fixed:** zoomed out, a varied fill turned into one flat average colour as soon as a single copy was under 2 px; it now stays a pattern while the block of copies is a few px.
+
 ## 0.41.1 — Varied fills in SVG (2026-10-25)
 
 - **Fixed:** an SVG of a shape with a varied Objects fill (Export, Save as SVG, Copy as SVG) stretched the source shapes over the whole block of cells, so it showed a few giant shapes. Each copy is now written as vectors, a `<use>` of its object turned, sized, moved and mirrored as on the canvas; with very many copies the block is a picture tile.
