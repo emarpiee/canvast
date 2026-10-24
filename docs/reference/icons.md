@@ -176,7 +176,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `corner-up-left` | Previous view (camera history) |
 | `corner-up-right` | Next view (camera history) |
 | `dice-5` | Every randomizer: Random empty view (bottom-right controls), Randomize in the Pattern panel, the gradient editor, the options of a pattern or picture fill (the picker module draws its own copy of it) |
-| `shuffle` | New seed: another arrangement with the same settings (Pattern panel) |
+| `shuffle` | New seed: another arrangement with the same settings (Pattern panel; Vary each copy of a texture fill) |
 | `sparkles` | Generate the pattern (Pattern panel) |
 | `mountain-snow` | Pattern panel (dock button) |
 | `snowflake` | Pattern panel: keep this setting when randomizing (freeze) |

@@ -2357,6 +2357,11 @@ input[data-scrub-input]:focus { cursor: text; }
 .tex-random { display: flex; justify-content: flex-end; }
 .tex-random button { display: inline-flex; align-items: center; gap: var(--sp-3); }
 .tex-random svg { width: var(--icon-sm); height: var(--icon-sm); }
+/* Vary each copy (ADR 0173): a heading over its rows, and New seed beside the seed */
+.tex-vary-title { margin: var(--sp-4) 0 0; padding-top: var(--sp-4); border-top: 1px solid var(--hud-border); font: var(--font-meta); font-weight: var(--weight-semibold); color: var(--hud-fg); }
+.tex-vary-title[hidden] { display: none; }
+.adj-row .tex-newseed { justify-self: end; display: inline-flex; align-items: center; padding: 0 var(--sp-3); }
+.tex-newseed svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
 .tex-fields .adj-row > select { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .paint-modes { display: flex; overflow-x: auto; scrollbar-width: thin; gap: var(--sp-1); padding: var(--sp-1); margin-bottom: var(--sp-5); background: var(--hud-hover); border-radius: var(--r-md); }

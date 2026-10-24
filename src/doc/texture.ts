@@ -35,6 +35,83 @@ export interface TexturePaint {
   readonly align: TileAlign;
   /** The average colour of the source, "#rrggbb", shown where the texture itself cannot be (the density preview, a swatch, an SVG). */
   readonly avg: string;
+  /** Each repeated copy varied by its own random values (ADR 0173); absent: every copy the same. */
+  readonly vary?: TextureVary;
+}
+
+/**
+ * How the copies of a repeated texture vary (ADR 0173). Each copy's values come from `seed` and its cell alone, so a copy is the same at
+ * every zoom, after a reload and in an export, and editing a source changes how the copies look, never where they are.
+ */
+export interface TextureVary {
+  /** Objects: a copy of each object in a cell of its own (true), or of all of them as they lie together (false, as without Vary). */
+  readonly each: boolean;
+  /** Turned by up to ± this many degrees; with `rotStep`, by whole steps of it. */
+  readonly rotation: number;
+  readonly rotStep: number;
+  /** Bigger or smaller by up to ± this share. */
+  readonly size: number;
+  /** Moved in its cell by up to ± this share of the cell. */
+  readonly jitter: number;
+  /** Which object is in a cell: in turn, or at random (`each` only). */
+  readonly order: "sequence" | "shuffle";
+  readonly flip: boolean;
+  /** This share of the cells is left empty. */
+  readonly skip: number;
+  readonly seed: number;
+}
+
+/** The copies repeat after at least this many cells across and down (so a block of them can be drawn once and repeated, at any zoom). */
+export const VARY_PERIOD = 16;
+/** The repeat for `n` objects in turn: a whole number of turns, so the turn does not jump where the block repeats (more than 16 objects: 16). */
+export const varyPeriod = (v: TextureVary, n: number): number => {
+  const count = v.each ? Math.max(1, n) : 1;
+  return count > VARY_PERIOD ? VARY_PERIOD : count * Math.ceil(VARY_PERIOD / count);
+};
+export const MAX_VARY_ROTATION = 180;
+export const MAX_VARY_SIZE = 0.9;
+export const MAX_VARY_JITTER = 0.5;
+export const MAX_VARY_SKIP = 0.95;
+export const noVary = (seed = 1): TextureVary => ({ each: true, rotation: 0, rotStep: 0, size: 0, jitter: 0, order: "sequence", flip: false, skip: 0, seed });
+
+/** Whether `t` is drawn copy by copy: repeated, with Vary changing anything. */
+export const isVaried = (t: TexturePaint): boolean => {
+  const v = t.vary;
+  return t.mode === "tile" && !!v && (v.each || v.rotation > 0 || v.size > 0 || v.jitter > 0 || v.flip || v.skip > 0 || v.order === "shuffle");
+};
+
+/** One copy: which object (index into the source's objects; -1: the cell is empty), how far it is moved (shares of the cell), turned (degrees), scaled and mirrored. */
+export interface Copy {
+  readonly src: number;
+  readonly dx: number;
+  readonly dy: number;
+  readonly rot: number;
+  readonly k: number;
+  readonly flip: boolean;
+}
+
+const mod = (a: number, n: number): number => ((a % n) + n) % n;
+
+/** A number in 0..1 for (seed, cell, slot, what): a hash, so each value is independent of the others and of the order they are asked in. */
+function unit(seed: number, i: number, j: number, slot: number, what: number): number {
+  let h = Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(i, 0x85ebca77) ^ Math.imul(j, 0xc2b2ae3d) ^ Math.imul(slot + 1, 0x27d4eb2f) ^ Math.imul(what + 7, 0x165667b1);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+  return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
+}
+
+/** The copy in cell (i, j), tile `slot` of the cell (a brick grid has two), of a source of `n` objects (or one arrangement). */
+export function copyAt(v: TextureVary, n: number, i: number, j: number, slot: number): Copy {
+  const period = varyPeriod(v, n);
+  const [a, b] = [mod(i, period), mod(j, period)];
+  const r = (what: number): number => unit(v.seed, a, b, slot, what);
+  const count = v.each ? Math.max(1, n) : 1;
+  if (v.skip > 0 && r(0) < v.skip) return { src: -1, dx: 0, dy: 0, rot: 0, k: 1, flip: false };
+  const src = v.order === "shuffle" ? Math.floor(r(1) * count) % count : mod(a + b + slot, count);
+  const spread = (what: number, by: number): number => (r(what) * 2 - 1) * by || 0; // (|| 0: no -0)
+  let rot = spread(2, v.rotation);
+  if (v.rotStep > 0) rot = Math.round(rot / v.rotStep) * v.rotStep || 0;
+  return { src, dx: spread(3, v.jitter), dy: spread(4, v.jitter), rot, k: 1 + spread(5, v.size), flip: v.flip && r(6) < 0.5 };
 }
 
 export const TEXTURE_MODES: readonly TextureMode[] = ["fill", "fit", "crop", "tile"];
@@ -69,7 +146,16 @@ export function isTextureValid(v: unknown): v is TexturePaint {
     && TILE_TYPES.includes(t["tile"] as TileType)
     && pair(t["spacing"], 0, MAX_SPACING)
     && TILE_ALIGNS.includes(t["align"] as TileAlign)
-    && typeof t["avg"] === "string" && AVG.test(t["avg"]);
+    && typeof t["avg"] === "string" && AVG.test(t["avg"])
+    && (t["vary"] === undefined || isVaryValid(t["vary"]));
+}
+
+function isVaryValid(v: unknown): v is TextureVary {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return typeof r["each"] === "boolean" && fin(r["rotation"], 0, MAX_VARY_ROTATION) && fin(r["rotStep"], 0, 180) && fin(r["size"], 0, MAX_VARY_SIZE)
+    && fin(r["jitter"], 0, MAX_VARY_JITTER) && (r["order"] === "sequence" || r["order"] === "shuffle") && typeof r["flip"] === "boolean"
+    && fin(r["skip"], 0, MAX_VARY_SKIP) && Number.isInteger(r["seed"]) && fin(r["seed"], 0, 2 ** 31);
 }
 
 /** A texture with the usual starting values: a picture covers the shape, objects repeat. */
@@ -136,8 +222,9 @@ export function layoutOf(t: TexturePaint, box: Box, aspect: number): Layout {
  * The same layout moved by whole cells so that its first cell lies near (`nx`, `ny`) (the part of the box in view, in the box's own frame):
  * a repeated texture is the same wherever it starts, and small numbers keep the drawing exact when the view is far from the box's corner.
  */
-export function nearOrigin(l: Layout, nx: number, ny: number): Layout {
+export function nearOrigin(l: Layout, nx: number, ny: number, step = 1): Layout {
   if (!l.repeat || !(l.cw > 0) || !(l.ch > 0)) return l;
-  const kx = Math.floor((nx - l.ox) / l.cw), ky = Math.floor((ny - l.oy) / l.ch);
+  // (by whole `step`s of cells: varied copies repeat only after a block of cells, so the first cell must stay one of the block's)
+  const kx = Math.floor((nx - l.ox) / (l.cw * step)) * step, ky = Math.floor((ny - l.oy) / (l.ch * step)) * step;
   return kx === 0 && ky === 0 ? l : { ...l, ox: l.ox + kx * l.cw, oy: l.oy + ky * l.ch };
 }

@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Objects fills live; Vary each copy (v0.40.1, v0.41.0, 2026-10-25)
+
+**Implemented:** objects fills follow a source during a gesture (texture host draws with the preview; filled shapes' tiles refreshed through `fillUsersOf`). `vary` on a texture ([ADR 0173](adr/0173-vary-texture-copies.md)): per-cell hashed copies (`copyAt`, `varyPeriod`), a cached repeated block, or the copies in view one by one when shown large; SVG writes the block; the texture editor has a Vary section (field and choice tables), New seed, and Randomize rolls Vary.
+**Tested:** unit 560 (4 new for copyAt); E2E pictures.spec 31/31 (live test, snapshot cd2232ac) and the new Vary test with the live and nested-fill tests (snapshot b5dcbdf6); pictures, vectors, colour-picker 120/120 (Chromium, snapshot b5dcbdf6); the Vary and live tests in Firefox 2/2.
+**Known failures:** none known.
+**Unverified:** which drawing path the zoomed-in check used (block or one by one) is not asserted; the deep-zoom colour inside a varied copy.
+**Committed:** `fix(texture): objects fills follow their sources live (v0.40.1)`, `feat(texture): vary each copy of a repeated fill (v0.41.0)`, local, not pushed.
+**Next bounded task:** the owner's next pick.
+
 ## Gaps with small openings; W A S D by name and in view (v0.40.0, 2026-10-25)
 
 **Implemented:** Fill gaps closes openings up to `shape.gapClosePx` (default 4 px) with bridges united as one region ([ADR 0172](adr/0172-fill-gaps.md)); boolean loops at a point where outlines touch go on along the piece turning furthest right, so corner-touching shapes close in a hole. W A S D: `nav.mode` adds `layer-view`, `az`, `az-view` (names as the Layers list shows them, passed in from main); *Nearest in view* falls back to the nearest same-size item ahead beyond reach.

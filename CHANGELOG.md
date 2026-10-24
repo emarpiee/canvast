@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.0 — Vary each copy of a repeated fill (2026-10-25)
+
+- **Vary each copy** ([ADR 0173](docs/adr/0173-vary-texture-copies.md)): a repeated picture or Objects fill can turn its copies (± an angle, or in steps), size them, move them in their cells, mirror some and leave some cells out; Objects can copy each object on its own, in turn or shuffled, or the whole arrangement. A seed gives the same copies every time, at every zoom and in exports; *New seed* gives others, and *Randomize* now rolls these too. With nothing varied the fill is exactly as before.
+
 ## 0.40.1 — Objects fills follow their sources live (2026-10-25)
 
 - **Fixed:** a shape filled with objects showed a change to those objects (moving, turning, resizing, recolouring them) only on release; it now follows at every step of the gesture, and shows them as they will be, not see-through like the selection being dragged.

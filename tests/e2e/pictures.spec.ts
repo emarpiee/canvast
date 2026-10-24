@@ -672,6 +672,28 @@ async function pickedRect(app: App, from: readonly [number, number], to: readonl
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([rect.id]);
   return rect;
 }
+/** Open the paint chooser on the Fill of the shape at `at` (the chooser of a step before may still be open over the shape, or be closed by this Fill: press away, pick the shape, try again until it is open). */
+async function openFill(app: App, at: readonly [number, number]): Promise<void> {
+  const p = app.page;
+  await expect(async () => {
+    await p.keyboard.press("Escape");
+    await p.mouse.click(60, 650);
+    await p.mouse.click(at[0], at[1]);
+    await p.click('[data-paint="fill"]', { timeout: 1500 });
+    await expect(p.locator(".colour-pop")).toBeVisible({ timeout: 1500 }); // (Fill on an open chooser closes it: then try again)
+  }).toPass({ timeout: 20000 });
+}
+/** Fill the shape at `target` with what is at `source` (all of its group), and close the chooser. */
+async function objectsFill(app: App, target: readonly [number, number], source: readonly [number, number]): Promise<void> {
+  const p = app.page;
+  await openFill(app, target);
+  await p.locator('.colour-pop [data-mode="objects"]').click();
+  await p.locator(".colour-pop [data-tex-pick]").click();
+  await p.mouse.click(source[0], source[1]);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+}
 const fillOf = async (app: App, id: string) => (await objs(app)).find((o) => o.id === id) as unknown as { fill?: { type?: string; src?: { kind: string; hash?: string; ids?: string[] }; mode?: string; spacing?: number[] } | string | null };
 const is = (c: number[] | undefined, r: number, g: number, b: number): boolean => !!c && Math.abs(c[0]! - r) < 12 && Math.abs(c[1]! - g) < 12 && Math.abs(c[2]! - b) < 12;
 
@@ -898,22 +920,7 @@ test("an objects fill of an objects fill shows the inner one, follows a change o
   await app.drag({ x: 950, y: 320 }, { x: 1010, y: 380 }, 6); // S: the source
   const s = (await objs(app)).at(-1)!;
   const t = await pickedRect(app, [400, 320], [700, 470]);
-  const setObjects = async (target: [number, number], source: [number, number]) => {
-    // (the chooser of the step before may still be open over the shape, or be closed by this Fill: press away, pick the shape, try again until the chooser is open)
-    await expect(async () => {
-      await p.keyboard.press("Escape");
-      await p.mouse.click(60, 650);
-      await p.mouse.click(...target);
-      await p.click('[data-paint="fill"]', { timeout: 1500 });
-      await expect(pop).toBeVisible({ timeout: 1500 }); // (Fill on an open chooser closes it: then try again)
-    }).toPass({ timeout: 20000 });
-    await pop.locator('[data-mode="objects"]').click();
-    await pop.locator("[data-tex-pick]").click();
-    await p.mouse.click(...source);
-    await p.keyboard.press("Escape");
-    await p.mouse.click(60, 650);
-    await app.frame();
-  };
+  const setObjects = (target: [number, number], source: [number, number]) => objectsFill(app, target, source);
   // the share of a region's pixels that are the colour of S's middle, and of the ground (a flat average has neither a grid nor gaps)
   const [blue, ground] = [(await px(app, 980, 350)).join(), (await px(app, 60, 650)).join()]; // (before S loses its fill)
   const share = async (x0: number, y0: number, w: number, h: number) => {
@@ -952,24 +959,11 @@ test("an objects fill of an objects fill shows the inner one, follows a change o
 
 test("an objects fill follows a source while it is being resized, before the release, and ends as it was shown (ADR 0154)", async ({ app }) => {
   const p = app.page;
-  const pop = p.locator(".colour-pop");
   await p.keyboard.press("u");
   await p.locator('[data-shape-kind="ellipse"]').click();
   await app.drag({ x: 950, y: 320 }, { x: 1010, y: 380 }, 6); // S: the source
   await pickedRect(app, [400, 320], [700, 470]); // T, filled with S
-  await expect(async () => {
-    await p.keyboard.press("Escape");
-    await p.mouse.click(60, 650);
-    await p.mouse.click(670, 440);
-    await p.click('[data-paint="fill"]', { timeout: 1500 });
-    await expect(pop).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20000 });
-  await pop.locator('[data-mode="objects"]').click();
-  await pop.locator("[data-tex-pick]").click();
-  await p.mouse.click(980, 350);
-  await p.keyboard.press("Escape");
-  await p.mouse.click(60, 650);
-  await app.frame();
+  await objectsFill(app, [670, 440], [980, 350]);
   // what T looks like: its pixels on a grid
   const look = async () => {
     const out: string[] = [];
@@ -993,6 +987,69 @@ test("an objects fill follows a source while it is being resized, before the rel
   const after = (await look()).split(" ");
   const off = during.split(" ").filter((v, i) => v !== after[i]).length;
   expect(off, `and ends as it was shown (${off} of ${after.length} points differ; a point on an edge may be smoothed differently)`).toBeLessThanOrEqual(after.length / 100);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Vary each copy: turned copies differ from plain ones, stay the same after a reload, change with a new seed, are drawn one by one when shown large, and at nothing varied are exactly the plain fill (ADR 0173)", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  // the source: an ellipse and a flat bar, grouped (a click on one gives the fill both)
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 950, y: 300 }, { x: 1010, y: 360 }, 6);
+  await p.locator('[data-shape-kind="rect"]').click();
+  await app.drag({ x: 1030, y: 320 }, { x: 1100, y: 340 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(980, 330);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(1065, 330);
+  await p.keyboard.up("Shift");
+  await p.keyboard.press("Control+g");
+  await pickedRect(app, [400, 320], [700, 470]); // T
+  await objectsFill(app, [670, 440], [980, 330]);
+  const look = async () => {
+    const out: string[] = [];
+    for (let y = 330; y < 470; y += 7) for (let x = 410; x < 700; x += 7) out.push((await px(app, x, y)).join());
+    return out.join(" ");
+  };
+  const plain = await look();
+  const set = async (pairs: Array<[string, string]>, newSeed = false) => {
+    await openFill(app, [670, 440]);
+    for (const [key, v] of pairs) {
+      const el = pop.locator(`#tex-${key}`);
+      if ((await el.evaluate((e) => e.tagName)) === "SELECT") await el.selectOption(v);
+      else {
+        await el.fill(v);
+        await el.press("Enter");
+      }
+    }
+    if (newSeed) await pop.locator("[data-tex-newseed]").click();
+    await p.keyboard.press("Escape");
+    await p.mouse.click(60, 650);
+    await app.frame();
+  };
+  await set([["vrot", "45"], ["vsize", "30"]]);
+  const varied = await look();
+  expect(varied, "turned and sized copies").not.toBe(plain);
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await app.frame();
+  await expect.poll(look, { message: "the same copies after a reload" }).toBe(varied);
+  await set([], true);
+  expect(await look(), "a new seed: other copies").not.toBe(varied);
+  // shown large (a copy over a few hundred px): drawn one by one, still the shape's pattern (copies and the space between them)
+  await p.evaluate(() => window.__canvastDebug.jump(3));
+  await app.frame();
+  const vp = p.viewportSize()!;
+  const seen = new Set<string>();
+  for (let y = 100; y < vp.height - 100; y += 20) for (let x = 420; x < vp.width - 100; x += 20) seen.add((await px(app, x, y)).join());
+  expect(seen.size, "copies and gaps, not one flat colour").toBeGreaterThan(1);
+  await p.evaluate(() => window.__canvastDebug.jump(-3));
+  await app.frame();
+  // nothing varied, copies of the arrangement: exactly the plain fill
+  await set([["vrot", "0"], ["vsize", "0"], ["veach", "all"]]);
+  expect(await look(), "nothing varied: the plain fill, pixel for pixel").toBe(plain);
   expect(app.consoleErrors).toEqual([]);
 });
 
