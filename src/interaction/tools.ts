@@ -50,7 +50,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { drawSheetOver, finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -996,19 +996,23 @@ export function attachTools(
     editor.changed();
   };
 
-  /** The region of the open Shape builder under a screen point, if any (regions already deleted are not there). */
-  const builderFaceAt = (s: ScreenPoint): number | null => {
-    const b = editor.builder;
-    if (!b) return null;
-    for (let i = 0; i < b.faces.length; i++) {
-      if (b.deleted.has(i)) continue;
-      const o = b.faces[i]!.obj;
-      const cam = cameraIn(view.frameCamera, o.frame ?? b.world);
+  /** Which of some shapes not in the document (regions, gaps) is under a screen point, if any. */
+  const pathAt = (objs: readonly PathObject[], world: Frame, s: ScreenPoint, skip: (i: number) => boolean = () => false): number | null => {
+    for (let i = 0; i < objs.length; i++) {
+      if (skip(i)) continue;
+      const o = objs[i]!;
+      const cam = cameraIn(view.frameCamera, o.frame ?? world);
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       if (po && !po.cover && insideBody(po, s.x, s.y)) return i;
     }
     return null;
   };
+  /** The region of the open Shape builder under a screen point, if any (regions already deleted are not there). */
+  const builderFaceAt = (s: ScreenPoint): number | null => {
+    const b = editor.builder;
+    return b && pathAt(b.faces.map((f) => f.obj), b.world, s, (i) => b.deleted.has(i));
+  };
+  const gapAt = (s: ScreenPoint): number | null => editor.gapFill && pathAt(editor.gapFill.gaps, editor.gapFill.world, s);
 
   /** Every picked path whose nodes can be edited (the Edit nodes tool works on all of them, ADR 0145). */
   const nodeTargets = (): Array<{ po: ProjectedObject; o: PathObject }> =>
@@ -1743,6 +1747,12 @@ export function attachTools(
       el.classList.add("is-panning");
       return;
     }
+    if (editor.gapFill) {
+      // Fill a gap: a click fills the gap under it; a click elsewhere does nothing.
+      const i = gapAt(s);
+      if (i !== null) fillGapAt(doc, editor, i);
+      return;
+    }
     if (editor.builder) {
       // The Shape builder: a stroke across regions merges them (Alt: deletes them).
       editor.builder.removing = e.altKey;
@@ -1886,6 +1896,14 @@ export function attachTools(
       const d = editor.pathDraft;
       editor.pathDraft = { ...d, cursor: localIn(d.frame, d.anchor, d.unit, local(e)) };
       editor.changed();
+      return;
+    }
+    if (editor.gapFill && g.kind === "none") {
+      const h = gapAt(local(e));
+      if (h !== editor.gapFill.hover) {
+        editor.gapFill.hover = h;
+        editor.changed();
+      }
       return;
     }
     if (editor.builder && g.kind === "none") {
@@ -2322,6 +2340,11 @@ export function attachTools(
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
+    if (editor.gapFill && g.kind === "none" && (e.key === "Enter" || e.key === "Escape")) {
+      finishGapFill(editor);
+      e.preventDefault();
+      return;
+    }
     if (editor.builder && g.kind === "none" && (e.key === "Enter" || e.key === "Escape")) {
       finishShapeBuilder(doc, editor, e.key === "Enter");
       e.preventDefault();

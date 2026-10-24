@@ -7,7 +7,7 @@ import { cameraIn } from "../scene/frame-index";
 import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { ProjectedObject, ScreenBox } from "./projection";
-import { projectObject } from "./projection";
+import { projectObject, projectionFor } from "./projection";
 import type { RasterSource } from "./draw-objects";
 import { drawMasked } from "./mask";
 import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
@@ -197,6 +197,7 @@ export function drawOverlays(
   labels: readonly ItemLabel[] = [],
 ): void {
   if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp);
+  if (editor.gapFill) drawGaps(ctx, editor.gapFill, fc, vp, theme);
   // The names above the items (ADR 0108, 0125).
   if (labels.length) {
     ctx.save();
@@ -608,6 +609,17 @@ function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["
     if (!on && !b.merged.some((grp) => grp.includes(i))) return;
     const wash = projectObject({ ...f.obj, fill: on ? (b.removing ? "#dc262699" : "#2563eb99") : "#2563eb55", stroke: null }, cam, vp, { keepTiny: true });
     if (wash && !wash.cover) drawPath(ctx, wash, vp);
+  });
+}
+
+/** Fill a gap (ADR 0172): every gap found outlined, the one under the pointer washed with the fill it would get. */
+function drawGaps(ctx: CanvasRenderingContext2D, f: NonNullable<EditorState["gapFill"]>, fc: FrameCamera, vp: Viewport, theme: SceneTheme): void {
+  f.gaps.forEach((o, i) => {
+    const cam = cameraIn(fc, o.frame ?? f.world);
+    if (!cam) return;
+    const on = f.hover === i;
+    const po = projectObject({ ...o, ...(on ? {} : { fill: null }), stroke: theme.selection, width: 1.5 / projectionFor(cam, vp, o.anchor, o.unit).ppu, dash: [4, 3] }, cam, vp, { keepTiny: true });
+    if (po && !po.cover) drawPath(ctx, po, vp);
   });
 }
 

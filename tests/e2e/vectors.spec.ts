@@ -2413,6 +2413,42 @@ test("Edit nodes on several paths: Shift-click picks nodes together, a lasso pic
   expect((await objs(app)).slice(-2).map((o) => o.sub[0]!.n.length / 6)).toEqual([4, 4]);
 });
 
+test("Fill gaps fills the place four shapes close in, under them; Fill a gap fills the one clicked and ignores a click elsewhere; one undo each (ADR 0172)", async ({ app }) => {
+  const p = app.page;
+  const px = () => p.evaluate(() => window.__canvastDebug.pixelAt(520, 380));
+  await key(app, "u");
+  await p.click('[data-shape-kind="rect"]');
+  // four bars round a hole from (440, 340) to (600, 420)
+  for (const [a, b] of [[[400, 300], [640, 340]], [[400, 420], [640, 460]], [[400, 300], [440, 460]], [[600, 300], [640, 460]]] as Array<[[number, number], [number, number]]>) await drag(app, a, b);
+  await key(app, "v");
+  const empty = await px();
+  await key(app, "Control+a");
+  await pathWith(p, "fillgaps");
+  let all = await objs(app);
+  expect(all).toHaveLength(5);
+  const gap = all.find((o) => o["name"] === "Gap")!;
+  expect(all.indexOf(gap), "under the shapes round it").toBe(0);
+  expect(size(gap).w).toBeCloseTo(160, 0);
+  expect(size(gap).h).toBeCloseTo(80, 0);
+  await key(app, "Escape");
+  await app.frame();
+  expect(await px()).toEqual([37, 99, 235]);
+  await key(app, "Control+z");
+  expect(await objs(app)).toHaveLength(4);
+  expect(await px()).toEqual(empty);
+  // one at a time: a click outside every gap does nothing, a click in one fills it (the last gap ends the mode)
+  await key(app, "Control+a");
+  await pathWith(p, "fillgap");
+  await click(app, 700, 520);
+  expect(await objs(app)).toHaveLength(4);
+  await click(app, 520, 380);
+  all = await objs(app);
+  expect(all).toHaveLength(5);
+  expect(all[0]!["name"]).toBe("Gap");
+  await key(app, "Control+z");
+  expect(await objs(app)).toHaveLength(4);
+});
+
 test("Divide cuts overlapping shapes into their regions; the Shape builder merges regions dragged across and deletes them with Alt; one undo each", async ({ app }) => {
   const p = app.page;
   await key(app, "u");

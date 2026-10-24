@@ -192,6 +192,8 @@ export class EditorState {
   attachMode = false;
   /** The Shape builder, while it is open; null otherwise. */
   builder: ShapeBuilderState | null = null;
+  /** Fill a gap (ADR 0172), while it is on: the gaps the picked shapes close in, as the shapes that would fill them; a click fills one. */
+  gapFill: { gaps: PathObject[]; world: Frame; hover: number | null } | null = null;
   /** Painting a brush mask (ADR 0144): the groups new pen strokes join (the masked group and the mask group) and their colour (white shows, black hides); null when not painting. */
   maskEdit: { groups: readonly [string, string]; ink: string } | null = null;
   /** The picture whose crop is being changed (ADR 0118): its box handles move its window instead of its size. */

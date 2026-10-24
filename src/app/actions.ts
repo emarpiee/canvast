@@ -33,6 +33,7 @@ import { MITER_LIMIT, NODE, type Arrow, drawnParams, drawnSubs, geometryBounds, 
 import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
 import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
+import { gapsOf } from "../doc/gaps";
 import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
@@ -1926,6 +1927,78 @@ export function divide(doc: DocumentStore, editor: EditorState): void {
   const placed = placeAbove(doc.ordered(), made.map((r) => homeObject(normalizeUnit(r.obj), doc.space)), top);
   doc.commit(doc.transaction(`Divide into ${made.length} regions`, placed, shapes.map((o) => o.id)));
   editor.select(placed.map((o) => o.id));
+  editor.changed();
+}
+
+// ---- Gaps (ADR 0172) ---------------------------------------------------------------------------------------------------------
+
+/** The gaps the picked shapes close in, as shapes with the Shape tool's fill and no outline, placed in the units of the back one; or why none. */
+function gapShapes(doc: DocumentStore, editor: EditorState): { back: PathObject; gaps: PathObject[] } | string {
+  const found = gapsOf(dividable(doc, editor), doc.space);
+  if (typeof found === "string") return found;
+  const { back } = found;
+  if (!found.gaps.length) return "The picked shapes close in no gap: an empty place must be closed in on every side to be filled.";
+  const gaps = found.gaps.map((g): PathObject => homeObject(normalizeUnit({
+    id: newObjectId(), kind: "path", ...(back.frame ? { frame: back.frame } : {}), anchor: back.anchor, unit: back.unit, z: back.z, opacity: 1,
+    attachmentTargetId: null, ...(back.parent ? { parent: back.parent } : {}), sub: g.subs, evenodd: true,
+    fill: editor.shapeFill ?? "#2563eb", stroke: null, width: back.width, name: "Gap",
+  }), doc.space) as PathObject);
+  return { back, gaps };
+}
+
+/** Put new fills just under `back` (they fill what lies between it and its neighbours, which stay on top). */
+function placeUnder(doc: DocumentStore, objs: PathObject[], back: PathObject): CanvasObject[] {
+  const all = doc.ordered();
+  const at = all.findIndex((o) => o.id === back.id);
+  return at > 0 ? placeAbove(all, objs, all[at - 1]!) : objs.map((o, i) => ({ ...o, z: back.z - objs.length + i }));
+}
+
+export const canFillGaps = (doc: DocumentStore, editor: EditorState): boolean => dividable(doc, editor).length >= 1;
+
+/** Fill every gap the picked shapes close in: one undo step; the fills are picked. */
+export function fillAllGaps(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const found = gapShapes(doc, editor);
+  if (typeof found === "string") {
+    editor.message = found;
+    return editor.changed();
+  }
+  const placed = placeUnder(doc, found.gaps, found.back);
+  doc.commit(doc.transaction(`Fill ${found.gaps.length} ${found.gaps.length === 1 ? "gap" : "gaps"}`, placed));
+  editor.select(placed.map((o) => o.id));
+  editor.changed();
+}
+
+/** Turn on Fill a gap: the gaps of the picked shapes show, a click fills the one under it (one undo step each), Enter or Esc ends it. */
+export function startGapFill(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit() || editor.builder || editor.gapFill) return;
+  const found = gapShapes(doc, editor);
+  if (typeof found === "string") {
+    editor.message = found;
+    return editor.changed();
+  }
+  editor.gapFill = { gaps: found.gaps, world: doc.space.world, hover: null };
+  editor.message = `Fill a gap: click a gap to fill it (${found.gaps.length} found); Enter or Esc when done.`;
+  editor.changed();
+}
+
+/** Fill gap `i` of Fill a gap, under the shape at the back of the ones around it. */
+export function fillGapAt(doc: DocumentStore, editor: EditorState, i: number): void {
+  const f = editor.gapFill;
+  const gap = f?.gaps[i];
+  if (!f || !gap || editor.blockEdit()) return;
+  const backs = dividable(doc, editor);
+  const back = [...backs].sort((a, b) => a.z - b.z)[0];
+  const placed = back ? placeUnder(doc, [gap], back) : [gap];
+  doc.commit(doc.transaction("Fill a gap", placed));
+  f.gaps = f.gaps.filter((_, k) => k !== i);
+  f.hover = null;
+  if (!f.gaps.length) editor.gapFill = null;
+  editor.changed();
+}
+
+export function finishGapFill(editor: EditorState): void {
+  editor.gapFill = null;
   editor.changed();
 }
 

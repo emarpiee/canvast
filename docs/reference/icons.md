@@ -23,6 +23,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `moon` | Paint the mask in black: the Pen hides (Actions bar) |
 | `slice` | Divide the picked shapes into the regions they overlap in (Actions bar) |
 | `puzzle` | Shape builder (Actions bar) |
+| `paintRoller` | Fill every gap the picked shapes close in (Actions bar, Path tools) |
+| `mousePointerClick` | Fill a gap: click the gaps to fill one by one (Actions bar, Path tools) |
 | `network` | Vector network: join the picked paths (Actions bar) |
 | `unplug` | Release the network (Actions bar) |
 | `route` | Set the picked text along the picked path (Actions bar) |

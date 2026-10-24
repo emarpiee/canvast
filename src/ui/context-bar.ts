@@ -108,6 +108,10 @@ export interface ContextActions {
   /** Divide the picked shapes into their regions, or open the Shape builder on them to merge and delete regions by dragging (ADR 0145). */
   divide(): void;
   shapeBuilder(): void;
+  /** Fill the gaps the picked shapes close in: all at once, or one click at a time (ADR 0172). */
+  canFillGaps(): boolean;
+  fillGaps(): void;
+  fillGap(): void;
   finishBuilder(apply: boolean): void;
   canDivide(): boolean;
   changeMask(change: { invert?: boolean; release?: true }): void;
@@ -277,7 +281,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // The tools that make, change or take apart paths and vector shapes, in one menu that stays open; only the ones that apply to the pick are listed
         const items = (): MenuItem[] => {
           const row = (id: string, label: string, hint: string, icon: string, run: () => void): MenuItem => ({ id, label, hint, icon, run });
-          const free = editor.builder === null; // (while the Shape builder is on, Done and Cancel are on the bar)
+          const free = editor.builder === null && editor.gapFill === null; // (while the Shape builder or Fill a gap is on, Done and Cancel are on the bar)
           return [
             ...(actions.canSimplify() ? [row("simplify", "Simplify", "Fewer nodes, the same shape", ICONS.chartSpline, () => actions.simplify())] : []),
             ...(actions.canStrokeToPath() ? [row("strokepath", "Pen stroke to path", "Turn the pen stroke into an editable path", ICONS.pencilRuler, () => actions.strokeToPath())] : []),
@@ -290,6 +294,10 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ...(actions.canDivide() && free ? [
               row("divide", "Divide", "Cut the picked shapes into the regions they overlap in", ICONS.slice, () => actions.divide()),
               row("shapebuilder", "Shape builder", "Drag across regions to merge them, Alt-drag to delete them", ICONS.puzzle, () => { closeMoreMenu(); actions.shapeBuilder(); }),
+            ] : []),
+            ...(actions.canFillGaps() && free ? [
+              row("fillgaps", "Fill gaps", "Fill every empty place the picked shapes close in, under them", ICONS.paintRoller, () => actions.fillGaps()),
+              row("fillgap", "Fill a gap…", "Click the gaps to fill, one by one; Enter or Esc when done", ICONS.mousePointerClick, () => { closeMoreMenu(); actions.fillGap(); }),
             ] : []),
             ...(actions.canOutline() ? [row("outline", "Text to path", "Convert the text to a path (Ctrl+E)", ICONS.replace, () => actions.outline())] : []),
             ...(actions.canSetOnPath() ? [row("onpath", "Text along a path", "Set the text along the picked path (pick the text and the path)", ICONS.route, () => actions.setOnPath())] : []),
@@ -387,8 +395,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const cur = actions.booleanState();
     const join = actions.groupJoin();
     q("boolmenu").hidden = !(actions.canCombine() || cur !== null || join !== null);
-    q("pathmenu").hidden = !(actions.canSimplify() || actions.canStrokeToPath() || actions.canOutlineStroke() || actions.canMakeNetwork() || actions.canReleaseNetwork() || (actions.canDivide() && editor.builder === null) || actions.canOutline() || actions.canSetOnPath() || actions.canTakeOffPath());
-    for (const k of ["builderdone", "buildercancel"]) q(k).hidden = editor.builder === null;
+    q("pathmenu").hidden = !(actions.canSimplify() || actions.canStrokeToPath() || actions.canOutlineStroke() || actions.canMakeNetwork() || actions.canReleaseNetwork() || ((actions.canDivide() || actions.canFillGaps()) && editor.builder === null && editor.gapFill === null) || actions.canOutline() || actions.canSetOnPath() || actions.canTakeOffPath());
+    for (const k of ["builderdone", "buildercancel"]) q(k).hidden = editor.builder === null && editor.gapFill === null;
     q("maskmenu").hidden = !(actions.canMakeMask() || actions.canReleaseMask());
 
     const reset = actions.resettable();

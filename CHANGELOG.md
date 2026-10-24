@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.39.0 — Fill the gaps between shapes (2026-10-25)
+
+- **Fill gaps** (Path tools menu, command palette, [ADR 0172](docs/adr/0172-fill-gaps.md)): fills every empty place the picked shapes close in, with the Shape tool's fill and no outline, under the shapes round it; a shape sitting in a gap is left out of its fill. One undo step.
+- **Fill a gap…**: the gaps show as dashed outlines, the one under the pointer as it would be filled; a click fills it, one undo step each; Enter or Esc ends it.
+
 ## 0.38.0 — Snapping to the shapes themselves; shapes start without an outline (2026-10-25)
 
 - **Snapping to the shapes** ([ADR 0171](docs/adr/0171-snap-to-shapes.md)): moving, resizing, turning and dragging a node now also snap to corners and sides, not only to boxes. A corner goes exactly onto another corner or the middle of a side (a ring marks it), onto any side, curves included, and a straight side lies flush along a nearly parallel one (the side is drawn). Turning brings a corner round to another or a side parallel to a nearby one. One rule for every gesture.

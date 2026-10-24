@@ -129,6 +129,8 @@ import sunSvg from "lucide-static/icons/sun.svg";
 import moonSvg from "lucide-static/icons/moon.svg";
 import sliceSvg from "lucide-static/icons/slice.svg";
 import puzzleSvg from "lucide-static/icons/puzzle.svg";
+import paintRollerSvg from "lucide-static/icons/paint-roller.svg";
+import mousePointerClickSvg from "lucide-static/icons/mouse-pointer-click.svg";
 import networkSvg from "lucide-static/icons/network.svg";
 import unplugSvg from "lucide-static/icons/unplug.svg";
 import stampSvg from "lucide-static/icons/stamp.svg";
@@ -349,6 +351,8 @@ export const ICONS = {
   unplug: clean(unplugSvg),
   slice: clean(sliceSvg),
   puzzle: clean(puzzleSvg),
+  paintRoller: clean(paintRollerSvg),
+  mousePointerClick: clean(mousePointerClickSvg),
   sun: clean(sunSvg),
   moon: clean(moonSvg),
   venetianMask: clean(venetianMaskSvg),

@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Fill the gaps between shapes (v0.39.0, 2026-10-25)
+
+**Implemented:** gaps as holes of the picked shapes' union (`doc/gaps.ts`, [ADR 0172](adr/0172-fill-gaps.md)), islands left out (even-odd); *Fill gaps* (all, one undo step) and *Fill a gap…* (click mode with dashed outlines and a hover preview, Enter/Esc/Done) in the Path tools menu and the command palette; fills placed under the back shape with the Shape tool's fill.
+**Tested:** unit 554/554 (3 new for gaps); E2E (Chromium, snapshot 747ae2fc): the new Fill gaps test and the Divide test, icon-audit and a11y 6/6.
+**Known failures:** none known.
+**Unverified:** Firefox for the new test; gaps among curved shapes in E2E (unit only for straight ones); the quick and full suites.
+**Committed:** `feat(shapes): fill the gaps between shapes (v0.39.0)`, local, not pushed.
+**Next bounded task:** close small openings (a gap open by a few px).
+
 ## Snapping to the shapes, shapes without an outline (v0.38.0, 2026-10-25)
 
 **Implemented:** snapping to the shapes themselves for move, node drag, resize and turn, one rule in `shapeSnap` with the searches in `interaction/snap-points.ts` ([ADR 0171](adr/0171-snap-to-shapes.md)): a corner exactly onto a corner or the middle of a side (always wins in reach), a corner onto any side, a straight side flush along a nearly parallel one; ring and side guides. New shapes start with no outline (lines and open paths still get the ink); the outline is no longer remembered between sessions; every outline width readout shows 0 / None when there is none (the bar's slider: far left is no outline). Fixed: an open path with a fill and no outline was invisible. Also in v0.37.1 to v0.37.3: big library imports without lag or flicker, the library index written in slices (no long tasks), Make vector copy in place.
