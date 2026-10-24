@@ -167,7 +167,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 
 ### The interface
 
-- **Tool rail** on the left: the tools, then Screenshot, Search, Import, Undo and Redo. **Properties bar** at the top: the options of the tool or of what is picked. A picked pen stroke, or several picked things, show their colours there as chips; a chip changes that colour everywhere it is used. Pasting CSS text with shapes picked makes it their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a colour name such as `rebeccapurple`). In the colour picker a long press (or right click) on a swatch or a saved gradient copies it (hex, or CSS for a gradient) without choosing it; copying the hex field includes the `#` and pasting one drops it. Copy and paste use the same CSS text: the Styles panel copies a colour as hex and a gradient as CSS. **Actions bar**: what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection. A bar wider than the window shows a fade and an arrow at the end with more; the mouse wheel (with or without Shift) scrolls it sideways.
+- **Tool rail** on the left: Undo and Redo, the tools (with Import after Note), then Screenshot and Search. **Properties bar** at the top: the options of the tool or of what is picked. A picked pen stroke, or several picked things, show their colours there as chips; a chip changes that colour everywhere it is used. Pasting CSS text with shapes picked makes it their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a colour name such as `rebeccapurple`). In the colour picker a long press (or right click) on a swatch or a saved gradient copies it (hex, or CSS for a gradient) without choosing it; copying the hex field includes the `#` and pasting one drops it. Copy and paste use the same CSS text: the Styles panel copies a colour as hex and a gradient as CSS. **Actions bar**: what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection. A bar wider than the window shows a fade and an arrow at the end with more; the mouse wheel (with or without Shift) scrolls it sideways.
 - **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
 - **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**. A right click on the canvas opens a menu of what fits.
 - **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
@@ -199,7 +199,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 
 ### Exporting
 
-**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here and also puts on the system clipboard: shapes as SVG text plus a PNG picture; a picture as one PNG at full size, as it looks with its crop and adjustments; a GIF or video as the frame it shows; a shape with a picture or objects fill, or anything mixed, as a PNG of it as drawn (at most 1024 px on the long side). A picture goes alone, with no text, so an app that prefers text still gets the picture. **Pasting back in canvast** brings the objects back as they were (links, masks, crop, adjustments, exact positions) as long as nothing else was copied in between. Shapes and texts are known by their text on the clipboard, so they come back even from another tab; a picture or GIF is known only while this window keeps the focus, and after switching to another window it comes back as a new picture (see Limitations). Anything copied in another app is imported as before: an SVG as shapes, an image as a picture. Pasting in another app takes what it accepts; pasting in another app takes what it accepts. Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast. `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
+**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here and also puts on the system clipboard: shapes as SVG text plus a PNG picture; a picture as one PNG at full size, as it looks with its crop and adjustments; a GIF or video as the frame it shows; a shape with a picture or objects fill, or anything mixed, as a PNG of it as drawn (at most 1024 px on the long side). A picture goes alone, with no text, so an app that prefers text still gets the picture. **Pasting back in canvast** brings the objects back as they were (links, masks, crop, adjustments, exact positions) as long as nothing else was copied in between. Shapes and texts are known by their text on the clipboard, so they come back even from another tab; a picture or GIF is known only while this window keeps the focus, and after switching to another window it comes back as a new picture (see Limitations). Anything copied in another app is imported as before: an SVG as shapes, an image as a picture. Pasting in another app takes what it accepts. Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast. `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
 
 **What you export is what you see.** Colours, widths and shapes are the ones stored in the document: nothing is changed by the theme when drawing or exporting. The default pen and outline colour is near-black on a light canvas and a light ink on a dark one, chosen when the shape is made and stored with it (*Change the old default ink to the canvas ink* in the command palette gives it to older drawings). Exports match the canvas in every format; the one thing SVG cannot say is an angular gradient: an SVG holds a picture of it (a PNG of up to 384 px a side, cut to the shape or the line) and, on the element, the real gradient: canvast reads it back, so *Make vector copy* or pasting the SVG gives the editable angular gradient again (other programs show the picture). The Export dialog and the SVG saves warn when a shape has one.
 
@@ -282,7 +282,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, eraser |
 | Navigation | How `W` `A` `S` `D` choose the next item; focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop |
 | Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
-| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots, extracted frames and edited pictures have their own in their own groups |
+| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
 | Panels | Minimize inactive panels, panels kept open |
@@ -303,7 +303,6 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 
 canvast describes only what it does. These are the current limits.
 
-- Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape.
 **Scale**
 
 | Area | Limitation |
@@ -322,6 +321,7 @@ canvast describes only what it does. These are the current limits.
 | Angular gradient in SVG | SVG has no sweep gradient, so an SVG holds a picture of it (up to 384 px a side, about 300 KB), not vectors; the Export dialog, Save as SVG and Copy as SVG warn. A PDF of such a shape is made as a picture, and picture exports are exact |
 | Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet scales the pattern as it does any content; it is not made again at the new size |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
+| Adjustments and shadows | Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape |
 | Boolean groups | Per-corner radii on a boolean result are not available |
 | Eraser | Trimming works on strokes, not on vector paths |
 | Files | Imports are limited to 256 MiB per file |
@@ -444,9 +444,9 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | --- | --- |
 | `npm run typecheck` | TypeScript check |
 | `npm run test:unit` | Unit tests (seconds) |
-| `npm test` | Typecheck, unit, quick end-to-end suite, token, picker and pattern-generator checks (about 16 min) |
+| `npm test` | Typecheck, unit, quick end-to-end suite, token, picker and pattern-generator checks (about an hour) |
 | `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
-| `npm run test:full` | The full suite with long stress loops (about 50 min) |
+| `npm run test:full` | The full suite with long stress loops (about 1.5 hours) |
 | `npm run test:snap -- <files or -g pattern>` | Run chosen end-to-end specs |
 | `npm run test:status` | List test builds with their result and how far each is behind the source |
 | `npm run bench` | Scale and tile-cache benchmarks |
@@ -475,7 +475,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 
 ## Security and privacy
 
-- The page's Content Security Policy is `default-src 'none'` with no `connect-src`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
+- The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
 - canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build.
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
