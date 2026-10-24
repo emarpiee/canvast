@@ -169,6 +169,16 @@ export interface ThumbRecord {
   h: number;
 }
 
+/** A change to an asset's tags, favourite flag or folder. */
+export interface MetaChange {
+  favorite?: boolean;
+  addTags?: readonly string[];
+  removeTags?: readonly string[];
+  addFolders?: readonly string[];
+  removeFolders?: readonly string[];
+  clearFolder?: boolean;
+}
+
 export class AssetCatalog {
   constructor(readonly db: IDBDatabase) {}
 
@@ -287,30 +297,39 @@ export class AssetCatalog {
    * showed"), so quick successive edits and edits from another tab never
    * overwrite each other. Tags are normalized; folders must exist.
    */
-  async updateMeta(
-    hash: string,
-    change: { favorite?: boolean; addTags?: readonly string[]; removeTags?: readonly string[]; addFolders?: readonly string[]; removeFolders?: readonly string[]; clearFolder?: boolean },
-  ): Promise<CatalogEntry> {
+  async updateMeta(hash: string, change: MetaChange): Promise<CatalogEntry> {
+    return (await this.updateMetaEach([{ hash, change }]))[0]!;
+  }
+
+  /**
+   * Change the tags, favourite flag or folder of many assets in one transaction: a change to hundreds of picked items is one write (and
+   * one flush to disk), not one each. All or nothing.
+   */
+  async updateMetaEach(changes: ReadonlyArray<{ hash: string; change: MetaChange }>): Promise<CatalogEntry[]> {
     return this.write(["assetCatalog", "meta"], async (tx) => {
-      const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
-      if (!e || e.state !== "active") throw new CatalogInputError("the item is not in the library");
-      const m = meta(e);
-      const next: CatalogEntry = { ...e, ...m };
-      if (change.favorite !== undefined) next.favorite = change.favorite;
-      if (change.addTags || change.removeTags) {
-        const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
-        next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
+      const known = changes.some(({ change: c }) => c.addFolders || c.removeFolders || c.clearFolder) ? new Set((await this.readFolders(tx)).map((f) => f.id)) : null;
+      const out: CatalogEntry[] = [];
+      for (const { hash, change } of changes) {
+        const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
+        if (!e || e.state !== "active") throw new CatalogInputError("the item is not in the library");
+        const m = meta(e);
+        const next: CatalogEntry = { ...e, ...m };
+        if (change.favorite !== undefined) next.favorite = change.favorite;
+        if (change.addTags || change.removeTags) {
+          const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
+          next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
+        }
+        if (known) {
+          if ((change.addFolders ?? []).some((id) => !known.has(id))) throw new CatalogInputError("that folder no longer exists");
+          const drop = new Set(change.removeFolders ?? []);
+          // One folder per asset: adding replaces the folder; removing clears it.
+          const added = change.addFolders ?? [];
+          if (change.addFolders || change.removeFolders || change.clearFolder) next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
+        }
+        tx.objectStore("assetCatalog").put(next);
+        out.push(next);
       }
-      if (change.addFolders || change.removeFolders || change.clearFolder) {
-        const known = new Set((await this.readFolders(tx)).map((f) => f.id));
-        if ((change.addFolders ?? []).some((id) => !known.has(id))) throw new CatalogInputError("that folder no longer exists");
-        const drop = new Set(change.removeFolders ?? []);
-        // One folder per asset: adding replaces the folder; removing clears it.
-        const added = change.addFolders ?? [];
-        next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
-      }
-      tx.objectStore("assetCatalog").put(next);
-      return next;
+      return out;
     });
   }
 
@@ -451,6 +470,25 @@ export class AssetCatalog {
    * it. The original is not erased here; `collect` does that once nothing
    * (including undo history) can bring an instance back.
    */
+  /** Delete many from the library in one transaction (one flush to disk, not one each): those in use are kept and counted. */
+  async markDeletedEach(hashes: readonly string[]): Promise<{ gone: string[]; inUse: number }> {
+    return this.write(["assetCatalog", "objects"], async (tx) => {
+      const gone: string[] = [];
+      let inUse = 0;
+      for (const hash of hashes) {
+        if ((await req(tx.objectStore("objects").index("assetId").count(hash))) > 0) {
+          inUse++;
+          continue;
+        }
+        const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
+        if (!e) continue;
+        tx.objectStore("assetCatalog").put({ ...e, state: "deleted", deletedAt: Date.now() } satisfies CatalogEntry);
+        gone.push(hash);
+      }
+      return { gone, inUse };
+    });
+  }
+
   async markDeleted(hash: string): Promise<void> {
     const tx = this.db.transaction(["assetCatalog", "objects"], "readwrite", { durability: "strict" });
     const committed = done(tx);

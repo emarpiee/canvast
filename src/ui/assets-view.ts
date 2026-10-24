@@ -34,7 +34,7 @@ import type { Engine } from "./media-player";
 import { avEngine, gifEngine } from "./media-player";
 import { mountPlayerControls } from "./player-controls";
 import type { ImageObject } from "../doc/model";
-import { chooseDialog } from "./confirm";
+import { chooseDialog, promptDialog } from "./confirm";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -1399,8 +1399,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const unused = ents.filter((e) => e.instances === 0).length;
     const placeable = ents.filter((e) => e.present).length;
     const dis = session.readOnly ? " disabled" : "";
-    const folders = listing!.folders;
-    const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
     const bytes = ents.reduce((t, e) => t + e.size, 0);
     inspector.dataset["hash"] = "";
     inspector.innerHTML = `
@@ -1413,18 +1411,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <span class="split"><button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable} on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-all-menu" data-testid="bulk-place-menu"${placeable ? "" : " disabled"}${dis} aria-haspopup="menu" aria-label="Place them on another canvas or a new one" title="Place them on another canvas or a new one">${ICONS.chevronDown}</button></span>
       </div>
       <div class="asset-facts"><span>${fmtBytes(bytes)} in all</span><span>${unused} of ${n} not used on any canvas</span></div>
-      <section class="asset-sec">
-        <h3>Add a tag to all</h3>
-        <div class="tag-chips"><input class="tag-input bulk-tag-input" data-testid="bulk-tag-input" placeholder="Add a tag" aria-label="Add a tag to all selected" title="Type a tag and press Enter" maxlength="64"${dis}></div>
-      </section>
-      <section class="asset-sec">
-        <h3>Move all to a folder</h3>
-        ${
-          sorted.length
-            ? `<ul class="asset-folders" data-testid="bulk-folders">${[`<li><label><input type="radio" name="bulk-folder" data-bulk-folder=""${ents.every((e) => meta(e).folderIds.length === 0) ? " checked" : ""}${dis}>No folder</label></li>`, ...sorted.map((f: AssetFolder) => `<li><label><input type="radio" name="bulk-folder" data-bulk-folder="${f.id}"${ents.every((e) => meta(e).folderIds[0] === f.id) ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`)].join("")}</ul>`
-            : `<p class="asset-note">No folders yet. Make one with “+ Folder” in the sidebar.</p>`
-        }
-      </section>
+      ${tagsAndFolderHtml(ents, true)}
       <div class="asset-actions">
         <button type="button" class="assets-btn" data-action="rename-all" data-testid="bulk-rename" title="Rename them together: enumerate, replace text, add text, change the extension (F2)"${dis}>${ICONS.textCursorInput}<span>Rename ${n}…</span></button>
         <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
@@ -1527,20 +1514,53 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     box.hidden = false;
   };
 
+  /**
+   * The tags and the folder of one asset or of several picked ones, the same for both: each tag on any of them, with (for several) how
+   * many have it, × to take it off all of them and + to put it on the rest; a field that suggests the library's tags; each folder with how
+   * many are in it (a mixed pick has none ticked) and New folder…, which makes one and moves them into it.
+   */
+  const tagsAndFolderHtml = (ents: ReadonlyArray<CatalogListing["entries"][number]>, bulk: boolean): string => {
+    const n = ents.length;
+    const dis = session.readOnly ? " disabled" : "";
+    const on = new Map<string, { label: string; k: number }>();
+    for (const e of ents) for (const t of meta(e).tags) {
+      const c = on.get(t.toLowerCase());
+      if (c) c.k++;
+      else on.set(t.toLowerCase(), { label: t, k: 1 });
+    }
+    const chips = [...on.values()].sort((a, b) => b.k - a.k || a.label.localeCompare(b.label)).map(({ label: t, k }) => {
+      const some = bulk && k < n;
+      return `<span class="tag-chip${some ? " is-partial" : ""}">#${esc(t)}${
+        some ? `<span class="tag-count" title="On ${k} of ${n}">${k}/${n}</span><button type="button" data-action="tag-all" data-tag="${esc(t)}" aria-label="Add tag ${esc(t)} to all ${n}" title="Add to all ${n}"${dis}>+</button>` : ""
+      }<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}${bulk ? ` from all ${n}` : ""}" title="Remove${bulk ? ` from all ${n}` : ""}"${dis}>×</button></span>`;
+    });
+    const known = [...new Set(listing!.entries.flatMap((e) => meta(e).tags))].filter((t) => !on.has(t.toLowerCase())).sort((a, b) => a.localeCompare(b));
+    const folders = listing!.folders;
+    const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
+    const radio = (id: string, label: string, k: number): string =>
+      `<li><label><input type="radio" name="${bulk ? "bulk-folder" : "asset-folder"}" ${bulk ? "data-bulk-folder" : "data-folder"}="${id}"${k === n ? " checked" : ""}${dis}>${label}${bulk && k > 0 && k < n ? `<span class="folder-count">${k} of ${n}</span>` : ""}</label></li>`;
+    return `
+      <section class="asset-sec">
+        <h3>${bulk ? "Tags of these" : "Tags"}</h3>
+        <div class="tag-chips" data-testid="${bulk ? "bulk-tags" : "asset-tags"}">
+          ${chips.join("")}
+          <input class="tag-input${bulk ? " bulk-tag-input" : ""}" data-testid="${bulk ? "bulk-tag-input" : "asset-tag-input"}" list="tag-suggest" placeholder="${bulk ? `Add a tag to all ${n}` : "Add a tag"}" aria-label="${bulk ? "Add a tag to all selected" : "Add a tag"}" title="Type a tag (or several, with commas) and press Enter" maxlength="64"${dis}>
+          <datalist id="tag-suggest">${known.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
+        </div>
+      </section>
+      <section class="asset-sec">
+        <h3>${bulk ? "Folder of these" : "Folder"}</h3>
+        ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
+        <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
+      </section>`;
+  };
+
   /** Tags and folders of an entry (inspector). */
   const organizeHtml = (e: CatalogListing["entries"][number]): string => {
     const m = meta(e);
     const dis = session.readOnly ? " disabled" : "";
-    const folders = listing!.folders;
-    const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
     return `
-      <section class="asset-sec">
-        <h3>Tags</h3>
-        <div class="tag-chips" data-testid="asset-tags">
-          ${m.tags.map((t) => `<span class="tag-chip">#${esc(t)}<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}"${dis}>×</button></span>`).join("")}
-          <input class="tag-input" data-testid="asset-tag-input" placeholder="Add a tag" aria-label="Add a tag" title="Type a tag and press Enter" maxlength="64"${dis}>
-        </div>
-      </section>
+      ${tagsAndFolderHtml([e], false)}
       ${(() => {
         // Tags put on this picture's instances on canvases (in-canvas tags) that the asset itself does not have yet.
         const extra = assetCanvasTags.filter((t) => !m.tags.some((x) => x.toLowerCase() === t.tag.toLowerCase()));
@@ -1550,15 +1570,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               <ul class="asset-ctags" data-testid="asset-canvas-tags">${extra.map((t) => `<li><button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t.tag)}" aria-label="Add the tag ${esc(t.tag)} to this asset"${dis}>+ #${esc(t.tag)}</button><span class="tag-where" title="${esc(t.canvases.map(crumbOf).join("; "))}">on ${esc(t.canvases.slice(0, 2).map(crumbOf).join(", "))}${t.canvases.length > 2 ? ` and ${t.canvases.length - 2} more` : ""}</span></li>`).join("")}</ul>
             </section>`
           : "";
-      })()}
-      <section class="asset-sec">
-        <h3>Folder</h3>
-        ${
-          sorted.length
-            ? `<ul class="asset-folders" data-testid="asset-folders">${[`<li><label><input type="radio" name="asset-folder" data-folder=""${m.folderIds.length === 0 ? " checked" : ""}${dis}>No folder</label></li>`, ...sorted.map((f: AssetFolder) => `<li><label><input type="radio" name="asset-folder" data-folder="${f.id}"${m.folderIds[0] === f.id ? " checked" : ""}${dis}>${esc(folderPath(folders, f.id).join(" › "))}</label></li>`)].join("")}</ul>`
-            : `<p class="asset-note">No folders yet. Make one with “+ Folder” in the sidebar.</p>`
-        }
-      </section>`;
+      })()}`;
   };
 
   const crumbOf = (canvasId: string): string => {
@@ -1726,7 +1738,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!b || b.disabled || !selected) return;
     const hash = selected;
     const group = [...picked];
-    switch (b.dataset["action"]) {
+    const action = b.dataset["action"];
+    /** What the panel is about: every picked asset, or the one shown. */
+    const pickedGroup = (): string[] => (picked.size > 1 ? group : [hash]);
+    switch (action) {
       case "clear":
         void select(null);
         break;
@@ -1744,9 +1759,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "favorite-all": {
         const on = b.getAttribute("aria-pressed") !== "true";
-        void session.organize(async (c) => {
-          for (const h of group) await c.updateMeta(h, { favorite: on });
-        });
+        void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { favorite: on } }))));
         break;
       }
       case "export-files-all":
@@ -1805,9 +1818,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void session.organize((c) => c.updateMeta(hash, { addTags: [tag] }));
         break;
       }
-      case "untag": {
+      case "untag":
+      case "tag-all": {
+        // one asset, or every picked one (the panel is about all of them), in one write
         const tag = b.dataset["tag"]!;
-        void session.organize((c) => c.updateMeta(hash, { removeTags: [tag] }));
+        const change = action === "untag" ? { removeTags: [tag] } : { addTags: [tag] };
+        void session.organize((c) => c.updateMetaEach(pickedGroup().map((h) => ({ hash: h, change }))));
+        break;
+      }
+      case "new-folder-into": {
+        const group = pickedGroup();
+        void promptDialog({ title: group.length > 1 ? `New folder for ${group.length} items` : "New folder", lines: ["They are moved into it."], value: "", confirmLabel: "Make and move" }).then((name) => {
+          if (!name?.trim()) return;
+          const id = newObjectId();
+          void session.organize(async (c) => {
+            await c.createFolder(name.trim(), null, id);
+            await c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [id] } })));
+          });
+        });
         break;
       }
       case "download":
@@ -1855,27 +1883,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // One asset, or every picked one.
     const group = input.classList.contains("bulk-tag-input") ? [...picked] : [selected];
     void session
-      .organize(async (c) => {
-        for (const h of group) await c.updateMeta(h, { addTags: add });
-      })
+      .organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { addTags: add } }))))
       .then(() => inspector.querySelector<HTMLInputElement>(".tag-input")?.focus());
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
     const bulk = box.dataset["bulkFolder"];
-    const put = (c: { updateMeta: (h: string, ch: { addFolders?: string[]; clearFolder?: boolean }) => Promise<unknown> }, h: string, id: string): Promise<unknown> =>
-      c.updateMeta(h, id ? { addFolders: [id] } : { clearFolder: true });
+    const into = (id: string) => (id ? { addFolders: [id] } : { clearFolder: true });
     if (bulk !== undefined) {
       const group = [...picked];
-      void session.organize(async (c) => {
-        for (const h of group) await put(c, h, bulk);
-      });
+      void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: into(bulk) }))));
       return;
     }
     const id = box.dataset["folder"];
     if (id === undefined || !selected) return;
     const hash = selected;
-    void session.organize((c) => put(c, hash, id));
+    void session.organize((c) => c.updateMeta(hash, into(id)));
   });
 
   // A thumbnail with see-through pixels gets a chequered ground (cards, filmstrip and the details picture) so it reads as transparent.

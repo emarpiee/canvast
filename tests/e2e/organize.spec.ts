@@ -519,3 +519,51 @@ test("canvases and boards can be duplicated, moved up and down, and a canvas mov
   await expect(p.locator(".nav-board-name")).toHaveText(["Board 1", "Board 2", "Board 1 copy"]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("several picked: each tag with how many have it, removed from all or added to the rest at once; tags typed with commas and a new folder go to all; a mixed folder shows counts, nothing ticked", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const files = [0, 1, 2, 3].map((i) => ({ name: `p${i}.png`, mimeType: "image/png", buffer: makePng(4, 4, () => [40 * i, 90, 160, 255]) }));
+  await p.getByTestId("assets-import-input").setInputFiles(files);
+  await expect(cards(p)).toHaveCount(4);
+  const hashes = await cards(p).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset["hash"]!));
+  await addTags(p, hashes[0]!, "half");
+  await addTags(p, hashes[1]!, "half");
+  await expect(p.getByTestId("asset-tags")).toContainText("#half"); // (stored: the field gets the focus back after it)
+  const all = async () =>
+    expect(async () => {
+      await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (Ctrl+A in a text field selects its text)
+      await p.keyboard.press("Control+a");
+      await expect(p.getByTestId("bulk-tags")).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+  await all();
+  const chip = p.getByTestId("bulk-tags").locator(".tag-chip", { hasText: "#half" });
+  await expect(chip).toContainText("2/4");
+  // + puts it on the rest
+  await chip.getByRole("button", { name: "Add tag half to all 4" }).click();
+  await expect(chip).not.toContainText("2/4");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.catalogEntries().then((es) => es.filter((e) => (e.tags ?? []).includes("half")).length))).toBe(4);
+  // × takes it off all of them
+  await chip.getByRole("button", { name: "Remove tag half from all 4" }).click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.catalogEntries().then((es) => es.filter((e) => (e.tags ?? []).length).length))).toBe(0);
+  // two tags at once, to all
+  await p.getByTestId("bulk-tag-input").fill("one, two");
+  await p.getByTestId("bulk-tag-input").press("Enter");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.catalogEntries().then((es) => es.filter((e) => (e.tags ?? []).length === 2).length))).toBe(4);
+  // a new folder for these, all moved in
+  await p.getByTestId("bulk-new-folder").click();
+  await p.getByTestId("prompt-dialog").locator("input").fill("Mix");
+  await p.getByTestId("prompt-dialog").getByRole("button", { name: "Make and move" }).click();
+  await expect(p.getByTestId("bulk-folders").getByRole("radio", { name: /Mix/ })).toBeChecked();
+  // two of them out again: the four together are mixed (counts, no tick)
+  await p.keyboard.press("Escape");
+  await pick(p, hashes[0]!);
+  await card(p, hashes[1]!).click({ modifiers: ["Shift"] });
+  await p.getByTestId("bulk-folders").getByRole("radio", { name: "No folder" }).check();
+  await p.keyboard.press("Escape");
+  await pick(p, hashes[0]!);
+  await all();
+  await expect(p.getByTestId("bulk-folders").getByRole("radio", { name: /Mix/ })).not.toBeChecked();
+  await expect(p.getByTestId("bulk-folders")).toContainText("2 of 4");
+  expect(app.consoleErrors).toEqual([]);
+});

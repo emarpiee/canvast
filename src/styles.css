@@ -1126,6 +1126,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .tag-input { flex: 1 1 100px; min-width: 0; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--hud-border); padding: var(--sp-2) var(--sp-1); }
 .asset-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .asset-folders label { display: flex; gap: var(--sp-4); align-items: center; cursor: pointer; }
+/* several picked: a tag only some have (dashed, with how many), a folder only some are in (how many) */
+.tag-chip.is-partial { background: transparent; border: 1px dashed var(--hud-border); }
+.tag-count, .folder-count { font-size: var(--text-xs); color: var(--hud-muted); }
+.folder-count { margin-left: auto; }
+.asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 
 /* The viewer: the original large, the details beside it (they can be hidden), the controls below (they can be hidden). */
 .viewer { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--media-bg); color: var(--media-fg); outline: none; }

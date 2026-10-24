@@ -497,19 +497,12 @@ export class Session {
   async deleteAssets(hashes: readonly string[]): Promise<number> {
     if (!this.guardWrite() || !this.catalog) return 0;
     await this.persistence.flush();
-    const gone: string[] = [];
+    let gone: string[] = [];
     let inUse = 0;
-    for (const h of hashes) {
-      try {
-        await this.catalog.markDeleted(h);
-        gone.push(h);
-      } catch (e) {
-        if (e instanceof AssetInUseError) inUse++;
-        else {
-          this.tell(`Could not delete the item: ${(e as Error).message}`);
-          break;
-        }
-      }
+    try {
+      ({ gone, inUse } = await this.catalog.markDeletedEach(hashes));
+    } catch (e) {
+      this.tell(`Could not delete the items: ${(e as Error).message}`);
     }
     if (gone.length) {
       this.gcPending = true;

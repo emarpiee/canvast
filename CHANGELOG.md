@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.42.0 — Tags and folders for many items at once (2026-10-25)
+
+- **Tags of several picked items:** every tag any of them has, with how many have it; **×** removes it from all of them (before, a tag could not be taken off several at once), **+** adds it to the rest. The tag field suggests the library's tags.
+- **Folder of several picked items:** how many of them each folder holds, nothing ticked for a mixed pick (it used to look like none was in a folder), and *New folder for these…*. One item gets the same panel, with *New folder…*.
+- **Fixed:** a tag, favourite, folder or deletion for many items wrote each item in a transaction of its own, each waiting for the disk: hundreds of items could take minutes on a real disk. They are now one write. Filing a folder import into folders too.
+
 ## 0.41.6 — Resizing a sheet by its handles carries what is on it (2026-10-25)
 
 - **Fixed:** resizing a sheet or a clipping mask by its handles, with it picked alone, left what was on it out of the resize: its pins (right, centre, scale) did nothing, and a pattern on it was neither stretched nor made again (0.41.5 only worked with the pattern picked too). What is on it now follows, as with the ratio and size fields.

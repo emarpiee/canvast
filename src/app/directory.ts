@@ -93,13 +93,14 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
     return parent!;
   };
   const imported = new Set(listing.entries.map((e) => e.hash));
-  // One organize for the whole batch: the library is told (and redrawn) once, not once per file.
+  // One organize for the whole batch: the library is told (and redrawn) once, not once per file; the files are filed in one write.
   await session.organize(async (c) => {
+    const changes: Array<{ hash: string; change: { addFolders: string[] } }> = [];
     for (const f of wanted) {
       const hash = await sha256Hex(await f.arrayBuffer());
       if (!imported.has(hash)) continue; // not imported (a type it does not take)
-      const id = await idOf(c, folderPathOf(f));
-      await c.updateMeta(hash, { addFolders: [id] });
+      changes.push({ hash, change: { addFolders: [await idOf(c, folderPathOf(f))] } });
     }
+    if (changes.length) await c.updateMetaEach(changes);
   });
 }
