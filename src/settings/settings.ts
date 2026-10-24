@@ -16,6 +16,10 @@
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 
+/** The ways W A S D step to the next item (interaction/item-navigation.ts), in the order Settings lists them. */
+export const NAV_MODES = ["view", "anywhere", "layer-view", "layer", "az-view", "az"] as const;
+export type NavMode = (typeof NAV_MODES)[number];
+
 export type Scope = "device" | "workspace" | "board";
 
 export interface Def<T> {
@@ -66,6 +70,7 @@ export const SETTINGS = {
   "shape.join": { scope: "device", default: "default", validate: oneOf("default", "miter", "round", "bevel"), effect: "immediate" } as Def<"default" | "miter" | "round" | "bevel">,
   "shape.cap": { scope: "device", default: "round", validate: oneOf("butt", "round", "square"), effect: "immediate" } as Def<"butt" | "round" | "square">,
   "shape.dash": { scope: "device", default: "solid", validate: oneOf("solid", "dashed", "dotted"), effect: "immediate" } as Def<"solid" | "dashed" | "dotted">,
+  "shape.gapClosePx": { scope: "device", default: 4, validate: range(0, 24), effect: "immediate" } as Def<number>,
   "shape.initialPaint": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shape.lockRadius": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shape.align": { scope: "device", default: "centre", validate: oneOf("inside", "centre", "outside"), effect: "immediate" } as Def<"inside" | "centre" | "outside">,
@@ -178,7 +183,7 @@ export const SETTINGS = {
   "shot.tagCanvas": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagItems": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.copy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "nav.mode": { scope: "device", default: "view", validate: oneOf("view", "anywhere", "layer"), effect: "immediate" } as Def<"view" | "anywhere" | "layer">,
+  "nav.mode": { scope: "device", default: "view", validate: oneOf(...NAV_MODES), effect: "immediate" } as Def<NavMode>,
   "nav.arrive": { scope: "device", default: "focus", validate: oneOf("focus", "keep"), effect: "immediate" } as Def<"focus" | "keep">,
   // Camera travel (ADR 0163): how the view moves to a bookmark or a previous view.
   "nav.travel": { scope: "device", default: "fly", validate: oneOf("fly", "near", "cut"), effect: "immediate" } as Def<"fly" | "near" | "cut">,

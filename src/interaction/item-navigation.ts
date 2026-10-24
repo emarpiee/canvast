@@ -9,16 +9,20 @@ import { isInside, unitKey } from "../doc/groups";
 import type { DocumentStore } from "../doc/document-store";
 import type { EditorState } from "../app/editor-state";
 import type { ViewState } from "../app/view-state";
+import type { NavMode } from "../settings/settings";
 
 /**
  * Stepping between items with W A S D, or the keys set in Settings > Shortcuts (ADR 0058, 0072). Three ways to pick the next item:
  *  - "view":     the nearest item in the direction, measured on the screen; items too small to see (too deep) or far larger than the
  *                window (too high) are ignored, so the step stays among what can be seen at this zoom.
  *  - "anywhere": the nearest item in the direction by position alone, at any depth and size.
- *  - "layer":    the next item up or down the paint order (top-most first), wherever it is.
- * A group counts as one item. Nothing here moves an item: it only changes the selection and the camera.
+ *  - "layer":    the next item up or down the paint order (top-most first), wherever it is; "layer-view": the same among the items in
+ *                the window.
+ *  - "az":       the next item by name, A to Z (the name the Layers list shows), wherever it is; "az-view": among the items in the window.
+ * In the ordered ways W and A go back, S and D on. A group counts as one item. Nothing here moves an item: it only changes the selection
+ * and the camera.
  */
-export type NavMode = "view" | "anywhere" | "layer";
+export type { NavMode };
 export type NavDir = "left" | "right" | "up" | "down";
 
 /** On-screen size (px) outside which an item is ignored by the "view" mode. */
@@ -60,15 +64,30 @@ function boxIn(view: ViewState, objects: readonly CanvasObject[]): { min: WorldP
 
 const centreOf = (b: { min: WorldPoint; max: WorldPoint }): WorldPoint => ({ x: D.shift(D.add(b.min.x, b.max.x), -1), y: D.shift(D.add(b.min.y, b.max.y), -1) });
 
-/** Pick the item to go to from the current selection (null: stay where you are). */
-export function pickNeighbour(doc: DocumentStore, view: ViewState, editor: EditorState, dir: NavDir, mode: NavMode): ObjectId[] | null {
-  const units = unitsOf(doc, editor);
-  if (units.length === 0) return null;
+/** Whether an item is in the window and big enough to see (the items "in view" for the ordered ways). */
+function seen(view: ViewState, members: readonly CanvasObject[]): boolean {
+  const b = boxIn(view, members);
+  if (!b) return false;
+  const vp = view.viewport;
+  const p = worldToScreen(view.camera, vp, b.min), q = worldToScreen(view.camera, vp, b.max);
+  const size = Math.max(Math.abs(q.x - p.x), Math.abs(q.y - p.y));
+  return Math.max(p.x, q.x) > 0 && Math.min(p.x, q.x) < vp.width && Math.max(p.y, q.y) > 0 && Math.min(p.y, q.y) < vp.height && size >= MIN_SEEN_PX;
+}
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+/** Pick the item to go to from the current selection (null: stay where you are). `nameOf` names an item for the A to Z ways. */
+export function pickNeighbour(doc: DocumentStore, view: ViewState, editor: EditorState, dir: NavDir, mode: NavMode, nameOf: (o: CanvasObject, unit: readonly CanvasObject[]) => string = (o) => o.name ?? ""): ObjectId[] | null {
   const selected = new Set(editor.selection);
+  // the ordered ways "in view" keep the items in the window, and the one picked (it is where the step goes from)
+  const inView = mode === "layer-view" || mode === "az-view";
+  const units = unitsOf(doc, editor).filter((u) => !inView || u.members.some((m) => selected.has(m.id)) || seen(view, u.members));
+  if (units.length === 0) return null;
   const anchors = units.filter((u) => u.members.some((m) => selected.has(m.id)));
 
-  if (mode === "layer") {
-    const order = [...units].sort((a, b) => b.z - a.z || a.key.localeCompare(b.key));
+  if (mode !== "view" && mode !== "anywhere") {
+    const by = mode === "az" || mode === "az-view" ? new Map(units.map((u) => [u, nameOf(u.members[0]!, u.members)])) : null;
+    const order = [...units].sort((a, b) => (by ? collator.compare(by.get(a)!, by.get(b)!) : b.z - a.z) || a.key.localeCompare(b.key));
     if (anchors.length === 0) return order[0]!.members.map((m) => m.id);
     const top = Math.min(...anchors.map((a) => order.indexOf(a)));
     const bottom = Math.max(...anchors.map((a) => order.indexOf(a)));
@@ -171,7 +190,7 @@ function pickInView(
   const legible = (b: Px): boolean => b.size >= MIN_SEEN_PX && b.size <= MAX_SEEN_VIEWPORTS * Math.max(vp.width, vp.height);
   const inWindow = (b: Px): boolean => b.maxX > 0 && b.minX < vp.width && b.maxY > 0 && b.minY < vp.height;
   const a = anchorBox ? px(anchorBox) : null;
-  const cands = pool.flatMap((u) => {
+  const candidates = (reach: boolean) => pool.flatMap((u) => {
     const b = px(boxes.get(u)!);
     if (!legible(b)) return [];
     if (a) {
@@ -181,10 +200,11 @@ function pickInView(
       const ratio = both ? SIZE_RATIO_IN_VIEW : SIZE_RATIO;
       if (b.size > a.size * ratio || b.size < a.size / ratio) return [];
       const gap = Math.hypot(Math.max(0, a.minX - b.maxX, b.minX - a.maxX), Math.max(0, a.minY - b.maxY, b.minY - a.maxY));
-      if (gap > (both ? Math.max(REACH * a.size, Math.max(vp.width, vp.height)) : REACH * a.size)) return [];
+      if (reach && gap > (both ? Math.max(REACH * a.size, Math.max(vp.width, vp.height)) : REACH * a.size)) return [];
     } else if (!inWindow(b)) return [];
     return [{ u, b }];
   });
+  const cands = candidates(true);
   if (!a || !hasAnchor) {
     // Nothing selected: the nearest to the middle of the window.
     const mx = vp.width / 2;
@@ -196,19 +216,25 @@ function pickInView(
     return first ? first.u.members.map((m) => m.id) : null;
   }
   const horizontal = dir === "left" || dir === "right";
-  let best: { u: Unit; score: number } | null = null;
-  for (const { u, b } of cands) {
-    const dx = b.cx - a.cx;
-    const dy = b.cy - a.cy;
-    const forward = dir === "left" ? -dx : dir === "right" ? dx : dir === "up" ? -dy : dy;
-    if (!(forward > 0)) continue;
-    const across = Math.abs(horizontal ? dy : dx);
-    // Overlapping the selected item across the arrow's line counts as straight ahead.
-    const overlaps = horizontal ? b.minY < a.maxY && b.maxY > a.minY : b.minX < a.maxX && b.maxX > a.minX;
-    if (!overlaps && across > forward * CONE) continue;
-    const score = forward + across * 2;
-    if (!best || score < best.score) best = { u, score };
-  }
+  const ahead = (list: typeof cands): { u: Unit; score: number } | null => {
+    let best: { u: Unit; score: number } | null = null;
+    for (const { u, b } of list) {
+      const dx = b.cx - a.cx;
+      const dy = b.cy - a.cy;
+      const forward = dir === "left" ? -dx : dir === "right" ? dx : dir === "up" ? -dy : dy;
+      if (!(forward > 0)) continue;
+      const across = Math.abs(horizontal ? dy : dx);
+      // Overlapping the selected item across the arrow's line counts as straight ahead.
+      const overlaps = horizontal ? b.minY < a.maxY && b.maxY > a.minY : b.minX < a.maxX && b.maxX > a.minX;
+      if (!overlaps && across > forward * CONE) continue;
+      const score = forward + across * 2;
+      if (!best || score < best.score) best = { u, score };
+    }
+    return best;
+  };
+  // Nothing within reach (zoomed in, the neighbours are off the screen and several of the item's sizes away): the nearest of the same
+  // size ahead, however far, so whether a neighbour is found does not depend on the zoom.
+  const best = ahead(cands) ?? ahead(candidates(false));
   return best ? best.u.members.map((m) => m.id) : null;
 }
 
@@ -226,8 +252,8 @@ export function focusObjects(doc: DocumentStore, view: ViewState, ids: readonly 
 }
 
 /** Step from the selection to a neighbour and bring it into view. Returns whether anything changed. */
-export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: EditorState, dir: NavDir, mode: NavMode, zoom: boolean): boolean {
-  const ids = pickNeighbour(doc, view, editor, dir, mode);
+export function stepToNeighbour(doc: DocumentStore, view: ViewState, editor: EditorState, dir: NavDir, mode: NavMode, zoom: boolean, nameOf?: Parameters<typeof pickNeighbour>[5]): boolean {
+  const ids = pickNeighbour(doc, view, editor, dir, mode, nameOf);
   if (!ids) return false;
   editor.select(ids);
   focusObjects(doc, view, ids, zoom);

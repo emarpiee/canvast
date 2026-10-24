@@ -34,6 +34,8 @@ import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
 import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
 import { gapsOf } from "../doc/gaps";
+import { cameraIn } from "../scene/frame-index";
+import { projectionFor } from "../render/projection";
 import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
 import { regionIn } from "../doc/boolean-group";
 import type { WidthProfile } from "../doc/stroker";
@@ -1933,8 +1935,13 @@ export function divide(doc: DocumentStore, editor: EditorState): void {
 // ---- Gaps (ADR 0172) ---------------------------------------------------------------------------------------------------------
 
 /** The gaps the picked shapes close in, as shapes with the Shape tool's fill and no outline, placed in the units of the back one; or why none. */
-function gapShapes(doc: DocumentStore, editor: EditorState): { back: PathObject; gaps: PathObject[] } | string {
-  const found = gapsOf(dividable(doc, editor), doc.space);
+function gapShapes(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): { back: PathObject; gaps: PathObject[] } | string {
+  const shapes = dividable(doc, editor);
+  // the closing distance on the screen, in the units of the back shape (the one the gaps are found in)
+  const back0 = [...shapes].sort((a, b) => a.z - b.z)[0];
+  const cam = back0 && cameraIn(view.frameCamera, back0.frame ?? doc.space.world);
+  const ppu = cam && back0 ? projectionFor(cam, view.viewport, back0.anchor, back0.unit).ppu : 0;
+  const found = gapsOf(shapes, doc.space, ppu > 0 && ppu < Infinity ? closePx / ppu : 0);
   if (typeof found === "string") return found;
   const { back } = found;
   if (!found.gaps.length) return "The picked shapes close in no gap: an empty place must be closed in on every side to be filled.";
@@ -1956,9 +1963,9 @@ function placeUnder(doc: DocumentStore, objs: PathObject[], back: PathObject): C
 export const canFillGaps = (doc: DocumentStore, editor: EditorState): boolean => dividable(doc, editor).length >= 1;
 
 /** Fill every gap the picked shapes close in: one undo step; the fills are picked. */
-export function fillAllGaps(doc: DocumentStore, editor: EditorState): void {
+export function fillAllGaps(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): void {
   if (editor.blockEdit()) return;
-  const found = gapShapes(doc, editor);
+  const found = gapShapes(doc, editor, view, closePx);
   if (typeof found === "string") {
     editor.message = found;
     return editor.changed();
@@ -1970,9 +1977,9 @@ export function fillAllGaps(doc: DocumentStore, editor: EditorState): void {
 }
 
 /** Turn on Fill a gap: the gaps of the picked shapes show, a click fills the one under it (one undo step each), Enter or Esc ends it. */
-export function startGapFill(doc: DocumentStore, editor: EditorState): void {
+export function startGapFill(doc: DocumentStore, editor: EditorState, view: ViewState, closePx: number): void {
   if (editor.blockEdit() || editor.builder || editor.gapFill) return;
-  const found = gapShapes(doc, editor);
+  const found = gapShapes(doc, editor, view, closePx);
   if (typeof found === "string") {
     editor.message = found;
     return editor.changed();

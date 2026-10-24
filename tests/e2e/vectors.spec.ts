@@ -2426,7 +2426,8 @@ test("Fill gaps fills the place four shapes close in, under them; Fill a gap fil
   await pathWith(p, "fillgaps");
   let all = await objs(app);
   expect(all).toHaveLength(5);
-  const gap = all.find((o) => o["name"] === "Gap")!;
+  const named = (o: Obj): string | undefined => (o as Obj & { name?: string }).name;
+  const gap = all.find((o) => named(o) === "Gap")!;
   expect(all.indexOf(gap), "under the shapes round it").toBe(0);
   expect(size(gap).w).toBeCloseTo(160, 0);
   expect(size(gap).h).toBeCloseTo(80, 0);
@@ -2444,9 +2445,21 @@ test("Fill gaps fills the place four shapes close in, under them; Fill a gap fil
   await click(app, 520, 380);
   all = await objs(app);
   expect(all).toHaveLength(5);
-  expect(all[0]!["name"]).toBe("Gap");
+  expect(named(all[0]!)).toBe("Gap");
   await key(app, "Control+z");
   expect(await objs(app)).toHaveLength(4);
+  // a slit of 2 px (the right bar moved off): within the 4 px a gap is closed by, so the place is still filled, up to the slit
+  await key(app, "Control+a");
+  await key(app, "Delete");
+  await key(app, "u");
+  for (const [a, b] of [[[400, 300], [598, 340]], [[400, 420], [598, 460]], [[400, 300], [440, 460]], [[600, 300], [640, 460]]] as Array<[[number, number], [number, number]]>) await drag(app, a, b);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await pathWith(p, "fillgaps");
+  expect((await objs(app)).filter((o) => named(o) === "Gap").length).toBeGreaterThan(0);
+  await key(app, "Escape");
+  await app.frame();
+  expect(await px()).toEqual([37, 99, 235]);
 });
 
 test("Divide cuts overlapping shapes into their regions; the Shape builder merges regions dragged across and deletes them with Alt; one undo each", async ({ app }) => {

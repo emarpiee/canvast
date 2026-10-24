@@ -75,8 +75,85 @@ export function gapsOfLoops(loops: readonly SubPath[]): Gap[] {
   });
 }
 
-/** The gaps the shapes close in, in the units of the back one, or a sentence saying why there are none to find. */
-export function gapsOf(shapes: readonly PathObject[], space: FrameSpace): { back: PathObject; gaps: Gap[] } | string {
+/** Bridges thinner than this share of the distance they close (they stay as a hair between the fill and the opening). */
+const BRIDGE_WIDTH = 0.01;
+/** Most corners looked at for openings (a corner is a node, or one of the points along a curve). */
+const MAX_BRIDGE_CORNERS = 20_000;
+
+/**
+ * Hair-thin bridges across the openings narrower than `r` between loops (or across a nearly closed bend of one loop): from each corner to
+ * the nearest point of another loop's side within `r`. United with the shapes, they close those openings, so the places behind them are
+ * gaps too and their fills stop at the line across the opening.
+ */
+export function bridgesOf(loops: readonly SubPath[], r: number): SubPath[] {
+  if (!(r > 0)) return [];
+  const polys = loops.map(loopPolygon);
+  // the sides, in a grid of cells of size r, with the length along their loop up to their start (to tell a bend from the next side)
+  type Side = { loop: number; x0: number; y0: number; x1: number; y1: number; at: number };
+  const sides: Side[] = [];
+  const lens: number[] = [];
+  polys.forEach((p, loop) => {
+    let at = 0;
+    for (let i = 0; i < p.length; i += 2) {
+      const j = (i + 2) % p.length;
+      const s = { loop, x0: p[i]!, y0: p[i + 1]!, x1: p[j]!, y1: p[j + 1]!, at };
+      sides.push(s);
+      at += Math.hypot(s.x1 - s.x0, s.y1 - s.y0);
+    }
+    lens.push(at);
+  });
+  const cell = (v: number): number => Math.floor(v / r);
+  const grid = new Map<string, number[]>();
+  sides.forEach((s, i) => {
+    const steps = Math.min(1000, Math.ceil(Math.hypot(s.x1 - s.x0, s.y1 - s.y0) / r));
+    for (let t = 0; t <= steps; t++) {
+      const k = `${cell(s.x0 + ((s.x1 - s.x0) * t) / (steps || 1))},${cell(s.y0 + ((s.y1 - s.y0) * t) / (steps || 1))}`;
+      const l = grid.get(k) ?? grid.set(k, []).get(k)!;
+      if (l[l.length - 1] !== i) l.push(i);
+    }
+  });
+  const out: SubPath[] = [];
+  let corners = 0;
+  polys.forEach((p, loop) => {
+    let at = 0;
+    for (let i = 0; i < p.length && corners < MAX_BRIDGE_CORNERS; i += 2, corners++) {
+      const x = p[i]!, y = p[i + 1]!;
+      let best: { x: number; y: number; d: number } | null = null;
+      const seen = new Set<number>();
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+        for (const k of grid.get(`${cell(x) + a},${cell(y) + b}`) ?? []) {
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const s = sides[k]!;
+          const vx = s.x1 - s.x0, vy = s.y1 - s.y0;
+          const len2 = vx * vx + vy * vy;
+          const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - s.x0) * vx + (y - s.y0) * vy) / len2)) : 0;
+          const qx = s.x0 + vx * t, qy = s.y0 + vy * t;
+          const d = Math.hypot(qx - x, qy - y);
+          if (d <= r * 1e-6 || d > r || (best && d >= best.d)) continue; // (touching already, or too far)
+          if (s.loop === loop) {
+            // the same loop: only across a bend, not along the outline itself (the way round is much longer than the way across)
+            const along = Math.abs(s.at + Math.sqrt(len2) * t - at);
+            if (Math.min(along, lens[loop]! - along) < 3 * d) continue;
+          }
+          best = { x: qx, y: qy, d };
+        }
+      }
+      if (best) {
+        const nx = (-(best.y - y) / best.d) * best.d * BRIDGE_WIDTH, ny = ((best.x - x) / best.d) * best.d * BRIDGE_WIDTH;
+        out.push({ closed: true, n: [[x, y], [best.x, best.y], [best.x + nx, best.y + ny], [x + nx, y + ny]].flatMap(([u, v]) => [u!, v!, u!, v!, u!, v!]) });
+      }
+      at += Math.hypot(p[(i + 2) % p.length]! - x, p[(i + 3) % p.length]! - y);
+    }
+  });
+  return out;
+}
+
+/**
+ * The gaps the shapes close in, in the units of the back one, or a sentence saying why there are none to find. `close` (in those units):
+ * openings up to that wide count as closed.
+ */
+export function gapsOf(shapes: readonly PathObject[], space: FrameSpace, close = 0): { back: PathObject; gaps: Gap[] } | string {
   if (!shapes.length) return "Pick the shapes around the gaps.";
   if (shapes.length > MAX_GAP_SHAPES) return `Gaps are found among up to ${MAX_GAP_SHAPES} shapes at a time.`;
   const back = [...shapes].sort((a, b) => a.z - b.z)[0]!;
@@ -87,7 +164,9 @@ export function gapsOf(shapes: readonly PathObject[], space: FrameSpace): { back
     regions.push({ subs: r.subs.filter((s) => s.closed && s.n.length >= 3 * NODE), evenodd: r.evenodd });
   }
   // (one shape: united with itself, which puts its loops in the union's turning, so a ring's hole is a gap)
-  const union = booleanOp("union", regions.length > 1 ? regions : [regions[0]!, regions[0]!]);
+  let union = booleanOp("union", regions.length > 1 ? regions : [regions[0]!, regions[0]!]);
+  const bridges = union && bridgesOf(union, close);
+  if (union && bridges?.length) union = booleanOp("union", [{ subs: union, evenodd: false }, { subs: bridges, evenodd: false }]); // (all bridges one region: one operation)
   if (!union) return "Those outlines graze each other in a way that cannot be told apart: move one a little and try again.";
   return { back, gaps: gapsOfLoops(union) };
 }

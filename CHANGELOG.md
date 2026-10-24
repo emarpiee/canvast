@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.40.0 — Gaps with small openings; W A S D by name and in view (2026-10-25)
+
+- **Fill gaps** closes small openings: a place left open by a slit narrower than 4 px on the screen (Settings > Drawing, *Fill gaps: close openings up to*, 0 to 24) is filled up to the slit.
+- **Fixed:** shapes that touch only at a corner (snapped hexagons, say) now close in the place between them, so Fill gaps finds it. Where outlines meet at one point, a boolean result's loop goes round the outside of the shapes.
+- **W A S D:** six ways to the next item: nearest in view, nearest anywhere, by layer in view or anywhere, by name A to Z in view or anywhere (the names the Layers list shows).
+- **Fixed:** *Nearest in view* found nothing when you were zoomed in on an item and its neighbours were off the screen several of its sizes away; it now goes to the nearest item of its size that way, however far, when nothing nearer qualifies.
+
 ## 0.39.0 — Fill the gaps between shapes (2026-10-25)
 
 - **Fill gaps** (Path tools menu, command palette, [ADR 0172](docs/adr/0172-fill-gaps.md)): fills every empty place the picked shapes close in, with the Shape tool's fill and no outline, under the shapes round it; a shape sitting in a gap is left out of its fill. One undo step.

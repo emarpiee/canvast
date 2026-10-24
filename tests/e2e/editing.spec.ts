@@ -472,6 +472,58 @@ test("W A S D step the selection between items (nearest in view, by layer) and f
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("W A S D by name A to Z, anywhere and in view: in the order of the names in the Layers list; in view skips what is off the screen (ADR 0058)", async ({ app }) => {
+  const p = app.page;
+  // three texts, their names out of order on the canvas: cherry, apple, banana from left to right
+  for (const [word, x] of [["cherry", 420], ["apple", 650], ["banana", 880]] as const) {
+    await p.keyboard.press("t");
+    await p.mouse.click(x, 450);
+    await expect(p.getByTestId("text-editor")).toBeFocused();
+    await p.keyboard.type(word);
+    await p.keyboard.press("Escape");
+    await app.frame();
+  }
+  await key(app, "v");
+  await key(app, "Escape");
+  const [cherry, apple, banana] = await objects(app);
+  const mode = async (m: string) => {
+    expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+    await p.evaluate((v) => localStorage.setItem("canvast.settings", JSON.stringify({ "nav.mode": v, "nav.arrive": "keep" })), m);
+    await p.reload();
+    await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  };
+  await mode("az");
+  await key(app, "s"); // (nothing picked: the first by name)
+  await expect.poll(() => selection(app)).toEqual([apple!.id]);
+  await key(app, "d");
+  await expect.poll(() => selection(app)).toEqual([banana!.id]);
+  await key(app, "s");
+  await expect.poll(() => selection(app)).toEqual([cherry!.id]);
+  await key(app, "w");
+  await expect.poll(() => selection(app)).toEqual([banana!.id]);
+  // in view: with cherry panned off the screen, banana is the last one
+  await mode("az-view");
+  // pan until cherry (the left-most) has gone off the left edge, whichever way an arrow key pans
+  const left = async () => (await screenOfObject(app, cherry!.id))?.box.maxX ?? -1; // (none: not drawn, off the screen)
+  const before = await left();
+  await key(app, "ArrowLeft");
+  await app.frame();
+  const k = (await left()) < before ? "ArrowLeft" : "ArrowRight";
+  for (let i = 0; i < 40 && (await left()) >= 0; i++) {
+    await key(app, k);
+    await app.frame();
+  }
+  expect(await left(), "cherry is off the screen").toBeLessThan(0);
+  const b = (await screenOfObject(app, banana!.id))!.box;
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  expect(await selection(app)).toEqual([banana!.id]);
+  await key(app, "s");
+  await app.frame();
+  expect(await selection(app), "the next by name is not in view").toEqual([banana!.id]);
+  await key(app, "w");
+  await expect.poll(() => selection(app)).toEqual([apple!.id]);
+});
+
 test("W A S D: 'nearest in view' skips an item too small to see at this zoom, 'nearest anywhere' does not (ADR 0058)", async ({ app }) => {
   const p = app.page;
   // A big stroke B, then a tiny one A drawn 8 levels deeper right beside the middle of B; back to the first zoom.
@@ -542,7 +594,7 @@ test("W A S D on arriving: 'Focus on the item' zooms to it, 'Keep the zoom level
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("W A S D, nearest in view: an item that is in the window is a neighbour however far (in its own sizes) or different in size; one off the screen is not (ADR 0058)", async ({ app }) => {
+test("W A S D, nearest in view: an item that is in the window is a neighbour however far (in its own sizes); zoomed in, with it off the screen, it still is when nothing nearer lies that way (ADR 0058)", async ({ app }) => {
   const p = app.page;
   await key(app, "p");
   // A small stroke; one far to the right (about 8 of its own sizes away) but in the window.
@@ -558,6 +610,11 @@ test("W A S D, nearest in view: an item that is in the window is a neighbour how
   await key(app, "d");
   await app.frame();
   expect(await selection(app), "in the window: it is what the step goes to").toEqual([far!.id]);
+  // the step zoomed in to it: the first one is now far off the screen (about 11 of its sizes away), and still the neighbour to the left
+  expect(await screenOfObject(app, a!.id).then((o) => o?.box.maxX ?? -1), "off the screen now (not drawn at all)").toBeLessThan(0);
+  await key(app, "a");
+  await app.frame();
+  expect(await selection(app), "zoomed in: the nearest item that way, however far").toEqual([a!.id]);
   expect(app.consoleErrors).toEqual([]);
 });
 

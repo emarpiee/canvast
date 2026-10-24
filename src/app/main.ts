@@ -713,7 +713,12 @@ async function start(): Promise<void> {
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
   });
   attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
-    navigate: (dir) => void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus"),
+    navigate: (dir) =>
+      void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
+        // the name the Layers list shows: a group's own, else the item's
+        const gid = unit.length > 1 ? o.groups?.[editor.entered.length] : undefined;
+        return gid ? (o.groupNames?.[gid] ?? "Group") : labelOf(o, assetNames.map).text;
+      }),
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
     openSearch: (prefix) => canvasSearch.open(prefix),
@@ -1345,8 +1350,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       shapeBuilder: () => startShapeBuilder(doc, editor),
       finishBuilder: (apply) => (editor.gapFill ? finishGapFill(editor) : finishShapeBuilder(doc, editor, apply)),
       canFillGaps: () => canFillGaps(doc, editor),
-      fillGaps: () => fillAllGaps(doc, editor),
-      fillGap: () => startGapFill(doc, editor),
+      fillGaps: () => fillAllGaps(doc, editor, view, settings.get("shape.gapClosePx")),
+      fillGap: () => startGapFill(doc, editor, view, settings.get("shape.gapClosePx")),
       canDivide: () => canDivide(doc, editor),
       makeMask: (mode) => makeMask(doc, editor, mode),
       makeClippingMask: () => makeClippingMask(doc, editor),
@@ -1782,8 +1787,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Shape", title: "Release the network", words: "paths edges", enabled: () => onCanvas && canReleaseNetwork(doc, editor), run: () => releaseNetwork(doc, editor) },
       { group: "Shape", title: "Divide into regions", words: "pathfinder cut overlap", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => divide(doc, editor) },
       { group: "Shape", title: "Shape builder", words: "merge regions overlap unite delete", enabled: () => onCanvas && canDivide(doc, editor) && !editor.builder, run: () => startShapeBuilder(doc, editor) },
-      { group: "Shape", title: "Fill gaps", words: "holes empty space between enclosed paint bucket", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => fillAllGaps(doc, editor) },
-      { group: "Shape", title: "Fill a gap", words: "hole empty space between enclosed paint bucket click", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => startGapFill(doc, editor) },
+      { group: "Shape", title: "Fill gaps", words: "holes empty space between enclosed paint bucket", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => fillAllGaps(doc, editor, view, settings.get("shape.gapClosePx")) },
+      { group: "Shape", title: "Fill a gap", words: "hole empty space between enclosed paint bucket click", enabled: () => onCanvas && canFillGaps(doc, editor) && !editor.builder && !editor.gapFill, run: () => startGapFill(doc, editor, view, settings.get("shape.gapClosePx")) },
       { group: "Mask", title: "Clipping mask", words: "clip cut shape", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeClippingMask(doc, editor) },
       { group: "Mask", title: "Mask by opacity", words: "alpha cut transparent", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "alpha") },
       { group: "Mask", title: "Mask by brightness", words: "luminance greyscale light dark cut", enabled: () => onCanvas && canMakeMask(doc, editor), run: () => makeMask(doc, editor, "luminance") },

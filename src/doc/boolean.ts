@@ -430,22 +430,29 @@ function link(pieces: readonly Piece[], extent: number): SubPath[] | null {
     const k = key(p.c[0], p.c[1]);
     (grid.get(k) ?? grid.set(k, []).get(k)!).push(i);
   });
-  const near = (x: number, y: number, skip: ReadonlySet<number>): number => {
-    let best = -1;
-    let bestD = tol;
+  // The way a piece leaves its start and arrives at its end (a handle on the point itself does not say: the next one does).
+  const dirOut = (c: Cubic): [number, number] => (c[2] !== c[0] || c[3] !== c[1] ? [c[2] - c[0], c[3] - c[1]] : c[4] !== c[0] || c[5] !== c[1] ? [c[4] - c[0], c[5] - c[1]] : [c[6] - c[0], c[7] - c[1]]);
+  const dirIn = (c: Cubic): [number, number] => (c[6] !== c[4] || c[7] !== c[5] ? [c[6] - c[4], c[7] - c[5]] : c[6] !== c[2] || c[7] !== c[3] ? [c[6] - c[2], c[7] - c[3]] : [c[6] - c[0], c[7] - c[1]]);
+  /**
+   * The piece to go on with from the end of `from`. Where several start at that point (outlines touching at a corner), the one turning
+   * furthest to the right: the loop then goes round the outside of the touching shapes, and an empty place they close in is a loop of
+   * its own (a hole), not shared out among the shapes' loops.
+   */
+  const near = (from: Cubic, skip: ReadonlySet<number>): number => {
+    const [x, y] = [from[6], from[7]];
     const cx = Math.round(x / cell);
     const cy = Math.round(y / cell);
+    const found: number[] = [];
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      for (const i of grid.get(`${cx + a},${cy + b}`) ?? []) {
-        if (skip.has(i)) continue;
-        const d = Math.hypot(pieces[i]!.c[0] - x, pieces[i]!.c[1] - y);
-        if (d <= bestD) {
-          best = i;
-          bestD = d;
-        }
-      }
+      for (const i of grid.get(`${cx + a},${cy + b}`) ?? []) if (!skip.has(i) && Math.hypot(pieces[i]!.c[0] - x, pieces[i]!.c[1] - y) <= tol) found.push(i);
     }
-    return best;
+    if (found.length <= 1) return found[0] ?? -1;
+    const [ix, iy] = dirIn(from);
+    const turn = (i: number): number => {
+      const [ox, oy] = dirOut(pieces[i]!.c);
+      return Math.atan2(ix * oy - iy * ox, ix * ox + iy * oy);
+    };
+    return found.reduce((best, i) => (turn(i) < turn(best) ? i : best));
   };
   const used = new Set<number>();
   const loops: SubPath[] = [];
@@ -459,7 +466,7 @@ function link(pieces: readonly Piece[], extent: number): SubPath[] | null {
       const e = pieces[i]!.c;
       // closed: the end meets the start of the chain
       if (chain.length > 1 && Math.hypot(e[6] - chain[0]!.c[0], e[7] - chain[0]!.c[1]) <= tol) break;
-      const next = near(e[6], e[7], used);
+      const next = near(e, used);
       if (next < 0) {
         if (Math.hypot(e[6] - chain[0]!.c[0], e[7] - chain[0]!.c[1]) <= tol * 100) break;
         return null; // a loop that will not close

@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Gaps with small openings; W A S D by name and in view (v0.40.0, 2026-10-25)
+
+**Implemented:** Fill gaps closes openings up to `shape.gapClosePx` (default 4 px) with bridges united as one region ([ADR 0172](adr/0172-fill-gaps.md)); boolean loops at a point where outlines touch go on along the piece turning furthest right, so corner-touching shapes close in a hole. W A S D: `nav.mode` adds `layer-view`, `az`, `az-view` (names as the Layers list shows them, passed in from main); *Nearest in view* falls back to the nearest same-size item ahead beyond reach.
+**Tested:** unit 556 (new: corner-touching gap, bridged slits); E2E (Chromium): vectors, frames, pictures 172/172 after the boolean change (snapshot 980d3532); W A S D 5/5 in Chromium and Firefox (one new A to Z test, the off-screen test extended), Fill gaps (with a 2 px slit) and Divide, settings (snapshot 8b382ba0).
+**Known failures:** none known.
+**Unverified:** curved shapes in E2E for gaps; the quick and full suites.
+**Committed:** `feat: gaps with small openings; W A S D by name and in view (v0.40.0)`, local, not pushed.
+**Next bounded task:** the owner's next pick.
+
 ## Fill the gaps between shapes (v0.39.0, 2026-10-25)
 
 **Implemented:** gaps as holes of the picked shapes' union (`doc/gaps.ts`, [ADR 0172](adr/0172-fill-gaps.md)), islands left out (even-odd); *Fill gaps* (all, one undo step) and *Fill a gap…* (click mode with dashed outlines and a hover preview, Enter/Esc/Done) in the Path tools menu and the command palette; fills placed under the back shape with the Shape tool's fill.
