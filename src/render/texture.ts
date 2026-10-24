@@ -12,7 +12,7 @@ import type { Viewport } from "../core/camera";
 import type { PathObject } from "../doc/model";
 import { geometryBounds } from "../doc/path";
 import type { Layout, TexturePaint, TextureVary } from "../doc/texture";
-import { copyAt, isVaried, layoutOf, nearOrigin, varyPeriod } from "../doc/texture";
+import { copyAt, isVaried, layoutOf, nearOrigin, noVary, varyPeriod } from "../doc/texture";
 import { boxToLocal } from "./gradient";
 import type { Projection } from "./projection";
 
@@ -23,6 +23,11 @@ export interface TextureHost {
   aspect(ids: readonly string[]): number | null;
   /** The objects drawn on a transparent canvas whose longer side is `px` pixels, or null. `version` changes when the drawing would. */
   objects(ids: readonly string[], px: number): { readonly canvas: CanvasImageSource; readonly version: string } | null;
+  /**
+   * The part `u0`..`u1` × `v0`..`v1` (shares of their box) of the objects, drawn again as they are (vectors) on a `w` × `h` canvas: a copy
+   * shown far larger than its tile could hold stays sharp at any depth. Null when it cannot be drawn.
+   */
+  objectsPart?(ids: readonly string[], u0: number, v0: number, u1: number, v1: number, w: number, h: number): { readonly canvas: CanvasImageSource; readonly pending: boolean } | null;
 }
 
 let host: TextureHost | null = null;
@@ -264,6 +269,8 @@ function cellCanvas(key: string, l: Layout, k: number, tile: CanvasImageSource):
 export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePaint, p: Projection, vp: Viewport): CanvasPattern | string {
   if (!host || drawing.includes(o.id) || drawing.length >= MAX_NESTING) return flat(t);
   if (isVaried(t)) return variedPaint(ctx, o, t, p, vp);
+  // an objects fill shown larger than its tile can hold: copy by copy with nothing varied, each drawn again from its objects (sharp at any depth)
+  if (t.src.kind === "objects" && t.mode === "tile" && host.objectsPart && plainTilePx(o, t, p) > 2048 * SHARPER) return variedPaint(ctx, o, { ...t, vary: { ...noVary(), each: false } }, p, vp, true);
   const box = geometryBounds(o.base ?? o.sub);
   const bw = box.maxX - box.minX, bh = box.maxY - box.minY;
   const ppu = p.ppu;
@@ -362,10 +369,33 @@ export function texturePaint(ctx: CanvasRenderingContext2D, o: PathObject, t: Te
 
 // ---- Varied copies (ADR 0173) -----------------------------------------------------------------------------------------------------
 
+/**
+ * A 2D affine map [a, b, c, d, e, f] (as a canvas transform), multiplied out here in doubles. A copy shown a billion times enlarged has
+ * offsets near 10^11 px that cancel to a few px on the screen; DOMMatrix did not keep that (the offsets came out wrong), so the maths is
+ * done here and only the final, small numbers go to the canvas.
+ */
+type Affine = readonly [number, number, number, number, number, number];
+const ID: Affine = [1, 0, 0, 1, 0, 0];
+const mul = ([a, b, c, d, e, f]: Affine, [a2, b2, c2, d2, e2, f2]: Affine): Affine => [a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f];
+const move = (m: Affine, x: number, y: number): Affine => mul(m, [1, 0, 0, 1, x, y]);
+const grow = (m: Affine, sx: number, sy = sx): Affine => mul(m, [sx, 0, 0, sy, 0, 0]);
+const turn = (m: Affine, deg: number): Affine => {
+  const r = (deg * Math.PI) / 180, cs = Math.cos(r), sn = Math.sin(r);
+  return mul(m, [cs, sn, -sn, cs, 0, 0]);
+};
+const invert = ([a, b, c, d, e, f]: Affine): Affine => {
+  const det = a * d - b * c;
+  return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det];
+};
+const apply = ([a, b, c, d, e, f]: Affine, x: number, y: number): [number, number] => [a * x + c * y + e, b * x + d * y + f];
+const asDom = (m: Affine): DOMMatrix => new DOMMatrix([...m]);
+
 /** What the copies are drawn from: the picture, each object (Vary's "each"), or the objects as they lie together; with width ÷ height. */
 interface Piece {
   readonly img: CanvasImageSource;
   readonly aspect: number;
+  /** The objects it is a picture of (so a copy shown large can be drawn from them again); absent for a picture of the library. */
+  readonly ids?: readonly string[];
 }
 
 /** The pieces of `t` at `px` on their longer side; `pending` when a picture in them is still being decoded. Null: nothing to draw. */
@@ -385,7 +415,7 @@ function piecesOf(o: PathObject, t: TexturePaint, px: number): { pieces: Piece[]
       const a = host.aspect(ids);
       const tile = a === null ? null : host.objects(ids, px);
       if (!tile || a === null) continue; // (an object that cannot be drawn: the others still are)
-      pieces.push({ img: tile.canvas, aspect: a });
+      pieces.push({ img: tile.canvas, aspect: a, ids });
       pending ||= tile.version.endsWith("p");
       versions.push(tile.version);
     }
@@ -399,7 +429,8 @@ function piecesOf(o: PathObject, t: TexturePaint, px: number): { pieces: Piece[]
  * The copies of cells `i0`..`i1` × `j0`..`j1` drawn on `g`, whose transform `base` takes the layout's cell space (units of the box, the
  * first cell's top left at 0, 0) to its pixels. Each copy is fitted in its tile, then moved, turned, scaled and mirrored as `copyAt` says.
  */
-function drawCopies(g: CanvasRenderingContext2D, base: DOMMatrix, l: Layout, v: TextureVary, pieces: readonly Piece[], i0: number, i1: number, j0: number, j1: number): void {
+function drawCopies(g: CanvasRenderingContext2D, base: Affine, l: Layout, v: TextureVary, pieces: readonly Piece[], i0: number, i1: number, j0: number, j1: number, sharp = false): { pending: boolean } {
+  let pending = false;
   for (let j = j0; j <= j1; j++) {
     for (let i = i0; i <= i1; i++) {
       l.tiles.forEach(([tx, ty], slot) => {
@@ -407,13 +438,36 @@ function drawCopies(g: CanvasRenderingContext2D, base: DOMMatrix, l: Layout, v: 
         const pc = c.src >= 0 ? pieces[c.src] : undefined;
         if (!pc) return;
         const [w, h] = pc.aspect >= l.tw / l.th ? [l.tw, l.tw / pc.aspect] : [l.th * pc.aspect, l.th];
-        const m = base.translate(i * l.cw + tx + l.tw / 2 + c.dx * l.cw, j * l.ch + ty + l.th / 2 + c.dy * l.ch).rotateSelf(c.rot).scaleSelf(c.k * (c.flip ? -1 : 1), c.k);
-        g.setTransform(m);
+        const m = grow(turn(move(base, i * l.cw + tx + l.tw / 2 + c.dx * l.cw, j * l.ch + ty + l.th / 2 + c.dy * l.ch), c.rot), c.k * (c.flip ? -1 : 1), c.k);
+        g.setTransform(...m);
+        // shown larger than its picture (in a view drawn copy by copy): the part of it in the canvas, drawn again from the objects at that size
+        const scale = Math.hypot(m[0], m[1]);
+        const px = scale * w, src = pc.img as { width?: number };
+        if (sharp && pc.ids && host?.objectsPart && px > (src.width ?? Infinity) * SHARPER) {
+          const inv = invert(m);
+          const qs = [[0, 0], [g.canvas.width, 0], [0, g.canvas.height], [g.canvas.width, g.canvas.height]].map(([x, y]) => { const [qx, qy] = apply(inv, x!, y!); return { x: qx, y: qy }; });
+          const u0 = Math.max(0, (Math.min(...qs.map((q) => q.x)) + w / 2) / w), u1 = Math.min(1, (Math.max(...qs.map((q) => q.x)) + w / 2) / w);
+          const v0 = Math.max(0, (Math.min(...qs.map((q) => q.y)) + h / 2) / h), v1 = Math.min(1, (Math.max(...qs.map((q) => q.y)) + h / 2) / h);
+          if (!(u1 > u0 && v1 > v0)) return;
+          const part = host.objectsPart(pc.ids, u0, v0, u1, v1, Math.min(MAX_BLOCK_PX, Math.ceil((u1 - u0) * w * scale)), Math.min(MAX_BLOCK_PX, Math.ceil((v1 - v0) * h * scale)));
+          if (part) {
+            pending ||= part.pending;
+            // the part's own pixels → the canvas, multiplied out here in doubles: the canvas keeps a transform in single precision, so the
+            // huge offsets of a copy shown a billion times enlarged must not reach it (the part itself lies on the canvas: small numbers)
+            const pc2 = part.canvas as { width: number; height: number };
+            g.setTransform(...grow(move(m, -w / 2 + u0 * w, -h / 2 + v0 * h), ((u1 - u0) * w) / pc2.width, ((v1 - v0) * h) / pc2.height));
+            g.drawImage(part.canvas, 0, 0);
+            return;
+          }
+        }
         g.drawImage(pc.img, -w / 2, -h / 2, w, h);
       });
     }
   }
+  return { pending };
 }
+/** A copy is drawn again from its objects once it is shown this many times larger than its picture. */
+const SHARPER = 1.5;
 
 /** Most px on a side of a block of varied cells (beyond, the copies are drawn one by one in the view). */
 const MAX_BLOCK_PX = 4096;
@@ -435,14 +489,14 @@ function blockCanvas(key: string, l: Layout, v: TextureVary, pieces: readonly Pi
   if (!g) return null;
   g.imageSmoothingQuality = "high";
   // (the scale is the block's own, so it repeats without a seam; the cells past its edges are the next block's, which copyAt repeats)
-  drawCopies(g, new DOMMatrix().scaleSelf(w / (period * l.cw), h / (period * l.ch)), l, v, pieces, -MARGIN, period - 1 + MARGIN, -MARGIN, period - 1 + MARGIN);
+  drawCopies(g, grow(ID, w / (period * l.cw), h / (period * l.ch)), l, v, pieces, -MARGIN, period - 1 + MARGIN, -MARGIN, period - 1 + MARGIN);
   cells.set(key, c);
   if (cells.size > CELL_CACHE) cells.delete(cells.keys().next().value!);
   return c;
 }
 
 /** A varied texture (ADR 0173): a repeated block of varied cells, or, when its copies are shown larger than the block can hold, the copies in view drawn one by one. */
-function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePaint, p: Projection, vp: Viewport): CanvasPattern | string {
+function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePaint, p: Projection, vp: Viewport, oneByOne = false): CanvasPattern | string {
   const vl = variedLayout(o, t);
   const ppu = p.ppu;
   if (!vl || !(ppu > 0 && Number.isFinite(ppu))) return flat(t);
@@ -455,21 +509,16 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
   const cs = Math.cos(theta), sn = Math.sin(theta);
   const lay = nearOrigin(lay0, cs * vx + sn * vy, -sn * vx + cs * vy, period);
   // cell space → the ctx's own units (as the pattern of a plain texture is placed)
-  const toUser = new DOMMatrix()
-    .translateSelf(p.cx - D.toNumber(p.lx) * ppu, p.cy - D.toNumber(p.ly) * ppu)
-    .scaleSelf(ppu)
-    .translateSelf(mx, my)
-    .rotateSelf((theta * 180) / Math.PI)
-    .translateSelf(lay.ox, lay.oy);
+  const toUser = move(turn(move(grow(move(ID, p.cx - D.toNumber(p.lx) * ppu, p.cy - D.toNumber(p.ly) * ppu), ppu), mx, my), (theta * 180) / Math.PI), lay.ox, lay.oy);
   const res = Math.min(Math.max(pow2(tilePx * dpr), 8), 2048);
   const got = piecesOf(o, t, res);
   if (!got) return lastPattern.get(o.id) ?? flat(t);
   if (got.pending) notReady = true;
   const want = res / Math.max(lay.tw, lay.th); // px per box unit the copies need
-  const fits = want * period * Math.max(lay.cw, lay.ch) <= MAX_BLOCK_PX;
+  const fits = !oneByOne && want * period * Math.max(lay.cw, lay.ch) <= MAX_BLOCK_PX;
   // the cells in view, in cell space
-  const inv = toUser.inverse();
-  const corners = [[0, 0], [vp.width, 0], [0, vp.height], [vp.width, vp.height]].map(([x, y]) => inv.transformPoint({ x: x!, y: y! }));
+  const inv = invert(toUser);
+  const corners = [[0, 0], [vp.width, 0], [0, vp.height], [vp.width, vp.height]].map(([x, y]) => { const [qx, qy] = apply(inv, x!, y!); return { x: qx, y: qy }; });
   const [i0, i1] = [Math.floor(Math.min(...corners.map((q) => q.x)) / lay.cw) - MARGIN, Math.ceil(Math.max(...corners.map((q) => q.x)) / lay.cw) + MARGIN];
   const [j0, j1] = [Math.floor(Math.min(...corners.map((q) => q.y)) / lay.ch) - MARGIN, Math.ceil(Math.max(...corners.map((q) => q.y)) / lay.ch) + MARGIN];
   const copies = (i1 - i0 + 1) * (j1 - j0 + 1) * lay.tiles.length;
@@ -479,7 +528,7 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
     const block = blockCanvas(`vary|${got.version}|${JSON.stringify(v)}|${period}|${t.tile}|${t.spacing}|${t.align}|${lay.tw}|${lay.th}|${Math.round(k * 1e6)}`, lay, v, got.pieces, period, k);
     if (!block) return flat(t);
     pat = ctx.createPattern(block, "repeat");
-    pat?.setTransform(toUser.scale((period * lay.cw) / block.width, (period * lay.ch) / block.height));
+    pat?.setTransform(asDom(grow(toUser, (period * lay.cw) / block.width, (period * lay.ch) / block.height)));
   } else {
     // shown large: the copies in view, one by one, at the size they are shown
     const c = document.createElement("canvas");
@@ -488,7 +537,7 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
     const g = c.getContext("2d");
     if (!g) return flat(t);
     g.imageSmoothingQuality = "high";
-    drawCopies(g, new DOMMatrix().scaleSelf(dpr).multiplySelf(toUser), lay, v, got.pieces, i0, i1, j0, j1);
+    if (drawCopies(g, mul([dpr, 0, 0, dpr, 0, 0], toUser), lay, v, got.pieces, i0, i1, j0, j1, true).pending) notReady = true;
     pat = ctx.createPattern(c, "no-repeat");
     pat?.setTransform(new DOMMatrix().scaleSelf(1 / dpr));
   }
@@ -551,4 +600,13 @@ function variedColourAt(o: PathObject, t: TexturePaint, x: number, y: number): s
     }
   }
   return hit;
+}
+
+/** The px a plain objects tile is shown at (its longer side). */
+function plainTilePx(o: PathObject, t: TexturePaint, p: Projection): number {
+  const box = geometryBounds(o.base ?? o.sub);
+  const a = t.src.kind === "objects" ? host?.aspect(t.src.ids) : null;
+  if (!a) return 0;
+  const l = layoutOf(t, { w: box.maxX - box.minX, h: box.maxY - box.minY }, a);
+  return Math.max(l.tw, l.th) * p.ppu * (typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 }

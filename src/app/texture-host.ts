@@ -9,6 +9,7 @@ import type { CanvasObject } from "../doc/model";
 import type { TextureHost } from "../render/texture";
 import type { FrameIndex } from "../scene/frame-index";
 import type { SceneTheme } from "../render/scene-renderer";
+import * as D from "../core/dyadic";
 import { buildTarget } from "./actions";
 import type { ExportTarget } from "./export-render";
 import { paintExport } from "./export-render";
@@ -18,6 +19,7 @@ const KEEP = 16;
 export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex; assets: AssetLibrary; theme: () => SceneTheme; editor: EditorState }): TextureHost & { live(on: boolean): void } {
   const targets = new Map<string, ExportTarget | null>();
   const tiles = new Map<string, HTMLCanvasElement>();
+  const parts = new Map<string, HTMLCanvasElement>();
   let rev = -1;
   // While a gesture changes a source (live), tiles show it as the gesture does, drawn again at each step of it.
   let live = false;
@@ -29,6 +31,7 @@ export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex;
     drawnStep = step;
     targets.clear();
     tiles.clear();
+    parts.clear();
   };
   const shown = (o: CanvasObject): CanvasObject => (live ? (deps.editor.previewed(o) ?? o) : o);
   const targetOf = (ids: readonly string[]): ExportTarget | null => {
@@ -74,6 +77,27 @@ export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex;
         if (tiles.size > KEEP) tiles.delete(tiles.keys().next().value!);
       }
       return { canvas, version: `${rev}.${step}${pending ? "p" : ""}` };
+    },
+    objectsPart(ids, u0, v0, u1, v1, w, h) {
+      const t = targetOf(ids);
+      if (!t || !(w >= 1 && h >= 1)) return null;
+      const key = `${ids.join(",")}|${u0}|${v0}|${u1}|${v1}|${w}|${h}`;
+      const hit = parts.get(key);
+      if (hit) return { canvas: hit, pending: false };
+      // the part's own box, exact: shares of the objects' box (at any depth, the numbers say exactly where)
+      const at = (a: D.Dyadic, b: D.Dyadic, f: number): D.Dyadic => D.add(a, D.mul(D.sub(b, a), D.fromNumber(f)));
+      const sub: ExportTarget = { ...t, min: { x: at(t.min.x, t.max.x, u0), y: at(t.min.y, t.max.y, v0) }, max: { x: at(t.min.x, t.max.x, u1), y: at(t.min.y, t.max.y, v1) }, ratio: (t.ratio * (u1 - u0)) / (v1 - v0) };
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      const pending = paintExport({ doc: deps.doc, index: deps.index, assets: deps.assets, theme: deps.theme(), editor: live ? deps.editor : null }, sub, ctx, w, h, "transparent", true);
+      if (!pending) {
+        parts.set(key, canvas);
+        if (parts.size > KEEP) parts.delete(parts.keys().next().value!);
+      }
+      return { canvas, pending };
     },
   };
 }

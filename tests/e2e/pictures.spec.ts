@@ -1109,10 +1109,13 @@ test("a varied fill deep in shows the copy that is there, not the plain layout's
   };
   for (const want of ["red", "yellow"]) {
     const [x, y] = await find(want);
-    // far in at that point (the wheel keeps it under the pointer), past where the texture is drawn as a pattern
-    for (let i = 0; i < 50; i++) await app.wheel(x, y, -800);
-    await app.frame();
-    expect(kind(await px(app, x, y)), `${want} deep in`).toBe(want);
+    // far in at that point (the wheel keeps it under the pointer), through every depth: drawn from the copy's picture, drawn again from its
+    // objects once larger than that (positions near 10^11 px, kept in doubles), and past where the texture is drawn as a pattern
+    for (let i = 1; i <= 50; i++) {
+      await app.wheel(x, y, -800);
+      await app.frame();
+      expect(kind(await px(app, x, y)), `${want} at notch ${i}`).toBe(want);
+    }
     for (let i = 0; i < 50; i++) await app.wheel(x, y, 800);
     await app.frame();
   }

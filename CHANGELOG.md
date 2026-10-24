@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.3 — Objects fills sharp and steady deep in (2026-10-25)
+
+- **Fixed:** zooming into an Objects fill (varied or plain), a copy shown larger than its tile picture became big blocks of that picture's pixels, then vanished for a few levels, then came back. A copy shown large is now drawn again from its objects, as vectors, only the part in view, so its edges stay sharp and in place at every depth. The maths that places it is done in doubles: a copy a billion times enlarged has offsets near 10^11 px, which the canvas's own transforms did not keep.
+
 ## 0.41.2 — Varied fills deep in and far out (2026-10-25)
 
 - **Fixed:** zoomed very far into a varied fill (past where it is drawn as a pattern), the colour shown was the one the plain layout has there, often another copy's (yellow inside a red copy); it is now the colour of the copy that is on top at that point.

@@ -8,7 +8,7 @@ import type { Viewport } from "../core/camera";
 import { lookAt, ZOOM_QUANTUM } from "../core/camera";
 import * as D from "../core/dyadic";
 import type { Frame } from "../core/frames";
-import { fromLocal } from "../core/frames";
+import { fromLocal, normalize } from "../core/frames";
 import type { WorldPoint } from "../core/camera";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { DocumentStore } from "../doc/document-store";
@@ -59,7 +59,8 @@ export function exportCamera(t: ExportTarget, w: number, h: number): ReturnType<
   const zi = Math.floor(level);
   const zf = Math.ceil((level - zi) / ZOOM_QUANTUM) * ZOOM_QUANTUM; // (rounded up: the box covers the canvas, never leaves a line of it bare)
   const centre = { x: D.shift(D.add(t.min.x, t.max.x), -1), y: D.shift(D.add(t.min.y, t.max.y), -1) };
-  return fromLocal(t.frame, lookAt(centre, zi, zf));
+  // (normalized as the view is: a box far smaller than its frame, a part of a texture's copy shown large, is looked at from a frame deep enough)
+  return normalize(t.frame.space, fromLocal(t.frame, lookAt(centre, zi, zf)));
 }
 
 const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
