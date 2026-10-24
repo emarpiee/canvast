@@ -1,4 +1,4 @@
-import { alignWith, arrangeWith, boolWith, contextChoose, expect, recordMetric, setPenColour, test } from "./harness";
+import { alignWith, arrangeWith, boolWith, contextChoose, expect, outlineShapes, recordMetric, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
@@ -896,6 +896,49 @@ test("snapping: a moved stroke lines up exactly with another one (home and a tri
   }
 });
 
+test("snapping to the shapes themselves: a corner goes exactly onto a corner that is no box line, and onto a slanted side (home and a trillion levels down) (ADR 0171)", async ({ app }) => {
+  const p = app.page;
+  const vertices = async (id: string): Promise<Array<[number, number]>> => {
+    const q = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.q;
+    return Array.from({ length: q.length / 2 }, (_, i) => [q[2 * i]!, q[2 * i + 1]!] as [number, number]);
+  };
+  const triangle = async (pts: Array<[number, number]>): Promise<void> => {
+    await p.keyboard.press("b");
+    for (const [x, y] of [...pts, pts[0]!]) {
+      await p.mouse.click(x, y); // (the first node again closes it)
+      await app.frame();
+    }
+  };
+  for (const deep of [false, true]) {
+    if (deep) await p.evaluate(() => window.__canvastDebug.jump(1e12));
+    // A's top corner (530, 220) is on its top box line but not on any of its x lines (500, 550, 600). (Right of the dev panel.)
+    await triangle([[500, 300], [600, 300], [530, 220]]);
+    await triangle([[660, 330], [760, 330], [690, 250]]);
+    const [a, b] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id).slice(-2) as [string, string];
+    await p.keyboard.press("v");
+    await p.mouse.click(710, 310);
+    // B's bottom-left corner to 3 px right of and 3 below A's top corner: the box lines alone would leave x 3 px off.
+    await app.drag({ x: 710, y: 310 }, { x: 710 - 127, y: 310 - 107 }, 6);
+    const top = (await vertices(a)).reduce((m, v) => (v[1] < m[1] ? v : m));
+    const bb = (await boxOf(app, b))!;
+    expect(bb.minX, "onto the corner, not 3 px beside it").toBeCloseTo(top[0], 6);
+    expect(bb.maxY).toBeCloseTo(top[1], 6);
+    await p.keyboard.press("Control+z");
+    // Onto A's slanted right side (from (600, 300) up to (530, 220)), 1.5 px off it and clear of every box line.
+    await p.mouse.click(710, 310);
+    await app.drag({ x: 710, y: 310 }, { x: 710 - 79, y: 310 - 54 }, 6);
+    const vs = await vertices(a);
+    const right = vs.reduce((m, v) => (v[0] > m[0] ? v : m));
+    const nb = (await boxOf(app, b))!;
+    const [ux, uy] = [top[0] - right[0], top[1] - right[1]];
+    const off = Math.abs(ux * (nb.maxY - right[1]) - uy * (nb.minX - right[0])) / Math.hypot(ux, uy);
+    expect(off, "B's corner lies on A's side").toBeLessThan(0.01);
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.keyboard.press("Home");
+  }
+});
+
 test("groups: picking one member picks the group, it moves as one, nests, enters, ungroups, reorders, and survives undo and a reload (ADR 0020)", async ({ app }) => {
   const p = app.page;
   const sel = () => p.evaluate(() => window.__canvastDebug.selection());
@@ -1635,6 +1678,7 @@ test("the Arrange menu aligns and arranges the selection in a grid, each as one 
 
 test("Align and Arrange treat a group, and a boolean group, as one thing: its members keep their places among themselves", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   type O = { id: string; groups?: string[]; result?: unknown };
   const all = async (): Promise<O[]> => (await p.evaluate(() => window.__canvastDebug.objects())) as unknown as O[];
   const box = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);

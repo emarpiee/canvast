@@ -59,10 +59,9 @@ export const SETTINGS = {
   "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "plane", "sliders", "mixer"), effect: "immediate" } as Def<"wheel" | "plane" | "sliders" | "mixer">,
   "colour.format": { scope: "device", default: "hex", validate: oneOf("hex", "rgb", "oklch"), effect: "immediate" } as Def<"hex" | "rgb" | "oklch">,
   "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
-  // Shapes and paths (ADR 0099): what the Shape and Path tools make.
+  // Shapes and paths (ADR 0099): what the Shape and Path tools make. The outline is not remembered: every session starts with none.
   "shape.kind": { scope: "device", default: "rect", validate: oneOf("rect", "ellipse", "line", "polygon", "star"), effect: "immediate" } as Def<"rect" | "ellipse" | "line" | "polygon" | "star">,
   "shape.fill": { scope: "device", default: "#2563eb", validate: paint, effect: "immediate" } as Def<string>,
-  "shape.stroke": { scope: "device", default: "#1f2329", validate: paint, effect: "immediate" } as Def<string>,
   "shape.widthPx": { scope: "device", default: 2, validate: range(0.5, 128), effect: "immediate" } as Def<number>,
   "shape.join": { scope: "device", default: "default", validate: oneOf("default", "miter", "round", "bevel"), effect: "immediate" } as Def<"default" | "miter" | "round" | "bevel">,
   "shape.cap": { scope: "device", default: "round", validate: oneOf("butt", "round", "square"), effect: "immediate" } as Def<"butt" | "round" | "square">,

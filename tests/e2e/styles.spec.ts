@@ -1,4 +1,4 @@
-import { expect, test } from "./harness";
+import { expect, outlineShapes, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { serializeAco } from "../../src/assets/aco";
@@ -158,6 +158,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
 
 test("Styles: a palette from the selection's colours is opened, a colour of it applied, edited (named, changed, added, removed), exported and read back as .gpl", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await p.keyboard.press("u");
   await drag(app, [500, 300], [620, 380]);
   const shape = (await objs(app)).at(-1)!;

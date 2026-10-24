@@ -270,6 +270,26 @@ export function drawOverlays(
       ctx.lineTo(vp.width, Math.round(editor.guides.y) + 0.5);
     }
     ctx.stroke();
+    ctx.setLineDash([]);
+    const { pt, seg } = editor.guides;
+    if (seg) {
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(seg[0], seg[1]);
+      ctx.lineTo(seg[2], seg[3]);
+      ctx.stroke();
+    }
+    if (pt) {
+      // a small cross in a ring: the corner it went to
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(pt[0], pt[1], 5, 0, 2 * Math.PI);
+      ctx.moveTo(pt[0] - 3, pt[1] - 3);
+      ctx.lineTo(pt[0] + 3, pt[1] + 3);
+      ctx.moveTo(pt[0] + 3, pt[1] - 3);
+      ctx.lineTo(pt[0] - 3, pt[1] + 3);
+      ctx.stroke();
+    }
     ctx.restore();
   }
   // In-progress stroke, drawn through the same projection as committed ones (with the camera in its frame).

@@ -293,7 +293,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape path">
-        <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom)">
+        <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom); all the way left: no outline">
         <span class="size-out" data-shape-out></span>
       </div>
       <div class="tb-group tb-options" data-for="pen select" data-kind="stroke tool" role="group" aria-label="Size">
@@ -374,8 +374,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
 
   scrubNumbers(root);
+  // As the Width field of the outline options: the far left is no outline (the width is kept), any other place a width that turns one on.
   root.querySelector<HTMLInputElement>("[data-shape-width]")!.addEventListener("input", (e) => {
-    editor.shapeWidthPx = penFromSlider(Number((e.target as HTMLInputElement).value));
+    const v = Number((e.target as HTMLInputElement).value);
+    if (v === 0) editor.shapeStroke = null;
+    else {
+      editor.shapeWidthPx = penFromSlider(v);
+      if (editor.shapeStroke === null && editor.shapeKind !== "line") editor.shapeStroke = "#1f2329";
+    }
     editor.changed();
   });
   root.querySelector<HTMLInputElement>("[data-sides]")!.addEventListener("input", (e) => {
@@ -711,7 +717,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const sel = editsSelection() ? actions.selectedOutline() : null;
     if (editsSelection() && !sel) return;
     openOutlinePopover(anchor, {
-      widthPx: sel ? sel.widthPx : editor.shapeWidthPx,
+      widthPx: sel ? sel.widthPx : editor.shapeStroke === null && editor.shapeKind !== "line" ? 0 : editor.shapeWidthPx,
       join: sel ? sel.join : (editor.shapeJoin ?? "miter"),
       cap: sel ? sel.cap : editor.shapeCap,
       align: sel ? sel.align : editor.shapeAlign,
@@ -997,8 +1003,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       }
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
-    if (document.activeElement !== sw) sw.value = String(sliderFromPen(editor.shapeWidthPx));
-    root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = `${editor.shapeWidthPx} px`;
+    const noOutline = editor.shapeStroke === null && editor.shapeKind !== "line"; // (a line gets the ink when it has no outline)
+    if (document.activeElement !== sw) sw.value = noOutline ? "0" : String(Math.max(1, sliderFromPen(editor.shapeWidthPx)));
+    root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
     const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;

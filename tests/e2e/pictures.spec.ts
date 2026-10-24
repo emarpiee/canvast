@@ -1,4 +1,4 @@
-import { exportWith, expect, test } from "./harness";
+import { exportWith, expect, outlineShapes, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { encodeGif } from "./gif";
@@ -891,6 +891,7 @@ test("objects repeat over a shape as a fill (ADR 0154): picked on the canvas, th
 
 test("an objects fill of an objects fill shows the inner one, follows a change of the innermost source, and a cycle or itself as the source cannot hang or error", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const pop = p.locator(".colour-pop");
   await p.keyboard.press("u");
   await p.locator('[data-shape-kind="ellipse"]').click();

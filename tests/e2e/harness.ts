@@ -171,6 +171,12 @@ export async function rowAction(page: Page, kind: "board" | "canvas", name: stri
 type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu" | "statemenu";
 
 /** Give the pen a colour through the colour picker of the Properties bar (it has no row of colours any more): type the hex, close the picker. */
+/** New shapes have no outline: a test about outlines first gives the next shapes the one they used to get, 2 px of the ink (slider 25). */
+export async function outlineShapes(page: Page): Promise<void> {
+  await page.keyboard.press("u");
+  await page.locator("[data-shape-width]").fill("25");
+}
+
 export async function setPenColour(page: Page, hex: string): Promise<void> {
   await page.locator("[data-colour-open]").click();
   const field = page.locator(".colour-pop [data-hex]");

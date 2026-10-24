@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, firefox, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { buildDir } from "./build-dir";
-import { exportWith, expect } from "./harness";
+import { exportWith, expect, outlineShapes } from "./harness";
 import { makePng } from "./png";
 
 /**
@@ -140,6 +140,7 @@ test("the one built file, alone in a folder with spaces, in a fresh offline prof
   const m = await cleanMachine(browser);
   const p = m.page;
   try {
+    await outlineShapes(p); // (the SVG export measured below has an outline in it)
     await coreWork(p);
     const ids = await objectIds(p);
     expect(ids.length).toBe(4);

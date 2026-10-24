@@ -8,7 +8,7 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
+import { editSubs, homeObject, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
@@ -41,11 +41,13 @@ import { cropEdges } from "../doc/crop";
 import { itemLabelAt } from "../render/item-label";
 import type { ItemLabel } from "../render/item-label";
 import type { ProjectedObject, ScreenBox } from "../render/projection";
-import { projectObject } from "../render/projection";
+import { exactX, exactY, projectObject } from "../render/projection";
+import type { Seg, SnapTargets } from "./snap-points";
+import { MAX_SNAP_POINTS, bestEdgeSnap, bestFlushSnap, bestPointSnap, snapTargets } from "./snap-points";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
-import { TURN, angleFromRadians, normAngle, radiansFromAngle } from "../core/angle";
+import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
 import { drawSheetOver, finishShapeBuilder, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
@@ -100,6 +102,89 @@ interface SnapContext {
   tx: Array<[number, number, number]>;
   ty: Array<[number, number, number]>;
   objs: CanvasObject[];
+  /** The shapes themselves (ADR 0171): corners and sides of the others, and the moving corners (px at the start) and straight sides. */
+  shape: { targets: SnapTargets; refs: CornerRef[]; src: number[]; srcRefs: CornerRef[]; srcSegs: Seg[] };
+}
+
+/** A corner of an object, to find its exact place: a node of a path (or the middle of the straight side after it), or a box corner. */
+type CornerRef = { o: CanvasObject; s: number; k: number; mid?: true } | { o: CanvasObject; c: 0 | 1 | 2 | 3 };
+
+/** The exact place of a corner, in frame `f`. */
+function cornerIn(r: CornerRef, f: Frame): WorldPoint {
+  const o = r.o;
+  if ("c" in r) {
+    const b = boundsIn(o, f);
+    return { x: r.c === 0 || r.c === 3 ? b.min.x : b.max.x, y: r.c < 2 ? b.min.y : b.max.y };
+  }
+  const n = pathSubs(o as PathObject)[r.s]!.n;
+  const at = (k: number): WorldPoint => ({ x: D.add(o.anchor.x, D.shift(D.fromNumber(n[k * NODE]!), o.unit)), y: D.add(o.anchor.y, D.shift(D.fromNumber(n[k * NODE + 1]!), o.unit)) });
+  let p = at(r.k);
+  if (r.mid) {
+    const q = at((r.k + 1) % (n.length / NODE));
+    p = { x: D.shift(D.add(p.x, q.x), -1), y: D.shift(D.add(p.y, q.y), -1) };
+  }
+  const of = o.frame ?? f.space.world;
+  return of === f ? p : expressExactIn(f.space, of, p, f);
+}
+
+/** The corners (with their refs) and sides of a projected object on the screen; sides that are straight are listed apart too. */
+function shapeOnScreen(po: ProjectedObject): { pts: number[]; refs: CornerRef[]; mids: number[]; midRefs: CornerRef[]; straight: Seg[]; curved: Seg[] } {
+  const o = po.obj;
+  const out = { pts: [] as number[], refs: [] as CornerRef[], mids: [] as number[], midRefs: [] as CornerRef[], straight: [] as Seg[], curved: [] as Seg[] };
+  if (o.kind === "path") {
+    pathSubs(o).forEach((sp, s) => {
+      const n = sp.n;
+      const count = n.length / NODE;
+      const px = (k: number, j: number): [number, number] => [exactX(po.proj, n[k * NODE + j]!), exactY(po.proj, n[k * NODE + j + 1]!)];
+      for (let k = 0; k < count; k++) {
+        const [x, y] = px(k, 0);
+        out.pts.push(x, y);
+        out.refs.push({ o, s, k });
+        if (k === count - 1 && !sp.closed) continue;
+        const k2 = (k + 1) % count;
+        const straight = n[k * NODE + 4] === n[k * NODE] && n[k * NODE + 5] === n[k * NODE + 1] && n[k2 * NODE + 2] === n[k2 * NODE] && n[k2 * NODE + 3] === n[k2 * NODE + 1];
+        if (!straight) continue; // (a curve's sides come from the drawn outline below)
+        const [x2, y2] = px(k2, 0);
+        out.straight.push([x, y, x2, y2]);
+        out.mids.push((x + x2) / 2, (y + y2) / 2);
+        out.midRefs.push({ o, s, k, mid: true });
+      }
+    });
+    for (const fp of po.path ?? []) {
+      const p = fp.pts;
+      const m = p.length / 2;
+      for (let i = 0; i + 1 < m + (fp.closed ? 1 : 0); i++) out.curved.push([p[2 * i]!, p[2 * i + 1]!, p[(2 * (i + 1)) % p.length]!, p[(2 * (i + 1) + 1) % p.length]!]);
+    }
+  } else if (!o.rot && o.kind !== "stroke") {
+    // A picture, text or player: its box is its shape.
+    const { minX: l, minY: t, maxX: r, maxY: b } = po.box;
+    out.pts.push(l, t, r, t, r, b, l, b);
+    out.refs.push({ o, c: 0 }, { o, c: 1 }, { o, c: 2 }, { o, c: 3 });
+    out.straight.push([l, t, r, t], [r, t, r, b], [r, b, l, b], [l, b, l, t]);
+  }
+  return out;
+}
+
+/**
+ * The snap to the shapes (ADR 0171), one rule for every gesture (move, node, resize, turn): `pts` and `segs` are the moving corners and
+ * straight sides where the gesture would put them now. A corner within reach of a corner always wins (it fixes both axes); else a corner
+ * onto a side, or a side flush along one, when that is nearer than `lineDist` (the best of the box lines). `to` is where the moving corner
+ * (`source`) goes on the screen; a flush side has no corner (`side` is set instead).
+ */
+type ShapeHit = { source: number; to: [number, number]; side: boolean; target: number | null; guides: NonNullable<EditorState["guides"]> };
+function shapeSnap(t: SnapTargets, pts: readonly number[], segs: readonly Seg[], lineDist = Infinity): ShapeHit | null {
+  const pt = bestPointSnap(pts, t);
+  if (pt) {
+    const to: [number, number] = [t.pts[2 * pt.target]!, t.pts[2 * pt.target + 1]!];
+    return { source: pt.source, to, side: false, target: pt.target, guides: { pt: to } };
+  }
+  const edge = bestEdgeSnap(pts, t);
+  const flush = segs.length ? bestFlushSnap(segs, t) : null;
+  const off = flush && (!edge || flush.dist < edge.dist) ? flush : edge;
+  if (!off || off.dist >= lineDist) return null;
+  const side = off === flush;
+  const [x, y] = side ? [(segs[off.source]![0] + segs[off.source]![2]) / 2, (segs[off.source]![1] + segs[off.source]![3]) / 2] : [pts[2 * off.source]!, pts[2 * off.source + 1]!];
+  return { source: off.source, to: [x + off.dx, y + off.dy], side, target: null, guides: { seg: off.seg } };
 }
 
 interface ExactLines {
@@ -214,6 +299,7 @@ type Gesture =
       start: number;
       /** The single stroke's angle before the gesture (for snapping to whole steps), else 0. */
       rot0: number;
+      snap: SnapContext | null;
     };
 
 /** Narrowest box that counts as a drawn text box (screen px); a narrower drag is a click. */
@@ -696,8 +782,8 @@ export function attachTools(
       editor.changed();
       return;
     }
-    // A closed path is a shape to fill; an open one is a line, and never goes unpainted.
-    const stroke = d.stroke ?? (closed || d.fill !== null ? null : newInk("#1f2329"));
+    // A closed path is a shape to fill; an open one is a line (its fill is dropped), and never goes unpainted.
+    const stroke = d.stroke ?? (closed ? null : newInk("#1f2329"));
     const obj: PathObject = {
       id: newObjectId(),
       kind: "path",
@@ -709,7 +795,7 @@ export function attachTools(
       attachmentTargetId: null,
       sub: [{ n: d.n, closed }],
       fill: closed ? d.fill : null,
-      stroke: closed ? d.stroke : (stroke ?? d.stroke),
+      stroke,
       width: d.width,
       ...lookFromChoices(editor.shapeJoin, editor.shapeCap, closed ? editor.shapeAlign : "centre", closed ? "miter" : undefined, editor.shapeDash),
       ...(pathSheet && doc.get(pathSheet) ? { parent: pathSheet } : {}),
@@ -1004,6 +1090,7 @@ export function attachTools(
     return true;
   };
 
+  let nodeSnap: { g: Gesture; t: SnapTargets } | null = null; // (built once per node drag)
   const updateNode = (s: ScreenPoint, alt: boolean): void => {
     if (g.kind !== "node" || g.what === "seg") return;
     if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) < DRAG_THRESHOLD_PX) return;
@@ -1028,8 +1115,26 @@ export function attachTools(
         };
         const sx = near(at.x, 0);
         const sy = near(at.y, 1);
-        if (sx !== null) { s = { ...s, x: s.x + (sx - at.x) }; editor.guides = { x: sx }; }
-        if (sy !== null) { s = { ...s, y: s.y + (sy - at.y) }; editor.guides = { ...editor.guides, y: sy }; }
+        // The shapes themselves (ADR 0171): onto a node, the middle of a straight side or a box corner when one is in reach, else the closest of
+        // a side and the lines.
+        if (nodeSnap?.g !== g) {
+          const tp = others.flatMap((n) => [n.p[0], n.p[1]]), segs: Seg[] = [];
+          for (const po of visible()) {
+            if (po.obj.id === tgt.o.id || po.cover) continue;
+            const sh = shapeOnScreen(po);
+            tp.push(...(po.obj.kind === "path" ? [] : sh.pts), ...sh.mids); // (the nodes of paths are in `others` already)
+            segs.push(...sh.straight, ...sh.curved);
+          }
+          nodeSnap = { g, t: snapTargets(tp, segs) };
+        }
+        const hit = shapeSnap(nodeSnap.t, [at.x, at.y], [], Math.min(sx === null ? Infinity : Math.abs(sx - at.x), sy === null ? Infinity : Math.abs(sy - at.y)));
+        if (hit) {
+          s = { ...s, x: s.x + hit.to[0] - at.x, y: s.y + hit.to[1] - at.y };
+          editor.guides = hit.guides;
+        } else {
+          if (sx !== null) { s = { ...s, x: s.x + (sx - at.x) }; editor.guides = { x: sx }; }
+          if (sy !== null) { s = { ...s, y: s.y + (sy - at.y) }; editor.guides = { ...editor.guides, y: sy }; }
+        }
       }
     }
     const l = localOf(tgt.po, s.x, s.y);
@@ -1182,6 +1287,7 @@ export function attachTools(
           start: Math.atan2(s.y - centre.y, s.x - centre.x),
           // the turn the box shows now: Shift snaps the whole angle to steps of 15 degrees, wherever it is from (a group is turned as its shapes are)
           rot0: single ? (single.rot ?? 0) : Math.round(angleFromRadians(frame.angle)),
+          snap: editor.snap ? snapContext(ids, view.frame) : null,
         };
         return;
       }
@@ -1326,9 +1432,24 @@ export function attachTools(
     const chosen = new Set(ids);
     let box: ScreenBox | null = null;
     let ex: { minX: D.Dyadic; minY: D.Dyadic; maxX: D.Dyadic; maxY: D.Dyadic } | null = null;
-    const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [] };
+    const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [], shape: undefined as unknown as SnapContext["shape"] };
+    const tp: number[] = [], refs: CornerRef[] = [], segs: Seg[] = [], straight = new Set<number>();
+    const src: number[] = [], srcRefs: CornerRef[] = [], srcSegs: Seg[] = [];
+    const onScreen = (b: ScreenBox): boolean => [b.minX, b.minY, b.maxX, b.maxY].every((v) => Math.abs(v) < 1e7);
     for (const po of vis) {
       const b = po.box;
+      if (chosen.has(po.obj.id) && !po.cover && onScreen(b) && src.length < 2 * MAX_SNAP_TARGETS) {
+        const sh = shapeOnScreen(po);
+        src.push(...sh.pts);
+        srcRefs.push(...sh.refs);
+        srcSegs.push(...sh.straight);
+      } else if (!chosen.has(po.obj.id) && !po.cover && onScreen(b) && tp.length < 2 * MAX_SNAP_POINTS) {
+        const sh = shapeOnScreen(po);
+        tp.push(...sh.pts, ...sh.mids);
+        refs.push(...sh.refs, ...sh.midRefs);
+        for (const s of sh.straight) straight.add(segs.push(s) - 1);
+        segs.push(...sh.curved);
+      }
       if (chosen.has(po.obj.id)) {
         box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
         const e = boundsIn(po.obj, frame);
@@ -1347,6 +1468,7 @@ export function attachTools(
       }
     }
     if (!box || !ex || !ctx.objs.length) return null;
+    ctx.shape = { targets: snapTargets(tp, segs, straight), refs, src, srcRefs, srcSegs };
     ctx.box = box;
     ctx.src = exactLines({ x: ex.minX, y: ex.minY }, { x: ex.maxX, y: ex.maxY });
     return ctx;
@@ -1365,6 +1487,29 @@ export function attachTools(
       const b = sn.box;
       const hx = bestSnap([b.minX + ox, (b.minX + b.maxX) / 2 + ox, b.maxX + ox], sn.tx);
       const hy = bestSnap([b.minY + oy, (b.minY + b.maxY) / 2 + oy, b.maxY + oy], sn.ty);
+      // The shapes themselves (ADR 0171): a corner within reach of a corner always wins (it fixes both axes); else the closest of a side
+      // and the box lines.
+      const sh = sn.shape;
+      const moved = sh.src.map((v, i) => v + (i % 2 ? oy : ox));
+      const movedSegs = sh.srcSegs.map(([a, b2, c, d]): Seg => [a + ox, b2 + oy, c + ox, d + oy]);
+      const hit = shapeSnap(sh.targets, moved, movedSegs, Math.min(hx?.dist ?? Infinity, hy?.dist ?? Infinity));
+      if (hit) {
+        editor.guides = hit.guides;
+        if (hit.target !== null) {
+          // Corner on corner, exact: the target corner minus where the moving corner started.
+          const t = cornerIn(sh.refs[hit.target]!, g.frame);
+          const f = cornerIn(sh.srcRefs[hit.source]!, g.frame);
+          [dx, dy] = [D.sub(t.x, f.x), D.sub(t.y, f.y)];
+        } else {
+          // Onto a side (a curve's too): the pointer moved as the corner or side did; as exact as the side's place on the screen.
+          const [fx, fy] = hit.side ? [(movedSegs[hit.source]![0] + movedSegs[hit.source]![2]) / 2, (movedSegs[hit.source]![1] + movedSegs[hit.source]![3]) / 2] : [moved[2 * hit.source]!, moved[2 * hit.source + 1]!];
+          const w2 = worldIn({ ...s, x: s.x + hit.to[0] - fx, y: s.y + hit.to[1] - fy }, g.frame);
+          [dx, dy] = [D.sub(w2.x, g.startWorld.x), D.sub(w2.y, g.startWorld.y)];
+        }
+        editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
+        editor.changed();
+        return;
+      }
       // The alignment is exact: target line minus where the moving line started.
       if (hx) {
         const t = linesOf(sn.objs[hx.target]!, g.frame);
@@ -1442,6 +1587,27 @@ export function attachTools(
           const t = sn.ty[hy.target]![hy.line]!;
           ky = (t - fixed.y) / sy;
           editor.guides = { ...editor.guides, y: t };
+        }
+      }
+    }
+    // The shapes themselves (ADR 0171): a corner of the shape at this size onto a corner (or, with no box line held, a side); the size
+    // follows from where that corner goes. A side handle changes one axis, so it takes only a corner already level on the other.
+    if (sn) {
+      const src = sn.shape.src;
+      const scaled = src.map((v, i) => (i % 2 ? fixed.y + (v - fixed.y) * ky : fixed.x + (v - fixed.x) * kx));
+      const hit = shapeSnap(sn.shape.targets, scaled, [], editor.guides ? 0 : Infinity);
+      if (hit) {
+        const ux = src[2 * hit.source]! - fixed.x, uy = src[2 * hit.source + 1]! - fixed.y;
+        const fx = Math.abs(ux) > 1 ? (hit.to[0] - fixed.x) / ux : null;
+        const fy = Math.abs(uy) > 1 ? (hit.to[1] - fixed.y) / uy : null;
+        const level = (i: number): boolean => Math.abs(hit.to[i]! - scaled[2 * hit.source + i]!) < 0.5;
+        if (proportional) {
+          const k = Math.abs(ux) >= Math.abs(uy) ? fx : fy;
+          if (k !== null && (moveX && moveY ? true : level(moveX ? 1 : 0))) [kx, ky, editor.guides] = [k, k, hit.guides];
+        } else if ((moveX || level(0)) && (moveY || level(1))) {
+          if (moveX && fx !== null) kx = fx;
+          if (moveY && fy !== null) ky = fy;
+          editor.guides = hit.guides;
         }
       }
     }
@@ -1795,10 +1961,28 @@ export function attachTools(
         break;
       case "rotate": {
         let delta = angleFromRadians(Math.atan2(s.y - g.centre.y, s.x - g.centre.x) - g.start);
+        editor.guides = null;
         if (keys(e).shift) {
           // Whole 15 degree steps: of the stroke's own angle when one is selected, else of the turn.
           // (A step is TURN / 24, not a whole number; the angle stored must be one.)
           delta = Math.round(Math.round((g.rot0 + delta) / ANGLE_STEP) * ANGLE_STEP) - g.rot0;
+        } else if (g.snap) {
+          // The shapes themselves (ADR 0171): turned this far, a corner onto a corner or a side, or a side flush along a side; the turn
+          // follows from it (a corner keeps its distance from the centre, so it lands on the target's direction).
+          const { c: cs, s: sn } = cosSin(delta);
+          const { x: cx, y: cy } = g.centre;
+          const turn = (x: number, y: number): [number, number] => [cx + (x - cx) * cs - (y - cy) * sn, cy + (x - cx) * sn + (y - cy) * cs];
+          const src = g.snap.shape.src;
+          const pts = src.flatMap((_, i) => (i % 2 ? [] : turn(src[i]!, src[i + 1]!)));
+          const segs = g.snap.shape.srcSegs.map(([a, b, c2, d]): Seg => [...turn(a, b), ...turn(c2, d)]);
+          const hit = shapeSnap(g.snap.shape.targets, pts, segs);
+          if (hit?.side) {
+            const [a, b, c2, d] = segs[hit.source]!, t = hit.guides.seg!;
+            let da = Math.atan2(t[3] - t[1], t[2] - t[0]) - Math.atan2(d - b, c2 - a);
+            da -= Math.PI * Math.round(da / Math.PI); // (a side has no direction: the nearer of the two ways)
+            delta += angleFromRadians(da);
+          } else if (hit) delta = angleFromRadians(Math.atan2(hit.to[1] - cy, hit.to[0] - cx) - Math.atan2(src[2 * hit.source + 1]! - cy, src[2 * hit.source]! - cx));
+          if (hit) editor.guides = hit.guides;
         }
         editor.preview = { kind: "rotate", ids: g.ids, frame: g.frame, about: g.about, delta };
         // the turn the box has now, in degrees, beside the finger or pointer

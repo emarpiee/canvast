@@ -275,7 +275,6 @@ async function start(): Promise<void> {
   editor.penKind = settings.get("pen.kind");
   editor.shapeKind = settings.get("shape.kind");
   editor.shapeFill = paintFromText(settings.get("shape.fill")) ?? null;
-  editor.shapeStroke = paintFromText(settings.get("shape.stroke")) ?? null;
   editor.shapeWidthPx = settings.get("shape.widthPx");
   editor.shapeJoin = settings.get("shape.join") === "default" ? null : settings.get("shape.join") as JoinChoice;
   editor.shapeCap = settings.get("shape.cap");
@@ -303,7 +302,6 @@ async function start(): Promise<void> {
     settings.set("pen.kind", editor.penKind);
     settings.set("shape.kind", editor.shapeKind);
     settings.set("shape.fill", paintToText(editor.shapeFill));
-    settings.set("shape.stroke", paintToText(editor.shapeStroke));
     settings.set("shape.widthPx", editor.shapeWidthPx);
     settings.set("shape.join", editor.shapeJoin ?? "default");
     settings.set("shape.cap", editor.shapeCap);
@@ -948,7 +946,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const first = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "path" || x?.kind === "image") as PathObject | ImageObject | undefined;
       const po = first && visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => p.obj.id === first.id);
       const ppu = po && !po.cover ? po.proj.ppu : 0;
-      const wLocal = first?.kind === "image" ? (first.stroke === undefined ? 0 : (first.width ?? 0)) : first?.width;
+      // No outline reads 0 (what typing 0 does), not the width kept for when one is turned on.
+      const wLocal = first?.kind === "image" ? (first.stroke === undefined ? 0 : (first.width ?? 0)) : first && (first.stroke === null ? 0 : first.width);
       return { ...o, widthPx: ppu > 0 && ppu < Infinity && wLocal !== undefined ? wLocal * ppu : null };
     },
     outlineSelected: (patch) => commitOutline(doc, editor, patch),

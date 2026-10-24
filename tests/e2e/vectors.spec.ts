@@ -1,4 +1,4 @@
-import { stateWith, alignWith, boolWith, expect, exportWith, maskWith, pathWith, test } from "./harness";
+import { stateWith, alignWith, boolWith, expect, exportWith, maskWith, outlineShapes, pathWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -45,7 +45,7 @@ test("Shape tool: every kind, Shift for a square, a click makes nothing, undo an
   expect(await tool(app)).toBe("shape");
   await drag(app, [500, 300], [700, 380]);
   let o = await last(app);
-  expect(o).toMatchObject({ kind: "path", shape: "rect", fill: "#2563eb", stroke: "#1f2329", join: "miter" });
+  expect(o).toMatchObject({ kind: "path", shape: "rect", fill: "#2563eb", stroke: null, join: "miter" }); // (no outline at first)
   expect(o.sub[0]!.closed).toBe(true);
   expect(o.sub[0]!.n).toHaveLength(24);
   expect(size(o).w).toBeCloseTo(200, 0);
@@ -139,6 +139,7 @@ test("Path tool: corners, a dragged smooth node, closing on the first node, Ente
 
 test("select: a filled shape is picked inside, an outline only on its line; move, stretch from a side, turn, undo", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await key(app, "u");
   await drag(app, [560, 300], [760, 400]); // filled, outlined
   const rect = await last(app);
@@ -240,6 +241,7 @@ test("Edit nodes: move a node, drag a mirrored handle, add a node on a segment, 
 
 test("colours: the chips set what the next shape gets and the selected shapes' paint, live and as one undo step; alpha and none", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const pop = p.locator(".colour-pop");
   await key(app, "u");
   await p.click('[data-paint="fill"]');
@@ -288,6 +290,7 @@ test("colours: the chips set what the next shape gets and the selected shapes' p
 
 test("zooming into a shape keeps it: its inside stays its colour at depth, and an edge stays where it is", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await key(app, "u");
   await drag(app, [420, 260], [860, 540]); // covers the centre of the view
   const fill = [37, 99, 235];
@@ -365,6 +368,7 @@ test("depth: an edge placed at 2^34 magnification is where it should be, a shape
 
 test("shapes work with the rest of the canvas: duplicate, copy and paste, group, the Layers list, the object eraser, zooming far out", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await key(app, "u");
   await drag(app, [500, 300], [700, 400]);
   await p.click('[data-shape-kind="ellipse"]');
@@ -416,6 +420,7 @@ test("shapes work with the rest of the canvas: duplicate, copy and paste, group,
 
 test("exact edges: past what doubles can place (2^45 and 2^3000 times in), a fill's edge and an outline's both stay where they are", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
   const fill = [37, 99, 235];
   const ink = [31, 35, 41];
@@ -791,6 +796,7 @@ test("Boolean groups: saved over a reload, copied and pasted as a working group,
 
 test("outline options: width, position inside, centre or outside the edge (drawn, picked and bounded), corners; one undo each; saved", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
   const dark = (c: number[] | null) => !!c && Math.abs(c[0]! - 31) < 12 && Math.abs(c[1]! - 35) < 12 && Math.abs(c[2]! - 41) < 12;
   const pop = p.locator(".outline-pop");
@@ -858,11 +864,12 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   expect((await last(app)).stroke).toBe("#1f2329");
   await reload(app);
   expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
-  // what the next shape gets is remembered too (it was set to Outside, Sharp corners were then left alone)
+  // what the next shape gets is remembered too (it was set to Outside, Sharp corners were then left alone), but not the outline itself:
+  // a new session starts with none, so its width reads 0
   await key(app, "u");
   await p.click("[data-outline-options]");
   await expect(pop.locator('[data-align="outside"]')).toHaveAttribute("aria-checked", "true");
-  await expect(pop.locator("#op-width")).toHaveValue("20");
+  await expect(pop.locator("#op-width")).toHaveValue("0");
 });
 
 test("a boolean group's gradient is moved with its handles on the canvas, picked whole, as a single shape's is", async ({ app }) => {
@@ -1264,6 +1271,7 @@ test("nested boolean groups: a group inside a group; moving, turning, rounding a
 
 test("selection colours: the colours of several picked shapes as chips; one change reaches every shape that uses it, a gradient too; one undo step", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const pop = p.locator(".colour-pop");
   const chips = p.locator("[data-sel-colour]");
   type G = { type: string; x0: number; y0: number; x1: number; y1: number; stops: Array<{ c: string }> };
@@ -1412,6 +1420,7 @@ test("polygon and star: a triangle handle on the shape sets how many; a label sa
 
 test("the interface around the vector tools: the hint floats at the bottom (and can be turned off), buttons name themselves, seldom-used options are in a menu, dividers in the selection bar, many colours do not push any out of reach", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const pop = p.locator(".colour-pop");
   const hint = p.getByTestId("tool-hint");
   await p.mouse.move(300, 650);
@@ -1974,6 +1983,7 @@ test("Boolean groups across zoom levels: a shape drawn 30 levels in, inside a bi
 
 test("numbers are live: dragging the outline width's field (not its name) changes the shape while the pointer is still down, and stores one undo step on release", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
   const dark = (c: number[] | null) => !!c && Math.abs(c[0]! - 31) < 14 && Math.abs(c[1]! - 35) < 14 && Math.abs(c[2]! - 41) < 14;
   await key(app, "u");
@@ -2044,6 +2054,7 @@ test("outline ends (flat, round, square) show on a dashed outline inside, centre
 
 test("only a picked shape moves (a press-and-slide on another draws the selection box); dashes from Outline options; a node snaps to another shape's node", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await key(app, "u");
   await drag(app, [400, 300], [500, 400]); // A
   await drag(app, [700, 300], [800, 400]); // B
@@ -2256,6 +2267,7 @@ test("pasted SVG text with <use> and a symbol becomes shapes (the used shape dra
 
 test("Outline stroke makes the line a shape of its own; a shape with a fill keeps it and gets the outline above; Taper is thin at the ends; one undo each", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   await key(app, "u");
   await p.click('[data-shape-kind="line"]');
   await drag(app, [400, 400], [700, 400]);
@@ -2918,6 +2930,7 @@ test("Make vector copy replaces an SVG picture with its shapes in the same place
 
 test("WYSIWYG colours: a new shape's default outline is a real colour chosen for the canvas it is drawn on, and the canvas, a picture and an SVG all show exactly what is stored", async ({ app }) => {
   const p = app.page;
+  await outlineShapes(p);
   const exported = async (format: "svg" | "png"): Promise<Buffer> => {
     await exportWith(p, "exportpic");
     const dlg = p.getByTestId("export-dialog");

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.38.0 — Snapping to the shapes themselves; shapes start without an outline (2026-10-25)
+
+- **Snapping to the shapes** ([ADR 0171](docs/adr/0171-snap-to-shapes.md)): moving, resizing, turning and dragging a node now also snap to corners and sides, not only to boxes. A corner goes exactly onto another corner or the middle of a side (a ring marks it), onto any side, curves included, and a straight side lies flush along a nearly parallel one (the side is drawn). Turning brings a corner round to another or a side parallel to a nearby one. One rule for every gesture.
+- **Changed:** a new shape has a fill and no outline. Lines and open paths still get the ink, or they would not show. The outline is no longer remembered between sessions.
+- **Fixed:** the outline width (Outline options and the bar's slider) read the width kept for later even when a shape had no outline; it now reads 0, or *None* on the slider, whose far left is no outline.
+- **Fixed:** an open path drawn with a fill and no outline was invisible.
+
 ## 0.37.3 — Make vector copy works in place (2026-10-25)
 
 - **Fixed:** *Make vector copy* of an SVG picture put the shapes under the pointer (the Actions bar button) at half the view's size, so they came out smaller and elsewhere. They now take the picture's place exactly: its size, crop, turn, layer, sheet and group.

@@ -157,13 +157,14 @@ export class EditorState {
   /** Snapping while moving (interaction/snap.ts). */
   snap = true;
   /** Guide lines (screen px) shown while a move is snapped to something. */
-  guides: { x?: number; y?: number } | null = null;
+  /** Snap guides in screen px: lines up with a box (x, y), a corner it went to (pt), a side it went onto (seg: x0, y0, x1, y1). */
+  guides: { x?: number; y?: number; pt?: readonly [number, number]; seg?: readonly [number, number, number, number] } | null = null;
   /** Select tool: ignore an object that fills the whole view (zoomed far into it), so it cannot be picked or deleted by accident. */
   ignoreFilling = false;
   /** The Shape and Path tools (ADR 0099): what they make. Fill and outline null: none. */
   shapeKind: ShapeKind = "rect";
   shapeFill: Paint | null = "#2563eb";
-  shapeStroke: Paint | null = "#1f2329";
+  shapeStroke: Paint | null = null; // (shapes start with no outline; a line or an open path gets the ink when it has none)
   shapeWidthPx = 2;
   /** Resizing keeps the corner radius its size (off: the radius scales with the shape, so it keeps its look). */
   lockRadius = false;

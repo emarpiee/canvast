@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Snapping to the shapes, shapes without an outline (v0.38.0, 2026-10-25)
+
+**Implemented:** snapping to the shapes themselves for move, node drag, resize and turn, one rule in `shapeSnap` with the searches in `interaction/snap-points.ts` ([ADR 0171](adr/0171-snap-to-shapes.md)): a corner exactly onto a corner or the middle of a side (always wins in reach), a corner onto any side, a straight side flush along a nearly parallel one; ring and side guides. New shapes start with no outline (lines and open paths still get the ink); the outline is no longer remembered between sessions; every outline width readout shows 0 / None when there is none (the bar's slider: far left is no outline). Fixed: an open path with a fill and no outline was invisible. Also in v0.37.1 to v0.37.3: big library imports without lag or flicker, the library index written in slices (no long tasks), Make vector copy in place.
+**Tested:** unit 548 + 3 new snap tests; E2E (Chromium) the 14 shape-related specs 276 passed and 2 failed, both fixed and re-run green (snapshot 7ac84d4d); the new snapping test (frames.spec, home and 10^12 levels down) in Chromium and Firefox. 16 tests that relied on a default outline now set one with the harness's `outlineShapes`.
+**Known failures:** none known.
+**Unverified:** the resize and turn snaps have no E2E test of their own (they share `shapeSnap` with the tested move); the quick and full suites have not run.
+**Committed:** `feat(snap): snap to the shapes themselves; shapes start without an outline (v0.38.0)`, local, not pushed.
+**Next bounded task:** E2E for resize and turn snapping; the owner's next pick.
+
 ## Painting view removed (v0.37.0, 2026-10-25)
 
 **Implemented:** the Paint view, `src/paint/`, its UI, the brush engine (`engine/`, its build step, notice and CSP allowance), the `paint.*` settings and the canvas code that only hosted it (switchable targets, tool host hooks, `paint`/`both` key scopes, `data-only`, helpers split out to share with it) removed ([ADR 0170](adr/0170-painting-view-removed.md)). The Eyedropper tool of the rail removed too (the colour picker's own pick stays). Kept: wheel scrolling of bars, a sheet's ratio from a px size. The IndexedDB stores of paintings stay (schema 11), unread; archives stay format 6, without paintings or presets; an older backup's paintings and presets are skipped with a note.
