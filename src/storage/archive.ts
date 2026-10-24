@@ -129,6 +129,23 @@ export class ArchiveError extends Error {}
 
 const HASH_RE = /^[0-9a-f]{64}$/;
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
+const SLICE = 2000;
+/**
+ * A canvas's objects in slices: each slice arrives in a task of its own, so the browser draws between them and a big
+ * canvas never blocks a frame for its whole read (the library index is written in the background while one works).
+ */
+async function eachObjects(tx: IDBTransaction, canvasId: string, fn: (records: ObjectRecord[]) => void): Promise<number> {
+  let n = 0;
+  let after: string | null = null;
+  for (;;) {
+    const keys: IDBKeyRange = after === null ? range(canvasId) : IDBKeyRange.bound([canvasId, after], [canvasId, "￿"], true);
+    const records = await req(tx.objectStore("objects").getAll(keys, SLICE) as IDBRequest<ObjectRecord[]>);
+    if (records.length) fn(records);
+    n += records.length;
+    if (records.length < SLICE) return n;
+    after = records[records.length - 1]!.id;
+  }
+}
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn): Promise<ExportResult> {
@@ -136,7 +153,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
   const boards: ManifestBoard[] = [];
-  const canvasFiles: Array<{ file: string; json: string }> = [];
+  const canvasFiles: Array<{ file: string; json: BlobPart[] }> = [];
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
   const since = scope.kind === "workspace" ? scope.since : undefined;
   const noBytes = scope.kind === "workspace" && scope.noBytes === true;
@@ -161,24 +178,33 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       if (since !== undefined && c.updatedAt <= since) {
         // an incremental backup does not repeat a canvas that has not changed since the backup it goes on from
         mb.canvases.push({ id: c.id, name: c.name, objectCount: c.objectCount });
-        for (const r of await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>)) {
+        await eachObjects(tx, cid, (records) => {
+          for (const r of records) {
+            const a = storedAssetOf(r.data);
+            if (a) hashes.add(a);
+          }
+        });
+        continue;
+      }
+      // The canvas file is made of parts, one per slice, never as one string: {"objects":[ slice , slice ], "frames":… }. Each slice is encoded
+      // into a Blob as it comes (joining Blobs copies nothing), so no single step encodes the whole canvas.
+      const json: BlobPart[] = ['{"objects":['];
+      const count = await eachObjects(tx, cid, (records) => {
+        for (const r of records) {
           const a = storedAssetOf(r.data);
           if (a) hashes.add(a);
         }
-        continue;
-      }
-      const records = await req(tx.objectStore("objects").getAll(range(cid)) as IDBRequest<ObjectRecord[]>);
+        const part = JSON.stringify(records.map((r) => r.data));
+        json.push(new Blob([json.length > 1 ? "," : "", part.slice(1, -1)]));
+      });
       const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
       const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
       const marks = readBookmarks(((await req(tx.objectStore("bookmarks").get(cid) as IDBRequest<{ items?: unknown } | undefined>)) ?? {}).items);
-      for (const r of records) {
-        const a = storedAssetOf(r.data);
-        if (a) hashes.add(a);
-      }
+      json.push("],", JSON.stringify({ frames, view, ...(marks.length ? { bookmarks: marks } : {}) }).slice(1));
       const file = `canvases/${c.id}.json`;
-      canvasFiles.push({ file, json: JSON.stringify({ objects: records.map((r) => r.data), frames, view, ...(marks.length ? { bookmarks: marks } : {}) }) });
-      mb.canvases.push({ id: c.id, name: c.name, objectCount: records.length, file });
-      objects += records.length;
+      canvasFiles.push({ file, json });
+      mb.canvases.push({ id: c.id, name: c.name, objectCount: count, file });
+      objects += count;
     }
     boards.push(mb);
   }
@@ -249,7 +275,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     k.input.data = blob;
   }
 
-  const json = (s: string): Blob => new Blob([s], { type: "application/json" });
+  const json = (s: string | BlobPart[]): Blob => new Blob(typeof s === "string" ? [s] : s, { type: "application/json" });
   const blob = await writeZip(
     [
       { name: "manifest.json", data: json(JSON.stringify(manifest, null, 1)) },

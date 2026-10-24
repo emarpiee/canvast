@@ -271,6 +271,20 @@ test("canvas, board and asset exports contain only what their scope needs", asyn
   await other.context.close();
 });
 
+test("a canvas bigger than one read slice (objects are read and written 2000 at a time) round-trips exactly", async ({ app, browser }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.benchStore({ kind: "dense", n: 4000 })); // two full slices, then an empty read
+  const id = (await sess(p)).current!.canvasId;
+  await openMenu(p);
+  const file = await download(p, () => rowAction(p, "canvas", "Canvas 1", "Export"));
+  const other = await freshProfile(browser);
+  await importArchive(other.page, file.name, file.bytes);
+  const back = await dump(other.page, (await sess(other.page)).current!.canvasId);
+  expect(back.objects).toHaveLength(4000);
+  expect(back.objects).toEqual((await dump(p, id)).objects);
+  await other.context.close();
+});
+
 test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app }) => {
   const p = app.page;
   await importImage(p);

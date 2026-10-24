@@ -46,15 +46,28 @@ export function crc32(bytes: Uint8Array, prev = 0): number {
   return ~c >>> 0;
 }
 
-/** CRC-32 of a Blob, read in chunks (never the whole Blob at once). */
+/** A task boundary, so the browser can draw a frame (a message, not a timer: timers are slowed down in a hidden tab). */
+const breathe = (): Promise<void> =>
+  new Promise((resolve) => {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => resolve();
+    ch.port2.postMessage(0);
+  });
+
+/** CRC-32 of a Blob, read in chunks (never the whole Blob at once), pausing every few ms so a big one never stalls a frame. */
 export async function crc32Blob(b: Blob): Promise<number> {
   if (b.size === 0) return 0;
   let c = 0;
+  let since = performance.now();
   const reader = b.stream().getReader();
   for (;;) {
     const { done, value } = await reader.read();
     if (done) return c;
     c = crc32(value, c);
+    if (performance.now() - since > 8) {
+      await breathe();
+      since = performance.now();
+    }
   }
 }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.2 — No more stutter from the library index on a big workspace (2026-10-25)
+
+- **Fixed:** with a library folder in use, the library index (saved about 20 s after the last change, at most once a minute) froze the canvas for up to about 0.2 s on a big workspace, so the frame rate dropped now and then. Each canvas is now read, written out and checked in small slices with frames drawn in between: on a 60,000-object workspace no step takes longer than a frame, where the longest used to block for 196 ms.
+- Backups and other ZIP exports use the same sliced writing and checking.
+
 ## 0.37.1 — Big library imports without the lag and flicker (2026-10-25)
 
 - **Fixed:** importing many files into the library no longer keeps every decoded picture in memory, so a big import stays responsive.
