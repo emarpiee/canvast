@@ -44,6 +44,7 @@ import type { ProjectedObject, ScreenBox } from "../render/projection";
 import { exactX, exactY, projectObject } from "../render/projection";
 import type { Seg, SnapTargets } from "./snap-points";
 import { MAX_SNAP_POINTS, bestEdgeSnap, bestFlushSnap, bestPointSnap, snapTargets } from "./snap-points";
+import { remadePatterns } from "../app/pattern";
 import { HANDLE_SIZE_PX, canRotate, selectedFrame } from "../render/scene-renderer";
 import { pointInPolygon } from "../render/geometry2d";
 import type { SelectionFrame } from "../render/selection-frame";
@@ -1659,9 +1660,9 @@ export function attachTools(
       const label = replaceCommit;
       replaceCommit = "";
       if (p.kind === "replace") {
-        const n = [...p.objs.values()].map((o) => homeObject(o, doc.space));
+        const made = remadePatterns(doc, [...p.objs.values()].map((o) => homeObject(o, doc.space))); // (patterns on resized sheets: made again at the new size)
         editor.preview = { kind: "none" };
-        doc.commit(doc.transaction(label, n));
+        doc.commit(doc.transaction(label, made.next, made.removed));
         return;
       }
     }

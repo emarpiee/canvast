@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.5 — A pattern follows its sheet's size (2026-10-25)
+
+- **Fixed:** resizing a sheet that holds a generated pattern left the pattern at its old size in the top-left corner (the rest of the sheet empty, or the pattern cut off), though it was meant to follow. It now stretches with the sheet while you drag, and on release is made again at the new size from its settings and seed, in one undo step (the resize handles, the ratio field and the size on a sheet).
+
 ## 0.41.4 — A pattern on a shape uses that shape (2026-10-25)
 
 - **Changed:** making a pattern on a picked shape turned a copy of it into a new mask over it, leaving the shape under it. The shape itself now becomes the clipping mask that holds the pattern: its place, layer, groups and name stay, and its fill and outline come back with *Release*.

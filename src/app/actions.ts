@@ -34,6 +34,7 @@ import { fitPolyline, simplifySub } from "../doc/fit-curve";
 import { alignedOutlineOf, outlineOf } from "../doc/outline-stroke";
 import { divideShapes, pathLookOf, uniteRegions } from "../doc/divide";
 import { gapsOf } from "../doc/gaps";
+import { remadePatterns } from "./pattern";
 import { cameraIn } from "../scene/frame-index";
 import { projectionFor } from "../render/projection";
 import { buildNetwork, regionFillAt, withRegionFill } from "../doc/network";
@@ -2356,7 +2357,8 @@ function scaleSheet(doc: DocumentStore, editor: EditorState, s: CanvasObject, kx
   const plan = planSheetScale(group, worldBounds(s).min, kx, ky, false, false);
   if (!final) return showReplaced(editor, [...plan.values()]);
   editor.preview = { kind: "none" };
-  doc.commit(doc.transaction(label, [...plan.values()]));
+  const made = remadePatterns(doc, [...plan.values()]);
+  doc.commit(doc.transaction(label, made.next, made.removed));
   editor.changed();
 }
 
@@ -2716,7 +2718,8 @@ export function resizeOnSheet(doc: DocumentStore, editor: EditorState, w: number
   const plan = planSheetScale(group, worldBounds(t.o).min, kx, ky, false, false);
   if (!final) return showReplaced(editor, [...plan.values()]);
   editor.preview = { kind: "none" };
-  doc.commit(doc.transaction("Resize", [...plan.values()]));
+  const made = remadePatterns(doc, [...plan.values()]);
+  doc.commit(doc.transaction("Resize", made.next, made.removed));
   editor.changed();
 }
 

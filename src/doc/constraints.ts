@@ -65,6 +65,9 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
     if (o.parent !== undefined && byId.has(o.parent)) (kids.get(o.parent) ?? kids.set(o.parent, []).get(o.parent)!).push(o);
     else out.set(o.id, scaleAbout(o, fixed, kx, o.kind === "image" || o.kind === "path" ? ky : kx, keepWidth, keepRadius));
   }
+  // the groups made by a pattern generator (ADR 0162): their pieces grow with the sheet while it is resized; on release the pattern is made
+  // again at the new size (app/pattern.ts remadePatterns)
+  const generated = new Set(objs.flatMap((o) => (o.gen ? [o.gen.gid] : [])));
   const rehomed = new Map<ObjectId, FrameSpace>();
   const queue = [...out.keys()];
   for (let q = 0; q < queue.length; q++) {
@@ -91,7 +94,7 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
       const cb = worldBounds(c);
       const x0 = rel(cb.min.x, ob.min.x), x1 = rel(cb.max.x, ob.min.x);
       const y0 = rel(cb.min.y, ob.min.y), y1 = rel(cb.max.y, ob.min.y);
-      const k = old.container.scale === true ? ({ h: "scale", v: "scale" } as const) : constraintOf(c); // (scale contents: whatever the pins say, everything grows with the sheet)
+      const k = old.container.scale === true || c.groups?.some((g) => generated.has(g)) ? ({ h: "scale", v: "scale" } as const) : constraintOf(c); // (scale contents: whatever the pins say, everything grows with the sheet)
       let [nx0, nx1] = constrainSpan(k.h, Lx0, Lx1, x0, x1);
       let [ny0, ny1] = constrainSpan(k.v, Ly0, Ly1, y0, y1);
       const sx = x1 > x0 ? (nx1 - nx0) / (x1 - x0) : 1;

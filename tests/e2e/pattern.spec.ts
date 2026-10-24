@@ -46,6 +46,44 @@ test("Pattern: a new sheet, each change replaces the result, hiding the backgrou
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Pattern: resizing the sheet it is on makes the pattern again at the new size (from its settings and seed), in one undo step", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("c");
+  await app.drag({ x: 450, y: 250 }, { x: 750, y: 450 }, 6);
+  await p.keyboard.press("v");
+  await p.mouse.click(600, 350);
+  await p.click("[data-pattern-panel]");
+  await choose(app, "ripple");
+  await make(app);
+  await p.locator("[data-pg-done]").click();
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  const box = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
+  const union = async (ids: string[]) => {
+    const bs = await Promise.all(ids.map(box));
+    return { minX: Math.min(...bs.map((b) => b.minX)), minY: Math.min(...bs.map((b) => b.minY)), maxX: Math.max(...bs.map((b) => b.maxX)), maxY: Math.max(...bs.map((b) => b.maxY)) };
+  };
+  let all = await objs(app);
+  const sheet = sheets(all)[0]!;
+  const seed = (on(all, sheet.id).find((o) => (o as Obj & { gen?: { seed: number } }).gen) as Obj & { gen: { seed: number } }).gen.seed;
+  // the sheet's corner handle, dragged out: 150 px wider, 100 px taller
+  await p.mouse.click(470, 240); // (its name above it)
+  await app.frame();
+  const c = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: c[2]![0] + 150, y: c[2]![1] + 100 }, 8);
+  await app.frame();
+  all = await objs(app);
+  const pieces = on(all, sheet.id);
+  const sb = await box(sheet.id), pb = await union(pieces.map((o) => o.id));
+  expect(sb.maxX - sb.minX).toBeCloseTo(450, -1);
+  for (const k of ["minX", "minY", "maxX", "maxY"] as const) expect(Math.abs(pb[k] - sb[k]), `the pattern reaches the sheet's ${k}`).toBeLessThan(2);
+  expect((pieces.find((o) => (o as Obj & { gen?: unknown }).gen) as Obj & { gen: { seed: number } }).gen.seed, "the same settings and seed").toBe(seed);
+  expect(new Set(pieces.map((o) => o.groups?.[0])).size, "still one pattern").toBe(1);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await box(sheet.id)).maxX - (await box(sheet.id)).minX).toBeCloseTo(300, -1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("Pattern: on a picked sheet and on a picked shape (which cuts it), Randomize, Done starts a new result", async ({ app }) => {
   const p = app.page;
   await p.click("[data-pattern-panel]");

@@ -11,7 +11,7 @@ import { homeObject, newObjectId } from "../doc/model";
 import type { ObjectId } from "../doc/model";
 import { drawnParams, drawnSubs, geometryBounds, mapSubs } from "../doc/path";
 import type { Generator, Values } from "../gen";
-import { cleanValues, generate } from "../gen";
+import { cleanValues, generate, generatorById } from "../gen";
 import { nextSheetName, pruneSelection } from "./actions";
 import type { EditorState } from "./editor-state";
 import type { ViewState } from "./view-state";
@@ -176,19 +176,8 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
     fresh.push(host);
   }
 
-  const shapes = generate(g, values, seed, box.w, box.h);
-  const base = { ...(frame ? { frame } : {}), anchor, unit, attachmentTargetId: null, opacity: 1, parent: host.id };
-  // a pattern that is being changed keeps its place in the stack (spread over the range its shapes had); a new one goes on top
-  const zLow = again ? Math.min(...old.map((o) => o.z)) : z0 + 2, zSpan = again ? Math.max(...old.map((o) => o.z)) - zLow + 0.5 : shapes.length;
-  const prefix = again ? (old[0]!.groups ?? []).slice(0, (old[0]!.groups ?? []).indexOf(editing!)) : [];
-  const pieces = shapes.map((s, i): CanvasObject => homeObject(normalizeUnit({
-    ...base, id: newObjectId(), kind: "path", z: zLow + (zSpan * i) / Math.max(1, shapes.length), ...(prefix.length ? { groups: prefix } : {}),
-    sub: mapSubs(s.sub, (x, y) => [x + box.x, y + box.y]), fill: s.fill, stroke: s.stroke, width: s.width,
-    ...(s.evenodd ? { evenodd: true as const } : {}), ...(s.name ? { name: s.name } : {}),
-  } as PathObject), doc.space));
   const gid = again ? editing! : newObjectId();
-  const info: GenInfo = { id: g.id, gid, seed, v: cleanValues(g, values) };
-  const grouped = groupObjects(pieces, prefix.length, gid).map((o, i) => ({ ...o, groupNames: { ...(again ? old[0]!.groupNames : {}), [gid]: g.label }, ...(i === 0 ? { gen: info } : {}) }) as CanvasObject);
+  const grouped = patternPieces(doc, g, { id: g.id, gid, seed, v: cleanValues(g, values) }, { ...host, frame, anchor, unit } as PathObject, box, again ? old : null, z0 + 2);
 
   const tx = doc.transaction(`Pattern: ${g.label}`, [...fresh, ...grouped], again ? old.map((o) => o.id) : []);
   doc.commit(tx);
@@ -197,6 +186,49 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
   else if (!t) editor.select([host.id]);
   editor.changed();
   return true;
+}
+
+/**
+ * The pieces a generator makes for `info` on `host` (they are put in its units, over `box`), grouped as the pattern `info.gid`. `old`: the pieces
+ * of the pattern they replace (they take its place in the stack, its outer groups and names); else they go on top, from `zTop`.
+ */
+function patternPieces(doc: DocumentStore, g: Generator, info: GenInfo, host: PathObject, box: { x: number; y: number; w: number; h: number }, old: readonly CanvasObject[] | null, zTop: number): CanvasObject[] {
+  const shapes = generate(g, info.v as Values, info.seed, box.w, box.h);
+  const base = { ...(host.frame ? { frame: host.frame } : {}), anchor: host.anchor, unit: host.unit, attachmentTargetId: null, opacity: 1, parent: host.id };
+  // a pattern that is being changed keeps its place in the stack (spread over the range its shapes had); a new one goes on top
+  const zLow = old?.length ? Math.min(...old.map((o) => o.z)) : zTop, zSpan = old?.length ? Math.max(...old.map((o) => o.z)) - zLow + 0.5 : shapes.length;
+  const prefix = old?.length ? (old[0]!.groups ?? []).slice(0, (old[0]!.groups ?? []).indexOf(info.gid)) : [];
+  const pieces = shapes.map((s, i): CanvasObject => homeObject(normalizeUnit({
+    ...base, id: newObjectId(), kind: "path", z: zLow + (zSpan * i) / Math.max(1, shapes.length), ...(prefix.length ? { groups: prefix } : {}),
+    sub: mapSubs(s.sub, (x, y) => [x + box.x, y + box.y]), fill: s.fill, stroke: s.stroke, width: s.width,
+    ...(s.evenodd ? { evenodd: true as const } : {}), ...(s.name ? { name: s.name } : {}),
+  } as PathObject), doc.space));
+  return groupObjects(pieces, prefix.length, info.gid).map((o, i) => ({ ...o, groupNames: { ...(old?.[0]?.groupNames ?? {}), [info.gid]: g.label }, ...(i === 0 ? { gen: info } : {}) }) as CanvasObject);
+}
+
+/**
+ * A resize of sheets (`next`: the objects as they will be) with the patterns on them made again at the sheets' new sizes, from their settings
+ * and seed (while the sheet was dragged they grew with it): what to commit, and the pieces that go.
+ */
+export function remadePatterns(doc: DocumentStore, next: readonly CanvasObject[]): { next: CanvasObject[]; removed: ObjectId[] } {
+  const byId = new Map(next.map((o) => [o.id, o]));
+  const out = new Map(byId);
+  const removed: ObjectId[] = [];
+  for (const first of next) {
+    const info = first.gen;
+    const host = first.parent !== undefined ? byId.get(first.parent) : undefined;
+    const g = info && generatorById(info.id);
+    if (!info || !g || !isContainer(host) || host.kind !== "path") continue;
+    const old = [...doc.all()].filter((o) => o.groups?.includes(info.gid));
+    const b = sizeOf(host);
+    if (!(b.w > 0 && b.h > 0) || !Number.isFinite(b.w + b.h)) continue;
+    for (const o of old) {
+      out.delete(o.id);
+      removed.push(o.id);
+    }
+    for (const o of patternPieces(doc, g, info, host, b, old, doc.topZ() + 1)) out.set(o.id, o);
+  }
+  return { next: [...out.values()], removed };
 }
 
 const maskNumber = (doc: DocumentStore): number => {
