@@ -1,5 +1,4 @@
 import type { Viewport } from "../core/camera";
-import { real } from "../app/target";
 import type { FrameCamera } from "../core/frames";
 import type { DocumentStore } from "../doc/document-store";
 import type { EditorState } from "../app/editor-state";
@@ -23,8 +22,8 @@ export const MASK_GHOST = 0.45;
 const maskCache = new WeakMap<DocumentStore, { revision: number; byGroup: Map<string, CanvasObject[]> }>();
 /** The objects of a mask group, in paint order (cached until the document changes). */
 function membersOfMask(doc: DocumentStore, by: string): CanvasObject[] {
-  let c = maskCache.get(real(doc));
-  if (!c || c.revision !== doc.revision) maskCache.set(real(doc), (c = { revision: doc.revision, byGroup: new Map() }));
+  let c = maskCache.get(doc);
+  if (!c || c.revision !== doc.revision) maskCache.set(doc, (c = { revision: doc.revision, byGroup: new Map() }));
   let list = c.byGroup.get(by);
   if (!list) c.byGroup.set(by, (list = maskMembers(doc.all(), by)));
   return list;
@@ -36,8 +35,8 @@ const hiddenCache = new WeakMap<DocumentStore, { revision: number; list: CanvasO
  * index, so the list is made once for each state of the document and only the first `limit` of it is looked at.
  */
 export function hiddenInView(doc: DocumentStore, fc: FC, vp: Viewport, limit = 400): ProjectedObject[] {
-  let c = hiddenCache.get(real(doc));
-  if (!c || c.revision !== doc.revision) hiddenCache.set(real(doc), (c = { revision: doc.revision, list: [...doc.all()].filter((o) => o.hidden && !o.isMask) }));
+  let c = hiddenCache.get(doc);
+  if (!c || c.revision !== doc.revision) hiddenCache.set(doc, (c = { revision: doc.revision, list: [...doc.all()].filter((o) => o.hidden && !o.isMask) }));
   const out: ProjectedObject[] = [];
   for (const o of c.list.slice(0, limit)) {
     const cam = cameraIn(fc, o.frame ?? doc.space.world);
@@ -96,8 +95,8 @@ export interface BoolView {
 const operandCache = new WeakMap<DocumentStore, { revision: number; byGroup: Map<string, CanvasObject[]> }>();
 /** The direct operands of a boolean group, back to front (cached until the document changes). */
 function operandsIn(doc: DocumentStore, gid: string): CanvasObject[] {
-  let c = operandCache.get(real(doc));
-  if (!c || c.revision !== doc.revision) operandCache.set(real(doc), (c = { revision: doc.revision, byGroup: new Map() }));
+  let c = operandCache.get(doc);
+  if (!c || c.revision !== doc.revision) operandCache.set(doc, (c = { revision: doc.revision, byGroup: new Map() }));
   let list = c.byGroup.get(gid);
   if (!list) c.byGroup.set(gid, (list = operandsOf(doc.all(), gid)));
   return list;

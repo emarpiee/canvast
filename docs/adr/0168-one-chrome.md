@@ -1,6 +1,6 @@
 # ADR 0168: one set of bars, tools and keys for the canvas and the Painting view
 
-- Status: accepted (v0.31.0, 2026-10-22)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted (v0.31.0, 2026-10-22)
 - Related: ADR 0167 (vector layers with the canvas's tools), ADR 0165 (the Painting view), ADR 0158 (keymap), ADR 0151 (grouped menus), ADR 0156 (panels)
 
 ## Context

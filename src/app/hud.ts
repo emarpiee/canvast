@@ -88,8 +88,6 @@ export interface HudStatus {
   quality(): number;
   /** Bring the selection, or everything visible at this zoom, into view (the buttons beside zoom in and out). */
   fit(kind: "selection" | "all"): void;
-  /** The Painting view's turn and mirror menu (its button is there only in that view). */
-  turnMenu(anchor: HTMLElement): void;
   hasSelection(): boolean;
   /** Previous view and next view (ADR 0116): whether each is there, going, and a way to hear that they changed. */
   canCameraBack(): boolean;
@@ -123,23 +121,22 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
       <div class="hud-fps hud-diag" data-testid="diagnostics" aria-live="off" hidden></div>
     </div>
     <div class="hud-controls" data-cmd-group="View controls" role="toolbar" aria-label="Navigation">
-      <button type="button" data-action="pattern" data-only="canvas" aria-label="Canvas pattern" title="Canvas pattern"></button>
-      <button type="button" data-action="background" data-only="canvas" aria-haspopup="dialog" aria-label="Canvas background colour" title="Canvas background colour. Hold to go back to the app's own.">${ICONS.paintBucket}</button>
-      <button type="button" data-action="info" data-only="canvas" aria-label="Information shown" title="Information shown"></button>
-      <button type="button" data-action="names" data-only="canvas" aria-label="Item names" title="Item names"></button>
+      <button type="button" data-action="pattern" aria-label="Canvas pattern" title="Canvas pattern"></button>
+      <button type="button" data-action="background" aria-haspopup="dialog" aria-label="Canvas background colour" title="Canvas background colour. Hold to go back to the app's own.">${ICONS.paintBucket}</button>
+      <button type="button" data-action="info" aria-label="Information shown" title="Information shown"></button>
+      <button type="button" data-action="names" aria-label="Item names" title="Item names"></button>
       <button type="button" data-action="zen" aria-pressed="false" aria-label="Zen mode" title="Zen mode: fade the bars and panels out; each shows while the pointer is over it (Z)">${ICONS.leaf}</button>
       <span class="hud-sep" role="separator"></span>
       <button type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (−)">${ICONS.minus}</button>
       <button type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">${ICONS.plus}</button>
-      <button type="button" class="hud-turn" data-action="view-turn" data-only="paint" aria-haspopup="menu" aria-expanded="false" aria-label="View rotation" title="Turn or mirror the view (4 and 6 turn it, 5 resets)">0°</button>
-      <span class="hud-sep" data-only="canvas" role="separator"></span>
-      <button type="button" data-action="cam-back" data-only="canvas" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
-      <button type="button" data-action="random-view" data-only="canvas" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dice5}</button>
-      <button type="button" data-action="cam-fwd" data-only="canvas" aria-label="Next view" title="Next view (Alt+Shift+Right)">${ICONS.cornerUpRight}</button>
       <span class="hud-sep" role="separator"></span>
-      <button type="button" data-action="fit-selection" data-only="canvas" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
+      <button type="button" data-action="cam-back" aria-label="Previous view" title="Previous view (Alt+Shift+Left)">${ICONS.cornerUpLeft}</button>
+      <button type="button" data-action="random-view" aria-label="Random empty view" title="Random empty view: go to a random place and zoom, far from everything on the canvas">${ICONS.dice5}</button>
+      <button type="button" data-action="cam-fwd" aria-label="Next view" title="Next view (Alt+Shift+Right)">${ICONS.cornerUpRight}</button>
+      <span class="hud-sep" role="separator"></span>
+      <button type="button" data-action="fit-selection" aria-label="Fit the selection in view" title="Fit the selection in view (Alt)">${ICONS.focus}</button>
       <button type="button" data-action="fit-all" aria-label="Fit everything in view" title="Fit everything visible at this zoom in view (Alt again)">${ICONS.frame}</button>
-      <button type="button" data-action="home" data-only="canvas" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
+      <button type="button" data-action="home" aria-label="Return to origin" title="Return to origin (0)">${ICONS.house}</button>
     </div>
     </div>
     <pre class="hud-debug" data-testid="debug-panel" ${debug ? "" : "hidden"}></pre>
@@ -183,7 +180,6 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     else if (action === "zoom-out") zoomByStep(view, -1);
     else if (action === "fit-selection") status.fit("selection");
     else if (action === "fit-all") status.fit("all");
-    else if (action === "view-turn") status.turnMenu((e.target as HTMLElement).closest("button")!);
     else if (action === "random-view") status.randomView();
     else if (action === "cam-back") status.cameraBack();
     else if (action === "cam-fwd") status.cameraForward();

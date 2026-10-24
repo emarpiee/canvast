@@ -15,8 +15,7 @@ import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
-import { ADJUSTMENTS, MAX_LAYERS, SHADOW_START, cleanAdjust, layersOf } from "../doc/adjust";
-import { curveCanvas, wireCurve } from "./curve-editor";
+import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, SHADOW_START, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
 import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
 import { swatchBackground } from "../render/ink";
@@ -913,7 +912,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const chSelect = (name: string): string => `<select data-${name} aria-label="${name === "lv-ch" ? "Levels" : "Curve"}: which channel">${CH.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
   const layerTabs = `<div class="adj-layers" role="group" aria-label="Layers of adjustments">${layers.map((_, i) => `<button type="button" data-layer="${i}" aria-pressed="${i === idx}">${i + 1}</button>`).join("")}${layers.length < MAX_LAYERS ? `<button type="button" data-layer-add aria-label="Add a layer of adjustments after this one" title="Add a layer: its numbers are applied to the result of the one before">+</button>` : ""}${layers.length > 1 ? `<button type="button" data-layer-del aria-label="Remove this layer" title="Remove this layer">${ICONS.x}</button>` : ""}</div>`;
   const levelsSection = `<section class="adj-group" aria-label="Levels">${head("Levels")}<div class="adj-row">${chSelect("lv-ch")}</div><div class="adj-row" data-lv-row><label class="adj-label" for="adj-lv-black">Black point</label><input type="number" class="adj-num" id="adj-lv-black" data-lv="black" min="0" max="254" step="1" aria-label="Levels: black point"><label class="adj-label" for="adj-lv-white">White point</label><input type="number" class="adj-num" id="adj-lv-white" data-lv="white" min="1" max="255" step="1" aria-label="Levels: white point"><label class="adj-label" for="adj-lv-gamma">Gamma</label><input type="number" class="adj-num" id="adj-lv-gamma" data-lv="gamma" min="0.1" max="5" step="0.05" aria-label="Levels: gamma"></div></section>`;
-  const curvesSection = `<section class="adj-group" aria-label="Curves">${head("Curves")}<div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div>${curveCanvas("Curve")}</section>`;
+  const curvesSection = `<section class="adj-group" aria-label="Curves">${head("Curves")}<div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
     layerTabs +
     `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span></header>` +
@@ -1127,25 +1126,132 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
 
   // ---- curves (ADR 0136) -------------------------------------------------------------------------------------------------------
   let cvCh: Channel = "master";
-  const curve = wireCurve(pop.querySelector<HTMLCanvasElement>("[data-curve]")!, {
-    points: () => (cur.curves?.[cvCh] ? cur.curves[cvCh]!.map((p) => [p[0], p[1]] as [number, number]) : [[0, 0], [255, 255]]),
-    set: (pts) => { cur = { ...cur, curves: { ...cur.curves, [cvCh]: pts } }; },
-    input: schedulePreview,
-    commit: () => { cancelPreview(); emitChange("Adjust picture"); },
+  let picked = -1;
+  const cv = pop.querySelector<HTMLCanvasElement>("[data-curve]")!;
+  const SIZE = 192, PAD = 6;
+  const toXY = (x: number, y: number): [number, number] => [PAD + (x / 255) * (SIZE - 2 * PAD), SIZE - PAD - (y / 255) * (SIZE - 2 * PAD)];
+  const fromXY = (px: number, py: number): [number, number] => [Math.max(0, Math.min(255, Math.round(((px - PAD) / (SIZE - 2 * PAD)) * 255))), Math.max(0, Math.min(255, Math.round(((SIZE - PAD - py) / (SIZE - 2 * PAD)) * 255)))];
+  const points = (): Array<[number, number]> => (cur.curves?.[cvCh] ? cur.curves[cvCh]!.map((p) => [p[0], p[1]] as [number, number]) : [[0, 0], [255, 255]]);
+  const setPoints = (pts: Array<[number, number]>): void => {
+    pts.sort((a, b) => a[0] - b[0]);
+    cur = { ...cur, curves: { ...cur.curves, [cvCh]: pts } };
+  };
+  const drawCurve = (): void => {
+    const g = cv.getContext("2d")!;
+    const css = getComputedStyle(cv);
+    g.clearRect(0, 0, SIZE, SIZE);
+    g.strokeStyle = css.getPropertyValue("--hud-border") || "#888";
+    g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const [x, y] = toXY((i * 255) / 4, (i * 255) / 4);
+      g.beginPath();
+      g.moveTo(x, PAD);
+      g.lineTo(x, SIZE - PAD);
+      g.moveTo(PAD, y);
+      g.lineTo(SIZE - PAD, y);
+      g.stroke();
+    }
+    const pts = points();
+    const f = curveFn(pts);
+    g.strokeStyle = css.getPropertyValue("--hud-accent") || "#0a7";
+    g.lineWidth = 2;
+    g.beginPath();
+    for (let x = 0; x <= 255; x += 3) {
+      const [px, py] = toXY(x, f(x));
+      if (x === 0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.stroke();
+    g.fillStyle = css.getPropertyValue("--hud-fg") || "#222";
+    pts.forEach(([x, y], i) => {
+      const [px, py] = toXY(x, y);
+      g.beginPath();
+      g.arc(px, py, i === picked ? 5 : 3.5, 0, 7);
+      g.fill();
+    });
+  };
+  const hit = (px: number, py: number): number => points().findIndex(([x, y]) => Math.hypot(toXY(x, y)[0] - px, toXY(x, y)[1] - py) <= 8);
+  const local = (e: PointerEvent): [number, number] => {
+    const r = cv.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * SIZE, ((e.clientY - r.top) / r.height) * SIZE];
+  };
+  const curveInput = (): void => {
+    schedulePreview();
+  };
+  cv.addEventListener("pointerdown", (e) => {
+    const [px, py] = local(e);
+    let i = hit(px, py);
+    if (i < 0) {
+      const pts = points();
+      if (pts.length >= MAX_CURVE_POINTS) return;
+      pts.push(fromXY(px, py));
+      setPoints(pts);
+      i = points().findIndex(([x, y]) => (x === fromXY(px, py)[0] && y === fromXY(px, py)[1]));
+      curveInput();
+    }
+    picked = i;
+    cv.setPointerCapture(e.pointerId);
+    cv.focus();
+    drawCurve();
   });
-  const drawCurve = curve.draw;
+  cv.addEventListener("pointermove", (e) => {
+    if (picked < 0 || !(e.buttons & 1)) return;
+    const pts = points();
+    const [x, y] = fromXY(...local(e));
+    // between its neighbours (points stay in order) and anywhere up and down
+    const lo = picked > 0 ? pts[picked - 1]![0] + 1 : 0, hi = picked < pts.length - 1 ? pts[picked + 1]![0] - 1 : 255;
+    pts[picked] = [Math.max(lo, Math.min(hi, x)), y];
+    setPoints(pts);
+    drawCurve();
+    curveInput();
+  });
+  cv.addEventListener("pointerup", () => {
+    if (picked < 0) return;
+    cancelPreview();
+    emitChange("Adjust picture");
+  });
+  cv.addEventListener("dblclick", (e) => {
+    const i = hit(...local(e as unknown as PointerEvent));
+    const pts = points();
+    if (i < 0 || pts.length <= 2) return;
+    pts.splice(i, 1);
+    picked = -1;
+    setPoints(pts);
+    drawCurve();
+    emitChange("Adjust picture");
+  });
+  cv.addEventListener("keydown", (e) => {
+    const pts = points();
+    if (e.key === "[" || e.key === "]") {
+      picked = (picked + (e.key === "]" ? 1 : -1) + pts.length) % pts.length;
+    } else if (picked >= 0 && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      const step = e.shiftKey ? 10 : 1;
+      const [x, y] = pts[picked]!;
+      pts[picked] = [Math.max(0, Math.min(255, x + (e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0))), Math.max(0, Math.min(255, y + (e.key === "ArrowUp" ? step : e.key === "ArrowDown" ? -step : 0)))];
+      setPoints(pts);
+      emitChange("Adjust picture");
+    } else if ((e.key === "Delete" || e.key === "Backspace") && picked >= 0 && pts.length > 2) {
+      pts.splice(picked, 1);
+      picked = -1;
+      setPoints(pts);
+      emitChange("Adjust picture");
+    } else return;
+    e.preventDefault();
+    drawCurve();
+  });
   pop.querySelector<HTMLSelectElement>("[data-cv-ch]")!.addEventListener("change", (e) => {
     cvCh = (e.target as HTMLSelectElement).value as Channel;
-    curve.unpick();
+    picked = -1;
     drawCurve();
   });
   pop.querySelector<HTMLElement>("[data-cv-reset]")!.addEventListener("click", () => {
     const { [cvCh]: _gone, ...rest } = cur.curves ?? {};
     cur = { ...cur, curves: Object.keys(rest).length ? rest : undefined } as Adjust;
-    curve.unpick();
+    picked = -1;
     drawCurve();
     emitChange("Adjust picture");
   });
+  drawCurve();
   /** Every slider, the gradient map, the levels and the curves of this layer back to nothing (the panel's Reset button). */
   const reset = (): void => {
     for (const s of rows) set(s.key, 0);

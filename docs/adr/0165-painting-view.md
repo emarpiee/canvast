@@ -1,6 +1,6 @@
 # ADR 0165: the Painting view (P1)
 
-- Status: accepted (v0.28.0, 2026-10-21)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted (v0.28.0, 2026-10-21)
 - Related: ADR 0164 (the brush engine as WebAssembly), ADR 0007 (reference-checked GC), ADR 0008 (archives), ADR 0068 (menus), ADR 0156 (panels), ADR 0017 (settings)
 
 ## Owner's rulings

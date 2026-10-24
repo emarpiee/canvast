@@ -1,6 +1,6 @@
 # ADR 0167: vector layers edited with the canvas's own tools
 
-- Status: accepted (v0.30.0, 2026-10-22)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted (v0.30.0, 2026-10-22)
 - Related: ADR 0166 (canvas objects on a page), ADR 0165 (the Painting view), ADR 0003 (selection), ADR 0151 (touch gestures), ADR 0158 (keymap)
 
 ## Context

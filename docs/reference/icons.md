@@ -68,7 +68,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `droplets` | Styles panel: Change colour (menu item) |
 | `rainbow` | Styles panel: New palette from a colour (harmony) |
-| `pipette` | Pick a colour from what is shown: the colour picker's screen pick (the picker module draws its own copy, `src/colour-picker/picker.ts`) and the Eyedropper tool of the rail (both views) |
+| `pipette` | Colour picker: pick a colour from the screen (the picker module draws its own copy, `src/colour-picker/picker.ts`) |
 | `listChecks` | Under your finger menu (long press): Add to the pick |
 | `pathMenu` | Actions bar: Path tools (simplify, outline stroke, taper, network, divide, shape builder, text to path) |
 | `boolMenu` | Actions bar: Shapes (the boolean operations and their group) |
@@ -81,7 +81,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `paintImage` | Paint chooser: a picture as the fill (Image) |
 | `paintObjects` | Paint chooser: objects repeated over the shape (Objects) |
 | `markdown` | Copy Markdown (the text format bar, the Export menu) |
-| `selectAll` | Select everything: the context menu, and Select all of the Paint view's Selection menu |
+| `selectAll` | Context menu: Select everything |
 | `paste` | Context menu: Paste |
 | `exportMenu` | Actions bar: Export and copy out (Export…, Save to library, Copy Markdown) |
 | `sheetMenu` | Actions bar: Sheets (put on a sheet, release, fit to contents) |
@@ -100,27 +100,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `chevrons-down` | Hide the controls (library viewer) |
 | `chevrons-up` | Show the controls (library viewer) |
 | `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
-| `rotate-ccw` | Reset rotation: of a shape (Actions bar) and of the Paint view (its View rotation menu) |
-| `rotate-ccw-square` | Turn the Paint view left (View rotation menu) |
-| `rotate-cw` | Turn the Paint view right (View rotation menu) |
-| `flip-horizontal` | Mirror the Paint view (View rotation menu) |
-| `squircle-dashed` | Rectangle marquee tool (Paint view, the Select flyout) |
-| `circle-dot-dashed` | Ellipse marquee tool (Paint view, the Select flyout) |
-| `triangle-dashed` | Polygonal lasso tool (Paint view, the Lasso flyout) |
-| `wand` | Magic wand tool (Paint view, the Lasso flyout) |
-| `square-x` | Deselect (Paint view, the Selection menu) |
-| `arrow-left-right` | Invert the selection (Paint view, the Selection menu) |
-| `unfold-horizontal` | Grow the selection (Paint view, the Selection menu) |
-| `fold-horizontal` | Shrink the selection (Paint view, the Selection menu) |
-| `cloud-fog` | Feather the selection (Paint view, the Selection menu) |
-| `beaker` | Fill bucket tool (Paint view) |
-| `sunset` | Gradient tool (Paint view, the Fill bucket's flyout) |
-| `sticker` | New brush from the selection (Paint view, the Selection menu) |
-| `picture-in-picture` | Add a reference picture (Paint view, the painting's menu) |
-| `fingerprint` | Smudge tool (Paint view, the Brush flyout) |
-| `files` | Clone stamp tool (Paint view, the Brush flyout) |
-| `eclipse` | Add a mask to a Paint view layer (the layer's ⋯ menu) |
-| `eye-closed` | Turn a Paint view layer's mask off or on (the layer's ⋯ menu) |
 | `check` | Canvas 1empty; Done in the Pattern panel (as every other Done) |
 | `chevron-down` | Folders; Smart folders; Tags; Canvas tags; Place on another canvas or a new one; Hide the controls |
 | `chevron-left` | Previous |
@@ -133,24 +112,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `download` | Download original (library details and selection bar) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
 | `eraser` | Object eraser |
-| `brush` | Paint view (the view switch) |
-| `paintbrush` | Brush tool (Paint view) |
-| `pen` | Pencil tool: aliased paint (Paint view, the Brush flyout) |
-| `paintbrush-vertical` | Brushes panel: the brush presets (the painting tools' Properties bar) |
-| `drafting-compass` | Brush Settings panel: the brush's tip and dynamics (the painting tools' Properties bar) |
-| `droplet-off` | Eraser tool of the Paint view: takes paint away from a layer |
-| `file-image` | New painting (Paint view) |
-| `file-plus` | New page (Paint view) |
-| `layers-plus` | New layer (Paint view) |
-| `corner-left-down` | Clip to the layer below (Paint view's Layers rows) |
-| `grid-2x2-check` | Alpha lock: painting keeps the layer's transparency (Paint view's Layers rows) |
-| `maximize-2` | Fit the page in the view (Paint view) |
-| `picture-in-picture-2` | Place the page on the canvas (Paint view) |
-| `book-image` | All paintings: the list of the workspace's paintings (Paint view) |
-| `ruler-dimension-line` | Page size and resolution (Paint view) |
-| `vector-polygon` | Vector layer: shapes, paths, strokes, texts and pictures on one layer (Paint view's + menu and Layers rows) |
-| `paint-roller` | Fill layer: the page covered by a colour, gradient or texture (Paint view) |
-| `grid-2x2-plus` | Rasterize: make the layer a paint layer of the same look (Paint view) |
 | `external-link` | Open in a new tab |
 | `eye` | Show all hidden |
 | `eye-off` | Hide the selection; Hide selection |
@@ -185,7 +146,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `lock-keyhole-open` | Unlock all |
 | `magnet` | Snap to other objects |
 | `map-pin` | Place on Board 1 › Canvas 1 |
-| `pin` | Brush settings: keep a section when another preset is picked (Paint view) |
 | `maximize` | Full screen |
 | `merge` | Flatten a boolean group into one path (Actions bar) |
 | `split` | Release the shapes of a boolean group (Actions bar) |
@@ -201,7 +161,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `square-dashed` | Put the picked objects on a sheet |
 | `square-dashed-x` | Release the sheet (keep what is inside) |
 | `scissors-line-dashed` | Clip content of a sheet (Layers) |
-| `crop` | Crop: the picture (canvas), and the page to the selection (Paint view, the Selection menu) |
+| `crop` | Crop the picture |
 | `fullscreen` | Show the whole picture (remove the crop) |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |

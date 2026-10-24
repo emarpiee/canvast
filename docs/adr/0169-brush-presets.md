@@ -1,6 +1,6 @@
 # ADR 0169: brush presets, brush files and Brush settings
 
-- Status: accepted (v0.32.0, 2026-10-22)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted (v0.32.0, 2026-10-22)
 - Related: ADR 0164 (the brush engine as WebAssembly), ADR 0165 (the Painting view), ADR 0168 (one chrome), ADR 0120 (styles), ADR 0123 (the panel dock), ADR 0162 (the Pattern panel's settings schema)
 
 ## Context

@@ -20,9 +20,7 @@
  *   frames       keyPath [canvasId, id] → FrameRecord + canvasId (nested frames, ADR 0014; v4).
  *                                          Objects name their frame; absent = the world frame, which is
  *                                          the absolute form of earlier versions, so old data needs no conversion.
- *   paintings    keyPath "id"      → Painting (the Painting view, ADR 0165; index "workspaceId"; v11)
- *   paintLayers  keyPath [paintingId, id] → Layer (v11)
- *   paintTiles   keyPath "hash"    → { hash, data }: a painting's 256 px tile (deflated RGBA), stored once (v11)
+ *   paintings, paintLayers, paintTiles (v11): the removed Painting view's paintings; no longer read or written, kept so nothing stored is lost
  *
  * Legacy (version 1, read-only after migration, never deleted here):
  *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
@@ -86,7 +84,7 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
       if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });
       if (!has("thumbs")) db.createObjectStore("thumbs", { keyPath: "hash" });
-      // v11: the Painting view (ADR 0165, paint/store.ts).
+      // v11: the Painting view's stores (ADR 0165; the view is removed, the stores stay so stored paintings are not lost).
       if (!has("paintings")) db.createObjectStore("paintings", { keyPath: "id" }).createIndex("workspaceId", "workspaceId");
       if (!has("paintLayers")) db.createObjectStore("paintLayers", { keyPath: ["paintingId", "id"] });
       if (!has("paintTiles")) db.createObjectStore("paintTiles", { keyPath: "hash" });

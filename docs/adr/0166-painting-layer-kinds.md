@@ -1,6 +1,6 @@
 # ADR 0166: shape, text, picture, fill and adjustment layers in the Painting view (P2, first part)
 
-- Status: accepted (v0.29.0, 2026-10-22)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted (v0.29.0, 2026-10-22)
 - Related: ADR 0165 (the Painting view), ADR 0144 (masks), ADR 0136 (adjustments), ADR 0162 (pattern generators), ADR 0068 and 0151 (menus)
 
 ## Context

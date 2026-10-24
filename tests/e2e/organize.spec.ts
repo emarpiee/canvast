@@ -349,7 +349,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await pick(p, HASH);
   await p.getByTestId("asset-folders").getByLabel("Refs").check();
   await p.getByTestId("view-canvas").click();
-  const crumb = p.getByTestId("view-canvas"); // (the canvas's crumb; the Paint view has a crumb of its own)
+  const crumb = p.getByTestId("view-canvas");
   const zipPaths = async (choice: RegExp): Promise<string[]> => {
     await crumb.click();
     const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {

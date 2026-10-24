@@ -1,6 +1,6 @@
 import { ICONS } from "./icons";
 
-export type AppView = "canvas" | "assets" | "paint" | "settings";
+export type AppView = "canvas" | "assets" | "settings";
 
 /**
  * The top-level switch to the Assets view, and the way into the Settings view: the Assets tab here, and the Settings button at the far end of
@@ -11,7 +11,6 @@ export function mountViewSwitch(root: HTMLElement, onSelect: (v: AppView) => voi
   root.innerHTML = `
     <div class="view-switch" data-cmd-group="Navigate" role="tablist" aria-label="View">
       <button type="button" role="tab" data-view="assets" data-testid="view-assets" title="Library">${ICONS.images}<span>Library</span></button>
-      <button type="button" role="tab" data-view="paint" data-testid="view-paint" title="Paint: paintings with pages in pixels, layers and brushes">${ICONS.paintView}<span>Paint</span></button>
     </div>
     <div class="view-settings" data-cmd-group="Navigate"><button type="button" data-view="settings" data-testid="view-settings" aria-pressed="false" aria-label="Settings" title="Settings">${ICONS.settings}</button></div>`;
   const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];

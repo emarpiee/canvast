@@ -5,17 +5,12 @@ import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { execFileSync, execSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { sourceHash } from "./lib/source-hash.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-
-// The Painting view's brush engine (ADR 0164): its WebAssembly (engine/out/brush.wasm, built here from the pinned source) and the worker
-// that runs it, bundled on its own and inlined as text.
-execFileSync("node", [resolve(root, "scripts/build-engine.mjs")], { cwd: root, stdio: ["ignore", "ignore", "inherit"] });
-const worker = await build({ entryPoints: [resolve(root, "src/paint/engine-worker.ts")], bundle: true, format: "iife", target: ["es2020"], platform: "browser", minify: !process.argv.includes("--no-minify"), legalComments: "none", write: false, logLevel: "warning" });
 
 const result = await build({
   entryPoints: [resolve(root, "src/app/main.ts")],
@@ -29,9 +24,8 @@ const result = await build({
   write: false,
   define: {
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
-    __PAINT_WORKER__: JSON.stringify(worker.outputFiles[0].text),
   },
-  loader: { ".svg": "text", ".ttf": "binary", ".md": "text", ".wasm": "binary" },
+  loader: { ".svg": "text", ".ttf": "binary", ".md": "text" },
   logLevel: "warning",
 });
 
@@ -44,11 +38,9 @@ const licence = async (path) => (await readFile(resolve(root, "node_modules", pa
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
 const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, MIT, travels in the file too)
-const engineLicence = (await readFile(resolve(root, ".engine-src/LICENSE-MIT"), "utf8")).replace(/\r\n/g, "\n").replace(/--/g, "- -").trim();
 const notices =
   `<!--\ncanvast\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
-  `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
-  `The Painting view's brush engine (compiled to WebAssembly; see THIRD_PARTY_NOTICES.md), used under the MIT License\n${engineLicence}\n-->\n`;
+  `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)

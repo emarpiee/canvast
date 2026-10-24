@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.37.0 — The Painting view is removed (2026-10-25)
+
+- **Removed:** the Paint view and everything in it (paintings, pages, layers, the painting tools, brush presets and brush files, reference pictures, OpenRaster) and its brush engine; the build no longer needs Rust ([ADR 0170](docs/adr/0170-painting-view-removed.md)).
+- **Removed** too: the Eyedropper tool of the rail (`I`); the colour picker keeps its own screen pick.
+- **Kept:** a plain wheel scrolling a bar sideways, a sheet's ratio typed as a px size.
+- Paintings already stored stay in the browser's storage, unread. A workspace backup no longer holds paintings or brush presets; importing an older backup that has them imports the rest and says they are left out.
+
 ## 0.36.0 — Smudge, Clone stamp, OpenRaster: P4 begins (2026-10-22)
 
 - **Smudge** (`R`, in the Brush flyout): drags the paint under it along, live; strength and finger painting.

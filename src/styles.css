@@ -103,7 +103,6 @@
   --icon-md: 16px;
   --icon-lg: 18px;
   --icon-xl: 20px;
-  /** The picked brush preset's name in the painting tools' Properties bar (cut short beyond this). */
   /* Neutral overlays that do not follow the theme (over pictures and video) */
   --white: oklch(1 0 0);
   --black: oklch(0 0 0);
@@ -246,18 +245,17 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 }
 
 #canvas[data-tool="select"] { cursor: default; }
-#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"], #canvas[data-tool="eyedropper"] { cursor: crosshair; }
-.paint-stage:is([data-tool="pen"], [data-tool="lasso"], [data-tool="node"], [data-tool="shape"], [data-tool="text"], [data-tool="eyedropper"]) .paint-canvas { cursor: crosshair; }
-:is(#canvas, .paint-canvas)[data-hover="ew"] { cursor: ew-resize; }
-:is(#canvas, .paint-canvas)[data-hover="ns"] { cursor: ns-resize; }
-:is(#canvas, .paint-canvas)[data-hover="nwse"] { cursor: nwse-resize; }
-:is(#canvas, .paint-canvas)[data-hover="nesw"] { cursor: nesw-resize; }
+#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"] { cursor: crosshair; }
+#canvas[data-hover="ew"] { cursor: ew-resize; }
+#canvas[data-hover="ns"] { cursor: ns-resize; }
+#canvas[data-hover="nwse"] { cursor: nwse-resize; }
+#canvas[data-hover="nesw"] { cursor: nesw-resize; }
 /* Over a rotate zone of the selection box: a turning-arrow cursor. */
-:is(#canvas, .paint-canvas).is-rotate { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><g stroke='white' stroke-width='4'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g><g stroke='black' stroke-width='2'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g></svg>") 12 12, alias; }
-:is(#canvas, .paint-canvas).is-add { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 3v15l4.5-4 3 7 2.5-1-3-7h6z' fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'/><circle cx='18' cy='18' r='5' fill='black' stroke='white' stroke-width='1.2'/><path d='M18 15.5v5M15.5 18h5' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>") 4 3, copy; }
-:is(#canvas, .paint-canvas).is-node { cursor: move; }
-:is(#canvas, .paint-canvas).is-hand { cursor: grab; }
-:is(#canvas, .paint-canvas).is-panning { cursor: grabbing; }
+#canvas.is-rotate { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><g stroke='white' stroke-width='4'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g><g stroke='black' stroke-width='2'><path d='M20 12a8 8 0 1 1-2.5-5.8'/><path d='M20 3v5h-5'/></g></svg>") 12 12, alias; }
+#canvas.is-add { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 3v15l4.5-4 3 7 2.5-1-3-7h6z' fill='white' stroke='black' stroke-width='1.2' stroke-linejoin='round'/><circle cx='18' cy='18' r='5' fill='black' stroke='white' stroke-width='1.2'/><path d='M18 15.5v5M15.5 18h5' stroke='white' stroke-width='1.6' stroke-linecap='round'/></svg>") 4 3, copy; }
+#canvas.is-node { cursor: move; }
+#canvas.is-hand { cursor: grab; }
+#canvas.is-panning { cursor: grabbing; }
 
 #hud { position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; }
 
@@ -2711,18 +2709,6 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .pg-swatch.is-none { opacity: 0.35; }
 .pg-eye { display: inline-flex; align-items: center; justify-content: center; width: var(--field-h); height: var(--field-h); padding: 0; color: var(--hud-fg); background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .pg-eye svg { width: var(--icon-sm); height: var(--icon-sm); }
-/* A brush dynamic's response curve, folded under its control. */
-.bs-curve summary { cursor: pointer; font: var(--font-meta); color: var(--hud-muted); }
-.bs-curve summary:hover { color: var(--hud-fg); }
-.bs-curve .adj-curve { margin-top: var(--sp-2); }
-.bs-picks { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); max-height: 12rem; overflow-y: auto; }
-.bs-picks button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-2); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
-.bs-picks button[aria-pressed="true"] { border-color: var(--hud-accent); outline: 1px solid var(--hud-accent); }
-.bs-picks canvas { width: var(--icon-md); height: var(--icon-md); }
-/* A Brush Settings section's pin: kept when another preset is picked. */
-.adj-pin { display: inline-flex; align-items: center; justify-content: center; margin-inline-start: auto; width: var(--field-h); height: var(--field-h); padding: 0; color: var(--hud-muted); background: none; border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer; }
-.adj-pin svg { width: var(--icon-sm); height: var(--icon-sm); }
-.adj-pin[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .pg-foot { gap: var(--sp-3); }
 .pg-seed, .pg-actions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 .pg-seed label { display: flex; align-items: center; gap: var(--sp-3); color: var(--hud-muted); font: var(--font-meta); }
@@ -2734,102 +2720,3 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .pg-foot button svg { width: var(--icon-sm); height: var(--icon-sm); }
 .style-pattern { display: block; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hud-border); }
 .style-pattern svg { display: block; width: 100%; height: auto; }
-
-/* ---- The Painting view (ADR 0165): a view of its own, like the Library ---- */
-#paint-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); color: var(--hud-fg); font: var(--text-md)/1.4 var(--font-ui); }
-#paint-view[hidden] { display: none; }
-/* One chrome for the canvas and the Painting view (ADR 0168): what belongs to one view only is not shown in the other. */
-body:not([data-view="paint"]) [data-only="paint"], body[data-view="paint"] [data-only="canvas"] { display: none !important; }
-body[data-view="paint"] .hint-float { display: none; }
-#paint-view button:focus-visible, #paint-view input:focus-visible, #paint-view select:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
-#paint-view button { font: inherit; color: inherit; }
-.paint-list { display: flex; flex-direction: column; gap: var(--sp-6); max-width: 880px; width: 100%; margin: 0 auto; padding-top: calc(var(--bar-h) + var(--sp-6)); min-height: 0; overflow-y: auto; }
-.paint-list[hidden], .paint-editor[hidden] { display: none; }
-.paint-list-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); }
-.paint-list-head h1 { margin: 0; font-size: var(--text-2xl); font-weight: var(--weight-semibold); }
-.paint-list-head button, .paint-pages button { display: inline-flex; align-items: center; gap: var(--sp-3); min-height: var(--ctl); padding: 0 var(--sp-5); background: transparent; border: 1px solid transparent; border-radius: var(--r-md); cursor: pointer; }
-.paint-list-head button.is-primary { background: var(--hud-accent); color: var(--hud-accent-fg); }
-#paint-view button svg { width: var(--icon-md); height: var(--icon-md); flex: none; }
-.paint-pages button:hover { background: var(--hud-hover); }
-.paint-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.paint-item { display: flex; align-items: center; gap: var(--sp-3); border: 1px solid var(--hud-border); border-radius: var(--r-md); background: var(--hud-bg); }
-.paint-item-open { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); padding: var(--sp-5) var(--sp-6); background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; text-align: start; }
-.paint-item-open:hover { background: var(--hud-hover); }
-.paint-item-open small, .paint-empty { color: var(--hud-muted); font-size: var(--text-sm); }
-.paint-empty { padding: var(--sp-6); }
-/* An open painting under the canvas's own bars (ADR 0168): the page fills the view; Layers floats at the right where the canvas's panels
-   are (the same rule as #side-panels), the pages at the bottom left. */
-.paint-editor, .paint-main, .paint-stage { position: absolute; inset: 0; }
-.paint-stage { overflow: hidden; background: var(--canvas-bg); touch-action: none; }
-.paint-stage[data-tool="hand"], .paint-stage.is-hand { cursor: grab; }
-.paint-stage.is-panning { cursor: grabbing; }
-.paint-turn { position: absolute; inset: 0; }
-.paint-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.paint-cursor { pointer-events: none; }
-.paint-canvas:focus { outline: none; }
-.paint-layer-list { list-style: none; margin: 0; padding: var(--sp-2); }
-.paint-layer .more-btn { flex: none; }
-.paint-pages { position: absolute; left: var(--edge); bottom: var(--edge); display: flex; align-items: center; gap: var(--sp-2); min-height: var(--bar-h); padding: var(--pad); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
-[data-paint-options] .tb-count { display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
-[data-paint-options] input[type="number"] { width: 64px; }
-.paint-head { display: flex; }
-/* The canvas's host (its bars) above the painting; only the bars take the pointer (they set it themselves), the page gets the rest. */
-body[data-view="paint"] #canvas-host { z-index: 3; pointer-events: none; }
-body[data-view="paint"] #canvas-host .ctx-bar { pointer-events: auto; } /* (the Actions bar is not a .toolbar, which sets it) */
-/* While the list of paintings is shown, the bars (which are for an open painting) are away; the canvas's own panels never show here. */
-body[data-view="paint"][data-paint-screen="list"] :is(#toolbar, .ctx-wrap, #hud, .paint-head, .paint-layers, .paint-adjust),
-body[data-view="paint"] :is(#canvas, .hud-readout, .hud-dev) { display: none !important; }
-/* The dock's stacks hold the Paint view's own panels too (Brushes, Brush settings, ADR 0169): only those show there. */
-body[data-view="paint"] :is(#side-panels, #side-panels-left) > :not(:has([data-only="paint"])) { display: none !important; }
-/* The Eraser on a paint layer takes paint: the canvas's object eraser options are not its. */
-body[data-view="paint"][data-paint-target="pixels"] :is(.tb-options[data-for="eraser"], .tb-options[data-for="lasso"]):not([data-paint-options]) { display: none !important; }
-[data-paint-options]:empty { display: none !important; }
-.paint-refs { position: absolute; inset: 0; pointer-events: none; }
-.paint-ref { position: absolute; pointer-events: auto; cursor: move; touch-action: none; box-shadow: var(--hud-lift); border-radius: var(--r-sm); }
-.paint-stage .paint-ref canvas { position: static; display: block; border-radius: var(--r-sm); } /* (not the stage's own canvases' rule) */
-.paint-ref .more-btn { position: absolute; top: var(--sp-1); right: var(--sp-1); background: var(--hud-bg); }
-.paint-ref-grip { position: absolute; right: 0; bottom: 0; width: var(--icon-md); height: var(--icon-md); cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--hud-fg) 50%); border-bottom-right-radius: var(--r-sm); }
-[data-paint-options] .paint-hint { color: var(--hud-muted); white-space: nowrap; padding: 0 var(--sp-2); }
-.paint-page { display: inline-flex; align-items: center; border-radius: var(--r-md); }
-.paint-page.is-on { background: var(--hud-accent); color: var(--hud-accent-fg); }
-.paint-page.is-on button:hover { background: transparent; }
-.paint-page-dialog .paint-field { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0 0 var(--sp-4); font-size: var(--text-sm); }
-.paint-page-dialog .paint-field-row { display: flex; gap: var(--sp-4); }
-.paint-page-dialog .paint-field-row .paint-field { flex: 1; min-width: 0; }
-.paint-page-dialog input, .paint-page-dialog select { font: inherit; min-height: var(--field-h); }
-.paint-dialog-note { color: var(--hud-danger); min-height: 1lh; }
-/* The Brushes and Brush settings panels (ADR 0169). */
-.brush-row .brush-thumb { flex: none; width: var(--ctl); height: var(--ctl); }
-.brush-sub { display: flex; align-items: center; gap: var(--sp-2); }
-.brush-find { flex: 1; min-width: 0; box-sizing: border-box; }
-.brush-sub .layer-btn[aria-pressed="true"] { background: var(--hud-hover); color: var(--hud-fg); }
-/* The Brushes panel's Thumbnails view: the tips in a grid, each with its size under it. */
-.brush-grid { list-style: none; margin: 0; padding: var(--sp-2) var(--sp-4); display: grid; grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr)); gap: var(--sp-2); }
-.brush-cell { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); padding: var(--sp-2); border-radius: var(--r-sm); cursor: pointer; }
-.brush-cell:hover { background: var(--hud-hover); }
-.brush-cell[aria-selected="true"] { background: var(--hud-hover); box-shadow: inset 0 0 0 1px var(--hud-accent); }
-.brush-cell .brush-thumb { width: 2.5rem; height: 2.5rem; }
-.brush-size { font: var(--font-value); font-size: var(--text-xs); opacity: 0.75; }
-.brush-group .adj-group-head { padding: var(--sp-2) var(--sp-4) 0; }
-.brush-settings-panel .adj-group.is-off > .adj-row { opacity: 0.45; }
-/* Brush settings, laid out as the Pattern panel: the body's padding, rows over two columns where a pair of switches shares a line, a
-   wider label column (its labels are long), menus as wide as a slider and its number. */
-.brush-settings-panel .panel-body { display: grid; align-content: start; gap: var(--sp-4); padding: var(--sp-4) var(--sp-6); }
-.brush-settings-panel .adj-group { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--sp-4); row-gap: var(--sp-3); }
-.brush-settings-panel .adj-group > * { grid-column: 1 / -1; }
-.brush-settings-panel .adj-group > .adj-row:has(> .pg-check) { grid-column: auto; }
-.brush-settings-panel .adj-row { grid-template-columns: 6.5rem minmax(0, 1fr) 3.25rem; gap: var(--sp-3); }
-.brush-settings-panel .adj-group > .adj-row:has(> select) { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); }
-.brush-settings-panel .adj-row > select { width: 100%; }
-.brush-settings-panel .pg-check { font: var(--font-meta); }
-.brush-settings-panel .adj-group:first-child { border-top: 0; padding-top: 0; }
-[data-paint-options] [data-brush-panel] { display: inline-flex; align-items: center; gap: var(--sp-2); }
-.paint-tip { width: var(--icon-lg); height: var(--icon-lg); }
-/* The Brushes button and the picked preset: a ring, not the accent fill (the tip is drawn in the ink colour). */
-[data-paint-options] [data-brush-panel="brushes"][aria-pressed="true"] { background: var(--hud-hover); color: var(--hud-fg); box-shadow: inset 0 0 0 1px var(--hud-accent); }
-.paint-layer .layer-state[aria-pressed="false"]:not([data-eye]) { opacity: 0.45; }
-.layer-mask { flex: none; display: inline-grid; place-items: center; padding: var(--sp-1); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.layer-mask canvas { width: var(--icon-xl); height: var(--icon-md); display: block; box-shadow: 0 0 0 1px var(--hud-muted); }
-.layer-mask[aria-pressed="true"] canvas { box-shadow: 0 0 0 2px var(--hud-accent); }
-.layer-mask.is-off canvas { opacity: 0.45; }
-.paint-layer:hover .layer-state[aria-pressed="false"] { opacity: 0.9; }

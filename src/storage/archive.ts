@@ -1,6 +1,4 @@
 import { externalFolder } from "./external-folder";
-import { PAINTINGS_FILE, brushesOf, importBrushes, importPaintings, paintingsOf, readBrushes, readPaintings, type PlannedPaintings } from "../paint/archive-part";
-import type { BrushPreset } from "../paint/brushes";
 import type { SerializedCamera } from "../core/camera";
 import { plural, were } from "../doc/plural";
 import { deserializeCamera } from "../core/camera";
@@ -114,9 +112,9 @@ export interface Manifest {
   libraryFile?: true;
   /** The device settings that differ from the defaults (a workspace archive): theme, shortcuts, panel layout. Restored only where the importing device has not set them. */
   settings?: Record<string, unknown>;
-  /** The library's brush presets (version 6, ADR 0169; a workspace archive only), their bitmaps under `paint-tiles/`. */
+  /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
-  /** The workspace's paintings (version 5, ADR 0165): `paintings.json` and their tiles under `paint-tiles/`. Every workspace archive has them all. */
+  /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
   paintings?: { file: string; count: number; tiles: number };
 }
 
@@ -134,13 +132,9 @@ const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn): Promise<ExportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta", "paintings", "paintLayers", "paintTiles"], "readonly");
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
-  // (the paintings of a workspace archive, read first, in this transaction: ADR 0165)
-  const paint = scope.kind === "workspace" && !(scope.noBytes === true) ? await paintingsOf(tx, workspaceId) : null;
-  // (and the brush presets, with the bitmaps the paintings' tiles do not already hold: ADR 0169)
-  const brushes = scope.kind === "workspace" && !(scope.noBytes === true) ? await brushesOf(tx, new Set(paint?.tiles.map((t) => t.name))) : null;
   const boards: ManifestBoard[] = [];
   const canvasFiles: Array<{ file: string; json: string }> = [];
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
@@ -245,8 +239,6 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
     ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
-    ...(paint ? { paintings: { file: PAINTINGS_FILE, count: paint.count, tiles: paint.tiles.length } } : {}),
-    ...(brushes ? { brushes: brushes.list } : {}),
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -263,8 +255,6 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       { name: "manifest.json", data: json(JSON.stringify(manifest, null, 1)) },
       ...canvasFiles.map((c) => ({ name: c.file, data: json(c.json) })),
       ...assetBlobs,
-      ...(paint ? [{ name: PAINTINGS_FILE, data: json(paint.json) }, ...paint.tiles] : []),
-      ...(brushes?.tiles ?? []),
     ],
     new Date(),
     false,
@@ -278,7 +268,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     progress?.("Checking the archive", ++checked, entries.size);
   }
   const back = JSON.parse(await entries.get("manifest.json")!.data.text()) as Manifest;
-  if (JSON.stringify(back) !== JSON.stringify(manifest) || entries.size !== 1 + canvasFiles.length + assetBlobs.length + (paint ? 1 + paint.tiles.length : 0) + (brushes?.tiles.length ?? 0)) {
+  if (JSON.stringify(back) !== JSON.stringify(manifest) || entries.size !== 1 + canvasFiles.length + assetBlobs.length) {
     throw new ArchiveError("the archive failed verification after writing");
   }
   return { blob, manifest, canvases: canvasFiles.length, objects };
@@ -317,10 +307,6 @@ export interface ImportPlan {
   styles: StyleItem[];
   /** How many archive files this was made from (more than one: a chain of incremental backups). */
   files: number;
-  /** The paintings it carries (version 5), checked: imported with new ids. */
-  paintings: PlannedPaintings;
-  /** The brush presets it carries (version 6), checked with their bitmaps: added like the saved styles. */
-  brushes: { list: BrushPreset[]; tiles: Map<string, Blob> };
   /** This one file is an incremental backup on its own: what did not change is in the files before it, which were not added. */
   incrementalOnly: boolean;
 }
@@ -337,10 +323,6 @@ export interface ImportResult {
   firstCanvasId: string | null;
   /** Saved styles added to the library. */
   stylesAdded: number;
-  /** Brush presets added to the library. */
-  brushesAdded: number;
-  /** Paintings added (ADR 0165). */
-  paintings: number;
 }
 
 /** Largest JSON part accepted, to fail fast instead of exhausting memory. */
@@ -433,8 +415,6 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     objects: 0,
     styles: [],
     files: parts.length,
-    paintings: { paintings: [], layers: [], tiles: new Map() },
-    brushes: { list: [], tiles: new Map() },
     incrementalOnly: parts.length === 1 && sinceOf(latest) !== null,
   };
   // where a canvas is: in the newest file that has its content
@@ -594,13 +574,10 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     if (org) plan.organization.set(hash, org);
   }
   plan.unresolved = [...referenced].filter((h) => !valid.has(h)).sort();
-  // the paintings (version 5): every workspace archive has them all, so the newest file's are the ones
-  if (isObj(m["paintings"]) && typeof m["paintings"]["file"] === "string") {
-    const pf = m["paintings"]["file"] as string;
-    plan.paintings = await readPaintings(await readJson(latest.entries, pf), (name) => latest.entries.get(name)?.data, problems);
-  }
-  // the brush presets (version 6): the newest file's list, with the bitmaps of that file
-  if (Array.isArray(m["brushes"])) plan.brushes = await readBrushes(m["brushes"], (name) => latest.entries.get(name)?.data, problems);
+  // paintings and brush presets (versions 5 and 6): the Painting view is gone, so they are left out, and said so
+  const paintings = isObj(m["paintings"]) && typeof m["paintings"]["count"] === "number" ? m["paintings"]["count"] : 0;
+  const brushes = Array.isArray(m["brushes"]) ? m["brushes"].length : 0;
+  if (paintings || brushes) problems.push(`It carries ${[paintings ? plural(paintings, "painting") : "", brushes ? plural(brushes, "brush preset") : ""].filter(Boolean).join(" and ")} from the Painting view, which canvast no longer has; they are not imported.`);
   // the saved styles (version 4): the newest file's list is the list
   for (let i = parts.length - 1; i >= 0 && plan.styles.length === 0; i--) {
     const raw = parts[i]!.m["styles"];
@@ -635,9 +612,9 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
  * `targetBoardId`; board and workspace archives become new boards.
  */
 export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
-  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta", "paintings", "paintLayers", "paintTiles"], "readwrite", { durability: "strict" });
+  const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
-  const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0, brushesAdded: 0, paintings: 0 };
+  const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
   try {
     const now = Date.now();
     const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
@@ -701,8 +678,6 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       }
     }
     for (const h of plan.unresolved) if ((await req(tx.objectStore("assets").count(h))) === 0) result.stillMissing++;
-    if (plan.paintings.paintings.length) result.paintings = await importPaintings(tx, workspaceId, plan.paintings);
-    result.brushesAdded = await importBrushes(tx, plan.brushes);
     await committed;
     return result;
   } catch (e) {

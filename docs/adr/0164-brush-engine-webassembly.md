@@ -1,6 +1,6 @@
 # ADR 0164: the Painting view's brush engine is WebAssembly (P0 spike)
 
-- Status: accepted for P1 (2026-10-21, owner's choice of WebAssembly over a TypeScript port; numbers from the P0 spike below)
+- Status: superseded by ADR 0170 (the Painting view removed, v0.37.0); was: accepted for P1 (2026-10-21, owner's choice of WebAssembly over a TypeScript port; numbers from the P0 spike below)
 - Related: Phase 0C (no WASM for the endless canvas: still true there), ADR 0027 (decoded-image budget), ADR 0120 (workspace data such as saved styles)
 
 ## Context

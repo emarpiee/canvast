@@ -24,7 +24,6 @@ const KNOWN = [
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
   /^https:\/\/scripts\.sil\.org\/OFL$/, // the Inter licence text
-  /^https:\/\/github\.com\/storytold\/photocraft$/, // the brush engine's licence text (ADR 0164)
   /^https:\/\/bottosson\.github\.io\/posts\/colorpicker\/$/, // a credit in the colour picker's code
   /^https:\/\/\\u2026$/, // the placeholder "https://…" in the link dialog's text
 ];
@@ -38,8 +37,7 @@ const directive = (name) => csp.split(";").map((d) => d.trim()).find((d) => d.st
 for (const [name, want] of [["default-src", "'none'"], ["connect-src", "'none'"], ["base-uri", "'none'"], ["form-action", "'none'"], ["object-src", "'none'"]]) {
   if (directive(name) !== `${name} ${want}` && !(name === "object-src" && directive("default-src") === "default-src 'none'")) problems.push(`CSP: ${name} must be ${want} (is: ${directive(name) ?? "missing"})`);
 }
-// ('wasm-unsafe-eval' lets the page compile WebAssembly, the brush engine of ADR 0164; it does not allow eval)
-if (/unsafe-eval|https?:|\*/.test(csp.replace(/'unsafe-inline'|'wasm-unsafe-eval'/g, ""))) problems.push(`CSP allows more than it should: ${csp}`);
+if (/unsafe-eval|https?:|\*/.test(csp.replace(/'unsafe-inline'/g, ""))) problems.push(`CSP allows more than it should: ${csp}`);
 
 if (problems.length) {
   console.error(`FAIL ${file}\n  ${problems.join("\n  ")}`);

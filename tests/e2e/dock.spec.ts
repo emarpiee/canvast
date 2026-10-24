@@ -190,3 +190,17 @@ test("the kinds of the Pen and Shape tools open beside their rail button, centre
     }
   }
 });
+
+test("a plain wheel over a bar's row that is wider than the window scrolls it sideways (every bar: bar.ts syncScroll), not the canvas", async ({ app }) => {
+  const p = app.page;
+  await p.setViewportSize({ width: 380, height: 800 });
+  const row = p.locator(".hud-controls[data-scroll]"); // (the view controls: wider than a narrow window)
+  await expect(row).toBeVisible();
+  const before = await p.evaluate(() => window.__canvastDebug.camera());
+  const b = (await row.boundingBox())!;
+  await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await p.mouse.wheel(0, 200);
+  await expect.poll(() => row.evaluate((r) => r.scrollLeft)).toBeGreaterThan(0);
+  expect(await p.evaluate(() => window.__canvastDebug.camera()), "the canvas did not move or zoom").toEqual(before);
+  expect(app.consoleErrors).toEqual([]);
+});

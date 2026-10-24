@@ -27,13 +27,12 @@ describe("settings view table (ADR 0048)", () => {
 });
 
 describe("tool keys (ADR 0049, 0158)", () => {
-  it("are the letters the toolbar has always shown, one tool each in each view (the Painting view's B is the Brush, Shift+B the Pencil, ADR 0168)", async () => {
+  it("are the letters the toolbar has always shown, one tool each", async () => {
     const { TOOL_ORDER, TOOL_COMMAND } = await import("../../src/settings/shortcuts");
-    const { commandById, inView } = await import("../../src/settings/keymap");
-    const keysIn = (view: "canvas" | "paint"): string[] => TOOL_ORDER.filter((t) => inView(commandById(TOOL_COMMAND[t])!.scope, view)).map((t) => commandById(TOOL_COMMAND[t])!.defaults[0]!);
-    expect(keysIn("canvas")).toEqual(["H", "V", "N", "P", "U", "B", "C", "L", "T", "M", "I", "E"]);
-    expect(keysIn("paint")).toEqual(["H", "V", "N", "P", "B", "Shift+B", "R", "S", "U", "M", "Shift+M", "L", "Shift+L", "W", "G", "Shift+G", "T", "I", "E"]);
-    for (const v of ["canvas", "paint"] as const) expect(new Set(keysIn(v)).size).toBe(keysIn(v).length);
+    const { commandById } = await import("../../src/settings/keymap");
+    const keys = TOOL_ORDER.map((t) => commandById(TOOL_COMMAND[t])!.defaults[0]);
+    expect(keys).toEqual(["H", "V", "N", "P", "U", "B", "C", "L", "T", "M", "E"]);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

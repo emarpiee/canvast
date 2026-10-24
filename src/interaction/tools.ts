@@ -1,7 +1,6 @@
 import { lookFromChoices } from "../doc/stroke-look";
-import { sampleAt } from "./eyedropper";
 import type { NavDir } from "./item-navigation";
-import { shortcutsActive } from "./shortcut-scope";
+import { canvasShortcutsActive } from "./shortcut-scope";
 import * as D from "../core/dyadic";
 import type { ScreenPoint, WorldPoint } from "../core/camera";
 import { screenToWorld } from "../core/camera";
@@ -9,12 +8,12 @@ import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { homeObject, newObjectId, strokePoints } from "../doc/model";
-import { bakedPath, rebuiltPath } from "../doc/node-edit";
+import { editSubs, homeObject, newObjectId, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
 import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
+import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
@@ -237,18 +236,6 @@ export interface ToolHooks {
   openSearch(prefix: string): void;
   /** A long press with a finger (no hover, no Ctrl): everything under it, top first, to choose from; `pick` picks one (additive: added to or taken from the pick). */
   revealList(at: ScreenPoint, things: readonly CanvasObject[], pick: (id: ObjectId, additive: boolean) => void): void;
-  /** The view whose keys these are (default "canvas"; the Painting view hosts these tools on a vector layer, ADR 0167). */
-  scope?: string;
-  /** Undo and redo of the host's own history (default the document's). */
-  history?: { undo(): void; redo(): void };
-  /** False: the pointer is not these tools' now (the host's other tools have it). */
-  active?: () => boolean;
-  /** False: the keys are not these tools' now (default: as `active`). */
-  keysActive?: () => boolean;
-  /** The Eyedropper's colour at a point of `el` (CSS px), averaged over `size` px; default: the pixels on screen. */
-  sample?: (at: ScreenPoint, size: number) => string | null;
-  /** A point of the window in `el`'s own px (default: from its box; the Painting view turns and mirrors its page box). */
-  toLocal?: (e: { clientX: number; clientY: number }) => ScreenPoint;
 }
 
 export function attachTools(
@@ -260,9 +247,6 @@ export function attachTools(
   hooks: ToolHooks,
 ): () => void {
   const pan = new PanGesture(view);
-  const doUndo = (): void => (hooks.history ? hooks.history.undo() : void undo(doc, editor));
-  const doRedo = (): void => (hooks.history ? hooks.history.redo() : void redo(doc, editor));
-  const off = (): boolean => hooks.active?.() === false;
   let g: Gesture = { kind: "none" };
   let spaceDown = false;
   let cycleIndex = 0;
@@ -303,7 +287,6 @@ export function attachTools(
   /** Where the pointer was last (canvas px): where a move lets go, to find the frame it lands in. */
   let pointer: ScreenPoint = { x: 0, y: 0 };
   const local = (e: { clientX: number; clientY: number }): ScreenPoint => {
-    if (hooks.toLocal) return (pointer = hooks.toLocal(e));
     const r = el.getBoundingClientRect();
     return (pointer = { x: e.clientX - r.left, y: e.clientY - r.top });
   };
@@ -760,8 +743,20 @@ export function attachTools(
     const po = res && visible().find((p) => p.obj.id === res.id);
     return po && po.obj.kind === "path" && !po.cover && !po.obj.locked ? { po, o: po.obj } : null;
   };
-  const baked = bakedPath;
-  const rebuilt = (o: PathObject, sub: readonly SubPath[]): PathObject => rebuiltPath(o, sub, doc.space);
+  /** The geometry as it is drawn (a turn baked in), and the object without its turn. */
+  const baked = (o: PathObject): { sub: readonly SubPath[]; flat: PathObject } => {
+    const { rot: _turn, ...flat } = o;
+    // (a rounded path is edited at its sharp corners: its base, turned)
+    const sub = editSubs(o);
+    return { sub, flat: { ...flat, sub } };
+  };
+  /** The path with its nodes replaced: a rounded path keeps its radius (the nodes are the sharp ones, the rounding is made again). */
+  const rebuilt = (o: PathObject, sub: readonly SubPath[]): PathObject => {
+    const { params: _own, ...flat } = baked(o).flat; // (nodes edited by hand are no longer the shape's own)
+    // (a radius for each corner no longer fits when nodes were added or taken away: it becomes the largest of them)
+    const radius = o.radius !== undefined && typeof o.radius !== "number" && o.radius.length !== nodesIn(sub) ? Math.max(...o.radius) : o.radius;
+    return homeObject(normalizeUnit((o.base && radius !== undefined ? { ...flat, radius, base: sub, sub: roundCorners(sub, radius, o.smoothing) } : { ...flat, sub }) as PathObject), doc.space) as PathObject;
+  };
   const commitSub = (o: PathObject, sub: readonly SubPath[], label: string): void => {
     const next = rebuilt(o, sub);
     doc.commit(doc.transaction(label, [next]));
@@ -1521,7 +1516,6 @@ export function attachTools(
 
   // ---- pointer events ----------------------------------------------------
   const onPointerDown = (e: PointerEvent): void => {
-    if (off()) return;
     const s = local(e);
     if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 1) return;
     e.preventDefault();
@@ -1531,16 +1525,6 @@ export function attachTools(
       // choosing the source of a texture fill: what is under the press is given to it, nothing is picked or started
       const top = pickAll(visible(), s.x, s.y)[0]?.obj;
       editor.sourcePick.take(top ? expandToUnits(doc.ordered(), [top], editor.entered).map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o) : []);
-      return;
-    }
-    if (editor.tool === "eyedropper" && e.button === 0 && !spaceDown) {
-      const dpr = window.devicePixelRatio || 1;
-      // shortcut: on screen the square is in device px and includes what is drawn over the canvas (guides, handles); a host that can read its page does
-      const c = hooks.sample ? hooks.sample(s, editor.sampleSize) : sampleAt(el as HTMLCanvasElement, s.x * dpr, s.y * dpr, editor.sampleSize);
-      if (c) {
-        editor.penColor = c;
-        editor.changed();
-      }
       return;
     }
     // A gesture whose pointer is gone (its release was lost) must not block this press, nor undo and redo.
@@ -1691,7 +1675,6 @@ export function attachTools(
   };
 
   const onPointerMove = (e: PointerEvent): void => {
-    if (off() && g.kind === "none") return;
     let boxLabel: string | null = null;
     const a = active.get(e.pointerId);
     if (a) a.p = local(e);
@@ -1894,8 +1877,8 @@ export function attachTools(
         el.classList.remove("is-panning");
         cancelGesture();
         const had = t.count === 2 ? doc.canUndo : doc.canRedo;
-        if (t.count === 2) doUndo();
-        else doRedo();
+        if (t.count === 2) undo(doc, editor);
+        else redo(doc, editor);
         navigator.vibrate?.(had ? 10 : [10, 40, 10]);
         editor.message = had ? (t.count === 2 ? "Undo" : "Redo") : t.count === 2 ? "Nothing to undo" : "Nothing to redo (an edit after an undo clears redo)";
         multiEndAt = performance.now();
@@ -2094,7 +2077,6 @@ export function attachTools(
   };
 
   const onDoubleClick = (e: MouseEvent): void => {
-    if (off()) return;
     if (performance.now() - editor.fingerListAt < 1500) return; // (the lift of a long press is not the second click of a double-click)
     if (effectiveTool() === "path" && editor.pathDraft) {
       // The two presses of the double-click each placed a node on the same spot: keep one, and end the path.
@@ -2152,7 +2134,7 @@ export function attachTools(
 
   // ---- keyboard ----------------------------------------------------------
   const onKeyDown = (e: KeyboardEvent): void => {
-    if (!shortcutsActive(e, hooks.scope ?? "canvas") || (hooks.keysActive ? !hooks.keysActive() : off())) return;
+    if (!canvasShortcutsActive(e)) return;
     if (e.key === "Control" || e.key === "Meta") reveal.key(true);
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
@@ -2163,10 +2145,10 @@ export function attachTools(
     }
     if (mod && key === "z") {
       if (g.kind !== "none") return;
-      if (e.shiftKey) doRedo();
-      else doUndo();
+      if (e.shiftKey) redo(doc, editor);
+      else undo(doc, editor);
     } else if (mod && key === "y") {
-      if (g.kind === "none") doRedo();
+      if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
       // everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it)
       const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));

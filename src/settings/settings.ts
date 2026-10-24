@@ -15,8 +15,6 @@
  */
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
-import type { Tool } from "../app/editor-state";
-import { SAMPLE_SIZES } from "../interaction/eyedropper";
 
 export type Scope = "device" | "workspace" | "board";
 
@@ -29,12 +27,6 @@ export interface Def<T> {
   readonly effect: "immediate" | "restart";
 }
 
-/** Reference pictures by painting: each `{ id, hash, x, y, w, opacity }`, checked (anything else: the setting is kept as it was). */
-const validRefs = (v: unknown): Record<string, unknown[]> | undefined => {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const ok = (r: Record<string, unknown>): boolean => typeof r["id"] === "string" && typeof r["hash"] === "string" && /^[0-9a-f]{64}$/.test(r["hash"]) && [r["x"], r["y"], r["w"]].every((n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) < 1e5) && typeof r["opacity"] === "number" && r["opacity"] > 0 && r["opacity"] <= 1;
-  return Object.values(v).every((l) => Array.isArray(l) && l.length <= 50 && l.every((r) => !!r && typeof r === "object" && ok(r as Record<string, unknown>))) ? (v as Record<string, unknown[]>) : undefined;
-};
 const oneOf = <T extends string>(...allowed: T[]) => (v: unknown): T | undefined => (allowed.includes(v as T) ? (v as T) : undefined);
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 const range = (lo: number, hi: number) => (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
@@ -60,7 +52,7 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets", "paint"), effect: "restart" } as Def<"canvas" | "assets" | "paint">,
+  "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   // The colour picker (ADR 0098): which colour model and layout it opens in, and the colours picked lately.
   "colour.model": { scope: "device", default: "okhsv", validate: oneOf("okhsl", "okhsv", "okhcl"), effect: "immediate" } as Def<"okhsl" | "okhsv" | "okhcl">,
@@ -105,14 +97,6 @@ export const SETTINGS = {
   "snap.enabled": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "eraser.diameterPx": { scope: "device", default: 16, validate: range(4, 128), effect: "immediate" } as Def<number>,
   "eraser.parts": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  // The Painting view (ADR 0165): the tool, each tool's options (checked against its schema when read, paint/tools.ts), the colour.
-  "paint.tool": { scope: "device", default: "brush", validate: oneOf<Tool>("brush", "pencil", "smudge", "clone", "eyedropper", "marquee", "marqueeEllipse", "lassoPoly", "wand", "fill", "gradient", "eraser", "hand", "select", "node", "pen", "shape", "path", "lasso", "text"), effect: "immediate" } as Def<Tool>,
-  "paint.tools": { scope: "device", default: {}, validate: (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined), effect: "immediate" } as Def<Record<string, unknown>>,
-  "paint.colour": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
-  "paint.symmetry": { scope: "device", default: "off", validate: oneOf("off", "vertical", "horizontal", "dual", "diagonal"), effect: "immediate" } as Def<"off" | "vertical" | "horizontal" | "dual" | "diagonal">,
-  // Reference pictures per painting (ui/paint-references.ts): where each floats over the view, its width and how visible it is.
-  "paint.refs": { scope: "device", default: {}, validate: validRefs, effect: "immediate" } as Def<Record<string, unknown[]>>,
-  "paint.brushView": { scope: "device", default: "list", validate: oneOf("list", "grid"), effect: "immediate" } as Def<"list" | "grid">,
   "eraser.wholeGroups": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "media.volume": { scope: "device", default: 100, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "media.step.video": { scope: "device", default: 3, validate: range(0.1, 600), effect: "immediate" } as Def<number>,
@@ -207,8 +191,6 @@ export const SETTINGS = {
   "nav.fade": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "tour.speed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "tour.pause": { scope: "device", default: 0, validate: range(0, 10), effect: "immediate" } as Def<number>,
-  "eyedropper.size": { scope: "device", default: 1, validate: (v: unknown) => ((SAMPLE_SIZES as readonly unknown[]).includes(v) ? (v as number) : undefined), effect: "immediate" } as Def<number>,
-  "eyedropper.layer": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "lasso.filter": { scope: "device", default: "strokes", validate: oneOf("strokes", "all"), effect: "immediate" } as Def<"strokes" | "all">,
 };
 

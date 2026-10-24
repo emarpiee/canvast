@@ -85,26 +85,6 @@ import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
 import refreshCw from "lucide-static/icons/refresh-cw.svg";
 import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
-import eclipseSvg from "lucide-static/icons/eclipse.svg";
-import marqueeRectSvg from "lucide-static/icons/squircle-dashed.svg";
-import marqueeEllipseSvg from "lucide-static/icons/circle-dot-dashed.svg";
-import lassoPolySvg from "lucide-static/icons/triangle-dashed.svg";
-import wandSvg from "lucide-static/icons/wand.svg";
-import smudgeSvg from "lucide-static/icons/fingerprint.svg";
-import cloneStampSvg from "lucide-static/icons/files.svg";
-import referencePictureSvg from "lucide-static/icons/picture-in-picture.svg";
-import stickerSvg from "lucide-static/icons/sticker.svg";
-import fillToolSvg from "lucide-static/icons/beaker.svg";
-import gradientToolSvg from "lucide-static/icons/sunset.svg";
-import squareXSvg from "lucide-static/icons/square-x.svg";
-import invertSelectionSvg from "lucide-static/icons/arrow-left-right.svg";
-import growSelectionSvg from "lucide-static/icons/unfold-horizontal.svg";
-import shrinkSelectionSvg from "lucide-static/icons/fold-horizontal.svg";
-import featherSelectionSvg from "lucide-static/icons/cloud-fog.svg";
-import eyeClosedSvg from "lucide-static/icons/eye-closed.svg";
-import rotateCcwSquareSvg from "lucide-static/icons/rotate-ccw-square.svg";
-import rotateCwSvg from "lucide-static/icons/rotate-cw.svg";
-import flipHorizontalSvg from "lucide-static/icons/flip-horizontal.svg";
 import rotateCwSquare from "lucide-static/icons/rotate-cw-square.svg";
 import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
@@ -183,7 +163,6 @@ import type from "lucide-static/icons/type.svg";
 import layoutGrid from "lucide-static/icons/layout-grid.svg";
 import penTool from "lucide-static/icons/pen-tool.svg";
 import pencilLine from "lucide-static/icons/pencil-line.svg";
-import pencilPixelSvg from "lucide-static/icons/pen.svg";
 import penLine from "lucide-static/icons/pen-line.svg";
 import highlighter from "lucide-static/icons/highlighter.svg";
 import bold from "lucide-static/icons/bold.svg";
@@ -277,24 +256,6 @@ import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
 import trash2 from "lucide-static/icons/trash-2.svg";
 import eraser from "lucide-static/icons/eraser.svg";
-// The Painting view (ADR 0165)
-import brushSvg from "lucide-static/icons/brush.svg";
-import paintbrushSvg from "lucide-static/icons/paintbrush.svg";
-import brushPresetsSvg from "lucide-static/icons/paintbrush-vertical.svg";
-import brushSettingsSvg from "lucide-static/icons/drafting-compass.svg";
-import dropletOffSvg from "lucide-static/icons/droplet-off.svg";
-import fileImageSvg from "lucide-static/icons/file-image.svg";
-import filePlusSvg from "lucide-static/icons/file-plus.svg";
-import layersPlusSvg from "lucide-static/icons/layers-plus.svg";
-import cornerLeftDownSvg from "lucide-static/icons/corner-left-down.svg";
-import grid2x2CheckSvg from "lucide-static/icons/grid-2x2-check.svg";
-import maximize2Svg from "lucide-static/icons/maximize-2.svg";
-import pictureInPictureSvg from "lucide-static/icons/picture-in-picture-2.svg";
-import bookImageSvg from "lucide-static/icons/book-image.svg";
-import rulerDimensionSvg from "lucide-static/icons/ruler-dimension-line.svg";
-import vectorLayerSvg from "lucide-static/icons/vector-polygon.svg";
-import paintRollerSvg from "lucide-static/icons/paint-roller.svg";
-import grid2x2PlusSvg from "lucide-static/icons/grid-2x2-plus.svg";
 import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
@@ -304,7 +265,6 @@ import layers from "lucide-static/icons/layers.svg";
 import lock from "lucide-static/icons/lock.svg";
 import lockKeyhole from "lucide-static/icons/lock-keyhole.svg";
 import lockKeyholeOpen from "lucide-static/icons/lock-keyhole-open.svg";
-import pin from "lucide-static/icons/pin.svg";
 import sendToBack from "lucide-static/icons/send-to-back.svg";
 import ungroup from "lucide-static/icons/ungroup.svg";
 import magnet from "lucide-static/icons/magnet.svg";
@@ -350,26 +310,6 @@ export const ICONS = {
   plus: clean(plus),
   refresh: clean(refreshCw),
   rotateCcw: clean(rotateCcw),
-  eclipse: clean(eclipseSvg),
-  marqueeRect: clean(marqueeRectSvg),
-  marqueeEllipse: clean(marqueeEllipseSvg),
-  lassoPoly: clean(lassoPolySvg),
-  wand: clean(wandSvg),
-  smudge: clean(smudgeSvg),
-  cloneStamp: clean(cloneStampSvg),
-  referencePicture: clean(referencePictureSvg),
-  sticker: clean(stickerSvg),
-  fillTool: clean(fillToolSvg),
-  gradientTool: clean(gradientToolSvg),
-  squareX: clean(squareXSvg),
-  invertSelection: clean(invertSelectionSvg),
-  growSelection: clean(growSelectionSvg),
-  shrinkSelection: clean(shrinkSelectionSvg),
-  featherSelection: clean(featherSelectionSvg),
-  eyeClosed: clean(eyeClosedSvg),
-  rotateCcwSquare: clean(rotateCcwSquareSvg),
-  rotateCw: clean(rotateCwSvg),
-  flipHorizontal: clean(flipHorizontalSvg),
   rotateCwSquare: clean(rotateCwSquare),
   ratio: clean(ratioIcon),
   focus: clean(focusIcon),
@@ -462,7 +402,6 @@ export const ICONS = {
   layoutGrid: clean(layoutGrid),
   penTool: clean(penTool),
   pencilLine: clean(pencilLine),
-  pencilPixel: clean(pencilPixelSvg),
   penLine: clean(penLine),
   highlighter: clean(highlighter),
   bold: clean(bold),
@@ -494,23 +433,6 @@ export const ICONS = {
   lock: clean(lock),
   group: clean(group),
   eraser: clean(eraser),
-  paintView: clean(brushSvg),
-  paintbrush: clean(paintbrushSvg),
-  brushPresets: clean(brushPresetsSvg),
-  brushSettings: clean(brushSettingsSvg),
-  paintEraser: clean(dropletOffSvg),
-  newPainting: clean(fileImageSvg),
-  newPage: clean(filePlusSvg),
-  newLayer: clean(layersPlusSvg),
-  clipBelow: clean(cornerLeftDownSvg),
-  alphaLock: clean(grid2x2CheckSvg),
-  fitPage: clean(maximize2Svg),
-  placeOnCanvas: clean(pictureInPictureSvg),
-  paintings: clean(bookImageSvg),
-  pageSize: clean(rulerDimensionSvg),
-  vectorLayer: clean(vectorLayerSvg),
-  fillLayer: clean(paintRollerSvg),
-  rasterize: clean(grid2x2PlusSvg),
   activity: clean(activity),
   boxSelect: clean(boxSelect),
   swatchBook: clean(swatchBookSvg),
@@ -555,7 +477,6 @@ export const ICONS = {
   eyeOff: clean(eyeOff),
   lockKeyhole: clean(lockKeyhole),
   lockKeyholeOpen: clean(lockKeyholeOpen),
-  pin: clean(pin),
   ungroup: clean(ungroup),
   bringToFront: clean(bringToFront),
   sendToBack: clean(sendToBack),

@@ -1,7 +1,4 @@
 import { externalFolder } from "../storage/external-folder";
-import type { PaintView } from "../ui/paint-view";
-import { tilesOf } from "../paint/model";
-import { tipsOf } from "../paint/brushes";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
@@ -120,19 +117,6 @@ export interface DebugHook {
   inkedPixels(step?: number): number;
   /** RGB of the canvas pixel at CSS px (x, y). */
   pixelAt(x: number, y: number): [number, number, number];
-  /** The Painting view (ADR 0165): the open painting's records, a layer's pixel (r, g, b, a) at page px, the screen point of a page px, and a wait for the strokes and saves. */
-  paint: {
-    state(): { paintingId: string; name: string; pageId: string; pages: Array<{ id: string; name: string; w: number; h: number; bg: string | null }>; activeId: string | null; layers: Array<{ id: string; name: string; pageId: string; z: number; tiles: number; kind: string; objs?: number; hidden?: true; locked?: true; clipBelow?: true; alphaLock?: true; opacity: number; blend?: string; mask?: number }>; canUndo: boolean } | null;
-    layerPixel(layerId: string, x: number, y: number): [number, number, number, number] | null;
-    /** How many pixels of the shown page are selected (at least half), 0 with no selection. */
-    selected(): number;
-    screenOf(x: number, y: number): { x: number; y: number } | null;
-    settled(): Promise<void>;
-    list(): Promise<Array<{ id: string; name: string }>>;
-    open(id: string): Promise<void>;
-    /** The brush presets (ADR 0169) and the painting tool in use with its brush. */
-    brushes(): Promise<{ presets: Array<{ id: string; name: string; group: string; tips: number }>; tool: { tool: string; preset: string; brush: Record<string, unknown>; values: Record<string, unknown> } | null }>;
-  };
   objects(): SerializedObject[];
   /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
   storedObjects(): SerializedObject[];
@@ -283,7 +267,6 @@ export interface DebugDeps {
   indexReady: () => Promise<void>;
   /** The names above the items as last drawn. */
   labels: () => readonly { id: string; text: string; x: number; y: number; w: number; h: number }[];
-  paint: PaintView;
 }
 
 /**
@@ -397,46 +380,6 @@ export function installDebugHook(
       let n = 0;
       for (const rgb of samples) if (channelDiff(rgb, bg) > 6) n++;
       return n;
-    },
-    paint: {
-      state: () => {
-        const s = deps.paint.session;
-        if (!s) return null;
-        return {
-          paintingId: s.painting.id,
-          name: s.painting.name,
-          pageId: s.pageId,
-          pages: s.painting.pages.map((p) => ({ id: p.id, name: p.name, w: p.w, h: p.h, bg: p.bg })),
-          activeId: s.activeId,
-          layers: [...s.layers.values()].sort((a, b) => a.z - b.z).map((l) => ({ id: l.id, name: l.name, pageId: l.pageId, z: l.z, tiles: Object.keys(tilesOf(l)).length, kind: l.kind, ...(l.kind === "object" ? { objs: l.objs.length } : {}), opacity: l.opacity, ...(l.hidden ? { hidden: true as const } : {}), ...(l.locked ? { locked: true as const } : {}), ...(l.clipBelow ? { clipBelow: true as const } : {}), ...(l.kind === "raster" && l.alphaLock ? { alphaLock: true as const } : {}), ...(l.blend ? { blend: l.blend } : {}), ...(l.mask ? { mask: Object.keys(l.mask.tiles).length } : {}) })),
-          canUndo: s.history.canUndo,
-        };
-      },
-      selected: () => {
-        const m = deps.paint.session?.selection?.mask;
-        if (!m) return 0;
-        const d = m.getContext("2d")!.getImageData(0, 0, m.width, m.height).data;
-        let n = 0;
-        for (let i = 3; i < d.length; i += 4) if (d[i]! >= 128) n++;
-        return n;
-      },
-      layerPixel: (id, x, y) => {
-        const s = deps.paint.session;
-        const l = s?.layers.get(id);
-        const c = l && s!.image(l);
-        return c ? ([...c.getContext("2d")!.getImageData(x, y, 1, 1).data] as [number, number, number, number]) : null;
-      },
-      screenOf: (x, y) => (deps.paint.session ? deps.paint.clientOf(x, y) : null),
-      settled: async () => {
-        await deps.paint.session?.settled();
-        deps.paint.drawNow();
-      },
-      list: async () => (await deps.paint.list()).map((p) => ({ id: p.id, name: p.name })),
-      open: (id) => deps.paint.open(id),
-      brushes: async () => ({
-        presets: (await deps.paint.brushes.presets()).map((p) => ({ id: p.id, name: p.name, group: [p.group, ...p.folder].join(" / "), tips: tipsOf(p.brush).length })),
-        tool: deps.paint.brushState(),
-      }),
     },
     pixelAt: (x, y) => {
       const dpr = canvas.width / view.viewport.width;

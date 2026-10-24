@@ -152,8 +152,6 @@ export async function runImport(session: Session, picked: File | readonly File[]
     saving.done(
       (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
         (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
-        (r.brushesAdded ? ` ${plural(r.brushesAdded, "brush preset")} added.` : "") +
-        (r.paintings ? ` ${plural(r.paintings, "painting")} added.` : "") +
         (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
     );
   } catch (e) {

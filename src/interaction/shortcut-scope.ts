@@ -4,16 +4,11 @@
  * Enter belong to the dialog, and Delete must never reach the canvas).
  */
 export function canvasShortcutsActive(e: KeyboardEvent): boolean {
-  return shortcutsActive(e, "canvas");
-}
-
-/** The same rule for any view (the Painting view's keys, ADR 0165): not while typing, not in a dialog, and only while `view` is shown. */
-export function shortcutsActive(e: KeyboardEvent, view: string): boolean {
   const t = e.target as HTMLElement | null;
   // Not while typing text. A slider, checkbox or radio button keeps keyboard focus after it is used, and must not
   // swallow Ctrl+Z, Delete and the tool keys.
   if (t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName))) return false;
   if (t?.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((t as HTMLInputElement).type)) return false;
   if (t?.closest?.("dialog")) return false;
-  return (document.body.dataset["view"] ?? "canvas") === view;
+  return (document.body.dataset["view"] ?? "canvas") === "canvas";
 }
