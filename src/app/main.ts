@@ -1417,7 +1417,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind !== "image") return;
         void assets.record(o.assetId).then(async (rec) => {
-          if (rec) importSvg(doc, editor, view, await rec.blob.text()); // (the picture stays: this makes a vector copy)
+          if (rec) importSvg(doc, editor, view, await rec.blob.text(), o); // (in the picture's place; the file stays in the library)
         });
       },
       canExportSvg: () => canExportSvg(doc, editor),

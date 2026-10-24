@@ -1703,7 +1703,11 @@ export function pasteCssPaint(doc: DocumentStore, editor: EditorState, text: str
  * Put the shapes of SVG text on the canvas (ADR 0107): centred in the view, the longer side half of the shorter side of the view, grouped
  * when there are several, picked. False (with a message) when the text is not a drawing the app can read.
  */
-export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewState, text: string): boolean {
+/**
+ * SVG text as editable shapes. Pasted, it lands under the pointer at half the view; with `over` (Make vector copy of an SVG picture) it
+ * replaces that picture where it is, at its size, turn, layer, sheet and group (one undo step; the file stays in the library).
+ */
+export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewState, text: string, over?: ImageObject): boolean {
   if (editor.blockEdit()) return false;
   const svg = parseSvg(text);
   if (!svg) {
@@ -1714,24 +1718,43 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
   const cam = view.camera;
   const vp = view.viewport;
   const at = screenToWorld(cam, vp, editor.pointerAt ?? { x: vp.width / 2, y: vp.height / 2 }); // (under the pointer, else the middle)
-  const k = (0.5 * Math.min(vp.width, vp.height)) / 2 ** cam.zf / Math.max(svg.box.w, svg.box.h);
-  const cx = svg.box.x + svg.box.w / 2, cy = svg.box.y + svg.box.h / 2;
-  const z0 = doc.topZ();
-  const base = { ...(view.frame === doc.space.world ? {} : { frame: view.frame }), anchor: at, unit: -cam.zi, attachmentTargetId: null };
+  let k = (0.5 * Math.min(vp.width, vp.height)) / 2 ** cam.zf / Math.max(svg.box.w, svg.box.h);
+  // An SVG point → local units about the anchor: (v − c) · k.
+  let cx = svg.box.x + svg.box.w / 2, cy = svg.box.y + svg.box.h / 2;
+  let z0 = doc.topZ();
+  let step = 1;
+  let base: Pick<PathObject, "frame" | "anchor" | "unit" | "attachmentTargetId" | "parent" | "groups" | "groupNames"> = { ...(view.frame === doc.space.world ? {} : { frame: view.frame }), anchor: at, unit: -cam.zi, attachmentTargetId: null };
+  if (over) {
+    // The picture shows the whole drawing (or a crop of it) over pixelW × pixelH, the viewBox fitted in the middle (as `meet` does); anchor = its top left.
+    const fx = over.w / (over.crop?.w ?? over.pixelW), fy = over.h / (over.crop?.h ?? over.pixelH);
+    k = Math.min((over.pixelW * fx) / svg.box.w, (over.pixelH * fy) / svg.box.h);
+    const left = -(over.crop?.x ?? 0) * fx + (over.pixelW * fx - svg.box.w * k) / 2, top = -(over.crop?.y ?? 0) * fy + (over.pixelH * fy - svg.box.h * k) / 2;
+    cx = svg.box.x - left / k;
+    cy = svg.box.y - top / k;
+    z0 = over.z;
+    step = 1 / (svg.shapes.length + 2); // between the picture's place and the next thing up
+    base = {
+      ...(over.frame ? { frame: over.frame } : {}), anchor: over.anchor, unit: over.unit, attachmentTargetId: over.attachmentTargetId,
+      ...(over.parent ? { parent: over.parent } : {}), ...(over.groups ? { groups: over.groups } : {}), ...(over.groupNames ? { groupNames: over.groupNames } : {}),
+    };
+  }
   const toLocal = (sub: readonly SubPath[]): SubPath[] => sub.map((p) => ({ n: p.n.map((v, j) => (v - (j % 2 === 0 ? cx : cy)) * k), closed: p.closed }));
+  // A turned picture turns its shapes about its own centre.
+  const centre = over && { x: D.add(over.anchor.x, D.shift(D.fromNumber(over.w / 2), over.unit)), y: D.add(over.anchor.y, D.shift(D.fromNumber(over.h / 2), over.unit)) };
+  const place = (o: PathObject): PathObject => homeObject(normalizeUnit(over?.rot && centre ? rotateAbout(o, centre, over.rot) : o), doc.space) as PathObject;
   // a clip-path of the drawing is a clipping mask (a sheet of the clip's shape, ADR 0108, 0144) that holds what it cuts, behind it
   const masks = svg.clips.map((c, ci) => {
     const first = svg.shapes.findIndex((s) => s.clip === ci);
-    return first < 0 ? null : homeObject(normalizeUnit({
-      ...base, id: newObjectId(), kind: "path", z: z0 + first + 0.5 - 1, opacity: 1, sub: toLocal(c.sub), fill: null, stroke: null, width: 1e-9,
+    return first < 0 ? null : place({
+      ...base, id: newObjectId(), kind: "path", z: z0 + (first + 0.5) * step, opacity: 1, sub: toLocal(c.sub), fill: null, stroke: null, width: 1e-9,
       container: { clip: true, mask: true, was: { fill: null, stroke: null } }, name: `Clip ${ci + 1}`,
-    } as PathObject), doc.space) as PathObject;
+    } as PathObject);
   });
-  let objs: CanvasObject[] = svg.shapes.map((s, i): PathObject => homeObject(normalizeUnit({
+  let objs: CanvasObject[] = svg.shapes.map((s, i): PathObject => place({
     ...base,
     id: newObjectId(),
     kind: "path",
-    z: z0 + 1 + i,
+    z: z0 + (1 + i) * step,
     opacity: s.opacity,
     ...(s.clip !== undefined && masks[s.clip] ? { parent: masks[s.clip]!.id } : {}),
     sub: toLocal(s.sub),
@@ -1744,10 +1767,11 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
     ...(s.evenodd ? { evenodd: true as const } : {}),
     ...(s.adjust ? { adjust: s.adjust } : {}),
     ...(s.name ? { name: s.name } : {}),
-  } as PathObject), doc.space) as PathObject);
+  } as PathObject));
   objs = [...masks.filter((m): m is PathObject => m !== null), ...objs];
-  if (objs.length > 1) objs = groupObjects(objs, 0);
-  doc.commit(doc.transaction(`Import SVG (${objs.length} ${objs.length === 1 ? "shape" : "shapes"})`, objs));
+  if (objs.length > 1) objs = groupObjects(objs, over?.groups?.length ?? 0);
+  const shapes = `${objs.length} ${objs.length === 1 ? "shape" : "shapes"}`;
+  doc.commit(over ? doc.transaction(`Make vector copy (${shapes})`, objs, [over.id]) : doc.transaction(`Import SVG (${shapes})`, objs));
   editor.select(objs.map((o) => o.id));
   editor.changed();
   return true;

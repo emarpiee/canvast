@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.3 — Make vector copy works in place (2026-10-25)
+
+- **Fixed:** *Make vector copy* of an SVG picture put the shapes under the pointer (the Actions bar button) at half the view's size, so they came out smaller and elsewhere. They now take the picture's place exactly: its size, crop, turn, layer, sheet and group.
+- **Changed:** the shapes replace the picture on the canvas, in one undo step; the file stays in the library.
+
 ## 0.37.2 — No more stutter from the library index on a big workspace (2026-10-25)
 
 - **Fixed:** with a library folder in use, the library index (saved about 20 s after the last change, at most once a minute) froze the canvas for up to about 0.2 s on a big workspace, so the frame rate dropped now and then. Each canvas is now read, written out and checked in small slices with frames drawn in between: on a 60,000-object workspace no step takes longer than a frame, where the longest used to block for 196 ms.

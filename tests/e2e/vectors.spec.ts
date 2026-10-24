@@ -2895,6 +2895,27 @@ test("Save to library puts the picked shapes in the library as an SVG picture", 
   await expect(p.getByTestId("asset-card")).toContainText("canvast-shapes");
 });
 
+test("Make vector copy replaces an SVG picture with its shapes in the same place and size, in one undo step", async ({ app }) => {
+  const p = app.page;
+  // A drawing whose rect fills its viewBox, so the shapes' box is the picture's box.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150" viewBox="0 0 200 100"><rect width="200" height="100" fill="#2563eb"/><circle cx="100" cy="50" r="30" fill="#dc2626"/></svg>`;
+  await p.getByTestId("import-input").setInputFiles({ name: "d.svg", mimeType: "image/svg+xml", buffer: Buffer.from(svg) });
+  await expect.poll(async () => (await objs(app)).filter((o) => o.kind === "image").length).toBe(1);
+  const img = (await objs(app)).find((o) => o.kind === "image")!;
+  await app.frame();
+  const before = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), img.id))!.box;
+  await key(app, "v");
+  await click(app, (before.minX + before.maxX) / 2, (before.minY + before.maxY) / 2);
+  await p.locator('[data-ctx="vectorise"]').click();
+  await expect.poll(async () => (await objs(app)).map((o) => o.kind).sort()).toEqual(["path", "path"]);
+  await app.frame();
+  const boxes = await p.evaluate((ids) => ids.map((id) => window.__canvastDebug.objectScreen(id)!.box), (await objs(app)).map((o) => o.id));
+  const after = { minX: Math.min(...boxes.map((b) => b.minX)), minY: Math.min(...boxes.map((b) => b.minY)), maxX: Math.max(...boxes.map((b) => b.maxX)), maxY: Math.max(...boxes.map((b) => b.maxY)) };
+  for (const k of ["minX", "minY", "maxX", "maxY"] as const) expect(Math.abs(after[k] - before[k]), `${k}: where the picture was`).toBeLessThan(1.5);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await objs(app)).map((o) => o.kind)).toEqual(["image"]);
+});
+
 test("WYSIWYG colours: a new shape's default outline is a real colour chosen for the canvas it is drawn on, and the canvas, a picture and an SVG all show exactly what is stored", async ({ app }) => {
   const p = app.page;
   const exported = async (format: "svg" | "png"): Promise<Buffer> => {
