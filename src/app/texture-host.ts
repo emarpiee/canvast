@@ -4,6 +4,7 @@
  */
 import type { AssetLibrary } from "../assets/asset-library";
 import type { DocumentStore } from "../doc/document-store";
+import type { EditorState } from "./editor-state";
 import type { CanvasObject } from "../doc/model";
 import type { TextureHost } from "../render/texture";
 import type { FrameIndex } from "../scene/frame-index";
@@ -14,26 +15,37 @@ import { paintExport } from "./export-render";
 
 const KEEP = 16;
 
-export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex; assets: AssetLibrary; theme: () => SceneTheme }): TextureHost {
+export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex; assets: AssetLibrary; theme: () => SceneTheme; editor: EditorState }): TextureHost & { live(on: boolean): void } {
   const targets = new Map<string, ExportTarget | null>();
   const tiles = new Map<string, HTMLCanvasElement>();
   let rev = -1;
+  // While a gesture changes a source (live), tiles show it as the gesture does, drawn again at each step of it.
+  let live = false;
+  let step = 0;
+  let drawnStep = 0;
   const fresh = (): void => {
-    if (rev === deps.doc.revision) return;
+    if (rev === deps.doc.revision && drawnStep === step) return;
     rev = deps.doc.revision;
+    drawnStep = step;
     targets.clear();
     tiles.clear();
   };
+  const shown = (o: CanvasObject): CanvasObject => (live ? (deps.editor.previewed(o) ?? o) : o);
   const targetOf = (ids: readonly string[]): ExportTarget | null => {
     fresh();
     const key = ids.join(",");
     if (!targets.has(key)) {
-      const sel = ids.map((i) => deps.doc.get(i)).filter((o): o is CanvasObject => !!o); // (a source may be hidden: the fill still shows it)
+      const sel = ids.map((i) => deps.doc.get(i)).filter((o): o is CanvasObject => !!o).map(shown); // (a source may be hidden: the fill still shows it)
       targets.set(key, sel.length ? buildTarget(deps.doc, sel, null) : null);
     }
     return targets.get(key)!;
   };
   return {
+    /** A gesture changed a source (on), or ended (off): the tiles are drawn again. */
+    live(on) {
+      live = on;
+      step++;
+    },
     picture(hash, shownPx) {
       const src = deps.assets.get(hash, shownPx);
       if (!src) return null;
@@ -49,19 +61,19 @@ export function createTextureHost(deps: { doc: DocumentStore; index: FrameIndex;
       if (!t) return null;
       const key = `${ids.join(",")}|${px}`;
       const hit = tiles.get(key);
-      if (hit) return { canvas: hit, version: `${rev}` };
+      if (hit) return { canvas: hit, version: `${rev}.${step}` };
       const [w, h] = t.ratio >= 1 ? [px, Math.max(1, Math.round(px / t.ratio))] : [Math.max(1, Math.round(px * t.ratio)), px];
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
-      const pending = paintExport({ doc: deps.doc, index: deps.index, assets: deps.assets, theme: deps.theme() }, t, ctx, w, h, "transparent", true);
+      const pending = paintExport({ doc: deps.doc, index: deps.index, assets: deps.assets, theme: deps.theme(), editor: live ? deps.editor : null }, t, ctx, w, h, "transparent", true);
       if (!pending) {
         tiles.set(key, canvas);
         if (tiles.size > KEEP) tiles.delete(tiles.keys().next().value!);
       }
-      return { canvas, version: `${rev}${pending ? "p" : ""}` };
+      return { canvas, version: `${rev}.${step}${pending ? "p" : ""}` };
     },
   };
 }

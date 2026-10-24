@@ -14,6 +14,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import type { DocumentStore } from "../doc/document-store";
 import type { ObjectId, PathObject } from "../doc/model";
 import { drawObjects } from "../render/scene-renderer";
+import type { EditorState } from "./editor-state";
 import type { SceneTheme } from "../render/scene-renderer";
 import { projectObject } from "../render/projection";
 import type { ProjectedObject } from "../render/projection";
@@ -47,6 +48,8 @@ export interface RenderDeps {
   readonly index: FrameIndex;
   readonly assets: AssetLibrary;
   readonly theme: SceneTheme;
+  /** Draw the objects as a gesture shows them before it is committed (a texture's tile following a drag); absent: as stored. */
+  readonly editor?: EditorState | null;
 }
 
 /** The camera that makes the target's box cover a canvas of `w` × `h` (to within a hundredth of a pixel), centred on it. */
@@ -73,7 +76,12 @@ export function paintExport(deps: RenderDeps, t: ExportTarget, ctx: CanvasRender
     ctx.fillStyle = bg === "white" ? "#ffffff" : "#000000";
     ctx.fillRect(0, 0, w, h);
   }
-  let list = visibleObjects(deps.doc, deps.index, null, fc, vp).filter((po) => t.ids.has(po.obj.id) && !po.obj.hidden);
+  let list = visibleObjects(deps.doc, deps.index, deps.editor ?? null, fc, vp).filter((po) => t.ids.has(po.obj.id) && !po.obj.hidden);
+  if (deps.editor) {
+    // (the canvas shows a selection being moved see-through; a picture of it shows the objects as they will be)
+    const moving = deps.editor.previewIds();
+    list = list.map((po) => (moving.has(po.obj.id) ? { ...po, obj: { ...po.obj, opacity: deps.doc.get(po.obj.id)?.opacity ?? po.obj.opacity } } : po));
+  }
   if (withHidden) {
     // (a texture's tile may be made of objects that are hidden: they are in no index, so they are projected on their own, and put in paint order)
     const extra: ProjectedObject[] = [];

@@ -950,6 +950,52 @@ test("an objects fill of an objects fill shows the inner one, follows a change o
   expect(s.id).not.toBe(t.id);
 });
 
+test("an objects fill follows a source while it is being resized, before the release, and ends as it was shown (ADR 0154)", async ({ app }) => {
+  const p = app.page;
+  const pop = p.locator(".colour-pop");
+  await p.keyboard.press("u");
+  await p.locator('[data-shape-kind="ellipse"]').click();
+  await app.drag({ x: 950, y: 320 }, { x: 1010, y: 380 }, 6); // S: the source
+  await pickedRect(app, [400, 320], [700, 470]); // T, filled with S
+  await expect(async () => {
+    await p.keyboard.press("Escape");
+    await p.mouse.click(60, 650);
+    await p.mouse.click(670, 440);
+    await p.click('[data-paint="fill"]', { timeout: 1500 });
+    await expect(pop).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20000 });
+  await pop.locator('[data-mode="objects"]').click();
+  await pop.locator("[data-tex-pick]").click();
+  await p.mouse.click(980, 350);
+  await p.keyboard.press("Escape");
+  await p.mouse.click(60, 650);
+  await app.frame();
+  // what T looks like: its pixels on a grid
+  const look = async () => {
+    const out: string[] = [];
+    for (let y = 330; y < 470; y += 9) for (let x = 410; x < 700; x += 9) out.push((await px(app, x, y)).join());
+    return out.join(" ");
+  };
+  const before = await look();
+  await p.keyboard.press("v");
+  await p.mouse.click(60, 650);
+  await p.mouse.click(980, 350); // pick S
+  await app.frame();
+  const c = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  await p.mouse.move(c[2]![0], c[2]![1]);
+  await p.mouse.down();
+  await p.mouse.move(c[2]![0] + 20, c[2]![1] + 70, { steps: 6 });
+  await app.frame();
+  const during = await look();
+  expect(during, "T follows S while it is still being resized").not.toBe(before);
+  await p.mouse.up();
+  await app.frame();
+  const after = (await look()).split(" ");
+  const off = during.split(" ").filter((v, i) => v !== after[i]).length;
+  expect(off, `and ends as it was shown (${off} of ${after.length} points differ; a point on an edge may be smoothed differently)`).toBeLessThanOrEqual(after.length / 100);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a sparse objects fill (small shapes far apart) far out is the colour of its shapes, not pale or white", async ({ app }) => {
   const p = app.page;
   const pop = p.locator(".colour-pop");

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.40.1 — Objects fills follow their sources live (2026-10-25)
+
+- **Fixed:** a shape filled with objects showed a change to those objects (moving, turning, resizing, recolouring them) only on release; it now follows at every step of the gesture, and shows them as they will be, not see-through like the selection being dragged.
+
 ## 0.40.0 — Gaps with small openings; W A S D by name and in view (2026-10-25)
 
 - **Fill gaps** closes small openings: a place left open by a slit narrower than 4 px on the screen (Settings > Drawing, *Fill gaps: close openings up to*, 0 to 24) is filled up to the slit.

@@ -232,16 +232,19 @@ async function start(): Promise<void> {
       else objectsUsers.delete(id);
     }
   });
-  doc.subscribe((_source, changed) => {
-    // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
-    const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
-    // (an objects fill of an objects fill follows too, down the chain; a cycle ends because an id is added once)
-    const hit = new Set(changed);
-    for (let grew = changed !== null && objectsUsers.size > 0; grew; ) {
+  /** The shapes whose objects fill shows any of `ids` (an objects fill of an objects fill too, down the chain; a cycle ends because an id is added once). */
+  const fillUsersOf = (ids: ReadonlySet<string>): string[] => {
+    const hit = new Set(ids);
+    for (let grew = objectsUsers.size > 0; grew; ) {
       grew = false;
       for (const [id, src] of objectsUsers) if (!hit.has(id) && src.some((i) => hit.has(i))) (hit.add(id), (grew = true));
     }
-    const more = changed ? [...hit].filter((id) => !changed.has(id)) : [];
+    return [...hit].filter((id) => !ids.has(id));
+  };
+  doc.subscribe((_source, changed) => {
+    // What a sheet holds is cut by it: when a sheet changes, so does the look of everything on it (ADR 0108).
+    const sheets = changed ? [...changed].filter((id) => isContainer(doc.get(id))) : [];
+    const more = changed ? fillUsersOf(changed) : [];
     tiles.invalidate(sheets.length || more.length ? new Set([...changed!, ...more, ...descendantsOf(doc.all(), new Set(sheets))]) : changed);
   });
   // Objects with a blend mode (ADR 0047): tiles hold paint without its backdrop, so a view that shows one is drawn directly.
@@ -451,8 +454,21 @@ async function start(): Promise<void> {
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
-  const textureHost = createTextureHost({ doc, index, assets, theme: () => theme });
+  const textureHost = createTextureHost({ doc, index, assets, theme: () => theme, editor });
   setTextureHost(textureHost); // (texture fills, ADR 0154)
+  // A gesture on a source of an objects fill (moving, turning, resizing, recolouring it): the fill follows at each step, not on release.
+  let livePreview: EditorState["preview"] | null = null;
+  let liveUsers: string[] = [];
+  editor.subscribe(() => {
+    const p = editor.preview;
+    if (p === livePreview) return;
+    livePreview = p;
+    const users = p.kind === "none" || p.kind === "edit" || !objectsUsers.size ? [] : fillUsersOf(editor.previewIds());
+    if (users.length) textureHost.live(true);
+    else if (liveUsers.length) textureHost.live(false);
+    if (users.length || liveUsers.length) tiles.invalidate(new Set([...users, ...liveUsers]));
+    liveUsers = users;
+  });
   applyHeldQuality();
   // The fonts texts are set in (ADR 0127): read from the library when a text names one; when one arrives, text made without it is drawn and measured again.
   const fontLoader = new FontLoader(async (hash) => (await assets.record(hash))?.blob);
