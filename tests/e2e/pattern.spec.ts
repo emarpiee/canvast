@@ -46,18 +46,15 @@ test("Pattern: a new sheet, each change replaces the result, hiding the backgrou
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Pattern: resizing the sheet it is on makes the pattern again at the new size (from its settings and seed), in one undo step", async ({ app }) => {
+for (const [what, key] of [["sheet", "c"], ["shape", "u"]] as const) test(`Pattern: resizing the ${what} it is on (picked alone) makes the pattern again at the new size (from its settings and seed), in one undo step`, async ({ app }) => {
   const p = app.page;
-  await p.keyboard.press("c");
+  await p.keyboard.press(key);
   await app.drag({ x: 450, y: 250 }, { x: 750, y: 450 }, 6);
   await p.keyboard.press("v");
   await p.mouse.click(600, 350);
   await p.click("[data-pattern-panel]");
   await choose(app, "ripple");
-  await make(app);
-  await p.locator("[data-pg-done]").click();
-  await p.keyboard.press("Escape");
-  await p.mouse.click(60, 650);
+  await make(app); // (the sheet or shape alone is picked: what is on it follows it)
   const box = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
   const union = async (ids: string[]) => {
     const bs = await Promise.all(ids.map(box));
@@ -67,8 +64,7 @@ test("Pattern: resizing the sheet it is on makes the pattern again at the new si
   const sheet = sheets(all)[0]!;
   const seed = (on(all, sheet.id).find((o) => (o as Obj & { gen?: { seed: number } }).gen) as Obj & { gen: { seed: number } }).gen.seed;
   // the sheet's corner handle, dragged out: 150 px wider, 100 px taller
-  await p.mouse.click(470, 240); // (its name above it)
-  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([sheet.id]);
   const c = (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
   await app.drag({ x: c[2]![0], y: c[2]![1] }, { x: c[2]![0] + 150, y: c[2]![1] + 100 }, 8);
   await app.frame();

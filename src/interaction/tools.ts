@@ -2047,7 +2047,9 @@ export function attachTools(
         // the shape of the box as it is resized, as a ratio (width : height), beside the finger or pointer
         if (g.size0.w > 0 && g.size0.h > 0 && kx > 0 && ky > 0) editor.handleLabel = { x: s.x, y: s.y, text: formatRatio((g.size0.w * kx) / (g.size0.h * ky)) };
         if (g.sheets) {
-          const plan = planSheetScale(g.ids.map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
+          // the sheets with what is on them (picked or not), which follows by its pins, as the ratio and size fields do
+          const withContents = new Set([...g.ids, ...descendantsOf(doc.all(), new Set(g.ids.filter((id) => isContainer(doc.get(id)))))]);
+          const plan = planSheetScale([...withContents].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
           editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
           replaceCommit = "Resize";
         } else editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };

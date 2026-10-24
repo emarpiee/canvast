@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.6 — Resizing a sheet by its handles carries what is on it (2026-10-25)
+
+- **Fixed:** resizing a sheet or a clipping mask by its handles, with it picked alone, left what was on it out of the resize: its pins (right, centre, scale) did nothing, and a pattern on it was neither stretched nor made again (0.41.5 only worked with the pattern picked too). What is on it now follows, as with the ratio and size fields.
+
 ## 0.41.5 — A pattern follows its sheet's size (2026-10-25)
 
 - **Fixed:** resizing a sheet that holds a generated pattern left the pattern at its old size in the top-left corner (the rest of the sheet empty, or the pattern cut off), though it was meant to follow. It now stretches with the sheet while you drag, and on release is made again at the new size from its settings and seed, in one undo step (the resize handles, the ratio field and the size on a sheet).
