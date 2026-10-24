@@ -149,8 +149,10 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
     box = b;
     if (t.kind === "sheet") host = t.obj;
     else {
-      const { groups: _g, groupNames: _gn, boolOps: _b, result: _r, mask: _m, isMask: _i, tags: _t, styles: _s, ...rest } = t.obj;
-      host = { ...rest, id: newObjectId(), z: z0 + 1, fill: null, stroke: null, container: { clip: true, mask: true, was: { fill: null, stroke: null } }, name: `Mask ${maskNumber(doc)}` } as PathObject;
+      // the picked shape itself becomes the clipping mask that holds the pattern (its place, layer, groups and name stay; its fill and outline
+      // are kept for when it is released, as Clipping mask does), not a copy of it on top with the shape left under it
+      const o = t.obj;
+      host = { ...o, fill: null, stroke: null, container: { clip: true, mask: true, was: { fill: o.fill, stroke: o.stroke } }, ...(o.name ? {} : { name: `Mask ${maskNumber(doc)}` }) } as PathObject;
       fresh.push(host);
     }
   } else {

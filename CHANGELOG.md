@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.4 — A pattern on a shape uses that shape (2026-10-25)
+
+- **Changed:** making a pattern on a picked shape turned a copy of it into a new mask over it, leaving the shape under it. The shape itself now becomes the clipping mask that holds the pattern: its place, layer, groups and name stay, and its fill and outline come back with *Release*.
+
 ## 0.41.3 — Objects fills sharp and steady deep in (2026-10-25)
 
 - **Fixed:** zooming into an Objects fill (varied or plain), a copy shown larger than its tile picture became big blocks of that picture's pixels, then vanished for a few levels, then came back. A copy shown large is now drawn again from its objects, as vectors, only the part in view, so its edges stay sharp and in place at every depth. The maths that places it is done in doubles: a copy a billion times enlarged has offsets near 10^11 px, which the canvas's own transforms did not keep.

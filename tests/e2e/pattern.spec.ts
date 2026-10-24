@@ -66,6 +66,7 @@ test("Pattern: on a picked sheet and on a picked shape (which cuts it), Randomiz
   await p.keyboard.press("Escape");
   await app.page.keyboard.press("u");
   await app.drag({ x: 560, y: 300 }, { x: 760, y: 400 }, 8);
+  const shape = (await objs(app)).at(-1)!;
   await app.page.keyboard.press("v");
   await app.page.mouse.click(660, 350);
   await app.frame();
@@ -77,7 +78,8 @@ test("Pattern: on a picked sheet and on a picked shape (which cuts it), Randomiz
   const mask = sheets(all).find((o) => o.container!.mask)!;
   expect(mask).toBeTruthy();
   expect(on(all, mask.id).length).toBeGreaterThan(1);
-  expect(all.filter((o) => o.kind === "path" && !o.container && !o.groups && o.fill !== null), "the shape itself is untouched").toHaveLength(1);
+  expect(mask.id, "the picked shape itself holds the pattern (not a new mask over it)").toBe(shape.id);
+  expect(all.filter((o) => o.kind === "path" && !o.container && !o.groups && o.fill !== null), "no copy of the shape is left under it").toHaveLength(0);
   expect(app.consoleErrors).toEqual([]);
 });
 
