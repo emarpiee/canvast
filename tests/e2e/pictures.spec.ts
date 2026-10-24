@@ -1038,6 +1038,20 @@ test("Vary each copy: turned copies differ from plain ones, stay the same after 
   await expect.poll(look, { message: "the same copies after a reload" }).toBe(varied);
   await set([], true);
   expect(await look(), "a new seed: other copies").not.toBe(varied);
+  // an SVG of it: the copies as vectors, a <use> of each object for each copy, turned and sized as on the canvas (not one stretched arrangement)
+  await p.mouse.click(60, 650);
+  await p.mouse.click(670, 440);
+  await exportWith(p, "exportpic");
+  const dlg = p.getByTestId("export-dialog");
+  await dlg.locator('[data-format="svg"]').click();
+  const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  const svg = (await import("node:fs")).readFileSync((await download.path())!, "utf8");
+  await dlg.locator('[data-ex="close"]').click();
+  const uses = svg.match(/<use xlink:href="#t\d+p[01]" transform="[^"]*rotate\(([-\d.]+)\) scale\(([-\d.]+) /g) ?? [];
+  expect(uses.length, "a copy for each cell in the shape").toBeGreaterThan(10);
+  expect(new Set(uses.map((u) => /rotate\(([-\d.]+)\)/.exec(u)![1])).size, "each turned its own way").toBeGreaterThan(5);
+  expect(svg).not.toContain("<image");
+  expect(svg).not.toMatch(/<g id="t\d+i"/); // (the arrangement stretched over a block of cells)
   // shown large (a copy over a few hundred px): drawn one by one, still the shape's pattern (copies and the space between them)
   await p.evaluate(() => window.__canvastDebug.jump(3));
   await app.frame();

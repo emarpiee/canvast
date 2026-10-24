@@ -12,7 +12,7 @@ import type { PathObject } from "../doc/model";
 import { alignOf, expressObjectIn, inkStyle, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
-import { isTexture } from "../doc/texture";
+import { copyAt, isTexture, isVaried } from "../doc/texture";
 import { svgTexture } from "../render/texture";
 import { svgAdjustFilter, svgAdjustReach } from "../render/adjust-filter";
 import { isNeutral } from "../doc/adjust";
@@ -192,22 +192,62 @@ export function exportSvg(
     if (isTexture(paint) && which === "fill") {
       // an objects fill: the tile as a picture, put where the canvas puts it, one image for each tile in view, cut to the shape (a <pattern> is
       // left for very many tiles: viewers that read Qt's SVG or import into design tools leave a <pattern> empty); a picture is one image of it, the same way
-      const src = paint.src.kind === "objects" && sourceOf && depth < 2 ? sourceOf(paint.src.ids) : null;
-      const inner = src?.length ? exportSvg(src, space, maskOf, undefined, sourceOf, true, depth + 1) : null;
-      const box = inner ? /viewBox="0 0 ([\d.e+-]+) ([\d.e+-]+)"/.exec(inner) : null;
-      const tex = svgTexture(p.o, paint, (x, y) => { const [px, py] = p.at(x, y); return [(px - minX) * sc, (py - minY) * sc]; }, !inner);
+      // the shapes of the source as vectors: all of them as one tile, or (varied, each object) one piece for each object
+      const vector = (ids: readonly string[]): { svg: string; w: number; h: number } | null => {
+        const src = sourceOf && depth < 2 ? sourceOf(ids) : null;
+        const svg = src?.length ? exportSvg(src, space, maskOf, undefined, sourceOf, true, depth + 1) : null;
+        const vb = svg ? /viewBox="0 0 ([\d.e+-]+) ([\d.e+-]+)"/.exec(svg) : null;
+        return svg && vb ? { svg, w: Number(vb[1]), h: Number(vb[2]) } : null;
+      };
+      const varied = isVaried(paint) ? paint.vary! : null;
+      const pieces = paint.src.kind !== "objects" ? null : (varied?.each ? paint.src.ids.map((i) => [i]) : [paint.src.ids]).map(vector);
+      const allVector = !!pieces?.length && pieces.every((x) => x !== null);
+      const inner = !varied && allVector ? pieces![0]!.svg : null;
+      const box = inner ? ([inner, String(pieces![0]!.w), String(pieces![0]!.h)] as const) : null;
+      let tex = svgTexture(p.o, paint, (x, y) => { const [px, py] = p.at(x, y); return [(px - minX) * sc, (py - minY) * sc]; }, !inner && !(varied && allVector));
       if (tex) {
         usesXlink = true;
         const id = `t${defs.length}`;
+        const pre = (k: string) => (t: string): string => t.replace(/\bid="([^"]+)"/g, `id="${k}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${k}$1)`).replace(/href="#([^"]+)"/g, `href="#${k}$1"`);
+        const body = (svg: string): { defs: string; content: string } => ({ defs: /<defs>([\s\S]*?)<\/defs>/.exec(svg)?.[1] ?? "", content: svg.slice(svg.indexOf(">") + 1, svg.lastIndexOf("</svg>")).replace(/<defs>[\s\S]*?<\/defs>/, "") });
+        if (tex.vary && allVector && d !== undefined) {
+          // varied copies as vectors (ADR 0173): each piece written once, and a <use> of it for each copy in view, moved, turned, scaled and mirrored as on the canvas
+          const vt = tex;
+          const m = new DOMMatrix([...vt.matrix]).inverse();
+          const cs = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => m.transformPoint(new DOMPoint(x, y)));
+          const [i0, i1] = [Math.floor(Math.min(...cs.map((c) => c.x)) / vt.cw) - 2, Math.ceil(Math.max(...cs.map((c) => c.x)) / vt.cw) + 2];
+          const [j0, j1] = [Math.floor(Math.min(...cs.map((c) => c.y)) / vt.ch) - 2, Math.ceil(Math.max(...cs.map((c) => c.y)) / vt.ch) + 2];
+          if ((i1 - i0 + 1) * (j1 - j0 + 1) * vt.tiles.length <= MAX_TILE_USES) {
+            pieces!.forEach((pc, k) => {
+              const b = body(pc!.svg);
+              const r = pre(`${id}p${k}_`);
+              defs.push(r(b.defs), `<g id="${id}p${k}">${r(b.content)}</g>`);
+            });
+            const mat = `matrix(${vt.matrix.map(num).join(" ")})`;
+            const uses: string[] = [];
+            for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) vt.tiles.forEach(([tx, ty], slot) => {
+              const c = copyAt(vt.vary!.v, vt.vary!.n, i, j, slot);
+              const pc = c.src >= 0 ? pieces![c.src] : null;
+              if (!pc) return;
+              const a = pc.w / pc.h;
+              const [fw, fh] = a >= vt.tw / vt.th ? [vt.tw, vt.tw / a] : [vt.th * a, vt.th];
+              uses.push(`<use xlink:href="#${id}p${c.src}" transform="${mat} translate(${num(i * vt.cw + tx + vt.tw / 2 + c.dx * vt.cw)} ${num(j * vt.ch + ty + vt.th / 2 + c.dy * vt.ch)}) rotate(${num(c.rot)}) scale(${num(c.k * (c.flip ? -1 : 1))} ${num(c.k)}) translate(${num(-fw / 2)} ${num(-fh / 2)}) scale(${num(fw / pc.w)} ${num(fh / pc.h)})"/>`);
+            });
+            defs.push(`<clipPath id="${id}c"><path d="${d}"${p.o.evenodd ? ' clip-rule="evenodd"' : ""}/></clipPath>`);
+            cover += `  <g clip-path="url(#${id}c)">${uses.join("")}</g>\n`;
+            return ` fill="none"`;
+          }
+          tex = svgTexture(p.o, paint, (x, y) => { const [px, py] = p.at(x, y); return [(px - minX) * sc, (py - minY) * sc]; }, true) ?? tex;
+        }
+        // varied, as a picture: the block of cells the copies repeat after is the tile
+        if (tex.vary) tex = { ...tex, cw: tex.vary.period * tex.cw, ch: tex.vary.period * tex.ch, tw: tex.vary.period * tex.cw, th: tex.vary.period * tex.ch, tiles: [[0, 0]] };
         // the shapes of the source, written once (their own gradients and masks with them) and scaled to the tile; a picture of the tile when they are not all shapes
         let img = `<image id="${id}i" xlink:href="${tex.href}" width="${num(tex.tw)}" height="${num(tex.th)}" preserveAspectRatio="none"/>`;
         if (inner && box) {
-          const pre = `${id}_`;
-          const rename = (t: string): string => t.replace(/\bid="([^"]+)"/g, `id="${pre}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${pre}$1)`).replace(/href="#([^"]+)"/g, `href="#${pre}$1"`);
-          const innerDefs = /<defs>([\s\S]*?)<\/defs>/.exec(inner)?.[1] ?? "";
-          const content = inner.slice(inner.indexOf(">") + 1, inner.lastIndexOf("</svg>")).replace(/<defs>[\s\S]*?<\/defs>/, "");
+          const rename = pre(`${id}_`);
+          const b = body(inner);
           if (inner.includes("xmlns:xlink")) usesXlink = true;
-          img = rename(innerDefs) + `<g id="${id}i" transform="scale(${num(tex.tw / Number(box[1]))} ${num(tex.th / Number(box[2]))})">${rename(content)}</g>`;
+          img = rename(b.defs) + `<g id="${id}i" transform="scale(${num(tex.tw / Number(box[1]))} ${num(tex.th / Number(box[2]))})">${rename(b.content)}</g>`;
         }
         const m = new DOMMatrix([...tex.matrix]);
         const inv = m.inverse();
@@ -224,7 +264,8 @@ export function exportSvg(
           cover += `  <g clip-path="url(#${id}c)">${uses.join("")}</g>\n`;
           return ` fill="none"`;
         }
-        const cells = tex.tiles.flatMap(([tx, ty]) => [-1, 0, 1].flatMap((i) => [-1, 0, 1].map((j) => `<use xlink:href="#${id}i" x="${num(tx + i * tex.cw)}" y="${num(ty + j * tex.ch)}"/>`)));
+        const [cellW, cellH] = [tex.cw, tex.ch];
+        const cells = tex.tiles.flatMap(([tx, ty]) => [-1, 0, 1].flatMap((i) => [-1, 0, 1].map((j) => `<use xlink:href="#${id}i" x="${num(tx + i * cellW)}" y="${num(ty + j * cellH)}"/>`)));
         defs.push(`<pattern id="${id}" patternUnits="userSpaceOnUse" width="${num(tex.cw)}" height="${num(tex.ch)}" patternTransform="matrix(${tex.matrix.map(num).join(" ")})">${img}${cells.join("")}</pattern>`);
         return ` fill="url(#${id})"`;
       }

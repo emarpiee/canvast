@@ -110,6 +110,8 @@ export interface SvgTexture {
   readonly href: string;
   /** False for a picture that fits or covers the shape once (one cell, no repeat). */
   readonly repeat: boolean;
+  /** Varied copies (ADR 0173): the cell and tiles above are one cell's, and `href` is the block they repeat after (`period` cells a side). */
+  readonly vary?: { readonly v: TextureVary; readonly n: number; readonly period: number };
 }
 export function svgTexture(o: PathObject, t: TexturePaint, toSvg: (x: number, y: number) => [number, number], withTile = true): SvgTexture | null {
   if (!host) return null;
@@ -135,8 +137,7 @@ export function svgTexture(o: PathObject, t: TexturePaint, toSvg: (x: number, y:
     const [mx, my] = boxToLocal(o, 0.5, 0.5);
     const theta = (o.rot ? radiansFromAngle(o.rot) : 0) + (t.rotation * Math.PI) / 180;
     const m = new DOMMatrix([x1 - x0, y1 - y0, x2 - x0, y2 - y0, x0, y0]).translateSelf(mx, my).rotateSelf((theta * 180) / Math.PI).translateSelf(lv.ox, lv.oy);
-    const [bw2, bh2] = [period * lv.cw, period * lv.ch];
-    return { cw: bw2, ch: bh2, tw: bw2, th: bh2, tiles: [[0, 0]], matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: block ? block.toDataURL("image/png") : "", repeat: true };
+    return { cw: lv.cw, ch: lv.ch, tw: lv.tw, th: lv.th, tiles: lv.tiles, matrix: [m.a, m.b, m.c, m.d, m.e, m.f], href: block ? block.toDataURL("image/png") : "", repeat: true, vary: { v: t.vary, n, period } };
   }
   const tile = withTile && t.src.kind === "objects" ? host.objects(t.src.ids, Math.min(Math.max(pow2(tilePx * 2), 64), 1024)) : null;
   if (withTile && t.src.kind === "objects" && (!tile || tile.version.endsWith("p"))) return null;
