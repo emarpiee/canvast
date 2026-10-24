@@ -350,6 +350,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const thumbs = new Map<string, Promise<string>>();
+  const thumbUrls = new Map<string, string>(); // the ones already loaded: a redrawn grid shows them at once instead of blank cards
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
   const fileTile = (e: { name: string; type: string }, note = true): string =>
     `<span class="file-tile" aria-hidden="true">${ICONS.fileIcon}<span class="file-tile-ext">${esc(chipOf(e.name, e.type))}</span>${note ? `<span class="file-tile-note">${FILE_CARD_NOTE}</span>` : ""}</span>`;
@@ -416,6 +417,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hash = img.dataset["hash"]!;
     thumbFor(hash).then(
       (url) => {
+        thumbUrls.set(hash, url);
         img.src = url;
       },
       () => img.classList.add("is-broken"),
@@ -433,6 +435,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const [hash, p] of thumbs) {
       if (live.has(hash)) continue;
       thumbs.delete(hash);
+      thumbUrls.delete(hash);
       void p.then((url) => URL.revokeObjectURL(url), () => undefined);
     }
   };
@@ -1152,7 +1155,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"${thumbUrls.has(e.hash) ? ` src="${thumbUrls.get(e.hash)}"` : ""}><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -1203,7 +1206,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       grid.innerHTML = html;
       lastGridHtml = html;
       if (focused?.hash) grid.querySelector<HTMLElement>(`${focused.box ? ".asset-check" : ".asset-card"}[data-hash="${focused.hash}"]`)?.focus({ preventScroll: true });
-      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
+      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]:not([src])")) io.observe(img);
     }
     markPicked();
     renderSide();
@@ -2517,8 +2520,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   notices.subscribe((text) => {
     if (visible) status.textContent = text;
   });
-  session.subscribeAssets(() => void refresh());
-  session.subscribe(() => void refresh()); // tree renamed, role changed
+  // A burst of changes (an import filing hundreds of files) reads and draws the library once more after the read in flight, not once per change.
+  let refreshing = false;
+  let refreshAgain = false;
+  const refreshSoon = (): void => {
+    if (refreshing) return void (refreshAgain = true);
+    refreshing = true;
+    void refresh().finally(() => {
+      refreshing = false;
+      if (refreshAgain) {
+        refreshAgain = false;
+        refreshSoon();
+      }
+    });
+  };
+  session.subscribeAssets(refreshSoon);
+  session.subscribe(refreshSoon); // tree renamed, role changed
 
   const view: AssetsView = {
     show() {
@@ -2583,7 +2600,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         progress.update(files.length > 1 ? done / files.length : null, files.length > 1 ? `${done + 1} of ${files.length}, ${f.name || "file"}` : f.name || "file");
         done++;
         try {
-          const { record, duplicate } = await assets.importFileDetailed(f);
+          const { record, duplicate } = await assets.importFileDetailed(f, false); // nothing is placed, so a big batch keeps no decoded pictures
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
           n++;
         } catch (e) {

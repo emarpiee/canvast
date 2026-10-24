@@ -1,6 +1,7 @@
 import type { Session } from "./session";
 import { newObjectId } from "../doc/model";
 import { sha256Hex } from "../assets/sha256";
+import type { AssetCatalog } from "../assets/asset-catalog";
 
 /**
  * Importing a folder (ADR 0134): a folder dropped on the window, or chosen with Import folder, brings in every file inside it (to a
@@ -70,7 +71,7 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
   if (!catalog || !wanted.length) return;
   const made = new Map<string, string>(); // "a/b" → folder id
   const listing = await catalog.list();
-  const idOf = async (path: string[]): Promise<string> => {
+  const idOf = async (c: AssetCatalog, path: string[]): Promise<string> => {
     let parent: string | null = null;
     for (let i = 0; i < path.length; i++) {
       const key = path.slice(0, i + 1).join("/").toLowerCase();
@@ -82,7 +83,7 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
           const nid = id;
           const p = parent;
           const name = path[i]!;
-          await session.organize((c) => c.createFolder(name, p, nid));
+          await c.createFolder(name, p, nid);
           listing.folders.push({ id: nid, name, parentId: p });
         }
         made.set(key, id);
@@ -91,10 +92,14 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
     }
     return parent!;
   };
-  for (const f of wanted) {
-    const hash = await sha256Hex(await f.arrayBuffer());
-    if (!listing.entries.some((e) => e.hash === hash) && !(await catalog.list()).entries.some((e) => e.hash === hash)) continue; // not imported (a type it does not take)
-    const id = await idOf(folderPathOf(f));
-    await session.organize((c) => c.updateMeta(hash, { addFolders: [id] }));
-  }
+  const imported = new Set(listing.entries.map((e) => e.hash));
+  // One organize for the whole batch: the library is told (and redrawn) once, not once per file.
+  await session.organize(async (c) => {
+    for (const f of wanted) {
+      const hash = await sha256Hex(await f.arrayBuffer());
+      if (!imported.has(hash)) continue; // not imported (a type it does not take)
+      const id = await idOf(c, folderPathOf(f));
+      await c.updateMeta(hash, { addFolders: [id] });
+    }
+  });
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.37.1 — Big library imports without the lag and flicker (2026-10-25)
+
+- **Fixed:** importing many files into the library no longer keeps every decoded picture in memory, so a big import stays responsive.
+- **Fixed:** after a folder import, filing the files into their folders is saved once instead of once per file, so the library is redrawn once and no longer flickers for a while.
+- **Fixed:** when the library is redrawn, thumbnails already loaded stay visible instead of blanking and loading again.
+
 ## 0.37.0 — The Painting view is removed (2026-10-25)
 
 - **Removed:** the Paint view and everything in it (paintings, pages, layers, the painting tools, brush presets and brush files, reference pictures, OpenRaster) and its brush engine; the build no longer needs Rust ([ADR 0170](docs/adr/0170-painting-view-removed.md)).
