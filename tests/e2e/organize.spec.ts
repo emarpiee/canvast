@@ -325,23 +325,6 @@ test("tags can be renamed and deleted for the whole library (ADR 0057)", async (
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("picking an item always shows its properties, even after the panel button hid them", async ({ app }) => {
-  const p = app.page;
-  await libraryWithTwo(p);
-  await pick(p, HASH);
-  await expect(p.getByTestId("asset-inspector")).toBeVisible();
-  await p.locator('.assets-bar [data-action="details"]').click();
-  await expect(p.getByTestId("asset-inspector")).toBeHidden();
-  await pick(p, GREEN_HASH); // a click
-  await expect(p.getByTestId("asset-inspector")).toBeVisible();
-  await p.locator('.assets-bar [data-action="details"]').click();
-  await expect(p.getByTestId("asset-inspector")).toBeHidden();
-  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await p.keyboard.press("Escape");
-  await p.keyboard.press("ArrowRight"); // a key
-  await expect(p.getByTestId("asset-inspector")).toBeVisible();
-});
-
 test("the workspace menu exports the whole workspace as a backup or as plain files (by file type or by folder) and imports a file (ADR 0057)", async ({ app, browser }) => {
   const p = app.page;
   await libraryWithTwo(p);
@@ -565,5 +548,106 @@ test("several picked: each tag with how many have it, removed from all or added 
   await all();
   await expect(p.getByTestId("bulk-folders").getByRole("radio", { name: /Mix/ })).not.toBeChecked();
   await expect(p.getByTestId("bulk-folders")).toContainText("2 of 4");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the library's own undo and redo; items dragged onto a folder or a tag; a plain click picks one alone after Ctrl+A; picks a search hides are shown and can be dropped", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const files = [0, 1, 2].map((i) => ({ name: `q${i}.png`, mimeType: "image/png", buffer: makePng(4, 4, () => [60 * i, 120, 90, 255]) }));
+  await p.getByTestId("assets-import-input").setInputFiles(files);
+  await expect(cards(p)).toHaveCount(3);
+  const hashes = await cards(p).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset["hash"]!));
+  const tagsOf = (h: string) => p.evaluate((x) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === x)?.tags ?? []), h);
+  const keyOutside = async (key: string) => {
+    await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await p.keyboard.press(key);
+  };
+  // undo and redo, one step each
+  await addTags(p, hashes[0]!, "keep");
+  await expect.poll(() => tagsOf(hashes[0]!)).toEqual(["keep"]);
+  await keyOutside("Control+z");
+  await expect.poll(() => tagsOf(hashes[0]!)).toEqual([]);
+  await keyOutside("Control+Shift+z");
+  await expect.poll(() => tagsOf(hashes[0]!)).toEqual(["keep"]);
+  // dragged onto a tag of the sidebar: tagged; onto a folder: moved in
+  await card(p, hashes[1]!).dragTo(side(p, /#keep/));
+  await expect.poll(() => tagsOf(hashes[1]!)).toEqual(["keep"]);
+  await newFolder(p, "Box");
+  await card(p, hashes[2]!).dragTo(side(p, /^Box/));
+  await expect.poll(() => p.evaluate((x) => window.__canvastDebug.catalogEntries().then((es) => (es.find((e) => e.hash === x)?.folderIds ?? []).length), hashes[2]!)).toBe(1);
+  // Ctrl+A, then a plain click: that one alone
+  await keyOutside("Escape");
+  await keyOutside("Control+a");
+  await expect(p.getByText("3 selected")).toBeVisible();
+  await card(p, hashes[1]!).click();
+  await expect(card(p, hashes[1]!)).toHaveAttribute("aria-pressed", "true");
+  await expect(card(p, hashes[0]!)).toHaveAttribute("aria-pressed", "false");
+  // two picked, a search hides one: said, and it can be dropped
+  await card(p, hashes[0]!).click({ modifiers: ["Control"] });
+  await expect(p.getByText("2 selected")).toBeVisible();
+  const name0 = await p.evaluate((x) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === x)!.name), hashes[0]!);
+  await p.getByTestId("assets-search").fill(name0);
+  await expect(p.getByTestId("bulk-hidden")).toContainText("1 not shown");
+  await p.getByTestId("bulk-hidden").click();
+  await expect(card(p, hashes[0]!)).toHaveAttribute("aria-pressed", "true");
+  await expect(p.getByTestId("bulk-hidden")).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a plain click picks without opening or closing the details panel, so nothing moves under the pointer; toggling the panel keeps the picked item where it is", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const files = Array.from({ length: 40 }, (_, i) => ({ name: `g${i}.png`, mimeType: "image/png", buffer: makePng(8 + (i % 5) * 4, 8 + (i % 3) * 6, () => [6 * i, 100, 200, 255]) }));
+  await p.getByTestId("assets-import-input").setInputFiles(files);
+  await expect(cards(p)).toHaveCount(40);
+  const panelButton = p.locator('.assets-bar [data-action="details"]');
+  await panelButton.click(); // the panel closed
+  await expect(p.getByTestId("asset-inspector")).toBeHidden();
+  const c = cards(p).nth(17);
+  const before = await c.boundingBox();
+  await c.click();
+  await expect(c).toHaveAttribute("aria-pressed", "true");
+  expect(await c.boundingBox(), "the click did not open the panel: nothing moved").toEqual(before);
+  // the panel opened again: the grid is narrower, the picked item keeps its height on the screen
+  await panelButton.click();
+  await expect(p.getByTestId("asset-inspector")).toBeVisible();
+  await expect.poll(async () => Math.abs((await c.boundingBox())!.y - before!.y)).toBeLessThan(2);
+  // with nothing picked the panel stays (and says so), so the grid does not change width
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("inspector-empty")).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Delete everywhere: an item in use on two canvases goes from both and from the library; Undo on the open canvas brings its instance and the item back", async ({ app }) => {
+  const p = app.page;
+  const place = async () => {
+    await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: BLOCKS });
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
+  };
+  await place(); // Board 1 › Canvas 1
+  await p.getByTestId("workspace-nav").click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).click();
+  await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
+  await place(); // the same original again, on Canvas 2 (open)
+  await p.getByTestId("view-assets").click();
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-delete")).toBeDisabled();
+  await p.getByTestId("asset-delete-everywhere").click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("used 2 times");
+  await p.getByTestId("confirm-ok").click();
+  const active = () => p.evaluate((h) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === h)?.state), HASH);
+  await expect.poll(active).toBe("deleted");
+  const images = () => p.evaluate(async () => {
+    const tree = window.__canvastDebug.session().tree!;
+    const all = await Promise.all(tree.flatMap((b) => b.canvases.map((c) => window.__canvastDebug.canvasDump(c.id))));
+    return all.reduce((n, d) => n + d.objects.filter((o) => o.kind === "image").length, 0);
+  });
+  await expect.poll(images, { message: "off both canvases" }).toBe(0);
+  // on the open canvas, Undo brings its instance back, and with it the item
+  await p.getByTestId("view-canvas").click();
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
+  await expect.poll(active).toBe("active");
   expect(app.consoleErrors).toEqual([]);
 });

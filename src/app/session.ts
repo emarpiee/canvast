@@ -2,11 +2,13 @@ import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
+import { beginProgress } from "./progress";
+import type { MetaSnapshot } from "../assets/asset-catalog";
 import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
 import { assetOf, newObjectId } from "../doc/model";
 import type { GcReport } from "../assets/asset-catalog";
-import type { ObjectId } from "../doc/model";
+import type { ObjectId, TextObject } from "../doc/model";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
@@ -61,6 +63,8 @@ declare const __CANVAST_VERSION__: string;
 
 /** Fraction of the viewport that revealed instances fill. */
 const REVEAL_FILL = 0.6;
+/** Steps of the library's own undo kept. */
+const LIBRARY_UNDO = 50;
 
 export interface WorkspaceTree {
   workspace: WorkspaceRecord;
@@ -317,17 +321,45 @@ export class Session {
    * folders, or create, rename and delete folders. Writer only; other tabs
    * refresh. Returns false (with a message) when refused.
    */
-  async organize(op: (c: AssetCatalog) => Promise<unknown>): Promise<boolean> {
+  async organize(op: (c: AssetCatalog) => Promise<unknown>, label = "Library change"): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
+    let before: MetaSnapshot;
     try {
+      before = await this.catalog.snapshotMeta();
       await op(this.catalog);
     } catch (e) {
       this.tell(e instanceof CatalogInputError ? e.message[0]!.toUpperCase() + e.message.slice(1) + "." : `Could not save: ${(e as Error).message}`);
       return false;
     }
+    this.libUndo.push({ label, snap: before });
+    if (this.libUndo.length > LIBRARY_UNDO) this.libUndo.shift();
+    this.libRedo = [];
     this.post({ kind: "assets" });
     this.emitAssets();
     return true;
+  }
+
+  /** The library's own undo (tags, favourites, folders, names): a snapshot before each change, put back by Ctrl+Z in the Library. */
+  private libUndo: Array<{ label: string; snap: MetaSnapshot }> = [];
+  private libRedo: Array<{ label: string; snap: MetaSnapshot }> = [];
+
+  /** Undo (or redo) the last change to the library's organization; the label of what was undone, or null when there is nothing to. */
+  async undoLibrary(redo = false): Promise<string | null> {
+    if (!this.guardWrite() || !this.catalog) return null;
+    const from = redo ? this.libRedo : this.libUndo;
+    const step = from.pop();
+    if (!step) return null;
+    try {
+      const now = await this.catalog.snapshotMeta();
+      await this.catalog.restoreMeta(step.snap);
+      (redo ? this.libUndo : this.libRedo).push({ label: step.label, snap: now });
+    } catch (e) {
+      this.tell(`Could not ${redo ? "redo" : "undo"}: ${(e as Error).message}`);
+      return null;
+    }
+    this.post({ kind: "assets" });
+    this.emitAssets();
+    return step.label;
   }
 
   /** Every canvas where an asset is placed, with board and canvas names. */
@@ -480,14 +512,52 @@ export class Session {
     const tagsOf = new Map<string, readonly string[]>();
     if (withTags) for (const h of hashes) tagsOf.set(h, (await this.catalog?.entry(h).catch(() => undefined))?.tags ?? []);
     const recs = [];
-    for (const h of hashes) {
+    // (each original is read, from the library folder too: many of them take a while, so it says how far it is)
+    const progress = hashes.length > 1 ? beginProgress(this.editor, "place", `Placing ${hashes.length} items`) : null;
+    for (const [i, h] of hashes.entries()) {
+      progress?.update(i / hashes.length, `${i + 1} of ${hashes.length}`);
       const rec = await this.assets.record(h);
       if (rec) recs.push(rec);
     }
+    progress?.done();
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the originals are missing and were not placed.`);
     if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place item", tagsOf.get(recs[0]!.hash) ?? []);
     else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} items`, tagsOf);
     return recs.length;
+  }
+
+  /**
+   * Delete assets from the library even though canvases use them: their instances go first, everywhere (on the open canvas as one undo
+   * step; on the others for good), a text using one as its font keeps its words in the default font; then they are deleted as usual (the
+   * originals are erased once nothing, undo included, can need them). Returns how many were deleted.
+   */
+  async deleteAssetsEverywhere(hashes: readonly string[]): Promise<number> {
+    if (!this.guardWrite() || !this.catalog || !this.repo) return 0;
+    const set = new Set(hashes);
+    await this.persistence.flush();
+    const here = [...this.doc.all()].filter((o) => {
+      const a = (o as { assetId?: string }).assetId; // (a picture, a player, a card, or a text whose font it is)
+      return a !== undefined && set.has(a);
+    });
+    if (here.length) {
+      const texts = here.filter((o): o is TextObject => o.kind === "text").map((o) => {
+        const { assetId: _font, ...rest } = o;
+        return rest as TextObject;
+      });
+      const gone = here.filter((o) => o.kind !== "text").map((o) => o.id);
+      this.doc.commit(this.doc.transaction(`Delete ${plural(hashes.length, "item")} everywhere`, texts, gone));
+      this.editor.select([...this.editor.selection].filter((id) => !gone.includes(id)));
+      await this.persistence.flush();
+    }
+    try {
+      const other = await this.repo.removeAssetInstances(hashes, this.current?.canvasId ?? null);
+      for (const id of other.canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });
+      await this.refreshTree();
+    } catch (e) {
+      this.tell(`Could not take them off the other canvases: ${(e as Error).message}`);
+      return 0;
+    }
+    return this.deleteAssets(hashes);
   }
 
   /**

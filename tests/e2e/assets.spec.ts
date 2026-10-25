@@ -982,9 +982,10 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await cards.nth(1).click({ modifiers: ["Control"] });
   await cards.nth(4).click({ modifiers: ["Shift"] });
   await expect(picked()).toHaveCount(4);
-  // Once picking has started a plain click picks too; Esc clears the selection (the keyboard need not be in the library).
+  // With several picked, a plain mouse click picks that one alone (Ctrl adds and removes; a tap would add); Esc clears the selection (the
+  // keyboard need not be in the library).
   await cards.nth(0).click();
-  await expect(picked()).toHaveCount(5);
+  await expect(picked()).toHaveCount(1);
   await expect(viewer).toBeHidden();
   await p.keyboard.press("Escape");
   await expect(picked()).toHaveCount(0);

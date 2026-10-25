@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.43.0 — The library: picking, undo, drag to folders and tags (2026-10-25)
+
+- **Changed:** a click on an item no longer opens the closed details panel (which narrowed the grid and moved the item away from under the pointer); the panel is opened and closed with its button or `I`, and stays in place, saying so, with nothing picked. When the grid is laid out again (panel toggled, window or thumbnails resized), the picked item keeps its place on the screen. On a narrow window the details are a sheet that opens on a tap, as before.
+- **Undo in the library** (`Ctrl+Z`, `Ctrl+Shift+Z` or `Ctrl+Y`): tags, favourites, folders and names, 50 steps.
+- **Drag items onto the sidebar:** a folder, *Unfiled*, a tag or *Favourites*.
+- **Fixed:** after `Ctrl+A`, a plain click took that item out of the pick instead of picking it alone (a tap still adds or removes on a touch screen).
+- Picked items that a search or filter hides are counted in the panel, with *keep the shown*.
+- **Fixed:** after adding a tag the focus went back to the tag field even when you had moved on (so `Ctrl+A` then selected the field's text).
+- Placing many items on a canvas shows its progress.
+- **Delete everywhere…** for an item (or several) in use: its instances are removed from every canvas, then it is deleted from the library, after a confirmation that says how often and where; Undo on the open canvas brings them back.
+
 ## 0.42.0 — Tags and folders for many items at once (2026-10-25)
 
 - **Tags of several picked items:** every tag any of them has, with how many have it; **×** removes it from all of them (before, a tag could not be taken off several at once), **+** adds it to the rest. The tag field suggests the library's tags.

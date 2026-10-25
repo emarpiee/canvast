@@ -468,6 +468,48 @@ export class WorkspaceRepo {
    * each touched canvas gets a new revision, so a tab that has it open sees the change as a commit from elsewhere.
    * Returns the canvases touched and how many objects changed.
    */
+  /**
+   * Take library assets out of every canvas but `skip` (Delete everywhere): their pictures, players and cards are removed; a text that uses
+   * one as its font keeps its words in the default font. One transaction; returns the canvases touched and how many objects changed.
+   */
+  async removeAssetInstances(hashes: readonly string[], skip: string | null): Promise<{ canvases: string[]; objects: number }> {
+    const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    try {
+      const store = tx.objectStore("objects");
+      const touched = new Map<string, number>(); // canvas → objects removed
+      let n = 0;
+      for (const hash of hashes) {
+        for (const rec of await req(store.index("assetId").getAll(hash) as IDBRequest<ObjectRecord[]>)) {
+          if (rec.canvasId === skip) continue;
+          n++;
+          if ((rec.data as { kind?: string }).kind === "text") {
+            const { assetId: _font, ...rest } = rec.data as SerializedObject & { assetId?: string };
+            store.put({ ...rec, data: rest as SerializedObject } satisfies ObjectRecord);
+            touched.set(rec.canvasId, touched.get(rec.canvasId) ?? 0);
+          } else {
+            store.delete([rec.canvasId, rec.id]);
+            touched.set(rec.canvasId, (touched.get(rec.canvasId) ?? 0) + 1);
+          }
+        }
+      }
+      for (const [id, removed] of touched) {
+        const canvas = await req(tx.objectStore("canvases").get(id) as IDBRequest<CanvasRecord | undefined>);
+        if (canvas) tx.objectStore("canvases").put({ ...canvas, objectCount: Math.max(0, canvas.objectCount - removed), revision: canvas.revision + 1, updatedAt: Date.now() } satisfies CanvasRecord);
+      }
+      await committed;
+      return { canvases: [...touched.keys()], objects: n };
+    } catch (e) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      await committed.catch(() => undefined);
+      throw e;
+    }
+  }
+
   async changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }> {
     const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
     const committed = done(tx);

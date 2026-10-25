@@ -169,6 +169,12 @@ export interface ThumbRecord {
   h: number;
 }
 
+/** What organizing can change, for undo: each active asset's name, tags, favourite flag and folder, and the folders. */
+export interface MetaSnapshot {
+  readonly entries: ReadonlyMap<string, { name: string; tags: string[]; favorite: boolean; folderIds: string[] }>;
+  readonly folders: AssetFolder[];
+}
+
 /** A change to an asset's tags, favourite flag or folder. */
 export interface MetaChange {
   favorite?: boolean;
@@ -470,6 +476,32 @@ export class AssetCatalog {
    * it. The original is not erased here; `collect` does that once nothing
    * (including undo history) can bring an instance back.
    */
+  async snapshotMeta(): Promise<MetaSnapshot> {
+    const tx = this.db.transaction(["assetCatalog", "meta"], "readonly");
+    const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+    const folders = await this.readFolders(tx);
+    return { entries: new Map(all.filter((e) => e.state === "active").map((e) => [e.hash, { name: e.name, ...meta(e) }])), folders };
+  }
+
+  /** Put back what a snapshot holds (only the assets that differ, and the folders), in one transaction; returns how many assets changed. */
+  async restoreMeta(s: MetaSnapshot): Promise<number> {
+    return this.write(["assetCatalog", "meta"], async (tx) => {
+      const store = tx.objectStore("assetCatalog");
+      const all = await req(store.getAll() as IDBRequest<CatalogEntry[]>);
+      let n = 0;
+      for (const e of all) {
+        const was = s.entries.get(e.hash);
+        if (!was || e.state !== "active") continue;
+        const now = { name: e.name, ...meta(e) };
+        if (JSON.stringify(now) === JSON.stringify(was)) continue;
+        store.put({ ...e, ...was });
+        n++;
+      }
+      tx.objectStore("meta").put(s.folders, FOLDERS_KEY);
+      return n;
+    });
+  }
+
   /** Delete many from the library in one transaction (one flush to disk, not one each): those in use are kept and counted. */
   async markDeletedEach(hashes: readonly string[]): Promise<{ gone: string[]; inUse: number }> {
     return this.write(["assetCatalog", "objects"], async (tx) => {

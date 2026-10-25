@@ -1129,6 +1129,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* several picked: a tag only some have (dashed, with how many), a folder only some are in (how many) */
 .tag-chip.is-partial { background: transparent; border: 1px dashed var(--hud-border); }
 .tag-count, .folder-count { font-size: var(--text-xs); color: var(--hud-muted); }
+.side-item.is-drop-target { outline: 2px dashed var(--hud-accent); outline-offset: -2px; background: var(--hud-hover); }
 .folder-count { margin-left: auto; }
 .asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 

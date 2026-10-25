@@ -333,7 +333,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let selected: string | null = null;
   const picked = new Set<string>();
   let anchor: string | null = null;
-  /** Picking several: once a checkbox, Ctrl or Shift started it, a plain click adds or removes; until then a click opens the viewer. */
+  /** Picking several: once a checkbox, Ctrl, Shift or Ctrl+A started it, a tap adds or removes (a plain mouse click picks one alone). */
   let selecting = false;
   let places: AssetPlace[] = [];
   let generation = 0;
@@ -982,7 +982,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideSet = only && only.size > 1 ? new Set(only) : null;
     void showSlide(hash).then(() => setShowing(true));
   };
-  /** The details panel was opened by a plain click on a card (so a double-click can undo it). */
+  /** The details panel was opened by a plain click on a card (so a double-click can undo it); only on a narrow window, where it is a sheet. */
   let autoShown = false;
   const toggleDetails = (): void => {
     autoShown = false;
@@ -1153,7 +1153,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const ar = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));
       const name = e.name || "Untitled";
       return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
-        <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}"
+        <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
         <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"${thumbUrls.has(e.hash) ? ` src="${thumbUrls.get(e.hash)}"` : ""}><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
@@ -1403,7 +1403,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     inspector.dataset["hash"] = "";
     inspector.innerHTML = `
       <div class="asset-insp-head">
-        <h2>${n} selected</h2>
+        <h2>${n} selected</h2>${(() => {
+          // picked items a search or filter now hides still count (and what is done here is done to them): say so, and offer to drop them
+          const shown = new Set(filtered().map((x) => x.hash));
+          const hidden = hashes.filter((h) => !shown.has(h)).length;
+          return hidden ? `<button type="button" class="assets-btn" data-action="drop-hidden" data-testid="bulk-hidden" title="${hidden} of the picked items are not shown by the search or filter, and what is done here is done to them too. Keep only the ${n - hidden} shown.">${hidden} not shown · keep the shown</button>` : "";
+        })()}
         <button type="button" class="assets-btn is-icon" data-action="clear" aria-label="Clear the selection" title="Clear the selection (Esc)">${ICONS.x}</button>
       </div>
       <div class="asset-quick">
@@ -1418,7 +1423,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${plural(placeable, "file")} as ZIP</span></button>
         <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
         <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
-        ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first.</p>` : ""}
+        ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first, or delete them everywhere.</p>
+          <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="bulk-delete-everywhere"${dis}>${ICONS.trash2}<span>Delete ${n} everywhere…</span></button>` : ""}
       </div>`;
   };
 
@@ -1431,7 +1437,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const e = listing?.entries.find((x) => x.hash === selected);
     const m = listing?.missing.find((x) => x.hash === selected);
     if (!e && !m) {
-      inspector.hidden = true;
+      // the panel keeps its place with nothing picked (so the grid does not change width when a pick ends)
+      inspector.hidden = narrow.matches;
+      inspector.dataset["hash"] = "";
+      inspector.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Pick an item to see its details. Several picked: their tags and folder together.</p>`;
       return;
     }
     inspector.hidden = false;
@@ -1479,7 +1488,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in a new tab</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
-               ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted. Remove ${instances === 1 ? "its" : "its"} ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first.</p>` : ""}` : ""}
+               ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted on its own. Remove its ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first, or delete it everywhere.</p>
+               <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="asset-delete-everywhere"${ro}>${ICONS.trash2}<span>Delete everywhere…</span></button>` : ""}` : ""}
       </div>
       ${e?.present && !isCard(e) ? `<details class="asset-more" data-testid="asset-metadata" data-metadata hidden><summary>What the file says</summary><div data-metadata-body></div></details>` : ""}
       <details class="asset-more"><summary>Technical details</summary>
@@ -1590,8 +1600,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /** Pick: one (a plain click), add or remove one (Ctrl, Cmd or the checkbox), or a range from the last pick (Shift). */
   const select = async (hash: string | null, how: "one" | "toggle" | "range" | "add-range" = "one"): Promise<void> => {
-    // Picking anything always shows its properties, whatever the panel button was last set to (the button is for looking at nothing).
-    if (hash !== null && !ui.details && viewer.hidden) {
+    // Picking never opens the details panel on a wide window (that would narrow the grid and move the picture away from under the pointer):
+    // the panel is opened and closed with its button or I, and once open it shows what is picked. On a narrow one it is a sheet below.
+    if (hash !== null && !ui.details && viewer.hidden && narrow.matches) {
       ui.details = true;
       autoShown = true;
       saveUi();
@@ -1650,7 +1661,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!card) return;
     const hash = card.dataset["hash"]!;
     if (e.shiftKey) void select(hash, e.ctrlKey || e.metaKey ? "add-range" : "range");
-    else if (e.ctrlKey || e.metaKey || selecting) void select(hash, "toggle");
+    // (picking several: a tap adds or removes, as on a phone; a plain click with a mouse picks that one alone, Ctrl or the checkbox add or remove)
+    else if (e.ctrlKey || e.metaKey || (selecting && (e as PointerEvent).pointerType === "touch")) void select(hash, "toggle");
     else {
       // A click picks it and shows its details; the viewer opens from a double-click or from the picture in the details.
       if (ui.details && e.detail <= 1) autoShown = false;
@@ -1759,7 +1771,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       case "favorite-all": {
         const on = b.getAttribute("aria-pressed") !== "true";
-        void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { favorite: on } }))));
+        void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { favorite: on } }))), on ? "Favourites" : "Not favourites");
         break;
       }
       case "export-files-all":
@@ -1823,7 +1835,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // one asset, or every picked one (the panel is about all of them), in one write
         const tag = b.dataset["tag"]!;
         const change = action === "untag" ? { removeTags: [tag] } : { addTags: [tag] };
-        void session.organize((c) => c.updateMetaEach(pickedGroup().map((h) => ({ hash: h, change }))));
+        void session.organize((c) => c.updateMetaEach(pickedGroup().map((h) => ({ hash: h, change }))), `${action === "untag" ? "Removed" : "Added"} #${tag}`);
+        break;
+      }
+      case "drop-hidden": {
+        const shown = new Set(filtered().map((x) => x.hash));
+        for (const h of [...picked]) if (!shown.has(h)) picked.delete(h);
+        if (selected && !picked.has(selected)) selected = [...picked].pop() ?? null;
+        markPicked();
+        renderInspector();
         break;
       }
       case "new-folder-into": {
@@ -1853,6 +1873,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "export":
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
+      case "delete-everywhere": {
+        // in use: their instances go too, everywhere, after a confirmation that says what and where
+        const hashes = pickedGroup();
+        const ents = hashes.map((h) => listing?.entries.find((x) => x.hash === h)).filter((x): x is CatalogListing["entries"][number] => !!x);
+        const uses = ents.reduce((t, x) => t + x.instances, 0);
+        const canvases = new Set(hashes.length === 1 ? places.map((pl) => pl.canvasId) : []).size || ents.reduce((t, x) => Math.max(t, x.canvases), 0);
+        const where = hashes.length === 1 && places.length ? places.map((pl) => `${pl.boardName} › ${pl.canvasName}`).join(", ") : null;
+        const name = hashes.length === 1 ? `“${ents[0]?.name || "Untitled"}”` : `${hashes.length} items`;
+        void confirmDialog({
+          title: `Delete ${name} everywhere?`,
+          lines: [
+            `${hashes.length === 1 ? "It is" : "They are"} used ${plural(uses, "time")}${where ? ` on ${where}` : canvases ? ` on ${plural(canvases, "canvas", "canvases")} or more` : ""}. Those instances are removed too; a text that uses one as its font keeps its words in the default font.`,
+            "On the open canvas Undo brings them back; on the other canvases they cannot be brought back. The originals are erased from this browser's storage once nothing can use them any more.",
+          ],
+          confirmLabel: "Delete everywhere",
+        }).then(async (ok) => {
+          if (ok) await session.deleteAssetsEverywhere(hashes);
+          await refresh();
+          search.focus();
+        });
+        break;
+      }
       case "delete": {
         const e = listing?.entries.find((x) => x.hash === hash);
         void confirmDialog({
@@ -1868,6 +1910,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
     }
   });
+  /** Counts presses and clicks anywhere: a field that would take the focus back after a write first checks that none came in between. */
+  let inputs = 0;
+  for (const type of ["pointerdown", "keydown"] as const) window.addEventListener(type, () => void inputs++, { capture: true });
   inspector.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
     if (!input.classList.contains("tag-input") || e.key !== "Enter" || !selected) return;
@@ -1880,11 +1925,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.message = note;
       session.editor.changed();
     }
+    const seq = ++inputs;
     // One asset, or every picked one.
     const group = input.classList.contains("bulk-tag-input") ? [...picked] : [selected];
     void session
-      .organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { addTags: add } }))))
-      .then(() => inspector.querySelector<HTMLInputElement>(".tag-input")?.focus());
+      .organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: { addTags: add } }))), `Added ${add.map((t) => `#${t.trim()}`).join(", ")}`)
+      .then(() => {
+        // back to the field for the next tag, unless something else was clicked or pressed meanwhile (the focus is not taken from it)
+        if (inputs === seq) inspector.querySelector<HTMLInputElement>(".tag-input")?.focus();
+      });
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
@@ -1892,13 +1941,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const into = (id: string) => (id ? { addFolders: [id] } : { clearFolder: true });
     if (bulk !== undefined) {
       const group = [...picked];
-      void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: into(bulk) }))));
+      void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: into(bulk) }))), "Moved to a folder");
       return;
     }
     const id = box.dataset["folder"];
     if (id === undefined || !selected) return;
     const hash = selected;
-    void session.organize((c) => c.updateMeta(hash, into(id)));
+    void session.organize((c) => c.updateMeta(hash, into(id)), "Moved to a folder");
   });
 
   // A thumbnail with see-through pixels gets a chequered ground (cards, filmstrip and the details picture) so it reads as transparent.
@@ -2080,6 +2129,57 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   // ---- sidebar: scope, folders
+  // ---- dragging items onto the sidebar: a folder moves them into it, Unfiled out of theirs, a tag adds it, Favourites marks them
+  const DRAG_TYPE = "application/x-canvast-assets";
+  grid.addEventListener("dragstart", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
+    if (!card || !e.dataTransfer) return;
+    const hash = card.dataset["hash"]!;
+    const hashes = picked.has(hash) ? [...picked] : [hash]; // (a picked one carries the whole pick)
+    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
+    e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (listing?.entries.find((x) => x.hash === hash)?.name ?? ""));
+    e.dataTransfer.effectAllowed = "copyMove";
+  });
+  const dropTarget = (e: DragEvent): HTMLElement | null => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-scope]");
+    const k = t?.dataset["scope"] ?? "";
+    return t && e.dataTransfer?.types.includes(DRAG_TYPE) && !session.readOnly && (k.startsWith("folder:") || k.startsWith("tag:") || k === "unfiled" || k === "favorites") ? t : null;
+  };
+  let over: HTMLElement | null = null;
+  const lightDrop = (t: HTMLElement | null): void => {
+    if (over === t) return;
+    over?.classList.remove("is-drop-target");
+    over = t;
+    over?.classList.add("is-drop-target");
+  };
+  side.addEventListener("dragover", (e) => {
+    const t = dropTarget(e);
+    lightDrop(t);
+    if (!t) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = t.dataset["scope"]!.startsWith("folder:") || t.dataset["scope"] === "unfiled" ? "move" : "copy";
+  });
+  side.addEventListener("dragleave", (e) => {
+    if (!side.contains(e.relatedTarget as Node | null)) lightDrop(null);
+  });
+  side.addEventListener("drop", (e) => {
+    const t = dropTarget(e);
+    lightDrop(null);
+    if (!t) return;
+    e.preventDefault();
+    const hashes = (JSON.parse(e.dataTransfer!.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => listing?.entries.some((x) => x.hash === h));
+    if (!hashes.length) return;
+    const k = t.dataset["scope"]!;
+    const label = t.querySelector(".side-label")?.textContent?.replace(/^#/, "") ?? "";
+    const change = k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] };
+    const what = k.startsWith("folder:") ? `Moved to ${label}` : k === "unfiled" ? "Taken out of their folders" : k === "favorites" ? "Added to the favourites" : `Tagged #${label}`;
+    void session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`).then((ok) => {
+      if (!ok) return;
+      session.editor.message = `${what}: ${plural(hashes.length, "item")}.`;
+      session.editor.changed();
+    });
+  });
+
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
@@ -2292,6 +2392,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
       selectAll();
       e.preventDefault();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y")) {
+      // the library's own undo: tags, favourites, folders and names (Ctrl+Shift+Z or Ctrl+Y: redo)
+      e.preventDefault();
+      const redo = e.key === "y" || e.key === "Y" || e.shiftKey;
+      void session.undoLibrary(redo).then((label) => {
+        session.editor.message = label ? `${redo ? "Redone" : "Undone"}: ${label}.` : `Nothing to ${redo ? "redo" : "undo"} in the library.`;
+        session.editor.changed();
+      });
     } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
       if (target?.closest?.("select, .assets-bar, .assets-side")) return; // arrows belong to a menu, the bar and the sidebar
       if (moveBy(e)) e.preventDefault();
@@ -2525,6 +2633,34 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
   }
   sizeInput.addEventListener("input", () => grid.style.setProperty("--thumb", `${sizeInput.value}px`));
+  // The picture you are looking at stays where it is on the screen when the grid is laid out again (the details panel opened or closed, the
+  // window or the thumbnails resized, items added above): the picked one if it is in view, else the one a third of the way down.
+  const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
+  let keepAt: { hash: string; top: number } | null = null;
+  const anchorCard = (): HTMLElement | null => {
+    const r = scroller.getBoundingClientRect();
+    const pickedCard = selected ? grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(selected)}"]`) : null;
+    const pr = pickedCard?.getBoundingClientRect();
+    if (pickedCard && pr && pr.bottom > r.top && pr.top < r.bottom) return pickedCard;
+    return (document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 3) as HTMLElement | null)?.closest<HTMLElement>(".asset-card") ?? null;
+  };
+  const remember = (): void => {
+    const c = anchorCard();
+    keepAt = c ? { hash: c.dataset["hash"]!, top: c.getBoundingClientRect().top - scroller.getBoundingClientRect().top } : null;
+  };
+  scroller.addEventListener("scroll", remember, { passive: true });
+  grid.addEventListener("click", () => requestAnimationFrame(remember));
+  if (typeof ResizeObserver !== "undefined") {
+    const keep = new ResizeObserver(() => {
+      if (!keepAt || !visible) return;
+      const c = grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(keepAt.hash)}"]`);
+      if (!c) return;
+      const moved = c.getBoundingClientRect().top - scroller.getBoundingClientRect().top - keepAt.top;
+      if (Math.abs(moved) >= 1) scroller.scrollTop += moved;
+    });
+    keep.observe(grid);
+    keep.observe(scroller);
+  }
   importBtn.addEventListener("click", () => fileInput.click());
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
   root.querySelector<HTMLElement>('[data-action="import-folder"]')!.addEventListener("click", () => folderInput.click());
