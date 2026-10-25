@@ -1100,12 +1100,18 @@ test("a varied fill deep in shows the copy that is there, not the plain layout's
   await app.frame();
   // a point well inside a red copy and one well inside a yellow one (the middle of a run of the same colour)
   const kind = (c: number[]) => (c[0]! > 200 && c[1]! < 80 ? "red" : c[0]! > 200 && c[1]! > 180 && c[2]! < 100 ? "yellow" : "");
+  // the scan runs in the page in one call (thousands of pixelAt round trips took minutes under load)
   const find = async (want: string) => {
-    for (let y = 230; y < 560; y += 6) for (let x = 450; x < 780; x += 6) {
-      const ring = await Promise.all([[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]].map(([dx, dy]) => px(app, x + dx!, y + dy!)));
-      if (ring.every((c) => kind(c) === want)) return [x, y] as const;
-    }
-    throw new Error(`no ${want} copy found`);
+    const at = await p.evaluate((w) => {
+      const kind = (c: number[]) => (c[0]! > 200 && c[1]! < 80 ? "red" : c[0]! > 200 && c[1]! > 180 && c[2]! < 100 ? "yellow" : "");
+      for (let y = 230; y < 560; y += 6) for (let x = 450; x < 780; x += 6) {
+        const ring = [[0, 0], [-5, 0], [5, 0], [0, -5], [0, 5]].map(([dx, dy]) => window.__canvastDebug.pixelAt(x + dx!, y + dy!));
+        if (ring.every((c) => kind(c) === w)) return [x, y] as const;
+      }
+      return null;
+    }, want);
+    if (!at) throw new Error(`no ${want} copy found`);
+    return at;
   };
   for (const want of ["red", "yellow"]) {
     const [x, y] = await find(want);

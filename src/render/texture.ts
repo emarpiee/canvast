@@ -167,6 +167,8 @@ const samples = new Map<string, ImageData | null>();
 /** The last pattern made for each shape: shown instead of the flat average while the next one is not ready (a picture still being decoded at a new size), so a fill never blinks. */
 const lastPattern = new Map<string, CanvasPattern>();
 const KEEP_PATTERNS = 64;
+/** The last canvas of copies drawn one by one, reused by the other tiles of the same frame. */
+let oneByOneLast: { key: string; canvas: HTMLCanvasElement } | null = null;
 
 /** The pixels of a source at a small size, kept (a picture by its hash; objects by their ids and the document's revision, which `version` tells). */
 function pixelsOf(key: string, source: CanvasImageSource, w: number, h: number): ImageData | null {
@@ -439,7 +441,7 @@ function drawCopies(g: CanvasRenderingContext2D, base: Affine, l: Layout, v: Tex
         if (!pc) return;
         const [w, h] = pc.aspect >= l.tw / l.th ? [l.tw, l.tw / pc.aspect] : [l.th * pc.aspect, l.th];
         const m = grow(turn(move(base, i * l.cw + tx + l.tw / 2 + c.dx * l.cw, j * l.ch + ty + l.th / 2 + c.dy * l.ch), c.rot), c.k * (c.flip ? -1 : 1), c.k);
-        g.setTransform(...m);
+        // (the transform is set only for a copy that is drawn: most copies here are culled)
         // shown larger than its picture (in a view drawn copy by copy): the part of it in the canvas, drawn again from the objects at that size
         const scale = Math.hypot(m[0], m[1]);
         const px = scale * w, src = pc.img as { width?: number };
@@ -460,6 +462,7 @@ function drawCopies(g: CanvasRenderingContext2D, base: Affine, l: Layout, v: Tex
             return;
           }
         }
+        g.setTransform(...m);
         g.drawImage(pc.img, -w / 2, -h / 2, w, h);
       });
     }
@@ -530,14 +533,21 @@ function variedPaint(ctx: CanvasRenderingContext2D, o: PathObject, t: TexturePai
     pat = ctx.createPattern(block, "repeat");
     pat?.setTransform(asDom(grow(toUser, (period * lay.cw) / block.width, (period * lay.ch) / block.height)));
   } else {
-    // shown large: the copies in view, one by one, at the size they are shown
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.ceil(vp.width * dpr));
-    c.height = Math.max(1, Math.ceil(vp.height * dpr));
-    const g = c.getContext("2d");
-    if (!g) return flat(t);
-    g.imageSmoothingQuality = "high";
-    if (drawCopies(g, mul([dpr, 0, 0, dpr, 0, 0], toUser), lay, v, got.pieces, i0, i1, j0, j1, true).pending) notReady = true;
+    // shown large: the copies in view, one by one, at the size they are shown. Every tile of a frame asks for the same view (each one drew
+    // all of it again, ~100 ms a time at DPR 2), so the last one is kept while the shape, the view and the pieces stay the same
+    const key = `${o.id}|${got.version}|${JSON.stringify(v)}|${JSON.stringify(lay)}|${toUser.join(",")}|${vp.width}x${vp.height}|${dpr}|${i0},${i1},${j0},${j1}`;
+    let c = oneByOneLast?.key === key ? oneByOneLast.canvas : null;
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = Math.max(1, Math.ceil(vp.width * dpr));
+      c.height = Math.max(1, Math.ceil(vp.height * dpr));
+      const g = c.getContext("2d");
+      if (!g) return flat(t);
+      g.imageSmoothingQuality = "high";
+      const pending = drawCopies(g, mul([dpr, 0, 0, dpr, 0, 0], toUser), lay, v, got.pieces, i0, i1, j0, j1, true).pending;
+      if (pending) notReady = true;
+      oneByOneLast = pending || got.pending ? null : { key, canvas: c };
+    }
     pat = ctx.createPattern(c, "no-repeat");
     pat?.setTransform(new DOMMatrix().scaleSelf(1 / dpr));
   }

@@ -94,7 +94,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await panel.getByRole("radio", { name: "Outline" }).click();
   await p.mouse.click(...(await centre(app, a.id)));
   await card("Gradient 1").click();
-  await expect.poll(async () => ((await objs(app)).find((o) => o.id === a.id)!.stroke as Grad).type).toBe("linear");
+  await expect.poll(async () => ((await objs(app)).find((o) => o.id === a.id)!.stroke as Grad | null)?.type).toBe("linear");
   await panel.getByRole("radio", { name: "Fill", exact: true }).click();
   // two picked: the person is asked which part
   await p.mouse.click(...(await centre(app, a.id)));
@@ -104,7 +104,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await card("Gradient 1").click();
   await p.getByTestId("choose-dialog").locator('input[value="stroke"]').check();
   await p.getByTestId("choose-ok").click();
-  for (const id of [a.id, b.id]) await expect.poll(async () => ((await objs(app)).find((o) => o.id === id)!.stroke as Grad).type).toBe("linear");
+  for (const id of [a.id, b.id]) await expect.poll(async () => ((await objs(app)).find((o) => o.id === id)!.stroke as Grad | null)?.type).toBe("linear");
 
   // a text takes a saved gradient too, on its letters
   await p.keyboard.press("t");

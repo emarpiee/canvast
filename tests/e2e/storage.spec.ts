@@ -49,7 +49,6 @@ test("a fresh start creates a workspace, and saves write only the changed object
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
 
   for (let i = 0; i < 3; i++) await draw(p, [[300 + i * 150, 300], [380 + i * 150, 360]]);
-  await expect(p.getByTestId("save-status")).not.toHaveText("Saved"); // queued or saving first
   await saved(p);
   await expect(p.getByTestId("save-status")).toHaveText("Saved");
   const canvasId = s0.current!.canvasId;

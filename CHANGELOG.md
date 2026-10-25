@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.43.1 — Varied fills deep in, without the stall (2026-10-26)
+
+- **Fixed:** zooming into a shape with a varied fill, where its copies are drawn one by one, took seconds a step on a high-density screen (about 6 s at twice the pixels): every tile of the view drew all the copies in view again. They are now drawn once a frame and shared by the tiles (about 0.4 s a step in the same test).
+
 ## 0.43.0 — The library: picking, undo, drag to folders and tags (2026-10-25)
 
 - **Changed:** a click on an item no longer opens the closed details panel (which narrowed the grid and moved the item away from under the pointer); the panel is opened and closed with its button or `I`, and stays in place, saying so, with nothing picked. When the grid is laid out again (panel toggled, window or thumbnails resized), the picked item keeps its place on the screen. On a narrow window the details are a sheet that opens on a tap, as before.
