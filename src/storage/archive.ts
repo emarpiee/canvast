@@ -57,6 +57,8 @@ export type ExportScope = (
 ) & {
   /** Leave out the originals hidden in the library, and their names and tags (what the person chose when asked, or always for the library index). */
   skipHidden?: boolean;
+  /** A workspace backup that also carries the password of the Hidden items (set by the app from Settings > Privacy). */
+  withPrivacy?: boolean;
 };
 
 /** The hashes of the hidden library items. */
@@ -146,6 +148,8 @@ export interface Manifest {
   libraryFile?: true;
   /** The device settings that differ from the defaults (a workspace archive): theme, shortcuts, panel layout. Restored only where the importing device has not set them. */
   settings?: Record<string, unknown>;
+  /** The kept form of the Hidden items' password (only when the person chose to include their privacy settings). Used on import only where the device has none. */
+  hiddenLock?: string;
   /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
   /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
@@ -247,6 +251,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) if (e.state === "active") hashes.add(e.hash);
   }
   if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
+  const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];
@@ -301,6 +306,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
     ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
+    ...(typeof hiddenLock === "string" ? { hiddenLock } : {}),
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -362,6 +368,8 @@ export interface ImportPlan {
   libraryFile: boolean;
   /** The device settings the archive carries (empty when none). */
   settings: Record<string, unknown>;
+  /** The password of the Hidden items the archive carries, or null. */
+  hiddenLock: string | null;
   /** Everything skipped, with reasons. Nothing is silently repaired. */
   problems: string[];
   objects: number;
@@ -473,6 +481,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     unresolved: [],
     libraryFile: m["libraryFile"] === true,
     settings: isObj(m["settings"]) ? (m["settings"] as Record<string, unknown>) : {},
+    hiddenLock: typeof m["hiddenLock"] === "string" && /^pbkdf2\$\d{1,8}\$[A-Za-z0-9+/=]{1,64}\$[A-Za-z0-9+/=]{1,128}$/.test(m["hiddenLock"]) ? m["hiddenLock"] : null,
     problems,
     objects: 0,
     styles: [],
@@ -729,6 +738,8 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }
     if (folders) tx.objectStore("meta").put(folders, "assetFolders");
+    // The password of the archive is taken only where this device has none: an import never replaces a password.
+    if (plan.hiddenLock && !(await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.hiddenLock, "hiddenLock");
     if (plan.styles.length) {
       // the saved styles: the ones the library does not have yet are added (by id), none is replaced
       const have = cleanStyles(await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>));

@@ -53,10 +53,14 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
   return gb !== undefined && gb <= 2 ? "128" : gb !== undefined && gb <= 4 ? "256" : "384";
 }
 
+/** The privacy settings that stay out of a backup unless `library.privacyInBackup` is on (the option itself never travels). */
+export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember"];
+
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "library.hiddenWord": { scope: "device", default: "hidden:", validate: text(40), effect: "immediate" } as Def<string>,
   "library.hiddenRemember": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.privacyInBackup": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,

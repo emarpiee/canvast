@@ -136,6 +136,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
     `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
     ...(folder ? ["Its originals are the files in the library folder."] : []),
+    ...(plan.hiddenLock ? ["It also carries the password of the Hidden items: it is used only if this device has none."] : []),
     ...((n) => (n ? [`It also carries your settings (theme, shortcuts, panel layout): ${n} you have not changed on this device ${n === 1 ? "is" : "are"} restored; the others stay as they are here.`] : []))(session.settingsHook?.restorable(plan.settings) ?? 0),
   ];
   if (plan.unresolved.length) lines.push(`${plural(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`);

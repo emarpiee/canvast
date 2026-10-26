@@ -698,7 +698,7 @@ export class Session {
   }
 
   /** The device settings, which travel in a workspace backup and come back on import (set by the app). */
-  settingsHook: { snapshot(): Record<string, unknown>; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
+  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacyInBackup(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
   /** Keeps the library index in the library folder up to date (storage/auto-index.ts); set by the app. */
   autoIndex: { poke(): void; flush(): Promise<void> } | null = null;
 
@@ -707,7 +707,8 @@ export class Session {
     await this.persistence.flush();
     await this.persistence.saveCamera();
     const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
-    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot(), progress);
+    const withPrivacy = scope.kind === "workspace" && !scope.noBytes && (this.settingsHook?.privacyInBackup() ?? false); // (the library index on disk never carries them)
+    const r = await buildArchive(this.repo.db, this.current.workspaceId, withPrivacy ? { ...scope, withPrivacy } : scope, version, this.settingsHook?.snapshot(withPrivacy), progress);
     const label =
       scope.kind === "workspace" ? r.manifest.workspaceName
       : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")

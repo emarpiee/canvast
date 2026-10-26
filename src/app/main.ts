@@ -131,7 +131,7 @@ import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels, itemName } from "../render/item-label";
 import { drawReveal, drawRevealOutlines, revealWords } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
-import { SettingsStore } from "../settings/settings";
+import { PRIVACY_KEYS, SettingsStore } from "../settings/settings";
 import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
 
@@ -1665,7 +1665,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   session.subscribeAssets(() => session.autoIndex?.poke()); // (commits, imports, catalog changes)
   settings.subscribe(() => session.autoIndex?.poke());
   externalFolder.subscribe(() => session.autoIndex?.poke()); // (a folder was chosen or came back)
-  session.settingsHook = { snapshot: () => settings.snapshot(), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
+  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => k !== "library.privacyInBackup" && (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacyInBackup: () => settings.get("library.privacyInBackup"), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
