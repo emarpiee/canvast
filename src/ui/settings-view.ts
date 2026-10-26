@@ -229,7 +229,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "privacy",
     label: "Privacy",
     rows: [
-      { key: "library.hiddenWord", label: "Word that opens the Hidden items", help: "Type this in the library's search box to open the items you hid (it asks for the password first, if you set one). The list is not shown anywhere else. Leave it empty to turn this off. Pick something that is not a word you would search for.", control: { kind: "text", max: 40, placeholder: "hidden:" } },
+      { key: "library.hiddenWord", label: "Word that opens the Hidden items", help: "Type this in the library's search box to open the items you hid (it asks for the password first, if you set one). The list is not shown anywhere else. Leave it empty to turn this off. Pick something that is not a word you would search for.", control: { kind: "text", max: 40, placeholder: "tago" } },
     ],
   },
   { id: "collaboration", label: "Collaboration" },
