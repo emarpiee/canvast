@@ -2241,7 +2241,7 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   await p.keyboard.down("Control");
   await p.mouse.move(c2.x, c2.y);
   await app.frame();
-  await p.mouse.move(c2.x + 34, c2.y + 31, { steps: 4 });
+  await p.mouse.move(c2.x + 34, c2.y + 31, { steps: 12 }); // (a straight run at the list: it does not move away)
   await app.frame();
   await p.mouse.click(c2.x + 34, c2.y + 31);
   await p.keyboard.up("Control");

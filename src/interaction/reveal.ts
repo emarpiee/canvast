@@ -112,8 +112,11 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     /** The pointer moved (null: it left the canvas); `ctrlHeld` is the pointer event's. */
     move(p: { x: number; y: number } | null, ctrlHeld: boolean): void {
       // On the list itself the reveal stays where it is (the list does not run away from the pointer) and the row under the pointer is the hot one.
-      const row = p && ctrlHeld ? revealRowAt(editor, p.x, p.y) : undefined;
-      if (row !== undefined) {
+      // The way to the list counts as the list (the area from the revealed point to the list's far corner), so the list is reached by going straight at it.
+      const L = editor.revealList;
+      const toward = !!(p && ctrlHeld && L && editor.revealAt && p.x >= editor.revealAt.x && p.y >= editor.revealAt.y && p.x <= L.x + L.w && p.y <= L.y + L.h);
+      if (toward) {
+        const row = revealRowAt(editor, p!.x, p!.y) ?? null;
         if (editor.revealHot !== row) { editor.revealHot = row; editor.redraw(); }
         return;
       }
