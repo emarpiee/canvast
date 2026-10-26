@@ -3445,7 +3445,7 @@ test("CSS text pasted with a shape picked becomes its fill: a gradient (linear, 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+C puts the shape on the system clipboard as SVG text and a PNG picture, and Ctrl+V here still pastes the shape itself (not an SVG import)", async ({ app }) => {
+test("Ctrl+C puts the shape on the system clipboard as a PNG picture alone, \"Copy the selection as SVG\" puts its SVG text, and Ctrl+V here still pastes the shape itself (not an SVG import)", async ({ app }) => {
   test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "the clipboard picture is read back in Chromium");
   const p = app.page;
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -3454,18 +3454,18 @@ test("Ctrl+C puts the shape on the system clipboard as SVG text and a PNG pictur
   await drag(app, [500, 300], [700, 400]);
   await key(app, "v");
   await p.keyboard.press("Control+c");
-  await expect.poll(() => p.evaluate(async () => (await navigator.clipboard.read())[0]?.types.join(",") ?? ""), "text and picture are both there").toMatch(/image\/png/);
-  const got = await p.evaluate(async () => {
-    const item = (await navigator.clipboard.read())[0]!;
-    return { text: await (await item.getType("text/plain")).text(), png: (await item.getType("image/png")).size, types: item.types };
-  });
-  expect(got.text).toMatch(/^<svg[\s>]/);
-  expect(got.png).toBeGreaterThan(100);
+  await expect.poll(() => p.evaluate(async () => (await navigator.clipboard.read())[0]?.types.join(",") ?? ""), "the picture is there, alone (text beside it would be pasted instead)").toBe("image/png");
+  const png = await p.evaluate(async () => (await (await navigator.clipboard.read())[0]!.getType("image/png")).size);
+  expect(png).toBeGreaterThan(100);
   await p.keyboard.press("Control+v");
   await app.frame();
   const all = await objs(app);
   expect(all).toHaveLength(2);
   expect(all.every((o) => o.shape === "ellipse"), "the shape itself, not a vector copy").toBe(true);
+  // The SVG text is its own row of the right-click menu
+  await p.mouse.click(600, 350, { button: "right" });
+  await p.getByRole("menu", { name: "Canvas actions" }).getByRole("menuitem", { name: "Copy the selection as SVG" }).click();
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toMatch(/^<svg[\s>]/);
   expect(app.consoleErrors).toEqual([]);
 });
 

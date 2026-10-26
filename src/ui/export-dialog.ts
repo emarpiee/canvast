@@ -5,6 +5,7 @@
  * made at exactly that size. PNG, WebP and JPEG; SVG too when everything is vector.
  */
 import { forgetCopiedPicture } from "../app/actions";
+import { writeSystemClipboard } from "../app/system-clipboard";
 import { scrubNumbers } from "../colour-picker/scrub";
 import type { Background, ExportTarget } from "../app/export-render";
 import { DPIS, MAX_AREA, MAX_SIDE, UNITS, clampSize, formatRatio, fromPx, presetOf, sizeSuggestions, toPx } from "../app/export-size";
@@ -472,7 +473,7 @@ export function openExportDialog(deps: ExportDeps): void {
       const s = px();
       if (what === "copy") {
         const [made] = await make("png");
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": made!.blob })]);
+        if ((await writeSystemClipboard({ image: made!.blob })) !== "image") throw new Error("the clipboard refused");
         forgetCopiedPicture(); // (what canvast copied before is not on the clipboard any more)
         note.textContent = `Copied ${s.w} × ${s.h} px (${size(made!.blob)}).`;
       } else {

@@ -39,6 +39,7 @@ import { dimHits, revealHits } from "../interaction/reveal";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
+import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -1162,13 +1163,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const { record } = await assets.importFileDetailed(new File([blob], fileName, { type: SHOT_FORMATS[format].mime }), false);
       const where = await fileInLibrary(session, record.hash, cfg.folder, tags);
       if (cfg.copy) {
-        try {
-          const png = format === "png" ? blob : await new Promise<Blob | null>((r) => pic.toBlob(r, "image/png"));
-          if (png) await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-          forgetCopiedPicture();
-        } catch {
-          // the clipboard refused (no permission): the screenshot is saved anyway
-        }
+        // (the clipboard may refuse: the screenshot is saved anyway)
+        const png = format === "png" ? blob : await new Promise<Blob | null>((r) => pic.toBlob(r, "image/png"));
+        if (png && (await writeSystemClipboard({ image: png })) === "image") forgetCopiedPicture();
       }
       editor.message = `Screenshot saved: “${fileName}” in ${where}.`;
       editor.messageAction = { label: "View", run: () => { setView("assets"); void assetsView.reveal([record.hash]); } };
@@ -1976,20 +1973,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // A picture of the copied things (PNG: one still at full size with its crop and adjustments, else at most 1024 px) next to the text (alone when the text would only say "N objects"), for other apps; the text stays what copySelection set,
   // which is how a paste here knows the objects are still ours. Best effort: a browser without the clipboard picture API keeps the text.
   const copySize = (t: ExportTarget, long: number): { w: number; h: number } => ({ w: Math.max(1, Math.round(t.ratio >= 1 ? long : long * t.ratio)), h: Math.max(1, Math.round(t.ratio >= 1 ? long / t.ratio : long)) });
-  const copyPicture = async (t: ExportTarget): Promise<void> => {
+  const copyPicture = async (t: ExportTarget, withText: boolean): Promise<void> => {
     const text = copiedText();
-    if (text === null || typeof ClipboardItem === "undefined") return;
+    if (text === null) return;
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
-    try {
-      // one still picture goes as it looks with its crop and adjustments at full size; a GIF or video as the frame shown; the rest as drawn
-      const still = t.original ? renderedStill(doc, editor, assets) : Promise.resolve(null);
-      const png = still
-        .then((b) => b ?? renderExport({ doc, index, assets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
-        .then((b) => (markCopiedPicture(), b));
-      await navigator.clipboard.write([new ClipboardItem({ ...(isPlaceholderText(text) ? {} : { "text/plain": new Blob([text], { type: "text/plain" }) }), "image/png": png })]);
-    } catch {
-      // too big to draw, or the browser refused: the text is already there
-    }
+    // one still picture goes as it looks with its crop and adjustments at full size; a GIF or video as the frame shown; the rest as drawn
+    const still = t.original ? renderedStill(doc, editor, assets) : Promise.resolve(null);
+    const png = still
+      .then((b) => b ?? renderExport({ doc, index, assets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
+      .then((b) => (markCopiedPicture(), b));
+    // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
+    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text) });
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {
@@ -2003,7 +1997,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const svg = svg0 && svg0.length <= 1_000_000 ? svg0 : null;
       if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) {
         e.preventDefault();
-        if (kind === "copy" && t) void copyPicture(t);
+        if (kind === "copy" && t) void copyPicture(t, !svg);
       }
     });
   }

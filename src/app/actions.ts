@@ -56,6 +56,7 @@ import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAb
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
+import { writeSystemClipboard } from "./system-clipboard";
 import type { ClipboardPayload } from "../doc/clipboard";
 import { depthOf } from "../core/frames";
 import { alignUnits, arrangeGrid, distributeUnits, gridCells } from "../doc/arrange";
@@ -2554,14 +2555,10 @@ export async function renderedStill(doc: DocumentStore, editor: EditorState, ass
 /** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
 export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<void> {
   const png = await renderedStill(doc, editor, assets);
-  try {
-    if (!png) throw new Error("no picture");
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+  if (png && (await writeSystemClipboard({ image: png })) === "image") {
     forgetCopiedPicture();
     editor.message = "Copied the picture as it looks now (crop and adjustments baked in).";
-  } catch {
-    editor.message = "Could not copy the picture to the clipboard.";
-  }
+  } else editor.message = "Could not copy the picture to the clipboard.";
   editor.changed();
 }
 

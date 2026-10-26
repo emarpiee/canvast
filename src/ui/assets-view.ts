@@ -28,6 +28,7 @@ import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { cleanFileName, splitName } from "../doc/rename-rules";
+import { asPng, writeSystemClipboard } from "../app/system-clipboard";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
@@ -2431,41 +2432,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // picture and text takes the text; Copy file name puts the name as text. An item that is not a picture goes as its name. Paste brings in a picture from the
   // clipboard, named by the text beside it when that is a file name, else "image".
   const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
-  const asPng = async (blob: Blob): Promise<Blob> => {
-    if (blob.type === "image/png") return blob;
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      const c = document.createElement("canvas");
-      c.width = img.naturalWidth || 1;
-      c.height = img.naturalHeight || 1;
-      c.getContext("2d")!.drawImage(img, 0, 0);
-      return await new Promise<Blob>((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("no picture"))), "image/png"));
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  };
-  /** Copy the first picture as a PNG (what a paste into a program that takes pictures wants; a name beside it would be taken instead by many of them), or the names as text; what is not a picture goes as its name. */
+  /** Copy the first picture alone, or the names as text (what is not a picture goes as its name). */
   const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => {
     const ents = hashes.flatMap((h) => listing?.entries.filter((x) => x.hash === h && x.present) ?? []);
     if (!ents.length) return;
-    const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
-    try {
-      const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
-      const rec = first ? await assets.record(first.hash) : undefined;
-      const png = rec ? await asPng(rec.blob) : null;
-      if (first && png) {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-        say(`Copied “${first.name || "image"}”.`);
-      } else {
-        await navigator.clipboard.writeText(ents.map((e) => e.name || "image").join("\n"));
-        say(ents.length === 1 ? `Copied the name “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} names.`);
-      }
-    } catch {
-      say("Could not copy to the clipboard.");
-    }
+    const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
+    const names = ents.map((e) => e.name || "image").join("\n");
+    const rec = first ? await assets.record(first.hash).catch(() => undefined) : undefined;
+    const done = await writeSystemClipboard({ ...(rec ? { image: asPng(rec.blob) } : {}), text: names });
+    session.editor.message =
+      done === "image" ? `Copied “${first!.name || "image"}”.` : done === "text" ? (ents.length === 1 ? `Copied the name “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} names.`) : "Could not copy to the clipboard.";
+    session.editor.changed();
   };
   const pasteFromClipboard = async (): Promise<void> => {
     const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };

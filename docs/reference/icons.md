@@ -121,6 +121,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |
 | `file-text` | Library: Copy file name |
+| `file-code` | Copy the selection as SVG (canvas menu) |
 | `focus` | Fit the selection in view |
 | `folder-plus` | New folder |
 | `folder-input` | Library bar, Import menu: a folder (every file in it, put in library folders of the same names) |
