@@ -21,7 +21,6 @@ Things on the canvas can be invisible (a shape with no fill and no outline, a sh
 | **Ctrl+click** | Picks exactly the thing there: the one whose **outline** the pointer is on (within 8 px; the nearest outline, the top one when two are as near), even under a filled shape that covers it; otherwise the top one (a sheet alone, without what is on it; deep inside a group or a mask). |
 | **Drag from the outline of a picked thing** | Moves it, although a filled shape covers the spot (the press takes the picked thing within 8 px of its outline; a click that does not move picks the thing on top, as before). |
 | **Ctrl+drag from inside a picked thing** | Moves it, whatever covers it (not only from its outline); Ctrl+click there without moving picks what Ctrl+click would pick. |
-| **Right click, Select layer** | Lists everything under the pointer (the touch long-press list, ADR 0151); a row picks that very thing, however far back. |
 | **Ctrl+Shift+click** | Adds that thing to what is picked, or takes it away if it is picked. |
 | **Ctrl+Alt+click** | Goes on to the thing below the one already picked. |
 | Point at (or tab to) a **Layers row** | The outline of what the row stands for, on the canvas. |

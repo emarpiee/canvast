@@ -2225,11 +2225,6 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   expect(Math.round(moved.minX - after.minX), "moved from the inside").toBe(30);
   expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
   expect(await ctrlClick(mid.x + 30, mid.y + 30), "a Ctrl+click that does not move picks the top one").toEqual([big.id]);
-  // Right click, Select layer: a list of what lies under the pointer; a row picks the one behind.
-  await p.mouse.click(mid.x + 30, mid.y + 30, { button: "right" });
-  await p.locator('.pop-menu [data-id="select-layer"]').click();
-  await p.locator(`.pop-menu [data-id="${small.id}"]`).click();
-  expect(await p.evaluate(() => window.__canvastDebug.selection()), "Select layer picked the one behind").toEqual([small.id]);
 });
 
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {

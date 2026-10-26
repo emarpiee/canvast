@@ -138,7 +138,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `infinity` | Canvas view |
 | `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much) |
 | `lasso` | Lasso |
-| `layers2` | Select layer (right-click menu: list what is under the pointer) |
 | `layers` | Layers panel |
 | `layout-grid` | Thumbnails |
 | `layout-list` | List |

@@ -1409,26 +1409,16 @@ export function attachTools(
         if (before.length !== editor.selection.size || before.some((id) => !editor.selection.has(id))) editor.select(before);
         editor.fingerListAt = performance.now();
         navigator.vibrate?.(10);
-        listUnder(s, all);
+        hooks.revealList(s, all.map((h) => h.obj), (id, additive) => {
+          const o = doc.get(id);
+          if (!o) return;
+          editor.entered = [...(o.groups ?? [])];
+          editor.openMask = maskAbove(o)?.id ?? null;
+          pick([id], additive);
+        });
       }, LONG_PRESS_MS);
     }
   };
-
-  /** The list of everything under a point to choose from (a long touch, or Select layer in the right-click menu): a row picks that very thing. */
-  const listUnder = (s: ScreenPoint, all: readonly ProjectedObject[]): void => {
-    hooks.revealList(s, all.map((h) => h.obj), (id, additive) => {
-      const o = doc.get(id);
-      if (!o) return;
-      editor.entered = [...(o.groups ?? [])];
-      editor.openMask = maskAbove(o)?.id ?? null;
-      pick([id], additive);
-    });
-  };
-  el.addEventListener("canvast-layers", (e) => {
-    const at = (e as CustomEvent<ScreenPoint>).detail;
-    const all = revealHits(visible(), at.x, at.y);
-    if (all.length) listUnder(at, all);
-  });
 
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
