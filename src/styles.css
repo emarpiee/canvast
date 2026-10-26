@@ -1106,7 +1106,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-viewing .asset-preview { display: none; }
 .asset-quick { display: flex; gap: var(--near); margin: var(--sp-6) 0 var(--sp-4); }
 .asset-quick .assets-btn:not(.is-icon) { flex: 1; min-width: 0; }
-.asset-quick .assets-btn[aria-pressed="true"] svg { fill: var(--hud-star); color: var(--hud-star); }
+.asset-quick .assets-btn[data-action^="favorite"][aria-pressed="true"] svg { fill: var(--hud-star); color: var(--hud-star); }
+.asset-quick .assets-btn[data-action^="hide"][aria-pressed="true"] svg { color: var(--hud-accent); }
 .asset-facts { display: flex; flex-direction: column; gap: var(--sp-1); color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .asset-sec { margin-top: var(--sp-8); }
 .asset-sec h3 { margin: 0 0 var(--sp-3); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }
