@@ -40,6 +40,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
+import { askHiddenPassword } from "../ui/hidden-access";
 import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -82,7 +83,7 @@ import type { MenuItem } from "../ui/more-menu";
 import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
-import { chooseDialog, confirmDialog } from "../ui/confirm";
+import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
 import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
@@ -1690,6 +1691,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
+    hiddenPassword: async (action) => {
+      const state = async (note = ""): Promise<{ has: boolean; text: string }> => {
+        const has = await session.hasHiddenPassword();
+        return { has, text: `${note ? `${note} ` : ""}${has ? "A password is set." : "No password is set: anyone can open the Hidden items."}` };
+      };
+      if (action === "status") return state();
+      if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
+      if (!(await askHiddenPassword(session, "Enter the current password."))) return state("Not changed.");
+      if (action === "remove") return (await session.setHiddenPassword(null)) ? state("The password was removed.") : state();
+      const first = await promptDialog({ title: "New password", lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
+      if (!first) return state("Not changed.");
+      const again = await promptDialog({ title: "New password", lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
+      if (again !== first) return state("The two did not match, so nothing changed.");
+      return (await session.setHiddenPassword(first)) ? state("The password was set.") : state();
+    },
     reset: async () => {
       const db = session.repo?.db ?? null;
       const tree = session.tree;

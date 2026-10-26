@@ -50,7 +50,7 @@ export function installAutoIndex(deps: AutoIndexDeps): AutoIndex {
     running = true;
     dirty = false;
     try {
-      const r = await deps.build({ kind: "workspace", noBytes: true });
+      const r = await deps.build({ kind: "workspace", noBytes: true, skipHidden: true }) /* (the index lies on disk: hidden items are not in it) */;
       await externalFolder.writeLibraryFile(r.blob);
       lastWrite = now();
       externalFolder.touch(); // (the card shows when it was saved)

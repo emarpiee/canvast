@@ -234,6 +234,19 @@ export class AssetCatalog {
     });
   }
 
+  /** The kept form of the Hidden list's password (assets/hidden-lock.ts), or null when there is none. Stays in this browser: no archive carries it. */
+  async hiddenLock(): Promise<string | null> {
+    const tx = this.db.transaction(["meta"], "readonly");
+    return (await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<string | undefined>)) ?? null;
+  }
+
+  async setHiddenLock(lock: string | null): Promise<void> {
+    await this.write(["meta"], async (tx) => {
+      if (lock === null) tx.objectStore("meta").delete("hiddenLock");
+      else tx.objectStore("meta").put(lock, "hiddenLock");
+    });
+  }
+
   /** Tags stored in an older form (spaces, punctuation) are formatted once the way Obsidian writes them (ADR 0084). */
   async healTags(): Promise<void> {
     const tx = this.db.transaction(["assetCatalog", "meta"], "readwrite");

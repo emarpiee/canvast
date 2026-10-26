@@ -48,12 +48,44 @@ export const ARCHIVE_EXTENSION = ".canvast";
 /** Where a long job is: the stage in words and how far (done of total). The caller turns it into a progress notice. */
 export type ProgressFn = (stage: string, done: number, total: number) => void;
 
-export type ExportScope =
+export type ExportScope = (
   /** `since`: an incremental backup, with only what changed after that time (the `at` of the backup it goes on from). */
   | { kind: "workspace"; since?: number; /** The library index kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
   | { kind: "board"; boardId: string }
   | { kind: "canvas"; canvasId: string }
-  | { kind: "assets"; hashes: string[] };
+  | { kind: "assets"; hashes: string[] }
+) & {
+  /** Leave out the originals hidden in the library, and their names and tags (what the person chose when asked, or always for the library index). */
+  skipHidden?: boolean;
+};
+
+/** The hashes of the hidden library items. */
+export async function hiddenSet(tx: IDBTransaction): Promise<Set<string>> {
+  const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+  return new Set(all.filter((e) => e.state === "active" && e.hidden).map((e) => e.hash));
+}
+
+/** How many hidden library items a scope would carry (asked before exporting). */
+export async function hiddenInScope(db: IDBDatabase, scope: ExportScope): Promise<number> {
+  const tx = db.transaction(["boards", "canvases", "objects", "assetCatalog"], "readonly");
+  const hidden = await hiddenSet(tx);
+  if (!hidden.size || scope.kind === "workspace") return hidden.size;
+  const used = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
+  if (scope.kind !== "assets") {
+    const canvasIds: string[] = [];
+    if (scope.kind === "canvas") canvasIds.push(scope.canvasId);
+    else canvasIds.push(...((await req(tx.objectStore("boards").get(scope.boardId) as IDBRequest<BoardRecord | undefined>))?.canvasIds ?? []));
+    for (const cid of canvasIds) {
+      await eachObjects(tx, cid, (records) => {
+        for (const r of records) {
+          const a = storedAssetOf(r.data);
+          if (a) used.add(a);
+        }
+      });
+    }
+  }
+  return [...used].filter((h) => hidden.has(h)).length;
+}
 
 interface ManifestCanvas {
   id: string;
@@ -214,6 +246,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     // A full backup also keeps library assets that nothing uses yet.
     for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) if (e.state === "active") hashes.add(e.hash);
   }
+  if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];

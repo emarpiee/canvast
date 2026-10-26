@@ -225,7 +225,13 @@ export const SETTINGS_TABS: readonly Tab[] = [
   },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
-  { id: "privacy", label: "Privacy" },
+  {
+    id: "privacy",
+    label: "Privacy",
+    rows: [
+      { key: "library.hiddenWord", label: "Word that opens the Hidden items", help: "Type this in the library's search box to open the items you hid (it asks for the password first, if you set one). The list is not shown anywhere else. Leave it empty to turn this off. Pick something that is not a word you would search for.", control: { kind: "text", max: 40, placeholder: "hidden:" } },
+    ],
+  },
   { id: "collaboration", label: "Collaboration" },
   { id: "about", label: "About and diagnostics" },
   {
@@ -270,6 +276,8 @@ export interface BackupHooks {
   persist(): Promise<void>;
   /** Start from scratch: the warning, the suggestions before it, and the deletion. */
   reset(): Promise<void>;
+  /** The password of the Hidden items: whether there is one, and change it (null removes it). Resolves with a sentence to show. */
+  hiddenPassword(action: "status" | "set" | "remove"): Promise<{ has: boolean; text: string }>;
 }
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
@@ -289,7 +297,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       ? cardsOf(t.rows)
           .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
           .join("") +
-        (t.id === "develop"
+        (t.id === "privacy"
+          ? `<div class="set-info set-card" data-hidden-card><h3>Password for the Hidden items</h3>
+             <p class="set-help">A password asked before the Hidden items open and before an export that includes them. It keeps people at your screen out; it does not encrypt the files, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.</p>
+             <p data-hidden-state role="status">…</p>
+             <div class="storage-actions"><button type="button" data-hidden-pw="set" data-testid="hidden-pw-set">Set a password…</button><button type="button" data-hidden-pw="remove" data-testid="hidden-pw-remove" hidden>Remove the password…</button></div></div>`
+          : t.id === "develop"
           ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
@@ -355,6 +368,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     for (const p of panels) p.hidden = p.dataset["panel"] !== id;
     cancelCapture();
     if (id === "storage") void storage();
+    if (id === "privacy") void hiddenCard("status");
     if (id === "about") showErrors();
   };
   const showErrors = (): void => {
@@ -480,7 +494,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       }
     }
   };
+  /** The password card of Privacy: show whether there is a password, or change it and show the result. */
+  const hiddenCard = async (action: "status" | "set" | "remove"): Promise<void> => {
+    if (!backup) return;
+    const r = await backup.hiddenPassword(action);
+    root.querySelector<HTMLElement>("[data-hidden-state]")!.textContent = r.text;
+    root.querySelector<HTMLElement>('[data-hidden-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
+    root.querySelector<HTMLElement>('[data-hidden-pw="remove"]')!.hidden = !r.has;
+  };
   root.addEventListener("click", (e) => {
+    const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-hidden-pw]");
+    if (pw && backup) {
+      void hiddenCard(pw.dataset["hiddenPw"] as "set" | "remove");
+      return;
+    }
     if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {
       void backup.reset();
       return;

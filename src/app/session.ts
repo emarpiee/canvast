@@ -13,6 +13,8 @@ import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
+import { hiddenInScope } from "../storage/archive";
+import { checkLock, makeLock } from "../assets/hidden-lock";
 import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain } from "../storage/archive";
 import type { FolderFiles, ProgressFn } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
@@ -672,6 +674,27 @@ export class Session {
       : "assets";
     const fileName = archiveFileName(`${label}-files`, new Date()).replace(/\.canvast$/, ".zip");
     return { ...r, fileName };
+  }
+
+  /** How many hidden library items an export of `scope` would carry. */
+  async hiddenInExport(scope: ExportScope): Promise<number> {
+    return this.repo ? hiddenInScope(this.repo.db, scope) : 0;
+  }
+
+  /** The Hidden list's password gate (assets/hidden-lock.ts): whether there is one, set or remove it, check a try. */
+  async hasHiddenPassword(): Promise<boolean> {
+    return !!(await this.catalog?.hiddenLock().catch(() => null));
+  }
+
+  async setHiddenPassword(password: string | null): Promise<boolean> {
+    if (!this.guardWrite() || !this.catalog) return false;
+    await this.catalog.setHiddenLock(password === null ? null : await makeLock(password));
+    return true;
+  }
+
+  async checkHiddenPassword(password: string): Promise<boolean> {
+    const lock = await this.catalog?.hiddenLock().catch(() => null);
+    return !lock || checkLock(lock, password);
   }
 
   /** The device settings, which travel in a workspace backup and come back on import (set by the app). */

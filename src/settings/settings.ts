@@ -55,6 +55,7 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
+  "library.hiddenWord": { scope: "device", default: "hidden:", validate: text(40), effect: "immediate" } as Def<string>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,

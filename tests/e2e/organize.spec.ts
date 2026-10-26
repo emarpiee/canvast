@@ -183,26 +183,49 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("hiding: a hidden item is in the Hidden list only, not in All, searches or counts, and it persists", async ({ app }) => {
+test("hiding: a hidden item is in no list until the word is typed (and the password given); an export asks about it", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);
   await pick(p, HASH);
   await p.getByTestId("asset-hide").click();
   await expect(cards(p)).toHaveCount(1); // gone from All; nothing stays picked
-  await expect(card(p, HASH)).toHaveCount(0);
   await expect(side(p, /^All items/)).toContainText("1");
-  await expect(side(p, /Hidden/)).toContainText("1");
-  await p.reload();
-  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect(side(p, /Hidden/)).toHaveCount(0); // (no Hidden row: the list is not shown anywhere)
+  const search = p.getByTestId("assets-search");
+
+  // A password, set in Settings > Privacy.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.getByTestId("hidden-pw-set").click();
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.locator("[data-hidden-state]")).toContainText("A password is set");
+
+  // The word opens the list, after the password; a wrong one asks again.
   await p.getByTestId("view-assets").click();
-  await expect(card(p, HASH)).toHaveCount(0);
-  await side(p, /Hidden/).click();
+  await search.fill("hidden:");
+  await p.getByTestId("prompt-input").fill("nope");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("prompt-dialog")).toContainText("not the password");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await expect(side(p, /Hidden/)).toContainText("1");
   await expect(card(p, HASH)).toBeVisible();
-  await pick(p, HASH);
-  await expect(p.getByTestId("asset-hide")).toHaveAttribute("aria-pressed", "true");
-  await p.getByTestId("asset-hide").click(); // shown again
-  await side(p, /^All items/).click();
-  await expect(cards(p)).toHaveCount(2);
+  await expect(cards(p)).toHaveCount(1);
+
+  // An export that would carry it asks; leaving it out keeps it out of the file.
+  await p.getByTestId("view-canvas").click();
+  await p.getByTestId("save-status").click();
+  const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {
+    await p.getByTestId("set-export-full").click();
+    await expect(p.getByTestId("choose-dialog")).toContainText("1 hidden item");
+    await p.getByTestId("choose-ok").click(); // (the first choice: leave them out)
+  })()]);
+  const z = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
+  const manifest = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<{ hash: string }> };
+  expect(manifest.assets.map((a) => a.hash)).toEqual([GREEN_HASH]);
   expect(app.consoleErrors).toEqual([]);
 });
 

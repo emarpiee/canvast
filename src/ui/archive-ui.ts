@@ -5,6 +5,7 @@ import { beginProgress } from "../app/progress";
 import type { Progress } from "../app/progress";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
+import { scopeWithHiddenChoice } from "./hidden-access";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { fmtBytes } from "./format";
@@ -39,7 +40,9 @@ function download(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export async function runExport(session: Session, scope: ExportScope): Promise<boolean> {
+export async function runExport(session: Session, asked: ExportScope): Promise<boolean> {
+  const scope = await scopeWithHiddenChoice(session, asked);
+  if (!scope) return false;
   const p = beginProgress(session.editor, "export", scope.kind === "workspace" && scope.since !== undefined ? "Exporting the changes" : scope.kind === "workspace" && scope.noBytes ? "Saving the library index" : "Exporting the backup");
   try {
     const r = await session.exportArchive(scope, stages(p));
@@ -60,7 +63,9 @@ export async function runExport(session: Session, scope: ExportScope): Promise<b
 }
 
 /** Export the original files of a scope as a plain ZIP, after asking how to group them. */
-export async function runExportFiles(session: Session, scope: ExportScope): Promise<boolean> {
+export async function runExportFiles(session: Session, asked: ExportScope): Promise<boolean> {
+  const scope = await scopeWithHiddenChoice(session, asked);
+  if (!scope) return false;
   const layout = await chooseDialog({
     title: "Export the files as a ZIP",
     lines: ["Every file keeps its original name. Choose how they are grouped inside the ZIP."],

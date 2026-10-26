@@ -5,6 +5,7 @@ import type { MetaRow } from "../assets/metadata";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
+import { askHiddenPassword } from "./hidden-access";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { storeFrame } from "../app/frames";
@@ -1317,7 +1318,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("all", "All items", entries.length, { icon: ICONS.images })}
           ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
-          ${hiddenCount || scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
+          ${scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
           ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
         ${section(
@@ -2713,6 +2714,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       search.value = search.value.slice(1);
     }
     paintSearchUi();
+    // The word that opens the Hidden items (Settings > Privacy): the list is nowhere in the sidebar until it is typed here and, if set, the password is given.
+    const word = settings.get("library.hiddenWord").trim().toLowerCase();
+    if (word && search.value.trim().toLowerCase() === word) {
+      search.value = "";
+      paintSearchUi();
+      void askHiddenPassword(session, "Enter the password to open the Hidden items.").then((ok) => {
+        if (!ok) return searchChanged();
+        scope = "hidden";
+        sideMenu = null;
+        render();
+      });
+    }
   });
   search.addEventListener("keydown", (e) => {
     if (e.key === "Enter") rememberNow();
@@ -2870,6 +2883,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       search.select();
     },
     hide() {
+      if (scope === "hidden") scope = "all"; // (leaving the library locks the Hidden items again)
       visible = false;
       // The viewer stays as it is for when the library is opened again (after placing an asset, say); only sound and the show stop.
       eng?.pause();

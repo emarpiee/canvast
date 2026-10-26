@@ -91,6 +91,8 @@ export interface PromptOptions {
   lines: string[];
   value: string;
   confirmLabel: string;
+  /** The text is a password: hidden as it is typed. */
+  secret?: boolean;
 }
 
 /** Modal question with one line to type in. Resolves with the text (possibly empty) when confirmed, or null when cancelled. */
@@ -102,7 +104,7 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
   dlg.innerHTML = `
     <h2 id="prompt-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
-    <input type="text" class="prompt-input" data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="off" spellcheck="false" value="${esc(opts.value)}">
+    <input type="${opts.secret ? "password" : "text"}" class="prompt-input" data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="${opts.secret ? "new-password" : "off"}" spellcheck="false" value="${esc(opts.value)}">
     <div class="confirm-actions">
       <button type="button" data-testid="prompt-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-primary" data-testid="prompt-ok" value="ok">${esc(opts.confirmLabel)}</button>

@@ -6,6 +6,7 @@ import { storedAssetOf } from "../doc/model";
 import { req } from "./idb";
 import { externalFolder } from "./external-folder";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
+import { hiddenSet } from "./archive";
 import type { ExportScope, ProgressFn } from "./archive";
 import type { ZipInput } from "./zip";
 import { writeZip } from "./zip";
@@ -82,6 +83,7 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
       }
     }
   }
+  if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
   void workspaceId; // one workspace per profile today; kept so the scopes read the same as the archive's
   const folders = (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
   const taken = new Set<string>();
