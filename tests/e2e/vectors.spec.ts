@@ -2721,7 +2721,8 @@ test("a long press with a finger lists everything under it; tapping a row picks 
   };
   await hold(550, 400);
   const rows = p.locator('.pop-menu[aria-label="Under your finger"] [data-i]');
-  await expect(rows, "the pick-several row and the two things under the finger").toHaveCount(3);
+  await expect.poll(() => rows.count(), "the pick-several row, the two things under the finger, then the context menu's actions").toBeGreaterThanOrEqual(4);
+  await expect(rows.nth(3), "a long touch is the context menu: its actions follow the list").toHaveClass(/has-sep/);
   await rows.nth(2).click(); // the one at the back
   await expect(p.locator(".pop-menu")).toHaveCount(0);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([back]);

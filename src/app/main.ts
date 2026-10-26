@@ -38,7 +38,7 @@ import { pickAll } from "../render/hit-test";
 import { dimHits, revealHits } from "../interaction/reveal";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
-import { mountContextMenu } from "../ui/context-menu";
+import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -756,6 +756,8 @@ async function start(): Promise<void> {
             if (!add) closeMoreMenu();
           } };
         }),
+        // then what a right click offers (the same groups), so a long touch is the context menu: a choice runs and the list closes
+        ...canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })),
       ];
       openMoreMenu(anchor, items(), "Under your finger", {
         keepOpen: true,

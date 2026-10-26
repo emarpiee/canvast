@@ -444,3 +444,16 @@ test("a custom canvas background is what the canvas draws, and the grid and the 
   const [r, g, b] = await p.evaluate(() => window.__canvastDebug.pixelAt(5, 5)); // (an empty corner away from the grid lines)
   expect(Math.abs(r! - 0xd9) + Math.abs(g! - 0x8c) + Math.abs(b! - 0x5f), "the canvas is the colour").toBeLessThan(40);
 });
+
+test("settings context menu: a right click on a setting offers its reset, and it works", async ({ app }) => {
+  const p = app.page;
+  const panel = p.locator("#settings-view");
+  await p.getByTestId("view-settings").click();
+  await panel.getByRole("tab", { name: "Drawing and selection" }).click();
+  await panel.getByLabel("Pen", { exact: true }).selectOption("marker");
+  const reset = panel.getByRole("button", { name: "Reset Pen to its default" });
+  await expect(reset).toBeEnabled();
+  await panel.locator('[data-row="pen.kind"] .set-label').click({ button: "right" });
+  await p.getByRole("menu", { name: "Setting actions" }).getByRole("menuitem", { name: "Reset to the default" }).click();
+  await expect(reset).toBeDisabled();
+});

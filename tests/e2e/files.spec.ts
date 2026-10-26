@@ -162,6 +162,24 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
     { name: "scene.xyz", mimeType: "", buffer: Buffer.from("scene-bytes") },
   ]);
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  // The library's context menu: on an item the panel's actions (it is picked first), on empty ground the library's own.
+  await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click({ button: "right" });
+  const ctx = p.getByRole("menu", { name: "Library actions" });
+  await expect(ctx.getByRole("menuitem", { name: "Rename…" })).toBeVisible();
+  if (p.context().browser()?.browserType().name() === "chromium") {
+    // Copy puts the file name on the system clipboard (a file that is not a picture goes as its name alone)
+    await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await ctx.getByRole("menuitem", { name: "Copy" }).click();
+    await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("robot.glb");
+    await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click({ button: "right" });
+  }
+  await ctx.getByRole("menuitem", { name: "Rename…" }).click();
+  await expect(p.getByTestId("rename-dialog")).toBeVisible();
+  await p.getByTestId("rename-cancel").click();
+  const sb = (await p.locator(".assets-scroll").boundingBox())!;
+  await p.mouse.click(sb.x + sb.width - 6, sb.y + sb.height - 6, { button: "right" }); // (below the cards)
+  await expect(ctx.getByRole("menuitem", { name: "Import files" })).toBeVisible();
+  await p.keyboard.press("Escape");
   const names = async (): Promise<string[]> => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.name))).sort();
   const dialog = p.getByTestId("rename-dialog");
   // One: the name to edit without its extension (kept), then the extension changed on purpose; the file type, chip and download name follow.

@@ -19,6 +19,8 @@ export interface MenuItem {
   aria?: string;
   /** A short line of what it does, under the label (the menu is then a list to read, not only to pick from). */
   hint?: string;
+  /** A line above this item: it starts a new group of the menu. */
+  sep?: boolean;
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
   run(): void;
@@ -130,7 +132,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   let current = items;
   const render = (): void => {
     menu.innerHTML = current
-    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
+    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
     .join("");
   };
   render();

@@ -1893,6 +1893,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .pop-menu.is-compact button { min-height: var(--field-h); gap: var(--sp-4); font: var(--font-value); }
 .pop-menu.is-compact .menu-hint { display: inline; margin-left: var(--sp-3); }
 .pop-menu.is-compact .menu-text { display: flex; align-items: baseline; gap: var(--sp-3); }
+.pop-menu button.has-sep { margin-top: var(--sp-2); position: relative; }
+.pop-menu button.has-sep::before { content: ""; position: absolute; left: var(--sp-3); right: var(--sp-3); top: calc(-1 * var(--sp-1) - 1px); border-top: 1px solid var(--hud-border); }
 .pop-menu button:disabled, .side-menu button:disabled, .nav-actions button:disabled { opacity: 0.4; cursor: default; }
 .pop-menu button.is-danger, .side-menu button.is-danger, .nav-actions button.is-danger { color: var(--hud-danger); }
 .pop-menu svg, .side-menu svg, .nav-actions svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }

@@ -25,6 +25,9 @@ import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
+import type { MenuItem } from "./more-menu";
+import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
+import { cleanFileName, splitName } from "../doc/rename-rules";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
@@ -2406,6 +2409,112 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (target?.closest?.("select, .assets-bar, .assets-side")) return; // arrows belong to a menu, the bar and the sidebar
       if (moveBy(e)) e.preventDefault();
     }
+  });
+  // ---- the context menu (right click, menu key, long touch): on an item the actions of the details panel, on empty ground the library's own.
+  // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
+  const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [string, string?]>> = [
+    [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"]],
+    [["rename", "Rename…"], ["rename-all"], ["download", "Download original"], ["open-tab"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
+    [["delete"], ["delete-all"], ["delete-everywhere"]],
+  ];
+  const panelGroups = (): MenuItem[][] =>
+    PANEL_GROUPS.map((g) =>
+      g.flatMap(([action, label]): MenuItem[] => {
+        const b = inspector.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+        if (!b || b.hidden) return [];
+        const text = label ?? (b.getAttribute("aria-label") || b.textContent?.trim() || action);
+        const icon = b.querySelector("svg")?.outerHTML;
+        return [{ id: action, label: text, ...(icon ? { icon } : {}), danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
+      }),
+    );
+  // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) and the file name as text,
+  // so a text field or a file dialog gets the name; an item that is not a picture goes as its name alone. Paste brings in a picture from the
+  // clipboard, named by the text beside it when that is a file name, else "image".
+  const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
+  const asPng = async (blob: Blob): Promise<Blob> => {
+    if (blob.type === "image/png") return blob;
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth || 1;
+      c.height = img.naturalHeight || 1;
+      c.getContext("2d")!.drawImage(img, 0, 0);
+      return await new Promise<Blob>((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("no picture"))), "image/png"));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+  const copyItems = async (hashes: readonly string[]): Promise<void> => {
+    const ents = hashes.flatMap((h) => listing?.entries.filter((x) => x.hash === h && x.present) ?? []);
+    if (!ents.length) return;
+    const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
+    try {
+      const text = ents.map((e) => e.name || "image").join("\n");
+      const first = ents.find((e) => e.type.startsWith("image/"));
+      const rec = first ? await assets.record(first.hash) : undefined;
+      const png = rec ? await asPng(rec.blob).catch(() => null) : null;
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([text], { type: "text/plain" }), ...(png ? { "image/png": png } : {}) })]);
+      say(ents.length === 1 ? `Copied “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} items (the first picture and the names).`);
+    } catch {
+      say("Could not copy to the clipboard.");
+    }
+  };
+  const pasteFromClipboard = async (): Promise<void> => {
+    const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
+    try {
+      const files: File[] = [];
+      for (const it of await navigator.clipboard.read()) {
+        const type = it.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const text = it.types.includes("text/plain") ? (await (await it.getType("text/plain")).text()).split(/\r?\n/)[0]!.trim() : "";
+        const named = text.length > 0 && text.length <= 120 ? cleanFileName(text) : "";
+        const name = named ? (splitName(named).ext ? named : named + (MIME_EXT[type] ?? "")) : `image${MIME_EXT[type] ?? ""}`;
+        files.push(new File([await it.getType(type)], name, { type }));
+      }
+      if (!files.length) return say("No picture on the clipboard.");
+      await view.importFiles(files);
+    } catch {
+      say("The browser did not let canvast read the clipboard: press Ctrl+V to paste.");
+    }
+  };
+  document.addEventListener("copy", (e) => {
+    if (!visible || viewer.hidden !== true || !(picked.size || selected) || (e.target as HTMLElement | null)?.closest?.(TYPING)) return;
+    e.preventDefault();
+    void copyItems(picked.size ? filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash) : [selected!]);
+  });
+  const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
+    ...(hashes.length ? [{ id: "copy", label: "Copy", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) }] : []),
+    { id: "paste", label: "Paste", icon: ICONS.paste, run: () => void pasteFromClipboard() },
+  ];
+  const emptyItems = (): MenuItem[] => {
+    const press = (sel: string) => (): void => root.querySelector<HTMLElement>(sel)?.click();
+    return groupedMenu([
+      [{ id: "select-all", label: "Select everything", icon: ICONS.selectAll, run: selectAll }, ...clipboardGroup([])],
+      [
+        { id: "import-files", label: "Import files", icon: ICONS.arrowDownToLine, run: press('[data-action="import"]') },
+        { id: "import-folder", label: "Import a folder", icon: ICONS.arrowDownToLine, run: () => root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')?.click() },
+        { id: "new-folder", label: "New folder", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
+      ],
+      [
+        { id: "slideshow", label: "Slideshow", icon: ICONS.play, run: press('[data-action="slideshow"]') },
+        { id: "details", label: "Details panel", icon: ICONS.panelRight, run: toggleDetails },
+      ],
+    ]);
+  };
+  bindContextMenu(root.querySelector<HTMLElement>(".assets-scroll")!, {
+    label: "Library actions",
+    active: () => visible && viewer.hidden === true,
+    build: async ({ target }) => {
+      const card = target.closest<HTMLElement>(".asset-card");
+      if (!card) return emptyItems();
+      const hash = card.dataset["hash"];
+      if (hash && !picked.has(hash)) await select(hash); // (a card outside the pick is picked alone; one inside it keeps the whole pick)
+      const g = panelGroups();
+      return groupedMenu([g[0]!, clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
+    },
   });
   // ---- the list's columns: drag a header onto another to move it
   const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;

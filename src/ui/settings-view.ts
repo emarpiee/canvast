@@ -7,6 +7,8 @@ import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS } from "../settings/shortcuts";
 import { KEY_COMMANDS, type Keymap, type KeyCommand, comboOfEvent, displayCombo, judge } from "../settings/keymap";
 import { esc } from "./format";
+import { bindContextMenu } from "./context-menu";
+import type { MenuItem } from "./more-menu";
 import { syncScroll } from "./bar";
 declare const __CANVAST_VERSION__: string;
 import NOTICES from "../../THIRD_PARTY_NOTICES.md";
@@ -704,6 +706,27 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   refresh();
   const tabRow = root.querySelector<HTMLElement>(".set-tabs")!;
   window.addEventListener("resize", () => syncScroll(tabRow));
+  // The context menu (right click, long touch): on a setting its reset, on a shortcut its key actions: the row's own buttons, pressed.
+  const ROW_ACTIONS: ReadonlyArray<readonly [selector: string, label: string, icon?: string]> = [
+    ["[data-reset]", "Reset to the default", ICONS.settingReset],
+    ['[data-change-key][data-mode="replace"]', "Change the keys…"],
+    ['[data-change-key][data-mode="add"]', "Add a key…"],
+    ["[data-key-reset]", "Reset the keys", ICONS.settingReset],
+  ];
+  bindContextMenu(root, {
+    label: "Setting actions",
+    active: () => !root.hidden,
+    build: ({ target }) => {
+      const row = target.closest<HTMLElement>(".set-row");
+      if (!row) return null;
+      const items = ROW_ACTIONS.flatMap(([sel, label, icon]): MenuItem[] => {
+        const b = row.querySelector<HTMLButtonElement>(sel);
+        return b ? [{ label, ...(icon ? { icon } : {}), disabled: b.disabled, run: () => b.click() }] : [];
+      });
+      return items.length ? items : null;
+    },
+  });
+
   return {
     show(tab?: string) {
       root.hidden = false;
