@@ -183,6 +183,29 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("hiding: a hidden item is in the Hidden list only, not in All, searches or counts, and it persists", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await pick(p, HASH);
+  await p.getByTestId("asset-hide").click();
+  await expect(cards(p)).toHaveCount(1); // gone from All; nothing stays picked
+  await expect(card(p, HASH)).toHaveCount(0);
+  await expect(side(p, /^All items/)).toContainText("1");
+  await expect(side(p, /Hidden/)).toContainText("1");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(card(p, HASH)).toHaveCount(0);
+  await side(p, /Hidden/).click();
+  await expect(card(p, HASH)).toBeVisible();
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-hide")).toHaveAttribute("aria-pressed", "true");
+  await p.getByTestId("asset-hide").click(); // shown again
+  await side(p, /^All items/).click();
+  await expect(cards(p)).toHaveCount(2);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("folders nest, an asset is in one folder at a time, and deleting a folder never deletes assets", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);

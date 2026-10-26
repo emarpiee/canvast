@@ -116,6 +116,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `eraser` | Object eraser |
 | `external-link` | Open in a new tab |
 | `eye` | Show all hidden |
+| `eye-closed` | Hide from the library; the Hidden list of the library |
 | `eye-off` | Hide the selection; Hide selection |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-output` | Export canvas Canvas 1; Export as archive |

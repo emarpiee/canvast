@@ -83,6 +83,7 @@ interface ManifestAsset {
   /** Organization (optional; archives from v0.3–v0.5 have none). Folders travel as name paths. */
   tags?: string[];
   favorite?: boolean;
+  hidden?: boolean;
   folders?: string[][];
 }
 
@@ -90,6 +91,7 @@ interface ManifestAsset {
 export interface AssetOrganization {
   tags: string[];
   favorite: boolean;
+  hidden: boolean;
   folders: string[][];
 }
 
@@ -228,7 +230,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const file = `assets/${hash}`;
     const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
-    const m = entry ? meta(entry) : { tags: [], favorite: false, folderIds: [] };
+    const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [] };
     folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
     const allFolders = folders;
     assets.push({
@@ -243,6 +245,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       ...(known ? {} : { file }),
       tags: m.tags,
       favorite: m.favorite,
+      ...(m.hidden ? { hidden: true } : {}),
       folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
     });
     if (!known) {
@@ -614,7 +617,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
 
 /** Validate an asset's optional organization fields; anything invalid is reported and dropped. */
 function readOrganization(a: Record<string, unknown>, label: string, problems: string[]): AssetOrganization | null {
-  if (a["tags"] === undefined && a["favorite"] === undefined && a["folders"] === undefined) return null;
+  if (a["tags"] === undefined && a["favorite"] === undefined && a["hidden"] === undefined && a["folders"] === undefined) return null;
   let tags: string[] = [];
   try {
     tags = normalizeTags(Array.isArray(a["tags"]) ? a["tags"].filter((t): t is string => typeof t === "string") : []);
@@ -630,7 +633,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
     }
     folders.push(path);
   }
-  return { tags, favorite: a["favorite"] === true, folders };
+  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders };
 }
 
 /**
@@ -688,7 +691,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
         const m = meta(entry);
         // One folder per asset: an asset already filed keeps its folder; otherwise the archive's (first) folder is used.
         const ids = m.folderIds.length || !org.folders.length ? m.folderIds : [resolveFolder(folders, org.folders[0]!)];
-        entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, folderIds: ids };
+        entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, hidden: m.hidden || org.hidden, folderIds: ids };
       }
       if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }

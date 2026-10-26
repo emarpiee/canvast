@@ -42,6 +42,8 @@ export interface CatalogEntry {
   /** Organization (ADR 0011). Absent on entries written before v0.6.0: read through `meta()`. */
   tags?: string[];
   favorite?: boolean;
+  /** Kept out of every list, search and picker except the Hidden scope of the library (for a workspace shown in public). Not encrypted (yet). */
+  hidden?: boolean;
   /** The folder the asset is filed in: at most one (older libraries may hold several; the first counts). Filing never copies the original. */
   folderIds?: string[];
 }
@@ -54,8 +56,8 @@ export interface AssetFolder {
 }
 
 /** Organization fields of an entry, with defaults for entries that predate them. */
-export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; folderIds: string[] } {
-  return { tags: e.tags ?? [], favorite: e.favorite ?? false, folderIds: (e.folderIds ?? []).slice(0, 1) };
+export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[] } {
+  return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1) };
 }
 
 export class CatalogInputError extends Error {}
@@ -171,13 +173,14 @@ export interface ThumbRecord {
 
 /** What organizing can change, for undo: each active asset's name, tags, favourite flag and folder, and the folders. */
 export interface MetaSnapshot {
-  readonly entries: ReadonlyMap<string, { name: string; tags: string[]; favorite: boolean; folderIds: string[] }>;
+  readonly entries: ReadonlyMap<string, { name: string; tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[] }>;
   readonly folders: AssetFolder[];
 }
 
 /** A change to an asset's tags, favourite flag or folder. */
 export interface MetaChange {
   favorite?: boolean;
+  hidden?: boolean;
   addTags?: readonly string[];
   removeTags?: readonly string[];
   addFolders?: readonly string[];
@@ -321,6 +324,7 @@ export class AssetCatalog {
         const m = meta(e);
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
+        if (change.hidden !== undefined) next.hidden = change.hidden;
         if (change.addTags || change.removeTags) {
           const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
           next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);

@@ -421,7 +421,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   let wantsLooks = false;
   /** The groups of look-alikes among the pictures read so far. */
-  const similar = (): string[][] => similarGroups([...looks].flatMap(([id, l]) => (l ? [{ id, dhash: l.dhash }] : [])));
+  const similar = (): string[][] => similarGroups([...looks].flatMap(([id, l]) => (l && !isHidden(id) ? [{ id, dhash: l.dhash }] : [])));
+  const isHidden = (hash: string): boolean => listing?.entries.some((x) => x.hash === hash && meta(x).hidden) ?? false;
   const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
     thumbFor(hash).then(
@@ -1115,6 +1116,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
     const inScope = (e: CatalogListing["entries"][number]): boolean => {
       const m = meta(e);
+      if (scope === "hidden") return m.hidden;
+      if (m.hidden) return false; // hidden items show in the Hidden scope only, whatever is searched
       if (scope === "similar") return group.has(e.hash);
       if (scope === "favorites") return m.favorite;
       if (scope === "unfiled") return m.folderIds.length === 0;
@@ -1229,7 +1232,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   const renderSide = (): void => {
     if (!listing) return;
-    const entries = listing.entries;
+    const hiddenCount = listing.entries.filter((e) => meta(e).hidden).length;
+    const entries = listing.entries.filter((e) => !meta(e).hidden); // (what is hidden is in no count, tag list or file type list but its own scope)
     const tagCounts = new Map<string, { label: string; n: number }>();
     for (const e of entries) for (const t of meta(e).tags) {
       const k = t.toLowerCase();
@@ -1296,6 +1300,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const scopeName = ((): string => {
       if (scope === "all") return "All items";
       if (scope === "favorites") return "Favourites";
+      if (scope === "hidden") return "Hidden";
       if (scope === "unfiled") return "Unfiled";
       if (scope === "similar") return "Similar images";
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
@@ -1312,6 +1317,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("all", "All items", entries.length, { icon: ICONS.images })}
           ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
+          ${hiddenCount || scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
           ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
         ${section(
@@ -1405,6 +1411,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const ents = hashes.map((h) => listing!.entries.find((x) => x.hash === h)).filter((x): x is CatalogListing["entries"][number] => !!x);
     const n = hashes.length;
     const allFav = ents.length > 0 && ents.every((e) => meta(e).favorite);
+    const allHidden = ents.length > 0 && ents.every((e) => meta(e).hidden);
     const unused = ents.filter((e) => e.instances === 0).length;
     const placeable = ents.filter((e) => e.present).length;
     const dis = session.readOnly ? " disabled" : "";
@@ -1422,6 +1429,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </div>
       <div class="asset-quick">
         <button type="button" class="assets-btn is-icon" data-action="favorite-all" data-testid="bulk-favorite" aria-pressed="${allFav}" aria-label="${allFav ? "Remove all from favourites" : "Add all to favourites"}" title="${allFav ? "Remove all from favourites" : "Add all to favourites"}"${dis}>${ICONS.star}</button>
+        <button type="button" class="assets-btn is-icon" data-action="hide-all" data-testid="bulk-hide" aria-pressed="${allHidden}" aria-label="${allHidden ? "Show them again in the library" : "Hide them from the library"}" title="${allHidden ? "Show them again in the library" : "Hide them from the library (they stay in the Hidden list)"}"${dis}>${ICONS.eyeClosed}</button>
         <span class="split"><button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable} on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-all-menu" data-testid="bulk-place-menu"${placeable ? "" : " disabled"}${dis} aria-haspopup="menu" aria-label="Place them on another canvas or a new one" title="Place them on another canvas or a new one">${ICONS.chevronDown}</button></span>
       </div>
       <div class="asset-facts"><span>${fmtBytes(bytes)} in all</span><span>${unused} of ${n} not used on any canvas</span></div>
@@ -1469,6 +1477,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       .join("");
     const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
     const fav = e ? meta(e).favorite : false;
+    const hid = e ? meta(e).hidden : false;
     inspector.innerHTML = `
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
@@ -1478,6 +1487,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         e
           ? `<div class="asset-quick">
                <button type="button" class="assets-btn is-icon" data-action="favorite" data-testid="asset-favorite" aria-pressed="${fav}" aria-label="${fav ? "Remove from favourites" : "Add to favourites"}" title="${fav ? "Remove from favourites" : "Add to favourites"}"${session.readOnly ? " disabled" : ""}>${ICONS.star}</button>
+               <button type="button" class="assets-btn is-icon" data-action="hide" data-testid="asset-hide" aria-pressed="${hid}" aria-label="${hid ? "Show it again in the library" : "Hide it from the library"}" title="${hid ? "Show it again in the library" : "Hide it from the library (it stays in the Hidden list)"}"${session.readOnly ? " disabled" : ""}>${ICONS.eyeClosed}</button>
                ${e.present ? `<span class="split"><button type="button" class="assets-btn is-primary" data-action="place" data-testid="asset-place"${ro} title="Place on ${esc(where)}">${ICONS.mapPin}<span>Place on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-menu" data-testid="asset-place-menu"${ro} aria-haspopup="menu" aria-label="Place on another canvas or a new one" title="Place on another canvas or a new one">${ICONS.chevronDown}</button></span>` : ""}
              </div>`
           : ""
@@ -1825,6 +1835,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "place-menu":
         openPlaceMenu(b, [hash]);
         break;
+      case "hide-all": {
+        const on = b.getAttribute("aria-pressed") !== "true";
+        void session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
+          if (ok && on) void select(null); // (they leave the list: nothing stays picked)
+        });
+        break;
+      }
+      case "hide": {
+        const on = b.getAttribute("aria-pressed") !== "true";
+        void session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
+          if (ok && on) void select(null);
+        });
+        break;
+      }
       case "favorite": {
         // The button shows the stored state it would change; set the opposite explicitly.
         const on = b.getAttribute("aria-pressed") !== "true";
@@ -2414,7 +2438,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- the context menu (right click, menu key, long touch): on an item the actions of the details panel, on empty ground the library's own.
   // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
   const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [string, string?]>> = [
-    [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"]],
+    [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"], ["hide"], ["hide-all"]],
     [["rename", "Rename…"], ["rename-all"], ["download", "Download original"], ["open-tab"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
     [["delete"], ["delete-all"], ["delete-everywhere"]],
   ];

@@ -714,7 +714,7 @@ async function start(): Promise<void> {
   /** The fonts in the library, loaded: for the font choices of the toolbar and of the words selected in a text. */
   const libraryFonts = async (): Promise<Array<{ hash: string; name: string; unusable: string }>> => {
     const list = (await session.catalog?.list())?.entries ?? [];
-    const fonts = list.filter((e) => e.present && describeFile(e.name, e.type).category === "Font").sort((a, b) => a.name.localeCompare(b.name));
+    const fonts = list.filter((e) => e.present && !e.hidden && describeFile(e.name, e.type).category === "Font").sort((a, b) => a.name.localeCompare(b.name));
     await Promise.all(fonts.map((e) => fontLoader.ensure(e.hash)));
     return fonts.map((e) => ({ hash: e.hash, name: e.name.replace(/\.[A-Za-z0-9]{1,5}$/, ""), unusable: fontLoader.state(e.hash) === "failed" ? fontLoader.reason(e.hash) : "" }));
   };
@@ -1200,7 +1200,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     libraryPictures: async () => {
       const list = await session.catalog?.list().catch(() => undefined);
       return (list?.entries ?? [])
-        .filter((e) => e.type.startsWith("image/") && !e.card && e.present)
+        .filter((e) => e.type.startsWith("image/") && !e.card && e.present && !e.hidden)
         .sort((a, b) => b.importedAt - a.importedAt)
         .map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob }));
     },

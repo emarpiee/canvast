@@ -262,6 +262,7 @@ import trash2 from "lucide-static/icons/trash-2.svg";
 import eraser from "lucide-static/icons/eraser.svg";
 import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
+import eyeClosedIcon from "lucide-static/icons/eye-closed.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
 import group from "lucide-static/icons/group.svg";
 import image from "lucide-static/icons/image.svg";
@@ -481,6 +482,7 @@ export const ICONS = {
   layers: clean(layers),
   eye: clean(eye),
   eyeOff: clean(eyeOff),
+  eyeClosed: clean(eyeClosedIcon),
   lockKeyhole: clean(lockKeyhole),
   lockKeyholeOpen: clean(lockKeyholeOpen),
   ungroup: clean(ungroup),
