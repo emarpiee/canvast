@@ -234,6 +234,7 @@ import arrowDownZA from "lucide-static/icons/arrow-down-z-a.svg";
 import calendarDays from "lucide-static/icons/calendar-days.svg";
 import rulerIcon from "lucide-static/icons/ruler.svg";
 import fileType from "lucide-static/icons/file-type.svg";
+import fileTextSvg from "lucide-static/icons/file-text.svg";
 import layers2 from "lucide-static/icons/layers-2.svg";
 import alignHStart from "lucide-static/icons/align-horizontal-justify-start.svg";
 import alignHCenter from "lucide-static/icons/align-horizontal-justify-center.svg";
@@ -499,6 +500,7 @@ export const ICONS = {
   calendarDays: clean(calendarDays),
   rulerIcon: clean(rulerIcon),
   fileType: clean(fileType),
+  fileText: clean(fileTextSvg),
   layers2: clean(layers2),
   alignHStart: clean(alignHStart),
   alignHCenter: clean(alignHCenter),

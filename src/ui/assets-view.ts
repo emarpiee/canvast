@@ -2427,8 +2427,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return [{ id: action, label: text, ...(icon ? { icon } : {}), danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
       }),
     );
-  // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) and the file name as text,
-  // so a text field or a file dialog gets the name; an item that is not a picture goes as its name alone. Paste brings in a picture from the
+  // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) alone, because a program that is offered a
+  // picture and text takes the text; Copy file name puts the name as text. An item that is not a picture goes as its name. Paste brings in a picture from the
   // clipboard, named by the text beside it when that is a file name, else "image".
   const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
   const asPng = async (blob: Blob): Promise<Blob> => {
@@ -2447,17 +2447,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       URL.revokeObjectURL(url);
     }
   };
-  const copyItems = async (hashes: readonly string[]): Promise<void> => {
+  /** Copy the first picture as a PNG (what a paste into a program that takes pictures wants; a name beside it would be taken instead by many of them), or the names as text; what is not a picture goes as its name. */
+  const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => {
     const ents = hashes.flatMap((h) => listing?.entries.filter((x) => x.hash === h && x.present) ?? []);
     if (!ents.length) return;
     const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
     try {
-      const text = ents.map((e) => e.name || "image").join("\n");
-      const first = ents.find((e) => e.type.startsWith("image/"));
+      const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
       const rec = first ? await assets.record(first.hash) : undefined;
-      const png = rec ? await asPng(rec.blob).catch(() => null) : null;
-      await navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([text], { type: "text/plain" }), ...(png ? { "image/png": png } : {}) })]);
-      say(ents.length === 1 ? `Copied “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} items (the first picture and the names).`);
+      const png = rec ? await asPng(rec.blob) : null;
+      if (first && png) {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+        say(`Copied “${first.name || "image"}”.`);
+      } else {
+        await navigator.clipboard.writeText(ents.map((e) => e.name || "image").join("\n"));
+        say(ents.length === 1 ? `Copied the name “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} names.`);
+      }
     } catch {
       say("Could not copy to the clipboard.");
     }
@@ -2486,7 +2491,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void copyItems(picked.size ? filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash) : [selected!]);
   });
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
-    ...(hashes.length ? [{ id: "copy", label: "Copy", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) }] : []),
+    ...(hashes.length
+      ? [
+          { id: "copy", label: "Copy", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) },
+          { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", icon: ICONS.fileText, run: () => void copyItems(hashes, "name") },
+        ]
+      : []),
     { id: "paste", label: "Paste", icon: ICONS.paste, run: () => void pasteFromClipboard() },
   ];
   const emptyItems = (): MenuItem[] => {

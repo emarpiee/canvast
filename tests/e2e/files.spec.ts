@@ -169,7 +169,7 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
   if (p.context().browser()?.browserType().name() === "chromium") {
     // Copy puts the file name on the system clipboard (a file that is not a picture goes as its name alone)
     await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-    await ctx.getByRole("menuitem", { name: "Copy" }).click();
+    await ctx.getByRole("menuitem", { name: "Copy", exact: true }).click();
     await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("robot.glb");
     await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click({ button: "right" });
   }

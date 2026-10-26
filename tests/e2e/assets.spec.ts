@@ -2462,7 +2462,7 @@ test("what a file says about itself is shown in its details (camera, settings, o
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("library Copy puts the picture and its file name on the system clipboard; Paste brings a clipboard picture in, named by the text beside it, else \"image\"", async ({ app, browserName }) => {
+test("library Copy puts the picture on the system clipboard and Copy file name its name; Paste brings a clipboard picture in, named by the text beside it, else \"image\"", async ({ app, browserName }) => {
   test.skip(browserName !== "chromium", "reading and writing the clipboard in the test harness is Chromium's");
   const p = app.page;
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -2492,9 +2492,28 @@ test("library Copy puts the picture and its file name on the system clipboard; P
   await expect.poll(names).toEqual(["image.png", "snap-shot.png"]);
   // Copy: the picture as a PNG (the name goes beside it as text, which the headless clipboard does not hand back when a picture is there)
   await p.locator('[data-testid="asset-card"][aria-label^="snap-shot.png"]').click({ button: "right" });
-  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy" }).click();
+  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();
   const types = await p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types]);
   expect(types).toContain("image/png");
   await expect(p.getByTestId("toast")).toContainText("Copied “snap-shot.png”");
+  // A JPEG is converted: its copy carries a PNG too
+  const jpg = await p.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 16;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#36c";
+    x.fillRect(0, 0, 16, 16);
+    const b = await new Promise<Blob>((ok) => c.toBlob((r) => ok(r!), "image/jpeg"));
+    return [...new Uint8Array(await b.arrayBuffer())];
+  });
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "photo.jpg", mimeType: "image/jpeg", buffer: Buffer.from(jpg) });
+  await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').click({ button: "right" });
+  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();
+  await expect(p.getByTestId("toast")).toContainText("Copied “photo.jpg”");
+  expect(await p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types])).toEqual(["image/png"]); // (the picture alone: a name beside it would be pasted instead of it)
+  // Copy file name: the name as text
+  await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').click({ button: "right" });
+  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy file name" }).click();
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("photo.jpg");
   expect(app.consoleErrors).toEqual([]);
 });
