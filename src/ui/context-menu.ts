@@ -5,7 +5,7 @@ import { ICONS } from "./icons";
 
 /** What a right click on the canvas offers, by command title: on something picked, and on empty canvas. Each is a command of the registry, so it is the same action as everywhere else. */
 const ON_ITEMS: ReadonlyArray<readonly string[]> = [
-  ["Copy", "Cut", "Paste", "Duplicate"],
+  ["Copy", "Cut", "Paste", "Duplicate", "Rename"],
   ["Group", "Ungroup", "Put the selection on a sheet", "Detach from what it follows"],
   ["Bring to front", "Send to back"],
   ["Export… (choose a size)", "Copy the selection as SVG", "Save the selection to the library as SVG"],
@@ -14,7 +14,7 @@ const ON_ITEMS: ReadonlyArray<readonly string[]> = [
 const ON_EMPTY: ReadonlyArray<readonly string[]> = [["Paste", "Select everything"], ["Show all hidden", "Unlock all"], ["Fit everything in view", "Return to the origin"]];
 /** The icon of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
 const ICON: Record<string, string> = {
-  Copy: ICONS.clipboardCopy, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
+  Rename: ICONS.textCursorInput, Copy: ICONS.clipboardCopy, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
   "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
   "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
   "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house, "Export… (choose a size)": ICONS.exportMenu, "Copy the selection as SVG": ICONS.fileCode,

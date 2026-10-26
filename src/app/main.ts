@@ -39,6 +39,7 @@ import { dimHits, revealHits } from "../interaction/reveal";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
+import { openBatchRename } from "../ui/batch-rename";
 import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -650,6 +651,21 @@ async function start(): Promise<void> {
   // Startup marks (docs/testing/phase-8.md): the canvas is loaded, the index is complete (the first frame is marked where it is drawn).
   mark("loaded");
   void indexSync.ready().then(() => mark("indexed"));
+  const selectedPictures = (): ImageObject[] => [...editor.selection].flatMap((id) => { const o = doc.get(id); return o?.kind === "image" ? [o] : []; });
+  /** Rename the file of the picked pictures in the library with the library's own dialog; a layer with a name of its own takes the new name too. */
+  const renamePictures = async (): Promise<void> => {
+    const pics = selectedPictures();
+    const hashes = [...new Set(pics.map((o) => o.assetId))];
+    const items = (await Promise.all(hashes.map(async (h) => ({ id: h, name: (await session.catalog?.entry(h).catch(() => undefined))?.name ?? "" })))).filter((i) => i.name);
+    if (!items.length) return;
+    const result = await openBatchRename(items, { noun: items.length === 1 ? "item" : "items" });
+    if (!result) return;
+    if (!(await session.renameAssets(result.map((r) => ({ hash: r.id, name: r.name }))))) return;
+    for (const r of result) assetNames.set(r.id, r.name);
+    const newName = new Map(result.map((r) => [r.id, r.name]));
+    for (const o of pics) if (o.name && newName.has(o.assetId)) renameLayer(doc, editor, o.id, newName.get(o.assetId)!);
+    editor.message = result.length === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${result.length} items.`;
+  };
   session.onAssetsRenamed = () => {
     tiles.clear(); // cards drawn with the old name
     invalidate();
@@ -1787,6 +1803,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
       { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
+      { group: "Edit", title: "Rename", words: "file name picture image library layer", enabled: () => onCanvas && !session.readOnly && selectedPictures().length > 0, run: () => void renamePictures() },
       { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
       { group: "Edit", title: "Show all hidden", words: "unhide reveal eye", enabled: () => onCanvas && [...doc.all()].some((o) => o.hidden), run: () => clearFlag(doc, editor, "hidden") },
       { group: "Edit", title: "Unlock all", words: "unlock locked", enabled: () => onCanvas && [...doc.all()].some((o) => o.locked), run: () => clearFlag(doc, editor, "locked") },

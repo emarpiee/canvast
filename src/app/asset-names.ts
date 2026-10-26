@@ -20,6 +20,13 @@ export class AssetNames {
     return this.names;
   }
 
+  /** A name changed in the library: remember it and tell the subscribers (the Layers panel and the labels redraw). */
+  set(hash: string, name: string): void {
+    this.names.set(hash, name);
+    this.asked.add(hash);
+    for (const fn of this.listeners) fn();
+  }
+
   get(hash: string): string | undefined {
     const n = this.names.get(hash);
     if (n === undefined && !this.asked.has(hash)) {
