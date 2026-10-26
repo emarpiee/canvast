@@ -24,7 +24,7 @@ import { folderPath, folderSubtree, meta } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
-import { clearRect, MENU_GAP } from "./more-menu";
+import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles } from "./archive-ui";
@@ -151,8 +151,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
       <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <span class="assets-sep" role="separator"></span>
-      <button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button>
-      <button type="button" class="assets-btn is-icon" data-action="import-folder" data-testid="assets-import-folder" aria-label="Import a folder" title="Import a folder: every file in it, put in library folders of the same names">${ICONS.arrowDownToLine}</button>
+      <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you picked, as a slideshow">${ICONS.play}</button>
       <span class="assets-sep" role="separator"></span>
@@ -2660,7 +2659,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   }
   importBtn.addEventListener("click", () => fileInput.click());
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
-  root.querySelector<HTMLElement>('[data-action="import-folder"]')!.addEventListener("click", () => folderInput.click());
+  const importMenu = root.querySelector<HTMLElement>('[data-action="import-menu"]')!;
+  importMenu.addEventListener("click", () =>
+    openMoreMenu(importMenu, [
+      { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", run: () => fileInput.click() },
+      { label: "A folder", icon: ICONS.folderInput, hint: "Every file in it, put in library folders of the same names", run: () => folderInput.click() },
+    ], "Import"),
+  );
   folderInput.addEventListener("change", () => {
     const files = filesOfPicker(folderInput.files);
     folderInput.value = "";

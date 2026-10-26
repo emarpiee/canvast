@@ -5,7 +5,7 @@ One icon per function: two buttons that do different things never share an icon,
 | Icon (lucide) | Function(s) |
 | --- | --- |
 | `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
-| `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import a folder, Import styles (nothing else carries it) |
+| `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import styles (nothing else carries it) |
 | `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state (nothing else carries it) |
 | `expand` | Scale contents with the sheet (the sheet's size field) |
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
@@ -122,6 +122,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `file-type` | By type |
 | `focus` | Fit the selection in view |
 | `folder-plus` | New folder |
+| `folder-input` | Library bar, Import menu: a folder (every file in it, put in library folders of the same names) |
 | `folder-x` | Unfiled1 |
 | `frame` | Fit everything in view |
 | `grid-3x3` | Canvas pattern: Grid |
