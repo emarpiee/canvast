@@ -230,6 +230,9 @@ html, body {
 /* The theme's controls, never the browser's: a select, a text field or a number field that no rule below styles (a new one, one made in code) still looks like the rest.
    :where() gives it no weight, so every rule of a panel or bar overrides it whatever its place in the file. */
 :where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"]) { font: var(--font-value); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); }
+/* Every place text is typed shows its caret and its selection in the accent, so neither depends on the browser's default against our backgrounds. */
+input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
+::selection { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); }
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

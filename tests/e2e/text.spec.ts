@@ -751,6 +751,8 @@ test("selected words can be made a link (web or mail address only, shown underli
   };
   await select(3, 5);
   await p.getByRole("button", { name: "Link of the selected words" }).click();
+  const caret = await p.getByTestId("prompt-input").evaluate((el) => [getComputedStyle(el).caretColor, getComputedStyle(document.documentElement).getPropertyValue("--hud-accent")] as const);
+  expect(caret[0], "the caret is not left to the browser's default").not.toBe("auto");
   await p.getByTestId("prompt-input").fill("javascript:alert(1)");
   await p.getByTestId("prompt-input").press("Enter");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
