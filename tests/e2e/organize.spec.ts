@@ -201,7 +201,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByTestId("prompt-ok").click();
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
-  await expect(p.locator("[data-hidden-state]")).toContainText("A password is set");
+  await expect(p.locator('[data-pw-card="hidden"] [data-pw-state]')).toContainText("A password is set");
 
   // The word opens the list, after the password; a wrong one asks again.
   await p.getByTestId("view-assets").click();
@@ -222,6 +222,8 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
     await p.getByTestId("set-export-full").click();
     await expect(p.getByTestId("choose-dialog")).toContainText("1 hidden item");
     await p.getByTestId("choose-ok").click(); // (the first choice: leave them out)
+    await expect(p.getByTestId("choose-dialog")).toContainText(/privacy settings/i); // (a password is set: asked whether to include it)
+    await p.getByTestId("choose-ok").click();
   })()]);
   const z = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
   const manifest = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<{ hash: string }> };
@@ -243,27 +245,28 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await expect(side(p, /Hidden/)).toContainText("1");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
 
-  // The password and these settings stay out of a backup unless the option is on.
-  const backup = async (): Promise<{ hiddenLock?: string; settings?: Record<string, unknown> }> => {
+  // The password and these settings stay out of a backup unless the person includes them when asked.
+  const backup = async (include: boolean): Promise<{ hiddenLock?: string; settings?: Record<string, unknown> }> => {
     await p.getByTestId("view-canvas").click();
     await p.getByTestId("save-status").click();
     const [d] = await Promise.all([p.waitForEvent("download"), (async () => {
       await p.getByTestId("set-export-full").click();
-      await p.getByTestId("choose-ok").click();
+      await p.getByTestId("choose-ok").click(); // (hidden items: leave them out)
+      await expect(p.getByTestId("choose-dialog")).toContainText(/privacy settings/i);
+      if (include) {
+        await p.getByRole("radio", { name: /Include them/ }).check();
+        await p.getByTestId("choose-ok").click(); // (no password asked again: it was given a moment ago)
+      } else await p.getByTestId("choose-ok").click();
     })()]);
     const zip = await readZip(new Blob([new Uint8Array(await readFile((await d.path())!))]));
     return JSON.parse(await zip.get("manifest.json")!.data.text());
   };
-  const without = await backup();
+  const without = await backup(false);
   expect(without.hiddenLock).toBeUndefined();
   expect(without.settings?.["library.hiddenRemember"]).toBeUndefined();
-  await p.getByTestId("view-settings").click();
-  await p.getByRole("tab", { name: /Privacy/ }).click();
-  await p.locator('[data-row="library.privacyInBackup"] input').check();
-  const withIt = await backup();
+  const withIt = await backup(true);
   expect(withIt.hiddenLock).toMatch(/^pbkdf2\$/);
   expect(withIt.settings?.["library.hiddenRemember"]).toBe(true);
-  expect(withIt.settings?.["library.privacyInBackup"]).toBeUndefined(); // (the option itself never travels)
   expect(app.consoleErrors).toEqual([]);
 });
 

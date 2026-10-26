@@ -57,7 +57,7 @@ export type ExportScope = (
 ) & {
   /** Leave out the originals hidden in the library, and their names and tags (what the person chose when asked, or always for the library index). */
   skipHidden?: boolean;
-  /** A workspace backup that also carries the password of the Hidden items (set by the app from Settings > Privacy). */
+  /** A workspace backup that also carries the passwords (of the Hidden items and of the workspace) and the privacy settings (set by the app from Settings > Privacy). */
   withPrivacy?: boolean;
 };
 
@@ -150,6 +150,8 @@ export interface Manifest {
   settings?: Record<string, unknown>;
   /** The kept form of the Hidden items' password (only when the person chose to include their privacy settings). Used on import only where the device has none. */
   hiddenLock?: string;
+  /** The same for the password of the whole workspace. */
+  workspaceLock?: string;
   /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
   /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
@@ -252,6 +254,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
+  const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const missingAssets: string[] = [];
@@ -307,6 +310,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(noBytes ? { libraryFile: true as const } : {}),
     ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
     ...(typeof hiddenLock === "string" ? { hiddenLock } : {}),
+    ...(typeof workspaceLock === "string" ? { workspaceLock } : {}),
   };
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -370,6 +374,7 @@ export interface ImportPlan {
   settings: Record<string, unknown>;
   /** The password of the Hidden items the archive carries, or null. */
   hiddenLock: string | null;
+  workspaceLock: string | null;
   /** Everything skipped, with reasons. Nothing is silently repaired. */
   problems: string[];
   objects: number;
@@ -481,6 +486,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     unresolved: [],
     libraryFile: m["libraryFile"] === true,
     settings: isObj(m["settings"]) ? (m["settings"] as Record<string, unknown>) : {},
+    workspaceLock: typeof m["workspaceLock"] === "string" && /^pbkdf2\$\d{1,8}\$[A-Za-z0-9+/=]{1,64}\$[A-Za-z0-9+/=]{1,128}$/.test(m["workspaceLock"]) ? m["workspaceLock"] : null,
     hiddenLock: typeof m["hiddenLock"] === "string" && /^pbkdf2\$\d{1,8}\$[A-Za-z0-9+/=]{1,64}\$[A-Za-z0-9+/=]{1,128}$/.test(m["hiddenLock"]) ? m["hiddenLock"] : null,
     problems,
     objects: 0,
@@ -739,6 +745,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     }
     if (folders) tx.objectStore("meta").put(folders, "assetFolders");
     // The password of the archive is taken only where this device has none: an import never replaces a password.
+    if (plan.workspaceLock && !(await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.workspaceLock, "workspaceLock");
     if (plan.hiddenLock && !(await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.hiddenLock, "hiddenLock");
     if (plan.styles.length) {
       // the saved styles: the ones the library does not have yet are added (by id), none is replaced

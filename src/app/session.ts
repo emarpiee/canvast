@@ -3,7 +3,7 @@ import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
 import { beginProgress } from "./progress";
-import type { MetaSnapshot } from "../assets/asset-catalog";
+import type { MetaSnapshot, PasswordKind } from "../assets/asset-catalog";
 import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
 import { assetOf, newObjectId } from "../doc/model";
@@ -681,24 +681,24 @@ export class Session {
     return this.repo ? hiddenInScope(this.repo.db, scope) : 0;
   }
 
-  /** The Hidden list's password gate (assets/hidden-lock.ts): whether there is one, set or remove it, check a try. */
-  async hasHiddenPassword(): Promise<boolean> {
-    return !!(await this.catalog?.hiddenLock().catch(() => null));
+  /** The password gates (assets/hidden-lock.ts): of the Hidden items and of the whole workspace. Whether there is one, set or remove it, check a try. */
+  async hasPassword(kind: PasswordKind): Promise<boolean> {
+    return !!(await this.catalog?.lock(kind).catch(() => null));
   }
 
-  async setHiddenPassword(password: string | null): Promise<boolean> {
+  async setPassword(kind: PasswordKind, password: string | null): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
-    await this.catalog.setHiddenLock(password === null ? null : await makeLock(password));
+    await this.catalog.setLock(kind, password === null ? null : await makeLock(password));
     return true;
   }
 
-  async checkHiddenPassword(password: string): Promise<boolean> {
-    const lock = await this.catalog?.hiddenLock().catch(() => null);
+  async checkPassword(kind: PasswordKind, password: string): Promise<boolean> {
+    const lock = await this.catalog?.lock(kind).catch(() => null);
     return !lock || checkLock(lock, password);
   }
 
   /** The device settings, which travel in a workspace backup and come back on import (set by the app). */
-  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacyInBackup(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
+  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacySet(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
   /** Keeps the library index in the library folder up to date (storage/auto-index.ts); set by the app. */
   autoIndex: { poke(): void; flush(): Promise<void> } | null = null;
 
@@ -707,8 +707,8 @@ export class Session {
     await this.persistence.flush();
     await this.persistence.saveCamera();
     const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
-    const withPrivacy = scope.kind === "workspace" && !scope.noBytes && (this.settingsHook?.privacyInBackup() ?? false); // (the library index on disk never carries them)
-    const r = await buildArchive(this.repo.db, this.current.workspaceId, withPrivacy ? { ...scope, withPrivacy } : scope, version, this.settingsHook?.snapshot(withPrivacy), progress);
+    const withPrivacy = scope.kind === "workspace" && !scope.noBytes && scope.withPrivacy === true; // (chosen when asked; the library index on disk never carries them)
+    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot(withPrivacy), progress);
     const label =
       scope.kind === "workspace" ? r.manifest.workspaceName
       : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")

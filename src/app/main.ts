@@ -40,7 +40,8 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askHiddenPassword, forgetHiddenPassword } from "../ui/hidden-access";
+import { askPassword, forgetHiddenPassword } from "../ui/hidden-access";
+import { openLockScreen } from "../ui/lock-screen";
 import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -635,6 +636,9 @@ async function start(): Promise<void> {
   assetNames.subscribe(() => invalidate());
   if (db) {
     try {
+      // A workspace password: nothing of the workspace is read or drawn until it is given.
+      const lock = await session.catalog?.lock("workspace").catch(() => null);
+      if (lock) await openLockScreen((typed) => session.checkPassword("workspace", typed));
       await session.start();
       if (session.startup?.kind === "migrated") {
         const m = session.startup.migration;
@@ -1665,7 +1669,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   session.subscribeAssets(() => session.autoIndex?.poke()); // (commits, imports, catalog changes)
   settings.subscribe(() => session.autoIndex?.poke());
   externalFolder.subscribe(() => session.autoIndex?.poke()); // (a folder was chosen or came back)
-  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => k !== "library.privacyInBackup" && (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacyInBackup: () => settings.get("library.privacyInBackup"), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
+  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacySet: () => PRIVACY_KEYS.some((k) => settings.isSet(k as never)), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
@@ -1691,21 +1695,22 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
-    hiddenPassword: async (action) => {
+    password: async (kind, action) => {
+      const what = kind === "workspace" ? "workspace" : "Hidden items";
       const state = async (note = ""): Promise<{ has: boolean; text: string }> => {
-        const has = await session.hasHiddenPassword();
-        return { has, text: `${note ? `${note} ` : ""}${has ? "A password is set." : "No password is set: anyone can open the Hidden items."}` };
+        const has = await session.hasPassword(kind);
+        return { has, text: `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
       };
       if (action === "status") return state();
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
-      if (!(await askHiddenPassword(session, "Enter the current password."))) return state("Not changed.");
-      forgetHiddenPassword();
-      if (action === "remove") return (await session.setHiddenPassword(null)) ? state("The password was removed.") : state();
-      const first = await promptDialog({ title: "New password", lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
+      if (!(await askPassword(session, kind, "Enter the current password."))) return state("Not changed.");
+      if (kind === "hidden") forgetHiddenPassword();
+      if (action === "remove") return (await session.setPassword(kind, null)) ? state("The password was removed.") : state();
+      const first = await promptDialog({ title: `New password for the ${what}`, lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
       if (!first) return state("Not changed.");
-      const again = await promptDialog({ title: "New password", lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
+      const again = await promptDialog({ title: `New password for the ${what}`, lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
       if (again !== first) return state("The two did not match, so nothing changed.");
-      return (await session.setHiddenPassword(first)) ? state("The password was set.") : state();
+      return (await session.setPassword(kind, first)) ? state("The password was set.") : state();
     },
     reset: async () => {
       const db = session.repo?.db ?? null;

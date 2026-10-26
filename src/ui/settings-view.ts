@@ -231,7 +231,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       { key: "library.hiddenWord", label: "Word that opens the Hidden items", help: "Type this in the library's search box to open the items you hid (it asks for the password first, if you set one). The list is not shown anywhere else. Leave it empty to turn this off. Pick something that is not a word you would search for.", control: { kind: "text", max: 40, placeholder: "hidden:" } },
       { key: "library.hiddenRemember", label: "Keep the Hidden items open until the tab closes", help: "Off (the default): the Hidden list closes when you choose another list or leave the library, and asks for the password again. On: after the password is given once, the list stays open, and opens without the password again, until this tab is closed or reloaded. Exporting hidden items always asks.", control: { kind: "toggle" } },
-      { key: "library.privacyInBackup", label: "Include the password and these settings in a backup", help: "Off (the default): a workspace backup has neither the opening word, the keep-open option nor the password, so a restored copy starts with no password. On: a full backup carries them, and importing it sets the password only on a device that has none (and applies the settings you have not changed there). Whether an item is hidden belongs to the item, so it travels either way when you include hidden items. The file then holds the password's hash: anyone who has it could try to guess the password.", control: { kind: "toggle" } },
     ],
   },
   { id: "collaboration", label: "Collaboration" },
@@ -278,9 +277,14 @@ export interface BackupHooks {
   persist(): Promise<void>;
   /** Start from scratch: the warning, the suggestions before it, and the deletion. */
   reset(): Promise<void>;
-  /** The password of the Hidden items: whether there is one, and change it (null removes it). Resolves with a sentence to show. */
-  hiddenPassword(action: "status" | "set" | "remove"): Promise<{ has: boolean; text: string }>;
+  /** A password (of the Hidden items or of the whole workspace): whether there is one, and change it (null removes it). Resolves with a sentence to show. */
+  password(kind: "hidden" | "workspace", action: "status" | "set" | "remove"): Promise<{ has: boolean; text: string }>;
 }
+
+const pwCard = (kind: "hidden" | "workspace", title: string, help: string): string => `<div class="set-info set-card" data-pw-card="${kind}"><h3>${esc(title)}</h3>
+             <p class="set-help">${esc(help)}</p>
+             <p data-pw-state role="status">…</p>
+             <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button></div></div>`;
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
@@ -300,10 +304,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
           .join("") +
         (t.id === "privacy"
-          ? `<div class="set-info set-card" data-hidden-card><h3>Password for the Hidden items</h3>
-             <p class="set-help">A password asked before the Hidden items open and before an export that includes them. It keeps people at your screen out; it does not encrypt the files, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.</p>
-             <p data-hidden-state role="status">…</p>
-             <div class="storage-actions"><button type="button" data-hidden-pw="set" data-testid="hidden-pw-set">Set a password…</button><button type="button" data-hidden-pw="remove" data-testid="hidden-pw-remove" hidden>Remove the password…</button></div></div>`
+          ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
+            pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either.")
           : t.id === "develop"
           ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
@@ -370,7 +372,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     for (const p of panels) p.hidden = p.dataset["panel"] !== id;
     cancelCapture();
     if (id === "storage") void storage();
-    if (id === "privacy") void hiddenCard("status");
+    if (id === "privacy") for (const k of ["workspace", "hidden"] as const) void passwordCard(k, "status");
     if (id === "about") showErrors();
   };
   const showErrors = (): void => {
@@ -496,18 +498,19 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       }
     }
   };
-  /** The password card of Privacy: show whether there is a password, or change it and show the result. */
-  const hiddenCard = async (action: "status" | "set" | "remove"): Promise<void> => {
+  /** A password card of Privacy: show whether there is a password, or change it and show the result. */
+  const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove"): Promise<void> => {
     if (!backup) return;
-    const r = await backup.hiddenPassword(action);
-    root.querySelector<HTMLElement>("[data-hidden-state]")!.textContent = r.text;
-    root.querySelector<HTMLElement>('[data-hidden-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
-    root.querySelector<HTMLElement>('[data-hidden-pw="remove"]')!.hidden = !r.has;
+    const r = await backup.password(kind, action);
+    const card = root.querySelector<HTMLElement>(`[data-pw-card="${kind}"]`)!;
+    card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = r.text;
+    card.querySelector<HTMLElement>('[data-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
+    card.querySelector<HTMLElement>('[data-pw="remove"]')!.hidden = !r.has;
   };
   root.addEventListener("click", (e) => {
-    const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-hidden-pw]");
+    const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-pw]");
     if (pw && backup) {
-      void hiddenCard(pw.dataset["hiddenPw"] as "set" | "remove");
+      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove");
       return;
     }
     if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {

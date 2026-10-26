@@ -457,3 +457,28 @@ test("settings context menu: a right click on a setting offers its reset, and it
   await p.getByRole("menu", { name: "Setting actions" }).getByRole("menuitem", { name: "Reset to the default" }).click();
   await expect(reset).toBeDisabled();
 });
+
+test("a workspace password: the app asks for it when it opens, a wrong one is refused, Escape does not close it", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.getByTestId("workspace-pw-set").click();
+  await p.getByTestId("prompt-input").fill("open sesame");
+  await p.getByTestId("prompt-ok").click();
+  await p.getByTestId("prompt-input").fill("open sesame");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText("A password is set");
+  await p.reload();
+  const lock = p.getByTestId("lock-screen");
+  await expect(lock).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(lock).toBeVisible();
+  await p.getByTestId("lock-input").fill("wrong");
+  await p.getByTestId("lock-ok").click();
+  await expect(lock.locator("[data-lock-error]")).toBeVisible();
+  await p.getByTestId("lock-input").fill("open sesame");
+  await p.getByTestId("lock-input").press("Enter");
+  await expect(lock).toHaveCount(0);
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -5,7 +5,7 @@ import { beginProgress } from "../app/progress";
 import type { Progress } from "../app/progress";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
-import { scopeWithHiddenChoice } from "./hidden-access";
+import { scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { fmtBytes } from "./format";
@@ -41,7 +41,8 @@ function download(blob: Blob, fileName: string): void {
 }
 
 export async function runExport(session: Session, asked: ExportScope): Promise<boolean> {
-  const scope = await scopeWithHiddenChoice(session, asked);
+  const hiddenChosen = await scopeWithHiddenChoice(session, asked);
+  const scope = hiddenChosen && (await scopeWithPrivacyChoice(session, hiddenChosen));
   if (!scope) return false;
   const p = beginProgress(session.editor, "export", scope.kind === "workspace" && scope.since !== undefined ? "Exporting the changes" : scope.kind === "workspace" && scope.noBytes ? "Saving the library index" : "Exporting the backup");
   try {
@@ -136,6 +137,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
     `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
     where,
     ...(folder ? ["Its originals are the files in the library folder."] : []),
+    ...(plan.workspaceLock ? ["It also carries a password for the whole workspace: it is used only if this device has none, and the app then asks for it when it opens."] : []),
     ...(plan.hiddenLock ? ["It also carries the password of the Hidden items: it is used only if this device has none."] : []),
     ...((n) => (n ? [`It also carries your settings (theme, shortcuts, panel layout): ${n} you have not changed on this device ${n === 1 ? "is" : "are"} restored; the others stay as they are here.`] : []))(session.settingsHook?.restorable(plan.settings) ?? 0),
   ];

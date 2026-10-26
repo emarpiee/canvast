@@ -188,6 +188,9 @@ export interface MetaChange {
   clearFolder?: boolean;
 }
 
+/** The two passwords: of the Hidden items, and of the whole workspace (asked when the app opens). */
+export type PasswordKind = "hidden" | "workspace";
+
 export class AssetCatalog {
   constructor(readonly db: IDBDatabase) {}
 
@@ -234,16 +237,16 @@ export class AssetCatalog {
     });
   }
 
-  /** The kept form of the Hidden list's password (assets/hidden-lock.ts), or null when there is none. Stays in this browser: no archive carries it. */
-  async hiddenLock(): Promise<string | null> {
+  /** The kept form of a password (assets/hidden-lock.ts): the Hidden items' or the whole workspace's, or null when there is none. Stays in this browser: no archive carries it unless the person chose to. */
+  async lock(kind: PasswordKind): Promise<string | null> {
     const tx = this.db.transaction(["meta"], "readonly");
-    return (await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<string | undefined>)) ?? null;
+    return (await req(tx.objectStore("meta").get(`${kind}Lock`) as IDBRequest<string | undefined>)) ?? null;
   }
 
-  async setHiddenLock(lock: string | null): Promise<void> {
+  async setLock(kind: PasswordKind, lock: string | null): Promise<void> {
     await this.write(["meta"], async (tx) => {
-      if (lock === null) tx.objectStore("meta").delete("hiddenLock");
-      else tx.objectStore("meta").put(lock, "hiddenLock");
+      if (lock === null) tx.objectStore("meta").delete(`${kind}Lock`);
+      else tx.objectStore("meta").put(lock, `${kind}Lock`);
     });
   }
 
