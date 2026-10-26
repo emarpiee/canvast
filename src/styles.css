@@ -233,6 +233,9 @@ html, body {
 /* Every place text is typed shows its caret and its selection in the accent, so neither depends on the browser's default against our backgrounds. */
 input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
 ::selection { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); }
+/* The interface is not text to select (a drag across a bar, a status line or a panel must not paint it); only what is typed in, code and the file facts (to copy a hash) can be selected. */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-selectable] { -webkit-user-select: text; user-select: text; }
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

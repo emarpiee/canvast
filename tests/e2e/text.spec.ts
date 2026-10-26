@@ -133,6 +133,7 @@ test("double-click edits a text; lists and pasted text become Markdown; emptying
   await p.evaluate(() => {
     const d = document.createElement("div");
     d.id = "copy-source";
+    d.setAttribute("data-selectable", ""); // (interface text cannot be selected, so a copy source says it can)
     d.innerHTML = "<b># pasted &lt;b&gt;</b>";
     document.body.append(d);
     getSelection()!.selectAllChildren(d);
@@ -753,6 +754,7 @@ test("selected words can be made a link (web or mail address only, shown underli
   await p.getByRole("button", { name: "Link of the selected words" }).click();
   const caret = await p.getByTestId("prompt-input").evaluate((el) => [getComputedStyle(el).caretColor, getComputedStyle(document.documentElement).getPropertyValue("--hud-accent")] as const);
   expect(caret[0], "the caret is not left to the browser's default").not.toBe("auto");
+  expect(await p.evaluate(() => [getComputedStyle(document.body).userSelect, getComputedStyle(document.querySelector('[data-testid="prompt-input"]')!).userSelect]), "interface text is not selectable, a field's is").toEqual(["none", "text"]);
   await p.getByTestId("prompt-input").fill("javascript:alert(1)");
   await p.getByTestId("prompt-input").press("Enter");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
