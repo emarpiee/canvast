@@ -574,7 +574,7 @@ async function start(): Promise<void> {
       const name = (po: ProjectedObject): string => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item");
       const hits = revealHits(all, editor.revealAt.x, editor.revealAt.y);
       const dim = dimHits(all, hiddenInView(doc, fc, vp), editor.revealAt.x, editor.revealAt.y);
-      drawReveal(ctx, hits, editor.revealAt, theme, name, dim);
+      editor.revealList = drawReveal(ctx, hits, editor.revealAt, theme, name, dim, editor.selection, editor.revealHot);
       // (a screen reader hears the same words through the hint line, once for each change)
       const said = hits.length || dim.length ? `Under the pointer: ${[...hits.map((po) => revealWords(name(po))), ...dim.map((d) => revealWords(name(d.po), d.why))].join(", ")}` : null;
       if (said !== editor.revealText) {

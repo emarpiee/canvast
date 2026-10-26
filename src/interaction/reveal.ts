@@ -70,6 +70,18 @@ export function deepPick(hits: readonly ProjectedObject[], picked: ReadonlySet<O
   return hits[at < 0 ? 0 : (at + 1) % hits.length]!;
 }
 
+/** Height of one row of the revealed list, and the padding above the first (CSS px). */
+export const REVEAL_ROW_PX = 16;
+export const REVEAL_PAD_PX = 3;
+
+/** The row of the revealed list under (x, y): its thing (null: a row that cannot be picked), or undefined when the point is not on the list. */
+export function revealRowAt(editor: EditorState, x: number, y: number): ObjectId | null | undefined {
+  const L = editor.revealList;
+  if (!editor.revealAt || !L || x < L.x || x > L.x + L.w || y < L.y || y > L.y + L.h) return undefined;
+  const i = Math.floor((y - L.y - REVEAL_PAD_PX) / REVEAL_ROW_PX);
+  return L.ids[i] ?? null;
+}
+
 /** Which of Ctrl, Shift and Alt a pointer press carries, as the deep pick reads them. */
 export interface PressKeys {
   readonly ctrl: boolean;
@@ -90,6 +102,7 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     const on = ctrl && at !== null && allowed();
     const next = on ? { x: at!.x, y: at!.y } : null;
     const was = editor.revealAt;
+    if (!next) { editor.revealList = null; editor.revealHot = null; }
     if (!next && !was) return;
     if (next && was && Math.abs(next.x - was.x) < 1 && Math.abs(next.y - was.y) < 1) return;
     editor.revealAt = next;
@@ -98,6 +111,13 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
   return {
     /** The pointer moved (null: it left the canvas); `ctrlHeld` is the pointer event's. */
     move(p: { x: number; y: number } | null, ctrlHeld: boolean): void {
+      // On the list itself the reveal stays where it is (the list does not run away from the pointer) and the row under the pointer is the hot one.
+      const row = p && ctrlHeld ? revealRowAt(editor, p.x, p.y) : undefined;
+      if (row !== undefined) {
+        if (editor.revealHot !== row) { editor.revealHot = row; editor.redraw(); }
+        return;
+      }
+      if (editor.revealHot) editor.revealHot = null;
       at = p;
       ctrl = ctrlHeld;
       update();

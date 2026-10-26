@@ -2225,6 +2225,28 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   expect(Math.round(moved.minX - after.minX), "moved from the inside").toBe(30);
   expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
   expect(await ctrlClick(mid.x + 30, mid.y + 30), "a Ctrl+click that does not move picks the top one").toEqual([big.id]);
+
+  // Without Ctrl too: a picked thing is moved by a drag from inside it although the big one covers it.
+  await p.mouse.click(120, 650);
+  await ctrlClick(moved.minX + 1, (moved.minY + moved.maxY) / 2);
+  const c = { x: (moved.minX + moved.maxX) / 2, y: (moved.minY + moved.maxY) / 2 };
+  await app.drag(c, { x: c.x + 20, y: c.y + 20 }, 8);
+  const moved2 = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, small.id);
+  expect(Math.round(moved2.minX - moved.minX), "moved from the inside, no Ctrl").toBe(20);
+  expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
+
+  // The revealed names are a list to pick from: Ctrl, the pointer onto the second row, a click picks that one (the one behind).
+  await p.mouse.click(120, 650);
+  const c2 = { x: c.x + 20, y: c.y + 20 };
+  await p.keyboard.down("Control");
+  await p.mouse.move(c2.x, c2.y);
+  await app.frame();
+  await p.mouse.move(c2.x + 34, c2.y + 31, { steps: 4 });
+  await app.frame();
+  await p.mouse.click(c2.x + 34, c2.y + 31);
+  await p.keyboard.up("Control");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.selection()), "the second row of the list picked the one behind").toEqual([small.id]);
 });
 
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {

@@ -221,6 +221,10 @@ export class EditorState {
   message = "";
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
+  /** Where the revealed list was drawn (px) and the thing each row stands for (null: one that cannot be picked): Ctrl+click on a row picks it. Set by the drawing. */
+  revealList: { x: number; y: number; w: number; h: number; ids: ReadonlyArray<string | null> } | null = null;
+  /** The row of that list the pointer is on: its outline is shown strong. */
+  revealHot: string | null = null;
   /** A text is being typed in (ui/text-editor.ts): the Properties bar shows the text's options, not the active tool's. */
   editingText = false;
   /** A texture fill is waiting for its source (ADR 0154): the next press on the canvas gives what is under it to `take` instead of picking it. */

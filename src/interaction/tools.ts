@@ -33,7 +33,7 @@ import { visibleObjects } from "../render/scene-view";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import { boxSelect, edgeDistancePx, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
-import { EDGE_PICK_PX, createReveal, deepPick, isDeepPress, revealHits } from "./reveal";
+import { EDGE_PICK_PX, createReveal, deepPick, isDeepPress, revealHits, revealRowAt } from "./reveal";
 import { descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
 import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
@@ -1273,6 +1273,24 @@ export function attachTools(
         return;
       }
     }
+    // The revealed list is a list to pick from: Ctrl+click on a row picks that very thing (Shift adds it or takes it away); a row that cannot be picked does nothing.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const row = revealRowAt(editor, s.x, s.y);
+      if (row !== undefined) {
+        const o = row ? doc.get(row) : undefined;
+        if (o) {
+          if (e.shiftKey && editor.selection.has(o.id)) {
+            editor.selection.delete(o.id);
+            editor.changed();
+          } else {
+            editor.entered = [...(o.groups ?? [])];
+            editor.openMask = maskAbove(o)?.id ?? null;
+            editor.select([o.id], e.shiftKey);
+          }
+        }
+        return;
+      }
+    }
     const vis = visible();
     // Rotate and resize handles take priority when a selection is visible.
     const sel = editor.selection.size ? selectedFrame(vis, editor, view.viewport) : null;
@@ -1366,12 +1384,13 @@ export function attachTools(
       editor.openMask = maskAbove(target)?.id ?? null;
     }
     let click: CanvasObject | undefined;
-    // Ctrl held over a picked thing's shape (ADR 0149): a drag from anywhere inside it moves it, whatever covers it; a click that does not move
-    // picks the thing Ctrl+click would have picked.
-    if (deep && !e.altKey && !e.shiftKey && !editor.selection.has(deep.obj.id)) {
-      const inside = revealHits(vis, s.x, s.y).find((h) => editor.selection.has(h.obj.id));
+    // A picked thing is moved by a drag from anywhere inside its shape, whatever covers it (a sheet is ground, so not it, unless Ctrl is held); a click
+    // that does not move picks what a click would have picked.
+    const front = deep ?? (target ? { obj: target } : null);
+    if (front && !e.altKey && !e.shiftKey && editor.selection.size && !editor.selection.has(front.obj.id)) {
+      const inside = revealHits(vis, s.x, s.y).find((h) => editor.selection.has(h.obj.id) && (deep || !isContainer(h.obj)));
       if (inside) {
-        click = deep.obj;
+        click = front.obj;
         target = inside.obj;
       }
     }
