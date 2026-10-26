@@ -7,7 +7,7 @@
 export type ClipboardResult = "image" | "text" | "failed";
 
 export interface ClipboardParts {
-  /** The picture as a PNG (or a promise of it: the browser starts writing at once and waits for it). */
+  /** The picture as a PNG (or a promise of it: it is awaited before writing, see below). */
   readonly image?: Blob | Promise<Blob>;
   readonly text?: string;
   /** Put the text beside the picture too (copied texts, where a text field should get the words). */
@@ -17,7 +17,9 @@ export interface ClipboardParts {
 export async function writeSystemClipboard(p: ClipboardParts): Promise<ClipboardResult> {
   if (p.image && typeof ClipboardItem !== "undefined") {
     try {
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": p.image, ...(p.withText && p.text ? { "text/plain": new Blob([p.text], { type: "text/plain" }) } : {}) })]);
+      // The picture is made first and written as a plain Blob: Firefox refuses a ClipboardItem that holds a promise (NotAllowedError), Chromium takes either.
+      const image = await p.image;
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": image, ...(p.withText && p.text ? { "text/plain": new Blob([p.text], { type: "text/plain" }) } : {}) })]);
       return "image";
     } catch {
       // the picture could not be made or written: the text, if there is any, is the next best thing

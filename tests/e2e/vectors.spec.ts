@@ -3469,6 +3469,31 @@ test("Ctrl+C puts the shape on the system clipboard as a PNG picture alone, \"Co
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("Ctrl+C writes the picture to the clipboard in every browser (Firefox refuses a ClipboardItem that holds a promise, so the picture is made first)", async ({ app, browserName }) => {
+  const p = app.page;
+  if (browserName === "chromium") await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.evaluate(() => {
+    const w = window as unknown as { __clip: string[] };
+    w.__clip = [];
+    const orig = navigator.clipboard.write.bind(navigator.clipboard);
+    navigator.clipboard.write = async (items) => {
+      try {
+        await orig(items);
+        w.__clip.push(`ok ${items.map((i) => i.types.join("+")).join(";")}`);
+      } catch (e) {
+        w.__clip.push(`refused ${String(e)}`);
+        throw e;
+      }
+    };
+  });
+  await key(app, "u");
+  await p.click('[data-shape-kind="ellipse"]');
+  await drag(app, [500, 300], [700, 400]);
+  await key(app, "v");
+  await p.keyboard.press("Control+c");
+  await expect.poll(() => p.evaluate(() => (window as unknown as { __clip: string[] }).__clip)).toEqual(["ok image/png"]);
+});
+
 test("adjustments on a shape: drawn on what it looks like, blur spreads past its edge, one undo step, kept over a reload", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
