@@ -503,3 +503,49 @@ test("Settings > Storage holds the backup: the last backup, a full export, the c
   await p.getByTestId("confirm-cancel").click();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a workspace password travels in a backup only when included, and an import sets it only where there is none", async ({ app, browser }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.getByTestId("workspace-pw-set").click();
+  for (let i = 0; i < 2; i++) {
+    await p.getByTestId("prompt-input").fill("open sesame");
+    await p.getByTestId("prompt-ok").click();
+  }
+  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText("A password is set");
+  await p.getByTestId("view-canvas").click();
+  await openPanel(p);
+  // Left out (asked, and the first choice is to leave it out): no trace in the file.
+  const left = await download(p, async () => {
+    await p.getByTestId("set-export-full").click();
+    await expect(p.getByTestId("choose-dialog")).toContainText("the password of the workspace");
+    await p.getByTestId("choose-ok").click();
+  });
+  expect((await manifestOf(left.bytes))["workspaceLock"]).toBeUndefined();
+  // Included: the password is asked first, and the file carries its hash (never the password).
+  const kept = await download(p, async () => {
+    await p.getByTestId("set-export-full").click();
+    await p.getByRole("radio", { name: /Include them/ }).check();
+    await p.getByTestId("choose-ok").click();
+    await p.getByTestId("prompt-input").fill("open sesame");
+    await p.getByTestId("prompt-ok").click();
+  });
+  const m = await manifestOf(kept.bytes);
+  expect(m["workspaceLock"]).toMatch(/^pbkdf2\$/);
+  expect(kept.bytes.includes(Buffer.from("open sesame"))).toBe(false);
+
+  // A fresh profile has no password: the import sets it, and the next start asks for it.
+  const { context, page } = await freshProfile(browser);
+  try {
+    expect(await importArchive(page, kept.name, kept.bytes)).toContain("password for the whole workspace");
+    await page.reload();
+    await expect(page.getByTestId("lock-screen")).toBeVisible();
+    await page.getByTestId("lock-input").fill("open sesame");
+    await page.getByTestId("lock-input").press("Enter");
+    await expect(page.getByTestId("lock-screen")).toHaveCount(0);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  } finally {
+    await context.close();
+  }
+});

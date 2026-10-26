@@ -39,9 +39,9 @@ Unverified / Committed / Next bounded task**.
 ## Hidden library items and passwords (v0.46.0, 2026-10-27)
 
 **Implemented:** Rename in the canvas context menu; a `hidden` flag on library items with a Hidden list opened by a word typed in the library search; a password gate for the Hidden items and one for the whole workspace (a lock screen before the workspace is read), both salted PBKDF2 hashes kept in the browser's catalog (no encryption); export questions for hidden items and for passwords and privacy settings; the library index leaves hidden items out.
-**Tested:** `organize.spec.ts` (hiding, the word, the password, the export questions, keep-open), `settings.spec.ts` (the lock screen), plus the archive, organize and settings specs in Chromium: 38 passed. The quick and full suites were not run.
-**Known failures:** `assets.spec.ts` "what a file says about itself" (the metadata fold stays open after picking another card) fails the same way before these changes.
-**Unverified:** Firefox and the other Chromium projects for these specs; importing a backup that carries a workspace password; a workspace password in a backup; the lock screen on a touch screen.
+**Tested:** `organize.spec.ts` (hiding, the word, the password, the export questions, keep-open), `settings.spec.ts` (the lock screen), `archive.spec.ts` (a workspace password in a backup, left out and included, and an import that sets it where there is none), `assets.spec.ts` (the metadata fold): organize, archive, settings and assets specs in Chromium, 91 passed; the new and changed tests in Firefox, 4 passed. The quick and full suites were not run.
+**Known failures:** none. The Details fold of the library panel read its open state from a `toggle` event that a quick pick of another item could outrun (a failure that predates this slice); it is now read when the panel is drawn.
+**Unverified:** the lock screen on a touch screen; the `chromium-cpu` and `chromium-dpr2` projects (these specs are logic specs and run in `chromium`).
 **Committed:** this slice (see the commit).
 **Next bounded task:** file encryption for the hidden items (the password would derive the key), and a remember-for-this-tab option for the workspace password.
 

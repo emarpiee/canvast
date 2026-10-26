@@ -214,10 +214,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
   // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
   let detailsOpen = false;
-  inspector.addEventListener("toggle", (e) => {
-    const d = e.target as HTMLElement;
-    if (d.matches?.("details[data-metadata]")) detailsOpen = (d as HTMLDetailsElement).open;
-  }, true);
+  // Read from the fold itself just before the panel is drawn again (its `toggle` event comes a task later, after a quick pick of another item has already replaced it).
+  const keepDetails = (): void => {
+    const d = inspector.querySelector<HTMLDetailsElement>("details[data-metadata]");
+    if (d) detailsOpen = d.open;
+  };
   const status = root.querySelector<HTMLElement>(".assets-status")!;
   const count = root.querySelector<HTMLElement>(".assets-count")!;
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
@@ -1418,6 +1419,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const dis = session.readOnly ? " disabled" : "";
     const bytes = ents.reduce((t, e) => t + e.size, 0);
     inspector.dataset["hash"] = "";
+    keepDetails();
     inspector.innerHTML = `
       <div class="asset-insp-head">
         <h2>${n} selected</h2>${(() => {
@@ -1458,6 +1460,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       // the panel keeps its place with nothing picked (so the grid does not change width when a pick ends)
       inspector.hidden = narrow.matches;
       inspector.dataset["hash"] = "";
+      keepDetails();
       inspector.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Pick an item to see its details. Several picked: their tags and folder together.</p>`;
       return;
     }
@@ -1479,6 +1482,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
     const fav = e ? meta(e).favorite : false;
     const hid = e ? meta(e).hidden : false;
+    keepDetails();
     inspector.innerHTML = `
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
