@@ -226,6 +226,22 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   const z = await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]));
   const manifest = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<{ hash: string }> };
   expect(manifest.assets.map((a) => a.hash)).toEqual([GREEN_HASH]);
+
+  // Left alone, the list closes with the library; with "keep open" on, it stays (and asks no more) until the tab closes.
+  await p.getByTestId("view-assets").click();
+  await expect(side(p, /Hidden/)).toHaveCount(0);
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.locator('[data-row="library.hiddenRemember"] input').check();
+  await p.getByTestId("view-assets").click();
+  await search.fill("hidden:");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await expect(side(p, /Hidden/)).toContainText("1");
+  await p.getByTestId("view-canvas").click();
+  await p.getByTestId("view-assets").click();
+  await expect(side(p, /Hidden/)).toContainText("1");
+  await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
 

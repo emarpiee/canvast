@@ -40,7 +40,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askHiddenPassword } from "../ui/hidden-access";
+import { askHiddenPassword, forgetHiddenPassword } from "../ui/hidden-access";
 import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -1699,6 +1699,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (action === "status") return state();
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
       if (!(await askHiddenPassword(session, "Enter the current password."))) return state("Not changed.");
+      forgetHiddenPassword();
       if (action === "remove") return (await session.setHiddenPassword(null)) ? state("The password was removed.") : state();
       const first = await promptDialog({ title: "New password", lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
       if (!first) return state("Not changed.");

@@ -2719,7 +2719,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (word && search.value.trim().toLowerCase() === word) {
       search.value = "";
       paintSearchUi();
-      void askHiddenPassword(session, "Enter the password to open the Hidden items.").then((ok) => {
+      void askHiddenPassword(session, "Enter the password to open the Hidden items.", settings.get("library.hiddenRemember")).then((ok) => {
         if (!ok) return searchChanged();
         scope = "hidden";
         sideMenu = null;
@@ -2883,7 +2883,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       search.select();
     },
     hide() {
-      if (scope === "hidden") scope = "all"; // (leaving the library locks the Hidden items again)
+      if (scope === "hidden" && !settings.get("library.hiddenRemember")) scope = "all"; // (leaving the library locks the Hidden items again, unless the tab remembers the password)
       visible = false;
       // The viewer stays as it is for when the library is opened again (after placing an asset, say); only sound and the show stop.
       eng?.pause();

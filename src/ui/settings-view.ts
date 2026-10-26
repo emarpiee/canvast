@@ -230,6 +230,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Privacy",
     rows: [
       { key: "library.hiddenWord", label: "Word that opens the Hidden items", help: "Type this in the library's search box to open the items you hid (it asks for the password first, if you set one). The list is not shown anywhere else. Leave it empty to turn this off. Pick something that is not a word you would search for.", control: { kind: "text", max: 40, placeholder: "hidden:" } },
+      { key: "library.hiddenRemember", label: "Keep the Hidden items open until the tab closes", help: "Off (the default): the Hidden list closes when you choose another list or leave the library, and asks for the password again. On: after the password is given once, the list stays open, and opens without the password again, until this tab is closed or reloaded. Exporting hidden items always asks.", control: { kind: "toggle" } },
     ],
   },
   { id: "collaboration", label: "Collaboration" },

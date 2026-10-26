@@ -7,13 +7,28 @@ import { plural } from "../doc/plural";
  * Where the Hidden list's password is asked (a gate in front of the list and of exporting hidden items; the files themselves are not encrypted).
  * With no password set, nothing is asked.
  */
-export async function askHiddenPassword(session: Session, why: string): Promise<boolean> {
+let rememberedHere = false;
+/** Forget the password given in this tab (the password was changed or removed, or remembering was turned off). */
+export function forgetHiddenPassword(): void {
+  rememberedHere = false;
+}
+
+/**
+ * `remember`: a right password is kept for this tab only (in memory, so a reload or closing the tab forgets it) and not asked again.
+ * Only the Hidden list uses it; an export always asks.
+ */
+export async function askHiddenPassword(session: Session, why: string, remember = false): Promise<boolean> {
+  if (!remember) rememberedHere = false;
+  if (remember && rememberedHere) return true;
   if (!(await session.hasHiddenPassword())) return true;
   let wrong = false;
   for (;;) {
     const typed = await promptDialog({ title: "Password", lines: [why, ...(wrong ? ["That is not the password."] : [])], value: "", confirmLabel: "Continue", secret: true });
     if (typed === null) return false;
-    if (await session.checkHiddenPassword(typed)) return true;
+    if (await session.checkHiddenPassword(typed)) {
+      rememberedHere = remember;
+      return true;
+    }
     wrong = true;
   }
 }
