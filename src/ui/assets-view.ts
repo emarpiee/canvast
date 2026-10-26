@@ -1483,11 +1483,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${e ? organizeHtml(e) : ""}
       ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
       <div class="asset-actions">
-        ${e ? `<button type="button" aria-label="Rename…" title="Rename it, or change its extension (F2)" class="assets-btn is-icon" data-action="rename" data-testid="asset-rename"${ro}>${ICONS.textCursorInput}</button>` : ""}
-        ${e?.present ? `<button type="button" aria-label="Download original" title="Download the original file" class="assets-btn is-icon" data-action="download" data-testid="asset-download">${ICONS.download}</button>` : ""}
-        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" aria-label="Open in a new tab" title="Open in a new tab" class="assets-btn is-icon" data-action="open-tab" data-testid="asset-open-tab">${ICONS.externalLink}</button>` : ""}
-        ${e?.present ? `<button type="button" aria-label="Export as archive" title="Export as archive" class="assets-btn is-icon" data-action="export" data-testid="asset-export">${ICONS.fileOutput}</button>` : ""}
-        ${e ? `<button type="button" aria-label="Delete from library" title="Delete from library" class="assets-btn is-icon is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}</button>
+        ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download</span></button>` : ""}
+        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export</span></button>` : ""}
+        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted on its own. Remove its ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first, or delete it everywhere.</p>
                <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="asset-delete-everywhere"${ro}>${ICONS.trash2}<span>Delete everywhere…</span></button>` : ""}` : ""}
       </div>
@@ -1558,7 +1558,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
         ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
-        <button type="button" class="assets-btn${bulk ? "" : " is-icon"}" aria-label="New folder${bulk ? ` for these ${n}` : ""}" title="New folder${bulk ? ` for these ${n}` : ""}…" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}"${dis}>${ICONS.folderPlus}${bulk ? `<span>New folder for these ${n}…</span>` : ""}</button>
+        <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
       </section>`;
   };
 

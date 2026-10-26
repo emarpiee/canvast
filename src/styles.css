@@ -2735,11 +2735,3 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .asset-sec .asset-sub { margin-top: var(--sp-3); padding-top: var(--sp-5); border-top: 1px solid var(--hud-border); }
 .asset-more[data-metadata] { padding: var(--sp-4) var(--sp-5); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
 .asset-more[data-metadata] h4 { margin-top: var(--sp-5); }
-/* Actions: icon buttons in one row, the dangerous one pushed to the end; folders as a wrapping row of choices. */
-.asset-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
-.asset-actions .assets-btn.is-icon { justify-content: center; }
-.asset-actions .assets-btn.is-danger { grid-column: auto; margin-left: auto; }
-.asset-actions .asset-note, .asset-actions > .assets-btn:not(.is-icon) { flex: 1 1 100%; }
-.asset-folders { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); max-height: none; }
-.asset-folders li { min-width: 0; }
-.asset-sec > .assets-btn[data-action="new-folder-into"].is-icon { justify-self: start; }
