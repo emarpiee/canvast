@@ -2213,6 +2213,18 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   // A click (no move) there picks what is on top, as before.
   await p.mouse.click(after.minX + 20, after.minY);
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([big.id]);
+
+  // With Ctrl held, a drag from anywhere inside the picked small one moves it (not only from its outline); Ctrl+click there without moving picks the top one.
+  await p.mouse.click(120, 650);
+  await ctrlClick(after.minX + 1, (after.minY + after.maxY) / 2);
+  const mid = { x: (after.minX + after.maxX) / 2, y: (after.minY + after.maxY) / 2 };
+  await p.keyboard.down("Control");
+  await app.drag(mid, { x: mid.x + 30, y: mid.y + 30 }, 8);
+  await p.keyboard.up("Control");
+  const moved = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, small.id);
+  expect(Math.round(moved.minX - after.minX), "moved from the inside").toBe(30);
+  expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
+  expect(await ctrlClick(mid.x + 30, mid.y + 30), "a Ctrl+click that does not move picks the top one").toEqual([big.id]);
 });
 
 test("Ctrl+Shift+click adds the very thing under the pointer to what is picked (and takes it away), Ctrl+Alt+click goes down the stack, hovering a Layers row reveals its outline (reveal module)", async ({ app }) => {

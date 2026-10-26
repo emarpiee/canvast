@@ -1366,6 +1366,15 @@ export function attachTools(
       editor.openMask = maskAbove(target)?.id ?? null;
     }
     let click: CanvasObject | undefined;
+    // Ctrl held over a picked thing's shape (ADR 0149): a drag from anywhere inside it moves it, whatever covers it; a click that does not move
+    // picks the thing Ctrl+click would have picked.
+    if (deep && !e.altKey && !e.shiftKey && !editor.selection.has(deep.obj.id)) {
+      const inside = revealHits(vis, s.x, s.y).find((h) => editor.selection.has(h.obj.id));
+      if (inside) {
+        click = deep.obj;
+        target = inside.obj;
+      }
+    }
     // A picked thing can be taken by its outline even when a filled shape covers it (what Ctrl+click on a revealed outline picked): a drag from
     // there moves it; a click that does not move picks the thing on top, as it always did.
     if (!deep && !e.altKey && !e.shiftKey && target && editor.selection.size && !editor.selection.has(target.id)) {
