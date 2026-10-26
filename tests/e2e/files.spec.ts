@@ -164,10 +164,17 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
   const names = async (): Promise<string[]> => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.name))).sort();
   const dialog = p.getByTestId("rename-dialog");
-  // One: the name to edit, extension included; the file type, chip and download name follow.
+  // One: the name to edit without its extension (kept), then the extension changed on purpose; the file type, chip and download name follow.
   await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click();
   await p.getByTestId("asset-rename").click();
   await expect(dialog).toBeVisible();
+  await expect(p.getByLabel("New name", { exact: true }), "the field has the name without its extension").toHaveValue("robot");
+  await p.getByLabel("New name", { exact: true }).fill("robot2");
+  await p.getByTestId("rename-ok").click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(names).toEqual(["notes.txt", "robot2.glb", "scene.xyz"]); // the extension is kept
+  await p.getByTestId("asset-rename").click();
+  await p.getByRole("button", { name: "Change the extension too" }).click();
   await p.getByLabel("New name", { exact: true }).fill("droid.obj");
   await p.getByTestId("rename-ok").click();
   await expect(dialog).toBeHidden();

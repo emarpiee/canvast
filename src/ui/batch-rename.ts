@@ -39,12 +39,17 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
   dlg.className = "confirm rename-dialog";
   dlg.dataset["testid"] = "rename-dialog";
   dlg.setAttribute("aria-labelledby", "rn-title");
+  // One name: only the part before the extension is edited (the extension stays, so it cannot be changed by accident); "Change the extension too" opens the whole name.
+  const one0 = one ? splitName(items[0]!.name) : { stem: "", ext: "" };
+  const oneExt = one && ext && one0.ext !== "";
+  let whole = !oneExt;
   const modes = MODES.filter(([m]) => ext || m !== "extension");
   dlg.innerHTML = `
     <h2 id="rn-title">${one ? "Rename" : `Rename ${items.length} ${esc(noun)}`}</h2>
     ${
       one
-        ? `<label class="rn-field"><span>New name</span><input type="text" class="rn-input" data-rn="one" value="${esc(items[0]!.name)}" aria-label="New name" maxlength="200" autocomplete="off" spellcheck="false"></label>`
+        ? `<label class="rn-field"><span>New name</span><span class="rn-name"><input type="text" class="rn-input" data-rn="one" value="${esc(oneExt ? one0.stem : items[0]!.name)}" aria-label="New name" maxlength="200" autocomplete="off" spellcheck="false">${oneExt ? `<span class="rn-ext" data-rn="ext-fixed">${esc(one0.ext)}</span>` : ""}</span></label>
+           ${oneExt ? `<button type="button" class="rn-link" data-rn="full">Change the extension too</button>` : ""}`
         : `<div class="rn-row"><label for="rn-mode">How to rename:</label>
              <select id="rn-mode" data-rn="mode">${modes.map(([m, l]) => `<option value="${m}">${esc(l)}</option>`).join("")}</select></div>
            <div class="rn-fields" data-for="enumerate">
@@ -92,7 +97,7 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
   const newNames = (): string[] => {
     if (one) {
       const v = field("one").value.trim();
-      return [v || items[0]!.name];
+      return [v ? (whole ? v : v + one0.ext) : items[0]!.name];
     }
     return applyRule(items.map((i) => i.name), rule());
   };
@@ -118,6 +123,14 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
       q<HTMLElement>(".rn-h").textContent = `Preview (${changed === items.length ? `all ${items.length} change` : `${changed} of ${items.length} change`})`;
     }
   };
+  dlg.querySelector<HTMLElement>('[data-rn="full"]')?.addEventListener("click", (e) => {
+    whole = true;
+    field("one").value += one0.ext;
+    q<HTMLElement>('[data-rn="ext-fixed"]').hidden = true;
+    (e.currentTarget as HTMLElement).hidden = true;
+    field("one").focus();
+    refresh();
+  });
   dlg.addEventListener("input", refresh);
   dlg.addEventListener("change", refresh);
 
@@ -148,12 +161,12 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
     });
     refresh();
     dlg.showModal();
-    // The name to edit gets the focus, with the part before the extension selected (a file manager does the same).
+    // The name to edit gets the focus, all of it selected (the extension is not in the field).
     const first = one ? field("one") : (modeSel as HTMLElement);
     first.focus();
     if (one) {
       const v = field("one").value;
-      field("one").setSelectionRange(0, ext ? splitName(v).stem.length : v.length);
+      field("one").setSelectionRange(0, v.length);
     }
   });
 }

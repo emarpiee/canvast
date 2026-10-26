@@ -2450,5 +2450,14 @@ test("what a file says about itself is shown in its details (camera, settings, o
   await expect(meta).toContainText("Acme");
   await expect(meta).toContainText("Turned 90° right");
   await expect(meta).toContainText("800");
+  // It stays open when the pick goes elsewhere and comes back (only you close it).
+  await p.keyboard.press("Escape");
+  await p.locator('[data-testid="asset-card"]').first().click();
+  await expect(p.getByTestId("asset-metadata")).toHaveAttribute("open", "");
+  await p.getByTestId("asset-metadata").locator("summary").click();
+  await expect(p.getByTestId("asset-metadata")).not.toHaveAttribute("open", "");
+  await p.keyboard.press("Escape");
+  await p.locator('[data-testid="asset-card"]').first().click();
+  await expect(p.getByTestId("asset-metadata")).not.toHaveAttribute("open", "");
   expect(app.consoleErrors).toEqual([]);
 });

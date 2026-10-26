@@ -2057,6 +2057,13 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .rn-fields { display: grid; gap: var(--sp-4); margin-bottom: var(--sp-4); }
 .rn-fields[hidden], .rn-keep[hidden] { display: none; }
 .rn-field { display: grid; gap: var(--sp-2); }
+.rn-name { display: flex; align-items: center; gap: var(--sp-3); color: var(--hud-fg); }
+.rn-name .rn-input { flex: 1; min-width: 0; }
+.rn-name .rn-ext { color: var(--hud-muted); font-size: var(--text-md); }
+.rn-name .rn-ext[hidden] { display: none; }
+.rn-link { justify-self: start; margin-bottom: var(--sp-4); padding: 0; color: var(--hud-muted); font-size: var(--text-sm); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.rn-link:hover { color: var(--hud-fg); }
+.rn-link[hidden] { display: none; }
 .rn-field > span, .rn-inline > span { color: var(--hud-muted); font-size: var(--text-sm); }
 .rn-input { min-width: 0; height: var(--list-h); padding: 0 var(--sp-5); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .rn-input:focus, .rn-num:focus, .rn-row select:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

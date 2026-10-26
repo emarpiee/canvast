@@ -207,6 +207,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const film = root.querySelector<HTMLElement>(".viewer-film")!;
   const grid = root.querySelector<HTMLElement>(".assets-grid")!;
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
+  // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
+  let detailsOpen = false;
+  inspector.addEventListener("toggle", (e) => {
+    const d = e.target as HTMLElement;
+    if (d.matches?.("details[data-metadata]")) detailsOpen = (d as HTMLDetailsElement).open;
+  }, true);
   const status = root.querySelector<HTMLElement>(".assets-status")!;
   const count = root.querySelector<HTMLElement>(".assets-count")!;
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
@@ -1490,7 +1496,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted on its own. Remove its ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first, or delete it everywhere.</p>
                <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="asset-delete-everywhere"${ro}>${ICONS.trash2}<span>Delete everywhere…</span></button>` : ""}` : ""}
       </div>
-      <details class="asset-more" data-testid="asset-metadata" data-metadata><summary>Details</summary>
+      <details class="asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}><summary>Details</summary>
         <div data-metadata-body></div>
         <dl>
           ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleDateString()}</dd>` : ""}
