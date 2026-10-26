@@ -205,7 +205,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
 
   // The word opens the list, after the password; a wrong one asks again.
   await p.getByTestId("view-assets").click();
-  await search.fill("tago");
+  await search.fill("hidden:");
   await p.getByTestId("prompt-input").fill("nope");
   await p.getByTestId("prompt-ok").click();
   await expect(p.getByTestId("prompt-dialog")).toContainText("not the password");
