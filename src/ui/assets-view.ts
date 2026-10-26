@@ -1483,19 +1483,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${e ? organizeHtml(e) : ""}
       ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
       <div class="asset-actions">
-        ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename…</span></button>` : ""}
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download original</span></button>` : ""}
-        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in a new tab</span></button>` : ""}
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export as archive</span></button>` : ""}
+        ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download</span></button>` : ""}
+        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
                ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted on its own. Remove its ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first, or delete it everywhere.</p>
                <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="asset-delete-everywhere"${ro}>${ICONS.trash2}<span>Delete everywhere…</span></button>` : ""}` : ""}
       </div>
-      ${e?.present && !isCard(e) ? `<details class="asset-more" data-testid="asset-metadata" data-metadata hidden><summary>What the file says</summary><div data-metadata-body></div></details>` : ""}
-      <details class="asset-more"><summary>Technical details</summary>
+      <details class="asset-more" data-testid="asset-metadata" data-metadata><summary>Details</summary>
+        <div data-metadata-body></div>
         <dl>
-          ${e ? `<dt>Type</dt><dd>${esc(e.type)}</dd><dt>Stored size</dt><dd>${fmtBytes(e.size)} (one copy)</dd><dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
-          <dt>Content hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 16)}…</dd>
+          ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleDateString()}</dd>` : ""}
+          <dt>Hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 12)}…</dd>
         </dl>
       </details>`;
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
@@ -1521,7 +1521,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const groups = new Map<string, MetaRow[]>();
     for (const r of rows) (groups.get(r.group) ?? groups.set(r.group, []).get(r.group)!).push(r);
     box.querySelector("[data-metadata-body]")!.innerHTML = [...groups].map(([g, rs]) => `<h4>${esc(g)}</h4><dl>${rs.map((r) => `<dt>${esc(r.label)}</dt><dd>${esc(r.value)}</dd>`).join("")}</dl>`).join("");
-    box.hidden = false;
   };
 
   /**
@@ -1557,9 +1556,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <input class="tag-input${bulk ? " bulk-tag-input" : ""}" data-testid="${bulk ? "bulk-tag-input" : "asset-tag-input"}" list="tag-suggest" placeholder="${bulk ? `Add a tag to all ${n}` : "Add a tag"}" aria-label="${bulk ? "Add a tag to all selected" : "Add a tag"}" title="Type a tag (or several, with commas) and press Enter" maxlength="64"${dis}>
           <datalist id="tag-suggest">${known.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
         </div>
-      </section>
-      <section class="asset-sec">
-        <h3>${bulk ? "Folder of these" : "Folder"}</h3>
+        <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
         ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
         <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
       </section>`;
