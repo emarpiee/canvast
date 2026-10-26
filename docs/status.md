@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Hidden library items and passwords (v0.46.0, 2026-10-27)
+
+**Implemented:** Rename in the canvas context menu; a `hidden` flag on library items with a Hidden list opened by a word typed in the library search; a password gate for the Hidden items and one for the whole workspace (a lock screen before the workspace is read), both salted PBKDF2 hashes kept in the browser's catalog (no encryption); export questions for hidden items and for passwords and privacy settings; the library index leaves hidden items out.
+**Tested:** `organize.spec.ts` (hiding, the word, the password, the export questions, keep-open), `settings.spec.ts` (the lock screen), plus the archive, organize and settings specs in Chromium: 38 passed. The quick and full suites were not run.
+**Known failures:** `assets.spec.ts` "what a file says about itself" (the metadata fold stays open after picking another card) fails the same way before these changes.
+**Unverified:** Firefox and the other Chromium projects for these specs; importing a backup that carries a workspace password; a workspace password in a backup; the lock screen on a touch screen.
+**Committed:** this slice (see the commit).
+**Next bounded task:** file encryption for the hidden items (the password would derive the key), and a remember-for-this-tab option for the workspace password.
+
 ## Objects fills live; Vary each copy (v0.40.1, v0.41.0, 2026-10-25)
 
 **Implemented:** objects fills follow a source during a gesture (texture host draws with the preview; filled shapes' tiles refreshed through `fillUsersOf`). `vary` on a texture ([ADR 0173](adr/0173-vary-texture-copies.md)): per-cell hashed copies (`copyAt`, `varyPeriod`), a cached repeated block, or the copies in view one by one when shown large; SVG writes the block; the texture editor has a Vary section (field and choice tables), New seed, and Randomize rolls Vary.

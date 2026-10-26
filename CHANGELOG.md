@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.46.0 — Hidden library items and passwords (2026-10-27)
+
+- **Added:** *Rename* in the canvas context menu on a picture: it renames the file in the library (with the library's own dialog) and a layer that has a name of its own.
+- **Added:** **Hide** an item from the library (details panel, bulk bar, context menu). A hidden item is left out of All, folders, tags, counts, searches, Similar images and the texture-fill and font pickers; pictures already placed on a canvas still show. The Hidden list is not in the sidebar: type its opening word in the library search (`hidden:` by default, changeable in Settings > Privacy).
+- **Added:** an optional **password for the Hidden items** and an optional **password for the whole workspace** (asked when the app opens, before anything is read). Both are gates, not encryption: the data is stored as it is, and a forgotten password cannot be recovered. *Keep the Hidden items open until the tab closes* is an option.
+- **Added:** an export that would carry hidden items asks whether to include them (the password first) or leave them out; a workspace backup asks whether to include the passwords and privacy settings. The automatic library index never carries hidden items or passwords.
+- **Fixed:** the pressed Hide button used the star yellow; it uses the theme accent.
+
 ## 0.43.1 — Varied fills deep in, without the stall (2026-10-26)
 
 - **Fixed:** zooming into a shape with a varied fill, where its copies are drawn one by one, took seconds a step on a high-density screen (about 6 s at twice the pixels): every tile of the view drew all the copies in view again. They are now drawn once a frame and shared by the tiles (about 0.4 s a step in the same test).
