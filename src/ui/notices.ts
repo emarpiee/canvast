@@ -5,8 +5,8 @@ import { esc } from "./format";
 /**
  * Notices (ADR 0053): what the app tells the user, where it can be seen. A stack at the bottom centre of the window, above every view,
  * replaces the small line that used to appear in the toolbar for a few seconds. A notice has an icon and a colour by kind, a progress
- * bar when it reports work in progress (importing, indexing), a close button, and a live region so it is read out. Successes and facts
- * fade after a while, errors stay longer, and a progress notice stays while it is being updated.
+ * bar when it reports work in progress (importing, indexing), a close button, and a live region so it is read out. Each notice fades after a time
+ * worked out from its words (`lifetimeOf`), errors stay longer, and a progress notice stays while it is being updated.
  *
  * Code anywhere still sets `editor.message`; this module takes it, works out the kind from the wording and the progress from
  * "3 of 10" or "45%", and replaces the earlier notice of the same activity instead of stacking a new one.
@@ -39,7 +39,10 @@ export function classify(text: string): Notice {
   return { text, kind: "info" };
 }
 
-const LIFETIME_MS: Record<NoticeKind, number> = { info: 6000, success: 5000, warning: 9000, error: 14000, progress: 4000 };
+/** How long a notice stays: a little to notice it plus time to read it (about 55 ms a character, more with a button to press), at least this much for its kind and at most the cap. */
+const MIN_MS: Record<NoticeKind, number> = { info: 2500, success: 2200, warning: 4000, error: 6000, progress: 2500 };
+const MAX_MS: Record<NoticeKind, number> = { info: 10_000, success: 8000, warning: 12_000, error: 16_000, progress: 6000 };
+export const lifetimeOf = (n: Notice): number => Math.min(MAX_MS[n.kind], Math.max(MIN_MS[n.kind], 1500 + 55 * n.text.length + (n.action ? 2500 : 0)));
 const MAX_SHOWN = 3;
 /** A sticky progress notice that has not been updated for this long is closed: the work must have ended without saying so. */
 const WATCHDOG_MS = 120_000;
@@ -76,7 +79,7 @@ export function mountNotices(host: HTMLElement, editor: EditorState): { push(n: 
   };
   const arm = (s: Shown): void => {
     if (s.timer) clearTimeout(s.timer);
-    s.timer = setTimeout(() => remove(s), s.notice.sticky ? WATCHDOG_MS : LIFETIME_MS[s.notice.kind]);
+    s.timer = setTimeout(() => remove(s), s.notice.sticky ? WATCHDOG_MS : lifetimeOf(s.notice));
   };
 
   const push = (n: Notice): void => {
