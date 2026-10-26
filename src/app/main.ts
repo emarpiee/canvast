@@ -1863,6 +1863,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (hit && !editor.selection.has(hit.id)) editor.select([hit.id]);
       return !!hit; // (empty canvas: the menu of the canvas, whatever is picked)
     },
+    layersAt: (x, y) => revealHits(visibleObjects(doc, index, null, view.frameCamera, view.viewport), x, y).length,
+    selectLayer: (x, y) => canvas.dispatchEvent(new CustomEvent("canvast-layers", { detail: { x, y } })),
   });
   registry.setProvider("panels", () => dock.commands().map((c): Command => ({ ...c, enabled: () => appView === "canvas" && (c.enabled?.() ?? true) })));
   registry.setProvider("settings", () => [

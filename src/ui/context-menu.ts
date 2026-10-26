@@ -20,6 +20,10 @@ export interface ContextMenuHooks {
   active(): boolean;
   /** Pick what is at the point (canvas px) if it is not picked already; whether there is something there. */
   pickAt(x: number, y: number): boolean;
+  /** How many things lie under the point (canvas px), by shape. */
+  layersAt(x: number, y: number): number;
+  /** List them to choose from: a row picks that very thing, however deep or far back. */
+  selectLayer(x: number, y: number): void;
 }
 
 /** The context menu of the canvas (right click, or the menu key / Shift+F10 at the middle of the picked item's place): the registry's commands that apply now. */
@@ -32,11 +36,15 @@ export function mountContextMenu(canvas: HTMLElement, registry: CommandRegistry,
     const r = canvas.getBoundingClientRect();
     const picked = hooks.pickAt(e.clientX - r.left, e.clientY - r.top);
     const all = registry.all();
-    const items: MenuItem[] = (picked ? ON_ITEMS : ON_EMPTY).flatMap((title): MenuItem[] => {
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    const layers = picked ? hooks.layersAt(px, py) : 0;
+    // Select layer: what lies under the pointer, to pick from (a thing behind another, inside a group or a mask).
+    const stack: MenuItem[] = layers > 1 ? [{ id: "select-layer", label: "Select layer", icon: ICONS.layers2, hint: `${layers} things here`, run: () => void window.setTimeout(() => hooks.selectLayer(px, py), 0) }] : [];
+    const items: MenuItem[] = [...stack, ...(picked ? ON_ITEMS : ON_EMPTY).flatMap((title): MenuItem[] => {
       const c = all.find((x) => x.title === title && x.group !== "Tool");
       if (!c || (c.enabled && !c.enabled())) return [];
       return [{ label: title, ...(ICON[title] ? { icon: ICON[title] } : {}), danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
-    });
+    })];
     if (!items.length) return;
     // An invisible anchor where the pointer is: the menu opens from it, to the right and down (or where there is room).
     const anchor = document.createElement("div");
