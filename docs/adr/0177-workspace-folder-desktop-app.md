@@ -156,7 +156,7 @@ Each step ends in a working app and is committed and released on its own.
 | 3 | The workspace password (asked when the app opens) | **Only locks the app**; it is not encryption, and the app says so. Only hidden items are encrypted |
 | 4 | Electron or Tauri | **Electron** |
 | 5 | First desktop package | **Linux AppImage**; other platforms later |
-| 6 | Should the browser build in Chromium also open a workspace folder? | Open: explained to the owner, waiting for the answer. Does not block steps 1 to 5 |
+| 6 | Should the browser build in Chromium also open a workspace folder? | **No.** The browser build keeps working as it does today (IndexedDB). The two builds share one codebase: everything above the storage adapter is the same code, so a fix lands in both (no copies of logic per build) |
 | 7 | Canvas previews in the file manager | **None.** What the app makes for itself (thumbnails, caches, previews) stays only in the dot folders; a `.cvst` holds the canvas and nothing else |
 
 ## Consequences
