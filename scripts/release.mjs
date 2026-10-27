@@ -13,7 +13,7 @@ import { changelogSection, olderThan, releaseNotes } from "./lib/release-notes.m
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dry = process.argv.includes("--dry-run"), force = process.argv.includes("--force");
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], ...opts }).trim();
+const run = (cmd, args, opts = {}) => (execFileSync(cmd, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], ...opts }) ?? "").trim();
 const say = (m) => console.log(m);
 const stop = (m) => { console.error(`release: ${m}`); process.exit(1); };
 const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
