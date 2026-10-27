@@ -521,6 +521,8 @@ async function start(): Promise<void> {
         break;
       }
     }
+    /** Extra CSS px round an object's box for antialiasing, line width and adjustments. */
+    const reach = (po: ProjectedObject): number => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2) + adjustReach(po);
     const tiled =
       editor.preview.kind === "none" && !blendShown
         ? tiles.draw(
@@ -531,7 +533,7 @@ async function start(): Promise<void> {
             dpr,
             (infl) => visibleObjects(doc, index, null, fc, infl),
             (c, list, all, infl) => drawObjects(c, list, assets, infl, dpr, theme, (runs ??= batchRuns(all))),
-            (po) => (po.obj.kind === "stroke" ? strokeLineWidth(po) / 2 + 2 : 2) + adjustReach(po),
+            reach,
             (o, infl) => {
               // A changed coarse object may cover any tile: drop them all.
               if (isCoarse(fc, o.frame ?? doc.space.world)) return coverObject(o, infl, {});
@@ -552,6 +554,22 @@ async function start(): Promise<void> {
                   return drawObjects(c, list, assets, infl, dpr, theme, lastRuns);
                 },
               };
+            },
+            // Zooming out with no set that covers the view: what lies outside the scaled tiles is drawn directly, clipped to that border.
+            (c, hole) => {
+              const all = visibleObjects(doc, index, null, fc, vp);
+              const out = all.filter((po) => {
+                const e = reach(po);
+                return po.box.minX - e < hole.l || po.box.minY - e < hole.t || po.box.maxX + e > hole.r || po.box.maxY + e > hole.b;
+              });
+              if (!out.length) return;
+              c.save();
+              c.beginPath();
+              c.rect(0, 0, vp.width, vp.height);
+              c.rect(hole.l, hole.t, hole.r - hole.l, hole.b - hole.t);
+              c.clip("evenodd");
+              drawObjects(c, out, assets, vp, dpr, theme, batchRuns(all));
+              c.restore();
             },
           )
         : null;

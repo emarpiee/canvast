@@ -53,7 +53,8 @@ const REFINE_MS = 150;
  */
 const IDLE_MS = 200;
 const SLICE_MS = 6;
-const AHEAD_LEVELS = [1, -1] as const;
+// Out first: a set scaled down while zooming out leaves a bare border that the shallower set covers; zooming in only blurs.
+const AHEAD_LEVELS = [-1, 1] as const;
 
 /** What the prebuild needs to render the tile set `dz` levels from the current one (null: not possible there). */
 export type AheadSource = (dz: number) => { cam: Camera; query: QueryVisible; draw: DrawObjects } | null;
@@ -74,6 +75,8 @@ interface Generation {
   frameId: number;
   vp: Viewport;
   tiles: Map<string, Tile>;
+  /** The tiles that covered its own view when it was drawn (or that a prebuilt set is made of): what it can be trusted to show. */
+  range?: { i0: number; i1: number; j0: number; j1: number };
   /** For a set built ahead of time: how to render its remaining tiles. */
   ahead?: { cam: Camera; query: QueryVisible; draw: DrawObjects };
 }
@@ -99,6 +102,8 @@ export type DrawObjects = (ctx: CanvasRenderingContext2D, list: readonly Project
 export type Reach = (po: ProjectedObject) => number;
 /** Visible committed objects for the current camera and the inflated viewport `vp`. */
 export type QueryVisible = (vp: Viewport) => ProjectedObject[];
+/** Draws the committed objects outside `hole` (CSS px of the viewport) directly, with the context's own transform. */
+export type DrawBorder = (ctx: CanvasRenderingContext2D, hole: { l: number; t: number; r: number; b: number }) => void;
 
 const MAX_POOL = 64;
 
@@ -196,6 +201,7 @@ export class TileCache {
     reach: Reach,
     project: (o: CanvasObject, vp: Viewport) => ProjectedObject | null,
     ahead?: AheadSource,
+    border?: DrawBorder,
   ): TileFrame | null {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.idleTimer = null;
@@ -212,12 +218,12 @@ export class TileCache {
       const preview = !stable && dense && this.gen.frameId === frameId;
       // Zooming out, the scaled set leaves a bare border: a prebuilt set that reaches every edge is shown instead.
       if (preview && !this.dirty.size && !this.covers(this.gen, cam, vp, dpr)) this.takeAhead(z, cam, vp, dpr);
-      const pv = preview ? this.preview(ctx, cam, vp, dpr) : null;
+      const pv = preview ? this.preview(ctx, cam, vp, dpr, border) : null;
       if (pv) return pv;
       // Beyond the bound: a prebuilt set within one level takes over (the old set becomes its neighbour).
       const next = preview && !this.dirty.size ? this.takeAhead(z, cam, vp, dpr) : null;
       if (next) {
-        const pv2 = this.preview(ctx, cam, vp, dpr);
+        const pv2 = this.preview(ctx, cam, vp, dpr, border);
         if (pv2) return pv2;
       }
       this.clear();
@@ -241,6 +247,7 @@ export class TileCache {
     const infl: Viewport = { width: vp.width + 2 * m, height: vp.height + 2 * m };
     const { i0, i1, j0, j1 } = this.range(dx, dy, vp, dpr);
     const gd = GUARD_CSS * dpr;
+    g.range = { i0, i1, j0, j1 };
 
     if (this.dirty.size) {
       // Drop tiles that showed a changed object, or that its new state overlaps.
@@ -386,8 +393,11 @@ export class TileCache {
     for (const dz of AHEAD_LEVELS) {
       let g = this.ahead.get(dz);
       if (!g) {
-        const src = a.source(dz);
-        if (!src) continue;
+        const made = a.source(dz);
+        if (!made) continue;
+        // One query for the whole set, not one per slice (its camera and viewport are fixed, and an edit drops the set).
+        let found: ProjectedObject[] | null = null;
+        const src = { ...made, query: (v: Viewport) => (found ??= made.query(v)) };
         g = {
           key: `${cur.frameId}|${src.cam.zi}|${src.cam.zf}|${a.dpr}`,
           z: src.cam.zi + src.cam.zf,
@@ -395,6 +405,7 @@ export class TileCache {
           frameId: cur.frameId,
           vp: a.vp,
           tiles: new Map(),
+          range: this.range(0, 0, a.vp, a.dpr),
           ahead: src,
         };
         this.ahead.set(dz, g);
@@ -430,35 +441,34 @@ export class TileCache {
 
   /** Whether the tiles of `g`, scaled to this camera, reach every edge of the viewport. */
   private covers(g: Generation, cam: Camera, vp: Viewport, dpr: number): boolean {
+    const e = this.extent(g, cam, vp, dpr);
+    const slack = 1;
+    return !!e && e.l <= slack && e.t <= slack && e.r >= vp.width * dpr - slack && e.b >= vp.height * dpr - slack;
+  }
+
+  /** Where the tiles of `g`, scaled to this camera, reach on the screen (device px; null when not a finite place). */
+  private extent(g: Generation, cam: Camera, vp: Viewport, dpr: number): { l: number; t: number; r: number; b: number } | null {
     const dz = cam.zi + cam.zf - g.z;
     const s = 2 ** dz;
     const f = 2 ** cam.zf;
     const ox = (vp.width / 2 + D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f) * dpr - (g.vp.width / 2) * dpr * s;
     const oy = (vp.height / 2 + D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f) * dpr - (g.vp.height / 2) * dpr * s;
-    if (!Number.isFinite(ox) || !Number.isFinite(oy)) return false;
-    let i0 = Infinity;
-    let i1 = -Infinity;
-    let j0 = Infinity;
-    let j1 = -Infinity;
-    for (const k of g.tiles.keys()) {
-      const [i, j] = k.split(",").map(Number) as [number, number];
-      i0 = Math.min(i0, i);
-      i1 = Math.max(i1, i);
-      j0 = Math.min(j0, j);
-      j1 = Math.max(j1, j);
-    }
+    if (!Number.isFinite(ox) || !Number.isFinite(oy) || !g.range) return null;
+    // Only a whole range counts (a prebuilt set still being made, or tiles kept from panning, leave holes in their box).
+    const { i0, i1, j0, j1 } = g.range;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (!g.tiles.has(`${i},${j}`)) return null;
     const td = TILE_CSS * dpr * s;
-    const slack = 1;
-    return ox + i0 * td <= slack && oy + j0 * td <= slack && ox + (i1 + 1) * td >= vp.width * dpr - slack && oy + (j1 + 1) * td >= vp.height * dpr - slack;
+    return { l: ox + i0 * td, t: oy + j0 * td, r: ox + (i1 + 1) * td, b: oy + (j1 + 1) * td };
   }
 
   /**
    * Draw the current tile set scaled to this camera's zoom, if allowed: same
    * DPR, no pending edits, and within PREVIEW_MAX_LEVELS. Schedules an exact
    * refinement for when the zoom stops. Areas the set never covered (the
-   * border after zooming out) stay empty until then.
+   * border after zooming out with no prebuilt set to take over) are drawn
+   * directly by `border`, so the view is never cut off.
    */
-  private preview(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, dpr: number): TileFrame | null {
+  private preview(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, dpr: number, border?: DrawBorder): TileFrame | null {
     const g = this.gen!;
     const dz = cam.zi + cam.zf - g.z;
     if (this.dirty.size || !g.key.endsWith(`|${dpr}`) || Math.abs(dz) > PREVIEW_MAX_LEVELS || !g.tiles.size) return null;
@@ -487,6 +497,11 @@ export class TileCache {
       n++;
     }
     ctx.restore();
+    if (border && !this.covers(g, cam, vp, dpr)) {
+      const e = this.extent(g, cam, vp, dpr);
+      // (empty tiles are not drawn, but their place is covered: nothing of them was there)
+      border(ctx, e ? { l: e.l / dpr, t: e.t / dpr, r: e.r / dpr, b: e.b / dpr } : { l: 0, t: 0, r: 0, b: 0 });
+    }
     if (this.refineTimer) clearTimeout(this.refineTimer);
     this.refineTimer = setTimeout(() => {
       this.refineTimer = null;

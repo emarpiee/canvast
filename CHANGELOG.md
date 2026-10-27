@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.48.1 — Zooming out is never cut off (2026-10-28)
+
+- **Fixed:** zooming out of a busy canvas could show only the middle of the view, with the edges empty for about half a second, until the exact picture was drawn: the scaled image of the last frame did not reach them. What it does not reach is now drawn exactly in the same frame (ADR 0012).
+- **Fixed:** the level one out, which zooming out swaps to with no gap and no pause, is now prepared before the level one in, and both are ready sooner after the view rests (about 425 ms instead of 580 ms in the showcase) because each is looked up once instead of once per slice (ADR 0033).
+
 ## 0.48.0 — Notes and fields on library items (2026-10-28)
 
 - **Added:** a **Note** box (plain text) in the details panel of a library item, and under it **Add a field**: rows of a name you choose and a value (a link, an author, a source…), with the library's field names suggested and **×** to remove one. They are stored when left (or on `Enter` in a field), undone with the library's undo, found by the library search, and carried in backups and the library index (an import keeps an item's own note and adds the fields it lacks).

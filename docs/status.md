@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Zooming out is never cut off (v0.48.1, 2026-10-28)
+
+**Implemented:** a zoom-out preview whose scaled tile set does not reach every edge draws the objects outside it directly, clipped to that border (`DrawBorder` in `TileCache.preview`, given by `main.ts`); cover checks use the whole tile range a set was built for (`Generation.range`); the idle prebuild makes the level one out first and queries each set once ([ADR 0012](adr/0012-zoom-preview.md) and [0033](adr/0033-idle-prebuild-of-adjacent-zoom-tiles.md) amendments).
+**Tested:** reproduced with the showcase (Powers of two, zoom in near Earth, rest about 0.3 s, zoom out): the scaled set covered about 70% of the view. The extended `tiles.spec.ts` preview test fails without the border drawing (30% of the border unlike the exact picture) and passes with it; `tiles.spec.ts` in all four projects on a fresh snapshot of the final source, 40 passed (1.1 min). Both prebuilt sets ready 584/541/658/563/552 ms → 421/410/435/415/444 ms after a zoom step (showcase, headless Chromium).
+**Known failures:** none known.
+**Unverified:** the quick and full suites; the cost of the border frames on a GPU (headless Chromium on the CPU: about 45-50 ms instead of 22-28 ms for a preview frame).
+**Committed:** this slice (see the commit).
+**Next bounded task:** chaining (ADR 0033, not done): build the next level while a long zoom gesture continues, so a zoom of several levels has no exact-frame pause (80-120 ms each in the showcase) at each level.
+
 ## Notes and fields on library items (v0.48.0, 2026-10-28)
 
 **Implemented:** catalog entries carry an optional plain-text `note` and ordered user-named `fields` (`{ key, value }`), set through `MetaChange` (replacing the stored ones, normalized and bounded in `AssetCatalog`), part of the library undo snapshot; the details panel of one item shows them under Tags and Folder (stored on change; the values being stored are shown until the listing has them, so a redraw never writes old ones back); the library search (All) matches them; archives and the library index carry them, and an import keeps an existing note and adds missing fields.

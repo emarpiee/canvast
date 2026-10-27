@@ -60,5 +60,16 @@ Measured, frame p50/p95/p99 in ms (Chromium | Firefox):
 - **Smoother level crossings:** building the next exact set in slices
   across frames (progressive refinement) or in a worker. Today the crossing
   frame is one full exact build.
-- **Filling the border after zooming out** from ring tiles or the density
-  preview.
+- ~~**Filling the border after zooming out** from ring tiles or the density
+  preview.~~ Done, see the amendment below.
+
+## Amendment (v0.48.1): the border after zooming out is drawn exactly
+
+A zoom out with no prebuilt set to take over (ADR 0033) left the outer part of the view empty until the refinement: about half a second
+in the showcase (150 ms, then an exact build of about 80-120 ms), reported as the view being cut off. The preview now draws the objects
+outside the scaled set directly, clipped to that border (`DrawBorder`, given by `main.ts`), so a preview frame is never cut off. Such a
+frame costs the preview plus a direct draw of the objects that reach the border (measured in the showcase, headless Chromium on the CPU:
+about 45-50 ms instead of 22-28 ms); the prebuilt outer set, now made first, makes it rare. Whether a set covers the view is judged on
+the whole tile range it was built for (`Generation.range`), not on the box of the tiles it holds, which tiles kept from panning or a set
+still being made could leave with holes. Tested in `tiles.spec.ts` (the border of a zoom-out preview matches the exact picture; without
+the fix 30% of it differed).

@@ -26,3 +26,10 @@ Chaining (building the next level while the gesture continues, in the frames tha
 ## Amendment (after v0.15.0): only a set that covers the view takes over
 
 A prebuilt set one level *deeper* than the camera is scaled down and leaves a border of bare background while zooming in; the shallower one is scaled up and covers. `takeAhead` now skips a set whose scaled tiles do not reach every edge of the viewport (`TileCache.covers`), and preview tiles are drawn on whole device pixels so scaling leaves no hairline seams. Found as the intermittent Firefox "curvy stroke" hole failure (a 91 px strip, 140 sample holes).
+
+## Amendment (v0.48.1): the outer level first, one query per set
+
+The level one out is built before the level one in: zooming out from a set leaves a bare border (drawn directly since ADR 0012's
+amendment, at a cost), zooming in only magnifies. Each prebuilt set queries the visible objects once instead of once per slice (its
+camera and viewport are fixed, and any edit drops it): both sets are ready about 425 ms after a zoom step instead of 580 ms in the
+showcase (Chromium, 5 runs; the 200 ms rest included).

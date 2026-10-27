@@ -248,6 +248,44 @@ test("dense scenes: zoom frames show a scaled preview, then refine to the exact 
   await expect.poll(async () => (await stats(p)).last?.preview, { timeout: 3000 }).toBe(false);
   // ...and it is the exact picture.
   expectSamePicture(await compare(p), "after refine");
+
+  // Zooming out before the wider set is prebuilt: the scaled set leaves a border, which is drawn directly, never left bare.
+  const out = await p.evaluate(async () => {
+    const h = window.__canvastDebug;
+    const c = document.getElementById("canvas") as HTMLCanvasElement;
+    const ahead = h.tileStats().ahead;
+    const cam = h.camera();
+    const z = cam.zi + cam.zf - 0.5;
+    const zi = Math.floor(z);
+    h.setCamera({ ...cam, zi, zf: Math.round((z - zi) * 2 ** 20) / 2 ** 20 });
+    await h.nextFrame();
+    const preview = h.tileStats().last?.preview;
+    const grab = (): Uint8ClampedArray => c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    const shown = grab();
+    h.setTileCache(false);
+    await h.nextFrame();
+    const direct = grab();
+    h.setTileCache(true);
+    // the outer tenth on every side: outside what the scaled set reaches (it shrank to about 71%)
+    const bx = Math.round(c.width / 10);
+    const by = Math.round(c.height / 10);
+    let band = 0;
+    let off = 0;
+    let inked = 0;
+    for (let y = 0; y < c.height; y++)
+      for (let x = 0; x < c.width; x++) {
+        if (x >= bx && x < c.width - bx && y >= by && y < c.height - by) continue;
+        const i = (y * c.width + x) * 4;
+        band++;
+        if (Math.max(Math.abs(shown[i]! - direct[i]!), Math.abs(shown[i + 1]! - direct[i + 1]!), Math.abs(shown[i + 2]! - direct[i + 2]!)) > 60) off++;
+        if (Math.abs(direct[i]! - direct[0]!) + Math.abs(direct[i + 1]! - direct[1]!) + Math.abs(direct[i + 2]! - direct[2]!) > 60) inked++;
+      }
+    return { ahead, preview, band, off, inked };
+  });
+  expect(out.ahead).toBe(0); // no prebuilt set yet: the border path is what is tested
+  expect(out.preview).toBe(true);
+  expect(out.inked / out.band, "the border has content to lose").toBeGreaterThan(0.05);
+  expect(out.off / out.band, `border pixels unlike the exact picture (${out.off} of ${out.band})`).toBeLessThan(0.01);
 });
 
 test("dense scenes: zooming more than one level from the tile set renders exactly", async ({ app }) => {
