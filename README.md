@@ -524,6 +524,17 @@ node scripts/showcase/dive.mjs showcase.canvast frames/     # renders the dive, 
 
 The README pictures are those PNGs converted to WebP (`cwebp -q 80`) in `docs/screenshots/`. The dive is the frames scaled to 800 px and joined with `img2webp` (`frames.txt` holds each frame's duration); the journey sheet is the frames where the dive pauses, set in a grid with ImageMagick `montage`.
 
+### The logo and its guidelines
+
+```sh
+npm run build
+node scripts/brand/build.mjs brand.canvast shots/   # draws the brand board in the app and exports the canvas (PNG of each page in shots/)
+node scripts/brand/icons.mjs icons/                 # the logo files: SVG masters, PNG 16–512 px, favicon.ico
+node scripts/brand/preview.mjs preview/ 1,3         # a quick look at pages without the app
+```
+
+The logo (a canvas open on its right side, and the dot you zoom into), its colours and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). At 32 px and under the icons use a small-size master drawn on the 16 px grid. The scripts work on a copy of `dist/canvast.html` in the system's temp folder.
+
 ### Releasing
 
 `npm run release` publishes `dist/canvast.html` as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature.
