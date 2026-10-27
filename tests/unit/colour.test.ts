@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MODELS, TEXT_FORMATS, colourToHex, contrastRatio, convert, formatColour, fromRgb, harmonies, hexToTriple, paintPlane, parseColour, parseHex, rgbToHex, toRgb, tripleToHex } from "../../src/colour-picker/colour";
+import { CHROMA_REF, MODELS, TEXT_FORMATS, colourToHex, contrastRatio, convert, formatColour, fromRgb, harmonies, hexToTriple, oklchEdge, oklchToRgb, paintPlane, parseColour, parseHex, rgbToHex, rgbToOklch, toRgb, tripleToHex } from "../../src/colour-picker/colour";
 
 const SAMPLES: [number, number, number][] = [[0, 0, 0], [255, 255, 255], [255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0], [0, 255, 255], [255, 0, 255], [31, 35, 41], [37, 99, 235], [220, 38, 38], [22, 163, 74], [128, 128, 128], [250, 240, 10], [3, 2, 1]];
 
@@ -56,6 +56,33 @@ describe("colour maths", () => {
   });
 });
 
+describe("OKLCH is the standard OKLab polar form, with the chroma asked for clipped to what sRGB can show", () => {
+  it("lightness, chroma and hue are those of oklch(): the same colour as oklchToRgb, and the model reads them back", () => {
+    for (const [h, c, L] of [[29, 0.1, 0.55], [145, 0.12, 0.7], [264, 0.15, 0.5], [90, 0.08, 0.9], [330, 0.1, 0.4]] as const) {
+      const t = { h, s: c / CHROMA_REF, x: L };
+      expect(toRgb("oklch", t.h, t.s, t.x)).toEqual(oklchToRgb(L, c, h)); // (the same maths as CSS oklch(), in gamut)
+      const back = rgbToOklch(oklchToRgb(L, c, h));
+      const r = fromRgb("oklch", ...oklchToRgb(L, c, h));
+      expect(Math.abs(r.x - back.L)).toBeLessThan(1e-9);
+      expect(Math.abs(r.s * CHROMA_REF - back.C)).toBeLessThan(1e-9);
+      expect(Math.abs(r.h - back.h)).toBeLessThan(1e-6);
+    }
+  });
+  it("chroma beyond the gamut is reduced at the same lightness and hue (clipped), never changing either", () => {
+    for (const [h, L] of [[29, 0.6], [145, 0.8], [264, 0.45], [100, 0.95], [330, 0.2]] as const) {
+      const edge = oklchEdge(h, L);
+      expect(edge).toBeGreaterThan(0);
+      expect(edge).toBeLessThan(1);
+      const over = toRgb("oklch", h, 1, L);               // asks for 0.4: more than any sRGB colour has
+      const atEdge = toRgb("oklch", h, edge, L);
+      expect(Math.max(...over.map((v, i) => Math.abs(v - atEdge[i]!)))).toBeLessThanOrEqual(1);
+      const o = rgbToOklch(over);
+      expect(Math.abs(o.L - L)).toBeLessThan(0.01);
+      expect(Math.abs(((o.h - h + 540) % 360) - 180)).toBeLessThan(3);
+    }
+  });
+});
+
 describe("the fast plane painter", () => {
   for (const model of MODELS) {
     it(`${model}: every pixel of the plane is within 2 bytes of the exact conversion, at many hues`, () => {
@@ -66,7 +93,13 @@ describe("the fast plane painter", () => {
         paintPlane(model, hue, w, h, out);
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
           const i = (y * w + x) * 4;
-          const want = toRgb(model, hue, x / (w - 1), 1 - y / (h - 1));
+          const s = x / (w - 1), L = 1 - y / (h - 1);
+          // OKLCH leaves transparent what sRGB cannot show at that lightness and hue (a little slack at the edge itself)
+          if (model === "oklch" && L > 0 && L < 1 && Math.abs(s - oklchEdge(hue, L)) > 0.03) {
+            expect(out[i + 3], `${model} hue ${hue} (${x},${y}) alpha`).toBe(s <= oklchEdge(hue, L) ? 255 : 0);
+          }
+          if (model === "oklch" && out[i + 3] === 0) continue;
+          const want = toRgb(model, hue, s, L);
           for (let c = 0; c < 3; c++) expect(Math.abs(out[i + c]! - want[c]!), `${model} hue ${hue} (${x},${y}) channel ${c}`).toBeLessThanOrEqual(2);
           expect(out[i + 3]).toBe(255);
         }
@@ -100,8 +133,8 @@ describe("colour text and alpha", () => {
     expect(contrastRatio([0, 0, 0], [255, 255, 255])).toBeCloseTo(21, 5);
     expect(contrastRatio([119, 119, 119], [255, 255, 255])).toBeCloseTo(4.48, 1);
     const [opposite] = harmonies([37, 99, 235], "complementary");
-    const a = fromRgb("okhcl", 37, 99, 235);
-    const b = fromRgb("okhcl", opposite![0], opposite![1], opposite![2]);
+    const a = fromRgb("oklch", 37, 99, 235);
+    const b = fromRgb("oklch", opposite![0], opposite![1], opposite![2]);
     expect(Math.abs(b.x - a.x)).toBeLessThan(0.01);
     expect(Math.abs(((b.h - a.h + 360) % 360) - 180)).toBeLessThan(2);
     expect(harmonies([37, 99, 235], "triad")).toHaveLength(2);

@@ -243,3 +243,28 @@ test("colour picker package: light and dark follow the system, and a theme (opti
   expect(result).toEqual({ option: DARK, editor: DARK, tag: DARK, tagLight: LIGHT });
   expect(errors).toEqual([]);
 });
+
+test("colour picker package: the demo page has an Auto, Light and Dark switch that drives the picker, the gradient editor and the browser's own controls", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto(DEMO);
+  const state = () =>
+    page.evaluate(() => {
+      const cp = document.querySelector("#host .cp")!;
+      const ge = document.querySelector("#ghost .cp")!;
+      return { picker: getComputedStyle(cp).getPropertyValue("--cp-bg").trim(), scheme: getComputedStyle(cp).colorScheme, gradient: getComputedStyle(ge).getPropertyValue("--cp-bg").trim(), page: getComputedStyle(document.body).backgroundColor };
+    });
+  const DARK = { picker: "#1d2126", scheme: "dark", gradient: "#1d2126", page: "rgb(20, 23, 26)" };
+  const LIGHT = { picker: "#ffffff", scheme: "light", gradient: "#ffffff", page: "rgb(238, 241, 243)" };
+  expect(await state(), "Auto follows the system: dark").toEqual(DARK);
+  await page.getByRole("button", { name: "Light" }).click();
+  expect(await state()).toEqual(LIGHT);
+  await expect(page.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.getByRole("button", { name: "Dark" }).click();
+  expect(await state(), "Dark whatever the system says").toEqual(DARK);
+  await page.getByRole("button", { name: "Auto" }).click();
+  expect(await state(), "Auto follows the system again: light (no colour-scheme is set, so the browser's own controls are light anyway)").toEqual({ ...LIGHT, scheme: "normal" });
+  expect(errors).toEqual([]);
+});

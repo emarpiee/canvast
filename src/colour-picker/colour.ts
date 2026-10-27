@@ -1,18 +1,22 @@
 /**
- * Colour maths for the picker: sRGB hex <-> OKHSL, OKHSV and OKHCL. Pure functions, no DOM, no imports, so it runs in a worker, in Node
+ * Colour maths for the picker: sRGB hex <-> OKHSL, OKHSV and OKLCH. Pure functions, no DOM, no imports, so it runs in a worker, in Node
  * and in any other project unchanged.
  *
  * OKHSL and OKHSV are Bjorn Ottosson's models (https://bottosson.github.io/posts/colorpicker/, MIT, Copyright (c) 2021 Bjorn
  * Ottosson; the licence text is in LICENSE next to this folder's README, and tests/unit/colour-reference.test.ts keeps it agreeing with his own JavaScript): saturation is relative to the
- * sRGB gamut, so every (h, s, x) triple is a real colour and a slider never leaves the gamut. OKHCL is the third view of the same
- * space: hue and lightness are OKLab's (L is not "toe" corrected), chroma is the fraction (0..1) of the most chroma sRGB can show at
- * that lightness and hue.
+ * sRGB gamut, so every (h, s, x) triple is a real colour and a slider never leaves the gamut. OKLCH is the standard polar form of OKLab
+ * (Ottosson's OKLab, as CSS `oklch()` uses it): lightness is OKLab's own (no "toe"), chroma is absolute, and a chroma that sRGB cannot
+ * show at that lightness and hue is reduced to the most it can (the colour is clipped to the gamut; the chroma asked for stays in the
+ * triple, so it comes back when the lightness or hue moves back).
  *
- * A triple is { h, s, x }: hue in degrees (0..360), s the saturation (OKHSL, OKHSV) or relative chroma (OKHCL), x the lightness
- * (OKHSL, OKHCL) or value (OKHSV); s and x run 0..1.
+ * A triple is { h, s, x }: hue in degrees (0..360), s the saturation (OKHSL, OKHSV) or the chroma as a fraction of CHROMA_REF (OKLCH), x the
+ * lightness (OKHSL, OKLCH) or value (OKHSV); s and x run 0..1.
  */
-export type Model = "okhsl" | "okhsv" | "okhcl";
-export const MODELS: readonly Model[] = ["okhsl", "okhsv", "okhcl"];
+export type Model = "okhsl" | "okhsv" | "oklch";
+export const MODELS: readonly Model[] = ["okhsl", "okhsv", "oklch"];
+
+/** The chroma that is 1 on an OKLCH slider: 0.4, the range CSS gives `oklch()` percentages (sRGB tops out near 0.32). */
+export const CHROMA_REF = 0.4;
 export interface Triple {
   h: number;
   s: number;
@@ -144,7 +148,7 @@ function chromas(L: number, a: number, b: number, cu: [number, number] = cusp(a,
   return [c0, cMid, cMax];
 }
 
-// The "toe" maps OKLab L to a lightness that matches how L looks on screen (OKHSL and OKHSV use it, OKHCL does not).
+// The "toe" maps OKLab L to a lightness that matches how L looks on screen (OKHSL and OKHSV use it, OKLCH does not).
 const K1 = 0.206;
 const K2 = 0.03;
 const K3 = (1 + K1) / (1 + K2);
@@ -208,13 +212,34 @@ function okhsvToRgb(hDeg: number, s: number, v: number): Rgb {
   return rgbOf(L * scale, C * scale * a, C * scale * b);
 }
 
-function okhclToRgb(hDeg: number, c: number, L: number): Rgb {
+/** The most chroma sRGB can show at this lightness and hue. */
+function maxChroma(L: number, a: number, b: number): number {
+  return gamutIntersection(a, b, L, 1, L, cusp(a, b));
+}
+
+/** The chroma, as a fraction of CHROMA_REF, that sRGB can show at this hue (degrees) and lightness: the most a triple's `s` can be on screen. */
+export function oklchEdge(hDeg: number, L: number): number {
+  if (L <= 0 || L >= 1) return 0;
+  const r = (hDeg * TAU) / 360;
+  return Math.min(1, maxChroma(L, Math.cos(r), Math.sin(r)) / CHROMA_REF);
+}
+
+function oklchModelToRgb(hDeg: number, s: number, L: number): Rgb {
   if (L >= 1) return [255, 255, 255];
   if (L <= 0) return [0, 0, 0];
   const a = Math.cos((hDeg * TAU) / 360);
   const b = Math.sin((hDeg * TAU) / 360);
-  const cMax = gamutIntersection(a, b, L, 1, L, cusp(a, b));
-  const C = c * cMax;
+  const C = Math.min(s * CHROMA_REF, maxChroma(L, a, b));
+  return rgbOf(L, C * a, C * b);
+}
+
+/** Hue turned at the same lightness and the same share of the gamut (not a model of the picker: what keeps a harmony inside sRGB). */
+function relativeChromaToRgb(hDeg: number, c: number, L: number): Rgb {
+  if (L >= 1) return [255, 255, 255];
+  if (L <= 0) return [0, 0, 0];
+  const a = Math.cos((hDeg * TAU) / 360);
+  const b = Math.sin((hDeg * TAU) / 360);
+  const C = c * maxChroma(L, a, b);
   return rgbOf(L, C * a, C * b);
 }
 
@@ -223,7 +248,7 @@ export function toRgb(model: Model, h: number, s: number, x: number): Rgb {
   const hue = ((h % 360) + 360) % 360;
   const sat = clamp01(s);
   const val = clamp01(x);
-  return model === "okhsl" ? okhslToRgb(hue, sat, val) : model === "okhsv" ? okhsvToRgb(hue, sat, val) : okhclToRgb(hue, sat, val);
+  return model === "okhsl" ? okhslToRgb(hue, sat, val) : model === "okhsv" ? okhsvToRgb(hue, sat, val) : oklchModelToRgb(hue, sat, val);
 }
 
 // ---- sRGB -> models ----------------------------------------------------------------------------------------------------------
@@ -237,14 +262,11 @@ const GREY = 1e-4;
 export function fromRgb(model: Model, r: number, g: number, b: number, hue = 0): Triple {
   const [L, A, B] = linearToOklab(toLinear(clamp01(r / 255)), toLinear(clamp01(g / 255)), toLinear(clamp01(b / 255)));
   const C = Math.hypot(A, B);
-  if (C < GREY) return { h: hue, s: 0, x: clamp01(model === "okhcl" ? L : toe(L)) };
+  if (C < GREY) return { h: hue, s: 0, x: clamp01(model === "oklch" ? L : toe(L)) };
   const a = A / C;
   const bb = B / C;
   const h = (((Math.atan2(B, A) * 180) / Math.PI) % 360 + 360) % 360;
-  if (model === "okhcl") {
-    const cMax = gamutIntersection(a, bb, clamp01(L), 1, clamp01(L), cusp(a, bb));
-    return { h, s: cMax > 1e-9 ? clamp01(C / cMax) : 0, x: clamp01(L) };
-  }
+  if (model === "oklch") return { h, s: clamp01(C / CHROMA_REF), x: clamp01(L) };
   if (model === "okhsl") {
     const [c0, cMid, cMax] = chromas(clamp01(L), a, bb);
     let s: number;
@@ -418,6 +440,7 @@ export function paintPlane(model: Model, hueDeg: number, w: number, h: number, o
       }
     }
   } else {
+    // OKLCH: lightness down, chroma across (0 to CHROMA_REF). What sRGB cannot show at that lightness and hue is left transparent.
     for (let y = 0; y < h; y++) {
       const L = 1 - y / rows;
       if (L <= 0 || L >= 1) {
@@ -425,7 +448,11 @@ export function paintPlane(model: Model, hueDeg: number, w: number, h: number, o
         continue;
       }
       const cMax = gamutIntersection(a, b, L, 1, L, cu);
-      for (let x = 0; x < w; x++) put((y * w + x) * 4, L, (x / cols) * cMax);
+      for (let x = 0; x < w; x++) {
+        const C = (x / cols) * CHROMA_REF;
+        if (C <= cMax) put((y * w + x) * 4, L, C);
+        else out[(y * w + x) * 4 + 3] = 0;
+      }
     }
   }
 }
@@ -511,10 +538,20 @@ export function contrastRatio(a: Rgb, b: Rgb): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** Colour harmonies: the colour with its hue turned (in OKHCL, so each stays inside sRGB and keeps its lightness and relative chroma). */
+/** Colour harmonies: the colour with its hue turned (each turned at its own lightness and share of the gamut, so it stays inside sRGB). */
 export type Harmony = "complementary" | "split" | "triad" | "analogous" | "tetrad";
+/** The colour with its hue turned by `deg`, at the same OKLab lightness and the same share of the gamut (`hue`: kept through greys). */
+export function turned(rgb: Rgb, deg: number, hue = 0): Rgb {
+  const [L, A, B] = linearToOklab(toLinear(rgb[0] / 255), toLinear(rgb[1] / 255), toLinear(rgb[2] / 255));
+  const C = Math.hypot(A, B);
+  if (C < GREY) return rgb;
+  const h = (((Math.atan2(B, A) * 180) / Math.PI) % 360 + 360) % 360;
+  const l = clamp01(L);
+  const cMax = maxChroma(l, A / C, B / C);
+  void hue;
+  return relativeChromaToRgb(h + deg, cMax > 1e-9 ? clamp01(C / cMax) : 0, l);
+}
 export const HARMONIES: Record<Harmony, readonly number[]> = { complementary: [180], split: [150, 210], triad: [120, 240], analogous: [-30, 30], tetrad: [90, 180, 270] };
 export function harmonies(rgb: Rgb, kind: Harmony, hue = 0): Rgb[] {
-  const t = fromRgb("okhcl", rgb[0], rgb[1], rgb[2], hue);
-  return HARMONIES[kind].map((d) => toRgb("okhcl", t.h + d, t.s, t.x));
+  return HARMONIES[kind].map((d) => turned(rgb, d, hue));
 }

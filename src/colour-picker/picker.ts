@@ -1,5 +1,5 @@
 /**
- * A colour picker with no dependencies: OKHSL, OKHSV or OKHCL, in four layouts (a hue ring around a box, a plane with a hue bar,
+ * A colour picker with no dependencies: OKHSL, OKHSV or OKLCH, in four layouts (a hue ring around a box, a plane with a hue bar,
  * sliders, or the ring with sliders under it), with optional transparency, hex / rgb() / oklch() text, an eyedropper, a contrast
  * readout and colour harmonies. It imports only `./colour` and `./style`, so the folder can be copied into another project as it is.
  * Everything it looks like comes from `--cp-*` custom properties, everything it says from `labels`, and it never touches storage:
@@ -15,6 +15,7 @@
  */
 import { copyToClipboard, flashCopied, onLongPress } from "./press";
 import {
+  CHROMA_REF,
   HARMONIES,
   MODELS,
   TEXT_FORMATS,
@@ -23,10 +24,12 @@ import {
   convert,
   formatColour,
   fromRgb,
+  oklchEdge,
   paintPlane,
   parseColour,
   rgbToHex,
   toRgb,
+  turned,
   type Colour,
   type Harmony,
   type Model,
@@ -120,9 +123,9 @@ export interface ColourPicker {
 }
 
 const DEFAULT_LABELS: Labels = {
-  models: { okhsl: "OKHSL", okhsv: "OKHSV", okhcl: "OKHCL" },
+  models: { okhsl: "OKHSL", okhsv: "OKHSV", oklch: "OKLCH" },
   views: { wheel: "Ring and box", plane: "Plane and bar", sliders: "Sliders", mixer: "Ring and sliders" },
-  channels: { okhsl: ["Hue", "Saturation", "Lightness"], okhsv: ["Hue", "Saturation", "Value"], okhcl: ["Hue", "Chroma", "Lightness"] },
+  channels: { okhsl: ["Hue", "Saturation", "Lightness"], okhsv: ["Hue", "Saturation", "Value"], oklch: ["Hue", "Chroma", "Lightness"] },
   formats: { hex: "HEX", rgb: "RGB", oklch: "OKLCH" },
   harmonies: { complementary: "Complement", split: "Split", triad: "Triad", analogous: "Analogous", tetrad: "Tetrad" },
   modelGroup: "Colour model",
@@ -146,7 +149,7 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
 const css = (rgb: readonly number[]): string => `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 
 // What the ring and the hue slider show for each model: hue at a fixed second and third channel.
-const HUE_REF: Record<Model, readonly [number, number]> = { okhsl: [0.9, 0.65], okhsv: [0.85, 0.95], okhcl: [0.9, 0.72] };
+const HUE_REF: Record<Model, readonly [number, number]> = { okhsl: [0.9, 0.65], okhsv: [0.85, 0.95], oklch: [0.3, 0.72] };
 const RING = 0.1; // the ring's thickness, as a fraction of the size
 const GAP = 0.025; // between the ring and the box
 const BOX_PX = 80; // the ring's box is painted at this many pixels a side and stretched
@@ -330,19 +333,31 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
       labels[i]!.title = names[i]!;
       for (const el of [sliders[i]!, rowNums[i]!, stripNums[i]!]) el.setAttribute("aria-label", L.field(names[i]!));
     }
+    // The chroma controls: a percent, or for OKLCH the chroma itself (0 to 0.4, to three places).
+    for (const el of [sliders[1]!, rowNums[1]!, stripNums[1]!]) {
+      el.max = model === "oklch" ? String(CHROMA_REF) : "100";
+      el.step = model === "oklch" ? "0.001" : "1";
+      if (el instanceof HTMLInputElement && el.type === "number") el.inputMode = model === "oklch" ? "decimal" : "numeric";
+    }
     for (const b of root.querySelectorAll<HTMLElement>("[data-model]")) b.setAttribute("aria-checked", String(b.dataset["model"] === model));
     tracks.fill("");
   }
+
+  // OKLCH keeps the chroma asked for, but shows (and draws) the most sRGB can show at that lightness and hue; the other models always fit.
+  const effS = (): number => (model === "oklch" ? Math.min(tri.s, oklchEdge(tri.h, tri.x)) : tri.s);
+  /** What the chroma field shows for a share of the slider: a percent, or for OKLCH the chroma itself (0 to CHROMA_REF). */
+  const cScale = (): number => (model === "oklch" ? CHROMA_REF : 100);
+  const fieldText = (i: number, v: number): string => (i === 1 && model === "oklch" ? v.toFixed(3) : String(Math.round(v)));
 
   function show(skip?: HTMLElement): void {
     const c = colour();
     hex = useAlpha ? colourToHex(c) : rgbToHex(c.rgb);
     const shown = display(hex);
     const solid = css(c.rgb);
-    const values = [tri.h, tri.s * 100, tri.x * 100];
+    const values = [tri.h, effS() * cScale(), tri.x * 100];
     const rgbHex = rgbToHex(c.rgb);
     for (let i = 0; i < 3; i++) {
-      const v = String(Math.round(values[i]!));
+      const v = fieldText(i, values[i]!);
       sliders[i]!.value = v;
       if (document.activeElement !== rowNums[i]) rowNums[i]!.value = v;
       if (document.activeElement !== stripNums[i]) stripNums[i]!.value = v;
@@ -373,14 +388,14 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     hueThumb.style.background = css(toRgb(model, tri.h, HUE_REF[model][0], HUE_REF[model][1]));
     const side = boxSide();
     const off = (size - side) / 2;
-    areaThumb.style.transform = `translate(${off + tri.s * side}px, ${off + (1 - tri.x) * side}px)`;
+    areaThumb.style.transform = `translate(${off + effS() * side}px, ${off + (1 - tri.x) * side}px)`;
     areaThumb.style.background = solid;
-    planeThumb.style.transform = `translate(${tri.s * size}px, ${(1 - tri.x) * planeH()}px)`;
+    planeThumb.style.transform = `translate(${effS() * size}px, ${(1 - tri.x) * planeH()}px)`;
     planeThumb.style.background = solid;
     hueEl.setAttribute("aria-valuenow", String(Math.round(tri.h)));
     hueEl.setAttribute("aria-valuetext", `${Math.round(tri.h)}°`);
     const names = L.channels[model];
-    const text = `${names[1]} ${Math.round(tri.s * 100)}%, ${names[2]} ${Math.round(tri.x * 100)}%`;
+    const text = `${names[1]} ${model === "oklch" ? (effS() * CHROMA_REF).toFixed(3) : `${Math.round(tri.s * 100)}%`}, ${names[2]} ${Math.round(tri.x * 100)}%`;
     area.setAttribute("aria-valuetext", text);
     planeArea.setAttribute("aria-valuetext", text);
     scheduleBox();
@@ -400,8 +415,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
     harmonyFrame = requestAnimationFrame(() => {
       harmonyFrame = 0;
       const rgb = parseColour(base)!.rgb;
-      const t = fromRgb("okhcl", rgb[0], rgb[1], rgb[2], tri.h);
-      const wanted = harmony.map((k) => ({ k, colours: HARMONIES[k].map((d) => rgbToHex(toRgb("okhcl", t.h + d, t.s, t.x))) }));
+      const wanted = harmony.map((k) => ({ k, colours: HARMONIES[k].map((d) => rgbToHex(turned(rgb, d, tri.h))) }));
       if (harmonyEl.childElementCount !== wanted.length) {
         harmonyEl.innerHTML = wanted.map((w) => `<div class="cp-group" data-k="${w.k}"><div class="cp-group-h">${esc(L.harmonies[w.k])}</div><div class="cp-swatches"></div></div>`).join("");
       }
@@ -533,13 +547,13 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
       if (!dx && !dy) return;
       e.preventDefault();
       const u = step(e, 0.01);
-      setTriple({ s: tri.s + dx * u, x: tri.x + dy * u });
+      setTriple({ s: effS() + dx * u, x: tri.x + dy * u });
       commit();
     });
   }
 
   sliders.forEach((s, i) => {
-    s.addEventListener("input", () => setTriple(i === 0 ? { h: Number(s.value) } : i === 1 ? { s: Number(s.value) / 100 } : { x: Number(s.value) / 100 }));
+    s.addEventListener("input", () => setTriple(i === 0 ? { h: Number(s.value) } : i === 1 ? { s: Number(s.value) / cScale() } : { x: Number(s.value) / 100 }));
     s.addEventListener("change", commit);
   });
   [rowNums, stripNums].forEach((set) =>
@@ -547,7 +561,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
       n.addEventListener("input", () => {
         const v = Number(n.value);
         if (n.value === "" || !Number.isFinite(v)) return;
-        setTriple(i === 0 ? { h: v % 360 } : i === 1 ? { s: v / 100 } : { x: v / 100 }, n);
+        setTriple(i === 0 ? { h: v % 360 } : i === 1 ? { s: v / cScale() } : { x: v / 100 }, n);
       });
       n.addEventListener("change", () => {
         show();

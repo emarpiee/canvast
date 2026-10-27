@@ -7,7 +7,7 @@
  *   el.addEventListener("change", (e) => e.detail.value);   // when a gesture ends
  *   el.value = "#ff0000";                                    // set from outside
  *
- * Attributes: value, model (okhsl | okhsv | okhcl), view (wheel | plane | sliders | mixer), format (hex | rgb | oklch), alpha, contrast,
+ * Attributes: value, model (okhsl | okhsv | oklch), view (wheel | plane | sliders | mixer), format (hex | rgb | oklch), alpha, contrast,
  * size, theme (auto | light | dark), eyedropper="false". Call `defineColourPickerElement()` once (the name can be changed) before the tag is used.
  */
 import { createColourPicker, VIEWS, type ColourPicker, type View } from "./picker";

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Changed:** the colour picker's third model, OKHCL (this project's own, not a published model), is replaced by **OKLCH**, the standard OKLab polar form that CSS `oklch()` uses: chroma is absolute (0 to 0.4), and what sRGB cannot show is reduced at the same lightness and hue. A saved model of OKHCL becomes OKLCH. The picker's package: a `theme` option and `data-cp-theme` (light, dark, auto), the packaged page has an Auto, Light and Dark switch, its licence travels in the built file, and its README is complete with the limitations.
+- **Fixed:** in a dark picker the layout list opened as a white native popup; the picker now sets `color-scheme` with its dark colours.
+
 ## 0.46.0 — Hidden library items and passwords (2026-10-27)
 
 - **Added:** *Rename* in the canvas context menu on a picture: it renames the file in the library (with the library's own dialog) and a layer that has a name of its own.

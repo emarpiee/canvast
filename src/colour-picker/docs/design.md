@@ -8,7 +8,7 @@ HSL and HSV are the ones people know, but their lightness and saturation are not
 | --- | --- | --- |
 | OKHSL | hue, saturation, lightness | "Make it lighter or paler"; greys and tints. Lightness 0 and 1 are black and white at any saturation. |
 | OKHSV | hue, saturation, value | The Photoshop-style box: the corner is the pure colour. The default. |
-| OKHCL | hue, chroma, lightness | Lightness is OKLab's own, so equal L means equal brightness across hues; chroma is the fraction of the gamut at that lightness and hue, so it never clips. For building palettes of even weight. |
+| OKLCH | hue, chroma, lightness | OKLab in polar form, as CSS `oklch()` writes it. Lightness is OKLab's own, so equal L means equal brightness across hues; chroma is absolute (0 to 0.4 on the slider), so it can ask for more than sRGB has, and then it is reduced at the same lightness and hue. For building palettes of even weight and for matching CSS. |
 
 Switching model converts the colour, so it never changes: only the controls do. A grey keeps the hue you had.
 

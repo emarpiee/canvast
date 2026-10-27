@@ -9,7 +9,7 @@ Makes a picker. Append `picker.el` where you want it. The picker is `size` px wi
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `value` | string | `"#2563eb"` | The start colour: hex of 3, 4, 6 or 8 digits (the `#` is optional), `rgb()` or `oklch()`. |
-| `model` | `"okhsl" \| "okhsv" \| "okhcl"` | `"okhsv"` | The colour model the channels are in. The user can switch it. |
+| `model` | `"okhsl" \| "okhsv" \| "oklch"` | `"okhsv"` | The colour model the channels are in. The user can switch it. |
 | `view` | `"wheel" \| "plane" \| "sliders" \| "mixer"` | `"wheel"` | The layout (see below). The user can switch it. |
 | `views` | `View[]` | all four | The layouts the switch offers. |
 | `alpha` | boolean | `false` | Offer transparency. Off: colours are opaque and values are `#rrggbb`. On: a fourth slider, and `#rrggbbaa` when the colour is not opaque. |
@@ -91,7 +91,7 @@ Colours here are `Rgb = [r, g, b]` bytes, and a model's colour is a `Triple = { 
 | `parseHex`, `rgbToHex`, `tripleToHex`, `hexToTriple` | The hex-only helpers. |
 | `rgbToOklch`, `oklchToRgb` | OKLCH, with absolute chroma. |
 | `contrastRatio(a, b)` | WCAG 2 contrast of two opaque colours, 1 to 21. |
-| `harmonies(rgb, kind, hue?)` | The colours of a harmony, turned in OKHCL so each stays inside sRGB. |
+| `harmonies(rgb, kind, hue?)` | The colours of a harmony, each turned at its own lightness and share of the gamut so it stays inside sRGB. `turned(rgb, deg, hue?)` is the single colour. |
 | `prefersDarkText(rgb)` | Whether black text reads better than white on this colour. |
 
 ## Dragging numbers

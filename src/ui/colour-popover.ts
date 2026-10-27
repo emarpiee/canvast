@@ -318,7 +318,7 @@ function editorPicker(relayout: () => void) {
     format: store?.get("colour.format") ?? "hex",
     groups: swatchGroups(),
     display: swatchBackground,
-    onModel: (m: "okhsl" | "okhsv" | "okhcl") => void store?.set("colour.model", m),
+    onModel: (m: "okhsl" | "okhsv" | "oklch") => void store?.set("colour.model", m),
     onFormat: (f: "hex" | "rgb" | "oklch") => void store?.set("colour.format", f),
     onView: (v: "wheel" | "plane" | "sliders" | "mixer") => {
       void store?.set("colour.view", v);
@@ -460,7 +460,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     format: store?.get("colour.format") ?? "hex",
     groups: groups(),
     display: swatchBackground,
-    onModel: (m: "okhsl" | "okhsv" | "okhcl") => void store?.set("colour.model", m),
+    onModel: (m: "okhsl" | "okhsv" | "oklch") => void store?.set("colour.model", m),
     onFormat: (f: "hex" | "rgb" | "oklch") => void store?.set("colour.format", f),
     onView: (v: "wheel" | "plane" | "sliders" | "mixer") => {
       void store?.set("colour.view", v);

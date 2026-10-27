@@ -10,7 +10,7 @@
  *
  * Light and dark: the defaults follow `prefers-color-scheme`. To choose one whatever the system says, set `data-cp-theme="light"` or
  * `data-cp-theme="dark"` on the picker, on any ancestor (the page, a panel) or on the `<colour-picker>` tag (the `theme` option and
- * attribute do the same); that also sets `color-scheme`, so the browser's own controls match.
+ * attribute do the same); that also sets `color-scheme`, so the browser's own controls (the layout list, scroll bars) match; so does the dark default.
  */
 const LIGHT = `--cp-bg: #ffffff; --cp-fg: #1f2329; --cp-muted: #5f6b76; --cp-border: rgba(31, 35, 41, 0.18); --cp-field: #f1f3f5; --cp-hover: rgba(31, 35, 41, 0.08); --cp-check-a: #d5d9dd; --cp-check-b: #ffffff;`;
 const DARK = `--cp-bg: #1d2126; --cp-fg: #e8eaed; --cp-muted: #9aa4ae; --cp-border: rgba(232, 234, 237, 0.2); --cp-field: #2a3037; --cp-hover: rgba(232, 234, 237, 0.1); --cp-check-a: #3a4048; --cp-check-b: #272c32;`;
@@ -25,7 +25,7 @@ export const PICKER_CSS = `
   --cp-thumb: 16px; --cp-bar: 12px; --cp-swatch: 20px;
 }
 @media (prefers-color-scheme: dark) {
-  :where(.cp) { ${DARK} }
+  :where(.cp) { ${DARK} color-scheme: dark; }
 }
 ${themed("light")} { ${LIGHT} color-scheme: light; }
 ${themed("dark")} { ${DARK} color-scheme: dark; }
@@ -64,7 +64,7 @@ ${themed("dark")} { ${DARK} color-scheme: dark; }
 .cp[data-view="wheel"] .cp-fields { display: none; }
 .cp[data-view="plane"] .cp-field[data-row="1"], .cp[data-view="plane"] .cp-field[data-row="2"], .cp[data-view="plane"] .cp-field[data-row="0"] .cp-num { display: none; }
 .cp[data-view="plane"] .cp-field[data-row="0"] { grid-template-columns: 1.4em 1fr; }
-.cp-field { display: grid; grid-template-columns: 1.4em 1fr 3.6em; align-items: center; gap: var(--cp-gap-sm); }
+.cp-field { display: grid; grid-template-columns: 1.4em 1fr 4.2em; align-items: center; gap: var(--cp-gap-sm); }
 .cp-field label { color: var(--cp-muted); font-size: var(--cp-text-sm); text-align: center; }
 .cp-alpha { display: none; }
 .cp[data-alpha="true"] .cp-alpha { display: grid; }

@@ -1,4 +1,4 @@
-// The pictures of the colour package (src/colour-picker/docs/): the four layouts (layouts.png) and light and dark (themes.png), made from the built package.
+// The pictures of the colour package (src/colour-picker/docs/): the four layouts (layouts.png), light and dark (themes.png) and OKLCH (oklch.png), made from the built package.
 // Run from the repo root after `npm run build:picker`: node scripts/showcase/picker-layouts.mjs <outDir>
 import { chromium } from "@playwright/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -36,5 +36,16 @@ const t = await browser.newPage({ viewport: { width: 656, height: 616 } });
 await t.goto("file://" + join(dir, "themes.html"));
 await t.waitForTimeout(500);
 await t.screenshot({ path: join(outDir, "themes.png"), fullPage: true });
+// OKLCH: the plane (what sRGB cannot show is transparent) and the sliders with chroma as the CSS value
+const oklch = `<!doctype html><meta charset="utf-8"><body style="margin:0;display:flex;gap:32px;background:#eef1f3;padding:40px 48px 36px;font-family:system-ui,sans-serif;width:max-content"><div id="a"></div><div id="b"></div>
+<script src="file://${resolve("dist-picker/colour-picker.js")}"></script>
+<script>
+for (const [id, view] of [["a", "plane"], ["b", "sliders"]]) document.getElementById(id).append(ColourPicker.createColourPicker({ value: "#2f7be0", model: "oklch", view, theme: "light" }).el);
+</script>`;
+writeFileSync(join(dir, "oklch.html"), oklch);
+const o = await browser.newPage({ viewport: { width: 640, height: 480 } });
+await o.goto("file://" + join(dir, "oklch.html"));
+await o.waitForTimeout(500);
+await o.screenshot({ path: join(outDir, "oklch.png"), fullPage: true });
 await browser.close();
 console.log("wrote", outDir);

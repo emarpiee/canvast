@@ -335,8 +335,13 @@ async function start(): Promise<void> {
   // Theme chosen in Settings (ui.theme): "system" leaves the attribute off so the operating system decides.
   const applyThemeAttribute = (): void => {
     const t = settings.get("ui.theme");
-    if (t === "system") delete document.documentElement.dataset["theme"];
-    else document.documentElement.dataset["theme"] = t;
+    if (t === "system") {
+      delete document.documentElement.dataset["theme"];
+      delete document.documentElement.dataset["cpTheme"];
+    } else {
+      document.documentElement.dataset["theme"] = t;
+      document.documentElement.dataset["cpTheme"] = t; // (the colour picker's own theme switch: its native controls and colours follow the app, not the system)
+    }
   };
   // Appearance (Settings > Appearance): attributes and variables on the root, read by the stylesheet.
   // Zen mode (ui.zen): an attribute on the root, read by the stylesheet, and the pressed state of the button beside Home.

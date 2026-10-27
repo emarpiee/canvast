@@ -18,13 +18,13 @@ Measured with `npm run bench:picker` (Node, one core of a laptop CPU; the browse
 
 | Model | Pixel by pixel with `toRgb` | `paintPlane` | Faster |
 | --- | --- | --- | --- |
-| OKHSL | 7.3 ms | 1.35 ms | 5.4× |
-| OKHSV | 7.0 ms | 1.38 ms | 5.1× |
-| OKHCL | 5.2 ms | 1.27 ms | 4.1× |
+| OKHSL | 8.0 ms | 1.41 ms | 5.7× |
+| OKHSV | 7.1 ms | 1.45 ms | 4.9× |
+| OKLCH | 5.2 ms | 0.34 ms | 15× (the part sRGB cannot show is skipped) |
 
 One `toRgb` or `fromRgb`: about 1 µs. In a browser, a hue step through the real input path (the handler: conversion, text, thumbs, tracks) is **0.47 ms**, and the frame after it (the box) fits one 16.7 ms frame with room to spare.
 
-Size: 49 KiB of code minified (52 KiB with the licence notices at the top of the file), 18 KiB gzipped, with the gradient editor (the picker alone is 38 KiB and 14 KiB).
+Size: 50 KiB of code minified (53 KiB with the licence notices at the top of the file), 18 KiB gzipped, with the gradient editor (the picker alone is 39 KiB and 14 KiB).
 
 ## Keeping it fast
 
