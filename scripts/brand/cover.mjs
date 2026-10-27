@@ -1,5 +1,5 @@
-// The cover at the top of the README: the wordmark and the tagline, and the logo with a zoom cone from its dot to the same mark 64 times larger
-// (the logo holds itself inside its dot, at 1/64). 1600 × 640 units, drawn at 2× for a sharp picture; the type is Space Grotesk (scripts/showcase/fonts).
+// The cover at the top of the README: the wordmark and the tagline, and the logo holding itself in its dot (a speck at 1/64 of the tile) with a
+// zoom cone from that speck to the same mark at full size. 1600 × 640 units, drawn at 2× for a sharp picture; the type is Space Grotesk (scripts/showcase/fonts).
 // Usage: node scripts/brand/cover.mjs <out.png | out.webp>   (a .webp is converted with cwebp -q 85)
 import { chromium } from "@playwright/test";
 import { execFileSync } from "node:child_process";
@@ -19,10 +19,12 @@ const f = (n) => Math.round(n * 100) / 100;
 const HERO = { x: 900, y: 80, s: 380 }, LOUPE = { x: 1300, y: 380, s: 190 };
 const dot = ({ x, y, s }) => ({ cx: x + (42 / 64) * s, cy: y + 0.5 * s, d: (10 / 64) * s });
 const dh = dot(HERO), dl = dot(LOUPE);
-const frame = (cx, cy, d, pad, w, o = 1) => `<rect x="${f(cx - d / 2 - pad)}" y="${f(cy - d / 2 - pad)}" width="${f(d + 2 * pad)}" height="${f(d + 2 * pad)}" rx="${f(pad + d * 0.25)}" fill="none" stroke="${C.spark}" stroke-width="${w}" stroke-dasharray="${w * 2.2} ${w * 1.6}" opacity="${o}"/>`;
 
-// The cone runs from the corners of the hero's dot frame to the corners of the loupe frame
-const fh = { x0: dh.cx - dh.d / 2 - 9, y0: dh.cy - dh.d / 2 - 9, x1: dh.cx + dh.d / 2 + 9, y1: dh.cy + dh.d / 2 + 9 };
+// The mark again inside each dot, at 1/64 of its tile (the dot is 10/64, so the speck is a tenth of the dot); the cone runs from the corners of the
+// hero's speck frame to the corners of the loupe frame, so it widens exactly as the zoom does
+const speck = (dotSize) => dotSize / 10; // (1/64 of the tile is a tenth of the dot, which is 10/64)
+const sh = speck(dh.d), sl = speck(dl.d);
+const fh = { x0: dh.cx - sh / 2 - 4, y0: dh.cy - sh / 2 - 4, x1: dh.cx + sh / 2 + 4, y1: dh.cy + sh / 2 + 4 }; // (a little wider than the speck)
 const fl = { x0: LOUPE.x - 10, y0: LOUPE.y - 10, x1: LOUPE.x + LOUPE.s + 10, y1: LOUPE.y + LOUPE.s + 10 };
 const cone = [[fh.x1, fh.y0], [fl.x1, fl.y0], [fl.x0, fl.y1], [fh.x0, fh.y1]];
 
@@ -36,9 +38,9 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
 ${mark(HERO.x, HERO.y, HERO.s)}
 <polygon points="${cone.map((p) => p.map(f).join(",")).join(" ")}" fill="${C.spark}" opacity="0.08"/>
 <path d="M${f(fh.x1)} ${f(fh.y0)}L${f(fl.x1)} ${f(fl.y0)}M${f(fh.x0)} ${f(fh.y1)}L${f(fl.x0)} ${f(fl.y1)}" stroke="${C.spark}" stroke-width="2" opacity="0.85"/>
-${frame(dh.cx, dh.cy, dh.d, 9, 2.5)}
+${mark(dh.cx - sh / 2, dh.cy - sh / 2, sh)}
 <rect x="${fl.x0}" y="${fl.y0}" width="${fl.x1 - fl.x0}" height="${fl.y1 - fl.y0}" rx="26" fill="${C.ink}"/>
-${mark(LOUPE.x, LOUPE.y, LOUPE.s)}${frame(dl.cx, dl.cy, dl.d, 5, 1.5)}
+${mark(LOUPE.x, LOUPE.y, LOUPE.s)}${mark(dl.cx - sl / 2, dl.cy - sl / 2, sl)}
 <rect x="${fl.x0}" y="${fl.y0}" width="${fl.x1 - fl.x0}" height="${fl.y1 - fl.y0}" rx="26" fill="none" stroke="${C.spark}" stroke-width="2.5"/>
 </svg>`;
 
@@ -55,8 +57,8 @@ body{margin:0;background:${C.ink}}
 <div class="t" style="left:94px;top:166px;font:190px SGB;letter-spacing:-0.02em;color:${C.paper}">canvast</div>
 <div class="t" style="left:100px;top:392px;font:46px SG;color:${C.haze}">Every point is a canvas.</div>
 <div class="t" style="left:100px;top:470px">${["One HTML file", "No account", "Works offline"].map(chip).join("")}</div>
-<div class="t" style="left:${HERO.x}px;top:500px;font:32px SGB;color:${C.spark}">64× deeper:</div>
-<div class="t" style="left:${HERO.x}px;top:546px;font:24px SG;color:${C.haze}">the same mark again.</div>
+<div class="t" style="left:${HERO.x}px;top:500px;font:32px SGB;color:${C.spark}">Zoom into the dot:</div>
+<div class="t" style="left:${HERO.x}px;top:546px;font:24px SG;color:${C.haze}">the logo is there again.</div>
 </div></body></html>`;
 
 const tmp = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-cover-"));
