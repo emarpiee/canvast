@@ -8,6 +8,7 @@ import { openBatchRename } from "./batch-rename";
 import { askHiddenPassword } from "./hidden-access";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
+import type { SuggestSources } from "../search/suggest";
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
@@ -75,6 +76,8 @@ export interface AssetsView {
 /** How wide the library panel (left) and the details panel (right) can be made on a wide screen, in pixels. */
 /** The most names "View in the library" puts in the search; a longer selection is picked in the whole list instead. */
 const REVEAL_NAMES_MAX = 20;
+/** How long typing in the search box pauses before the results are drawn again. */
+const SEARCH_PAUSE_MS = 120;
 const SIDE_W = { min: 180, max: 420, def: 232 };
 const INSP_W = { min: 260, max: 560, def: 308 };
 
@@ -360,6 +363,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
+  const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   const thumbs = new Map<string, Promise<string>>();
   const thumbUrls = new Map<string, string>(); // the ones already loaded: a redrawn grid shows them at once instead of blank cards
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
@@ -423,10 +427,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   let wantsLooks = false;
   /** The groups of look-alikes among the pictures read so far. */
-  const similar = (): string[][] => similarGroups([...looks].flatMap(([id, l]) => (l && !isHidden(id) ? [{ id, dhash: l.dhash }] : [])));
-  const isHidden = (hash: string): boolean => listing?.entries.some((x) => x.hash === hash && meta(x).hidden) ?? false;
+  const similar = (): string[][] => {
+    const hidden = new Set(listing?.entries.flatMap((x) => (meta(x).hidden ? [x.hash] : [])));
+    return similarGroups([...looks].flatMap(([id, l]) => (l && !hidden.has(id) ? [{ id, dhash: l.dhash }] : [])));
+  };
   const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
+    const known = thumbUrls.get(hash);
+    if (known) {
+      img.src = known;
+      return;
+    }
     thumbFor(hash).then(
       (url) => {
         thumbUrls.set(hash, url);
@@ -435,13 +446,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       () => img.classList.add("is-broken"),
     );
   };
-  const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      io.unobserve(e.target);
-      loadThumb(e.target as HTMLImageElement);
-    }
-  });
+  // Pictures near the view are shown; the ones scrolled far away let go of theirs, so a long scroll does not keep every decoded picture alive.
+  // (The thumbnail's address stays cached, so coming back shows it again at once.)
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const img = e.target as HTMLImageElement;
+        if (e.isIntersecting) {
+          if (!img.hasAttribute("src")) loadThumb(img);
+        } else if (img.hasAttribute("src")) img.removeAttribute("src");
+      }
+    },
+    { root: scroller, rootMargin: "100% 0px" },
+  );
   const dropStaleThumbs = (): void => {
     const live = new Set(listing?.entries.map((e) => e.hash));
     for (const [hash, p] of thumbs) {
@@ -1155,6 +1172,29 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // ---- rendering
   let lastGridHtml = "";
+  // A card's markup is made once per listing (dates and folder paths are slow to format for thousands of cards on every keystroke).
+  let cardHtml = new WeakMap<object, string>();
+  let cardsOf: CatalogListing | null = null;
+  let cardsReadOnly = false;
+  /** The pictures already loaded that are in view get them before the first paint, so a redrawn grid does not flash blank cards. */
+  const showCachedInView = (): void => {
+    const cells = grid.children;
+    const r = scroller.getBoundingClientRect();
+    let lo = 0;
+    let hi = cells.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cells[mid]!.getBoundingClientRect().bottom < r.top) lo = mid + 1;
+      else hi = mid;
+    }
+    for (let i = lo; i < cells.length; i++) {
+      const cell = cells[i]!;
+      if (cell.getBoundingClientRect().top > r.bottom) break;
+      const img = cell.querySelector<HTMLImageElement>("img[data-hash]");
+      const url = img && thumbUrls.get(img.dataset["hash"]!);
+      if (url) img.src = url;
+    }
+  };
   const render = (): void => {
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
     if (!listing) return;
@@ -1162,14 +1202,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
     count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
     const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
+    if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
+      cardHtml = new WeakMap();
+      cardsOf = listing;
+      cardsReadOnly = session.readOnly;
+    }
     const cards = rows.map((e) => {
+      const cached = cardHtml.get(e);
+      if (cached) return cached;
       const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
       const ar = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));
       const name = e.name || "Untitled";
-      return `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
+      const html = `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"${thumbUrls.has(e.hash) ? ` src="${thumbUrls.get(e.hash)}"` : ""}><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -1188,6 +1235,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </button>
       ${check(e.hash, name)}
       </div>`;
+      cardHtml.set(e, html);
+      return html;
     });
     const missing = usageAll
       ? listing.missing.map(
@@ -1220,7 +1269,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       grid.innerHTML = html;
       lastGridHtml = html;
       if (focused?.hash) grid.querySelector<HTMLElement>(`${focused.box ? ".asset-check" : ".asset-card"}[data-hash="${focused.hash}"]`)?.focus({ preventScroll: true });
-      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]:not([src])")) io.observe(img);
+      io.disconnect();
+      if (visible) showCachedInView();
+      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
     }
     markPicked();
     renderSide();
@@ -2697,7 +2748,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     render();
   };
   setWay("all");
+  let suggestFor: CatalogListing | null = null;
+  let suggestSources: SuggestSources = { tags: [], types: [] };
   mountSuggest(pop.querySelector<HTMLElement>(".search-suggest")!, search, () => {
+    if (suggestFor === listing && listing) return suggestSources;
     const tags = new Map<string, { label: string; n: number }>();
     const types = new Map<string, number>();
     for (const e of listing?.entries ?? []) {
@@ -2709,7 +2763,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const k = chipOf(e.name, e.type).toLowerCase();
       types.set(k, (types.get(k) ?? 0) + 1);
     }
-    return { tags: [...tags.values()], types: [...types].map(([ext, n]) => ({ ext, n })) };
+    suggestFor = listing;
+    return (suggestSources = { tags: [...tags.values()], types: [...types].map(([ext, n]) => ({ ext, n })) });
   });
   search.addEventListener("input", () => {
     // A first "/" chooses Name and is not part of the search; a "#" stays (it is a search word).
@@ -2766,15 +2821,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
   );
   grid.addEventListener("click", rememberNow);
-  for (const el of [search, usageSel, sortSel]) {
-    el.addEventListener("input", () => {
-      render();
-    });
-  }
+  for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render());
+  // Typing redraws the results once the typing pauses, not on every letter (a large library would make each key wait for the whole grid).
+  let typingTimer = 0;
+  search.addEventListener("input", () => {
+    clearTimeout(typingTimer);
+    typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);
+  });
   sizeInput.addEventListener("input", () => grid.style.setProperty("--thumb", `${sizeInput.value}px`));
   // The picture you are looking at stays where it is on the screen when the grid is laid out again (the details panel opened or closed, the
   // window or the thumbnails resized, items added above): the picked one if it is in view, else the one a third of the way down.
-  const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   let keepAt: { hash: string; top: number } | null = null;
   const anchorCard = (): HTMLElement | null => {
     const r = scroller.getBoundingClientRect();
@@ -2787,7 +2843,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const c = anchorCard();
     keepAt = c ? { hash: c.dataset["hash"]!, top: c.getBoundingClientRect().top - scroller.getBoundingClientRect().top } : null;
   };
-  scroller.addEventListener("scroll", remember, { passive: true });
+  let rememberFrame = 0;
+  scroller.addEventListener("scroll", () => (rememberFrame ||= requestAnimationFrame(() => ((rememberFrame = 0), remember()))), { passive: true });
   grid.addEventListener("click", () => requestAnimationFrame(remember));
   if (typeof ResizeObserver !== "undefined") {
     const keep = new ResizeObserver(() => {
