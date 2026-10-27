@@ -32,13 +32,11 @@ A desktop build can use the disk directly. The workspace becomes an ordinary fol
 
 ```
 my_workspace/                      the workspace (any name, anywhere)
-├── .canvast/                      app-owned: settings and index
+├── .canvast/                      app-owned (see "On-disk format")
+│   ├── workspace.json             boards and canvases (order, names, paths), styles, locks
+│   ├── library.json               library items and folders: names, tags, notes, fields, hash ↔ file
 │   ├── settings.json              workspace settings (synced with the folder)
-│   ├── index.json                 library catalog: names, tags, folders, notes, fields, hash ↔ file,
-│   │                              order of boards and canvases, display names
-│   ├── bookmarks.json
-│   ├── device/                    per device, not meant to sync: open canvas, cameras, panels
-│   └── cache/                     thumbnails and other derived data; safe to delete
+│   └── devices/<device id>.json   per device: open canvas, cameras, last backup
 ├── .hidden/                       app-owned: encrypted hidden library items
 ├── .trash/                        app-owned: deleted files, when that option is chosen
 ├── sketches/                      a board = a folder
@@ -57,7 +55,7 @@ my_workspace/                      the workspace (any name, anywhere)
 ```
 
 - **A dot in front means app-owned:** `.canvast/`, `.hidden/`, `.trash/` are not meant to be edited by hand. Board folders and `library/` are.
-- **A canvas** is one `.cvst` file (JSON). The `.canvas` extension is not used, because another app already uses it. Exact coordinates (BigInt) are written as strings, as the archive already does.
+- **A canvas** is one `.cvst` file (JSON, the backup's canvas format with a header; see \"On-disk format\"). The `.canvas` extension is not used, because another app already uses it.
 - **`.canvast`** stays what it is: a zipped backup or export of a whole workspace, a board or a canvas. It is never the live workspace.
 - **Painting data** is not part of the layout. It was removed in v0.48.2.
 
@@ -70,9 +68,9 @@ my_workspace/                      the workspace (any name, anywhere)
 | Two **different** files with the same name get a number | `forest-dusk.webp`, `forest-dusk-2.webp` |
 | The **same** file imported again makes no new file: it is one item, found by its SHA-256 (kept in the index). The second name is an alias | — |
 | **Safe mapping** for library folder, board and canvas names: characters Windows forbids (`<>:"/\|?*`, control characters) are removed, reserved names (`CON`, `NUL`, `COM1`…) get a suffix, trailing dots and spaces are trimmed, length is capped. Clashes are compared case-insensitively | `Refs: Hands?` → `refs-hands` |
-| The name you typed stays what the app shows; the index keeps it | — |
+| The name you typed stays what the app shows; `workspace.json` / `library.json` keep it | — |
 | Renaming or moving in the app renames or moves the file or folder. **Library undo** (50 steps) moves it back | — |
-| Tags, notes, fields and the hidden flag are kept in the index, never in names | — |
+| Tags, notes, fields and the hidden flag are kept in `library.json`, never in names | — |
 
 A library item is in at most one library folder (as today), so every item has exactly one place on disk.
 
@@ -134,6 +132,110 @@ Within one device, the writer lease keeps one window as the writer, as it does f
 - Firefox keeps the browser build. The desktop build is Chromium only.
 - Releases (ADR 0175) add a desktop package (a Linux AppImage first; other platforms later) next to `canvast.html`, built from the same commit.
 
+## On-disk format (step 3, proposed for review)
+
+### Files and what each holds
+
+| File | Holds | Written by | Synced between devices |
+|---|---|---|---|
+| `<board>/<canvas>.cvst` | One canvas: its objects, nested frames and bookmarks | The app, whole file, safe write | Yes |
+| `.canvast/workspace.json` | The workspace: its name and view ground, the boards and canvases in order with their names, ids and paths, the saved styles, the password locks | The app | Yes |
+| `.canvast/library.json` | The library: every item (hash, file path, name, type, size, pixels, import date, tags, favourite, library folder, note, fields, deleted or not) and the library folders | The app | Yes |
+| `.canvast/devices/<device id>.json` | What belongs to one device: the open board and canvas, each canvas's camera, the last backup made there | Only that device | Synced, but each device writes only its own file, so they never clash |
+| `.canvast/settings.json` | Settings of the workspace itself (when ADR 0017's workspace scope gets settings; empty at first) | The app | Yes |
+| `library/…` | The originals, as readable files | The app, or you | Yes |
+| `.hidden/`, `.trash/` | Step 4 and step 5 | The app | Yes |
+
+The device settings (theme, shortcuts, panels) stay in the app, per device, as today, and travel in backups as today.
+
+### A canvas file (`.cvst`)
+
+The same JSON a `.canvast` backup already writes for a canvas (`canvases/<id>.json`), with a header, so one writer and one reader serve both:
+
+```json
+{
+  "format": "canvast-canvas",
+  "version": 1,
+  "id": "3f9a…",
+  "revision": 42,
+  "savedAt": "2026-10-28T14:12:05Z",
+  "savedBy": "d7c1…",
+  "objects": [ { "id": "…", "kind": "stroke", "ax": "75p1", "ay": "0p0", "…": "…" } ],
+  "frames": [ { "id": "…", "parent": null, "n": "…", "ox": "…", "oy": "…", "level": "…" } ],
+  "bookmarks": [ { "…": "…" } ]
+}
+```
+
+- Exact coordinates are already strings in the stored form (`"75p1"` = 75·2¹), so nothing is lost and JSON needs no BigInt.
+- The **name** is not in the file: the file name is the canvas's safe name, and `workspace.json` keeps the name as typed. The **id** is in the file, so a canvas renamed or moved in the file manager is still recognised.
+- The **camera** is per device, so it lives in the device file, not here.
+
+### `workspace.json`
+
+```json
+{
+  "format": "canvast-workspace",
+  "version": 1,
+  "id": "a1b2…",
+  "name": "My workspace",
+  "viewGround": "checker",
+  "boards": [
+    { "id": "…", "name": "Sketches", "folder": "sketches",
+      "canvases": [ { "id": "…", "name": "Characters", "file": "sketches/characters.cvst" } ] }
+  ],
+  "styles": [ "…" ],
+  "locks": { "hidden": "pbkdf2$…", "workspace": "pbkdf2$…" }
+}
+```
+
+- Order of boards and canvases is the order in this file.
+- Locks are the salted PBKDF2 form used today (never the password). The hidden lock also unlocks the encrypted hidden items in step 4.
+
+### `library.json`
+
+```json
+{
+  "format": "canvast-library",
+  "version": 1,
+  "folders": [ { "id": "…", "name": "Anatomy", "parentId": null } ],
+  "items": [
+    { "hash": "3f9a…", "file": "library/anatomy/hand_study-loomis.jpg", "name": "Hand Study (Loomis).jpg",
+      "type": "image/jpeg", "size": 48213, "pixelW": 1200, "pixelH": 900, "importedAt": 1793142570297,
+      "tags": ["hands"], "favorite": false, "folderId": "…", "note": "", "fields": [], "state": "active" }
+  ]
+}
+```
+
+- **Library folders are real folders:** an item's file is under `library/<its folder path>/`, each part a safe name. Filing an item in another folder moves the file; renaming the item renames it; undo moves it back. An item in no folder is under `library/<kind>/`. A library folder whose safe name is the same as a kind folder (`Images` → `images`) shares that folder on disk; the index still knows which item is in which.
+- Items are found by **hash**, so a file renamed or moved outside the app is matched again (step 5).
+
+### Names on disk
+
+Board folders, canvas files and library folders use the same safe naming as library files (`workspace-names.ts`: the naming convention, forbidden characters and reserved names removed, `-2` on a clash compared without case). Renaming a board or canvas in the app renames its folder or file. The name as typed is kept in `workspace.json` / `library.json` and is what the app shows.
+
+### Saving and the cache
+
+- Each edit is first committed to **IndexedDB, as today** (the same revision-checked, per-object, read-back-verified commit). There it is safe within a fraction of a second.
+- IndexedDB is now the **journal and the cache**: a canvas's file is written from it **about 2 seconds after editing pauses** (and at once when the canvas is closed, the app quits, or a backup is made), as one safe write: temporary file, flushed, renamed over the old one. Rewriting a canvas of 100,000 objects on every stroke would be too slow; this way every stroke is still saved at once, and the file follows shortly.
+- At start-up the app compares each canvas's file with the cache: a file newer than the cache (written by another device, through sync) replaces the cache; a cache newer than the file (the app was closed before the file was written) is written to the file. Deleting the cache loses nothing that a file has.
+- **Conflicts:** if a canvas's file changed on disk (its `revision`/`savedBy` is not what this device last wrote) while this device has edits not yet in the file, the app writes this device's version beside it as `characters (conflict 2026-10-28 1412).cvst`, adds it as a canvas, and says so. Nothing is overwritten.
+- `workspace.json` and `library.json` are written the same way, shortly after each change.
+
+### Moving in from the browser
+
+The move uses the existing backup format: in the browser build, **Export a full backup** (`.canvast`); in the desktop app, **Import backup** into a workspace folder. The import writes the boards, canvases and library into the folder through the same code as any import. No second migration path to maintain. The old library folder's files are read by that import too (it already reads them for a backup made with a library folder).
+
+### Review points for the owner
+
+| # | Point | Proposed |
+|---|---|---|
+| A | Bookmarks are stored in the canvas file (they belong to a canvas, like today), not in a separate `bookmarks.json` | In the `.cvst` |
+| B | Cameras and the open canvas are per device (`.canvast/devices/<id>.json`), so two devices do not move each other's view | Per device |
+| C | The file of a canvas is written about 2 s after editing pauses; every edit is still saved at once in the app's journal | 2 s |
+| D | A conflict keeps both versions as two canvases (`… (conflict <date>).cvst`) | Keep both |
+| E | Moving in from the browser = export a full backup there, import it in the desktop app | Through a backup |
+| F | A library folder named like a kind folder (`Images`) shares `library/images/` | Share |
+
 ## Order of work
 
 Each step ends in a working app and is committed and released on its own.
@@ -142,7 +244,7 @@ Each step ends in a working app and is committed and released on its own.
 |---|---|---|
 | 1 | **Storage adapter:** IndexedDB behind one interface; no change in behaviour | Browser build unchanged; storage specs green in both browsers. **Done:** `src/storage/store.ts` (WorkspaceStore, BackupStore, CatalogStore, OriginalStore, LibraryFolderStore, Storage), `idb-storage.ts`, `check:storage` |
 | 2 | **Desktop shell:** Electron main, preload file API, `app://`, workspace picker and list; library files through a `FolderStore` | The desktop app runs the current build; library files land in `library/` with readable names. **Done:** `desktop/` (main, preload), `scripts/build-desktop.mjs`, `src/storage/desktop-storage.ts`, `workspace-names.ts`; `desktop.spec.ts` |
-| 3 | **Workspace format:** boards as folders, `.cvst` canvases, `.canvast/index.json`, safe-write saving, the move from browser storage | A whole workspace lives in a folder and survives restart, move and copy |
+| 3 | **Workspace format:** boards as folders, `.cvst` canvases, `.canvast/workspace.json` and `library.json`, IndexedDB as journal and cache, safe-write saving, the move from browser storage | A whole workspace lives in a folder and survives restart, move and copy |
 | 4 | **Encrypted hidden items** | `.hidden/` files unreadable without the password; password change re-wraps the key |
 | 5 | **Delete options and outside changes:** trash setting, file watching, relinking, conflict copies | The table above works with real file-manager actions |
 | 6 | **Releases:** the AppImage in the release pipeline; README, Limitations and this ADR accepted | A release carries the HTML and the desktop package |
