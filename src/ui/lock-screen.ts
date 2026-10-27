@@ -1,3 +1,5 @@
+import { logoSvg } from "./brand";
+
 /**
  * The screen in front of a workspace that has a password: nothing is read or drawn until the right one is typed. It cannot be closed (Escape does
  * nothing). A gate, not encryption.
@@ -8,6 +10,7 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
   dlg.dataset["testid"] = "lock-screen";
   dlg.setAttribute("aria-labelledby", "lock-title");
   dlg.innerHTML = `
+    <span class="lock-logo">${logoSvg()}</span>
     <h2 id="lock-title">This workspace is locked</h2>
     <p>Enter the password to open it.</p>
     <p class="lock-error" data-lock-error role="alert" hidden>That is not the password.</p>

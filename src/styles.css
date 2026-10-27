@@ -103,6 +103,9 @@
   --icon-md: 16px;
   --icon-lg: 18px;
   --icon-xl: 20px;
+  /* The logo (src/ui/brand.ts): beside the name in About, and over the lock screen */
+  --logo-sm: 28px;
+  --logo-lg: 56px;
   /* Neutral overlays that do not follow the theme (over pictures and video) */
   --white: oklch(1 0 0);
   --black: oklch(0 0 0);
@@ -612,6 +615,10 @@ dialog.confirm {
 dialog.confirm::backdrop { background: var(--hud-scrim); }
 dialog.lock-screen::backdrop { background: var(--canvas-bg); }
 .lock-error { color: var(--hud-danger); }
+.lock-logo { display: block; width: var(--logo-lg); height: var(--logo-lg); margin: 0 0 var(--sp-8); }
+.lock-logo svg, .about-logo svg { display: block; width: 100%; height: 100%; }
+.about-title { display: flex; align-items: center; gap: var(--sp-5); }
+.about-logo { flex: none; width: var(--logo-sm); height: var(--logo-sm); }
 dialog.confirm h2 { margin: 0 0 var(--sp-4); font-size: var(--text-xl); }
 dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-6); }

@@ -14,6 +14,7 @@ declare const __CANVAST_VERSION__: string;
 import NOTICES from "../../THIRD_PARTY_NOTICES.md";
 import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } from "../app/diagnostics";
 import { ICONS } from "./icons";
+import { logoSvg } from "./brand";
 
 /**
  * The Settings view (ADR 0048, engineering plan §14.40): a tabbed page, one of the three top-level views. Every row is one declared
@@ -335,7 +336,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
              <p>Deletes everything canvast keeps in this browser: all boards and canvases, the library, saved styles and settings. You are asked first, and offered a backup.</p>
              <div class="storage-actions"><button type="button" class="is-danger" data-reset-all data-testid="reset-all">Delete all data…</button></div></div>`
         : t.id === "about"
-          ? `<div class="set-info set-card"><h3>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
+          ? `<div class="set-info set-card"><h3 class="about-title"><span class="about-logo">${logoSvg()}</span>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
              <div class="set-info set-card"><h3>This browser</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
              <div class="set-info set-card"><h3>Errors this session</h3><ul class="set-errors" data-testid="about-errors"></ul>
                <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>

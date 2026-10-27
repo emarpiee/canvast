@@ -1,3 +1,5 @@
+<img src="docs/brand/canvast-icon.svg" width="72" height="72" alt="The canvast logo">
+
 # canvast
 
 **An offline-first endless canvas.** Pan in any direction and zoom in or out without ever reaching an edge or a zoom limit. Draw, write, place pictures, video and audio, and edit at whatever scale you reach. canvast is **one self-contained HTML file** that runs from your disk: no server, no account, no network connection.
@@ -533,7 +535,7 @@ node scripts/brand/icons.mjs icons/                 # the logo files: SVG master
 node scripts/brand/preview.mjs preview/ 1,3         # a quick look at pages without the app
 ```
 
-The logo (a canvas open on its right side, and the dot you zoom into), its colours and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). At 32 px and under the icons use a small-size master drawn on the 16 px grid. The scripts work on a copy of `dist/canvast.html` in the system's temp folder.
+The logo (a canvas open on its right side, and the dot you zoom into), its colours and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). At 32 px and under the icons use a small-size master drawn on the 16 px grid. The scripts work on a copy of `dist/canvast.html` in the system's temp folder. In the app the logo is the favicon (the small-size master, inline in `src/index.html`), and it stands over the lock screen and beside the name in Settings > About and diagnostics (`src/ui/brand.ts`, which holds the same geometry as `pages.mjs`); `docs/brand/canvast-icon.svg`, at the top of this README, is the icon file `icons.mjs` writes.
 
 ### Releasing
 
