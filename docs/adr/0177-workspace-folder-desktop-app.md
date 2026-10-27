@@ -140,7 +140,7 @@ Each step ends in a working app and is committed and released on its own.
 
 | Step | Work | Ends with |
 |---|---|---|
-| 1 | **Storage adapter:** IndexedDB behind one interface; no change in behaviour | Browser build unchanged; storage specs green in both browsers |
+| 1 | **Storage adapter:** IndexedDB behind one interface; no change in behaviour | Browser build unchanged; storage specs green in both browsers. **Done:** `src/storage/store.ts` (WorkspaceStore, BackupStore, CatalogStore, OriginalStore, LibraryFolderStore, Storage), `idb-storage.ts`, `check:storage` |
 | 2 | **Desktop shell:** Electron main, preload file API, `app://`, workspace picker and list; library files through a `FolderStore` | The desktop app runs the current build; library files land in `library/` with readable names |
 | 3 | **Workspace format:** boards as folders, `.cvst` canvases, `.canvast/index.json`, safe-write saving, the move from browser storage | A whole workspace lives in a folder and survives restart, move and copy |
 | 4 | **Encrypted hidden items** | `.hidden/` files unreadable without the password; password change re-wraps the key |

@@ -1,10 +1,9 @@
 import type { Session } from "../app/session";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
-import { LIBRARY_FILE, externalFolder, folderSupported, libraryCounts } from "../storage/external-folder";
+import { LIBRARY_FILE, externalFolder, folderSupported } from "../storage/external-folder";
 import { runOpenLibraryFile, runSaveLibraryFile } from "./archive-ui";
 import { beginProgress } from "../app/progress";
-import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-move";
 
 /**
  * The library folder card of Settings > Storage (ADR 0159): where the originals are kept, and the moves between the
@@ -12,8 +11,8 @@ import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-m
  */
 export function mountLibraryFolderCard(host: HTMLElement, session: Session): () => Promise<void> {
   const draw = async (): Promise<void> => {
-    const db = session.storage?.db;
-    if (!db) {
+    const folder = session.storage?.libraryFolder;
+    if (!folder) {
       host.innerHTML = `<p>Storage is not available in this tab.</p>`;
       return;
     }
@@ -23,7 +22,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
       host.innerHTML = `${intro}<p data-testid="storage-folder"><strong>Not available in this browser.</strong> It needs Chromium (Chrome, Edge, Brave). Your files stay in the browser's storage.</p>`;
       return;
     }
-    const { inFolder, inBrowser, bareNames } = await libraryCounts(db);
+    const { inFolder, inBrowser, bareNames } = await folder.counts();
     /** A button; `blocked` (a reason) or a read-only tab turns it off, with the reason as its title. */
     const btn = (action: string, label: string, blocked = ""): string => {
       const why = session.readOnly ? "Read-only: another tab is editing" : blocked;
@@ -73,27 +72,27 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
   let busy = false;
   host.addEventListener("click", async (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-folder]");
-    const db = session.storage?.db;
-    if (!b || !db || b.disabled || busy) return;
+    const folder = session.storage?.libraryFolder;
+    if (!b || !folder || b.disabled || busy) return;
     busy = true; // (one job at a time: the buttons do nothing until it ends)
     const act = b.dataset["folder"];
     try {
       if (act === "choose") {
-        await externalFolder.choose(db);
+        await folder.choose();
         // A folder that already holds a library (saved on another device) is offered at once: one more click, not three.
         if (await externalFolder.readLibraryFile()) await runOpenLibraryFile(session);
       }
       else if (act === "reconnect") await externalFolder.reconnect();
-      else if (act === "forget") await externalFolder.forget(db);
+      else if (act === "forget") await folder.forget();
       else if (act === "save-library") await runSaveLibraryFile(session);
       else if (act === "open-library") await runOpenLibraryFile(session);
       else if (act === "names") {
         const p = beginProgress(session.editor, "folder", "Adding extensions to the files");
-        const r = await addExtensions(db, (d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
+        const r = await folder.addExtensions((d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
         p.done(r.failed ? `Added extensions to ${plural(r.moved, "file")}; ${r.failed} could not be changed (${r.why}).` : `Added extensions to ${plural(r.moved, "file")}.`);
       } else {
         const p = beginProgress(session.editor, "folder", act === "in" ? "Moving files into the folder" : "Moving files back into the browser");
-        const r = await (act === "in" ? moveToFolder : moveFromFolder)(db, (d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
+        const r = await (act === "in" ? folder.moveIn : folder.moveOut)((d, n) => p.update(n ? d / n : null, `${d} of ${n}`));
         p.done(r.failed ? `Moved ${plural(r.moved, "file")}; ${r.failed} could not be moved (${r.why}). They stay where they were.` : `Moved ${plural(r.moved, "file")}.`);
       }
     } catch (err) {

@@ -32,6 +32,7 @@ jobs:
       - run: npm run check:offline
       - run: npm run check:names
       - run: npm run check:tokens
+      - run: npm run check:storage
       - run: npm run check:picker
       - run: npm run check:patterns
       - run: npm run check:repro

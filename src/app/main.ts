@@ -1,4 +1,4 @@
-import { externalFolder, externalHashes } from "../storage/external-folder";
+import { externalFolder } from "../storage/external-folder";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -50,8 +50,8 @@ import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-in
 import type { Frame } from "../core/frames";
 import { depthOf, localCamera, normalize } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
-import { openDb } from "../storage/idb";
-import { idbStorage } from "../storage/idb-storage";
+import { openBrowserStorage } from "../storage/idb-storage";
+import type { Storage } from "../storage/store";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
@@ -61,8 +61,6 @@ import { beginProgress } from "./progress";
 import { plural } from "../doc/plural";
 import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
-import { resetAllData } from "../storage/reset";
-import { libraryCounts } from "../storage/external-folder";
 import { runSaveLibraryFile } from "../ui/archive-ui";
 import { mountToolbar } from "../ui/toolbar";
 import { initColourPopover } from "../ui/colour-popover";
@@ -419,10 +417,10 @@ async function start(): Promise<void> {
   let scheduled = false;
   let frameWaiters: Array<() => void> = [];
 
-  let db: IDBDatabase | null = null;
+  let storage: Storage | null = null;
   let storageError = "";
   try {
-    db = await openDb(undefined, {
+    storage = await openBrowserStorage({
       onBlocked: () => {
         editor.message = "Upgrading storage: close other canvast tabs to continue.";
         editor.changed();
@@ -433,7 +431,7 @@ async function start(): Promise<void> {
         editor.changed();
       },
     });
-    await externalFolder.load(db); // (before anything is drawn: an await later in this function lets a frame run early)
+    // (the library folder's link is loaded too, before anything is drawn: an await later in this function lets a frame run early)
   } catch (e) {
     storageError = (e as Error).message;
   }
@@ -448,15 +446,14 @@ async function start(): Promise<void> {
     tiles.clear(); // text drawn before the font was ready used the interim fallback
     invalidate();
   });
-  const storage = db ? idbStorage(db) : null;
   const assets = new AssetLibrary(storage?.originals ?? null, () => {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
   // The library folder (ADR 0159): a restart asks permission again, which needs a click in the storage panel.
   externalFolder.subscribe(() => assets.retryAll());
-  if (db && externalFolder.state === "needs-permission") {
-    void externalHashes(db).then((h) => {
+  if (storage?.libraryFolder && externalFolder.state === "needs-permission") {
+    void storage.libraryFolder.keptHashes().then((h) => {
       if (!h.length) return;
       editor.message = "The library folder needs your permission again: open the storage panel and press Reconnect folder.";
       editor.changed();
@@ -658,7 +655,7 @@ async function start(): Promise<void> {
   });
   const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   assetNames.subscribe(() => invalidate());
-  if (db) {
+  if (storage) {
     try {
       // A workspace password: nothing of the workspace is read or drawn until it is given.
       const lock = await session.catalog?.lock("workspace").catch(() => null);
@@ -1737,14 +1734,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (await session.setPassword(kind, first)) ? state("The password was set.", true) : state();
     },
     reset: async () => {
-      const db = session.storage?.db ?? null;
+      const folderStore = session.storage?.libraryFolder ?? null;
       const tree = session.tree;
       const boards = tree?.boards.length ?? 0;
       const canvases = tree?.boards.reduce((n, b) => n + b.canvases.length, 0) ?? 0;
       const items = (await session.catalog?.list().catch(() => null))?.entries.length ?? 0;
       const est = await navigator.storage?.estimate?.().catch(() => undefined);
       const last = await session.lastBackup();
-      const folder = externalFolder.ready && db ? (await libraryCounts(db)).inFolder : null;
+      const folder = externalFolder.ready && folderStore ? (await folderStore.counts()).inFolder : null;
       const sure = await confirmReset({
         summary: [
           `${plural(boards, "board")} with ${plural(canvases, "canvas", "canvases")}`,
@@ -1761,7 +1758,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (!sure) return;
       const p = beginProgress(editor, "reset", "Deleting all data");
       p.update(null, "the page reloads when it is done");
-      await resetAllData({ db, onBlocked: () => p.update(null, "waiting for the other canvast tabs to close") }).catch((e) => p.fail(`Could not delete all data: ${(e as Error).message}`));
+      await (session.storage?.resetAll(() => p.update(null, "waiting for the other canvast tabs to close")) ?? Promise.reject(new Error("storage is unavailable"))).catch((e) => p.fail(`Could not delete all data: ${(e as Error).message}`));
     },
   });
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).

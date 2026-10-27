@@ -10,6 +10,7 @@ import type { BoardRecord, CanvasRecord, CommitResult, CurrentMeta, LoadedCanvas
 import type { StartupOutcome } from "./migrate-v1";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult, ProgressFn } from "./archive";
 import type { FilesLayout, FilesZipResult } from "./files-zip";
+import type { MoveReport } from "./folder-move";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 
@@ -147,6 +148,21 @@ export interface Storage {
   readonly backups: BackupStore;
   readonly catalog: CatalogStore;
   readonly originals: OriginalStore;
-  /** The browser build's database, for what is not behind an interface yet (the library folder, reset, the test hook). */
-  readonly db?: IDBDatabase;
+  /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
+  readonly libraryFolder: LibraryFolderStore | null;
+  /** Start from scratch: delete everything canvast keeps here, then reload. `onBlocked`: another window still has it open. */
+  resetAll(onBlocked?: () => void): Promise<void>;
+}
+
+/** The browser build's library folder: which originals are kept there, and moving them in and out. */
+export interface LibraryFolderStore {
+  /** Hashes of the originals kept in the folder. */
+  keptHashes(): Promise<string[]>;
+  /** How many originals are in the folder (and how many still named by a bare hash) and how many in the browser. */
+  counts(): Promise<{ inFolder: number; inBrowser: number; bareNames: number }>;
+  choose(): Promise<void>;
+  forget(): Promise<void>;
+  moveIn(progress: (done: number, total: number) => void): Promise<MoveReport>;
+  moveOut(progress: (done: number, total: number) => void): Promise<MoveReport>;
+  addExtensions(progress: (done: number, total: number) => void): Promise<MoveReport>;
 }

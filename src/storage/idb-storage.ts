@@ -3,19 +3,54 @@ import type { ExportScope, ImportPlan, ProgressFn } from "./archive";
 import { applyImport, buildArchive, hiddenInScope, sweepImportStaging } from "./archive";
 import type { FilesLayout } from "./files-zip";
 import { buildFilesZip } from "./files-zip";
-import { done, idbGet, req } from "./idb";
-import type { BackupRecord, BackupStore, OriginalStore, Storage } from "./store";
+import { done, idbGet, openDb, req } from "./idb";
+import type { OpenOptions } from "./idb";
+import type { BackupRecord, BackupStore, LibraryFolderStore, OriginalStore, Storage } from "./store";
 import { WorkspaceRepo } from "./workspace-repo";
 import type { CatalogEntry, ThumbRecord } from "../assets/asset-catalog";
 import { AssetCatalog, entryFromRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { ImportError } from "../assets/asset-library";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "./quota";
-import { externalFolder, folderFileName } from "./external-folder";
+import { externalFolder, externalHashes, folderFileName, libraryCounts } from "./external-folder";
+import { addExtensions, moveFromFolder, moveToFolder } from "./folder-move";
+import { resetAllData } from "./reset";
 
-export function idbStorage(db: IDBDatabase): Storage {
+/** The browser build's storage, with its database (which only the #debug test hook reads directly). */
+export interface IdbStorage extends Storage {
+  readonly db: IDBDatabase;
+}
+
+/** Open the database (upgrading it if needed) and the library folder's link, before anything is drawn. */
+export async function openBrowserStorage(opts: OpenOptions): Promise<IdbStorage> {
+  const db = await openDb(undefined, opts);
+  await externalFolder.load(db);
+  return idbStorage(db);
+}
+
+export function idbStorage(db: IDBDatabase): IdbStorage {
   const catalog = new AssetCatalog(db);
-  return { workspace: new WorkspaceRepo(db), backups: new IdbBackups(db), catalog, originals: new IdbOriginals(db, catalog), db };
+  return {
+    db,
+    workspace: new WorkspaceRepo(db),
+    backups: new IdbBackups(db),
+    catalog,
+    originals: new IdbOriginals(db, catalog),
+    libraryFolder: idbLibraryFolder(db),
+    resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
+  };
+}
+
+function idbLibraryFolder(db: IDBDatabase): LibraryFolderStore {
+  return {
+    keptHashes: () => externalHashes(db),
+    counts: () => libraryCounts(db),
+    choose: () => externalFolder.choose(db),
+    forget: () => externalFolder.forget(db),
+    moveIn: (progress) => moveToFolder(db, progress),
+    moveOut: (progress) => moveFromFolder(db, progress),
+    addExtensions: (progress) => addExtensions(db, progress),
+  };
 }
 
 /** Archives and ZIPs read from and written to IndexedDB. */

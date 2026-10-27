@@ -452,7 +452,7 @@ Every object is validated before it enters the document or is loaded: finite num
 
 ### Storage
 
-Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 12) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection. With a library folder an original is a file named `<sha256>.<ext>` (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
+The app reaches storage only through the interfaces in `src/storage/store.ts` (the workspace, backups, the library's entries and its originals); the browser's IndexedDB is one implementation of them (`src/storage/idb-storage.ts`), and `npm run check:storage` keeps IndexedDB out of the rest of the code. Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 12) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Originals are removed only by reference-checked garbage collection. With a library folder an original is a file named `<sha256>.<ext>` (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
 
 A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas and each original once under `assets/<sha256>`, with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files), always one file however big. Import is verified completely before anything is written. The originals are then written a batch at a time (up to 128 MiB each), so an import needs about that much memory whatever the size of the backup, and everything else (boards, canvases, library entries) in one transaction, so it shows all at once or not at all; originals written by an import that did not finish are erased at once, or when the app next opens.
 
@@ -507,7 +507,7 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | --- | --- |
 | `npm run typecheck` | TypeScript check |
 | `npm run test:unit` | Unit tests (seconds) |
-| `npm test` | Typecheck, unit, quick end-to-end suite, token, picker and pattern-generator checks (about an hour) |
+| `npm test` | Typecheck, unit, quick end-to-end suite, token, storage, picker and pattern-generator checks (about an hour) |
 | `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
 | `npm run test:full` | The full suite with long stress loops (about 1.5 hours) |
 | `npm run test:snap -- <files or -g pattern>` | Run chosen end-to-end specs |
@@ -515,9 +515,10 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | `npm run bench` | Scale and tile-cache benchmarks |
 | `npm run check:offline` | Fail if the built file references anything outside itself |
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
+| `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |
 | `npm run check:repro` | Build twice in different folders, time zones and locales and compare the SHA-256 |
 
-Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, a CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: typecheck, unit tests, the build, the offline, naming, token, picker and pattern checks and the reproducible-build check, and a short Chromium end-to-end run of three specs (the whole quick suite, about an hour, is run by hand). It keeps the built file as a downloadable artifact of the run. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
+Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, a CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks and the reproducible-build check, and a short Chromium end-to-end run of three specs (the whole quick suite, about an hour, is run by hand). It keeps the built file as a downloadable artifact of the run. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
 
 ### The showcase and the screenshots
 

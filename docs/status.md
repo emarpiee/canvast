@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Workspace folder, step 1: the storage boundary (branch `workspace-folder`, 2026-10-28)
+
+**Implemented:** the app reaches storage only through `src/storage/store.ts` ([ADR 0177](adr/0177-workspace-folder-desktop-app.md), proposed): `WorkspaceStore` (implemented by `WorkspaceRepo`, which also took the v1 start-up and the tag queries from `Session`), `BackupStore` (`IdbBackups`), `CatalogStore` (`AssetCatalog`), `OriginalStore` (`IdbOriginals`, which took `AssetLibrary`'s reads and writes of originals with the library folder and storage-full handling), `LibraryFolderStore` (browser only) and `Storage.resetAll`. `main.ts` opens it with `openBrowserStorage()` and never holds the database. `npm run check:storage` (in `npm test`, `test:full` and CI) fails on IndexedDB use outside the listed implementation files. No change in behaviour.
+**Tested:** per sub-slice on fresh snapshots: storage, archive, library-folder in Chromium 27/27 and tags/core storage in Chromium and Firefox 16/16 (1a, 072bbbeb); assets, library-folder, organize in Chromium 77/77 and Firefox import tests 6/6 (1b, b3a88330); storage and library-folder in Chromium and Firefox 28 passed, 8 skipped (Chromium-only folder tests), archive and asset import/GC 16/16 (1c, f71a3bf6); unit 572/572; the guard fails on a planted violation.
+**Known failures:** none known.
+**Unverified:** the quick and full suites.
+**Committed:** on branch `workspace-folder` (see the commits); no version bump until the branch is merged into `main`.
+**Next bounded task:** step 2, the desktop shell (Electron, preload file API, `app://`, workspace picker) with a `FolderStore` for library files.
+
 ## Old painting data removed (v0.48.2, 2026-10-28)
 
 **Implemented:** IndexedDB schema 12 deletes the stores `paintings`, `paintLayers` and `paintTiles` left by the removed Painting view (`storage/idb.ts`; [ADR 0170](adr/0170-painting-view-removed.md) amended). The archive import still recognises paintings in old backups and leaves them out with a note.
