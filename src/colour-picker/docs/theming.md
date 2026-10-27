@@ -24,6 +24,25 @@ The defaults sit in `:where(.cp)`, which has no specificity, so **any rule of yo
 | | `--cp-field-h` | 0 | The least height of the number fields, the text field and the switches (a host with a density setting sets it). |
 | | `--cp-size` | from the `size` option | The ring. Set the option, not this. |
 
+## Light and dark
+
+Out of the box the picker follows the system: the defaults above are the light ones, and `@media (prefers-color-scheme: dark)` swaps the colour properties (`--cp-bg`, `--cp-fg`, `--cp-muted`, `--cp-border`, `--cp-field`, `--cp-hover`, `--cp-check-a`, `--cp-check-b`) for the dark ones. To choose one whatever the system says, for a page with its own light and dark switch:
+
+```html
+<div data-cp-theme="dark"> … any picker, gradient editor or <colour-picker> inside … </div>
+```
+
+```ts
+createColourPicker({ theme: "dark" });     // or "light"; "auto" (the default) follows the system
+createGradientEditor({ theme: "dark" });
+```
+
+```html
+<colour-picker theme="dark"></colour-picker>   <!-- the attribute can change: light, dark, or removed for auto -->
+```
+
+`data-cp-theme="light"` or `"dark"` can be on the picker, on any ancestor (the page, a panel) or on the `<colour-picker>` tag, and it also sets `color-scheme`, so the browser's own controls (the layout list, scroll bars) match. Like the defaults it has no specificity: any rule of yours (`.cp { --cp-bg: … }`) still wins, so a host with its own palette sets its own properties and may ignore all of this. The tokens that do not change with the theme (the accent, sizes, type, shape) are set once.
+
 ## Examples
 
 A popover that matches a host's theme (canvast does this):

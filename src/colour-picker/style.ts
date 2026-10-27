@@ -7,18 +7,28 @@
  *   --cp-text --cp-text-sm --cp-font --cp-mono                                                             type
  *   --cp-radius --cp-radius-sm --cp-gap --cp-gap-sm --cp-pad                                               shape and space
  *   --cp-thumb --cp-bar --cp-swatch --cp-field-h --cp-dot --cp-size (the ring, set from the `size` option)          sizes
+ *
+ * Light and dark: the defaults follow `prefers-color-scheme`. To choose one whatever the system says, set `data-cp-theme="light"` or
+ * `data-cp-theme="dark"` on the picker, on any ancestor (the page, a panel) or on the `<colour-picker>` tag (the `theme` option and
+ * attribute do the same); that also sets `color-scheme`, so the browser's own controls match.
  */
+const LIGHT = `--cp-bg: #ffffff; --cp-fg: #1f2329; --cp-muted: #5f6b76; --cp-border: rgba(31, 35, 41, 0.18); --cp-field: #f1f3f5; --cp-hover: rgba(31, 35, 41, 0.08); --cp-check-a: #d5d9dd; --cp-check-b: #ffffff;`;
+const DARK = `--cp-bg: #1d2126; --cp-fg: #e8eaed; --cp-muted: #9aa4ae; --cp-border: rgba(232, 234, 237, 0.2); --cp-field: #2a3037; --cp-hover: rgba(232, 234, 237, 0.1); --cp-check-a: #3a4048; --cp-check-b: #272c32;`;
+/** The picker, or what holds it, says which theme (zero specificity, like the defaults: any rule of the host wins). */
+const themed = (theme: "light" | "dark"): string => `:where(.cp[data-cp-theme="${theme}"], [data-cp-theme="${theme}"] .cp, :host([data-cp-theme="${theme}"]) .cp)`;
 export const PICKER_CSS = `
 :where(.cp) {
-  --cp-bg: #ffffff; --cp-fg: #1f2329; --cp-muted: #5f6b76; --cp-border: rgba(31, 35, 41, 0.18); --cp-field: #f1f3f5; --cp-hover: rgba(31, 35, 41, 0.08);
-  --cp-accent: #2563eb; --cp-accent-fg: #ffffff; --cp-focus: #2563eb; --cp-check-a: #d5d9dd; --cp-check-b: #ffffff;
+  ${LIGHT}
+  --cp-accent: #2563eb; --cp-accent-fg: #ffffff; --cp-focus: #2563eb;
   --cp-text: 13px; --cp-text-sm: 11px; --cp-font: ui-sans-serif, system-ui, sans-serif; --cp-mono: ui-monospace, Menlo, Consolas, monospace;
   --cp-radius: 8px; --cp-radius-sm: 5px; --cp-gap: 10px; --cp-gap-sm: 6px; --cp-pad: 0px;
   --cp-thumb: 16px; --cp-bar: 12px; --cp-swatch: 20px;
 }
 @media (prefers-color-scheme: dark) {
-  :where(.cp) { --cp-bg: #1d2126; --cp-fg: #e8eaed; --cp-muted: #9aa4ae; --cp-border: rgba(232, 234, 237, 0.2); --cp-field: #2a3037; --cp-hover: rgba(232, 234, 237, 0.1); --cp-check-a: #3a4048; --cp-check-b: #272c32; }
+  :where(.cp) { ${DARK} }
 }
+${themed("light")} { ${LIGHT} color-scheme: light; }
+${themed("dark")} { ${DARK} color-scheme: dark; }
 .cp { --cp-check: conic-gradient(var(--cp-check-a) 25%, var(--cp-check-b) 0 50%, var(--cp-check-a) 0 75%, var(--cp-check-b) 0) 0 0 / 8px 8px; display: flex; flex-direction: column; gap: var(--cp-gap); padding: var(--cp-pad); width: calc(var(--cp-size) + var(--cp-pad) * 2); box-sizing: content-box; color: var(--cp-fg); font: var(--cp-text) / 1.3 var(--cp-font); user-select: none; -webkit-user-select: none; }
 .cp *, .cp *::before, .cp *::after { box-sizing: border-box; }
 .cp [hidden] { display: none; }

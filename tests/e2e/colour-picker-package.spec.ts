@@ -197,3 +197,49 @@ test("colour picker package: the opacity number and the channel numbers scrub by
     expect(after % 5, `${sel} is on a step of 5`).toBe(0);
   }
 });
+
+test("colour picker package: light and dark follow the system, and a theme (option, attribute on it or around it, the tag) chooses whatever the system says", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(DEMO);
+  const bg = () => page.evaluate(() => getComputedStyle(document.querySelector("#host .cp")!).getPropertyValue("--cp-bg").trim());
+  const LIGHT = "#ffffff", DARK = "#1d2126";
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await bg()).toBe(LIGHT);
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await bg()).toBe(DARK);
+  // A theme on the picker, or on anything around it, wins over the system either way; the browser's own controls follow (color-scheme).
+  await page.evaluate(() => document.querySelector("#host .cp")!.setAttribute("data-cp-theme", "light"));
+  expect(await bg()).toBe(LIGHT);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector("#host .cp")!).colorScheme)).toBe("light");
+  await page.evaluate(() => { document.querySelector("#host .cp")!.removeAttribute("data-cp-theme"); document.body.setAttribute("data-cp-theme", "light"); });
+  expect(await bg()).toBe(LIGHT);
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.evaluate(() => document.body.setAttribute("data-cp-theme", "dark"));
+  expect(await bg()).toBe(DARK);
+  // A host's own rule still wins (the defaults have no specificity).
+  await page.addStyleTag({ content: ".cp { --cp-bg: #123456; }" });
+  expect(await bg()).toBe("#123456");
+  // The option, the gradient editor, and the tag (in a shadow root, which a page's selectors cannot see into).
+  const result = await page.evaluate(() => {
+    const CP = (window as unknown as { ColourPicker: { createColourPicker(o: object): { el: HTMLElement }; createGradientEditor(o: object): { el: HTMLElement }; defineColourPickerElement(): void } }).ColourPicker;
+    document.body.removeAttribute("data-cp-theme");
+    document.querySelectorAll("style").forEach((s) => { if (s.textContent?.includes("#123456")) s.remove(); });
+    const read = (el: Element): string => getComputedStyle(el).getPropertyValue("--cp-bg").trim();
+    const picker = CP.createColourPicker({ theme: "dark" });
+    const editor = CP.createGradientEditor({ theme: "dark" });
+    document.body.append(picker.el, editor.el);
+    CP.defineColourPickerElement();
+    const tag = document.createElement("colour-picker");
+    tag.setAttribute("theme", "dark");
+    document.body.append(tag);
+    const inner = (): Element => tag.shadowRoot!.querySelector(".cp")!;
+    const out = { option: read(picker.el), editor: read(editor.el.querySelector(".cp:not(.cg)") ?? editor.el), tag: read(inner()), tagLight: "" };
+    tag.setAttribute("theme", "light");
+    out.tagLight = read(inner());
+    return out;
+  });
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(result).toEqual({ option: DARK, editor: DARK, tag: DARK, tagLight: LIGHT });
+  expect(errors).toEqual([]);
+});

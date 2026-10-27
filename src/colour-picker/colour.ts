@@ -3,7 +3,7 @@
  * and in any other project unchanged.
  *
  * OKHSL and OKHSV are Bjorn Ottosson's models (https://bottosson.github.io/posts/colorpicker/, MIT, Copyright (c) 2021 Bjorn
- * Ottosson; the licence text is in THIRD_PARTY_NOTICES.md): saturation is relative to the
+ * Ottosson; the licence text is in LICENSE next to this folder's README, and tests/unit/colour-reference.test.ts keeps it agreeing with his own JavaScript): saturation is relative to the
  * sRGB gamut, so every (h, s, x) triple is a real colour and a slider never leaves the gamut. OKHCL is the third view of the same
  * space: hue and lightness are OKLab's (L is not "toe" corrected), chroma is the fraction (0..1) of the most chroma sRGB can show at
  * that lightness and hue.

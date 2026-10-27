@@ -91,6 +91,8 @@ export interface PickerOptions {
   size?: number;
   groups?: readonly SwatchGroup[];
   labels?: Partial<Labels>;
+  /** "light" or "dark" whatever the system prefers (default "auto": it follows `prefers-color-scheme`). The same as `data-cp-theme` on the picker or on anything around it. */
+  theme?: "auto" | "light" | "dark";
   /** The CSS colour to show a stored colour as (a host that maps one colour to a theme colour does it here). */
   display?: (hex: string) => string;
   onInput?: (hex: string) => void;
@@ -189,6 +191,7 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
 
   const root = document.createElement("div");
   root.className = "cp";
+  if (options.theme === "light" || options.theme === "dark") root.dataset["cpTheme"] = options.theme;
   root.style.setProperty("--cp-size", `${size}px`);
   root.dataset["view"] = view;
   root.dataset["alpha"] = String(useAlpha);

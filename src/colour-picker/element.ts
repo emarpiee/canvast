@@ -8,7 +8,7 @@
  *   el.value = "#ff0000";                                    // set from outside
  *
  * Attributes: value, model (okhsl | okhsv | okhcl), view (wheel | plane | sliders | mixer), format (hex | rgb | oklch), alpha, contrast,
- * size, eyedropper="false". Call `defineColourPickerElement()` once (the name can be changed) before the tag is used.
+ * size, theme (auto | light | dark), eyedropper="false". Call `defineColourPickerElement()` once (the name can be changed) before the tag is used.
  */
 import { createColourPicker, VIEWS, type ColourPicker, type View } from "./picker";
 import { MODELS, TEXT_FORMATS, type Model, type TextFormat } from "./colour";
@@ -19,7 +19,7 @@ export function defineColourPickerElement(name = "colour-picker"): void {
   customElements.define(
     name,
     class extends HTMLElement {
-      static observedAttributes = ["value", "model", "view"];
+      static observedAttributes = ["value", "model", "view", "theme"];
       private picker: ColourPicker | null = null;
 
       connectedCallback(): void {
@@ -43,6 +43,7 @@ export function defineColourPickerElement(name = "colour-picker"): void {
           ...(format ? { format } : {}),
           ...(size > 0 ? { size } : {}),
           ...(this.getAttribute("contrast") ? { contrast: this.getAttribute("contrast")! } : {}),
+          ...(this.getAttribute("theme") === "light" || this.getAttribute("theme") === "dark" ? { theme: this.getAttribute("theme") as "light" | "dark" } : {}),
           alpha: this.hasAttribute("alpha"),
           eyedropper: this.getAttribute("eyedropper") !== "false",
           injectStyles: false,
@@ -62,7 +63,13 @@ export function defineColourPickerElement(name = "colour-picker"): void {
       }
 
       attributeChangedCallback(attr: string, _old: string | null, value: string | null): void {
-        if (!this.picker || value === null) return;
+        if (!this.picker) return;
+        if (attr === "theme") {
+          if (value === "light" || value === "dark") this.picker.el.dataset["cpTheme"] = value;
+          else delete this.picker.el.dataset["cpTheme"];
+          return;
+        }
+        if (value === null) return;
         if (attr === "value") this.picker.setValue(value);
         else if (attr === "model" && (MODELS as readonly string[]).includes(value)) this.picker.setModel(value as Model);
         else if (attr === "view" && (VIEWS as readonly string[]).includes(value)) this.picker.setView(value as View);

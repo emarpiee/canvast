@@ -50,6 +50,8 @@ export interface GradientEditorOptions {
   /** Options for the colour picker of the selected stop (model, view, format, groups, labels, size, display, …). Transparency is on. */
   picker?: Omit<PickerOptions, "value" | "alpha" | "onInput" | "onChange" | "injectStyles">;
   labels?: Partial<GradientLabels>;
+  /** "light" or "dark" whatever the system prefers (default "auto"); the colour picker inside follows. */
+  theme?: "auto" | "light" | "dark";
   /** Show the Linear / Radial switch (default true). A host that chooses the kind elsewhere turns it off. */
   typeSwitch?: boolean;
   /** Fewest and most stops (default 2 and 16). */
@@ -124,6 +126,7 @@ export function createGradientEditor(options: GradientEditorOptions = {}): Gradi
 
   const root = document.createElement("div");
   root.className = "cp cg";
+  if (options.theme === "light" || options.theme === "dark") root.dataset["cpTheme"] = options.theme;
   root.dataset["type"] = v.type;
   // As wide as the picker below it (a host that only embeds the editor gets the same width).
   root.style.setProperty("--cp-size", `${options.picker?.size ?? 232}px`);

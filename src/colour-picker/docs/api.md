@@ -18,6 +18,7 @@ Makes a picker. Append `picker.el` where you want it. The picker is `size` px wi
 | `contrast` | string | none | A colour to compare against; the picker shows the WCAG 2 ratio and grade (AAA, AA, AA large, Fail). A transparent colour is mixed over it first. |
 | `harmony` | `Harmony[]` | none | Show swatches of the colour with its hue turned: `complementary`, `split`, `triad`, `analogous`, `tetrad`. They follow the colour as it moves. |
 | `groups` | `{ label, colours[] }[]` | none | Swatch rows under the picker (your recent colours, a palette). Choosing one sets the colour. |
+| `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | `"auto"` follows `prefers-color-scheme`; the others choose whatever the system says (the same as `data-cp-theme` on the picker or on anything around it; see [theming.md](theming.md)). |
 | `size` | number | `232` | Side of the ring in CSS px. |
 | `labels` | `Partial<Labels>` | English | Every word the picker shows; see `Labels` in `picker.ts`. |
 | `display` | `(value) => css` | identity | The CSS colour to draw a stored value as. For a host that draws one value differently, for example a theme's ink. |
@@ -65,6 +66,7 @@ A bar showing the gradient with a handle per stop: drag a handle to move the sto
 | --- | --- |
 | `value` | `{ type: "linear" \| "radial" \| "angular", angle, cx, cy, r, stops: [{ offset, colour }] }`. `angle` in degrees (0 runs left to right, 90 top to bottom); `cx`, `cy`, `r` as fractions of the box the gradient is on; offsets 0 to 1; colours `#rrggbb` or `#rrggbbaa`. What angle and centre mean on a shape is the host's business. `"angular"` goes round the centre, the first stop at `angle`; the editor's own Linear and Radial switch offers only the other two, so the host chooses it. |
 | `picker` | Options for the stop's picker (`model`, `view`, `format`, `groups`, `labels`, `size`, `display`, `onModel`, …). Transparency is always on. |
+| `theme` | `"auto"` (follows the system), `"light"` or `"dark"`: as for the picker; the picker of the selected stop follows. |
 | `labels` | Every word of the editor (`GradientLabels`). |
 | `minStops`, `maxStops` | The limits on the number of stops. |
 | `onInput`, `onChange` | The value on every step, and once when a gesture ends or a field is committed. |
@@ -73,7 +75,7 @@ Members: `el`, `value` (a copy), `setValue(value)` (fires nothing), `destroy()`.
 
 ## `<colour-picker>`
 
-`defineColourPickerElement(name = "colour-picker")` once. Attributes: `value`, `model`, `view`, `format`, `alpha`, `contrast`, `size`, `eyedropper="false"`. Property `value`. Events `input` and `change`, with `event.detail.value`. The picker is in a shadow root; `--cp-*` properties pass through it.
+`defineColourPickerElement(name = "colour-picker")` once. Attributes: `value`, `model`, `view`, `format`, `alpha`, `contrast`, `size`, `theme` (`light`, `dark`; none follows the system), `eyedropper="false"`. Property `value`. Events `input` and `change`, with `event.detail.value`. The picker is in a shadow root; `--cp-*` properties pass through it.
 
 ## The maths (`colour.ts`)
 

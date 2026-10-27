@@ -24,7 +24,7 @@ Measured with `npm run bench:picker` (Node, one core of a laptop CPU; the browse
 
 One `toRgb` or `fromRgb`: about 1 µs. In a browser, a hue step through the real input path (the handler: conversion, text, thumbs, tracks) is **0.47 ms**, and the frame after it (the box) fits one 16.7 ms frame with room to spare.
 
-Size: 49 KiB minified, 17 KiB gzipped, with the gradient editor (the picker alone is 38 KiB and 14 KiB).
+Size: 49 KiB of code minified (52 KiB with the licence notices at the top of the file), 18 KiB gzipped, with the gradient editor (the picker alone is 38 KiB and 14 KiB).
 
 ## Keeping it fast
 

@@ -1,7 +1,7 @@
 // Builds the colour picker on its own, to prove it works outside canvast and to ship it as a file:
 //   node scripts/build-picker.mjs  -> dist-picker/colour-picker.js (ESM) and dist-picker/demo.html (opens from file://)
 import { build } from "esbuild";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,7 +9,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outArg = process.argv.indexOf("--out");
 const out = outArg >= 0 ? resolve(process.argv[outArg + 1]) : resolve(root, "dist-picker"); // (--out: a test snapshot builds its own copy)
 await mkdir(out, { recursive: true });
-const r = await build({ entryPoints: [resolve(root, "src/colour-picker/index.ts")], bundle: true, format: "iife", globalName: "ColourPicker", target: ["es2020"], minify: true, write: false, logLevel: "warning" });
+const r = await build({ entryPoints: [resolve(root, "src/colour-picker/index.ts")], bundle: true, format: "iife", globalName: "ColourPicker", target: ["es2020"], minify: true, write: false, banner: { js: `/*!\n${(await readFile(resolve(root, "src/colour-picker/LICENSE"), "utf8")).replace(/\*\//g, "* /").trim()}\n*/` }, // (the licences travel in the file)
+   logLevel: "warning" });
 const js = r.outputFiles[0].text;
 await writeFile(resolve(out, "colour-picker.js"), js);
 const demo = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Colour picker</title>
