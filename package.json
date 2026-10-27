@@ -25,7 +25,8 @@
     "check:patterns": "node scripts/check-patterns.mjs",
     "build:picker": "node scripts/build-picker.mjs",
     "build:patterns": "node scripts/build-patterns.mjs",
-    "bench:picker": "node scripts/bench-picker.mjs"
+    "bench:picker": "node scripts/bench-picker.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@expo-google-fonts/inter": "0.4.2",

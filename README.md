@@ -59,7 +59,7 @@ The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like
 
 ### Open it
 
-Open `canvast.html` in a modern browser: double-click it, or use *File → Open*. No installation and no web server are needed. To build the file from source, see [Building and testing](#building-and-testing).
+Open `canvast.html` in a modern browser: double-click it, or use *File → Open*. No installation and no web server are needed. The newest build is always attached to the [latest release](https://github.com/emarpiee/canvast/releases/latest) (direct link: [`canvast.html`](https://github.com/emarpiee/canvast/releases/latest/download/canvast.html), with its SHA-256 beside it); each release's notes list its **Features** and its **Fixes** separately. To build the file from source, see [Building and testing](#building-and-testing).
 
 ### Your first minutes
 
@@ -523,6 +523,10 @@ node scripts/showcase/dive.mjs showcase.canvast frames/     # renders the dive, 
 ```
 
 The README pictures are those PNGs converted to WebP (`cwebp -q 80`) in `docs/screenshots/`. The dive is the frames scaled to 800 px and joined with `img2webp` (`frames.txt` holds each frame's duration); the journey sheet is the frames where the dive pauses, set in a grid with ImageMagick `montage`.
+
+### Releasing
+
+`npm run release` publishes `dist/canvast.html` as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature.
 
 ### Reproducible build
 
