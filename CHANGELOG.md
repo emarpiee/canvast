@@ -9,6 +9,20 @@
 - **Fixed:** the pressed Hide button used the star yellow; it uses the theme accent.
 - **Fixed:** the library's Details fold could reopen on the next item after you closed it, when you picked the next item quickly.
 
+## 0.45.0 to 0.45.3 — One context menu, and copying out (2026-10-26)
+
+- **Added:** one context menu for every view (canvas, library, Settings): a right click, the menu key or a long touch opens the commands that fit; the library has *Copy*, *Copy file name* and *Paste* with the system clipboard.
+- **Fixed:** *Copy* puts the picture alone on the clipboard (a name beside it was pasted instead by many programs); *Copy file name* puts the name; one writer serves every copy out; `Ctrl`+`C` copies the picture in Firefox too (the picture is made before it is written); the SVG text of a shape is its own command.
+
+## 0.44.0 to 0.44.7 — Reveal, renaming and small polish (2026-10-26)
+
+- **Added:** `Ctrl`+drag from inside a picked thing moves it, whatever covers it; the names beside the pointer are a list to pick from (it stays put while you reach it).
+- **Changed:** renaming one library item edits the name without its extension; the Details fold stays as you left it; every text field shows its caret and selection in the accent; interface text is not selectable by accident (fields, code and file facts are); a notice stays as long as its words need.
+
+## 0.43.2 to 0.43.4 — Library details and import (2026-10-26)
+
+- **Changed:** the details panel reads in one flow (one Details block, tags and folder in one card); one Import button with a menu for files or a folder.
+
 ## 0.43.1 — Varied fills deep in, without the stall (2026-10-26)
 
 - **Fixed:** zooming into a shape with a varied fill, where its copies are drawn one by one, took seconds a step on a high-density screen (about 6 s at twice the pixels): every tile of the view drew all the copies in view again. They are now drawn once a frame and shared by the tiles (about 0.4 s a step in the same test).

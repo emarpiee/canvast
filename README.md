@@ -149,7 +149,7 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Media player:** videos, audio and animated GIFs play on the canvas with a player right under the item. It has play and pause, a seek bar, step back and forward (seconds for video and audio, frames for GIFs), repeat, playback speed, volume, a waveform for audio, and a start and end to play only part of a file. The paused frame is saved. Playback continues when the item scrolls out of view.
 - **Extract frame** turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas.
 - **File details:** EXIF, colour profile and codec information are shown. STL and OBJ 3D models and PDFs are kept as cards with a preview; any other file is kept as a card with its extension and can be downloaded again.
-- **Import** by button, drag and drop, paste, or a whole folder. Files up to 256 MiB are accepted and decoded before being stored.
+- **Import** by button (in the Library the Import button has a menu for files or for a whole folder), drag and drop, paste, or a whole folder. Files up to 256 MiB are accepted and decoded before being stored.
 
 ### Organizing
 
@@ -189,7 +189,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - A gallery of every imported file with its size, type and usage ("4 uses · 3 canvases"), with search, filters by file type, sorting, list or grid layouts and adjustable thumbnails.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used, and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones.
 - **Folders** (an item lives in one folder, folders nest), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
-- **Picking and the details panel:** a click picks an item; the details panel is opened and closed with its button (or `I`) and, while open, shows what is picked (several: their tags and folder together), so a click never moves the grid under the pointer. When the grid is laid out again (the panel toggled, the window or the thumbnails resized), the picked item stays where it is on the screen. `Ctrl+A` picks all shown; a plain click then picks one alone (`Ctrl`+click adds or removes; on a touch screen, a tap adds or removes). Picked items a search or filter hides are counted in the panel, with a button to keep only the shown.
+- **Picking and the details panel:** a click picks an item; the details panel is opened and closed with its button (or `I`) and, while open, shows what is picked (several: their tags and folder together), so a click never moves the grid under the pointer. When the grid is laid out again (the panel toggled, the window or the thumbnails resized), the picked item stays where it is on the screen. `Ctrl+A` picks all shown; a plain click then picks one alone (`Ctrl`+click adds or removes; on a touch screen, a tap adds or removes). Picked items a search or filter hides are counted in the panel, with a button to keep only the shown. The *Details* fold (the file's own metadata) stays open or closed as you left it when you pick another item.
 - **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a picked item carries the whole pick.
 - **Undo in the library:** `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (originals are kept while undo on a canvas can need them).
 - **Tags and folders of several items at once:** with several picked, the details panel lists every tag any of them has, with how many have it (*2/4*); **×** takes a tag off all of them and **+** puts it on the rest. The tag field suggests the library's tags and takes several at once, separated by commas. Each folder shows how many of them it holds (a mixed pick has none ticked), and *New folder for these…* makes one and moves them into it. Changes to hundreds of items are one write, so they take a moment, not minutes.
@@ -271,9 +271,14 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Copy · cut · paste · duplicate | `Ctrl/⌘+C` · `X` · `V` · `D` |
 | Select all · clear · cancel a gesture | `Ctrl/⌘+A` · `Esc` |
 | Delete | `Delete` · `Backspace` |
+| Group · ungroup | `Ctrl/⌘+G` · `Ctrl/⌘+Shift+G` |
+| Put the selection on a sheet · flatten | `Ctrl+Alt+G` · `Ctrl/⌘+E` (text to paths, a boolean group to one path) |
+| Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
+| Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
+| Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
 | Command palette | `Ctrl/⌘+K` (`@kind` narrows it; commands can take a value; macros record and replay) |
 | Context menu | Right-click the canvas |
-| Search | `Ctrl+F` (library: `Ctrl+Shift+F`) |
+| Search | `Ctrl+F` (library: `Ctrl+Shift+F`); on the canvas `#` searches tags, `@` bookmarks, `/` is the command palette and `?` the shortcut list |
 | Focus on selection · fit everything | `F` · `F` again |
 | Step to next item | `W` `A` `S` `D` |
 | Zen mode | `Z` (bars fade out until the pointer is over them) |

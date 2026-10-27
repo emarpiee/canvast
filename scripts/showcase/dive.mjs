@@ -18,7 +18,7 @@ const H = (fn, arg) => p.evaluate(fn, arg);
 const frame = () => H(() => window.__canvastDebug.nextFrame());
 
 await p.getByTestId("save-status").click();
-await p.getByTestId("import-archive-input").setInputFiles(resolve(archive));
+await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
 await p.getByTestId("confirm-ok").click();
 await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
 await p.keyboard.press("Escape");

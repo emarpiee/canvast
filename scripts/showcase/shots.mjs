@@ -91,7 +91,7 @@ await go("1 · The Solar System");
 await bookmarks(false);
 await p.getByRole("button", { name: "Layers panel", exact: true }).click();
 await p.keyboard.down("Control");
-await p.mouse.click(1091, 343);
+await p.mouse.click(1102, 364); // (Jupiter itself: its orbit ring passes through the middle of the planet)
 await p.keyboard.up("Control");
 await off();
 await shot("layers");
