@@ -4,7 +4,7 @@
 
 canvast: an offline-first endless canvas (unbounded pan and zoom, drawing, images) that ships as **one self-contained HTML file** opened from `file://`. No server, no network, no runtime dependencies. TypeScript + Canvas 2D, bundled by esbuild. `README.md` is the one place for all user and technical documentation (no wiki, no pages): a professional manual of the app as it is now, ordered user-friendly intro → usage → data → limitations → technical → build/test/security; an API section will be added. It holds no history, versions, milestones, ADR numbers or phase names (those live in `CHANGELOG.md`, `docs/status.md`, `docs/adr/`); update it whenever behaviour or limitations change, and keep its Limitations section true; `docs/status.md` is the single source of truth for roadmap/status (each milestone reported as Implemented / Tested / Known failures / Unverified / Committed / Next bounded task). Design decisions live in `docs/adr/`.
 
-The repo sits inside an Obsidian vault synced by Syncthing; the parent vault's CLAUDE.md does not apply to this code.
+This file is for coding agents working in the repo; it applies to this code only.
 
 ## Testing
 
