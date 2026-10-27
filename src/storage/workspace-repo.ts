@@ -8,6 +8,9 @@ import type { CanvasObject, ObjectId, SerializedObject } from "../doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../doc/model";
 import { duplicateRecords } from "../doc/duplicate";
 import { done, idbGet, req } from "./idb";
+import type { TagUse, WorkspaceStore, WorkspaceTreeRecords } from "./store";
+import { ensureWorkspace } from "./migrate-v1";
+import type { StartupOutcome } from "./migrate-v1";
 
 /**
  * Persistent hierarchy: Workspace → Boards → Canvas (ADR 0006).
@@ -101,8 +104,13 @@ export interface CommitResult {
   deletes: number;
 }
 
-export class WorkspaceRepo {
+export class WorkspaceRepo implements WorkspaceStore {
   constructor(readonly db: IDBDatabase) {}
+
+  /** The current workspace, a converted v1 snapshot (migrate-v1.ts), or a new workspace. */
+  startup(): Promise<StartupOutcome> {
+    return ensureWorkspace(this);
+  }
 
   async current(): Promise<CurrentMeta | undefined> {
     return idbGet<CurrentMeta>(this.db, "meta", "current");
@@ -138,7 +146,7 @@ export class WorkspaceRepo {
   }
 
   /** The workspace tree for navigation: boards in order, each with its canvases in order. */
-  async tree(workspaceId: string): Promise<{ workspace: WorkspaceRecord; boards: Array<{ board: BoardRecord; canvases: CanvasRecord[] }> }> {
+  async tree(workspaceId: string): Promise<WorkspaceTreeRecords> {
     const tx = this.db.transaction(["workspaces", "boards", "canvases"], "readonly");
     const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
     if (!ws) throw new Error(`workspace ${workspaceId} not found`);
@@ -508,6 +516,35 @@ export class WorkspaceRepo {
       await committed.catch(() => undefined);
       throw e;
     }
+  }
+
+  /** Every in-canvas tag of the workspace (ADR 0062), read from the objects' "tags" index. */
+  async tagIndex(): Promise<Map<string, TagUse>> {
+    const out = new Map<string, TagUse>();
+    const tx = this.db.transaction("objects", "readonly");
+    await new Promise<void>((resolve, reject) => {
+      const cur = tx.objectStore("objects").index("tags").openCursor();
+      cur.onsuccess = () => {
+        const c = cur.result;
+        if (!c) return resolve();
+        const rec = c.value as { canvasId: string; data: { assetId?: string; tags?: string[] } };
+        const label = (rec.data.tags ?? []).find((t) => t.toLowerCase() === String(c.key).toLowerCase()) ?? String(c.key);
+        const k = String(c.key).toLowerCase();
+        const e = out.get(k) ?? { label, objects: 0, canvases: new Set<string>(), assets: new Set<string>() };
+        e.objects++;
+        e.canvases.add(rec.canvasId);
+        if (rec.data.assetId) e.assets.add(rec.data.assetId);
+        out.set(k, e);
+        c.continue();
+      };
+      cur.onerror = () => reject(cur.error);
+    });
+    return out;
+  }
+
+  async tagsOfAssetInstances(hash: string): Promise<Array<{ canvasId: string; tags: string[] }>> {
+    const rows = await req(this.db.transaction("objects", "readonly").objectStore("objects").index("assetId").getAll(hash) as IDBRequest<ObjectRecord[]>);
+    return rows.map((r) => ({ canvasId: r.canvasId, tags: (r.data as { tags?: string[] }).tags ?? [] }));
   }
 
   async changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }> {

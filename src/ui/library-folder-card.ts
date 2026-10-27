@@ -12,7 +12,7 @@ import { addExtensions, moveFromFolder, moveToFolder } from "../storage/folder-m
  */
 export function mountLibraryFolderCard(host: HTMLElement, session: Session): () => Promise<void> {
   const draw = async (): Promise<void> => {
-    const db = session.repo?.db;
+    const db = session.storage?.db;
     if (!db) {
       host.innerHTML = `<p>Storage is not available in this tab.</p>`;
       return;
@@ -73,7 +73,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
   let busy = false;
   host.addEventListener("click", async (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-folder]");
-    const db = session.repo?.db;
+    const db = session.storage?.db;
     if (!b || !db || b.disabled || busy) return;
     busy = true; // (one job at a time: the buttons do nothing until it ends)
     const act = b.dataset["folder"];

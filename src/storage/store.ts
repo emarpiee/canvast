@@ -1,0 +1,106 @@
+/**
+ * What the app asks of storage (ADR 0177): the workspace and its backups, behind interfaces, so the same app runs on the browser's
+ * IndexedDB (`WorkspaceRepo`, `IdbBackups`) or, in the desktop build, on a workspace folder. Everything above these interfaces is
+ * shared by both builds; only their implementations differ. Types only: nothing here touches a storage API.
+ */
+import type { FrameRecord } from "../core/frames";
+import type { CanvasObject, ObjectId } from "../doc/model";
+import type { Bookmark } from "./bookmarks";
+import type { BoardRecord, CanvasRecord, CommitResult, CurrentMeta, LoadedCanvas, StoredView, ViewGround, WorkspaceRecord } from "./workspace-repo";
+import type { StartupOutcome } from "./migrate-v1";
+import type { ExportResult, ExportScope, ImportPlan, ImportResult, ProgressFn } from "./archive";
+import type { FilesLayout, FilesZipResult } from "./files-zip";
+import type { AssetCatalog } from "../assets/asset-catalog";
+
+export interface WorkspaceTreeRecords {
+  workspace: WorkspaceRecord;
+  boards: Array<{ board: BoardRecord; canvases: CanvasRecord[] }>;
+}
+
+/** An in-canvas tag across the workspace (ADR 0062): its first spelling, how many objects carry it, where, and which assets they show. */
+export interface TagUse {
+  label: string;
+  objects: number;
+  canvases: Set<string>;
+  assets: Set<string>;
+}
+
+/** Boards, canvases and their objects, cameras, bookmarks and saved styles (ADR 0006). */
+export interface WorkspaceStore {
+  /** Open the workspace to work in: the current one, a converted older one, or a new one. */
+  startup(): Promise<StartupOutcome>;
+  current(): Promise<CurrentMeta | undefined>;
+  setCurrent(cur: CurrentMeta): Promise<void>;
+  styles(): Promise<unknown>;
+  saveStyles(items: readonly unknown[]): Promise<void>;
+
+  workspace(id: string): Promise<WorkspaceRecord | undefined>;
+  board(id: string): Promise<BoardRecord | undefined>;
+  canvas(id: string): Promise<CanvasRecord | undefined>;
+  tree(workspaceId: string): Promise<WorkspaceTreeRecords>;
+
+  createWorkspace(displayName: string): Promise<CurrentMeta>;
+  createBoard(workspaceId: string, name: string): Promise<{ board: BoardRecord; canvas: CanvasRecord }>;
+  createCanvas(boardId: string, name: string): Promise<CanvasRecord>;
+  duplicateCanvas(canvasId: string, name: string): Promise<CanvasRecord>;
+  duplicateBoard(boardId: string, name: string): Promise<{ board: BoardRecord; canvas: CanvasRecord }>;
+  moveCanvas(canvasId: string, toBoardId: string, index: number): Promise<CanvasRecord>;
+  moveBoard(boardId: string, index: number): Promise<void>;
+  renameWorkspace(id: string, name: string): Promise<void>;
+  setViewGround(id: string, ground: ViewGround): Promise<void>;
+  renameBoard(id: string, name: string): Promise<void>;
+  renameCanvas(id: string, name: string): Promise<void>;
+  deleteCanvas(canvasId: string, expectedRevision: number): Promise<{ objects: number }>;
+  deleteBoard(boardId: string, expected: ReadonlyMap<string, number>): Promise<{ canvases: number; objects: number }>;
+
+  loadCanvas(canvasId: string): Promise<LoadedCanvas>;
+  /** One revision-checked write of a canvas's changes; a stale `expectedRevision` is refused (RevisionConflictError). */
+  commit(canvasId: string, expectedRevision: number, puts: readonly CanvasObject[], deletes: readonly ObjectId[], frames?: readonly FrameRecord[]): Promise<CommitResult>;
+  revision(canvasId: string): Promise<number | undefined>;
+  saveBookmarks(canvasId: string, items: readonly Bookmark[], frames?: readonly FrameRecord[], dropFrames?: readonly string[]): Promise<void>;
+  saveCamera(canvasId: string, camera: StoredView, frames?: readonly FrameRecord[], dropFrames?: readonly string[]): Promise<void>;
+
+  /** Every in-canvas tag of the workspace, keyed by its lower-case form. */
+  tagIndex(): Promise<Map<string, TagUse>>;
+  /** The in-canvas tags of every instance of one library asset, with the canvas each is on. */
+  tagsOfAssetInstances(hash: string): Promise<Array<{ canvasId: string; tags: string[] }>>;
+  changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }>;
+  removeAssetInstances(hashes: readonly string[], skip: string | null): Promise<{ canvases: string[]; objects: number }>;
+  formatStoredTags(): Promise<void>;
+}
+
+/** The last backup of the whole workspace (full or incremental). */
+export interface BackupRecord {
+  /** Full when absent (records made before incremental backups). An incremental one goes on from the one made at its `since`. */
+  kind?: "full" | "incremental";
+  at: number;
+  bytes: number;
+  fileName: string;
+  boards: number;
+  canvases: number;
+  objects: number;
+  assets: number;
+  /** The archive was read back and every checksum matched before it was handed to the browser. */
+  verified: boolean;
+}
+
+/** `.canvast` archives and plain ZIPs of originals, out of and into the workspace (ADR 0008, 0176). */
+export interface BackupStore {
+  buildArchive(workspaceId: string, scope: ExportScope, appVersion: string, settings: Record<string, unknown> | undefined, progress?: ProgressFn): Promise<ExportResult>;
+  buildFilesZip(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult>;
+  hiddenInScope(scope: ExportScope): Promise<number>;
+  applyImport(workspaceId: string, boardId: string, plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult>;
+  /** Erase originals written by an import that did not finish; how many. */
+  sweepImportStaging(): Promise<number>;
+  lastBackup(): Promise<BackupRecord | null>;
+  recordBackup(rec: BackupRecord): Promise<void>;
+}
+
+/** One opened storage: what a session works on. */
+export interface Storage {
+  readonly workspace: WorkspaceStore;
+  readonly backups: BackupStore;
+  readonly catalog: AssetCatalog;
+  /** The browser build's database, for what is not behind an interface yet (the library folder, reset, the test hook). */
+  readonly db?: IDBDatabase;
+}

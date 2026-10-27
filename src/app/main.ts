@@ -51,7 +51,7 @@ import type { Frame } from "../core/frames";
 import { depthOf, localCamera, normalize } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openDb } from "../storage/idb";
-import { WorkspaceRepo } from "../storage/workspace-repo";
+import { idbStorage } from "../storage/idb-storage";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
@@ -642,7 +642,7 @@ async function start(): Promise<void> {
     for (const w of waiters) w();
   };
 
-  const session = new Session(db ? new WorkspaceRepo(db) : null, doc, view, editor, assets);
+  const session = new Session(db ? idbStorage(db) : null, doc, view, editor, assets);
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
   const followStyles = (): void => {
@@ -1736,7 +1736,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (await session.setPassword(kind, first)) ? state("The password was set.", true) : state();
     },
     reset: async () => {
-      const db = session.repo?.db ?? null;
+      const db = session.storage?.db ?? null;
       const tree = session.tree;
       const boards = tree?.boards.length ?? 0;
       const canvases = tree?.boards.reduce((n, b) => n + b.canvases.length, 0) ?? 0;

@@ -4,7 +4,8 @@ import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames
 import type { AssetLibrary } from "../assets/asset-library";
 import { beginProgress } from "./progress";
 import type { MetaSnapshot, PasswordKind } from "../assets/asset-catalog";
-import { AssetCatalog, AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
+import type { AssetCatalog } from "../assets/asset-catalog";
+import { AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
 import { assetOf, newObjectId } from "../doc/model";
 import type { GcReport } from "../assets/asset-catalog";
@@ -13,20 +14,17 @@ import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
-import { hiddenInScope } from "../storage/archive";
 import { checkLock, makeLock } from "../assets/hidden-lock";
-import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain, sweepImportStaging } from "../storage/archive";
+import { archiveFileName, readArchive, readArchiveChain } from "../storage/archive";
 import type { FolderFiles, ProgressFn } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
-import { buildFilesZip } from "../storage/files-zip";
-import { idbGet } from "../storage/idb";
 import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
 import type { EditorState } from "./editor-state";
 import { CanvasPersistence } from "../storage/canvas-persistence";
 import type { BoardRecord, CanvasRecord, CurrentMeta, ViewGround, WorkspaceRecord } from "../storage/workspace-repo";
-import { HierarchyError, RevisionConflictError, WorkspaceRepo } from "../storage/workspace-repo";
-import { ensureWorkspace } from "../storage/migrate-v1";
+import { HierarchyError, RevisionConflictError } from "../storage/workspace-repo";
+import type { BackupRecord, BackupStore, Storage, TagUse, WorkspaceStore } from "../storage/store";
 import type { StartupOutcome } from "../storage/migrate-v1";
 import { WriterLease } from "../storage/writer-lease";
 
@@ -46,20 +44,7 @@ export interface AssetPlace {
   ids: ObjectId[];
 }
 
-/** The last backup of the whole workspace (full or incremental), stored in meta["backup"]. */
-export interface BackupRecord {
-  /** Full when absent (records made before incremental backups). An incremental one goes on from the one made at its `since`. */
-  kind?: "full" | "incremental";
-  at: number;
-  bytes: number;
-  fileName: string;
-  boards: number;
-  canvases: number;
-  objects: number;
-  assets: number;
-  /** The archive was read back and every checksum matched before it was handed to the browser. */
-  verified: boolean;
-}
+export type { BackupRecord } from "../storage/store";
 
 declare const __CANVAST_VERSION__: string;
 
@@ -97,15 +82,21 @@ export class Session {
   /** Deleted assets are still retained by roots: collect again when the roots may have shrunk. */
   private gcPending = true;
 
+  /** Boards, canvases and objects (null when storage could not open). */
+  readonly repo: WorkspaceStore | null;
+  private readonly backups: BackupStore | null;
+
   constructor(
-    readonly repo: WorkspaceRepo | null,
+    readonly storage: Storage | null,
     readonly doc: DocumentStore,
     readonly view: ViewState,
     readonly editor: EditorState,
     readonly assets: AssetLibrary | null = null,
   ) {
-    this.persistence = new CanvasPersistence(repo, doc, view);
-    this.catalog = repo ? new AssetCatalog(repo.db) : null;
+    this.repo = storage?.workspace ?? null;
+    this.backups = storage?.backups ?? null;
+    this.persistence = new CanvasPersistence(this.repo, doc, view);
+    this.catalog = storage?.catalog ?? null;
     this.styles = new StyleLibrary(async (items) => {
       if (!this.repo || this.readOnly) throw new Error("read-only");
       await this.repo.saveStyles(items);
@@ -199,7 +190,7 @@ export class Session {
     await this.catalog?.healTags().catch(() => undefined);
     await this.repo.formatStoredTags().catch(() => undefined);
     this.editor.readOnly = this.readOnly;
-    this.startup = await ensureWorkspace(this.repo);
+    this.startup = await this.repo.startup();
     this.current = this.startup.current;
     this.styles.load(await this.repo.styles().catch(() => undefined));
     await this.refreshTree();
@@ -207,7 +198,7 @@ export class Session {
     if (!this.readOnly && this.catalog) {
       try {
         // Originals of an import that did not finish are erased before reconcile, which would give them library entries (ADR 0176).
-        await sweepImportStaging(this.repo.db);
+        await this.backups!.sweepImportStaging();
         await this.catalog.reconcile();
         await this.collectGarbage();
       } catch (e) {
@@ -402,29 +393,10 @@ export class Session {
    * Every in-canvas tag in the workspace (ADR 0062), read from the objects' "tags" index: the tag as first spelled, how many objects
    * carry it, which canvases, and which library assets those objects are instances of.
    */
-  async canvasTagIndex(): Promise<Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>> {
-    const out = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
-    if (!this.repo) return out;
+  async canvasTagIndex(): Promise<Map<string, TagUse>> {
+    if (!this.repo) return new Map();
     await this.persistence.flush();
-    const tx = this.repo.db.transaction("objects", "readonly");
-    await new Promise<void>((resolve, reject) => {
-      const cur = tx.objectStore("objects").index("tags").openCursor();
-      cur.onsuccess = () => {
-        const c = cur.result;
-        if (!c) return resolve();
-        const rec = c.value as { canvasId: string; data: { assetId?: string; tags?: string[] } };
-        const label = (rec.data.tags ?? []).find((t) => t.toLowerCase() === String(c.key).toLowerCase()) ?? String(c.key);
-        const k = String(c.key).toLowerCase();
-        const e = out.get(k) ?? { label, objects: 0, canvases: new Set<string>(), assets: new Set<string>() };
-        e.objects++;
-        e.canvases.add(rec.canvasId);
-        if (rec.data.assetId) e.assets.add(rec.data.assetId);
-        out.set(k, e);
-        c.continue();
-      };
-      cur.onerror = () => reject(cur.error);
-    });
-    return out;
+    return this.repo.tagIndex();
   }
 
   /**
@@ -466,14 +438,10 @@ export class Session {
   async canvasTagsOfAsset(hash: string): Promise<Array<{ tag: string; canvases: string[] }>> {
     if (!this.repo) return [];
     await this.persistence.flush();
-    const rows = await new Promise<Array<{ canvasId: string; data: { tags?: string[] } }>>((resolve, reject) => {
-      const r = this.repo!.db.transaction("objects", "readonly").objectStore("objects").index("assetId").getAll(hash);
-      r.onsuccess = () => resolve(r.result as Array<{ canvasId: string; data: { tags?: string[] } }>);
-      r.onerror = () => reject(r.error);
-    });
+    const rows = await this.repo.tagsOfAssetInstances(hash);
     // Each tag with the canvases it was put on this picture on (so the person can tell which canvas a tag comes from).
     const seen = new Map<string, { tag: string; canvases: Set<string> }>();
-    for (const row of rows) for (const t of row.data.tags ?? []) {
+    for (const row of rows) for (const t of row.tags) {
       const e = seen.get(t.toLowerCase()) ?? { tag: t, canvases: new Set<string>() };
       e.canvases.add(row.canvasId);
       seen.set(t.toLowerCase(), e);
@@ -667,7 +635,7 @@ export class Session {
   async exportFiles(scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult & { fileName: string }> {
     if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
     await this.persistence.flush();
-    const r = await buildFilesZip(this.repo.db, this.current.workspaceId, scope, layout, progress);
+    const r = await this.backups!.buildFilesZip(this.current.workspaceId, scope, layout, progress);
     const tree = this.tree;
     const label =
       scope.kind === "workspace" ? (tree?.workspace.displayName ?? "workspace")
@@ -680,7 +648,7 @@ export class Session {
 
   /** How many hidden library items an export of `scope` would carry. */
   async hiddenInExport(scope: ExportScope): Promise<number> {
-    return this.repo ? hiddenInScope(this.repo.db, scope) : 0;
+    return this.backups ? this.backups.hiddenInScope(scope) : 0;
   }
 
   /** The password gates (assets/hidden-lock.ts): of the Hidden items and of the whole workspace. Whether there is one, set or remove it, check a try. */
@@ -710,7 +678,7 @@ export class Session {
     await this.persistence.saveCamera();
     const version = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
     const withPrivacy = scope.kind === "workspace" && !scope.noBytes && scope.withPrivacy === true; // (chosen when asked; the library index on disk never carries them)
-    const r = await buildArchive(this.repo.db, this.current.workspaceId, scope, version, this.settingsHook?.snapshot(withPrivacy), progress);
+    const r = await this.backups!.buildArchive(this.current.workspaceId, scope, version, this.settingsHook?.snapshot(withPrivacy), progress);
     const label =
       scope.kind === "workspace" ? r.manifest.workspaceName
       : scope.kind === "assets" ? (r.manifest.assets[0]?.name.replace(/\.[^.]*$/, "") ?? "assets")
@@ -729,18 +697,13 @@ export class Session {
         assets: r.manifest.assets.length,
         verified: true,
       };
-      const tx = this.repo.db.transaction("meta", "readwrite");
-      tx.objectStore("meta").put(rec, "backup");
-      await new Promise<void>((res, rej) => {
-        tx.oncomplete = () => res();
-        tx.onerror = () => rej(tx.error);
-      });
+      await this.backups!.recordBackup(rec);
     }
     return { ...r, fileName };
   }
 
   async lastBackup(): Promise<BackupRecord | null> {
-    return this.repo ? ((await idbGet<BackupRecord>(this.repo.db, "meta", "backup")) ?? null) : null;
+    return this.backups ? this.backups.lastBackup() : null;
   }
 
   /** Validate an archive, or a chain of backups (a full one and the incremental ones after it), without writing anything. */
@@ -752,7 +715,7 @@ export class Session {
   async applyImport(plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult | null> {
     if (!this.guardWrite() || !this.current) return null;
     await this.persistence.flush();
-    const r = await applyImport(this.repo!.db, this.current.workspaceId, this.current.boardId, plan, progress);
+    const r = await this.backups!.applyImport(this.current.workspaceId, this.current.boardId, plan, progress);
     await this.refreshTree();
     this.post({ kind: "tree" });
     this.post({ kind: "assets" });

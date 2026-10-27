@@ -414,7 +414,7 @@ export function installDebugHook(
     },
     storedFrameCount: async () => {
       const range = IDBKeyRange.bound([session.current!.canvasId, ""], [session.current!.canvasId, "\uffff"]);
-      const tx = session.repo!.db.transaction("frames", "readonly");
+      const tx = session.storage!.db!.transaction("frames", "readonly");
       return req<number>(tx.objectStore("frames").count(range));
     },
     coarseState: (id) => {
@@ -454,7 +454,7 @@ export function installDebugHook(
       // Raw object records under this canvas id (works for a deleted canvas too).
       const range = IDBKeyRange.bound([canvasId, ""], [canvasId, "\uffff"]);
       const keys = await new Promise<IDBValidKey[]>((res, rej) => {
-        const r = session.repo!.db.transaction("objects", "readonly").objectStore("objects").getAllKeys(range);
+        const r = session.storage!.db!.transaction("objects", "readonly").objectStore("objects").getAllKeys(range);
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
@@ -579,7 +579,7 @@ export function installDebugHook(
     catalogEntries: () => readAll<CatalogEntry>("assetCatalog"),
     thumbRecords: async () => (await readAll<ThumbRecord>("thumbs")).map((t) => ({ hash: t.hash, type: t.blob.type, bytes: t.blob.size, w: t.w, h: t.h })),
     storedAssetHashes: async () => {
-      const tx = session.repo!.db.transaction("assets", "readonly");
+      const tx = session.storage!.db!.transaction("assets", "readonly");
       const keys = await new Promise<IDBValidKey[]>((res, rej) => {
         const r = tx.objectStore("assets").getAllKeys();
         r.onsuccess = () => res(r.result);
@@ -590,7 +590,7 @@ export function installDebugHook(
     gc: () => session.collectGarbage(),
     gcRoots: () => [...session.gcRoots()].sort(),
     forceCatalogState: async (hash, state) => {
-      const tx = session.repo!.db.transaction("assetCatalog", "readwrite");
+      const tx = session.storage!.db!.transaction("assetCatalog", "readwrite");
       const store = tx.objectStore("assetCatalog");
       const r = store.get(hash);
       r.onsuccess = () => {
@@ -622,7 +622,7 @@ export function installDebugHook(
       await w.write(new Blob([blob]));
       await w.close();
       await dir.removeEntry(name);
-      const db = session.repo!.db;
+      const db = session.storage!.db!;
       const tx = db.transaction("assets", "readwrite");
       const r = tx.objectStore("assets").get(hash);
       r.onsuccess = () => {
@@ -646,7 +646,7 @@ export function installDebugHook(
     folderState: () => externalFolder.state,
     importTesting: (o) => void Object.assign(importTesting, o),
     importStaged: async () => {
-      const tx = session.repo!.db.transaction("meta", "readonly");
+      const tx = session.storage!.db!.transaction("meta", "readonly");
       const r = tx.objectStore("meta").get("importStaged");
       return new Promise<string[]>((res, rej) => {
         r.onsuccess = () => res((r.result as string[] | undefined) ?? []);
@@ -654,7 +654,7 @@ export function installDebugHook(
       });
     },
     removeAssetBytes: async (hash) => {
-      const tx = session.repo!.db.transaction("assets", "readwrite");
+      const tx = session.storage!.db!.transaction("assets", "readwrite");
       tx.objectStore("assets").delete(hash);
       await done(tx);
     },
@@ -678,7 +678,7 @@ export function installDebugHook(
   };
   function readAll<T>(store: string): Promise<T[]> {
     return new Promise((res, rej) => {
-      const r = session.repo!.db.transaction(store, "readonly").objectStore(store).getAll();
+      const r = session.storage!.db!.transaction(store, "readonly").objectStore(store).getAll();
       r.onsuccess = () => res(r.result as T[]);
       r.onerror = () => rej(r.error);
     });

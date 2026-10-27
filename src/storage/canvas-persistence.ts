@@ -5,7 +5,8 @@ import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import type { Bookmark } from "./bookmarks";
 import type { CommitResult } from "./workspace-repo";
-import { RevisionConflictError, WorkspaceRepo } from "./workspace-repo";
+import { RevisionConflictError } from "./workspace-repo";
+import type { WorkspaceStore } from "./store";
 
 /**
  * Saves the active canvas incrementally (ADR 0006).
@@ -59,7 +60,7 @@ export class CanvasPersistence {
   onCommitted: ((canvasId: string, revision: number) => void) | null = null;
 
   constructor(
-    private readonly repo: WorkspaceRepo | null,
+    private readonly repo: WorkspaceStore | null,
     private readonly doc: DocumentStore,
     private readonly view: ViewState,
   ) {
