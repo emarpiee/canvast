@@ -15,6 +15,8 @@ export interface DesktopBridge {
   workspace(): Promise<DesktopWorkspace | null>;
   /** A file's bytes, or null when there is no such file. */
   read(path: string): Promise<Uint8Array | null>;
+  /** The first kilobyte of a file as text (a canvas file's header), or null when there is no such file. */
+  head(path: string): Promise<string | null>;
   /** Whether a file is there. */
   exists(path: string): Promise<boolean>;
   /** Write a file whole: a temporary file is written, flushed and renamed over it, so it is never half written. Folders are made. */

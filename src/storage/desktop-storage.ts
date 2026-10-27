@@ -51,7 +51,12 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   const tree = (): void => mirror.tree();
   const canvases = (r: { canvases: string[] }): void => r.canvases.forEach((id) => mirror.canvas(id));
   const workspace = watched(storage.workspace, {
-    startup: () => void mirror.start(),
+    // The folder is read before the session opens anything (its current canvas may be one the folder brought).
+    startup: async (r) => {
+      await mirror.start();
+      const current = await storage.workspace.current();
+      return current ? { ...r, current } : r;
+    },
     commit: (_r, id) => mirror.canvas(id),
     saveBookmarks: (_r, id) => mirror.canvas(id),
     changeObjectTag: canvases,

@@ -5,12 +5,12 @@
  * canvases with their names and order in `.canvast/workspace.json`, and this device's state in `.canvast/devices/<id>.json`.
  * Boards and canvases renamed, moved or deleted in the app are renamed, moved or put in `.trash/` on disk.
  */
-import { canvasJson } from "./archive";
-import { canvasFileHead } from "./canvas-file";
+import { canvasJson, putCanvasContent } from "./archive";
+import { canvasFileHead, readCanvasFile } from "./canvas-file";
 import type { DesktopBridge } from "./desktop-bridge";
-import { idbGet, req } from "./idb";
+import { done, idbGet, idbPut, req } from "./idb";
 import type { BackupRecord, WorkspaceStore } from "./store";
-import type { StoredView } from "./workspace-repo";
+import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
 import { placeTree } from "./workspace-names";
 
@@ -31,6 +31,29 @@ export interface WorkspaceFile {
 }
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+const ID_RE = /^[0-9a-f]{32}$/;
+
+/**
+ * What this device last knew of the folder (kept in IndexedDB, meta "workspaceMirror"): the boards of `workspace.json` as
+ * last written or read, and per canvas the file's header then (`file`) and the app's revision of it then (`local`).
+ * A file whose header differs was written elsewhere; an app revision that differs has edits the file does not have yet.
+ */
+interface MirrorState {
+  tree: string;
+  canvases: Record<string, { file: { revision: number; savedBy: string }; local: number }>;
+}
+const STATE_KEY = "workspaceMirror";
+
+/** The header fields of a canvas file, from its first kilobyte (they come before the objects). */
+export function canvasHead(text: string | null): { id: string; revision: number; savedBy: string } | null {
+  if (!text) return null;
+  const id = /"id":"([0-9a-f]{32})"/.exec(text)?.[1];
+  const revision = /"revision":(\d+)/.exec(text)?.[1];
+  const savedBy = /"savedBy":"([^"]*)"/.exec(text)?.[1];
+  return id && revision !== undefined && savedBy !== undefined ? { id, revision: Number(revision), savedBy } : null;
+}
+
+const stamp = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
 
 export class WorkspaceMirror {
   private readonly dirty = new Set<string>();
@@ -43,6 +66,7 @@ export class WorkspaceMirror {
   /** Told when a write failed (once per streak), in plain words. */
   onError: ((text: string) => void) | null = null;
   private failing = false;
+  private state: MirrorState = { tree: "", canvases: {} };
 
   constructor(
     private readonly db: IDBDatabase,
@@ -51,18 +75,149 @@ export class WorkspaceMirror {
     readonly deviceId: string,
   ) {}
 
-  /** Read where things are on disk from `workspace.json`; a folder that has none yet gets everything written. */
+  /**
+   * At start-up, before anything is shown: the folder and the app's storage are brought together (ADR 0177, "Saving and
+   * the cache"). Boards and canvases changed elsewhere (`workspace.json` is not what this device last wrote or read) are
+   * taken from the folder; each canvas file another device wrote replaces the app's copy, unless the app has edits the file
+   * does not have, when both are kept (the app's as a conflict copy). What the folder lacks is written to it.
+   */
   async start(): Promise<void> {
+    this.state = (await idbGet<MirrorState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { tree: "", canvases: {} };
+    const fileWs = await this.readWorkspaceFile();
+    if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
+    const tree = JSON.stringify(fileWs.boards);
+    if (tree !== this.state.tree) await this.adoptTree(fileWs);
+    this.placed = fileWs.boards;
+    this.state.tree = tree;
+    const cur = await this.repo.current();
+    if (!cur) return;
+    const records = (await this.repo.tree(cur.workspaceId)).boards.flatMap((b) => b.canvases);
+    const files = new Map(fileWs.boards.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
+    for (const c of records) {
+      const file = files.get(c.id);
+      const head = file ? canvasHead(await this.bridge.head(file)) : null;
+      const known = this.state.canvases[c.id];
+      if (!file || !head || head.id !== c.id) {
+        this.dirty.add(c.id); // not in the folder (or not this canvas there): written
+        continue;
+      }
+      const fileChanged = !known || head.revision !== known.file.revision || head.savedBy !== known.file.savedBy;
+      const localChanged = known ? c.revision !== known.local : c.objectCount > 0;
+      if (!fileChanged) {
+        if (localChanged) this.dirty.add(c.id);
+        continue;
+      }
+      if (localChanged && !(head.savedBy === this.deviceId && head.revision === c.revision)) {
+        // Both changed: the app's version is kept as a copy beside the canvas, which takes the folder's version.
+        await this.repo.duplicateCanvas(c.id, `${c.name} (conflict ${stamp()})`);
+        this.treeDirty = true;
+        this.onError?.(`“${c.name}” was changed in the workspace folder and here: the folder's version is kept, and this device's as “${c.name} (conflict …)”.`);
+      }
+      await this.adoptCanvas(c, file);
+    }
+    await idbPut(this.db, "meta", STATE_KEY, this.state);
+    this.treeDirty = true;
+    this.deviceDirty = true;
+    this.later();
+  }
+
+  private async readWorkspaceFile(): Promise<WorkspaceFile | null> {
     const bytes = await this.bridge.read(WORKSPACE_FILE);
-    if (bytes) {
-      try {
-        const ws = JSON.parse(new TextDecoder().decode(bytes)) as Partial<WorkspaceFile>;
-        if (ws.format === WORKSPACE_FILE_FORMAT && Array.isArray(ws.boards)) this.placed = ws.boards;
-      } catch {
-        // damaged: it is written again from the app's storage below
+    if (!bytes) return null;
+    try {
+      const ws = JSON.parse(new TextDecoder().decode(bytes)) as Partial<WorkspaceFile>;
+      if (ws.format !== WORKSPACE_FILE_FORMAT || !Array.isArray(ws.boards)) return null;
+      // Only well-formed boards and canvases are taken; a damaged entry is left out (and the app's copy stays).
+      const boards = ws.boards.filter((b) => b && ID_RE.test(b.id) && typeof b.name === "string" && typeof b.folder === "string" && Array.isArray(b.canvases));
+      for (const b of boards) b.canvases = b.canvases.filter((c) => c && ID_RE.test(c.id) && typeof c.name === "string" && typeof c.file === "string");
+      if (!boards.some((b) => b.canvases.length)) return null; // nothing to open: written again from the app
+      return { ...(ws as WorkspaceFile), boards };
+    } catch {
+      return null; // damaged: written again from the app's storage
+    }
+  }
+
+  /**
+   * Take the folder's boards and canvases (names, order, which board): new ones are added (empty until their file is read),
+   * ones the folder no longer has are deleted, unless the app has edits of them the folder never had (they stay). One transaction.
+   */
+  private async adoptTree(fileWs: WorkspaceFile): Promise<void> {
+    const tx = this.db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "meta"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const cur = await req(tx.objectStore("meta").get("current") as IDBRequest<CurrentMeta | undefined>);
+    const ws = cur ? await req(tx.objectStore("workspaces").get(cur.workspaceId) as IDBRequest<WorkspaceRecord | undefined>) : undefined;
+    if (!cur || !ws) {
+      tx.abort();
+      await committed.catch(() => undefined);
+      return;
+    }
+    const now = Date.now();
+    const inFile = new Set(fileWs.boards.flatMap((b) => b.canvases.map((c) => c.id)));
+    const keep: CanvasRecord[] = [];
+    for (const bid of ws.boardIds) {
+      const board = await req(tx.objectStore("boards").get(bid) as IDBRequest<BoardRecord | undefined>);
+      for (const cid of board?.canvasIds ?? []) {
+        if (inFile.has(cid)) continue;
+        const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
+        if (!c) continue;
+        const known = this.state.canvases[cid];
+        const unsynced = known ? c.revision !== known.local : c.objectCount > 0;
+        if (unsynced) {
+          keep.push(c);
+          continue;
+        }
+        const range = IDBKeyRange.bound([cid, ""], [cid, "\uffff"]);
+        for (const store of ["objects", "frames"]) tx.objectStore(store).delete(range);
+        for (const store of ["canvasViews", "bookmarks", "canvases"]) tx.objectStore(store).delete(cid);
+        delete this.state.canvases[cid];
+      }
+      if (board && !fileWs.boards.some((b) => b.id === bid)) tx.objectStore("boards").delete(bid);
+    }
+    for (const fb of fileWs.boards) {
+      const board = (await req(tx.objectStore("boards").get(fb.id) as IDBRequest<BoardRecord | undefined>)) ?? { id: fb.id, workspaceId: ws.id, name: fb.name, canvasIds: [], createdAt: now };
+      const kept = keep.filter((c) => c.boardId === fb.id).map((c) => c.id);
+      tx.objectStore("boards").put({ ...board, name: fb.name, canvasIds: [...fb.canvases.map((c) => c.id), ...kept] } satisfies BoardRecord);
+      for (const fc of fb.canvases) {
+        const c = await req(tx.objectStore("canvases").get(fc.id) as IDBRequest<CanvasRecord | undefined>);
+        tx.objectStore("canvases").put(c ? { ...c, boardId: fb.id, name: fc.name } : { id: fc.id, boardId: fb.id, name: fc.name, revision: 0, objectCount: 0, updatedAt: now });
       }
     }
-    this.everything();
+    // Canvases kept on a board the folder no longer has go to the first board.
+    const first = fileWs.boards.find((b) => b.canvases.length)!;
+    const orphans = keep.filter((c) => !fileWs.boards.some((b) => b.id === c.boardId));
+    if (orphans.length) {
+      const b = (await req(tx.objectStore("boards").get(first.id) as IDBRequest<BoardRecord>));
+      tx.objectStore("boards").put({ ...b, canvasIds: [...b.canvasIds, ...orphans.map((c) => c.id)] });
+      for (const c of orphans) tx.objectStore("canvases").put({ ...c, boardId: first.id });
+    }
+    tx.objectStore("workspaces").put({ ...ws, displayName: typeof fileWs.name === "string" && fileWs.name ? fileWs.name : ws.displayName, ...(fileWs.viewGround ? { viewGround: fileWs.viewGround as WorkspaceRecord["viewGround"] } : {}), boardIds: fileWs.boards.map((b) => b.id) });
+    if (Array.isArray(fileWs.styles)) tx.objectStore("meta").put(fileWs.styles, "styles");
+    if (typeof fileWs.locks?.hidden === "string") tx.objectStore("meta").put(fileWs.locks.hidden, "hiddenLock");
+    if (typeof fileWs.locks?.workspace === "string") tx.objectStore("meta").put(fileWs.locks.workspace, "workspaceLock");
+    const open = fileWs.boards.some((b) => b.canvases.some((c) => c.id === cur.canvasId)) || keep.some((c) => c.id === cur.canvasId);
+    if (!open) tx.objectStore("meta").put({ workspaceId: ws.id, boardId: first.id, canvasId: first.canvases[0]!.id } satisfies CurrentMeta, "current");
+    await committed;
+    if (keep.length) this.treeDirty = true; // they are written back to the folder
+  }
+
+  /** Read a canvas file into the app's storage, in place of what it held (its id kept), at the next revision. */
+  private async adoptCanvas(c: CanvasRecord, file: string): Promise<void> {
+    const bytes = await this.bridge.read(file);
+    if (!bytes) return;
+    const read = readCanvasFile(new TextDecoder().decode(bytes), c.name);
+    if (read.problems.length) this.onError?.(read.problems.join(" "));
+    const tx = this.db.transaction(["canvases", "objects", "frames", "bookmarks"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const range = IDBKeyRange.bound([c.id, ""], [c.id, "\uffff"]);
+    tx.objectStore("objects").delete(range);
+    tx.objectStore("frames").delete(range);
+    tx.objectStore("bookmarks").delete(c.id);
+    putCanvasContent(tx, c.id, read.canvas);
+    const now = (await req(tx.objectStore("canvases").get(c.id) as IDBRequest<CanvasRecord | undefined>)) ?? c;
+    const revision = now.revision + 1;
+    tx.objectStore("canvases").put({ ...now, revision, objectCount: read.canvas.objects.length, updatedAt: Date.now() } satisfies CanvasRecord);
+    await committed;
+    this.state.canvases[c.id] = { file: { revision: read.head.revision, savedBy: read.head.savedBy }, local: revision };
   }
 
   /** A canvas's content changed. */
@@ -120,8 +275,11 @@ export class WorkspaceMirror {
       const file = files.get(id);
       const record = tree.boards.flatMap((b) => b.canvases).find((c) => c.id === id);
       if (!file || !record) continue; // deleted since
+      const known = this.state.canvases[id];
+      if (all && known && known.local === record.revision && known.file.savedBy === this.deviceId && known.file.revision === record.revision) continue; // the file has it
       try {
         await this.writeCanvas(id, record.revision, file);
+        this.state.canvases[id] = { file: { revision: record.revision, savedBy: this.deviceId }, local: record.revision };
       } catch (e) {
         this.dirty.add(id); // tried again with the next write
         throw e;
@@ -131,6 +289,7 @@ export class WorkspaceMirror {
       this.deviceDirty = false;
       await this.writeDevice(cur);
     }
+    await idbPut(this.db, "meta", STATE_KEY, this.state);
     this.failing = false;
   }
 
@@ -180,6 +339,7 @@ export class WorkspaceMirror {
     };
     await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(ws, null, 1)));
     this.placed = next;
+    this.state.tree = JSON.stringify(next);
   }
 
   private async moveIfThere(from: string, to: string): Promise<void> {
@@ -203,10 +363,11 @@ export class WorkspaceMirror {
 }
 
 /**
- * The same object, with `after[name]` called once each method in it has finished (with its result and arguments).
+ * The same object, with `after[name]` called once each method in it has finished (with its result and arguments). A hook
+ * that returns a promise is waited for, and what it resolves to (when not undefined) is the method's result instead.
  * The workspace folder hooks its marks onto the shared storage this way, so no storage logic is written twice.
  */
-export function watched<T extends object>(target: T, after: { [K in keyof T]?: T[K] extends (...a: infer A) => Promise<infer R> ? (result: R, ...args: A) => void : never }): T {
+export function watched<T extends object>(target: T, after: { [K in keyof T]?: T[K] extends (...a: infer A) => Promise<infer R> ? (result: R, ...args: A) => void | Promise<R | void> : never }): T {
   return new Proxy(target, {
     get(t, key, receiver) {
       const value = Reflect.get(t, key, receiver) as unknown;
@@ -216,8 +377,8 @@ export function watched<T extends object>(target: T, after: { [K in keyof T]?: T
       if (!hook) return bound;
       return async (...args: unknown[]) => {
         const result = await bound(...args);
-        hook(result, ...args);
-        return result;
+        const replaced = await hook(result, ...args);
+        return replaced === undefined ? result : replaced;
       };
     },
   });

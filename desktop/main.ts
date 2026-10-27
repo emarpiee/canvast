@@ -135,6 +135,21 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       throw err;
     }
   });
+  ipcMain.handle("canvast:head", async (e, rel: string) => {
+    own(e);
+    try {
+      const fh = await open(await inside(root, rel), "r");
+      try {
+        const buf = Buffer.alloc(1024);
+        const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+        return buf.subarray(0, bytesRead).toString("utf8");
+      } finally {
+        await fh.close();
+      }
+    } catch {
+      return null;
+    }
+  });
   ipcMain.handle("canvast:exists", async (e, rel: string) => {
     own(e);
     try {

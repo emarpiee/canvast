@@ -524,6 +524,16 @@ export function readCanvasData(data: unknown, name: string, problems: string[], 
   return { name, objects, view, frames, bookmarks };
 }
 
+/**
+ * Write a validated canvas's objects, frames and bookmarks under `canvasId` (an import, or a workspace folder's canvas file
+ * read into the app's storage). `tx` writes "objects", "frames" and "bookmarks"; what was there before is the caller's to clear.
+ */
+export function putCanvasContent(tx: IDBTransaction, canvasId: string, c: Pick<PlannedCanvas, "objects" | "frames" | "bookmarks">): void {
+  for (const o of c.objects) tx.objectStore("objects").put({ canvasId, id: o.id, data: serializeObject(o) } satisfies ObjectRecord);
+  for (const f of c.frames) tx.objectStore("frames").put({ ...f, canvasId } satisfies FrameStoreRecord);
+  if (c.bookmarks.length) tx.objectStore("bookmarks").put({ canvasId, items: c.bookmarks });
+}
+
 /** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
 /** The files of a library folder by hash: what an archive without bytes (the library index) is matched with. */
 export type FolderFiles = ReadonlyMap<string, { file: string; size: number }>;
@@ -829,10 +839,8 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
     const addCanvas = (boardId: string, c: PlannedCanvas): string => {
       const canvas: CanvasRecord = { id: newObjectId(), boardId, name: c.name, revision: 0, objectCount: c.objects.length, updatedAt: now };
       tx.objectStore("canvases").put(canvas);
-      for (const o of c.objects) tx.objectStore("objects").put({ canvasId: canvas.id, id: o.id, data: serializeObject(o) } satisfies ObjectRecord);
-      for (const f of c.frames) tx.objectStore("frames").put({ ...f, canvasId: canvas.id } satisfies FrameStoreRecord);
+      putCanvasContent(tx, canvas.id, c);
       if (c.view) tx.objectStore("canvasViews").put(c.view, canvas.id);
-      if (c.bookmarks.length) tx.objectStore("bookmarks").put({ canvasId: canvas.id, items: c.bookmarks });
       result.canvases++;
       result.objects += c.objects.length;
       result.firstCanvasId ??= canvas.id;
