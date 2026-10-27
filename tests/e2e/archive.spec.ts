@@ -513,7 +513,7 @@ test("a workspace password travels in a backup only when included, and an import
     await p.getByTestId("prompt-input").fill("open sesame");
     await p.getByTestId("prompt-ok").click();
   }
-  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText("A password is set");
+  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText(/The password was set|A password is set/);
   await p.getByTestId("view-canvas").click();
   await openPanel(p);
   // Left out (asked, and the first choice is to leave it out): no trace in the file.

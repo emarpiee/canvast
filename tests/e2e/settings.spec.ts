@@ -467,7 +467,7 @@ test("a workspace password: the app asks for it when it opens, a wrong one is re
   await p.getByTestId("prompt-ok").click();
   await p.getByTestId("prompt-input").fill("open sesame");
   await p.getByTestId("prompt-ok").click();
-  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText("A password is set");
+  await expect(p.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText(/The password was set|A password is set/);
   await p.reload();
   const lock = p.getByTestId("lock-screen");
   await expect(lock).toBeVisible();

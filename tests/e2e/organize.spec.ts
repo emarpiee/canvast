@@ -201,7 +201,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByTestId("prompt-ok").click();
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
-  await expect(p.locator('[data-pw-card="hidden"] [data-pw-state]')).toContainText("A password is set");
+  await expect(p.locator('[data-pw-card="hidden"] [data-pw-state]')).toContainText(/The password was set|A password is set/);
 
   // The word opens the list, after the password; a wrong one asks again.
   await p.getByTestId("view-assets").click();

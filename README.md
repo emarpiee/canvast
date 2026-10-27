@@ -177,7 +177,10 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Read-outs:** the bottom left shows the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when picked, hidden).
 - **Hint line** at the bottom says what the tool does and what each key does over a handle. **Notices** report results, often with a *View* button that opens what was made, and fade after a time that follows their words (a short one goes in a couple of seconds, a long one or an error stays to be read); they stack above the Actions bar, never over it. Anything that makes you wait (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a bar and the stage it is at, which stays until the work ends and then says the result.
 
-![Command palette](docs/screenshots/command-palette.webp)
+| | |
+| --- | --- |
+| ![Command palette](docs/screenshots/command-palette.webp) | ![The context menu of a picked picture, with Rename](docs/screenshots/context-menu.webp) |
+| The command palette | The context menu of a picked picture: its commands in groups, with *Rename* for the file in the Library |
 
 ### The Library
 
@@ -185,7 +188,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 
 - A gallery of every imported file with its size, type and usage ("4 uses · 3 canvases"), with search, filters by file type, sorting, list or grid layouts and adjustable thumbnails.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used, and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones.
-- **Folders** (an item lives in one folder, folders nest), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden**: an item hidden with its eye button (details panel, bulk bar or context menu) is left out of All, folders, tags, counts, searches, Similar images and the pickers of texture fills and fonts. The Hidden list is not in the sidebar: type its opening word in the library search (`hidden:` by default; change it, or turn it off by emptying it, in Settings > Privacy) and it opens, after the password if one is set; it closes again when you choose another list or leave the library, unless *Keep the Hidden items open until the tab closes* is on (Settings > Privacy): then it stays open, without asking the password again, until the tab is closed or reloaded (an export that includes hidden items always asks). A workspace backup asks whether to include the passwords (of the Hidden items and of the workspace) and the privacy settings (the opening word, the keep-open option); they stay out by default, and each password is asked first when included. If included, importing sets a password only on a device that has none. Whether an item is hidden is data of the item and travels in any export that includes it. The password (Settings > Privacy, kept only as a salted hash in this browser) is a gate for the list and for exporting hidden items, **not encryption**: the files are stored as they are, so it does not stop someone with access to the browser's storage or to an exported file that includes them. An export (backup, board, canvas, files ZIP) that would carry hidden items asks whether to include them with their files and names (the password first, if set) or leave them out (pictures on a canvas that use them then show as missing on import); the automatic library index in the library folder always leaves them out. Pictures already placed on a canvas still show there. **A password for the whole workspace** (Settings > Privacy, separate from the Hidden items' one) is asked when the app opens: nothing of the workspace is read or drawn until it is given, and Escape does not close the screen. It is also a gate, not encryption, and it cannot be recovered (changing or removing it asks for the old one).
+- **Folders** (an item lives in one folder, folders nest), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
 - **Picking and the details panel:** a click picks an item; the details panel is opened and closed with its button (or `I`) and, while open, shows what is picked (several: their tags and folder together), so a click never moves the grid under the pointer. When the grid is laid out again (the panel toggled, the window or the thumbnails resized), the picked item stays where it is on the screen. `Ctrl+A` picks all shown; a plain click then picks one alone (`Ctrl`+click adds or removes; on a touch screen, a tap adds or removes). Picked items a search or filter hides are counted in the panel, with a button to keep only the shown.
 - **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a picked item carries the whole pick.
 - **Undo in the library:** `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (originals are kept while undo on a canvas can need them).
@@ -201,6 +204,45 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | --- | --- |
 | ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
 | The Library, filled by six screenshots of the showcase | The viewer with its filmstrip and details |
+
+### Hidden items and passwords
+
+For a workspace that is shown in a public place, an item of the Library can be **hidden**, and the workspace or the Hidden list can be guarded by a **password**. Both are gates in front of the data, not encryption (see the end of this section).
+
+| | |
+| --- | --- |
+| ![The details of a picked item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![The Hidden list: the item that was hidden, in its own list](docs/screenshots/hidden-list.webp) |
+| **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several picked items, and in the library's context menu) | The **Hidden** list, open: the hidden item is only here, and the sidebar counts do not include it |
+
+**Hiding.** A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the Library (the picture of a texture fill, the fonts). Pictures already placed on a canvas still show there, with their names in the Layers panel. Hiding does not move, delete or change the file. In the Hidden list the same button shows the item again.
+
+**Opening the Hidden list.** It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy): the word clears itself, the password is asked if there is one, and the list opens as one more list in the sidebar. It closes when you choose another list or leave the Library. With *Keep the Hidden items open until the tab closes* on (Settings > Privacy), it stays open, without asking again, until the tab is closed or reloaded.
+
+| | |
+| --- | --- |
+| ![Settings, Privacy: the opening word, keeping the list open, and the two passwords](docs/screenshots/privacy.webp) | ![The screen shown when the app opens on a workspace with a password](docs/screenshots/lock-screen.webp) |
+| **Settings > Privacy**: the opening word, the keep-open option and the two passwords | The **lock screen**: with a workspace password set, nothing is read or drawn until it is given |
+
+**Two passwords, set separately** in Settings > Privacy (each is typed twice; changing or removing one asks for the old one):
+
+| Password | Asked | Guards |
+| --- | --- | --- |
+| **Workspace** | Every time the app opens or is reloaded, before anything of the workspace is read. Escape does not close the screen | The whole workspace |
+| **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | The Hidden list and exporting its items |
+
+**Exports and backups ask.**
+
+![The question asked before an export that would carry a hidden item](docs/screenshots/export-hidden.webp)
+
+| Export | What is asked | If you leave it out |
+| --- | --- | --- |
+| Any export with hidden items in it (backup, board, canvas, files as ZIP) | *Include them, with their files and names, or leave them out?* Including asks the Hidden password first | The file has no trace of them; pictures on a canvas that use them show as missing when it is imported |
+| A workspace backup, when a password or a changed privacy setting exists | *Include the passwords and the privacy settings (the opening word, keeping the list open)?* Each password is asked first, unless it was typed a moment ago | A copy restored from it starts with no password and the default settings |
+| The library index kept in the library folder | Nothing: it is written by itself, so it always leaves hidden items and passwords out | |
+
+Whether an item is hidden is data of the item, so it travels in any export that includes it and the item comes back hidden. Importing a backup that carries a password sets it only on a device that has none, and the import dialog says so.
+
+**What this is not.** The passwords are asked by the app; the files are stored as they are. They keep people at your screen out. They do not stop someone who can open this browser's storage, or who has an exported file that includes hidden items. Only a salted hash of each password is kept, in this browser and in no archive unless you include it. A forgotten password cannot be recovered: the only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (a backup made without the password opens without one). File encryption is not part of canvast yet.
 
 ### Exporting
 
@@ -265,6 +307,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
 - Backups made in one browser import into another (tested between Chromium and Firefox).
 - Incremental backups are available after the first full one.
+- A backup asks what to do with hidden items and with the passwords and privacy settings (see [Hidden items and passwords](#hidden-items-and-passwords)); by default they stay out of it.
 
 The browser does not say whether a download finished, so keep your backups somewhere safe.
 
@@ -293,7 +336,8 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Panels | Minimize inactive panels, panels kept open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
-| Privacy, Collaboration | What stays on your machine; collaboration (none) |
+| Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
+| Collaboration | Collaboration (none) |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see below) |
 
@@ -357,6 +401,7 @@ canvast describes only what it does. These are the current limits.
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
 | Collaboration | None. There is no network by design |
+| Passwords | The workspace and Hidden passwords are gates, not encryption: the data is stored as it is, so they do not stop someone with access to the browser's storage or to an exported file that includes hidden items. They cannot be recovered. The workspace password is asked at every open and reload |
 
 **Left out on purpose:** ratings, saved searches, a minimap (there are no bounds to map).
 
@@ -469,6 +514,7 @@ Every end-to-end run builds its own copy of the app into `test-builds/` and test
 npm run build
 node scripts/showcase/build.mjs showcase.canvast            # draws the showcase in the app and exports it
 node scripts/showcase/shots.mjs showcase.canvast shots/     # imports it in a fresh profile and takes the README pictures (PNG)
+node scripts/showcase/shots-privacy.mjs showcase.canvast shots/  # the same for the context menu, hiding, passwords and the lock screen
 node scripts/showcase/dive.mjs showcase.canvast frames/     # renders the dive, frame by frame (PNG and frames.txt)
 ```
 
@@ -486,6 +532,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 - canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build.
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
+- Optional passwords for the workspace and for the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)): only a salted PBKDF2 hash is kept, in this browser, and nothing is encrypted. The library index on disk and any export you decline to include them in carry neither hidden items nor passwords.
 - No analytics, no telemetry, no account.
 
 ---

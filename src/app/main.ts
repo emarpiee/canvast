@@ -1697,20 +1697,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
     password: async (kind, action) => {
       const what = kind === "workspace" ? "workspace" : "Hidden items";
-      const state = async (note = ""): Promise<{ has: boolean; text: string }> => {
+      const state = async (note = "", only = false): Promise<{ has: boolean; text: string }> => {
         const has = await session.hasPassword(kind);
-        return { has, text: `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
+        return { has, text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
       };
       if (action === "status") return state();
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
       if (!(await askPassword(session, kind, "Enter the current password."))) return state("Not changed.");
       if (kind === "hidden") forgetHiddenPassword();
-      if (action === "remove") return (await session.setPassword(kind, null)) ? state("The password was removed.") : state();
+      if (action === "remove") return (await session.setPassword(kind, null)) ? state("The password was removed.", true) : state();
       const first = await promptDialog({ title: `New password for the ${what}`, lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
       if (!first) return state("Not changed.");
       const again = await promptDialog({ title: `New password for the ${what}`, lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
       if (again !== first) return state("The two did not match, so nothing changed.");
-      return (await session.setPassword(kind, first)) ? state("The password was set.") : state();
+      return (await session.setPassword(kind, first)) ? state("The password was set.", true) : state();
     },
     reset: async () => {
       const db = session.repo?.db ?? null;

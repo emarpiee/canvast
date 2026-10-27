@@ -31,7 +31,7 @@ await p.getByRole("button", { name: "Back to canvas" }).click();
 
 // Import the showcase and open its canvas
 await p.getByTestId("save-status").click();
-await p.getByTestId("import-archive-input").setInputFiles(resolve(archive));
+await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
 await p.getByTestId("confirm-ok").click();
 await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
 await p.keyboard.press("Escape");
