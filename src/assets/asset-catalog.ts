@@ -6,6 +6,7 @@ import { isCard } from "./file-kind";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import { done, req } from "../storage/idb";
 import type { AssetRecord } from "./asset-library";
+import type { CatalogStore } from "../storage/store";
 
 /**
  * The workspace's shared asset catalog (ADR 0007).
@@ -227,7 +228,7 @@ export interface MetaChange {
 /** The two passwords: of the Hidden items, and of the whole workspace (asked when the app opens). */
 export type PasswordKind = "hidden" | "workspace";
 
-export class AssetCatalog {
+export class AssetCatalog implements CatalogStore {
   constructor(readonly db: IDBDatabase) {}
 
   async thumb(hash: string): Promise<ThumbRecord | undefined> {

@@ -1,7 +1,7 @@
 import type { Session } from "./session";
 import { newObjectId } from "../doc/model";
 import { sha256Hex } from "../assets/sha256";
-import type { AssetCatalog } from "../assets/asset-catalog";
+import type { CatalogStore } from "../storage/store";
 
 /**
  * Importing a folder (ADR 0134): a folder dropped on the window, or chosen with Import folder, brings in every file inside it (to a
@@ -71,7 +71,7 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
   if (!catalog || !wanted.length) return;
   const made = new Map<string, string>(); // "a/b" → folder id
   const listing = await catalog.list();
-  const idOf = async (c: AssetCatalog, path: string[]): Promise<string> => {
+  const idOf = async (c: CatalogStore, path: string[]): Promise<string> => {
     let parent: string | null = null;
     for (let i = 0; i < path.length; i++) {
       const key = path.slice(0, i + 1).join("/").toLowerCase();

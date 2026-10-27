@@ -1,11 +1,7 @@
 import type { RasterSource } from "../render/draw-objects";
 import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
-import { done, idbGet, req } from "../storage/idb";
-import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "../storage/quota";
-import { externalFolder, folderFileName } from "../storage/external-folder";
-import type { CatalogEntry } from "./asset-catalog";
-import { AssetCatalog, entryFromRecord } from "./asset-catalog";
+import type { OriginalStore } from "../storage/store";
 import { makeThumb } from "./thumb";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
@@ -177,9 +173,11 @@ export class AssetLibrary {
   private lastEvictCheck = 0;
 
   constructor(
-    private readonly db: IDBDatabase | null,
+    private readonly store: OriginalStore | null,
     private readonly onReady: () => void,
-  ) {}
+  ) {
+    if (store) store.onNotice = (text) => this.onNotice?.(text);
+  }
 
   /** Told once when storage is nearly full (set by the app, which shows it as a notice). */
   onNotice: ((text: string) => void) | null = null;
@@ -200,13 +198,13 @@ export class AssetLibrary {
     const hash = await sha256Hex(bytes);
     const existing = await this.record(hash);
     if (existing) {
-      const entry = this.db ? await idbGet<CatalogEntry>(this.db, "assetCatalog", hash) : undefined;
-      const duplicate: ImportOutcome["duplicate"] = entry && entry.state !== "active" ? "restored" : "present";
+      const state = this.store ? await this.store.entryState(hash) : undefined;
+      const duplicate: ImportOutcome["duplicate"] = state && state !== "active" ? "restored" : "present";
       const had = this.decoded.has(hash);
       if (keepDecoded || Math.max(existing.pixelW, existing.pixelH) <= SMALL_EDGE) await this.ensureDecoded(existing);
       this.missing.delete(hash);
       if (!had) this.onReady(); // e.g. a missing original restored: redraw what showed its placeholder
-      if (this.db) await this.store(existing, false);
+      if (this.store) await this.save(existing, false);
       return { record: existing, duplicate };
     }
     let img!: CanvasImageSource & { width: number; height: number };
@@ -276,7 +274,7 @@ export class AssetLibrary {
       ...(carded ? { card: true } : {}),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
-    if (this.db) await this.store(record, true);
+    if (this.store) await this.save(record, true);
     else this.memoryOnly.set(hash, record);
     if (keepDecoded || Math.max(record.pixelW, record.pixelH) <= SMALL_EDGE) this.decoded.set(hash, makeSource(img, record.pixelW));
     else (img as Partial<ImageBitmap>).close?.(); // part of a big batch: it is decoded again, reduced, when it is drawn
@@ -286,49 +284,20 @@ export class AssetLibrary {
     return { record, duplicate: null };
   }
 
-  /**
-   * Write the original (when new) and its catalog entry in one transaction.
-   * Importing bytes that are already stored adds no copy; it only returns a
-   * deleted or absent catalog entry to the library.
-   */
-  private async store(record: AssetRecord, writeBytes: boolean): Promise<void> {
-    // With a library folder the file is written and proven first; only then does the browser keep a stub of it.
-    const toFolder = writeBytes && externalFolder.ready;
-    const file = folderFileName(record.hash, record.name, record.type);
-    if (toFolder) {
-      try {
-        await externalFolder.write(record.hash, record.blob, file);
-      } catch (err) {
-        throw new ImportError((err as Error).message);
-      }
-    }
-    try {
-      const tx = this.db!.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
-      const committed = done(tx);
-      if (writeBytes) tx.objectStore("assets").put(toFolder ? ({ ...record, blob: new Blob([]), ext: 1, file } satisfies AssetRecord) : record, record.hash);
-      const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
-      if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
-      else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);
-      await committed;
-    } catch (err) {
-      if (isQuotaError(err)) throw new ImportError(FULL_MESSAGE);
-      throw err;
-    }
-    if (writeBytes) {
-      this.queueThumb(record);
-      void requestPersistence();
-      void nearFullNotice().then((t) => t && this.onNotice?.(t));
-    }
+  /** Store the original (when new) and its library entry; a new one gets its thumbnail made in the background. */
+  private async save(record: AssetRecord, writeBytes: boolean): Promise<void> {
+    await this.store!.put(record, writeBytes);
+    if (writeBytes) this.queueThumb(record);
   }
 
   private thumbQueue: Promise<void> = Promise.resolve();
   /** Make the new asset's thumbnail in the background, one at a time (a big import must not decode them all at once). */
   private queueThumb(record: AssetRecord): void {
-    const catalog = new AssetCatalog(this.db!);
+    const store = this.store!;
     this.thumbQueue = this.thumbQueue
       .then(async () => {
         const t = await makeThumb(record);
-        if (t) await catalog.putThumb(t);
+        if (t) await store.putThumb(t);
       })
       .catch(() => undefined); // derived data: made again when the library is viewed
   }
@@ -395,18 +364,7 @@ export class AssetLibrary {
   }
 
   async record(hash: string): Promise<AssetRecord | undefined> {
-    if (!this.db) return this.memoryOnly.get(hash);
-    let rec = await idbGet<AssetRecord>(this.db, "assets", hash);
-    if (!rec) return rec;
-    if (rec.ext) {
-      // Kept in the library folder: missing (as for a cleared store) when the file or the permission is gone.
-      const blob = await externalFolder.read(hash, rec.size, rec.type, rec.file);
-      if (!blob) return undefined;
-      rec = { ...rec, blob };
-    }
-    // The name is the catalog entry's: renaming an asset (ADR 0085) changes that entry and never rewrites the stored bytes.
-    const entry = await idbGet<CatalogEntry>(this.db, "assetCatalog", hash).catch(() => undefined);
-    return entry && entry.name !== rec.name ? { ...rec, name: entry.name } : rec;
+    return this.store ? this.store.get(hash) : this.memoryOnly.get(hash);
   }
 
   /** Names changed (ADR 0085): the cards drawn from them are made again, here and on the canvas. */

@@ -4,7 +4,6 @@ import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames
 import type { AssetLibrary } from "../assets/asset-library";
 import { beginProgress } from "./progress";
 import type { MetaSnapshot, PasswordKind } from "../assets/asset-catalog";
-import type { AssetCatalog } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
 import { assetOf, newObjectId } from "../doc/model";
@@ -24,7 +23,7 @@ import type { EditorState } from "./editor-state";
 import { CanvasPersistence } from "../storage/canvas-persistence";
 import type { BoardRecord, CanvasRecord, CurrentMeta, ViewGround, WorkspaceRecord } from "../storage/workspace-repo";
 import { HierarchyError, RevisionConflictError } from "../storage/workspace-repo";
-import type { BackupRecord, BackupStore, Storage, TagUse, WorkspaceStore } from "../storage/store";
+import type { BackupRecord, BackupStore, CatalogStore, Storage, TagUse, WorkspaceStore } from "../storage/store";
 import type { StartupOutcome } from "../storage/migrate-v1";
 import { WriterLease } from "../storage/writer-lease";
 
@@ -70,7 +69,7 @@ export class Session {
   startup: StartupOutcome | null = null;
   readonly persistence: CanvasPersistence;
   readonly lease: WriterLease;
-  readonly catalog: AssetCatalog | null;
+  readonly catalog: CatalogStore | null;
   /** The saved styles (ADR 0120): adjustments, colours, and what comes next. */
   readonly styles: StyleLibrary;
   /** The last garbage-collection result (diagnostics and tests). */
@@ -316,7 +315,7 @@ export class Session {
    * folders, or create, rename and delete folders. Writer only; other tabs
    * refresh. Returns false (with a message) when refused.
    */
-  async organize(op: (c: AssetCatalog) => Promise<unknown>, label = "Library change"): Promise<boolean> {
+  async organize(op: (c: CatalogStore) => Promise<unknown>, label = "Library change"): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
     let before: MetaSnapshot;
     try {

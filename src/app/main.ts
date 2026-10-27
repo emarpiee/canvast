@@ -448,7 +448,8 @@ async function start(): Promise<void> {
     tiles.clear(); // text drawn before the font was ready used the interim fallback
     invalidate();
   });
-  const assets = new AssetLibrary(db, () => {
+  const storage = db ? idbStorage(db) : null;
+  const assets = new AssetLibrary(storage?.originals ?? null, () => {
     tiles.dropPending(); // an original finished loading: redraw tiles that showed its placeholder
     invalidate();
   });
@@ -642,7 +643,7 @@ async function start(): Promise<void> {
     for (const w of waiters) w();
   };
 
-  const session = new Session(db ? idbStorage(db) : null, doc, view, editor, assets);
+  const session = new Session(storage, doc, view, editor, assets);
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
   const followStyles = (): void => {

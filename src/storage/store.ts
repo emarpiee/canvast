@@ -10,7 +10,8 @@ import type { BoardRecord, CanvasRecord, CommitResult, CurrentMeta, LoadedCanvas
 import type { StartupOutcome } from "./migrate-v1";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult, ProgressFn } from "./archive";
 import type { FilesLayout, FilesZipResult } from "./files-zip";
-import type { AssetCatalog } from "../assets/asset-catalog";
+import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
+import type { AssetRecord } from "../assets/asset-library";
 
 export interface WorkspaceTreeRecords {
   workspace: WorkspaceRecord;
@@ -96,11 +97,56 @@ export interface BackupStore {
   recordBackup(rec: BackupRecord): Promise<void>;
 }
 
+/** The library's entries: names, tags, folders, notes and fields, thumbnails, the password locks, usage and garbage collection (ADR 0007). */
+export interface CatalogStore {
+  list(): Promise<CatalogListing>;
+  /** The listing again only when something changed since `prev` (null when nothing did). */
+  relist(prev: CatalogListing): Promise<CatalogListing | null>;
+  entry(hash: string): Promise<CatalogEntry | undefined>;
+  locations(hash: string): Promise<AssetLocation[]>;
+  thumb(hash: string): Promise<ThumbRecord | undefined>;
+  putThumb(rec: ThumbRecord): Promise<void>;
+  healThumbs(): Promise<void>;
+  healTags(): Promise<void>;
+  renameAssets(changes: ReadonlyArray<{ hash: string; name: string }>): Promise<number>;
+  updateMeta(hash: string, change: MetaChange): Promise<CatalogEntry>;
+  updateMetaEach(changes: ReadonlyArray<{ hash: string; change: MetaChange }>): Promise<CatalogEntry[]>;
+  renameTag(from: string, to: string): Promise<number>;
+  deleteTag(tag: string): Promise<number>;
+  createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder>;
+  renameFolder(id: string, name: string): Promise<void>;
+  deleteFolder(id: string): Promise<{ folders: number; unfiled: number }>;
+  snapshotMeta(): Promise<MetaSnapshot>;
+  restoreMeta(s: MetaSnapshot): Promise<number>;
+  lock(kind: PasswordKind): Promise<string | null>;
+  setLock(kind: PasswordKind, lock: string | null): Promise<void>;
+  /** Give every stored original a library entry; how many were added. */
+  reconcile(): Promise<number>;
+  markDeleted(hash: string): Promise<void>;
+  markDeletedEach(hashes: readonly string[]): Promise<{ gone: string[]; inUse: number }>;
+  /** Erase deleted originals that nothing (no instance, no undo root) can need. */
+  collect(roots: ReadonlySet<string>): Promise<GcReport>;
+}
+
+/** The bytes of the originals, stored once by SHA-256. */
+export interface OriginalStore {
+  /** The original with its library name, or undefined when it is not stored (or its file is gone). */
+  get(hash: string): Promise<AssetRecord | undefined>;
+  /** The state of its library entry, if it has one. */
+  entryState(hash: string): Promise<CatalogEntry["state"] | undefined>;
+  /** Write the original (when `writeBytes`) and make its library entry active, as one step. Throws ImportError when there is no room. */
+  put(record: AssetRecord, writeBytes: boolean): Promise<void>;
+  putThumb(rec: ThumbRecord): Promise<void>;
+  /** Told when storage is nearly full. */
+  onNotice: ((text: string) => void) | null;
+}
+
 /** One opened storage: what a session works on. */
 export interface Storage {
   readonly workspace: WorkspaceStore;
   readonly backups: BackupStore;
-  readonly catalog: AssetCatalog;
+  readonly catalog: CatalogStore;
+  readonly originals: OriginalStore;
   /** The browser build's database, for what is not behind an interface yet (the library folder, reset, the test hook). */
   readonly db?: IDBDatabase;
 }
