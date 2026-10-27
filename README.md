@@ -121,12 +121,16 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 
 ![Boolean shapes: the rocket is a Union, and the Shapes menu is open](docs/screenshots/shapes.webp)
 
+![The Pattern panel: the Contours generator on a sheet, with its colours, settings and seed](docs/screenshots/pattern.webp)
+
 ### Colour and styles
 
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
 - **Palettes:** *Palette from a colour* builds harmonies, and a palette can be taken from a picture. Palettes and gradients can be imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files.
 - **Styles panel:** saved colours, gradients, text styles, adjustment stacks and patterns (a generator with its settings and seed, saved from the Pattern panel with the *Save as a style* button and updated from it; pressing its card puts it back in the Pattern panel and makes it on what is picked, on each of several picked shapes). An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it. A colour, gradient or palette card is copied by a long press or a right click on it (a palette as CSS variables; a colour inside an opened palette as hex), or by *Copy hex* / *Copy as CSS* in its More menu (a long press does not apply it); CSS pasted (a colour in any notation, or a gradient) is saved as a new style when the pointer is over the panel or nothing is picked.
+
+![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp)
 
 ### Text
 
@@ -137,6 +141,8 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 - **Text on a path**, and **Text to path** (`Ctrl+E`) to turn letters into editable outlines.
 - **Notes** (`M`): a text on a coloured card.
 - **No zoom limit:** zoom into a letter as far as you like; the font's real outlines are drawn.
+
+![A text being edited, with its formatting bar and its look in the bar above](docs/screenshots/text.webp)
 
 ### Pictures, video, audio and other files
 
@@ -519,6 +525,7 @@ npm run build
 node scripts/showcase/build.mjs showcase.canvast            # draws the showcase in the app and exports it
 node scripts/showcase/shots.mjs showcase.canvast shots/     # imports it in a fresh profile and takes the README pictures (PNG)
 node scripts/showcase/shots-privacy.mjs showcase.canvast shots/  # the same for the context menu, hiding, passwords and the lock screen
+node scripts/showcase/shots-more.mjs showcase.canvast shots/     # the same for the text, Pattern panel and colour picker pictures
 node scripts/showcase/dive.mjs showcase.canvast frames/     # renders the dive, frame by frame (PNG and frames.txt)
 ```
 
