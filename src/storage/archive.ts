@@ -192,6 +192,28 @@ async function eachObjects(tx: IDBTransaction, canvasId: string, fn: (records: O
   }
 }
 
+/**
+ * One canvas as JSON (`{...head, "objects": [...], "frames": [...], "view"?: ..., "bookmarks"?: [...]}`), shared by backups
+ * (`canvases/<id>.json`) and the desktop build's canvas files (`.cvst`, ADR 0177). It is made of parts, one per slice, never
+ * as one string: each slice is encoded into a Blob as it comes (joining Blobs copies nothing), so no single step encodes the
+ * whole canvas. `withView`: the camera goes in too (a backup; a canvas file leaves it to the device). `tx` reads "objects",
+ * "frames", "bookmarks" and, with the view, "canvasViews".
+ */
+export async function canvasJson(tx: IDBTransaction, cid: string, head: Record<string, unknown>, withView: boolean, onRecords?: (records: ObjectRecord[]) => void): Promise<{ json: BlobPart[]; count: number }> {
+  const start = JSON.stringify(head);
+  const json: BlobPart[] = [`${start.slice(0, -1)}${start.length > 2 ? "," : ""}"objects":[`];
+  const count = await eachObjects(tx, cid, (records) => {
+    onRecords?.(records);
+    const part = JSON.stringify(records.map((r) => r.data));
+    json.push(new Blob([json.length > 1 ? "," : "", part.slice(1, -1)]));
+  });
+  const view = withView ? ((await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null) : undefined;
+  const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
+  const marks = readBookmarks(((await req(tx.objectStore("bookmarks").get(cid) as IDBRequest<{ items?: unknown } | undefined>)) ?? {}).items);
+  json.push("],", JSON.stringify({ frames, ...(withView ? { view } : {}), ...(marks.length ? { bookmarks: marks } : {}) }).slice(1));
+  return { json, count };
+}
+
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
 export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn): Promise<ExportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
@@ -231,21 +253,12 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
         });
         continue;
       }
-      // The canvas file is made of parts, one per slice, never as one string: {"objects":[ slice , slice ], "frames":… }. Each slice is encoded
-      // into a Blob as it comes (joining Blobs copies nothing), so no single step encodes the whole canvas.
-      const json: BlobPart[] = ['{"objects":['];
-      const count = await eachObjects(tx, cid, (records) => {
+      const { json, count } = await canvasJson(tx, cid, {}, true, (records) => {
         for (const r of records) {
           const a = storedAssetOf(r.data);
           if (a) hashes.add(a);
         }
-        const part = JSON.stringify(records.map((r) => r.data));
-        json.push(new Blob([json.length > 1 ? "," : "", part.slice(1, -1)]));
       });
-      const view = (await req(tx.objectStore("canvasViews").get(cid) as IDBRequest<StoredView | undefined>)) ?? null;
-      const frames = (await req(tx.objectStore("frames").getAll(range(cid)) as IDBRequest<FrameStoreRecord[]>)).map(({ canvasId: _c, ...f }): FrameRecord => f);
-      const marks = readBookmarks(((await req(tx.objectStore("bookmarks").get(cid) as IDBRequest<{ items?: unknown } | undefined>)) ?? {}).items);
-      json.push("],", JSON.stringify({ frames, view, ...(marks.length ? { bookmarks: marks } : {}) }).slice(1));
       const file = `canvases/${c.id}.json`;
       canvasFiles.push({ file, json });
       mb.canvases.push({ id: c.id, name: c.name, objectCount: count, file });
@@ -452,6 +465,65 @@ async function readPart(file: Blob): Promise<Part> {
 const sinceOf = (p: Part): number | null => (isObj(p.m["incremental"]) && Number.isFinite(p.m["incremental"]["since"]) ? (p.m["incremental"]["since"] as number) : null);
 const exportedAtOf = (p: Part): number => (typeof p.m["exportedAt"] === "number" ? p.m["exportedAt"] : 0);
 
+/**
+ * Validate one canvas's JSON (a backup's `canvases/<id>.json` or a `.cvst` canvas file): damaged objects, frames, a view
+ * or bookmarks are skipped with a line in `problems`; the hashes its objects use are added to `referenced`. Throws
+ * ArchiveError when it is not a canvas at all.
+ */
+export function readCanvasData(data: unknown, name: string, problems: string[], referenced: Set<string>): PlannedCanvas {
+  if (!isObj(data) || !Array.isArray(data["objects"])) throw new ArchiveError(`canvas "${name}" is damaged`);
+  const objects: CanvasObject[] = [];
+  const seen = new Set<string>();
+  let bad = 0;
+  const space = new FrameSpace();
+  if (Array.isArray(data["frames"]) && data["frames"].length) {
+    try {
+      space.restore(data["frames"] as FrameRecord[]);
+    } catch (e) {
+      problems.push(`The frames of “${name}” were damaged (${(e as Error).message}); objects that need them were skipped.`);
+    }
+  }
+  for (const s of data["objects"] as unknown[]) {
+    try {
+      const o = deserializeObject(s as SerializedObject, space);
+      if (seen.has(o.id)) throw new Error("duplicate id");
+      seen.add(o.id);
+      objects.push(o);
+      const a = assetOf(o);
+      if (a) referenced.add(a);
+    } catch {
+      bad++;
+    }
+  }
+  if (bad) problems.push(`${plural(bad, "damaged object")} on “${name}” ${were(bad)} skipped.`);
+  let view: StoredView | null = null;
+  let viewFrame = space.world;
+  if (data["view"] != null) {
+    try {
+      const v = data["view"] as StoredView;
+      if (isObj(v) && "v" in v) viewFrame = deserializeFrameCamera(space, v as StoredFrameView).f;
+      else deserializeCamera(v as SerializedCamera);
+      view = v;
+    } catch {
+      problems.push(`The saved view of “${name}” was invalid; it will open at the origin.`);
+    }
+  }
+  // Bookmarks (version 3): keep the ones whose frame and view are valid.
+  const bookmarks: Bookmark[] = [];
+  let lostMarks = 0;
+  for (const b of readBookmarks(data["bookmarks"])) {
+    try {
+      deserializeFrameCamera(space, b.view);
+      bookmarks.push(b);
+    } catch {
+      lostMarks++;
+    }
+  }
+  if (lostMarks || (Array.isArray(data["bookmarks"]) && bookmarks.length + lostMarks < data["bookmarks"].length)) problems.push(`Some bookmarks of “${name}” were damaged and were skipped.`);
+  const frames = space.records([viewFrame, ...bookmarks.flatMap((b) => space.frameByUid(b.view.frame) ?? []), ...objects.flatMap((o) => (o.frame ? [o.frame] : []))]);
+  return { name, objects, view, frames, bookmarks };
+}
+
 /** Read and validate an archive completely. Writes nothing. Throws ArchiveError if it cannot be imported at all. */
 /** The files of a library folder by hash: what an archive without bytes (the library index) is matched with. */
 export type FolderFiles = ReadonlyMap<string, { file: string; size: number }>;
@@ -527,58 +599,9 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
         throw new ArchiveError("the archive manifest is damaged");
       }
       const data = await readJson(where.entries, where.file);
-      if (!isObj(data) || !Array.isArray(data["objects"])) throw new ArchiveError(`canvas "${name}" is damaged`);
-      const objects: CanvasObject[] = [];
-      const seen = new Set<string>();
-      let bad = 0;
-      const space = new FrameSpace();
-      if (Array.isArray(data["frames"]) && data["frames"].length) {
-        try {
-          space.restore(data["frames"] as FrameRecord[]);
-        } catch (e) {
-          problems.push(`The frames of “${name}” were damaged (${(e as Error).message}); objects that need them were skipped.`);
-        }
-      }
-      for (const s of data["objects"] as unknown[]) {
-        try {
-          const o = deserializeObject(s as SerializedObject, space);
-          if (seen.has(o.id)) throw new Error("duplicate id");
-          seen.add(o.id);
-          objects.push(o);
-          const a = assetOf(o);
-          if (a) referenced.add(a);
-        } catch {
-          bad++;
-        }
-      }
-      if (bad) problems.push(`${plural(bad, "damaged object")} on “${name}” ${were(bad)} skipped.`);
-      let view: StoredView | null = null;
-      let viewFrame = space.world;
-      if (data["view"] != null) {
-        try {
-          const v = data["view"] as StoredView;
-          if (isObj(v) && "v" in v) viewFrame = deserializeFrameCamera(space, v as StoredFrameView).f;
-          else deserializeCamera(v as SerializedCamera);
-          view = v;
-        } catch {
-          problems.push(`The saved view of “${name}” was invalid; it will open at the origin.`);
-        }
-      }
-      // Bookmarks (version 3): keep the ones whose frame and view are valid.
-      const bookmarks: Bookmark[] = [];
-      let lostMarks = 0;
-      for (const b of readBookmarks(data["bookmarks"])) {
-        try {
-          deserializeFrameCamera(space, b.view);
-          bookmarks.push(b);
-        } catch {
-          lostMarks++;
-        }
-      }
-      if (lostMarks || (Array.isArray(data["bookmarks"]) && bookmarks.length + lostMarks < data["bookmarks"].length)) problems.push(`Some bookmarks of “${name}” were damaged and were skipped.`);
-      const frames = space.records([viewFrame, ...bookmarks.flatMap((b) => space.frameByUid(b.view.frame) ?? []), ...objects.flatMap((o) => (o.frame ? [o.frame] : []))]);
-      board.canvases.push({ name, objects, view, frames, bookmarks });
-      plan.objects += objects.length;
+      const planned = readCanvasData(data, name, problems, referenced);
+      board.canvases.push(planned);
+      plan.objects += planned.objects.length;
     }
     if (board.canvases.length) plan.boards.push(board);
   }
