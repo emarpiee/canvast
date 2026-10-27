@@ -29,3 +29,10 @@ export interface DesktopBridge {
 export function desktopBridge(): DesktopBridge | null {
   return (globalThis as { canvastDesktop?: DesktopBridge }).canvastDesktop ?? null;
 }
+
+declare global {
+  interface Window {
+    /** Set by the desktop build's preload; absent in the browser. */
+    canvastDesktop?: DesktopBridge;
+  }
+}

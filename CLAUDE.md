@@ -17,7 +17,7 @@ Which suite when (see `docs/testing/README.md` for commands and durations):
 
 - **After fixing a failed test, always re-run it from a freshly built snapshot** (`npm run test:snap` rebuilds each time), especially when the source changed; a result belongs to the source hash it was built from, so never count an older snapshot's result for the fix.
 - E2E opens `canvast.html#debug` (from the snapshot in `CANVAST_BUILD_DIR`, never `dist/`) from `file://` and fails on any request other than `file:`/`data:`/`blob:`. Tests drive the app through `window.__canvastDebug` (`src/app/debug-hook.ts`, enabled by `#debug`).
-- Firefox is a supported E2E project, not an afterthought (the owner's main browser; they asked on 2026-10-16 to put Chromium first for now): new features get their tests run in it too. The projects are `chromium`, `chromium-cpu`, `chromium-dpr2` and `firefox`.
+- Firefox is a supported E2E project, not an afterthought (the owner's main browser; they asked on 2026-10-16 to put Chromium first for now): new features get their tests run in it too. The projects are `chromium`, `chromium-cpu`, `chromium-dpr2`, `firefox` and `desktop` (Electron, `desktop.spec.ts` only, from the snapshot's `desktop/` build; test desktop-shell changes there).
 - `LIMITS` in `tests/e2e/harness.ts` were fixed before runs and are **never loosened** to make a test pass.
 - Write loop counts with `reps(full, quick)` from the harness. Don't assume a fixed zoom depth from wheel notches (DPR-dependent); use keyboard steps or measured values.
 - `app.drag` / `app.wheel` assert input starts on the canvas.

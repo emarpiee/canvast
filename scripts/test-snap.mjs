@@ -26,6 +26,10 @@ const patternsDir = resolve(dir, "patterns");
 const builtPatterns = spawnSync("node", ["scripts/build-patterns.mjs", "--out", patternsDir], { cwd: root, stdio: "inherit" });
 if (builtPatterns.status !== 0) process.exit(builtPatterns.status ?? 1);
 
+// the desktop shell around the same build (ADR 0177): desktop.spec.ts runs it with Electron
+const builtDesktop = spawnSync("node", ["scripts/build-desktop.mjs", "--html", resolve(dir, "canvast.html"), "--out", resolve(dir, "desktop")], { cwd: root, stdio: "inherit" });
+if (builtDesktop.status !== 0) process.exit(builtDesktop.status ?? 1);
+
 for (const script of ["check-offline", "check-names"]) {
   const checked = spawnSync("node", [`scripts/${script}.mjs`, resolve(dir, "canvast.html")], { cwd: root, stdio: "inherit" });
   if (checked.status !== 0) process.exit(checked.status ?? 1);

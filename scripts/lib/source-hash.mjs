@@ -1,6 +1,7 @@
-// What a build was made from: the hash of every file under src/ plus package.json, so a build and the source can be compared without git.
+// What a build was made from: the hash of every file under src/ and desktop/ (the desktop shell) plus package.json, so a build and the source can be compared without git.
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 async function walk(dir, out) {
@@ -14,7 +15,8 @@ async function walk(dir, out) {
 
 /** { files: { "src/x.ts": sha1... }, srcHash } for the repo at `root`. */
 export async function sourceHash(root) {
-  const paths = (await walk(resolve(root, "src"), [])).concat(resolve(root, "package.json")).sort();
+  const desktop = resolve(root, "desktop");
+  const paths = (await walk(resolve(root, "src"), [])).concat(existsSync(desktop) ? await walk(desktop, []) : [], resolve(root, "package.json")).sort();
   const files = {};
   for (const p of paths) files[p.slice(root.length + 1)] = createHash("sha1").update(await readFile(p)).digest("hex");
   const srcHash = createHash("sha256").update(JSON.stringify(files)).digest("hex");
