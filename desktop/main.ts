@@ -9,7 +9,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { mkdir, open, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
+import { basename, dirname, join, resolve, sep } from "node:path";
+import { isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
 
 const SCHEME = "app";
@@ -76,6 +78,93 @@ async function openOther(): Promise<void> {
   app.exit(0);
 }
 
+/** The full path of `rel` inside the workspace, or an error when it is not a safe path that stays inside it (no `..`, no link out). */
+async function inside(root: string, rel: string): Promise<string> {
+  if (typeof rel !== "string" || !isSafeRelativePath(rel)) throw new Error("not a path inside the workspace");
+  const full = resolve(root, ...rel.split("/"));
+  if (!full.startsWith(root + sep)) throw new Error("not a path inside the workspace");
+  // The deepest folder that exists must really be inside (a link must not lead out).
+  const realRoot = await realpath(root);
+  let probe = dirname(full);
+  for (;;) {
+    try {
+      const real = await realpath(probe);
+      if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new Error("not a path inside the workspace");
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT" || probe === root) throw e;
+      probe = dirname(probe);
+    }
+  }
+  return full;
+}
+
+/** Write a file safely: a temporary file beside it, flushed to the disk, then renamed over it (never half a file). */
+async function writeAtomic(full: string, bytes: Uint8Array): Promise<void> {
+  await mkdir(dirname(full), { recursive: true });
+  const tmp = `${full}.tmp-${process.pid}-${Date.now().toString(36)}`;
+  const fh = await open(tmp, "w");
+  try {
+    await fh.writeFile(bytes);
+    await fh.sync();
+  } finally {
+    await fh.close();
+  }
+  await rename(tmp, full);
+}
+
+/** Move a file into the workspace's `.trash/` at the same relative path (numbered when one is there already). */
+async function toTrash(root: string, rel: string, full: string): Promise<void> {
+  let target = resolve(root, ".trash", ...rel.split("/"));
+  for (let n = 2; existsSync(target); n++) target = resolve(root, ".trash", ...rel.split("/")).replace(/(\.[^./\\]+)?$/, `-${n}$1`);
+  await mkdir(dirname(target), { recursive: true });
+  await rename(full, target);
+}
+
+/** The file calls of the bridge, each answering only this window's page and only inside its workspace folder. */
+function installFileCalls(win: BrowserWindow, root: string): void {
+  const own = (e: Electron.IpcMainInvokeEvent): void => {
+    if (e.sender !== win.webContents) throw new Error("not this window");
+  };
+  ipcMain.handle("canvast:read", async (e, rel: string) => {
+    own(e);
+    try {
+      return new Uint8Array(await readFile(await inside(root, rel)));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT" || (err as NodeJS.ErrnoException).code === "EISDIR") return null;
+      throw err;
+    }
+  });
+  ipcMain.handle("canvast:exists", async (e, rel: string) => {
+    own(e);
+    try {
+      return (await stat(await inside(root, rel))).isFile();
+    } catch {
+      return false;
+    }
+  });
+  ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array) => {
+    own(e);
+    if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
+    await writeAtomic(await inside(root, rel), bytes);
+  });
+  ipcMain.handle("canvast:remove", async (e, rel: string) => {
+    own(e);
+    const full = await inside(root, rel);
+    if (!existsSync(full)) return;
+    if (rel.startsWith(".trash/")) throw new Error("already in the trash");
+    await toTrash(root, rel, full);
+  });
+  ipcMain.handle("canvast:list", async (e, rel: string) => {
+    own(e);
+    try {
+      return (await readdir(await inside(root, rel), { withFileTypes: true })).filter((d) => d.isFile()).map((d) => d.name);
+    } catch {
+      return [];
+    }
+  });
+}
+
 function partitionOf(workspace: string): string {
   return `persist:ws-${createHash("sha256").update(workspace).digest("hex").slice(0, 24)}`;
 }
@@ -117,6 +206,7 @@ async function openWindow(workspace: string): Promise<void> {
   });
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
+  installFileCalls(win, await realpath(workspace));
   win.webContents.on("will-navigate", (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.on("page-title-updated", (e) => e.preventDefault()); // (the title names the workspace folder)

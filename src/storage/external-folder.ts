@@ -45,6 +45,23 @@ export function folderFileName(hash: string, name: string, type: string): string
   return `${hash}.${ext || "bin"}`;
 }
 
+/** How the folder names its files: by hash in the browser's library folder, readable in a workspace folder (ADR 0177). */
+export interface FolderNaming {
+  /** The file for a new original; `taken` says whether a file already has that name. */
+  fileFor(hash: string, name: string, type: string, taken: (file: string) => Promise<boolean>): Promise<string>;
+  /** Whether a stored file name is one this folder may read, write or remove for that hash. */
+  valid(hash: string, file: string): boolean;
+  /** Where the library index is kept. */
+  indexFile: string;
+}
+
+/** The browser's library folder (ADR 0159): `<sha256>.<ext>` beside the hidden library index. */
+export const HASH_NAMING: FolderNaming = {
+  fileFor: async (hash, name, type) => folderFileName(hash, name, type),
+  valid: (hash, file) => FILE_RE.test(file) && file.startsWith(hash),
+  indexFile: LIBRARY_FILE,
+};
+
 export function folderSupported(): boolean {
   return typeof window !== "undefined" && typeof (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker === "function";
 }
@@ -52,6 +69,20 @@ export function folderSupported(): boolean {
 class ExternalFolder {
   private dir: Dir | null = null;
   private status: FolderState = "none";
+  /** How files are named (set once at start-up: the desktop build names them readably). */
+  naming: FolderNaming = HASH_NAMING;
+
+  /** The file for a new original, free in the folder. */
+  async fileFor(hash: string, name: string, type: string): Promise<string> {
+    return this.naming.fileFor(hash, name, type, async (file) => {
+      try {
+        await this.dir?.getFileHandle(file);
+        return !!this.dir;
+      } catch {
+        return false;
+      }
+    });
+  }
   private readonly listeners = new Set<() => void>();
 
   get state(): FolderState {
@@ -148,7 +179,7 @@ class ExternalFolder {
 
   /** Write the file, read it back and compare it with the hash. Throws when it cannot be proven stored. */
   async write(hash: string, blob: Blob, file = hash): Promise<void> {
-    if (!this.dir || !HASH_RE.test(hash) || !FILE_RE.test(file) || !file.startsWith(hash)) throw new FolderError("the library folder is not available");
+    if (!this.dir || !HASH_RE.test(hash) || !this.naming.valid(hash, file)) throw new FolderError("the library folder is not available");
     try {
       const fh = await this.dir.getFileHandle(file, { create: true });
       const w = await fh.createWritable();
@@ -170,7 +201,7 @@ class ExternalFolder {
    * no extension, so the browser gives it no type: `type` (the original's) is put back, or an SVG would not show.
    */
   async read(hash: string, size: number, type = "", file = hash): Promise<Blob | null> {
-    if (!this.dir || this.status !== "ready" || !FILE_RE.test(file) || !file.startsWith(hash)) return null;
+    if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return null;
     try {
       const f = await (await this.dir.getFileHandle(file)).getFile();
       return f.size === size ? (type ? new Blob([f], { type }) : f) : null;
@@ -206,7 +237,7 @@ class ExternalFolder {
   async readLibraryFile(): Promise<File | null> {
     if (!this.dir || this.status !== "ready") return null;
     try {
-      return await (await this.dir.getFileHandle(LIBRARY_FILE)).getFile();
+      return await (await this.dir.getFileHandle(this.naming.indexFile)).getFile();
     } catch {
       return null;
     }
@@ -216,7 +247,7 @@ class ExternalFolder {
   async writeLibraryFile(blob: Blob): Promise<void> {
     if (!this.dir || this.status !== "ready") throw new FolderError("the library folder is not available");
     try {
-      const w = await (await this.dir.getFileHandle(LIBRARY_FILE, { create: true })).createWritable();
+      const w = await (await this.dir.getFileHandle(this.naming.indexFile, { create: true })).createWritable();
       await w.write(blob);
       await w.close();
     } catch (e) {
@@ -227,7 +258,7 @@ class ExternalFolder {
 
   /** Remove the file of an erased original. Nothing to do when it is not there. */
   async remove(hash: string, file = hash): Promise<void> {
-    if (!this.dir || this.status !== "ready" || !FILE_RE.test(file) || !file.startsWith(hash)) return;
+    if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return;
     try {
       await this.dir.removeEntry(file);
     } catch {

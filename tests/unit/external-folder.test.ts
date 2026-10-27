@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "../../src/assets/sha256";
 import { externalFolder, folderFileName } from "../../src/storage/external-folder";
 import type { Dir } from "../../src/storage/external-folder";
+import { HASH_NAMING } from "../../src/storage/external-folder";
+import { WORKSPACE_NAMING, isSafeRelativePath, libraryPath, safeBase } from "../../src/storage/workspace-names";
 
 /** An in-memory directory; `tamper` changes what a file reads back as, `perm` is what the browser answers about permission. */
 function fakeDir(): Dir & { files: Map<string, Blob>; tamper: boolean; perm: PermissionState } {
@@ -93,5 +95,34 @@ describe("library folder", () => {
     await externalFolder.reconnect();
     expect(externalFolder.state).toBe("ready");
     expect(await externalFolder.has(hash, bytes.length)).toBe(true);
+  });
+
+  it("in a workspace folder (desktop): readable names in the naming convention, numbered on a clash, only safe paths under library/", async () => {
+    expect(safeBase("Hand Study (Loomis)")).toBe("hand_study-loomis");
+    expect(safeBase("Sternocleidomastoid — Form, Figure Drawing")).toBe("sternocleidomastoid-form-figure_drawing");
+    expect(safeBase('a<b>c:d"e/f\\g|h?i*j')).toBe("abc-defg-hij"); // (":" and "|" separate parts; the rest of what systems forbid is dropped)
+    expect(safeBase("  ..hidden  ")).toBe("hidden");
+    expect(safeBase("CON")).toBe("con_file");
+    expect(safeBase("???")).toBe("file");
+    expect(safeBase("x".repeat(300)).length).toBe(100);
+    const taken = new Set(["library/images/ref.png", "library/images/ref-2.png"]);
+    expect(await libraryPath("Ref.PNG", "image/png", async (p) => taken.has(p))).toBe("library/images/ref-3.png");
+    expect(await libraryPath("Inter Regular", "font/woff2", async () => false)).toBe("library/fonts/inter_regular.woff2");
+    expect(await libraryPath("notes.txt", "text/plain", async () => false)).toBe("library/documents/notes.txt");
+    for (const bad of ["", "/etc/passwd", "library/../x", "library//x", "library/./x", "a\\b", "a\0b"]) expect(isSafeRelativePath(bad)).toBe(false);
+
+    const hash = await hashOf();
+    externalFolder.naming = WORKSPACE_NAMING;
+    try {
+      const file = await externalFolder.fileFor(hash, "Hand Study.png", "image/png");
+      expect(file).toBe("library/images/hand_study.png");
+      await externalFolder.write(hash, new Blob([bytes]), file);
+      expect(await externalFolder.read(hash, bytes.length, "image/png", file)).not.toBeNull();
+      expect(await externalFolder.fileFor(hash, "Hand Study.png", "image/png")).toBe("library/images/hand_study-2.png");
+      await expect(externalFolder.write(hash, new Blob([bytes]), "../x.png")).rejects.toThrow(/not available/);
+      await expect(externalFolder.write(hash, new Blob([bytes]), ".canvast/x.png")).rejects.toThrow(/not available/); // not under library/
+    } finally {
+      externalFolder.naming = HASH_NAMING;
+    }
   });
 });

@@ -7,6 +7,11 @@ import type { DesktopBridge } from "../src/storage/desktop-bridge";
 
 const bridge: DesktopBridge = {
   workspace: () => ipcRenderer.invoke("canvast:workspace"),
+  read: (path) => ipcRenderer.invoke("canvast:read", path),
+  exists: (path) => ipcRenderer.invoke("canvast:exists", path),
+  write: (path, bytes) => ipcRenderer.invoke("canvast:write", path, bytes),
+  remove: (path) => ipcRenderer.invoke("canvast:remove", path),
+  list: (path) => ipcRenderer.invoke("canvast:list", path),
 };
 
 contextBridge.exposeInMainWorld("canvastDesktop", bridge);

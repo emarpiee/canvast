@@ -142,6 +142,14 @@ export interface OriginalStore {
   onNotice: ((text: string) => void) | null;
 }
 
+/** Told while storage opens or changes under the app (an upgrade waiting for, or asked by, another tab or window). */
+export interface OpenHooks {
+  /** Called while an upgrade waits for other tabs to close their connections. */
+  onBlocked?: () => void;
+  /** Called when another tab needs this connection closed for an upgrade. */
+  onVersionChange?: () => void;
+}
+
 /** One opened storage: what a session works on. */
 export interface Storage {
   readonly workspace: WorkspaceStore;
@@ -150,6 +158,8 @@ export interface Storage {
   readonly originals: OriginalStore;
   /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
   readonly libraryFolder: LibraryFolderStore | null;
+  /** The desktop build's workspace folder (its full path); null in the browser build. */
+  readonly workspaceFolder: string | null;
   /** Start from scratch: delete everything canvast keeps here, then reload. `onBlocked`: another window still has it open. */
   resetAll(onBlocked?: () => void): Promise<void>;
 }

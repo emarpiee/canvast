@@ -33,12 +33,8 @@
 export const DB_NAME = "canvast";
 export const DB_VERSION = 12;
 
-export interface OpenOptions {
-  /** Called while an upgrade waits for other tabs to close their connections. */
-  onBlocked?: () => void;
-  /** Called when another tab needs this connection closed for an upgrade. */
-  onVersionChange?: () => void;
-}
+export type { OpenHooks as OpenOptions } from "./store";
+import type { OpenHooks as OpenOptions } from "./store";
 
 export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

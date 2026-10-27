@@ -11,6 +11,11 @@ import { beginProgress } from "../app/progress";
  */
 export function mountLibraryFolderCard(host: HTMLElement, session: Session): () => Promise<void> {
   const draw = async (): Promise<void> => {
+    const workspace = session.storage?.workspaceFolder;
+    if (workspace) {
+      host.innerHTML = `<p data-testid="storage-folder">Your library's files are kept as ordinary files in <strong>${esc(workspace)}</strong>, under <code>library/</code>, named after their names in the library.</p>`;
+      return;
+    }
     const folder = session.storage?.libraryFolder;
     if (!folder) {
       host.innerHTML = `<p>Storage is not available in this tab.</p>`;

@@ -509,7 +509,7 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | `npm run test:unit` | Unit tests (seconds) |
 | `npm test` | Typecheck, unit, quick end-to-end suite, token, storage, picker and pattern-generator checks (about an hour) |
 | `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
-| `npm run desktop` | Build the app and run it in the desktop shell (Electron, in development: ADR 0177) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog |
+| `npm run desktop` | Build the app and run it in the desktop shell (Electron, in development: ADR 0177) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog. New library files are written as readable files under `library/<kind>/` in that folder (`Hand Study (Loomis).png` → `library/images/hand_study-loomis.png`, `-2` on a clash, the same file stored once); boards and canvases are still kept in the app's own storage, one per workspace folder |
 | `npm run test:full` | The full suite with long stress loops (about 1.5 hours) |
 | `npm run test:snap -- <files or -g pattern>` | Run chosen end-to-end specs |
 | `npm run test:status` | List test builds with their result and how far each is behind the source |

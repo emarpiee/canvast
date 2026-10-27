@@ -12,7 +12,7 @@ import { AssetCatalog, entryFromRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { ImportError } from "../assets/asset-library";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "./quota";
-import { externalFolder, externalHashes, folderFileName, libraryCounts } from "./external-folder";
+import { externalFolder, externalHashes, libraryCounts } from "./external-folder";
 import { addExtensions, moveFromFolder, moveToFolder } from "./folder-move";
 import { resetAllData } from "./reset";
 
@@ -37,6 +37,7 @@ export function idbStorage(db: IDBDatabase): IdbStorage {
     catalog,
     originals: new IdbOriginals(db, catalog),
     libraryFolder: idbLibraryFolder(db),
+    workspaceFolder: null,
     resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
   };
 }
@@ -123,7 +124,7 @@ export class IdbOriginals implements OriginalStore {
   async put(record: AssetRecord, writeBytes: boolean): Promise<void> {
     // With a library folder the file is written and proven first; only then does the browser keep a stub of it.
     const toFolder = writeBytes && externalFolder.ready;
-    const file = folderFileName(record.hash, record.name, record.type);
+    const file = toFolder ? await externalFolder.fileFor(record.hash, record.name, record.type) : "";
     if (toFolder) {
       try {
         await externalFolder.write(record.hash, record.blob, file);

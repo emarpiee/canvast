@@ -51,7 +51,9 @@ import type { Frame } from "../core/frames";
 import { depthOf, localCamera, normalize } from "../core/frames";
 import { AssetLibrary } from "../assets/asset-library";
 import { openBrowserStorage } from "../storage/idb-storage";
-import type { Storage } from "../storage/store";
+import { openDesktopStorage } from "../storage/desktop-storage";
+import { desktopBridge } from "../storage/desktop-bridge";
+import type { OpenHooks, Storage } from "../storage/store";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
@@ -420,7 +422,8 @@ async function start(): Promise<void> {
   let storage: Storage | null = null;
   let storageError = "";
   try {
-    storage = await openBrowserStorage({
+    const desktop = desktopBridge();
+    const opts: OpenHooks = {
       onBlocked: () => {
         editor.message = "Upgrading storage: close other canvast tabs to continue.";
         editor.changed();
@@ -430,7 +433,8 @@ async function start(): Promise<void> {
         editor.readOnly = true;
         editor.changed();
       },
-    });
+    };
+    storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
     // (the library folder's link is loaded too, before anything is drawn: an await later in this function lets a frame run early)
   } catch (e) {
     storageError = (e as Error).message;
