@@ -406,7 +406,7 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Storage | Browsers cap local storage: Firefox gives a local file about 790 MiB, Chromium about 10 GiB (a Chromium library folder is not counted). With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
+| Storage | Browsers cap local storage, and the cap grows once the browser agrees to keep the data (*Ask the browser to keep it*, Settings > Storage): Firefox allows at most 10 GiB (or 10% of the disk, if smaller) before that and up to half the disk after, Chromium about 10 GiB (a Chromium library folder is not counted). Settings > Storage shows the current figure. With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
 | Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
