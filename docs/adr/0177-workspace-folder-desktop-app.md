@@ -132,7 +132,7 @@ Within one device, the writer lease keeps one window as the writer, as it does f
 - Firefox keeps the browser build. The desktop build is Chromium only.
 - Releases (ADR 0175) add a desktop package (a Linux AppImage first; other platforms later) next to `canvast.html`, built from the same commit.
 
-## On-disk format (step 3, proposed for review)
+## On-disk format (step 3; review points A–F approved by the owner, 2026-10-28)
 
 ### Files and what each holds
 
@@ -225,7 +225,7 @@ Board folders, canvas files and library folders use the same safe naming as libr
 
 The move uses the existing backup format: in the browser build, **Export a full backup** (`.canvast`); in the desktop app, **Import backup** into a workspace folder. The import writes the boards, canvases and library into the folder through the same code as any import. No second migration path to maintain. The old library folder's files are read by that import too (it already reads them for a backup made with a library folder).
 
-### Review points for the owner
+### Review points (all approved as proposed, 2026-10-28)
 
 | # | Point | Proposed |
 |---|---|---|
