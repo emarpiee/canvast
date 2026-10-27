@@ -9,6 +9,7 @@ import { askHiddenPassword } from "./hidden-access";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
+import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
@@ -77,7 +78,36 @@ export interface AssetsView {
 /** The most names "View in the library" puts in the search; a longer selection is picked in the whole list instead. */
 const REVEAL_NAMES_MAX = 20;
 /** How long typing in the search box pauses before the results are drawn again. */
-const SEARCH_PAUSE_MS = 120;
+const SEARCH_PAUSE_MS = 250;
+/** Cards drawn beyond the view on each side, in screens (the grid) and in items (the filmstrip). */
+const GRID_OVERSCAN = 1;
+const FILM_OVERSCAN = 12;
+/**
+ * Make `parent`'s children exactly `els`, in order, moving as few as possible (a kept element stays in the page, so its picture is not
+ * loaded again). A focused element that had to move gets its focus back.
+ */
+function syncChildren(parent: HTMLElement, els: readonly HTMLElement[]): void {
+  const focused = document.activeElement instanceof HTMLElement && parent.contains(document.activeElement) ? document.activeElement : null;
+  let ref = parent.firstElementChild;
+  for (const el of els) {
+    if (el === ref) ref = ref.nextElementSibling;
+    else parent.insertBefore(el, ref);
+  }
+  while (ref) {
+    const next = ref.nextElementSibling;
+    ref.remove();
+    ref = next;
+  }
+  if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+}
+/** How many thumbnails are made from their originals at once. */
+const THUMB_MAKERS = 3;
+/** How many loaded thumbnails are kept ready to show again. */
+const THUMB_URLS_KEPT = 3000;
+/** How often the library is drawn again while the looks of the pictures are being read. */
+const LOOKS_REDRAW_MS = 400;
+/** A thumbnail not made because nothing wanted it any more by its turn. */
+class ThumbSkipped extends Error {}
 const SIDE_W = { min: 180, max: 420, def: 232 };
 const INSP_W = { min: 260, max: 560, def: 308 };
 
@@ -315,6 +345,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const syncViewing = (): void => {
     document.body.toggleAttribute("data-viewing", visible && !viewer.hidden);
   };
+  const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;
+  /** Lays the grid out again (set once the grid is made, below). */
+  let onLayoutChange = (): void => undefined;
   const applyUi = (): void => {
     body.classList.toggle("no-details", !ui.details);
     viewer.classList.toggle("no-bar", !ui.bar);
@@ -339,6 +372,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
+    onLayoutChange();
   };
   let visible = false;
   applyUi();
@@ -364,20 +398,52 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
-  const thumbs = new Map<string, Promise<string>>();
-  const thumbUrls = new Map<string, string>(); // the ones already loaded: a redrawn grid shows them at once instead of blank cards
+  /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
+  type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean };
+  const thumbs = new Map<string, ThumbJob>();
+  const thumbUrls = new Map<string, string>(); // the ones already loaded, oldest first: a redrawn grid shows them at once instead of blank cards
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
   const fileTile = (e: { name: string; type: string }, note = true): string =>
     `<span class="file-tile" aria-hidden="true">${ICONS.fileIcon}<span class="file-tile-ext">${esc(chipOf(e.name, e.type))}</span>${note ? `<span class="file-tile-note">${FILE_CARD_NOTE}</span>` : ""}</span>`;
 
   // ---- thumbnails: generated lazily from the stored original, kept in memory only
-  const thumbFor = (hash: string): Promise<string> => {
-    let p = thumbs.get(hash);
-    if (!p) {
-      p = (async () => {
-        // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
-        const stored = await session.catalog?.thumb(hash).catch(() => undefined);
-        if (stored) return URL.createObjectURL(stored.blob);
+  // Making one reads and decodes the whole original, so only a few are made at once: the latest asked for by the screen first,
+  // the background ones (what pictures look like) after, and one nobody wants any more (its card scrolled away) is not made at all.
+  const waiting: Array<{ job: ThumbJob; go: () => void; drop: () => void }> = [];
+  let making = 0;
+  const pump = (): void => {
+    while (making < THUMB_MAKERS && waiting.length) {
+      let i = waiting.length - 1;
+      while (i >= 0 && !waiting[i]!.job.urgent) i--;
+      const [w] = waiting.splice(i < 0 ? waiting.length - 1 : i, 1);
+      if (!w!.job.wants.some((f) => f())) {
+        w!.drop();
+        continue;
+      }
+      making++;
+      w!.go();
+    }
+  };
+  const always = (): boolean => true;
+  const thumbFor = (hash: string, wanted: () => boolean = always, urgent = true): Promise<string> => {
+    const had = thumbs.get(hash);
+    if (had) {
+      had.wants.push(wanted);
+      had.urgent ||= urgent;
+      return had.p;
+    }
+    const job = { wants: [wanted], urgent } as ThumbJob;
+    job.p = (async () => {
+      // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
+      const stored = await session.catalog?.thumb(hash).catch(() => undefined);
+      // A card that scrolled away while this was read gets no address (making one for each of thousands of passing cards was slow).
+      if (!job.wants.some((f) => f())) throw new ThumbSkipped();
+      if (stored) return URL.createObjectURL(stored.blob);
+      await new Promise<void>((go, drop) => {
+        waiting.push({ job, go, drop: () => drop(new ThumbSkipped()) });
+        pump();
+      });
+      try {
         const rec = await assets.record(hash);
         if (!rec) throw new Error("missing");
         const made = await makeThumb(rec);
@@ -386,14 +452,38 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           return URL.createObjectURL(made.blob);
         }
         return URL.createObjectURL(rec.blob);
-      })();
-      thumbs.set(hash, p);
+      } finally {
+        making--;
+        pump();
+      }
+    })();
+    job.p.then(
+      () => (job.wants = []),
+      (e) => {
+        if (e instanceof ThumbSkipped && thumbs.get(hash) === job) thumbs.delete(hash); // asked again later, it is made then
+      },
+    );
+    thumbs.set(hash, job);
+    return job.p;
+  };
+  /** Keep the addresses of the thumbnails seen most recently; older ones not on screen are let go (a long session would keep them all). */
+  const keepThumbUrl = (hash: string, url: string): void => {
+    thumbUrls.delete(hash);
+    thumbUrls.set(hash, url);
+    if (thumbUrls.size <= THUMB_URLS_KEPT) return;
+    for (const [h, u] of thumbUrls) {
+      if (thumbUrls.size <= THUMB_URLS_KEPT) break;
+      if (mounted.has(h) || filmMounted.has(h) || h === selected || h === slideHash || looking.has(h)) continue;
+      thumbUrls.delete(h);
+      thumbs.delete(h);
+      URL.revokeObjectURL(u);
     }
-    return p;
   };
   // ---- what pictures look like (ADR 0114): read from the thumbnails, a few at a time, kept in memory
   const looks = new Map<string, Look | null>();
   const looking = new Set<string>();
+  /** Counts the looks read, so what depends on them (the filter, the Similar groups) is worked out again only when there are new ones. */
+  let looksGen = 0;
   let lookTimer = 0;
   const ensureLooks = (hashes: readonly string[]): void => {
     const todo = hashes.filter((h) => !looks.has(h) && !looking.has(h));
@@ -401,10 +491,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     let next = 0;
     const worker = async (): Promise<void> => {
       while (next < todo.length) {
+        // Reading looks is only for the Similar list and the look filters: it stops when neither is in use (and starts again when one is).
+        if (!visible || !wantsLooks) {
+          for (let k = next; k < todo.length; k++) looking.delete(todo[k]!);
+          next = todo.length;
+          break;
+        }
         const hash = todo[next++]!;
         try {
           const img = new Image();
-          img.src = await thumbFor(hash);
+          img.src = await thumbFor(hash, always, false);
           await img.decode();
           const c = document.createElement("canvas");
           c.width = c.height = LOOK_SIZE;
@@ -415,7 +511,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           looks.set(hash, null); // a file with no picture (a card, a missing original)
         }
         looking.delete(hash);
-        if (!lookTimer) lookTimer = window.setTimeout(() => ((lookTimer = 0), render()), 150);
+        looksGen++;
+        if (!lookTimer) lookTimer = window.setTimeout(() => ((lookTimer = 0), render()), LOOKS_REDRAW_MS);
       }
     };
     for (let i = 0; i < Math.min(3, todo.length); i++) void worker();
@@ -427,10 +524,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   let wantsLooks = false;
   /** The groups of look-alikes among the pictures read so far. */
+  let similarMemo: { of: CatalogListing | null; gen: number; groups: string[][] } | null = null;
   const similar = (): string[][] => {
+    if (similarMemo?.of === listing && similarMemo.gen === looksGen) return similarMemo.groups;
     const hidden = new Set(listing?.entries.flatMap((x) => (meta(x).hidden ? [x.hash] : [])));
-    return similarGroups([...looks].flatMap(([id, l]) => (l && !hidden.has(id) ? [{ id, dhash: l.dhash }] : [])));
+    const groups = similarGroups([...looks].flatMap(([id, l]) => (l && !hidden.has(id) ? [{ id, dhash: l.dhash }] : [])));
+    similarMemo = { of: listing, gen: looksGen, groups };
+    return groups;
   };
+  /** Show a card's picture: at once when it was loaded before, else once it is read or made (if the card is still in the page then). */
   const loadThumb = (img: HTMLImageElement): void => {
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
@@ -438,34 +540,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       img.src = known;
       return;
     }
-    thumbFor(hash).then(
+    thumbFor(hash, () => img.isConnected).then(
       (url) => {
-        thumbUrls.set(hash, url);
+        keepThumbUrl(hash, url);
         img.src = url;
       },
-      () => img.classList.add("is-broken"),
+      (e) => {
+        if (!(e instanceof ThumbSkipped)) img.classList.add("is-broken");
+      },
     );
   };
-  // Pictures near the view are shown; the ones scrolled far away let go of theirs, so a long scroll does not keep every decoded picture alive.
-  // (The thumbnail's address stays cached, so coming back shows it again at once.)
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        const img = e.target as HTMLImageElement;
-        if (e.isIntersecting) {
-          if (!img.hasAttribute("src")) loadThumb(img);
-        } else if (img.hasAttribute("src")) img.removeAttribute("src");
-      }
-    },
-    { root: scroller, rootMargin: "100% 0px" },
-  );
   const dropStaleThumbs = (): void => {
     const live = new Set(listing?.entries.map((e) => e.hash));
-    for (const [hash, p] of thumbs) {
+    for (const [hash, job] of thumbs) {
       if (live.has(hash)) continue;
       thumbs.delete(hash);
       thumbUrls.delete(hash);
-      void p.then((url) => URL.revokeObjectURL(url), () => undefined);
+      void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
     }
   };
 
@@ -489,41 +580,101 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (slideUrl) URL.revokeObjectURL(slideUrl);
     slideUrl = null;
   };
-  const ioFilm = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        ioFilm.unobserve(e.target);
-        loadThumb(e.target as HTMLImageElement);
-      }
-    },
-    { root: film, rootMargin: "0px 400px" },
-  );
-  /** The filmstrip: every asset of the current list, in order, the open one marked. */
-  const viewList = (): CatalogListing["entries"] => (slideSet ? filtered().filter((e) => slideSet!.has(e.hash)) : filtered());
-  const renderFilm = (): void => {
-    const list = viewList();
-    film.innerHTML = list
-      .map(
-        (e) =>
-          `<button type="button" class="film-item${e.hash === slideHash ? " is-current" : ""}" role="option" aria-selected="${e.hash === slideHash}" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`,
-      )
-      .join("");
-    for (const img of film.querySelectorAll<HTMLImageElement>("img[data-hash]")) ioFilm.observe(img);
-    const i = list.findIndex((e) => e.hash === slideHash);
-    pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
+  /** The assets the viewer steps through, in order, with where each one is (worked out once per list, not on every step). */
+  let viewMemo: { rows: CatalogListing["entries"]; set: Set<string> | null; list: CatalogListing["entries"]; at: Map<string, number> } | null = null;
+  const viewList = (): { list: CatalogListing["entries"]; at: Map<string, number> } => {
+    const rows = filtered();
+    if (viewMemo?.rows !== rows || viewMemo.set !== slideSet) {
+      const list = slideSet ? rows.filter((e) => slideSet!.has(e.hash)) : rows;
+      viewMemo = { rows, set: slideSet, list, at: new Map(list.map((e, i) => [e.hash, i])) };
+    }
+    return viewMemo;
   };
-  const markFilm = (): void => {
-    for (const b of film.querySelectorAll<HTMLElement>(".film-item")) {
-      const on = b.dataset["hash"] === slideHash;
+  // The filmstrip: the whole list scrolls, but only the items near the view are in the page; two spacers stand for the rest.
+  const filmBefore = document.createElement("span");
+  const filmWin = document.createElement("span");
+  const filmAfter = document.createElement("span");
+  filmBefore.className = filmAfter.className = "film-spacer";
+  filmWin.className = "film-win";
+  const filmMounted = new Map<string, HTMLElement>();
+  let filmRange: [number, number] = [0, 0];
+  let filmPitch = 0;
+  let filmItemW = 0;
+  const filmItem = (e: CatalogListing["entries"][number]): HTMLElement => {
+    const t = document.createElement("template");
+    t.innerHTML = `<button type="button" class="film-item" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`;
+    const b = t.content.firstElementChild as HTMLElement;
+    const img = b.querySelector<HTMLImageElement>("img");
+    if (img) loadThumb(img);
+    return b;
+  };
+  const windowFilm = (force = false): void => {
+    const { list } = viewList();
+    if (!list.length) {
+      filmWin.replaceChildren();
+      filmMounted.clear();
+      filmBefore.hidden = filmAfter.hidden = true;
+      return;
+    }
+    if (!filmPitch) {
+      const probe = filmItem(list[0]!);
+      filmWin.append(probe);
+      filmItemW = probe.getBoundingClientRect().width;
+      probe.remove();
+      filmPitch = filmItemW + (parseFloat(getComputedStyle(film).columnGap) || 0);
+    }
+    const n = list.length;
+    const pad = parseFloat(getComputedStyle(film).paddingLeft) || 0;
+    const first = filmPitch > 0 ? Math.max(0, Math.floor((film.scrollLeft - pad) / filmPitch) - FILM_OVERSCAN) : 0;
+    const end = filmPitch > 0 ? Math.min(n, first + Math.ceil(film.clientWidth / filmPitch) + 2 * FILM_OVERSCAN) : n;
+    if (!force && first === filmRange[0] && end === filmRange[1]) return;
+    filmRange = [first, end];
+    const space = (el: HTMLElement, k: number): void => {
+      el.hidden = k === 0;
+      el.style.width = `${k * filmPitch - (filmPitch - filmItemW)}px`;
+    };
+    space(filmBefore, first);
+    space(filmAfter, n - end);
+    const keep = new Map<string, HTMLElement>();
+    const els: HTMLElement[] = [];
+    for (let i = first; i < end; i++) {
+      const e = list[i]!;
+      const el = filmMounted.get(e.hash) ?? filmItem(e);
+      keep.set(e.hash, el);
+      els.push(el);
+    }
+    syncChildren(filmWin, els);
+    filmMounted.clear();
+    for (const [h, el] of keep) filmMounted.set(h, el);
+    markFilmItems();
+  };
+  const markFilmItems = (): void => {
+    for (const [h, b] of filmMounted) {
+      const on = h === slideHash;
       b.classList.toggle("is-current", on);
       b.setAttribute("aria-selected", String(on));
-      if (on) b.scrollIntoView({ block: "nearest", inline: "center" });
     }
-    const list = viewList();
-    const i = list.findIndex((e) => e.hash === slideHash);
-    pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
   };
+  let filmFrame = 0;
+  film.addEventListener("scroll", () => (filmFrame ||= requestAnimationFrame(() => ((filmFrame = 0), windowFilm()))), { passive: true });
+  /** Put the open asset in the middle of the filmstrip. */
+  const centreFilm = (): void => {
+    const { list, at } = viewList();
+    const i = at.get(slideHash ?? "") ?? -1;
+    pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
+    if (i >= 0 && filmPitch > 0) film.scrollLeft = (parseFloat(getComputedStyle(film).paddingLeft) || 0) + i * filmPitch - (film.clientWidth - filmItemW) / 2;
+    windowFilm(true);
+  };
+  const renderFilm = (): void => {
+    if (!film.contains(filmWin)) film.replaceChildren(filmBefore, filmWin, filmAfter);
+    // Items made for an older list may show other names or pictures: start again.
+    filmWin.replaceChildren();
+    filmMounted.clear();
+    filmPitch = 0;
+    filmOf = viewList().list;
+    centreFilm();
+  };
+  const markFilm = (): void => centreFilm();
   // ---- zoom: the wheel (or a pinch) zooms at the pointer, a drag pans, a double-click toggles Fit and 100%, + - 0 1 work from the keyboard
   const stage = viewer.querySelector<HTMLElement>(".viewer-stage")!;
   // Video, audio and GIF play with the same engines and control bar as the on-canvas player (ADR 0064).
@@ -565,7 +716,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (!png) await new Promise((r) => setTimeout(r, 250));
     }
     if (!png || eng !== engine) return;
-    const src = listing?.entries.find((x) => x.hash === at);
+    const src = entryOf(at);
     // The name, format, folder and tags come from Settings > Media and playback (ADR 0081).
     const record = await storeFrame(assets, session, settings, { png, label: engine.label(), sourceName: src?.name ?? "frame", sourceHash: at });
     if (!settings.get("frame.place")) {
@@ -795,7 +946,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   }
 
   const showSlide = async (hash: string): Promise<void> => {
-    const e = listing?.entries.find((x) => x.hash === hash);
+    const e = entryOf(hash);
     if (!e) return;
     const token = ++slideToken;
     const opening = viewer.hidden;
@@ -948,9 +1099,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.removeAttribute("src");
     unloadMedia();
     freeSlideUrl();
-    film.innerHTML = "";
+    filmWin.replaceChildren();
+    filmMounted.clear();
     // Back in the library the card of the asset that was open is in view.
-    if (was) grid.querySelector<HTMLElement>(`.asset-card[data-hash="${was}"]`)?.scrollIntoView({ block: "nearest" });
+    if (was) revealHash(was, "nearest");
   };
   // The invisible edges of the viewer: a click on the left or right side goes to the previous or next asset (the width is a setting).
   const applyEdge = (): void => void viewer.style.setProperty("--edge-w", String(settings.get("assets.edgeWidth")));
@@ -963,9 +1115,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const type of ["pointerdown", "dblclick"]) edge.addEventListener(type, (e) => e.stopPropagation());
   }
   const stepSlide = (d: number): void => {
-    const list = viewList().map((x) => x.hash);
-    const i = list.indexOf(slideHash ?? "");
-    if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!);
+    const { list, at } = viewList();
+    const i = at.get(slideHash ?? "") ?? -1;
+    if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!.hash);
   };
   // ---- slideshow: moves to the next asset after the chosen time (a video or audio file plays to its end first) and wraps round
   const progress = viewer.querySelector<HTMLElement>(".viewer-progress")!;
@@ -1067,15 +1219,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   // ---- data
-  const refresh = async (): Promise<void> => {
+  /** Read the library again; `metaOnly` after a change to its organization only, which keeps the usage and the canvas tags read before. */
+  const refresh = async (metaOnly = false): Promise<void> => {
     if (!visible) return;
     const gen = ++generation;
     if (!session.catalog) {
       grid.innerHTML = `<p class="assets-empty">Storage is unavailable, so there is no library in this tab.</p>`;
       return;
     }
-    await session.persistence.flush(); // usage reflects every edit made so far
-    const l = await session.catalog.list();
+    const light = metaOnly && listing ? await session.catalog.relist(listing) : null;
+    if (gen !== generation) return;
+    if (!light) await session.persistence.flush(); // usage reflects every edit made so far
+    const l = light ?? (await session.catalog.list());
     if (gen !== generation) return;
     listing = l;
     dropStaleThumbs();
@@ -1083,9 +1238,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const known = new Set([...l.entries.map((e) => e.hash), ...l.missing.map((m) => m.hash)]);
     for (const h of [...picked]) if (!known.has(h)) picked.delete(h);
     if (selected && !known.has(selected)) selected = [...picked].pop() ?? null;
-    places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
-    canvasTags = await session.canvasTagIndex().catch(() => canvasTags);
-    assetCanvasTags = selected && picked.size <= 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
+    if (!light) {
+      places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
+      canvasTags = await session.canvasTagIndex().catch(() => canvasTags);
+      assetCanvasTags = selected && picked.size <= 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
+    } else if (!selected || picked.size !== 1) places = [];
     if (gen !== generation) return;
     if (scope.startsWith("ctag:") && !canvasTags.has(scope.slice(5))) scope = "all";
     render();
@@ -1124,7 +1281,34 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
     return words_ok && (usage === "all" || (usage === "used" ? e.instances > 0 : e.instances === 0));
   };
+  /** The listing by hash (looked up instead of searched for each time). */
+  let byHash = new Map<string, CatalogListing["entries"][number]>();
+  let byHashOf: CatalogListing | null = null;
+  const entryOf = (hash: string): CatalogListing["entries"][number] | undefined => {
+    if (byHashOf !== listing) {
+      byHash = new Map(listing?.entries.map((e) => [e.hash, e]));
+      byHashOf = listing;
+    }
+    return byHash.get(hash);
+  };
+  const collator = new Intl.Collator();
+  /** One formatter for every card's date (making one per card was most of the time it took to draw a card). */
+  const addedDate = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" });
+  /** What is listed, worked out again only when the listing, the search, the scope, the sort or (for the look filters) the looks changed. */
+  let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; rows: CatalogListing["entries"] } | null = null;
   const filtered = (): CatalogListing["entries"] => {
+    if (!listing) return [];
+    const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope].join("\u0001");
+    const m = filterMemo;
+    if (m && m.key === memoKey && m.of === listing && m.tags === canvasTags && (!m.wantsLooks || m.looksGen === looksGen)) {
+      wantsLooks = m.wantsLooks;
+      return m.rows;
+    }
+    const rows = filterNow();
+    filterMemo = { key: memoKey, of: listing, tags: canvasTags, wantsLooks, looksGen, rows };
+    return rows;
+  };
+  const filterNow = (): CatalogListing["entries"] => {
     if (!listing) return [];
     // shortcut: a linear filter over the in-memory listing; add a tag/name index if libraries reach tens of thousands.
     const words = searchWords(search.value);
@@ -1149,18 +1333,27 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
     if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e)).map((e) => e.hash));
     // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
-    if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || a.name.localeCompare(b.name));
+    if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
     const key = sortSel.value as SortKey;
-    const folderOf = (e: (typeof rows)[number]): string => (meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : "");
+    // Text sorts compare a key made once per item (a folder path or the joined tags, made in every comparison, made sorting slow).
+    const textKey: Partial<Record<SortKey, (e: (typeof rows)[number]) => string>> = {
+      type: (e) => chipOf(e.name, e.type),
+      tags: (e) => meta(e).tags.join(" "),
+      folder: (e) => (meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : ""),
+    };
+    const keyOf = textKey[key];
+    const keys = keyOf ? new Map(rows.map((e) => [e, keyOf(e)])) : null;
+    const byKey = (a: (typeof rows)[number], b: (typeof rows)[number]): number => collator.compare(keys!.get(a)!, keys!.get(b)!);
+    const byName = (a: (typeof rows)[number], b: (typeof rows)[number]): number => collator.compare(a.name, b.name);
     const cmp: Record<SortKey, (a: (typeof rows)[number], b: (typeof rows)[number]) => number> = {
       newest: (a, b) => b.importedAt - a.importedAt,
-      name: (a, b) => a.name.localeCompare(b.name),
+      name: byName,
       size: (a, b) => b.size - a.size,
       uses: (a, b) => b.instances - a.instances,
       pixels: (a, b) => b.pixelW * b.pixelH - a.pixelW * a.pixelH,
-      type: (a, b) => chipOf(a.name, a.type).localeCompare(chipOf(b.name, b.type)),
-      tags: (a, b) => meta(a).tags.join(" ").localeCompare(meta(b).tags.join(" ")) || a.name.localeCompare(b.name),
-      folder: (a, b) => folderOf(a).localeCompare(folderOf(b)) || a.name.localeCompare(b.name),
+      type: byKey,
+      tags: (a, b) => byKey(a, b) || byName(a, b),
+      folder: (a, b) => byKey(a, b) || byName(a, b),
       favourite: (a, b) => Number(meta(b).favorite) - Number(meta(a).favorite),
       width: (a, b) => b.pixelW - a.pixelW,
       height: (a, b) => b.pixelH - a.pixelH,
@@ -1171,49 +1364,33 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
 
   // ---- rendering
-  let lastGridHtml = "";
-  // A card's markup is made once per listing (dates and folder paths are slow to format for thousands of cards on every keystroke).
+  // Only the cards near the view are in the page (a library of many thousands would otherwise be laid out, styled and kept in memory
+  // whole): where every card goes is worked out in code (library-layout.ts), and the grid is as tall as all of them.
+  type Shown = { hash: string; ar: number; html: () => string };
+  let shown: Shown[] = [];
+  let shownAt = new Map<string, number>();
+  let shownRows: CatalogListing["entries"] | null = null;
+  let shownMissing: CatalogListing["missing"] | null = null;
+  let layout: GridLayout = { boxes: [], rows: [], height: 0 };
+  let layoutW = 0;
+  /** The cards changed while the grid could not be laid out (the library was not on screen): it is laid out when it can be. */
+  let layoutDirty = false;
+  const mounted = new Map<string, { el: HTMLElement; html: string }>();
+  let gridRange: [number, number] = [0, 0];
+  let gridEmpty = "";
+  const phone = window.matchMedia("(max-width: 640px)");
+  grid.classList.add("is-virtual");
+  // A card's markup is made once per listing (dates and folder paths are slow to format), and only for cards that are drawn.
   let cardHtml = new WeakMap<object, string>();
   let cardsOf: CatalogListing | null = null;
   let cardsReadOnly = false;
-  /** The pictures already loaded that are in view get them before the first paint, so a redrawn grid does not flash blank cards. */
-  const showCachedInView = (): void => {
-    const cells = grid.children;
-    const r = scroller.getBoundingClientRect();
-    let lo = 0;
-    let hi = cells.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (cells[mid]!.getBoundingClientRect().bottom < r.top) lo = mid + 1;
-      else hi = mid;
-    }
-    for (let i = lo; i < cells.length; i++) {
-      const cell = cells[i]!;
-      if (cell.getBoundingClientRect().top > r.bottom) break;
-      const img = cell.querySelector<HTMLImageElement>("img[data-hash]");
-      const url = img && thumbUrls.get(img.dataset["hash"]!);
-      if (url) img.src = url;
-    }
-  };
-  const render = (): void => {
-    root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
-    if (!listing) return;
-    const rows = filtered();
-    const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
-    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
-    const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
-    if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
-      cardHtml = new WeakMap();
-      cardsOf = listing;
-      cardsReadOnly = session.readOnly;
-    }
-    const cards = rows.map((e) => {
-      const cached = cardHtml.get(e);
-      if (cached) return cached;
-      const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
-      const ar = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));
-      const name = e.name || "Untitled";
-      const html = `<div class="asset-cell" role="listitem" style="--ar:${ar.toFixed(3)}">
+  const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
+  const entryHtml = (e: CatalogListing["entries"][number]): string => {
+    const cached = cardHtml.get(e);
+    if (cached) return cached;
+    const small = Math.max(e.pixelW, e.pixelH) < THUMB_PX ? " is-pixelated" : "";
+    const name = e.name || "Untitled";
+    const html = `<div class="asset-cell" role="listitem">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
         <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
@@ -1228,19 +1405,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-width">${e.pixelW} px</span>
           <span class="asset-height">${e.pixelH} px</span>
           <span class="asset-canvases">${e.canvases}</span>
-          <span class="asset-added">${new Date(e.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+          <span class="asset-added">${addedDate.format(e.importedAt)}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
         </span>
       </button>
       ${check(e.hash, name)}
       </div>`;
-      cardHtml.set(e, html);
-      return html;
-    });
-    const missing = usageAll
-      ? listing.missing.map(
-          (m) => `<div class="asset-cell" role="listitem" style="--ar:1.4">
+    cardHtml.set(e, html);
+    return html;
+  };
+  const missingHtml = (m: CatalogListing["missing"][number]): string => `<div class="asset-cell" role="listitem">
             <button type="button" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" aria-pressed="false" aria-label="Missing original">
               <span class="asset-thumb"></span>
               <span class="asset-missing-label">Original missing</span>
@@ -1253,53 +1428,210 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               </span>
             </button>
             ${check(m.hash, "missing original")}
-          </div>`,
-        )
-      : [];
-    const html = cards.length + missing.length
-      ? cards.join("") + missing.join("")
-      : listing.entries.length
-        ? `<p class="assets-empty">Nothing in the library matches.</p>`
-        : `<p class="assets-empty">The library is empty. Import files here (any type), or drop them on a canvas.</p>`;
-    grid.style.setProperty("--thumb", `${sizeInput.value}px`);
-    // The cards are only drawn again when something about them changed: picking, opening and typing leave them (and the pictures) alone.
-    if (html !== lastGridHtml) {
-      const ae = document.activeElement as HTMLElement | null;
-      const focused = ae && grid.contains(ae) ? { hash: ae.dataset["hash"], box: ae.classList.contains("asset-check") } : null;
-      grid.innerHTML = html;
-      lastGridHtml = html;
-      if (focused?.hash) grid.querySelector<HTMLElement>(`${focused.box ? ".asset-check" : ".asset-card"}[data-hash="${focused.hash}"]`)?.focus({ preventScroll: true });
-      io.disconnect();
-      if (visible) showCachedInView();
-      for (const img of grid.querySelectorAll<HTMLImageElement>("img[data-hash]")) io.observe(img);
+          </div>`;
+  /** Show whether a drawn card is picked. */
+  const markCell = (el: HTMLElement): void => {
+    const card = el.querySelector<HTMLElement>(".asset-card")!;
+    const on = picked.has(card.dataset["hash"]!);
+    card.setAttribute("aria-pressed", String(on));
+    const box = el.querySelector<HTMLInputElement>(".asset-check");
+    if (box) box.checked = on;
+  };
+  const makeCell = (html: string): HTMLElement => {
+    const t = document.createElement("template");
+    t.innerHTML = html;
+    const el = t.content.firstElementChild as HTMLElement;
+    markCell(el);
+    return el;
+  };
+  /** Work out where every card goes for the grid's width, the thumbnail size and the layout (gallery, squares on a phone, or list). */
+  const layoutNow = (): void => {
+    layoutDirty = false;
+    const list = ui.layout === "list";
+    const cs = getComputedStyle(grid);
+    layoutW = grid.clientWidth;
+    const gap = parseFloat(list ? cs.rowGap : cs.columnGap) || 0;
+    const size = Number(sizeInput.value);
+    layout = list
+      ? listLayout(shown.length, layoutW, parseFloat(cs.getPropertyValue("--list-row")) || size, gap)
+      : phone.matches
+        ? squaresLayout(shown.length, layoutW, size, gap)
+        : justifiedLayout(shown.map((x) => x.ar), layoutW, size, gap);
+    grid.style.setProperty("--grid-h", `${layout.height}px`);
+  };
+  /** Put the cards near the view in the page (and take the others out); `force` places them again after the layout changed. */
+  const windowGrid = (force = false): void => {
+    if (gridEmpty || layoutDirty) return;
+    const vh = scroller.clientHeight;
+    const top = scroller.scrollTop - grid.offsetTop;
+    const [a, b] = vh > 0 ? itemsIn(layout, top - vh * GRID_OVERSCAN, top + vh * (1 + GRID_OVERSCAN)) : [0, 0];
+    if (!force && a === gridRange[0] && b === gridRange[1]) return;
+    gridRange = [a, b];
+    const ae = document.activeElement as HTMLElement | null;
+    const focused = ae && grid.contains(ae) ? { el: ae, hash: ae.dataset["hash"], box: ae.classList.contains("asset-check") } : null;
+    const els: HTMLElement[] = [];
+    const keep = new Map<string, { el: HTMLElement; html: string }>();
+    const made: HTMLElement[] = [];
+    for (let i = a; i < b; i++) {
+      const it = shown[i]!;
+      const html = it.html();
+      let m = mounted.get(it.hash);
+      if (!m || m.html !== html) {
+        m = { el: makeCell(html), html };
+        made.push(m.el);
+      }
+      const box = layout.boxes[i]!;
+      const st = m.el.style;
+      st.setProperty("--x", `${box.x}px`);
+      st.setProperty("--y", `${box.y}px`);
+      st.setProperty("--w", `${box.w}px`);
+      st.setProperty("--h", `${box.h}px`);
+      m.el.classList.toggle("is-even", i % 2 === 1);
+      m.el.setAttribute("aria-posinset", String(i + 1));
+      m.el.setAttribute("aria-setsize", String(shown.length));
+      keep.set(it.hash, m);
+      els.push(m.el);
+    }
+    syncChildren(grid, els);
+    mounted.clear();
+    for (const [h, m] of keep) mounted.set(h, m);
+    for (const el of made) {
+      const img = el.querySelector<HTMLImageElement>("img[data-hash]");
+      if (img) loadThumb(img);
+    }
+    // A card drawn again (its tags changed, say) keeps the keyboard.
+    if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(focused.box ? ".asset-check" : ".asset-card")?.focus({ preventScroll: true });
+  };
+  /** Lay the grid out again (its width, the thumbnail size or the cards changed), keeping the remembered card where it was on the screen. */
+  const relayout = (): void => {
+    if (gridEmpty || !grid.clientWidth) return;
+    layoutNow();
+    const i = keepAt && visible ? shownAt.get(keepAt.hash) : undefined;
+    if (keepAt && i !== undefined) {
+      const want = grid.offsetTop + layout.boxes[i]!.y - keepAt.top;
+      if (Math.abs(want - scroller.scrollTop) >= 1) scroller.scrollTop = want;
+    }
+    windowGrid(true);
+  };
+  onLayoutChange = relayout;
+  /** Scroll an item into view (nearest edge, or the middle) and return its card. */
+  const revealIndex = (i: number, block: "nearest" | "center"): HTMLElement | null => {
+    const b = layout.boxes[i];
+    if (!b) return null;
+    const head = ui.layout === "list" ? listHead.offsetHeight : 0; // (the list's header stays over the top of it)
+    const y = grid.offsetTop + b.y;
+    const vh = scroller.clientHeight;
+    let st = scroller.scrollTop;
+    if (block === "center") st = y - (vh - b.h) / 2;
+    else if (y - head < st) st = y - head;
+    else if (y + b.h > st + vh) st = y + b.h - vh;
+    if (Math.abs(st - scroller.scrollTop) >= 1) scroller.scrollTop = st;
+    windowGrid();
+    return mounted.get(shown[i]!.hash)?.el.querySelector<HTMLElement>(".asset-card") ?? null;
+  };
+  const revealHash = (hash: string, block: "nearest" | "center"): HTMLElement | null => {
+    const i = shownAt.get(hash);
+    return i === undefined ? null : revealIndex(i, block);
+  };
+  let filmOf: CatalogListing["entries"] | null = null;
+  const render = (): void => {
+    root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
+    if (!listing) return;
+    const rows = filtered();
+    const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
+    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
+    if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
+      cardHtml = new WeakMap();
+      cardsOf = listing;
+      cardsReadOnly = session.readOnly;
+      shownRows = null;
+    }
+    const missing = usageAll ? listing.missing : [];
+    // The cards are only laid out again when what is listed changed: picking, opening and typing leave them (and the pictures) alone.
+    if (rows !== shownRows || (missing.length ? missing !== shownMissing : shownMissing?.length)) {
+      shownRows = rows;
+      shownMissing = missing;
+      shown = [
+        ...rows.map((e) => ({ hash: e.hash, ar: Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH))), html: () => entryHtml(e) })),
+        ...missing.map((m) => ({ hash: m.hash, ar: 1.4, html: () => missingHtml(m) })),
+      ];
+      shownAt = new Map(shown.map((x, i) => [x.hash, i]));
+      layoutDirty = true;
+      const empty = shown.length
+        ? ""
+        : listing.entries.length
+          ? `<p class="assets-empty">Nothing in the library matches.</p>`
+          : `<p class="assets-empty">The library is empty. Import files here (any type), or drop them on a canvas.</p>`;
+      if (empty) {
+        if (empty !== gridEmpty) {
+          grid.classList.remove("is-virtual");
+          grid.innerHTML = empty;
+          mounted.clear();
+          gridEmpty = empty;
+        }
+      } else {
+        if (gridEmpty) {
+          grid.replaceChildren();
+          grid.classList.add("is-virtual");
+          gridEmpty = "";
+        }
+        relayout();
+      }
     }
     markPicked();
     renderSide();
     renderInspector();
     if (slideHash && !viewer.hidden) {
-      if (listing.entries.some((x) => x.hash === slideHash)) renderFilm();
-      else closeSlide(); // the open asset was deleted
+      if (!entryOf(slideHash)) closeSlide(); // the open asset was deleted
+      else if (viewList().list !== filmOf) renderFilm();
     }
     importBtn.disabled = session.readOnly;
   };
 
+  /** The sidebar's counts, made once per listing (not on every redraw: they go over the whole library). */
+  type SideCounts = { of: CatalogListing; hidden: number; shown: number; favourites: number; unfiled: number; tags: Map<string, { label: string; n: number }>; types: Map<string, number>; folders: Map<string, number> };
+  let sideCounts: SideCounts | null = null;
+  const countSide = (l: CatalogListing): SideCounts => {
+    if (sideCounts?.of === l) return sideCounts;
+    const c: SideCounts = { of: l, hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), types: new Map(), folders: new Map() };
+    const parentOf = new Map(l.folders.map((f) => [f.id, f.parentId]));
+    for (const e of l.entries) {
+      const m = meta(e);
+      if (m.hidden) {
+        c.hidden++;
+        continue; // (what is hidden is in no count, tag list or file type list but its own scope)
+      }
+      c.shown++;
+      if (m.favorite) c.favourites++;
+      if (!m.folderIds.length) c.unfiled++;
+      for (const t of m.tags) {
+        const k = t.toLowerCase();
+        const tc = c.tags.get(k);
+        if (tc) tc.n++;
+        else c.tags.set(k, { label: t, n: 1 });
+      }
+      // The file types in the workspace: one chip per extension, with how many files have it.
+      const k = chipOf(e.name, e.type).toLowerCase();
+      c.types.set(k, (c.types.get(k) ?? 0) + 1);
+      // A folder counts what is in it and in the folders under it, each item once.
+      const under = new Set<string>();
+      for (let id of m.folderIds) {
+        for (let guard = 0; id && !under.has(id) && guard < 1000; guard++) {
+          under.add(id);
+          id = parentOf.get(id) ?? "";
+        }
+      }
+      for (const id of under) c.folders.set(id, (c.folders.get(id) ?? 0) + 1);
+    }
+    return (sideCounts = c);
+  };
+  let lastSideHtml = "";
   const renderSide = (): void => {
     if (!listing) return;
-    const hiddenCount = listing.entries.filter((e) => meta(e).hidden).length;
-    const entries = listing.entries.filter((e) => !meta(e).hidden); // (what is hidden is in no count, tag list or file type list but its own scope)
-    const tagCounts = new Map<string, { label: string; n: number }>();
-    for (const e of entries) for (const t of meta(e).tags) {
-      const k = t.toLowerCase();
-      const c = tagCounts.get(k);
-      if (c) c.n++;
-      else tagCounts.set(k, { label: t, n: 1 });
-    }
-    // The file types in the workspace: one chip per extension, with how many files have it.
-    const typeCounts = new Map<string, number>();
-    for (const e of entries) {
-      const k = chipOf(e.name, e.type).toLowerCase();
-      typeCounts.set(k, (typeCounts.get(k) ?? 0) + 1);
-    }
+    const counts = countSide(listing);
+    const hiddenCount = counts.hidden;
+    const tagCounts = counts.tags;
+    const typeCounts = counts.types;
     const ro = session.readOnly;
     const kindWord = { folder: "folder", tag: "tag", ctag: "canvas tag", style: "style" } as const;
     /** A row's "more" button and, when open, its labelled menu (Rename, Delete and so on): one button instead of a row of them. */
@@ -1319,10 +1651,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
-    const subtreeCount = (id: string): number => {
-      const ids = folderSubtree(listing!.folders, id);
-      return entries.filter((e) => meta(e).folderIds.some((x) => ids.has(x))).length;
-    };
+    const subtreeCount = (id: string): number => counts.folders.get(id) ?? 0;
     const tree = (parent: string | null, depth: number): string =>
       listing!.folders
         .filter((f) => f.parentId === parent)
@@ -1363,13 +1692,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return "Library";
     })();
     side.dataset["open"] = String(sideOpen);
-    side.innerHTML = `
+    const html = `
       <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
       <div class="side-body">
         <ul class="side-list side-views">
-          ${item("all", "All items", entries.length, { icon: ICONS.images })}
-          ${item("favorites", "Favourites", entries.filter((e) => meta(e).favorite).length, { icon: ICONS.star })}
-          ${item("unfiled", "Unfiled", entries.filter((e) => meta(e).folderIds.length === 0).length, { icon: ICONS.folderX })}
+          ${item("all", "All items", counts.shown, { icon: ICONS.images })}
+          ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
+          ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
           ${scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
           ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
@@ -1442,6 +1771,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </ul>`,
         )}
       </div>`;
+    // Drawn again only when something in it changed (a redraw for a pick or a look read leaves it, its scroll and its input alone).
+    if (html === lastSideHtml && side.firstElementChild) return;
+    lastSideHtml = html;
+    side.innerHTML = html;
     // The menu floats over the page (the sidebar scrolls and would clip it), kept inside the window.
     const pop = side.querySelector<HTMLElement>(".side-menu");
     const anchor = side.querySelector<HTMLElement>('[data-side-more][aria-expanded="true"]');
@@ -1461,7 +1794,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The details of several picked assets: what can be done to all of them at once. */
   const renderBulk = (): void => {
     const hashes = [...picked];
-    const ents = hashes.map((h) => listing!.entries.find((x) => x.hash === h)).filter((x): x is CatalogListing["entries"][number] => !!x);
+    const ents = hashes.map(entryOf).filter((x): x is CatalogListing["entries"][number] => !!x);
     const n = hashes.length;
     const allFav = ents.length > 0 && ents.every((e) => meta(e).favorite);
     const allHidden = ents.length > 0 && ents.every((e) => meta(e).hidden);
@@ -1505,7 +1838,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       renderBulk();
       return;
     }
-    const e = listing?.entries.find((x) => x.hash === selected);
+    const e = selected ? entryOf(selected) : undefined;
     const m = listing?.missing.find((x) => x.hash === selected);
     if (!e && !m) {
       // the panel keeps its place with nothing picked (so the grid does not change width when a pick ends)
@@ -1665,8 +1998,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   /** Show which cards are picked without redrawing the library. */
   const markPicked = (): void => {
-    for (const c of grid.querySelectorAll<HTMLElement>(".asset-card")) c.setAttribute("aria-pressed", String(picked.has(c.dataset["hash"]!)));
-    for (const c of grid.querySelectorAll<HTMLInputElement>(".asset-check")) c.checked = picked.has(c.dataset["hash"]!);
+    for (const { el } of mounted.values()) markCell(el);
     // Every card shows its checkbox only once several are being picked; one plain click just opens that item's details.
     grid.classList.toggle("has-picks", picked.size > 1 || (selecting && picked.size > 0));
   };
@@ -1714,8 +2046,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderInspector();
   };
   const selectAll = (): void => {
-    for (const e of filtered()) picked.add(e.hash);
-    selected = filtered()[filtered().length - 1]?.hash ?? selected;
+    const rows = filtered();
+    for (const e of rows) picked.add(e.hash);
+    selected = rows[rows.length - 1]?.hash ?? selected;
     selecting = true;
     places = [];
     assetCanvasTags = [];
@@ -1774,44 +2107,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Where the arrow keys last went: the pick itself lands a moment later, and a quick second key must start from here. */
   let cursor: string | null = null;
   const moveBy = (e: KeyboardEvent): boolean => {
-    const cells = [...grid.querySelectorAll<HTMLElement>(".asset-cell")];
-    if (!cells.length) return false;
+    const n = shown.length;
+    if (!n) return false;
     const active = document.activeElement as HTMLElement | null;
-    const focusedCell = active && grid.contains(active) ? active.closest<HTMLElement>(".asset-cell") : null;
-    const selectedCell = selected ? (grid.querySelector<HTMLElement>(`.asset-card[data-hash="${selected}"]`)?.closest<HTMLElement>(".asset-cell") ?? null) : null;
-    const cursorCell = cursor ? (grid.querySelector<HTMLElement>(`.asset-card[data-hash="${cursor}"]`)?.closest<HTMLElement>(".asset-cell") ?? null) : null;
-    const cur = focusedCell ?? cursorCell ?? selectedCell;
+    const focusedHash = active && grid.contains(active) ? active.closest<HTMLElement>(".asset-cell")?.querySelector<HTMLElement>(".asset-card")?.dataset["hash"] : undefined;
+    const cur = [focusedHash, cursor, selected].map((h) => (h ? shownAt.get(h) : undefined)).find((i) => i !== undefined);
     const list = ui.layout === "list";
-    let next: HTMLElement | undefined;
-    if (!cur) next = e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "End" ? cells[cells.length - 1] : cells[0];
+    let next: number;
+    if (cur === undefined) next = e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "End" ? n - 1 : 0;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    else if (e.key === "ArrowLeft" || (list && e.key === "ArrowUp")) next = Math.max(0, cur - 1);
+    else if (e.key === "ArrowRight" || (list && e.key === "ArrowDown")) next = Math.min(n - 1, cur + 1);
     else {
-      const i = cells.indexOf(cur);
-      if (e.key === "Home") next = cells[0];
-      else if (e.key === "End") next = cells[cells.length - 1];
-      else if (e.key === "ArrowLeft" || (list && e.key === "ArrowUp")) next = cells[Math.max(0, i - 1)];
-      else if (e.key === "ArrowRight" || (list && e.key === "ArrowDown")) next = cells[Math.min(cells.length - 1, i + 1)];
-      else {
-        // Up and down in a justified gallery: the nearest card in the row above or below, by horizontal position.
-        const r = cur.getBoundingClientRect();
-        const cx = (r.left + r.right) / 2;
-        const down = e.key === "ArrowDown";
-        let best: { cell: HTMLElement; dy: number; dx: number } | null = null;
-        for (const c of cells) {
-          const b = c.getBoundingClientRect();
-          const dy = down ? b.top - r.bottom + 1 : r.top - b.bottom + 1;
-          if (dy < 0) continue;
-          const dx = Math.abs((b.left + b.right) / 2 - cx);
-          if (!best || dy < best.dy - 4 || (Math.abs(dy - best.dy) <= 4 && dx < best.dx)) best = { cell: c, dy, dx };
-        }
-        next = best?.cell ?? cur;
-      }
+      // Up and down in a gallery: the nearest card in the row above or below, by horizontal position.
+      const row = rowOf(layout, cur) + (e.key === "ArrowDown" ? 1 : -1);
+      const b = layout.boxes[cur]!;
+      next = row < 0 || row >= layout.rows.length ? cur : nearestInRow(layout, row, b.x + b.w / 2);
     }
-    if (!next) return false;
-    const card = next.querySelector<HTMLElement>(".asset-card")!;
+    const card = revealIndex(next, "nearest");
+    if (!card) return false;
     card.focus({ preventScroll: true });
-    card.scrollIntoView({ block: "nearest" });
     const hash = card.dataset["hash"]!;
-    cursor = hash;
     if (e.shiftKey) void select(hash, "range");
     else if (!e.ctrlKey && !e.metaKey && !selecting) void select(hash);
     return true;
@@ -1830,10 +2147,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void select(null);
         break;
       case "place-all-menu":
-        openPlaceMenu(b, group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)));
+        openPlaceMenu(b, group.filter((h) => entryOf(h)?.present === true));
         break;
       case "place-all": {
-        const ok = group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present));
+        const ok = group.filter((h) => entryOf(h)?.present === true);
         void askPlaceTags(ok).then((withTags) => {
           if (withTags === null) return;
           showCanvas();
@@ -1847,10 +2164,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "export-files-all":
-        void runExportFiles(session, { kind: "assets", hashes: group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)) });
+        void runExportFiles(session, { kind: "assets", hashes: group.filter((h) => entryOf(h)?.present === true) });
         break;
       case "export-all":
-        void runExport(session, { kind: "assets", hashes: group.filter((h) => listing?.entries.some((x) => x.hash === h && x.present)) });
+        void runExport(session, { kind: "assets", hashes: group.filter((h) => entryOf(h)?.present === true) });
         break;
       case "slideshow-all": {
         const order = filtered().filter((e) => picked.has(e.hash));
@@ -1858,7 +2175,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "delete-all": {
-        const gone = group.filter((h) => listing?.entries.some((x) => x.hash === h && x.instances === 0));
+        const gone = group.filter((h) => entryOf(h)?.instances === 0);
         void confirmDialog({
           title: `Delete ${gone.length} item${gone.length === 1 ? "" : "s"} from the library?`,
           lines: ["Their originals are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
@@ -1962,7 +2279,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "delete-everywhere": {
         // in use: their instances go too, everywhere, after a confirmation that says what and where
         const hashes = pickedGroup();
-        const ents = hashes.map((h) => listing?.entries.find((x) => x.hash === h)).filter((x): x is CatalogListing["entries"][number] => !!x);
+        const ents = hashes.map(entryOf).filter((x): x is CatalogListing["entries"][number] => !!x);
         const uses = ents.reduce((t, x) => t + x.instances, 0);
         const canvases = new Set(hashes.length === 1 ? places.map((pl) => pl.canvasId) : []).size || ents.reduce((t, x) => Math.max(t, x.canvases), 0);
         const where = hashes.length === 1 && places.length ? places.map((pl) => `${pl.boardName} › ${pl.canvasName}`).join(", ") : null;
@@ -1982,7 +2299,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "delete": {
-        const e = listing?.entries.find((x) => x.hash === hash);
+        const e = entryOf(hash);
         void confirmDialog({
           title: `Delete “${e?.name || "Untitled"}” from the library?`,
           lines: [`Its original (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
@@ -2062,7 +2379,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    * (ADR 0062). Returns true (with tags), false (without), or null when cancelled; false at once when none has tags.
    */
   const askPlaceTags = async (hashes: readonly string[]): Promise<boolean | null> => {
-    const tagged = hashes.map((h) => listing?.entries.find((x) => x.hash === h)).filter((e): e is CatalogListing["entries"][number] => !!e && meta(e).tags.length > 0);
+    const tagged = hashes.map(entryOf).filter((e): e is CatalogListing["entries"][number] => !!e && meta(e).tags.length > 0);
     if (!tagged.length) return false;
     const names = [...new Set(tagged.flatMap((e) => meta(e).tags))].slice(0, 6).map((t) => `#${t}`).join(" ");
     const answer = await chooseDialog({
@@ -2223,7 +2540,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hash = card.dataset["hash"]!;
     const hashes = picked.has(hash) ? [...picked] : [hash]; // (a picked one carries the whole pick)
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
-    e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (listing?.entries.find((x) => x.hash === hash)?.name ?? ""));
+    e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (entryOf(hash)?.name ?? ""));
     e.dataTransfer.effectAllowed = "copyMove";
   });
   const dropTarget = (e: DragEvent): HTMLElement | null => {
@@ -2253,7 +2570,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lightDrop(null);
     if (!t) return;
     e.preventDefault();
-    const hashes = (JSON.parse(e.dataTransfer!.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => listing?.entries.some((x) => x.hash === h));
+    const hashes = (JSON.parse(e.dataTransfer!.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => !!entryOf(h));
     if (!hashes.length) return;
     const k = t.dataset["scope"]!;
     const label = t.querySelector(".side-label")?.textContent?.replace(/^#/, "") ?? "";
@@ -2416,7 +2733,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const renameAssetsDialog = async (hashes: readonly string[]): Promise<void> => {
     if (session.readOnly) return;
     const items = hashes.flatMap((h) => {
-      const en = listing?.entries.find((x) => x.hash === h);
+      const en = entryOf(h);
       return en ? [{ id: h, name: en.name }] : [];
     });
     if (!items.length) return;
@@ -2427,9 +2744,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} items.`;
       session.editor.changed();
     }
-    await refresh();
+    await refresh(true);
     // Keep the keyboard where it was: on the first renamed card (F2 works again).
-    grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(items[0]!.id)}"]`)?.focus({ preventScroll: true });
+    mounted.get(items[0]!.id)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
   };
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && sideMenu) {
@@ -2584,7 +2901,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
   });
   // ---- the list's columns: drag a header onto another to move it
-  const listHead = root.querySelector<HTMLElement>(".assets-list-head")!;
   let dragCol: ColumnId | null = null;
   // A click on a header sorts by it; another click reverses it, as in a table.
   listHead.addEventListener("click", (e) => {
@@ -2828,35 +3144,51 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     clearTimeout(typingTimer);
     typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);
   });
-  sizeInput.addEventListener("input", () => grid.style.setProperty("--thumb", `${sizeInput.value}px`));
+  sizeInput.addEventListener("input", () => {
+    grid.style.setProperty("--thumb", `${sizeInput.value}px`);
+    relayout();
+  });
   // The picture you are looking at stays where it is on the screen when the grid is laid out again (the details panel opened or closed, the
   // window or the thumbnails resized, items added above): the picked one if it is in view, else the one a third of the way down.
   let keepAt: { hash: string; top: number } | null = null;
-  const anchorCard = (): HTMLElement | null => {
-    const r = scroller.getBoundingClientRect();
-    const pickedCard = selected ? grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(selected)}"]`) : null;
-    const pr = pickedCard?.getBoundingClientRect();
-    if (pickedCard && pr && pr.bottom > r.top && pr.top < r.bottom) return pickedCard;
-    return (document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 3) as HTMLElement | null)?.closest<HTMLElement>(".asset-card") ?? null;
-  };
   const remember = (): void => {
-    const c = anchorCard();
-    keepAt = c ? { hash: c.dataset["hash"]!, top: c.getBoundingClientRect().top - scroller.getBoundingClientRect().top } : null;
+    keepAt = null;
+    if (!shown.length || gridEmpty) return;
+    const top = scroller.scrollTop - grid.offsetTop;
+    const vh = scroller.clientHeight;
+    let i = selected ? shownAt.get(selected) : undefined;
+    const box = i === undefined ? undefined : layout.boxes[i];
+    if (!box || box.y + box.h <= top || box.y >= top + vh) {
+      const y = top + vh / 3;
+      const [a, b] = itemsIn(layout, y, y);
+      i = a < b ? nearestInRow(layout, rowOf(layout, a), layoutW / 2) : undefined;
+    }
+    if (i !== undefined) keepAt = { hash: shown[i]!.hash, top: grid.offsetTop + layout.boxes[i]!.y - scroller.scrollTop };
   };
-  let rememberFrame = 0;
-  scroller.addEventListener("scroll", () => (rememberFrame ||= requestAnimationFrame(() => ((rememberFrame = 0), remember()))), { passive: true });
+  let scrollFrame = 0;
+  scroller.addEventListener(
+    "scroll",
+    () =>
+      (scrollFrame ||= requestAnimationFrame(() => {
+        scrollFrame = 0;
+        remember(); // (first: it only reads, so the page is not laid out twice)
+        windowGrid();
+      })),
+    { passive: true },
+  );
   grid.addEventListener("click", () => requestAnimationFrame(remember));
   if (typeof ResizeObserver !== "undefined") {
-    const keep = new ResizeObserver(() => {
-      if (!keepAt || !visible) return;
-      const c = grid.querySelector<HTMLElement>(`.asset-card[data-hash="${CSS.escape(keepAt.hash)}"]`);
-      if (!c) return;
-      const moved = c.getBoundingClientRect().top - scroller.getBoundingClientRect().top - keepAt.top;
-      if (Math.abs(moved) >= 1) scroller.scrollTop += moved;
-    });
-    keep.observe(grid);
-    keep.observe(scroller);
+    // A new width lays the cards out again; a new height only draws the ones now in view.
+    let lastH = 0;
+    new ResizeObserver(() => {
+      if (!visible) return;
+      if (grid.clientWidth !== layoutW || layoutDirty) relayout();
+      else if (scroller.clientHeight !== lastH) windowGrid();
+      lastH = scroller.clientHeight;
+    }).observe(scroller);
   }
+  // The gaps between cards follow the density setting.
+  settings.subscribe(() => relayout());
   importBtn.addEventListener("click", () => fileInput.click());
   const folderInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')!;
   const importMenu = root.querySelector<HTMLElement>('[data-action="import-menu"]')!;
@@ -2884,19 +3216,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // A burst of changes (an import filing hundreds of files) reads and draws the library once more after the read in flight, not once per change.
   let refreshing = false;
   let refreshAgain = false;
-  const refreshSoon = (): void => {
+  let wantFull = false;
+  const refreshSoon = (metaOnly = false): void => {
+    if (!metaOnly) wantFull = true; // (any change that is not only organization makes the next read a whole one)
     if (refreshing) return void (refreshAgain = true);
     refreshing = true;
-    void refresh().finally(() => {
+    const full = wantFull;
+    wantFull = false;
+    void refresh(!full).finally(() => {
       refreshing = false;
       if (refreshAgain) {
         refreshAgain = false;
-        refreshSoon();
+        refreshSoon(true); // (whole or not, as the changes that came meanwhile asked)
       }
     });
   };
   session.subscribeAssets(refreshSoon);
-  session.subscribe(refreshSoon); // tree renamed, role changed
+  session.subscribe(() => refreshSoon()); // tree renamed, role changed
 
   const view: AssetsView = {
     show() {
@@ -2935,7 +3271,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       render();
       markPicked();
       renderInspector();
-      if (have[0]) grid.querySelector<HTMLElement>(`[data-hash="${CSS.escape(have[0])}"]`)?.scrollIntoView({ block: "center" });
+      if (have[0]) revealHash(have[0], "center");
       if (have.length < hashes.length) status.textContent = `${hashes.length - have.length} of the selected items are not in the library any more.`;
     },
     focusSearch() {

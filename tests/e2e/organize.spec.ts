@@ -687,7 +687,7 @@ test("a plain click picks without opening or closing the details panel, so nothi
   await p.getByTestId("view-assets").click();
   const files = Array.from({ length: 40 }, (_, i) => ({ name: `g${i}.png`, mimeType: "image/png", buffer: makePng(8 + (i % 5) * 4, 8 + (i % 3) * 6, () => [6 * i, 100, 200, 255]) }));
   await p.getByTestId("assets-import-input").setInputFiles(files);
-  await expect(cards(p)).toHaveCount(40);
+  await expect(p.getByTestId("assets-count")).toHaveText("40 items"); // (only the cards near the view are in the page)
   const panelButton = p.locator('.assets-bar [data-action="details"]');
   await panelButton.click(); // the panel closed
   await expect(p.getByTestId("asset-inspector")).toBeHidden();

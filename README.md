@@ -399,7 +399,7 @@ canvast describes only what it does. These are the current limits.
 | Dense scenes | With thousands of strokes visible at once, zooming shows a briefly scaled image of the last exact frame and snaps to the exact picture about 150 ms after you stop |
 | Far zoom-out | Content too small to draw is shown as a soft mark in its own colour (pictures as grey). Marks cannot be selected; zoom in to edit |
 | Very large documents | A board of one million objects needs about 940 MB of memory and about 6 s to build its index on load |
-| Large libraries | The Library puts every shown item in the page: cards out of view are not drawn and their pictures are let go once scrolled far away, and search results are redrawn when typing pauses, but a search or filter change still rebuilds the whole list. Libraries of many thousands of items, and backups of many gigabytes, have not been measured |
+| Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its original, three at a time. Backups of many gigabytes have not been measured |
 | Frame rate | Measured on one desktop machine; no results exist for other device classes |
 
 **Platform**

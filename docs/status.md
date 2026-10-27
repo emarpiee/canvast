@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## A fast library with thousands of items (v0.47.1, 2026-10-27)
+
+**Implemented:** the library grid and the viewer's filmstrip keep only the items near the view in the page; the card places are worked out in code (`src/ui/library-layout.ts`: justified rows, squares on a phone, list rows) and the cards are positioned in a grid as tall as all of them; keyboard moves, reveal and the scroll anchor use that layout. Thumbnails missing from storage are made three at a time (the screen first, none for a card gone from the page) and at most 3,000 loaded addresses are kept. The filter and sort run once per change (one collator, text keys made once), the sidebar counts once per listing, entries are looked up by hash; search redraws after a 250 ms pause; picture looks are read only while Similar or a look filter is in use. An organization change (`Session.organize`, library undo) reads only the catalog again (`AssetCatalog.relist`), and library-folder files are checked fifty at a time.
+**Tested:** unit 572 (2 new, library layout); E2E assets, library-folder, files, organize, a11y, archive, settings and vectors in Chromium and Firefox (372 passed, 2 failed: an organize test that counted every card in the page, changed to the library count); then organize, assets (one new test: 3,000 items) and a11y in both browsers on a fresh snapshot, 146 passed (6.9 min). A local measurement with 20,000 seeded items (Chromium, headless): opening 11.1 s → 1.0 s, wheel scrolling about 2 → 60 frames a second at the top, half way and at the end, typing six letters 15.9 s of stalls → none, Ctrl+A 19.4 s → under 0.1 s.
+**Known failures:** none known.
+**Unverified:** the quick and full suites; a real library of many thousands of different originals (the measurement used one shared thumbnail and no originals); touch scrolling on a phone.
+**Committed:** this slice (see the commit).
+**Next bounded task:** a jump of several screens at once (dragging the scroll bar) still makes about 60 picture addresses per frame (about 55 ms); reusing addresses or decoding off the main thread would smooth it.
+
 ## The logo, and OKLCH in the colour picker (v0.47.0, 2026-10-27)
 
 **Implemented:** the logo and its guidelines (`scripts/brand/`; favicon in full colour, the one-colour mark in the app, a designed lock screen, prompt fields like Settings); the colour picker's OKLCH model replacing OKHCL, its `theme` option, and a dark `color-scheme`; README cover and screenshots made again, with new pictures for the Pattern panel, the colour picker and text.

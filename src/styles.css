@@ -1081,6 +1081,10 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .assets-grid { --row-h: var(--thumb, 144px); display: flex; flex-wrap: wrap; gap: var(--near); align-content: flex-start; }
 .assets-grid::after { content: ""; flex-grow: 1000000; }
 .asset-cell { position: relative; flex: calc(var(--ar) * 100) 1 calc(var(--ar) * var(--row-h)); min-width: 64px; aspect-ratio: var(--ar); }
+/* Only the cards near the view are in the page, each placed where the layout (library-layout.ts) puts it; the grid is as tall as all of them. */
+#assets-view .assets-grid.is-virtual { position: relative; display: block; height: var(--grid-h, 0px); }
+#assets-view .assets-grid.is-virtual::after { display: none; }
+#assets-view .assets-grid.is-virtual > .asset-cell { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: var(--h); min-width: 0; margin: 0; aspect-ratio: auto; }
 .asset-card { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; overflow: hidden; content-visibility: auto; color: inherit; text-align: left; background: var(--hud-hover); border: 0; border-radius: var(--r-md); cursor: pointer; }
 .asset-thumb { position: absolute; inset: 0; display: block; }
 .asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1199,6 +1203,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .vbtn.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .vbtn.is-primary:hover:not(:disabled) { background: var(--hud-accent); filter: brightness(1.1); }
 .viewer-film { flex: 1; min-width: 0; display: flex; gap: var(--sp-3); overflow-x: auto; padding: var(--sp-2) var(--sp-1); scrollbar-width: thin; }
+.film-spacer { flex: none; }
+.film-win { display: contents; }
 .film-item { flex: none; width: 64px; height: 44px; padding: 0; overflow: hidden; background: var(--white-a08); border: 0; border-radius: var(--r-sm); cursor: pointer; opacity: 0.7; }
 .film-item:hover { opacity: 1; }
 .film-item.is-current { opacity: 1; box-shadow: 0 0 0 2px var(--hud-accent); }
@@ -1305,7 +1311,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
    The checkbox is a hover thing, or shows once anything is picked; focus left on a card by a click never keeps it on. */
 .asset-check { opacity: 0; }
 .asset-cell:hover .asset-check { opacity: 1; }
-.assets-grid.has-picks .asset-check, .asset-check:checked, .asset-cell:has(.asset-card:focus-visible) .asset-check { opacity: 1; }
+.assets-grid.has-picks .asset-check, .asset-check:checked, .asset-card:focus-visible ~ .asset-check { opacity: 1; }
 /* A touch screen, or any device that does not report a hover: the checkbox is always there. */
 @media (pointer: coarse), (hover: none), (hover: on-demand), (max-width: 640px) { .asset-check { opacity: 1 !important; } }
 .asset-thumb img, .film-item img, .asset-preview img, .viewer img { -webkit-user-drag: none; user-select: none; }
@@ -1398,7 +1404,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 
 /* ---- The library list, aligned: the header sits over its columns ---------------------------------------------------------------- */
 .assets-body.is-list .assets-list-head { padding: var(--sp-2) var(--sp-4) var(--sp-3) var(--sp-12); }
-.assets-body.is-list .asset-cell { height: 46px; padding-left: var(--sp-12); }
+.assets-body.is-list .asset-cell { height: var(--list-row); padding-left: var(--sp-12); }
+.assets-body.is-list .assets-grid { --list-row: 46px; row-gap: var(--sp-1); }
 .assets-body.is-list .asset-card { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }
 .assets-body.is-list .asset-thumb { width: 56px; height: 38px; }
 .assets-body.is-list .asset-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1406,7 +1413,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-list .asset-check { width: 18px; height: 18px; left: 7px; opacity: 0; }
 .assets-body.is-list .asset-cell:hover .asset-check, .assets-body.is-list .asset-check:checked, .assets-body.is-list .assets-grid.has-picks .asset-check { opacity: 1; }
 @media (pointer: coarse), (hover: none), (hover: on-demand), (max-width: 640px) { .assets-body.is-list .asset-check { opacity: 0.6 !important; } .assets-body.is-list .asset-check:checked { opacity: 1 !important; } }
-.assets-body.is-list .asset-cell:nth-child(even) .asset-card:not([aria-pressed="true"]) { background: color-mix(in oklch, var(--hud-hover) 45%, transparent); }
+.assets-body.is-list .asset-cell.is-even .asset-card:not([aria-pressed="true"]) { background: color-mix(in oklch, var(--hud-hover) 45%, transparent); }
 /* The list of actions opens to the left of its More button, so the More buttons of the rows below stay reachable. */
 .nav-actions { top: 0; right: calc(var(--ctl) - 2px); }
 /* List rows read as text on the page, not as the white text of a picture overlay. */

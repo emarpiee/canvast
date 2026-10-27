@@ -1,7 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.47.1 — A fast library with thousands of items (2026-10-27)
 
+- **Fixed:** the library grew slower the deeper you scrolled: every card stayed in the page with its picture. Only the cards near the view are in the page now (their places worked out in code), and the filmstrip of the viewer does the same; with 20,000 items the library opens in about a second instead of 11 and scrolls at 60 frames a second instead of about 2.
+- **Fixed:** typing in the library search stalled on every letter with a large library (15 s for six letters with 20,000 items): the results are redrawn once typing pauses, the list is filtered and sorted once per change, and the sidebar's counts are made once per change of the library.
+- **Fixed:** thumbnails missing from storage were all made at once as cards scrolled past (each reads and decodes a whole original); now three at a time, the ones on screen first, and none for a card that scrolled away.
+- **Fixed:** tagging, starring, filing or renaming one item read the whole library again, with every placed object; it now reads only the library's organization. With a library folder its files are checked fifty at a time instead of one by one.
+- **Fixed:** Ctrl+A, the details of many picked items, stepping through the viewer and keyboard moves in the grid went over the whole library each time.
 - **Added:** a GitHub Actions workflow that checks every push to `main` and every pull request: typecheck, unit tests, build, offline, naming, token, picker and pattern checks, the reproducible-build check and a short Chromium end-to-end run; the built file is kept as an artifact of the run.
 - **Fixed:** a unit test for old library entries did not know the `hidden` flag added in 0.46.0.
 

@@ -91,7 +91,7 @@ export class Session {
   /** The last garbage-collection result (diagnostics and tests). */
   lastGc: GcReport | null = null;
   private readonly listeners = new Set<() => void>();
-  private readonly assetListeners = new Set<() => void>();
+  private readonly assetListeners = new Set<(metaOnly: boolean) => void>();
   private switching: Promise<void> | null = null;
   private channel: BroadcastChannel | null = null;
   /** Deleted assets are still retained by roots: collect again when the roots may have shrunk. */
@@ -163,14 +163,14 @@ export class Session {
     this.emit();
   }
 
-  /** Listen for changes to the asset library or its usage. */
-  subscribeAssets(fn: () => void): () => void {
+  /** Listen for changes to the asset library or its usage (`metaOnly`: only its organization changed, nothing was added, removed or placed). */
+  subscribeAssets(fn: (metaOnly: boolean) => void): () => void {
     this.assetListeners.add(fn);
     return () => this.assetListeners.delete(fn);
   }
 
-  private emitAssets(): void {
-    for (const fn of this.assetListeners) fn();
+  private emitAssets(metaOnly = false): void {
+    for (const fn of this.assetListeners) fn(metaOnly);
   }
 
   subscribe(fn: () => void): () => void {
@@ -337,7 +337,7 @@ export class Session {
     if (this.libUndo.length > LIBRARY_UNDO) this.libUndo.shift();
     this.libRedo = [];
     this.post({ kind: "assets" });
-    this.emitAssets();
+    this.emitAssets(true);
     return true;
   }
 
@@ -360,7 +360,7 @@ export class Session {
       return null;
     }
     this.post({ kind: "assets" });
-    this.emitAssets();
+    this.emitAssets(true);
     return step.label;
   }
 

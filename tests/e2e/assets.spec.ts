@@ -2517,3 +2517,54 @@ test("library Copy puts the picture on the system clipboard and Copy file name i
   await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("photo.jpg");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a library of thousands keeps only the cards near the view in the page; End, scrolling, search and Ctrl+A still reach every item", async ({ app }) => {
+  const p = app.page;
+  const N = 3000;
+  // Written straight into storage (no originals, one shared stored thumbnail): importing thousands of files would take minutes.
+  await p.evaluate(async (n) => {
+    const c = document.createElement("canvas");
+    c.width = 32;
+    c.height = 24;
+    c.getContext("2d")!.fillRect(0, 0, 32, 24);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), "image/png"));
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open("canvast");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const tx = db.transaction(["assetCatalog", "thumbs"], "readwrite");
+    for (let i = 0; i < n; i++) {
+      const hash = i.toString(16).padStart(64, "0");
+      tx.objectStore("assetCatalog").put({ hash, name: `item-${i}.png`, type: "image/png", size: 100, pixelW: 100 + (i % 9) * 40, pixelH: 120, importedAt: 1e12 - i, state: "active", deletedAt: null, tags: [], favorite: false, folderIds: [] });
+      tx.objectStore("thumbs").put({ hash, blob, w: 32, h: 24 });
+    }
+    await new Promise((res, rej) => ((tx.oncomplete = res), (tx.onerror = () => rej(tx.error))));
+    db.close();
+  }, N);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await expect(p.getByTestId("assets-count")).toHaveText(`${N} items`);
+  const inPage = (): Promise<number> => p.getByTestId("asset-card").count();
+  expect(await inPage()).toBeLessThan(300);
+  // Newest first: item-0 leads, item-2999 is last. End reaches it with the keyboard and brings it into view.
+  await p.locator('[data-testid="asset-card"][data-hash$="0000"]').first().click();
+  await p.keyboard.press("End");
+  const last = p.locator(`[data-testid="asset-card"][aria-label^="item-${N - 1}.png"]`);
+  await expect(last).toBeFocused();
+  await expect(last).toBeInViewport();
+  expect(await inPage()).toBeLessThan(300);
+  // Scrolled back to the top by hand, the first card is drawn again with its picture.
+  await p.locator(".assets-scroll").evaluate((s) => (s.scrollTop = 0));
+  const first = p.locator('[data-testid="asset-card"][aria-label^="item-0.png"]');
+  await expect(first).toBeInViewport();
+  await expect.poll(() => first.locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  // A search lists every match, and Ctrl+A picks all of them, not only the cards in the page.
+  await p.locator(".assets-search").fill("item-29");
+  await expect(p.getByTestId("assets-count")).toHaveText(`111 of ${N} items`);
+  await p.getByTestId("asset-card").first().click();
+  await p.keyboard.press("Control+a");
+  await expect(p.getByTestId("asset-inspector").locator("h2")).toHaveText("111 selected");
+  expect(app.consoleErrors).toEqual([]);
+});

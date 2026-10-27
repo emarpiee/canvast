@@ -282,6 +282,26 @@ export class AssetCatalog {
     await committed;
   }
 
+  /**
+   * The library again after a change to its organization only (names, tags, folders, flags): usage and whether each original is
+   * present are taken from `prev`, so neither the objects nor the originals are gone through. Null when items came or went (use list()).
+   */
+  async relist(prev: CatalogListing): Promise<CatalogListing | null> {
+    const tx = this.db.transaction(["assetCatalog", "meta"], "readonly");
+    const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+    const was = new Map(prev.entries.map((e) => [e.hash, e]));
+    const active = entries.filter((e) => e.state === "active");
+    if (active.length !== prev.entries.length) return null;
+    const out: CatalogListing["entries"] = [];
+    for (const e of active) {
+      const p = was.get(e.hash);
+      if (!p) return null;
+      out.push({ ...e, instances: p.instances, canvases: p.canvases, present: p.present });
+    }
+    return { entries: out, missing: prev.missing, pendingDeletion: entries.filter((e) => e.state === "deleted").length, folders };
+  }
+
   /** The whole library with usage, in one read-only transaction (keys only for usage; no bytes are read). */
   async list(): Promise<CatalogListing> {
     const tx = this.db.transaction(["assetCatalog", "assets", "objects", "meta"], "readonly");
@@ -307,7 +327,11 @@ export class AssetCatalog {
     });
     const known = new Set(entries.map((e) => e.hash));
     // An original kept in the library folder is present only while its file is (ADR 0159).
-    for (const s of stubs) if (!(await externalFolder.has(s.hash, s.size, s.file))) blobKeys.delete(s.hash);
+    for (let i = 0; i < stubs.length; i += 50) {
+      const batch = stubs.slice(i, i + 50);
+      const have = await Promise.all(batch.map((s) => externalFolder.has(s.hash, s.size, s.file)));
+      batch.forEach((s, k) => have[k] || blobKeys.delete(s.hash));
+    }
     return {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: blobKeys.has(e.hash) })),
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
