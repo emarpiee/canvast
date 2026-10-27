@@ -103,9 +103,10 @@
   --icon-md: 16px;
   --icon-lg: 18px;
   --icon-xl: 20px;
-  /* The logo (src/ui/brand.ts): beside the name in About, and over the lock screen */
-  --logo-sm: 28px;
-  --logo-lg: 56px;
+  /* The logo (src/ui/brand.ts, one colour, in the theme's text colour): beside the name in About, and over the lock screen */
+  --logo-sm: 20px;
+  --logo-lg: 40px;
+  --lock-w: 360px; /* the lock screen's card */
   /* Neutral overlays that do not follow the theme (over pictures and video) */
   --white: oklch(1 0 0);
   --black: oklch(0 0 0);
@@ -614,13 +615,24 @@ dialog.confirm {
 }
 dialog.confirm::backdrop { background: var(--hud-scrim); }
 dialog.lock-screen::backdrop { background: var(--canvas-bg); }
-.lock-error { color: var(--hud-danger); }
-.lock-logo { display: block; width: var(--logo-lg); height: var(--logo-lg); margin: 0 0 var(--sp-8); }
+/* the lock screen: a centred card, the mark and the name over the question, a full-width field and button */
+dialog.lock-screen { box-sizing: border-box; width: min(var(--lock-w), calc(100vw - var(--sp-12))); max-width: none; padding: var(--sp-13) var(--sp-12) var(--sp-12); text-align: center; }
+.lock-brand { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); margin: 0 0 var(--sp-10); }
+.lock-logo { display: block; width: var(--logo-lg); height: var(--logo-lg); color: var(--hud-fg); }
+.lock-name { font: var(--weight-semibold) var(--text-lg)/1 var(--font-ui); color: var(--hud-muted); }
+dialog.confirm.lock-screen h2 { margin: 0 0 var(--sp-3); font-size: var(--text-4xl); font-weight: var(--weight-semibold); }
+dialog.lock-screen .lock-text { margin: 0 0 var(--sp-9); color: var(--hud-muted); }
+dialog.lock-screen .lock-error { margin: var(--sp-4) 0 0; font-size: var(--text-sm); text-align: left; color: var(--hud-danger); }
+dialog.lock-screen .confirm-actions { margin-top: var(--sp-8); }
+dialog.lock-screen .confirm-actions button { flex: 1; height: var(--ctl); }
 .lock-logo svg, .about-logo svg { display: block; width: 100%; height: 100%; }
 .about-title { display: flex; align-items: center; gap: var(--sp-5); }
-.about-logo { flex: none; width: var(--logo-sm); height: var(--logo-sm); }
+.about-logo { flex: none; width: var(--logo-sm); height: var(--logo-sm); color: var(--hud-fg); }
 dialog.confirm h2 { margin: 0 0 var(--sp-4); font-size: var(--text-xl); }
 dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
+/* the field of a prompt (and of the lock screen): the same as a field in Settings */
+dialog.confirm .prompt-input { box-sizing: border-box; display: block; width: 100%; height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
+dialog.confirm .prompt-input:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-6); }
 .confirm-actions button {
   font: var(--weight-medium) var(--text-md) var(--font-ui);

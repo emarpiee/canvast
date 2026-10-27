@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **Added:** the canvast logo, a canvas open on its right side and the dot you zoom into: it is the favicon (a version drawn on the 16 px grid), stands over the lock screen and beside the name in Settings > About and diagnostics. Its guidelines and files are made by `scripts/brand/`.
+- **Added:** the canvast logo, a canvas open on its right side and the dot you zoom into: the full-colour logo is the favicon (a version drawn on the 16 px grid); inside the app the one-colour mark, in the theme's text colour (light, dark and the theme colour), stands over the lock screen and beside the name in Settings > About and diagnostics. Its guidelines and files are made by `scripts/brand/`.
+- **Changed:** the lock screen is a centred card with the mark and the name over the question, and a full-width field and button; the field of every prompt (a password, a name) is drawn like a field in Settings instead of the browser's plain one.
 - **Changed:** the colour picker's third model, OKHCL (this project's own, not a published model), is replaced by **OKLCH**, the standard OKLab polar form that CSS `oklch()` uses: chroma is absolute (0 to 0.4), and what sRGB cannot show is reduced at the same lightness and hue. A saved model of OKHCL becomes OKLCH. The picker's package: a `theme` option and `data-cp-theme` (light, dark, auto), the packaged page has an Auto, Light and Dark switch, its licence travels in the built file, and its README is complete with the limitations.
 - **Fixed:** in a dark picker the layout list opened as a white native popup; the picker now sets `color-scheme` with its dark colours.
 

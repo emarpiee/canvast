@@ -10,11 +10,11 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
   dlg.dataset["testid"] = "lock-screen";
   dlg.setAttribute("aria-labelledby", "lock-title");
   dlg.innerHTML = `
-    <span class="lock-logo">${logoSvg()}</span>
+    <div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>
     <h2 id="lock-title">This workspace is locked</h2>
-    <p>Enter the password to open it.</p>
-    <p class="lock-error" data-lock-error role="alert" hidden>That is not the password.</p>
+    <p class="lock-text">Enter the password to open it.</p>
     <input type="password" class="prompt-input" data-testid="lock-input" aria-labelledby="lock-title" autocomplete="current-password" spellcheck="false">
+    <p class="lock-error" data-lock-error role="alert" hidden>That is not the password.</p>
     <div class="confirm-actions"><button type="button" class="is-primary" data-testid="lock-ok">Open</button></div>`;
   document.body.appendChild(dlg);
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
