@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.48.0 — Notes and fields on library items (2026-10-28)
+
+- **Added:** a **Note** box (plain text) in the details panel of a library item, and under it **Add a field**: rows of a name you choose and a value (a link, an author, a source…), with the library's field names suggested and **×** to remove one. They are stored when left (or on `Enter` in a field), undone with the library's undo, found by the library search, and carried in backups and the library index (an import keeps an item's own note and adds the fields it lacks).
+
 ## 0.47.2 — Import a backup of any size (2026-10-28)
 
 - **Fixed:** importing a backup read all its files into memory and kept them there until it was written, so a backup of several gigabytes needed that much free memory. The files are now checked one by one and written a batch at a time (up to 128 MiB), then the canvases, boards and library entries in one transaction, so the import still shows all at once or not at all; files written by an import that did not finish are erased at once, or when the app next opens (ADR 0176). A backup is still one `.canvast` file.

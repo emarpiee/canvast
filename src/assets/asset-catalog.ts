@@ -46,6 +46,16 @@ export interface CatalogEntry {
   hidden?: boolean;
   /** The folder the asset is filed in: at most one (older libraries may hold several; the first counts). Filing never copies the original. */
   folderIds?: string[];
+  /** A plain-text note (no Markdown). Absent when empty. */
+  note?: string;
+  /** Fields the user names (a link, a source, an author...), in their order. Absent when there are none. */
+  fields?: AssetField[];
+}
+
+/** A user-named field of an asset: any key, any value, both plain text. */
+export interface AssetField {
+  key: string;
+  value: string;
 }
 
 /** A library folder. Order is by name; nesting by `parentId`. */
@@ -56,14 +66,36 @@ export interface AssetFolder {
 }
 
 /** Organization fields of an entry, with defaults for entries that predate them. */
-export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[] } {
-  return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1) };
+export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[]; note: string; fields: AssetField[] } {
+  return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1), note: e.note ?? "", fields: e.fields ?? [] };
 }
 
 export class CatalogInputError extends Error {}
 
 const MAX_TAGS = 100;
 const MAX_FOLDER_NAME = 120;
+export const MAX_NOTE = 20_000;
+export const MAX_FIELDS = 50;
+export const MAX_FIELD_KEY = 64;
+export const MAX_FIELD_VALUE = 2_000;
+
+/** A note as stored: line ends made `\n`, the ends trimmed. */
+export function normalizeNote(note: string): string {
+  const n = note.replace(/\r\n?/g, "\n").trim();
+  if (n.length > MAX_NOTE) throw new CatalogInputError(`a note can be at most ${MAX_NOTE} characters`);
+  return n;
+}
+
+/** Fields as stored: keys on one line and trimmed, values trimmed; a field with neither a key nor a value is dropped. */
+export function normalizeFields(fields: readonly AssetField[]): AssetField[] {
+  const out = fields
+    .map((f) => ({ key: f.key.replace(/\s+/g, " ").trim(), value: f.value.replace(/\r\n?/g, "\n").trim() }))
+    .filter((f) => f.key || f.value);
+  if (out.length > MAX_FIELDS) throw new CatalogInputError(`an item can have at most ${MAX_FIELDS} fields`);
+  if (out.some((f) => f.key.length > MAX_FIELD_KEY)) throw new CatalogInputError(`a field name can be at most ${MAX_FIELD_KEY} characters`);
+  if (out.some((f) => f.value.length > MAX_FIELD_VALUE)) throw new CatalogInputError(`a field value can be at most ${MAX_FIELD_VALUE} characters`);
+  return out;
+}
 
 /** Format tags the way Obsidian does (ADR 0084) and drop repeats that differ only in case (the first spelling wins). */
 export function normalizeTags(tags: readonly string[]): string[] {
@@ -173,12 +205,16 @@ export interface ThumbRecord {
 
 /** What organizing can change, for undo: each active asset's name, tags, favourite flag and folder, and the folders. */
 export interface MetaSnapshot {
-  readonly entries: ReadonlyMap<string, { name: string; tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[] }>;
+  readonly entries: ReadonlyMap<string, { name: string } & ReturnType<typeof meta>>;
   readonly folders: AssetFolder[];
 }
 
-/** A change to an asset's tags, favourite flag or folder. */
+/** A change to an asset's tags, favourite flag, folder, note or fields. */
 export interface MetaChange {
+  /** The whole note (it replaces the stored one). */
+  note?: string;
+  /** All the fields, in order (they replace the stored ones). */
+  fields?: readonly AssetField[];
   favorite?: boolean;
   hidden?: boolean;
   addTags?: readonly string[];
@@ -365,6 +401,10 @@ export class AssetCatalog {
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
         if (change.hidden !== undefined) next.hidden = change.hidden;
+        if (change.note !== undefined) next.note = normalizeNote(change.note);
+        if (change.fields !== undefined) next.fields = normalizeFields(change.fields);
+        if (!next.note) delete next.note;
+        if (!next.fields?.length) delete next.fields;
         if (change.addTags || change.removeTags) {
           const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
           next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
@@ -538,7 +578,10 @@ export class AssetCatalog {
         if (!was || e.state !== "active") continue;
         const now = { name: e.name, ...meta(e) };
         if (JSON.stringify(now) === JSON.stringify(was)) continue;
-        store.put({ ...e, ...was });
+        const next: CatalogEntry = { ...e, ...was };
+        if (!next.note) delete next.note;
+        if (!next.fields?.length) delete next.fields;
+        store.put(next);
         n++;
       }
       tx.objectStore("meta").put(s.folders, FOLDERS_KEY);

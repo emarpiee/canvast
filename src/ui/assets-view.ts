@@ -22,8 +22,8 @@ import { parseFilter, type Filter } from "../assets/filters";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
-import type { AssetFolder, CatalogListing } from "../assets/asset-catalog";
-import { folderPath, folderSubtree, meta } from "../assets/asset-catalog";
+import type { AssetField, AssetFolder, CatalogListing } from "../assets/asset-catalog";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, meta } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
@@ -1259,8 +1259,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    * `#tag` is an exact tag and `.png` an exact file type, in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter.
    */
   const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter, how: Way = way): boolean => {
-    const tags = meta(e).tags.map((t) => t.toLowerCase());
+    const m = meta(e);
+    const tags = m.tags.map((t) => t.toLowerCase());
     const name = e.name.toLowerCase();
+    let notes: string | null = null; // the note and the fields, lowercased only when a word gets that far
     const words_ok = evalQuery(query, ({ text: w }) => {
       if (w.startsWith("#")) return tags.some((t) => tagIsOrUnder(t, w.slice(1))); // a tag and the tags nested under it
       // `.png` is the file type: a word that starts with a dot matches files with that extension (a lone dot: files that have one).
@@ -1277,7 +1279,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const inTags = tags.some((t) => t.includes(w));
       if (how === "tag") return inTags;
       if (how === "name") return name.includes(w);
-      return name.includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || inTags;
+      if (name.includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || inTags) return true;
+      notes ??= [m.note, ...m.fields.flatMap((f) => [f.key, f.value])].join("\n").toLowerCase();
+      return notes.includes(w);
     });
     return words_ok && (usage === "all" || (usage === "used" ? e.instances > 0 : e.instances === 0));
   };
@@ -1853,6 +1857,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const typing = inspector.dataset["hash"] === selected ? inspector.querySelector<HTMLInputElement>(".tag-input") : null;
     const draft = typing?.value ?? "";
     const hadFocus = !!typing && document.activeElement === typing;
+    // The same for the note or a field being typed in: its text, caret and scroll stay.
+    const act = document.activeElement;
+    const editing = inspector.dataset["hash"] === selected && act instanceof HTMLElement && inspector.contains(act) && act.dataset["prop"] ? (act as HTMLInputElement | HTMLTextAreaElement) : null;
+    const kept = editing && { prop: editing.dataset["prop"]!, value: editing.value, start: editing.selectionStart, end: editing.selectionEnd, top: editing.scrollTop };
+    if (inspector.dataset["hash"] !== selected) blankField = null;
     inspector.dataset["hash"] = selected!;
     const instances = e?.instances ?? m!.instances;
     const where = session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas";
@@ -1889,6 +1898,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${e && !e.present ? `<p class="asset-warn">The original file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
+      ${e ? notesHtml(e) : ""}
       ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
       <div class="asset-actions">
         ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
@@ -1912,6 +1922,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
     if (tagInput && draft) tagInput.value = draft;
     if (tagInput && hadFocus) tagInput.focus();
+    const back = kept && inspector.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-prop="${kept.prop}"]`);
+    if (kept && back) {
+      back.value = kept.value;
+      back.focus();
+      back.setSelectionRange(kept.start, kept.end);
+      back.scrollTop = kept.top;
+    }
     // The viewer's favourite button follows the stored state.
     if (e && slideHash === e.hash) viewer.querySelector<HTMLElement>('[data-act="favorite"]')!.setAttribute("aria-pressed", String(fav));
   };
@@ -1986,6 +2003,61 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             </section>`
           : "";
       })()}`;
+  };
+
+  /** The asset whose details show a field added with + and not filled in yet (a field with no name and no value is not stored). */
+  let blankField: string | null = null;
+  /** The note and fields being stored: shown until the library has them, so a redraw meanwhile never shows (and then stores) the old ones. */
+  let savingNotes: { hash: string; note: string; fields: AssetField[] } | null = null;
+
+  /** The note (plain text) and the fields the user names (a link, a source, an author...) of one asset. */
+  const notesHtml = (e: CatalogListing["entries"][number]): string => {
+    const stored = meta(e);
+    if (savingNotes?.hash === e.hash && JSON.stringify([savingNotes.note, savingNotes.fields]) === JSON.stringify([stored.note, stored.fields])) savingNotes = null;
+    const m = savingNotes?.hash === e.hash ? savingNotes : stored;
+    const dis = session.readOnly ? " disabled" : "";
+    const rows = blankField === e.hash ? [...m.fields, { key: "", value: "" }] : m.fields;
+    const keys = [...new Set(listing!.entries.flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    return `
+      <section class="asset-sec asset-notes" data-testid="asset-notes">
+        <h3><label for="asset-note-box">Note</label></h3>
+        <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
+        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field">
+            <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of field ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
+            <input class="field-value" data-prop="value-${i}" value="${esc(f.value)}" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of field ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>
+            <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the field ${esc(f.key || String(i + 1))}" title="Remove this field"${dis}>${ICONS.x}</button>
+          </li>`).join("")}</ul>` : ""}
+        <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
+        <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a field with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a field</span></button>
+      </section>`;
+  };
+
+  /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
+  const notesNow = (): { note: string; fields: AssetField[] } => ({
+    note: inspector.querySelector<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
+    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map((li) => ({ key: li.querySelector<HTMLInputElement>(".field-key")!.value, value: li.querySelector<HTMLInputElement>(".field-value")!.value })),
+  });
+
+  /** Store the note and the fields of the asset in the details (one write, one undo step), if they changed. */
+  const saveNotes = (hash: string, now = notesNow(), label = "Changed the note or fields"): void => {
+    const e = entryOf(hash);
+    if (!e) return;
+    // a field still empty stays on screen (it is not stored)
+    const hadBlank = blankField === hash;
+    blankField = now.fields.some((f) => !f.key.trim() && !f.value.trim()) ? hash : null;
+    // as the library will store them (see normalizeNote, normalizeFields)
+    const next = { hash, note: now.note.trim(), fields: now.fields.map((f) => ({ key: f.key.replace(/\s+/g, " ").trim(), value: f.value.trim() })).filter((f) => f.key || f.value) };
+    const m = savingNotes?.hash === hash ? savingNotes : meta(e);
+    if (JSON.stringify([next.note, next.fields]) === JSON.stringify([m.note, m.fields])) {
+      if (hadBlank !== (blankField === hash)) renderInspector(); // only the empty field went
+      return;
+    }
+    savingNotes = next;
+    void session.organize((c) => c.updateMeta(hash, now), label).then((ok) => {
+      if (ok || savingNotes !== next) return;
+      savingNotes = null; // refused: show what is stored
+      renderInspector();
+    });
   };
 
   const crumbOf = (canvasId: string): string => {
@@ -2228,6 +2300,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void session.organize((c) => c.updateMeta(hash, { favorite: on }));
         break;
       }
+      case "field-add": {
+        // a new empty row under the others, its name field ready to type in (one at a time: + again goes back to it)
+        blankField = hash;
+        renderInspector();
+        const keys = inspector.querySelectorAll<HTMLInputElement>(".field-key");
+        keys[keys.length - 1]?.focus();
+        break;
+      }
+      case "field-remove": {
+        const now = notesNow();
+        now.fields.splice(Number(b.dataset["index"]), 1);
+        saveNotes(hash, now, "Removed a field");
+        break;
+      }
       case "adopt-tag": {
         const tag = b.dataset["tag"]!;
         void session.organize((c) => c.updateMeta(hash, { addTags: [tag] }));
@@ -2340,6 +2426,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
+    // the note or a field: stored when it is left (or Enter in a field)
+    if (box.dataset["prop"] !== undefined) {
+      const hash = inspector.dataset["hash"];
+      if (hash) saveNotes(hash);
+      return;
+    }
     const bulk = box.dataset["bulkFolder"];
     const into = (id: string) => (id ? { addFolders: [id] } : { clearFolder: true });
     if (bulk !== undefined) {

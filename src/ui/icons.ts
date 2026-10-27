@@ -151,6 +151,7 @@ import presentationIcon from "lucide-static/icons/presentation.svg";
 import clipboardCopyIcon from "lucide-static/icons/clipboard-copy.svg";
 import layoutListIcon from "lucide-static/icons/layout-list.svg";
 import listPlusIcon from "lucide-static/icons/list-plus.svg";
+import fieldAddIcon from "lucide-static/icons/between-horizontal-end.svg";
 import grid2x2Icon from "lucide-static/icons/grid-2x2.svg";
 import cameraIcon from "lucide-static/icons/camera.svg";
 import tagIcon from "lucide-static/icons/tag.svg";
@@ -381,6 +382,7 @@ export const ICONS = {
   clipboardCopy: clean(clipboardCopyIcon),
   layoutList: clean(layoutListIcon),
   listPlus: clean(listPlusIcon),
+  fieldAdd: clean(fieldAddIcon),
   grid2x2: clean(grid2x2Icon),
   camera: clean(cameraIcon),
   tabDrawing: clean(tabDrawingSvg),

@@ -229,7 +229,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `vector-square` | A path or shape in the Layers list |
 | `waves` | Stabilizer |
 | `waypoints` | Edit nodes tool |
-| `x` | Hide the Layers panel; Hide the Tags panel; Hide the Bookmarks panel; Close details; Close slide view |
+| `x` | Hide the Layers panel; Hide the Tags panel; Hide the Bookmarks panel; Close details; Close slide view; Remove a field of a library item |
+| `between-horizontal-end` | Add a field (a name and a value) to a library item |
 | `square-pen` | Settings tab: Drawing and selection |
 | `compass` | Settings tab: Navigation |
 | `keyboard` | Settings tab: Shortcuts |

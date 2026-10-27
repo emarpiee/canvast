@@ -172,6 +172,28 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await p.getByRole("button", { name: "Remove tag ref" }).click();
   await expect(p.getByTestId("asset-tags").locator(".tag-chip")).toHaveCount(1);
 
+  // A plain-text note and fields the user names: stored when left (Enter in a field), found by the search, removed with ×.
+  const rows = p.getByTestId("asset-fields").locator(".asset-field");
+  await p.getByTestId("asset-note").fill("Two hands\nfrom the life class");
+  await p.getByTestId("asset-field-add").click(); // leaving the note stores it; the new field's name is ready to type in
+  await expect(p.getByRole("combobox", { name: "Name of field 1" })).toBeFocused();
+  await p.keyboard.type("link");
+  await p.keyboard.press("Tab");
+  await p.keyboard.type("https://example.com/hands");
+  await p.keyboard.press("Enter");
+  await p.getByTestId("asset-field-add").click();
+  await p.keyboard.type("author");
+  await p.keyboard.press("Tab");
+  await p.keyboard.type("Ana");
+  await p.keyboard.press("Enter");
+  await expect(p.getByRole("textbox", { name: "Value of author" })).toHaveValue("Ana");
+  await expect(rows).toHaveCount(2);
+  await searchFor("life class", 1);
+  await searchFor("example.com", 1);
+  await searchFor("", 3);
+  await p.getByRole("button", { name: "Remove the field author" }).click();
+  await expect(rows).toHaveCount(1);
+
   // Everything survives a reload.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -180,6 +202,8 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-tags")).toHaveText(/#Hands/);
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
+  await expect(p.getByTestId("asset-note")).toHaveValue("Two hands\nfrom the life class");
+  await expect(p.getByRole("textbox", { name: "Value of link" })).toHaveValue("https://example.com/hands");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -318,7 +342,7 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("tags, favourites and folders travel in archives and merge on import without duplicate folders", async ({ app, browser }) => {
+test("tags, favourites, folders, notes and fields travel in archives and merge on import without duplicates", async ({ app, browser }) => {
   const p = app.page;
   await libraryWithTwo(p);
   await newFolder(p, "Refs");
@@ -327,15 +351,22 @@ test("tags, favourites and folders travel in archives and merge on import withou
   await p.getByTestId("asset-favorite").click();
   await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
   await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
+  await p.getByTestId("asset-note").fill("From the life class");
+  await p.getByTestId("asset-field-add").click();
+  await p.keyboard.type("link");
+  await p.keyboard.press("Tab");
+  await p.keyboard.type("https://example.com");
+  await p.keyboard.press("Enter");
+  await expect(p.getByRole("textbox", { name: "Value of link" })).toBeVisible();
 
   await p.getByTestId("view-canvas").click();
   await p.getByTestId("save-status").click();
   const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("set-export-full").click()]);
   const bytes = await readFile((await dl.path())!);
   const man = JSON.parse(await (await readZip(new Blob([new Uint8Array(bytes)]))).get("manifest.json")!.data.text()) as {
-    assets: Array<{ hash: string; tags: string[]; favorite: boolean; folders: string[][] }>;
+    assets: Array<{ hash: string; tags: string[]; favorite: boolean; folders: string[][]; note?: string; fields?: unknown[] }>;
   };
-  expect(man.assets.find((a) => a.hash === HASH)).toMatchObject({ tags: ["Hands"], favorite: true, folders: [["Refs", "Hands"]] });
+  expect(man.assets.find((a) => a.hash === HASH)).toMatchObject({ tags: ["Hands"], favorite: true, folders: [["Refs", "Hands"]], note: "From the life class", fields: [{ key: "link", value: "https://example.com" }] });
   expect(man.assets.find((a) => a.hash === GREEN_HASH)).toMatchObject({ tags: [], favorite: false, folders: [] });
 
   // Into a fresh profile, twice: the second import merges and creates no second "Refs" or "Hands".
@@ -357,6 +388,8 @@ test("tags, favourites and folders travel in archives and merge on import withou
   await expect(q.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(q.getByTestId("asset-tags").locator(".tag-chip")).toHaveCount(1);
   await expect(q.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
+  await expect(q.getByTestId("asset-note")).toHaveValue("From the life class");
+  await expect(q.getByTestId("asset-fields").locator(".asset-field")).toHaveCount(1);
   await context.close();
 });
 

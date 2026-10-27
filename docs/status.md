@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Notes and fields on library items (v0.48.0, 2026-10-28)
+
+**Implemented:** catalog entries carry an optional plain-text `note` and ordered user-named `fields` (`{ key, value }`), set through `MetaChange` (replacing the stored ones, normalized and bounded in `AssetCatalog`), part of the library undo snapshot; the details panel of one item shows them under Tags and Folder (stored on change; the values being stored are shown until the listing has them, so a redraw never writes old ones back); the library search (All) matches them; archives and the library index carry them, and an import keeps an existing note and adds missing fields.
+**Tested:** unit 572 passed (the old-entry defaults test now expects an empty note and fields); extended two `organize.spec.ts` tests (edit, search, remove, reload; archive round trip and double import), in Chromium and Firefox, twice each on a fresh snapshot, 8 passed (1.2 min); before the fix of a redraw race the edit test failed once in Chromium (a field save wrote the old note back). `archive.spec.ts`, the archive and library-undo tests of `organize.spec.ts` in Chromium, 11 passed; the icon audit in both browsers passed.
+**Known failures:** none known.
+**Unverified:** the quick and full suites; touch screens; several picked items (the note and fields are shown for one item only).
+**Committed:** this slice (see the commit).
+**Next bounded task:** ask the owner whether a value that is a web address should be a link that opens in a new tab.
+
 ## Import a backup of any size (v0.47.2, 2026-10-28)
 
 **Implemented:** an import keeps no bytes in its plan (each original is hashed and let go; the plan holds a slice of the file), writes the originals the store lacks a batch at a time (128 MiB, listed under `meta.importStaged` in the same transaction), then everything else in one transaction that clears the list; `sweepImportStaging` erases listed originals without a library entry when an import fails, before each import and at start (before the catalog is reconciled) ([ADR 0176](adr/0176-batched-import.md)). Export and the `.canvast` format are unchanged: one file.

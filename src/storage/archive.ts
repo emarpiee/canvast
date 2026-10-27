@@ -9,8 +9,8 @@ import { assetOf, deserializeObject, newObjectId, serializeObject, storedAssetOf
 import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
-import type { AssetFolder } from "../assets/asset-catalog";
-import { entryFromRecord, folderPath, meta, normalizeTags } from "../assets/asset-catalog";
+import type { AssetField, AssetFolder } from "../assets/asset-catalog";
+import { MAX_FIELDS, entryFromRecord, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
@@ -120,6 +120,8 @@ interface ManifestAsset {
   favorite?: boolean;
   hidden?: boolean;
   folders?: string[][];
+  note?: string;
+  fields?: AssetField[];
 }
 
 /** An asset's organization as carried in an archive. */
@@ -128,6 +130,8 @@ export interface AssetOrganization {
   favorite: boolean;
   hidden: boolean;
   folders: string[][];
+  note: string;
+  fields: AssetField[];
 }
 
 export interface Manifest {
@@ -272,7 +276,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const file = `assets/${hash}`;
     const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
-    const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [] };
+    const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [], note: "", fields: [] };
     folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
     const allFolders = folders;
     assets.push({
@@ -289,6 +293,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       favorite: m.favorite,
       ...(m.hidden ? { hidden: true } : {}),
       folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
+      ...(m.note ? { note: m.note } : {}),
+      ...(m.fields.length ? { fields: m.fields } : {}),
     });
     if (!known) {
       const input: ZipInput = { name: file, data: r.blob };
@@ -666,7 +672,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
 
 /** Validate an asset's optional organization fields; anything invalid is reported and dropped. */
 function readOrganization(a: Record<string, unknown>, label: string, problems: string[]): AssetOrganization | null {
-  if (a["tags"] === undefined && a["favorite"] === undefined && a["hidden"] === undefined && a["folders"] === undefined) return null;
+  if (["tags", "favorite", "hidden", "folders", "note", "fields"].every((k) => a[k] === undefined)) return null;
   let tags: string[] = [];
   try {
     tags = normalizeTags(Array.isArray(a["tags"]) ? a["tags"].filter((t): t is string => typeof t === "string") : []);
@@ -682,7 +688,19 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
     }
     folders.push(path);
   }
-  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders };
+  let note = "";
+  try {
+    note = typeof a["note"] === "string" ? normalizeNote(a["note"]) : "";
+  } catch (e) {
+    problems.push(`The note of “${label}” was invalid (${(e as Error).message}) and was not imported.`);
+  }
+  let fields: AssetField[] = [];
+  try {
+    fields = normalizeFields(Array.isArray(a["fields"]) ? a["fields"].filter((f): f is AssetField => isObj(f) && typeof f["key"] === "string" && typeof f["value"] === "string").map((f) => ({ key: f.key, value: f.value })) : []);
+  } catch (e) {
+    problems.push(`The fields of “${label}” were invalid (${(e as Error).message}) and were not imported.`);
+  }
+  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders, note, fields };
 }
 
 /** Originals are written at most this many bytes per transaction, before the canvases (ADR 0176). */
@@ -822,12 +840,16 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
       let entry: CatalogEntry = !e ? entryFromRecord(a) : e.state !== "active" ? { ...e, state: "active", deletedAt: null } : e;
       const org = plan.organization.get(a.hash);
       if (org) {
-        // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path.
+        // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path, a note is kept (the archive's
+        // only fills an empty one), and the archive's fields this asset does not have yet (same name and value) are added after its own.
         folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
         const m = meta(entry);
         // One folder per asset: an asset already filed keeps its folder; otherwise the archive's (first) folder is used.
         const ids = m.folderIds.length || !org.folders.length ? m.folderIds : [resolveFolder(folders, org.folders[0]!)];
+        const fields = [...m.fields, ...org.fields.filter((f) => !m.fields.some((x) => x.key === f.key && x.value === f.value))].slice(0, MAX_FIELDS);
         entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, hidden: m.hidden || org.hidden, folderIds: ids };
+        if (m.note || org.note) entry.note = m.note || org.note;
+        if (fields.length) entry.fields = fields;
       }
       if (entry !== e) tx.objectStore("assetCatalog").put(entry);
     }
