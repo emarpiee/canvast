@@ -13,4 +13,4 @@
 
 ## Not built
 
-A GitHub Actions workflow that builds on a tag (the build is reproducible, `npm run check:repro`, so it could be added); release candidates and pre-releases; signing.
+A GitHub Actions workflow that publishes on a tag (a CI workflow, `.github/workflows/ci.yml`, checks every push and pull request, but does not release) (the build is reproducible, `npm run check:repro`, so it could be added); release candidates and pre-releases; signing.

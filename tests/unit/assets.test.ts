@@ -135,6 +135,6 @@ describe("library organization (ADR 0011)", () => {
 
   it("reads entries written before organization existed with empty defaults", () => {
     const old = { hash: HASH_A, name: "x", type: "image/png", size: 1, pixelW: 1, pixelH: 1, importedAt: 0, state: "active" as const, deletedAt: null };
-    expect(meta(old)).toEqual({ tags: [], favorite: false, folderIds: [] });
+    expect(meta(old)).toEqual({ tags: [], favorite: false, folderIds: [], hidden: false });
   });
 });

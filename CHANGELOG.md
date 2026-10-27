@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Added:** a GitHub Actions workflow that checks every push to `main` and every pull request: typecheck, unit tests, build, offline, naming, token, picker and pattern checks, the reproducible-build check and a short Chromium end-to-end run; the built file is kept as an artifact of the run.
+- **Fixed:** a unit test for old library entries did not know the `hidden` flag added in 0.46.0.
+
 ## 0.47.0 — The logo, and OKLCH in the colour picker (2026-10-27)
 
 - **Added:** the canvast logo, a canvas open on its right side and the dot you zoom into: the full-colour logo is the favicon (a version drawn on the 16 px grid); inside the app the one-colour mark, in the theme's text colour (light, dark and the theme colour), stands over the lock screen and beside the name in Settings > About and diagnostics. Its guidelines and files are made by `scripts/brand/`.

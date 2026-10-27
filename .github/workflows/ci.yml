@@ -1,0 +1,66 @@
+name: CI
+
+# The fast checks on every push to main and every pull request, plus a small end-to-end smoke run in Chromium.
+# The whole quick suite (about an hour) and the full suite are run by hand (docs/testing/README.md), not here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run build
+      - run: npm run check:offline
+      - run: npm run check:names
+      - run: npm run check:tokens
+      - run: npm run check:picker
+      - run: npm run check:patterns
+      - run: npm run check:repro
+      - name: Keep the built file
+        uses: actions/upload-artifact@v4
+        with:
+          name: canvast.html
+          path: dist/canvast.html
+          retention-days: 14
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # A few fast specs from a snapshot build (scripts/test-snap.mjs), as the project's own rules require: no test reads dist/.
+      - run: npm run test:snap -- --project=chromium tests/e2e/settings.spec.ts tests/e2e/zoom-controls.spec.ts tests/e2e/a11y.spec.ts
+      - name: Keep the report on a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            test-results/
+            test-builds/*/run.json
+          retention-days: 7
