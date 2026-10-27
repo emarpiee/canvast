@@ -241,8 +241,6 @@ test("views: the Assets tab, the Settings button at the end of the dock and the 
   await p.getByTestId("view-canvas").click(); // the infinity button is the way back to the canvas
   expect(await view()).toBe("canvas");
   await p.getByTestId("view-settings").click();
-  await p.locator("#settings-view").getByRole("tab", { name: "Collaboration" }).click();
-  await expect(p.locator("#set-panel-collaboration")).toContainText("Collaboration is off");
   await p.getByTestId("view-assets").click();
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

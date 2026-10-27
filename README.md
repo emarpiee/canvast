@@ -342,7 +342,6 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
-| Collaboration | Collaboration (none) |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see below) |
 

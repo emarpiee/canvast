@@ -239,7 +239,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `gauge` | Settings tab: Performance |
 | `hard-drive` | Settings tab: Storage |
 | `shield` | Settings tab: Privacy |
-| `users` | Settings tab: Collaboration |
 | `badge-info` | Settings tab: About and diagnostics |
 | `code` | Settings tab: Develop |
 | `undo-dot` | Reset a setting to its default (every row of Settings) |

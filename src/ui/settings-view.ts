@@ -77,13 +77,13 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", privacy: "tabPrivacy", collaboration: "tabCollaboration", about: "tabAbout", develop: "tabDevelop" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Media", ["media", "screenshot"]],
   ["Interface", ["appearance", "panels", "performance"]],
-  ["App", ["storage", "privacy", "collaboration", "about", "develop"]],
+  ["App", ["storage", "privacy", "about", "develop"]],
 ];
 
 const SCOPE_LABEL = { device: "This device", workspace: "This workspace", board: "This board" } as const;
@@ -233,7 +233,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "library.hiddenRemember", label: "Keep the Hidden items open until the tab closes", help: "Off (the default): the Hidden list closes when you choose another list or leave the library, and asks for the password again. On: after the password is given once, the list stays open, and opens without the password again, until this tab is closed or reloaded. Exporting hidden items always asks.", control: { kind: "toggle" } },
     ],
   },
-  { id: "collaboration", label: "Collaboration" },
   { id: "about", label: "About and diagnostics" },
   {
     id: "develop",
@@ -342,9 +341,6 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>
                <p class="set-help">The report is a text file with the version, this browser, the numbers above and the errors. It holds no canvas content. canvast sends nothing: you send the file if you choose to.</p></div>
              <div class="set-info set-card"><h3>Licences</h3><details><summary>Software this app is built from</summary><pre class="set-licences" data-testid="about-licences">${esc(NOTICES)}</pre></details></div>`
-        : t.id === "collaboration"
-          ? `<div class="set-info set-card"><p><strong>Collaboration is off.</strong> This version has no shared or online sessions: nothing can connect to your canvases.</p>
-           <p>When it is added it will be opt-in for each workspace, with named roles, and everything will keep working offline. Until then, share work with an export from the workspace menu.</p></div>`
         : `<div class="set-info set-card"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
            <p>Nothing you draw, import or write leaves this browser unless you export it yourself.</p></div>`;
     return `<section role="tabpanel" id="set-panel-${t.id}" aria-labelledby="set-tab-${t.id}" data-panel="${t.id}" hidden><h2>${esc(t.label)}</h2>${body}</section>`;

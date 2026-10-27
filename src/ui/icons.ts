@@ -8,7 +8,6 @@ import tabPanelsSvg from "lucide-static/icons/panels-top-left.svg";
 import tabPerformanceSvg from "lucide-static/icons/gauge.svg";
 import tabStorageSvg from "lucide-static/icons/hard-drive.svg";
 import tabPrivacySvg from "lucide-static/icons/shield.svg";
-import tabCollaborationSvg from "lucide-static/icons/users.svg";
 import tabAboutSvg from "lucide-static/icons/badge-info.svg";
 import tabDevelopSvg from "lucide-static/icons/code.svg";
 import settingResetSvg from "lucide-static/icons/undo-dot.svg";
@@ -393,7 +392,6 @@ export const ICONS = {
   tabPerformance: clean(tabPerformanceSvg),
   tabStorage: clean(tabStorageSvg),
   tabPrivacy: clean(tabPrivacySvg),
-  tabCollaboration: clean(tabCollaborationSvg),
   tabAbout: clean(tabAboutSvg),
   tabDevelop: clean(tabDevelopSvg),
   settingReset: clean(settingResetSvg),

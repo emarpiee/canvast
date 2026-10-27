@@ -134,7 +134,7 @@ Counted from the rows below (a row is one item of the plan, so counts compare ar
 | Storage and Backups tab | Done (ADR 0133) | Usage, quota, persistence, and backup, export and import. |
 | Performance tab | Done (ADR 0135) | Adaptive quality, the quality held when it is off, memory for pictures, animation and speed. Canvas 2D is the only backend (ADR 0002). |
 | About and Diagnostics tab | Done (ADR 0135) | Version, what the browser can do, the errors of the session, licences and a report to save. |
-| Privacy tab, Collaboration tab | Partial | Explanations only. Nothing to set while there is no network and no collaboration. |
+| Privacy tab | Done | The opening word, keeping the Hidden items open, and the two passwords (v0.46.0). The Collaboration tab was taken out of Settings for now: there is no collaboration. |
 | Command palette; Settings reachable from it | Done (ADR 0117) | Ctrl+K. |
 | Minimap or overview, tours or presentation paths, camera transitions | Partial (ADR 0116) | Tour of the bookmarks and gliding done; a minimap is decided against (no bounds, objects at every depth). |
 | Navigation history (previous view) | Done (ADR 0116) | Alt+Shift+Left and Alt+Shift+Right. |
