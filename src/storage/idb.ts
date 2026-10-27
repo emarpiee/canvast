@@ -1,7 +1,7 @@
 /**
  * IndexedDB schema and small promise helpers.
  *
- * Database "canvast", version 11 (see docs/adr/0006-workspace-storage.md and
+ * Database "canvast", version 12 (see docs/adr/0006-workspace-storage.md and
  * docs/adr/0007-asset-catalog-and-gc.md):
  *
  *   meta         key string        → MetaRecord (schema info, current workspace, migrations)
@@ -20,7 +20,7 @@
  *   frames       keyPath [canvasId, id] → FrameRecord + canvasId (nested frames, ADR 0014; v4).
  *                                          Objects name their frame; absent = the world frame, which is
  *                                          the absolute form of earlier versions, so old data needs no conversion.
- *   paintings, paintLayers, paintTiles (v11): the removed Painting view's paintings; no longer read or written, kept so nothing stored is lost
+ *   (v11 added paintings, paintLayers, paintTiles for the Painting view; v12 deletes them, ADR 0170)
  *
  * Legacy (version 1, read-only after migration, never deleted here):
  *   snapshots    key "main" | "camera" → Phase 0B whole-document snapshot
@@ -31,7 +31,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 11;
+export const DB_VERSION = 12;
 
 export interface OpenOptions {
   /** Called while an upgrade waits for other tabs to close their connections. */
@@ -84,10 +84,8 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       if (!has("frames")) db.createObjectStore("frames", { keyPath: ["canvasId", "id"] });
       if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: "canvasId" });
       if (!has("thumbs")) db.createObjectStore("thumbs", { keyPath: "hash" });
-      // v11: the Painting view's stores (ADR 0165; the view is removed, the stores stay so stored paintings are not lost).
-      if (!has("paintings")) db.createObjectStore("paintings", { keyPath: "id" }).createIndex("workspaceId", "workspaceId");
-      if (!has("paintLayers")) db.createObjectStore("paintLayers", { keyPath: ["paintingId", "id"] });
-      if (!has("paintTiles")) db.createObjectStore("paintTiles", { keyPath: "hash" });
+      // v12: the removed Painting view's stores (v11, ADR 0165) are deleted with what they hold (ADR 0170).
+      for (const name of ["paintings", "paintLayers", "paintTiles"]) if (has(name)) db.deleteObjectStore(name);
     };
     req.onsuccess = () => {
       const db = req.result;

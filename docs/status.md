@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Old painting data removed (v0.48.2, 2026-10-28)
+
+**Implemented:** IndexedDB schema 12 deletes the stores `paintings`, `paintLayers` and `paintTiles` left by the removed Painting view (`storage/idb.ts`; [ADR 0170](adr/0170-painting-view-removed.md) amended). The archive import still recognises paintings in old backups and leaves them out with a note.
+**Tested:** the v1 migration test in `storage.spec.ts` now also seeds a leftover `paintTiles` store and checks the upgrade removes it: Chromium and Firefox, 2 passed (snapshot 669bfb55). Unit 572/572, typecheck, check:names, check:offline.
+**Known failures:** none known.
+**Unverified:** the quick and full suites.
+**Committed:** this slice (see the commit).
+**Next bounded task:** the workspace folder and desktop app proposal (ADR 0177, on branch `workspace-folder`), waiting for the owner's decision; chaining (ADR 0033) is still open.
+
 ## Zooming out is never cut off (v0.48.1, 2026-10-28)
 
 **Implemented:** a zoom-out preview whose scaled tile set does not reach every edge draws the objects outside it directly, clipped to that border (`DrawBorder` in `TileCache.preview`, given by `main.ts`); cover checks use the whole tile range a set was built for (`Generation.range`); the idle prebuild makes the level one out first and queries each set once ([ADR 0012](adr/0012-zoom-preview.md) and [0033](adr/0033-idle-prebuild-of-adjacent-zoom-tiles.md) amendments).

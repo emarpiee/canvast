@@ -167,6 +167,7 @@ test("v1 snapshot data is migrated, verified, and the legacy store is left untou
         r.onupgradeneeded = () => {
           r.result.createObjectStore("snapshots");
           r.result.createObjectStore("assets");
+          r.result.createObjectStore("paintTiles"); // a leftover of the removed Painting view: the upgrade deletes it
         };
         r.onsuccess = () => {
           const tx = r.result.transaction("snapshots", "readwrite");
@@ -208,6 +209,17 @@ test("v1 snapshot data is migrated, verified, and the legacy store is left untou
       }),
   );
   expect(after).toEqual(legacy);
+  const stores = await page.evaluate(
+    () =>
+      new Promise<string[]>((resolveNames) => {
+        const r = indexedDB.open("canvast");
+        r.onsuccess = () => {
+          resolveNames([...r.result.objectStoreNames]);
+          r.result.close();
+        };
+      }),
+  );
+  expect(stores).not.toContain("paintTiles");
 
   // A second start does not migrate again.
   await page.reload();

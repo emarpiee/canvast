@@ -1,6 +1,6 @@
 # ADR 0170: the Painting view is removed
 
-- Status: accepted (v0.37.0, 2026-10-25)
+- Status: accepted (v0.37.0, 2026-10-25); amended v0.48.2 (2026-10-28): the stored paintings are deleted
 - Supersedes: ADR 0164 (brush engine as WebAssembly), 0165 (Painting view), 0166 (layer kinds), 0167 (vector layers), 0168 (one chrome), 0169 (brush presets)
 
 ## Context
@@ -13,10 +13,10 @@ The owner discontinued the Painting view. Its code (`src/paint/`, the Paint view
 
 **Kept:** a plain wheel scrolling a bar sideways (`ui/bar.ts`), a sheet's ratio typed as a px size, and the test fixes made on the way.
 
-**Stored data stays.** The IndexedDB stores `paintings`, `paintLayers` and `paintTiles` (schema 11) are not deleted and nothing reads or writes them, so paintings already stored are not lost. The schema version stays 11. The asset GC no longer counts pictures used by those layers.
+**Stored data is deleted (amended in v0.48.2).** Schema 12 deletes the stores `paintings`, `paintLayers` and `paintTiles` and what they hold; the owner ended painting for good. Until v0.48.1: The IndexedDB stores `paintings`, `paintLayers` and `paintTiles` (schema 11) are not deleted and nothing reads or writes them, so paintings already stored are not lost. The schema version stays 11. The asset GC no longer counts pictures used by those layers.
 
 **Backups.** The archive format stays version 6. A workspace backup no longer writes paintings or brush presets. An import of an older backup that has them imports everything else and says in its summary that they are left out.
 
 ## Consequences
 
-The built file is smaller and the build needs no Rust toolchain. Paintings made in v0.28 to v0.36 cannot be opened in this version; they remain in the browser's storage and in the backups made then.
+The built file is smaller and the build needs no Rust toolchain. Paintings made in v0.28 to v0.36 cannot be opened in this version; they remained in the browser's storage until v0.48.2 deleted them, and remain in the backups made then.

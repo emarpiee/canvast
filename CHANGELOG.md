@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.48.2 — Old painting data removed (2026-10-28)
+
+- **Removed:** the browser storage kept three stores of the removed Painting view (paintings, their layers and tiles) that nothing read. The storage upgrade (schema 12) deletes them and what they hold. Backups made by older versions still import, and say the paintings in them are left out (ADR 0170).
+
 ## 0.48.1 — Zooming out is never cut off (2026-10-28)
 
 - **Fixed:** zooming out of a busy canvas could show only the middle of the view, with the edges empty for about half a second, until the exact picture was drawn: the scaled image of the last frame did not reach them. What it does not reach is now drawn exactly in the same frame (ADR 0012).
