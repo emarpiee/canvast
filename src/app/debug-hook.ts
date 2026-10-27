@@ -1,4 +1,5 @@
 import { externalFolder } from "../storage/external-folder";
+import { importTesting } from "../storage/archive";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
@@ -225,6 +226,10 @@ export interface DebugHook {
   canvasDump(canvasId: string): Promise<{ objects: SerializedObject[]; view: SerializedCamera | null; bookmarks: Array<{ name: string; view: SerializedCamera }> }>;
   /** Fault injection for tests: remove an original's bytes (a lost or damaged store). */
   removeAssetBytes(hash: string): Promise<void>;
+  /** Import tuning (ADR 0176): the byte budget of a batch of originals, and stopping after them as a failure or as a closed tab. */
+  importTesting(o: Partial<typeof importTesting>): void;
+  /** The originals listed as written ahead by an import that has not finished. */
+  importStaged(): Promise<string[]>;
   /** Use a private browser directory (OPFS) as the library folder, as the picker would. */
   useTestFolder(name: string): Promise<void>;
   /** Names of the files in the test folder. */
@@ -639,6 +644,15 @@ export function installDebugHook(
       (window as unknown as { showDirectoryPicker: () => Promise<Dir> }).showDirectoryPicker = async () => testDir(name);
     },
     folderState: () => externalFolder.state,
+    importTesting: (o) => void Object.assign(importTesting, o),
+    importStaged: async () => {
+      const tx = session.repo!.db.transaction("meta", "readonly");
+      const r = tx.objectStore("meta").get("importStaged");
+      return new Promise<string[]>((res, rej) => {
+        r.onsuccess = () => res((r.result as string[] | undefined) ?? []);
+        r.onerror = () => rej(r.error);
+      });
+    },
     removeAssetBytes: async (hash) => {
       const tx = session.repo!.db.transaction("assets", "readwrite");
       tx.objectStore("assets").delete(hash);

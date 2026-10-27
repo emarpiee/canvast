@@ -15,7 +15,7 @@ import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../storage/archive";
 import { hiddenInScope } from "../storage/archive";
 import { checkLock, makeLock } from "../assets/hidden-lock";
-import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain } from "../storage/archive";
+import { applyImport, archiveFileName, buildArchive, readArchive, readArchiveChain, sweepImportStaging } from "../storage/archive";
 import type { FolderFiles, ProgressFn } from "../storage/archive";
 import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
 import { buildFilesZip } from "../storage/files-zip";
@@ -206,6 +206,8 @@ export class Session {
     await this.load(this.current.canvasId);
     if (!this.readOnly && this.catalog) {
       try {
+        // Originals of an import that did not finish are erased before reconcile, which would give them library entries (ADR 0176).
+        await sweepImportStaging(this.repo.db);
         await this.catalog.reconcile();
         await this.collectGarbage();
       } catch (e) {
@@ -747,10 +749,10 @@ export class Session {
   }
 
   /** Write a validated archive into this workspace, then open its first canvas. */
-  async applyImport(plan: ImportPlan): Promise<ImportResult | null> {
+  async applyImport(plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult | null> {
     if (!this.guardWrite() || !this.current) return null;
     await this.persistence.flush();
-    const r = await applyImport(this.repo!.db, this.current.workspaceId, this.current.boardId, plan);
+    const r = await applyImport(this.repo!.db, this.current.workspaceId, this.current.boardId, plan, progress);
     await this.refreshTree();
     this.post({ kind: "tree" });
     this.post({ kind: "assets" });

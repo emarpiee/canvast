@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## Import a backup of any size (v0.47.2, 2026-10-28)
+
+**Implemented:** an import keeps no bytes in its plan (each original is hashed and let go; the plan holds a slice of the file), writes the originals the store lacks a batch at a time (128 MiB, listed under `meta.importStaged` in the same transaction), then everything else in one transaction that clears the list; `sweepImportStaging` erases listed originals without a library entry when an import fails, before each import and at start (before the catalog is reconciled) ([ADR 0176](adr/0176-batched-import.md)). Export and the `.canvast` format are unchanged: one file.
+**Tested:** unit 572 passed; `archive.spec.ts` in Chromium and Firefox, 16 passed and 2 failed (the extended test: the start-up sweep ran after reconcile, which had given the leftovers library entries); after the fix the extended test passed in both browsers on a fresh snapshot (2 passed, 18 s). It imports with one original per batch, stops after the files (nothing left), stops as if the tab closed (the files listed, erased on reload) and imports in full.
+**Known failures:** none known.
+**Unverified:** memory and time with a real backup of several gigabytes; the rest of `archive.spec.ts` on the final source (it passed on the source before the start-up order change, which touches only start-up); the quick and full suites.
+**Committed:** this slice (see the commit).
+**Next bounded task:** measure the peak memory of importing a multi-gigabyte synthetic backup in Chromium and Firefox.
+
 ## A fast library with thousands of items (v0.47.1, 2026-10-27)
 
 **Implemented:** the library grid and the viewer's filmstrip keep only the items near the view in the page; the card places are worked out in code (`src/ui/library-layout.ts`: justified rows, squares on a phone, list rows) and the cards are positioned in a grid as tall as all of them; keyboard moves, reveal and the scroll anchor use that layout. Thumbnails missing from storage are made three at a time (the screen first, none for a card gone from the page) and at most 3,000 loaded addresses are kept. The filter and sort run once per change (one collator, text keys made once), the sidebar counts once per listing, entries are looked up by hash; search redraws after a 250 ms pause; picture looks are read only while Similar or a look filter is in use. An organization change (`Session.organize`, library undo) reads only the catalog again (`AssetCatalog.relist`), and library-folder files are checked fifty at a time.

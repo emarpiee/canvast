@@ -285,7 +285,7 @@ test("a canvas bigger than one read slice (objects are read and written 2000 at 
   await other.context.close();
 });
 
-test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app }) => {
+test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app, browser }) => {
   const p = app.page;
   await importImage(p);
   await openPanel(p);
@@ -348,6 +348,34 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   expect(old).toContain("It carries 2 paintings and 1 brush preset from the Painting view, which canvast no longer has; they are not imported.");
   expect((await sess(p)).tree!.length).toBe(4);
   expect(app.consoleErrors).toEqual([]);
+
+  // The originals are written a batch at a time before the canvases (ADR 0176); here one per batch. In a fresh profile, so none is in
+  // its library: an import stopped after the files leaves nothing; a tab closed at that point leaves them listed, and the next start erases them.
+  const man = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<Record<string, unknown>> };
+  man.assets.push({ ...man.assets[0], hash: GREEN_HASH, name: "green.png", size: GREEN.length, pixelW: 4, pixelH: 4, file: `assets/${GREEN_HASH}` });
+  const entries = [...z.values()].map((e) => ({ name: e.name, data: e.name === "manifest.json" ? new Blob([JSON.stringify(man)]) : e.data }));
+  const two = Buffer.from(await (await writeZip([...entries, { name: `assets/${GREEN_HASH}`, data: new Blob([new Uint8Array(GREEN)]) }])).arrayBuffer());
+  const both = [HASH, GREEN_HASH].sort();
+  const staged = (q: Page): Promise<string[]> => q.evaluate(() => window.__canvastDebug.importStaged());
+  const { context, page: q } = await freshProfile(browser);
+  const boards = (await sess(q)).tree!.length;
+  await q.evaluate(() => window.__canvastDebug.importTesting({ stageBytes: 1, stopAfterFiles: "fail" }));
+  await importArchive(q, "two.canvast", two);
+  await expect(q.getByTestId("toast")).toContainText("Import failed; nothing was changed");
+  expect([await stored(q), await staged(q), (await sess(q)).tree!.length]).toEqual([[], [], boards]);
+  await q.evaluate(() => window.__canvastDebug.importTesting({ stopAfterFiles: "crash" }));
+  await importArchive(q, "two.canvast", two);
+  expect([(await stored(q)).sort(), (await staged(q)).sort()]).toEqual([both, both]);
+  await q.reload();
+  await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect.poll(() => stored(q)).toEqual([]);
+  expect(await staged(q)).toEqual([]);
+  // The import itself, a batch per original: both stored, the canvas in, nothing left listed.
+  await q.evaluate(() => window.__canvastDebug.importTesting({ stageBytes: 1 }));
+  await importArchive(q, "two.canvast", two);
+  await expect(q.getByTestId("toast")).toContainText("2 new originals stored");
+  expect([(await stored(q)).sort(), await staged(q), (await sess(q)).tree!.length]).toEqual([both, [], boards + 1]);
+  await context.close();
 });
 
 test("a read-only tab can export but not import", async ({ app, context }) => {

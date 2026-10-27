@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.47.2 — Import a backup of any size (2026-10-28)
+
+- **Fixed:** importing a backup read all its files into memory and kept them there until it was written, so a backup of several gigabytes needed that much free memory. The files are now checked one by one and written a batch at a time (up to 128 MiB), then the canvases, boards and library entries in one transaction, so the import still shows all at once or not at all; files written by an import that did not finish are erased at once, or when the app next opens (ADR 0176). A backup is still one `.canvast` file.
+- **Fixed:** the README said Firefox gives a local file about 790 MiB; that is before the browser agrees to keep the data, after which it allows up to half the disk.
+
 ## 0.47.1 — A fast library with thousands of items (2026-10-27)
 
 - **Fixed:** the library grew slower the deeper you scrolled: every card stayed in the page with its picture. Only the cards near the view are in the page now (their places worked out in code), and the filmstrip of the viewer does the same; with 20,000 items the library opens in about a second instead of 11 and scrolls at 60 frames a second instead of about 2.

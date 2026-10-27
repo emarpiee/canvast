@@ -151,7 +151,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
   const saving = beginProgress(session.editor, "import-archive", folder ? "Opening the library" : `Importing ${file.name}`);
   saving.update(null, "saving into the workspace");
   try {
-    const r = await session.applyImport(plan);
+    const r = await session.applyImport(plan, stages(saving));
     if (!r) {
       saving.done();
       return;

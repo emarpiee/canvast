@@ -36,7 +36,8 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  *
  * Import treats the file as untrusted. It is fully read and validated first,
  * without writing anything (`readArchive`). The user then confirms a summary,
- * and `applyImport` writes everything in one transaction: all or nothing.
+ * and `applyImport` writes the originals a batch at a time, then everything
+ * else in one transaction, so the import shows all or nothing (ADR 0176).
  * Boards and canvases get new ids, so importing the same archive twice never
  * overwrites anything. Object ids are kept (they are namespaced per canvas).
  * Originals are deduplicated by hash.
@@ -630,8 +631,8 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       problems.push(`Library item “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
     }
-    const bytes = await e.data.arrayBuffer();
-    if ((await sha256Hex(bytes)) !== hash) {
+    // The bytes are read for the hash and let go: the plan keeps a slice of the file, read again when it is written (ADR 0176).
+    if ((await sha256Hex(await e.data.arrayBuffer())) !== hash) {
       problems.push(`Library item “${label}” does not match its content hash (damaged) and was skipped.`);
       continue;
     }
@@ -639,11 +640,11 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     plan.assets.push({
       hash,
       type,
-      size: bytes.byteLength,
+      size: e.size,
       name: str(a["name"], ""),
       pixelW: a["pixelW"] as number,
       pixelH: a["pixelH"] as number,
-      blob: new Blob([bytes], { type }),
+      blob: e.data.slice(0, e.size, type),
       importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
       ...(a["card"] === true ? { card: true } : {}),
     });
@@ -684,11 +685,98 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
   return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders };
 }
 
+/** Originals are written at most this many bytes per transaction, before the canvases (ADR 0176). */
+const STAGE_BYTES = 128 * 2 ** 20;
+/** The `meta` key listing the originals an import has written ahead of its canvases. */
+const STAGED_KEY = "importStaged";
+/** For tests (the debug hook): a smaller batch, and an import that stops after its originals, as if it failed or the tab closed. */
+export const importTesting = { stageBytes: STAGE_BYTES, stopAfterFiles: null as null | "fail" | "crash" };
+
 /**
- * Apply a validated plan in one transaction. Canvas archives are added to
- * `targetBoardId`; board and workspace archives become new boards.
+ * Erase the originals an unfinished import wrote ahead of its canvases: the ones that still have no library entry (an entry means the
+ * import finished, or the same file was imported into the library since). Run before an import and when the app opens (ADR 0176).
  */
-export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan): Promise<ImportResult> {
+export async function sweepImportStaging(db: IDBDatabase): Promise<number> {
+  const tx = db.transaction(["assets", "assetCatalog", "thumbs", "meta"], "readwrite", { durability: "strict" });
+  const committed = done(tx);
+  const staged = ((await req(tx.objectStore("meta").get(STAGED_KEY) as IDBRequest<string[] | undefined>)) ?? []);
+  let swept = 0;
+  for (const h of staged) {
+    if ((await req(tx.objectStore("assetCatalog").count(h))) > 0) continue;
+    tx.objectStore("assets").delete(h);
+    tx.objectStore("thumbs").delete(h);
+    swept++;
+  }
+  if (staged.length) tx.objectStore("meta").delete(STAGED_KEY);
+  await committed;
+  return swept;
+}
+
+/**
+ * Write the originals the store does not have, a batch at a time, each listed under `STAGED_KEY` in the same transaction. Only one batch
+ * of bytes is in memory at once, so the size of an archive is not limited by memory. Returns the hashes written.
+ */
+async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], progress?: ProgressFn): Promise<Set<string>> {
+  const written = new Set<string>();
+  const total = assets.length;
+  let i = 0;
+  while (i < total) {
+    // Read the next batch: whole files, up to the byte budget (always at least one file).
+    const batch: AssetRecord[] = [];
+    let bytes = 0;
+    while (i < total && (batch.length === 0 || bytes + assets[i]!.size <= importTesting.stageBytes)) {
+      const a = assets[i++]!;
+      if (a.ext) continue; // a file of the library folder: no bytes to write
+      batch.push(a);
+      bytes += a.size;
+    }
+    if (!batch.length) break;
+    const have = await (async () => {
+      const t = db.transaction("assets", "readonly");
+      return Promise.all(batch.map(async (a) => (await req(t.objectStore("assets").count(a.hash))) > 0));
+    })();
+    const fresh = batch.filter((_, k) => !have[k]);
+    if (fresh.length) {
+      const loaded = await Promise.all(fresh.map(async (a): Promise<AssetRecord> => ({ ...a, blob: new Blob([await a.blob.arrayBuffer()], { type: a.type }) })));
+      const tx = db.transaction(["assets", "meta"], "readwrite", { durability: "strict" });
+      const committed = done(tx);
+      const staged = ((await req(tx.objectStore("meta").get(STAGED_KEY) as IDBRequest<string[] | undefined>)) ?? []);
+      for (const a of loaded) if ((await req(tx.objectStore("assets").count(a.hash))) === 0) {
+        tx.objectStore("assets").put(a, a.hash);
+        staged.push(a.hash);
+        written.add(a.hash);
+      }
+      tx.objectStore("meta").put(staged, STAGED_KEY);
+      await committed;
+    }
+    progress?.("Writing the files", i, total);
+  }
+  return written;
+}
+
+/**
+ * Apply a validated plan. Canvas archives are added to `targetBoardId`; board and workspace archives become new boards.
+ *
+ * The originals are written first, a batch at a time, and listed as staged: until the last step nothing points at them, so they cannot
+ * be seen. The last step is one transaction for everything else (canvases, boards, library entries, passwords, styles) and clears the
+ * list, so the import shows all at once or not at all. If it stops before that, the staged originals are erased at once, or when the
+ * app next opens (ADR 0176).
+ */
+export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult> {
+  await sweepImportStaging(db);
+  let staged: Set<string>;
+  try {
+    staged = await stageOriginals(db, plan.assets, progress);
+    if (importTesting.stopAfterFiles === "crash") return { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
+    if (importTesting.stopAfterFiles === "fail") throw new ArchiveError("stopped after the files (test)");
+    return await applyRest(db, workspaceId, targetBoardId, plan, staged);
+  } catch (e) {
+    await sweepImportStaging(db).catch(() => undefined);
+    throw e;
+  }
+}
+
+async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, staged: ReadonlySet<string>): Promise<ImportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
   const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
@@ -725,8 +813,8 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       tx.objectStore("workspaces").put(ws);
     }
     for (const a of plan.assets) {
-      const hasBytes = (await req(tx.objectStore("assets").count(a.hash))) > 0;
-      if (!hasBytes) {
+      if (staged.has(a.hash)) result.assetsAdded++; // written ahead (stageOriginals)
+      else if ((await req(tx.objectStore("assets").count(a.hash))) === 0) {
         tx.objectStore("assets").put(a, a.hash);
         result.assetsAdded++;
       }
@@ -758,6 +846,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
       }
     }
     for (const h of plan.unresolved) if ((await req(tx.objectStore("assets").count(h))) === 0) result.stillMissing++;
+    tx.objectStore("meta").delete(STAGED_KEY); // the staged originals now have their entries
     await committed;
     return result;
   } catch (e) {
