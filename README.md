@@ -35,7 +35,7 @@ To open it: click the save indicator at the bottom left, choose **Import archive
 | ![A heart one million zoom levels down](docs/screenshots/deep-zoom.webp) | ![Other universes, 1,000 zoom levels up](docs/screenshots/zoom-out.webp) |
 | One million levels down: 10^301,030× magnified, still exact and editable | 1,000 levels up: our universe is the ringed bubble |
 
-The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like a person would: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks. `scripts/showcase/dive.mjs` renders the animation, and `scripts/showcase/shots.mjs` takes the screenshots in the dark theme with the *Ultramarine* theme colour (Settings → Appearance).
+The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like a person would: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks. The labels are set in **Space Grotesk** (SIL Open Font License 1.1, in `scripts/showcase/fonts/`), which the script imports into the Library and chooses in the Text tool, so the two font files travel inside `showcase.canvast` like any library file. On the bright scenes (the island, the tree, the cells, DNA and the proton) the text sits on a dark plate, and the script measures the contrast of every label against the pixels behind it (WCAG 2: 4.5 : 1 under 24 px, 3 : 1 from 24 px) and reports any below it; the last build had none (the tightest is 4.69 : 1). `scripts/showcase/dive.mjs` renders the animation, and `scripts/showcase/shots.mjs` takes the screenshots in the dark theme with the *Ultramarine* theme colour (Settings → Appearance).
 
 ![The Solar System, home of the showcase](docs/screenshots/hero.webp)
 
@@ -203,7 +203,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | | |
 | --- | --- |
 | ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
-| The Library, filled by six screenshots of the showcase | The viewer with its filmstrip and details |
+| The Library, filled by six screenshots of the showcase (shown by file type: the showcase also carries its two font files) | The viewer with its filmstrip and details |
 
 ### Hidden items and passwords
 
@@ -544,6 +544,6 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 
 ## Licences
 
-canvast is released under the [MIT licence](LICENSE), copyright (c) 2026 emarpiee. The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest and Playwright.
+canvast is released under the [MIT licence](LICENSE), copyright (c) 2026 emarpiee. The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest and Playwright. The showcase archive `showcase.canvast` also carries the Space Grotesk font (SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors) as two library files; the licence text is in [scripts/showcase/fonts/OFL.txt](scripts/showcase/fonts/OFL.txt).
 
 A history of changes is in [CHANGELOG.md](CHANGELOG.md).

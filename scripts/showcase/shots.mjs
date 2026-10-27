@@ -125,6 +125,8 @@ for (const name of ["1 · The Solar System", "4 · The Milky Way", "8 · Earth",
   await p.getByTestId("toast").filter({ hasText: /Screenshot saved/ }).waitFor();
 }
 await p.getByTestId("view-assets").click();
+// (the showcase also carries its two font files: the pictures are shown by their file type)
+await p.getByTestId("assets-side").getByRole("button", { name: /^\.WEBP/ }).click();
 await off();
 await shot("library");
 await p.locator(".asset-card, [data-testid='asset-card']").first().dblclick().catch(() => {});

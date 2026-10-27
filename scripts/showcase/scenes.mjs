@@ -28,6 +28,24 @@ const stars = (n, portal, clear, opts = {}) => {
 const ring = ([x, y], r, c = "#ffd166") => `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="4 5" opacity="0.9"/>`;
 const sparkle = (x, y, r, c = "#ffffff") => `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r}Z" fill="${c}"/>`;
 const title = (t, sub, c = "#ffffff", cs = "#b8c4ff") => [[260, 175, t, 40, c], [264, 232, sub, 18, cs]];
+/**
+ * Dark plates behind labels, so the text reads on any ground: a card behind a title and its line (labels 0 and 1) and a pill behind each other
+ * label. `only` lists the labels to plate (default: all). The audit in build.mjs measures the contrast from the pixels.
+ */
+const plate = (x, y, w, h, r) => `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${r}" fill="#050b1a" opacity="0.8"/>`;
+const plates = (labels, only) => {
+  const CH = 0.6; // (an estimate of a letter's width in ems: a little wide, so the plate always covers the text)
+  const use = (i) => !only || only.includes(i);
+  let b = "";
+  if (use(0) && use(1)) {
+    const [t, sub] = labels;
+    // (a text is placed by the middle of its first line: the plate reaches 3/4 of a line above and below)
+    const top = t[1] - t[3] * 0.75 - 14, bottom = sub[1] + sub[3] * 0.75 + 16;
+    b += plate(t[0] - 28, top, Math.max(t[2].length * t[3] * CH, sub[2].length * sub[3] * CH) + 48, bottom - top, 22);
+  }
+  labels.slice(2).forEach(([x, y, str, size], i) => { if (use(i + 2)) b += plate(x - 12, y - size * 0.75 - 6, str.length * size * CH + 24, size * 1.5 + 12, 12); });
+  return b;
+};
 
 /** A spiral galaxy of dots: arms, a bar and a core. Returns the SVG and a point on an arm (for "you are here"). */
 function spiral({ cx, cy, scale, arms = 2, n = 600, tilt = 1, turn = 0, portal, clear, core = 1, hue = "blue" }) {
@@ -87,9 +105,10 @@ export function multiverse() {
     b += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="url(#${id})"/>`;
   }
   b += `<circle cx="${CX}" cy="${CY}" r="80" fill="url(#ours)"/>` + ring(portal, 96);
+  const labels = [...title("The multiverse?", "A thousand zoom levels above the Solar System. Every bubble could be a universe."), [CX + 104, CY - 88, "Ours. 960 levels in.", 18, "#ffd166"]];
   return {
-    svg: svg(b, defs), portal,
-    labels: [...title("The multiverse?", "A thousand zoom levels above the Solar System. Every bubble could be a universe."), [CX + 104, CY - 88, "Ours. 960 levels in.", 18, "#ffd166"]],
+    svg: svg(b + plates(labels, [2]), defs), portal,
+    labels,
   };
 }
 
@@ -238,9 +257,10 @@ export function earth() {
   b += `<path d="M ${CX + 200} ${CY - 220} C ${CX + 320} ${CY - 420}, ${CX + 520} ${CY - 330}, ${CX + 460} ${CY - 170}" fill="none" stroke="#ffd6a5" stroke-width="2" stroke-dasharray="2 9" stroke-linecap="round"/>`;
   b += ring(portal, clear + 14, "#ffd166");
   void clear;
+  const labels = [...title("Earth", "32× closer than the Solar System. The rocket is a Union of five shapes, the Moon a Subtract."), [portal[0] + 26, portal[1] - 30, "An island", 14, "#ffd166"]];
   return {
-    svg: svg(b, defs), portal,
-    labels: [...title("Earth", "32× closer than the Solar System. The rocket is a Union of five shapes, the Moon a Subtract."), [portal[0] + 26, portal[1] - 30, "An island", 14, "#ffd166"]],
+    svg: svg(b + plates(labels, [2]), defs), portal,
+    labels,
     moonAt: [CX + 470, CY - 300], rocketAt: [CX + 460, CY - 120],
   };
 }
@@ -269,7 +289,8 @@ export function island() {
   for (const [x, y, s] of [[CX - 520, CY - 260, 1], [CX + 560, CY + 300, 1.3]]) b += `<path d="M ${x} ${y} l ${30 * s} ${8 * s} l ${-30 * s} ${8 * s} z" fill="#ffffff"/><path d="M ${x - 4} ${y + 18 * s} l ${40 * s} 0 l ${-6 * s} ${8 * s} l ${-28 * s} 0 z" fill="#8b5e34"/>`;
   for (let i = 0; i < 40; i++) { const x = 200 + rnd() * 1400, y = 130 + rnd() * 860; if (Math.hypot((x - CX) / 1.4, y - CY) > 420) b += `<path d="M ${f(x)} ${f(y)} q 12 -6 24 0 q 12 6 24 0" fill="none" stroke="#bfe9ff" stroke-width="1.5" opacity="0.5"/>`; }
   b += `<circle cx="${portal[0]}" cy="${portal[1]}" r="${clear * 0.9}" fill="#6fbf5f"/>` + ring(portal, clear * 2.6, "#ffd166");
-  return { svg: svg(b, defs), portal, labels: [...title("An island", "128× closer. Forest, reef and two boats. One tree stands alone in a clearing."), [portal[0] + 32, portal[1] - 34, "That tree", 14, "#ffd166"]] };
+  const labels = [...title("An island", "128× closer. Forest, reef and two boats. One tree stands alone in a clearing.", "#ffffff", "#eef2ff"), [portal[0] + 32, portal[1] - 34, "That tree", 14, "#ffd166"]];
+  return { svg: svg(b + plates(labels), defs), portal, labels };
 }
 
 export function tree() {
@@ -286,7 +307,8 @@ export function tree() {
   for (let i = 0; i < 60; i++) { const x = 200 + rnd() * 1400, y = 130 + rnd() * 860; if (Math.hypot(x - CX, y - CY) > 470) b += `<path d="M ${f(x)} ${f(y)} l 2 -9 l 2 9" fill="none" stroke="#3d8b37" stroke-width="1.4"/>`; }
   for (const [x, y, c] of [[CX + 560, CY - 300, "#ffd6e0"], [CX - 600, CY + 320, "#fff3b0"], [CX + 620, CY + 340, "#e0c3fc"]]) for (let k = 0; k < 5; k++) b += `<circle cx="${f(x + 7 * Math.cos(k * 1.256))}" cy="${f(y + 7 * Math.sin(k * 1.256))}" r="5" fill="${c}"/>`;
   b += ring(portal, clear * 2.2, "#ffd166");
-  return { svg: svg(b, defs), portal, labels: [...title("A tree, from above", "128× closer again. About 200,000 leaves. Pick one."), [portal[0] + 42, portal[1] - 44, "This leaf", 14, "#ffd166"]] };
+  const labels = [...title("A tree, from above", "128× closer again. About 200,000 leaves. Pick one.", "#ffffff", "#eef2ff"), [portal[0] + 42, portal[1] - 44, "This leaf", 14, "#ffd166"]];
+  return { svg: svg(b + plates(labels), defs), portal, labels };
 }
 
 export function leaf() {
@@ -304,7 +326,8 @@ export function leaf() {
   }
   b += `<circle cx="1500" cy="300" r="18" fill="#d4f1f9" opacity="0.6"/><circle cx="1494" cy="294" r="5" fill="#ffffff" opacity="0.8"/>`;
   b += ring(portal, clear * 2.4, "#ffd166");
-  return { svg: svg(b, defs), portal, labels: [...title("A leaf", "64× closer. Veins, pores (stomata) and a drop of dew. Its skin is made of cells."), [portal[0] + 30, portal[1] - 32, "A cell", 14, "#ffd166"]] };
+  const labels = [...title("A leaf", "64× closer. Veins, pores (stomata) and a drop of dew. Its skin is made of cells.", "#ffffff", "#eef2ff"), [portal[0] + 30, portal[1] - 32, "A cell", 14, "#ffd166"]];
+  return { svg: svg(b + plates(labels), defs), portal, labels };
 }
 
 export function cells() {
@@ -327,7 +350,8 @@ export function cells() {
   b += `<circle cx="${portal[0]}" cy="${portal[1]}" r="62" fill="url(#nuc)"/><circle cx="${portal[0] + 26}" cy="${portal[1] - 24}" r="12" fill="#5a189a"/>`;
   b += ring(portal, 74, "#ffd166");
   void clear;
-  return { svg: svg(b, defs), portal, labels: [...title("Plant cells", "128× closer. Walls, green chloroplasts and in each cell a nucleus that holds the DNA.", "#081c15", "#1b4332"), [portal[0] + 78, portal[1] - 70, "The nucleus", 14, "#5a189a"]] };
+  const labels = [...title("Plant cells", "128× closer. Walls, green chloroplasts and in each cell a nucleus that holds the DNA.", "#ffffff", "#eef2ff"), [portal[0] + 78, portal[1] - 70, "The nucleus", 14, "#ffd166"]];
+  return { svg: svg(b + plates(labels), defs), portal, labels };
 }
 
 export function dna() {
@@ -348,7 +372,8 @@ export function dna() {
   b += `<path d="${path(yA)}" fill="none" stroke="#e0aaff" stroke-width="12" stroke-linecap="round"/><path d="${path(yB)}" fill="none" stroke="#f1c0e8" stroke-width="12" stroke-linecap="round" opacity="0.9"/>`;
   b += ring(portal, 13, "#ffd166");
   void clear;
-  return { svg: svg(b, defs), portal, labels: [...title("DNA", "256× closer. Two strands and their base pairs. Between them, one carbon atom."), [portal[0] + 20, portal[1] - 26, "A carbon atom", 14, "#ffd166"]] };
+  const labels = [...title("DNA", "256× closer. Two strands and their base pairs. Between them, one carbon atom.", "#ffffff", "#eef2ff"), [portal[0] + 20, portal[1] - 26, "A carbon atom", 14, "#ffd166"]];
+  return { svg: svg(b + plates(labels), defs), portal, labels };
 }
 
 export function atom() {
@@ -386,9 +411,10 @@ export function proton() {
   for (let i = 0; i < 3; i++) b += `<path d="${spring(q[i], q[(i + 1) % 3])}" fill="none" stroke="#ffd166" stroke-width="4" opacity="0.8"/>`;
   for (const [x, y, id] of q) b += `<circle cx="${x}" cy="${y}" r="64" fill="url(#${id})"/>`;
   b += ring(portal, 26, "#ffffff");
+  const labels = [...title("Inside a proton", "64× closer. Two up quarks and a down quark, bound by gluons.", "#ffffff", "#eef2ff"), [CX - 250, CY - 250, "up", 18, "#ffffff"], [CX + 225, CY - 220, "up", 18, "#ffffff"], [CX - 30, CY + 340, "down", 18, "#ffffff"], [portal[0] + 30, portal[1] - 40, "56 levels down: the smallest length physics knows", 14, "#ffffff"]];
   return {
-    svg: svg(b, defs), portal,
-    labels: [...title("Inside a proton", "64× closer. Two up quarks and a down quark, bound by gluons."), [CX - 250, CY - 250, "up", 18, "#ffffff"], [CX + 225, CY - 220, "up", 18, "#ffffff"], [CX - 30, CY + 340, "down", 18, "#ffffff"], [portal[0] + 30, portal[1] - 40, "56 levels down: the smallest length physics knows", 14, "#ffffff"]],
+    svg: svg(b + plates(labels), defs), portal,
+    labels,
   };
 }
 
@@ -403,7 +429,7 @@ export function planck() {
     b += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="none" stroke="${pick(["#c77dff", "#7b2cbf", "#e0aaff", "#5a189a"])}" stroke-width="${f(1 + rnd() * 2)}" opacity="${f(0.25 + rnd() * 0.5)}"/>`;
   }
   b += ring(portal, 20, "#ffd166");
-  return { svg: svg(b, defs), portal, labels: [...title("The Planck length", "1.6 × 10⁻³⁵ m: physics has no smaller ruler. A drawing app should stop here. canvast does not.", "#ffffff", "#e0aaff"), [portal[0] + 24, portal[1] - 28, "Keep going: 884 more levels", 14, "#ffd166"]] };
+  return { svg: svg(b, defs), portal, labels: [...title("The Planck length", "1.6 × 10^-35 m: physics has no smaller ruler. A drawing app should stop here. canvast does not.", "#ffffff", "#e0aaff"), [portal[0] + 24, portal[1] - 28, "Keep going: 884 more levels", 14, "#ffd166"]] };
 }
 
 export function universeAgain() {

@@ -2,12 +2,18 @@
 // A "powers of two" journey: every scene (scenes.mjs) sits at the portal of the one above it, from a multiverse 1,000 levels up to a
 // million levels down. Run from the repo root after `npm run build`: node scripts/showcase/build.mjs showcase.canvast [debugShotsDir]
 import { chromium } from "@playwright/test";
-import { mkdtempSync, copyFileSync } from "node:fs";
+import { mkdtempSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as S from "./scenes.mjs";
 
 const [out, shots] = process.argv.slice(2);
+// The showcase text is set in Space Grotesk (SIL Open Font License, see fonts/OFL.txt): a bold for titles, a regular for the rest. Both are
+// imported into the library first and chosen in the Text tool's Font menu, so the font travels in the archive like any other library file.
+const FONTS = [["Space Grotesk.ttf", "SpaceGrotesk_400Regular.ttf"], ["Space Grotesk Bold.ttf", "SpaceGrotesk_700Bold.ttf"]];
+const FONT_REGULAR = "Space Grotesk", FONT_BOLD = "Space Grotesk Bold";
+const fontDir = join(dirname(fileURLToPath(import.meta.url)), "fonts");
 const ctx = await chromium.launchPersistentContext(mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-")), { viewport: { width: 1440, height: 900 }, acceptDownloads: true });
 const p = ctx.pages()[0] ?? (await ctx.newPage());
 p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
@@ -57,6 +63,7 @@ const setHex = async (hex) => {
 /** A new text with its size and colour set on the Text tool first (they carry to the new text). */
 const text = async (x, y, str, size, hex) => {
   await p.keyboard.press("t");
+  await p.locator("select[data-text-font]").selectOption({ label: size >= 30 ? FONT_BOLD : FONT_REGULAR }); // (titles bold)
   const sz = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
   await sz.fill(String(size));
   await sz.press("Enter");
@@ -68,6 +75,41 @@ const text = async (x, y, str, size, hex) => {
   await p.keyboard.press("Escape");
   await p.keyboard.press("v");
   await esc();
+};
+/**
+ * Contrast of the labels against what is behind them, from the pixels: `pre` is the view before the labels were typed, `post` after. Each label's
+ * box is where the two differ near its click point; the colour behind it is read from `pre`. WCAG 2: 4.5 : 1 for text under 24 px, 3 : 1 from 24 px.
+ */
+const contrast = [];
+const audit = async (scene, pre, post, labels) => {
+  const rows = await H(async ([a, b, labels]) => {
+    const load = (u) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = u; });
+    const px = async (u) => { const i = await load(u), c = document.createElement("canvas"); c.width = i.width; c.height = i.height; const g = c.getContext("2d"); g.drawImage(i, 0, 0); return g.getImageData(0, 0, c.width, c.height); };
+    const [A, B] = [await px(a), await px(b)];
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const lum = (r, g, bl) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(bl);
+    const out = [];
+    for (const [x, y, str, size, hex] of labels) {
+      const tl = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+      const lt = lum(...tl);
+      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      const rx0 = Math.max(0, Math.floor(x - 6)), rx1 = Math.min(A.width, Math.ceil(x + str.length * size * 0.75)), ry0 = Math.max(0, Math.floor(y - 6)), ry1 = Math.min(A.height, Math.ceil(y + size * 1.5));
+      for (let yy = ry0; yy < ry1; yy++) for (let xx = rx0; xx < rx1; xx++) {
+        const i = (yy * A.width + xx) * 4;
+        if (Math.max(Math.abs(A.data[i] - B.data[i]), Math.abs(A.data[i + 1] - B.data[i + 1]), Math.abs(A.data[i + 2] - B.data[i + 2])) > 40) { x0 = Math.min(x0, xx); y0 = Math.min(y0, yy); x1 = Math.max(x1, xx); y1 = Math.max(y1, yy); }
+      }
+      if (x1 < 0) { out.push({ str, size, hex, missing: true }); continue; }
+      const ratios = [];
+      for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) {
+        const i = (yy * A.width + xx) * 4, lb = lum(A.data[i], A.data[i + 1], A.data[i + 2]);
+        ratios.push((Math.max(lt, lb) + 0.05) / (Math.min(lt, lb) + 0.05));
+      }
+      ratios.sort((p, q) => p - q);
+      out.push({ str, size, hex, worst: ratios[Math.floor(ratios.length * 0.05)], median: ratios[Math.floor(ratios.length / 2)], need: size >= 24 ? 3 : 4.5 });
+    }
+    return out;
+  }, ["data:image/png;base64," + pre.toString("base64"), "data:image/png;base64," + post.toString("base64"), labels]);
+  for (const r of rows) contrast.push({ scene, ...r });
 };
 const nameLayer = async (from, to) => {
   if (!(await p.getByTestId("layers-panel").isVisible())) await p.getByRole("button", { name: "Layers panel", exact: true }).click();
@@ -101,6 +143,13 @@ await p.locator(".nav-rename").fill("Powers of two");
 await p.locator(".nav-rename").press("Enter");
 await esc();
 if (await p.getByTestId("workspace-menu").isVisible()) await p.getByTestId("workspace-nav").click();
+
+// The fonts, into the library
+await p.getByTestId("view-assets").click();
+await p.getByTestId("assets-import-input").setInputFiles(FONTS.map(([name, file]) => ({ name, mimeType: "font/ttf", buffer: readFileSync(join(fontDir, file)) })));
+await p.getByTestId("asset-card").nth(1).waitFor();
+await p.getByTestId("view-canvas").click();
+await frame();
 
 // The journey, outermost first. `L` is the zoom level (log2) each scene is drawn at.
 const chain = [
@@ -158,10 +207,21 @@ for (const s of chain) {
     await p.keyboard.press("v");
     await esc();
   }
+  await esc();
+  const pre = await p.screenshot();
   for (const [x, y, str, size, hex] of s.scene.labels) await text(...scr([x, y]), str, size, hex);
+  await esc();
+  await frame();
+  await audit(s.name, pre, await p.screenshot(), s.scene.labels.map(([x, y, str, size, hex]) => [...scr([x, y]), str, size, hex]));
   await shot(`dbg-${String(chain.indexOf(s)).padStart(2, "0")}-${s.fn}`);
   console.log("scene", s.name);
 }
+
+// The contrast of every label: the worst 5 % of the pixels behind its text (what the eye meets) against its colour
+const bad = contrast.filter((r) => r.missing || r.worst < r.need);
+for (const r of contrast) console.log(r.missing ? "?" : r.worst < r.need ? "FAIL" : "ok  ", r.scene, "|", r.str.slice(0, 34), `${r.size}px`, r.hex, r.missing ? "(not found)" : `worst ${r.worst.toFixed(2)} median ${r.median.toFixed(2)} need ${r.need}`);
+console.log(bad.length ? `${bad.length} labels below their contrast` : "every label meets its contrast");
+if (shots) writeFileSync(`${shots}/contrast.json`, JSON.stringify(contrast, null, 1));
 
 // Bookmarks in the order of the tour: home, out to the multiverse, then all the way in
 const order = [home, ...[...Array(home).keys()].reverse(), ...[...chain.keys()].slice(home + 1)];
@@ -176,7 +236,7 @@ await shot("dbg-home");
 if (await p.locator(".bookmarks-panel").isVisible()) await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
 await H(() => window.__canvastDebug.flushSave());
 await p.getByTestId("save-status").click();
-const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 180000 }), p.getByTestId("export-workspace").click()]);
+const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 180000 }), p.getByTestId("set-export-full").click()]);
 copyFileSync(await dl.path(), out);
 console.log("objects", (await H(() => window.__canvastDebug.objects())).length, "→", out);
 await ctx.close();

@@ -72,6 +72,7 @@ await p.keyboard.press("Escape");
 
 // 2. Hiding: an item picked in the library, its details panel with the Hide button
 await p.getByTestId("view-assets").click();
+await p.getByTestId("assets-side").getByRole("button", { name: /^\.WEBP/ }).click(); // (the pictures only: the showcase also carries its font files)
 await off();
 const card = p.getByTestId("asset-card").nth(1);
 await card.click();
