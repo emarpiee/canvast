@@ -63,7 +63,7 @@ A bar showing the gradient with a handle per stop: drag a handle to move the sto
 
 | Option | Meaning |
 | --- | --- |
-| `value` | `{ type: "linear" \| "radial", angle, cx, cy, r, stops: [{ offset, colour }] }`. `angle` in degrees (0 runs left to right, 90 top to bottom); `cx`, `cy`, `r` as fractions of the box the gradient is on; offsets 0 to 1; colours `#rrggbb` or `#rrggbbaa`. What angle and centre mean on a shape is the host's business. |
+| `value` | `{ type: "linear" \| "radial" \| "angular", angle, cx, cy, r, stops: [{ offset, colour }] }`. `angle` in degrees (0 runs left to right, 90 top to bottom); `cx`, `cy`, `r` as fractions of the box the gradient is on; offsets 0 to 1; colours `#rrggbb` or `#rrggbbaa`. What angle and centre mean on a shape is the host's business. `"angular"` goes round the centre, the first stop at `angle`; the editor's own Linear and Radial switch offers only the other two, so the host chooses it. |
 | `picker` | Options for the stop's picker (`model`, `view`, `format`, `groups`, `labels`, `size`, `display`, `onModel`, …). Transparency is always on. |
 | `labels` | Every word of the editor (`GradientLabels`). |
 | `minStops`, `maxStops` | The limits on the number of stops. |
@@ -91,6 +91,10 @@ Colours here are `Rgb = [r, g, b]` bytes, and a model's colour is a `Triple = { 
 | `contrastRatio(a, b)` | WCAG 2 contrast of two opaque colours, 1 to 21. |
 | `harmonies(rgb, kind, hue?)` | The colours of a harmony, turned in OKHCL so each stays inside sRGB. |
 | `prefersDarkText(rgb)` | Whether black text reads better than white on this colour. |
+
+## Dragging numbers
+
+The number fields of the picker (the channels and the opacity) change by dragging them left or right; `Shift` snaps to round steps worked out from the field's range. A press that does not move goes into the field. `scrubNumbers(root, hint?)` does the same for any number fields under `root` (a host's own fields), and `hint` is their tooltip.
 
 ## Copying and pasting
 

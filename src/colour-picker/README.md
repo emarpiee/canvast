@@ -1,6 +1,6 @@
 # colour-picker
 
-A colour picker for the web with no dependencies and no link to the app it was made in (canvast). It is small (42 KiB minified, 15 KiB gzipped, all of it: maths, picker, gradient editor, styles), fast (a drag does about half a millisecond of work a step), themed by CSS custom properties, and works from `file://`.
+A colour picker for the web with no dependencies and no link to the app it was made in (canvast). It is small (49 KiB minified, 17 KiB gzipped, all of it: maths, picker, gradient editor, styles), fast (a drag does about half a millisecond of work a step), themed by CSS custom properties, and works from `file://`.
 
 * **Three perceptual models:** OKHSL, OKHSV and OKHCL. Every slider stays inside the sRGB gamut, and the same step looks like the same change of colour anywhere.
 * **Four layouts:** a hue ring around a box, a plane with a hue bar, sliders, or the ring with sliders under it.
@@ -8,7 +8,8 @@ A colour picker for the web with no dependencies and no link to the app it was m
 * **Text in three formats:** hex, `rgb()`, `oklch()`. Any of them can be typed or pasted, in any format, with or without `#`.
 * **Eyedropper** where the browser has one, **WCAG contrast** against a colour you choose, **colour harmonies**, **swatch groups** you supply, and a **before and after** preview.
 * **Keyboard and screen reader complete**, **translatable** (every word is an option), **light and dark** by default.
-* **A gradient editor** (`createGradientEditor`): stops on a bar, linear or radial, angle or centre and radius, and this picker for the selected stop.
+* **A gradient editor** (`createGradientEditor`): stops on a bar, linear or radial (and an angular gradient, which the host places), angle or centre and radius, and this picker for the selected stop.
+* **Numbers you can drag:** every number field (the channels, the opacity) changes by dragging it left or right, and `Shift` snaps to round steps. **Swatches copy** by a long press, a right click or `Ctrl/⌘+C`, and a `#` in the hex field copies and pastes cleanly.
 * **Also a custom element:** `<colour-picker>`.
 
 ![the four layouts](docs/layouts.png)
@@ -49,6 +50,8 @@ Without a bundler: `npm run build:picker` (in canvast) writes `dist-picker/colou
 | `gradient.ts` | The gradient editor: `createGradientEditor`. |
 | `element.ts` | `<colour-picker>`, in a shadow root. |
 | `style.ts` | The stylesheet as a string (`PICKER_CSS`) and `ensureStyles()`. |
+| `scrub.ts` | `scrubNumbers`: number fields that change by dragging, with `Shift` snapping to round steps. |
+| `press.ts` | `onLongPress`, `copyToClipboard`, `flashCopied`: the long press that copies a swatch. |
 | `index.ts` | The exports. |
 | `docs/` | [api.md](docs/api.md) options, methods and the maths API · [theming.md](docs/theming.md) · [performance.md](docs/performance.md) · [design.md](docs/design.md) why it is built this way, and what comes next. |
 

@@ -18,8 +18,10 @@ The defaults sit in `:where(.cp)`, which has no specificity, so **any rule of yo
 | Type | `--cp-text`, `--cp-text-sm` | 13 px, 11 px | Body and small text. |
 | | `--cp-font`, `--cp-mono` | system UI, system mono | Text and numbers. |
 | Shape | `--cp-radius`, `--cp-radius-sm` | 8 px, 5 px | Boxes and bars; fields and buttons. |
+| | `--cp-dot` | `50%` | The corner radius of the round handles and swatches (a host with sharp corners sets `0`). |
 | Space | `--cp-gap`, `--cp-gap-sm`, `--cp-pad` | 10 px, 6 px, 0 | Between sections, inside them, around the picker. |
 | Size | `--cp-thumb`, `--cp-bar`, `--cp-swatch` | 16 px, 12 px, 20 px | The handles, the slider bars, the swatches. |
+| | `--cp-field-h` | 0 | The least height of the number fields, the text field and the switches (a host with a density setting sets it). |
 | | `--cp-size` | from the `size` option | The ring. Set the option, not this. |
 
 ## Examples
