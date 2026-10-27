@@ -55,7 +55,7 @@ my_workspace/                      the workspace (any name, anywhere)
 ```
 
 - **A dot in front means app-owned:** `.canvast/`, `.hidden/`, `.trash/` are not meant to be edited by hand. Board folders and `library/` are.
-- **A canvas** is one `.cvst` file (JSON, the backup's canvas format with a header; see \"On-disk format\"). The `.canvas` extension is not used, because another app already uses it.
+- **A canvas** is one `.cvst` file (JSON, the backup's canvas format with a header; see "On-disk format"). The `.canvas` extension is not used, because another app already uses it.
 - **`.canvast`** stays what it is: a zipped backup or export of a whole workspace, a board or a canvas. It is never the live workspace.
 - **Painting data** is not part of the layout. It was removed in v0.48.2.
 
