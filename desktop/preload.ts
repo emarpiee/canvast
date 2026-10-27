@@ -12,6 +12,14 @@ const bridge: DesktopBridge = {
   write: (path, bytes) => ipcRenderer.invoke("canvast:write", path, bytes),
   remove: (path) => ipcRenderer.invoke("canvast:remove", path),
   list: (path) => ipcRenderer.invoke("canvast:list", path),
+  rename: (from, to) => ipcRenderer.invoke("canvast:rename", from, to),
+  onClosing: (write) => {
+    ipcRenderer.on("canvast:closing", () => {
+      void write()
+        .catch(() => undefined)
+        .finally(() => ipcRenderer.invoke("canvast:closed"));
+    });
+  },
 };
 
 contextBridge.exposeInMainWorld("canvastDesktop", bridge);

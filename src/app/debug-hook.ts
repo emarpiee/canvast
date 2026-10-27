@@ -162,6 +162,10 @@ export interface DebugHook {
   startupMarks(): Record<string, number>;
   /** Put a generated benchmark scene in the document and in storage (in chunks, as edits), then wait until it is saved: the stored canvas a restart loads. */
   benchStore(scene: BenchScene): Promise<{ objects: number; ms: number }>;
+  /** Run one of the session's own board and canvas operations (as the Boards UI does). */
+  workspaceOp(op: "newBoard" | "newCanvas" | "renameBoard" | "renameCanvas" | "deleteCanvas" | "moveCanvas", ...args: Array<string | number>): Promise<void>;
+  /** Write what the desktop build's workspace folder does not have yet (its storage's flush). */
+  flushStorage(): Promise<void>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
   benchLoad(scene: BenchScene): Promise<{ objects: number; generateMs: number; loadMs: number; heapMB: number | null }>;
   /**
@@ -469,6 +473,19 @@ export function installDebugHook(
       return po ? exactStrokeEdgeDistancePx(po, x, y) : Infinity;
     },
     startupMarks: () => Object.fromEntries(performance.getEntriesByType("mark").filter((m) => m.name.startsWith("canvast:")).map((m) => [m.name.slice(8), m.startTime])),
+    workspaceOp: async (op, ...args) => {
+      const [a, b, c] = args as [string, string & number, number];
+      if (op === "newBoard") await session.newBoard();
+      else if (op === "newCanvas") await session.newCanvas(a);
+      else if (op === "renameBoard") await session.renameBoard(a, b);
+      else if (op === "renameCanvas") await session.renameCanvas(a, b);
+      else if (op === "deleteCanvas") await session.deleteCanvas(a);
+      else await session.moveCanvas(a, b, c);
+    },
+    flushStorage: async () => {
+      await session.persistence.flush();
+      await session.storage?.flush();
+    },
     benchStore: async (scene) => {
       const t0 = performance.now();
       const { objects } = generateBenchScene(scene);

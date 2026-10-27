@@ -433,6 +433,10 @@ async function start(): Promise<void> {
         editor.readOnly = true;
         editor.changed();
       },
+      onNotice: (text) => {
+        editor.message = text;
+        editor.changed();
+      },
     };
     storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
     // (the library folder's link is loaded too, before anything is drawn: an await later in this function lets a frame run early)
@@ -645,6 +649,12 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(storage, doc, view, editor, assets);
+  // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
+  desktopBridge()?.onClosing(async () => {
+    await session.persistence.flush();
+    await session.persistence.saveCamera();
+    await storage?.flush();
+  });
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
   const followStyles = (): void => {

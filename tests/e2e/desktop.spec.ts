@@ -84,3 +84,39 @@ test("library files are readable files under library/: the same bytes once, -2 o
     await app.close();
   }
 });
+
+test("boards are folders and canvases .cvst files: safe names, -2 on a clash, renames move them, a deleted canvas goes to .trash, closing writes the last change", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  let { app, page } = await launch(ws);
+  const tree = () => page.evaluate(() => window.__canvastDebug.session().tree!);
+  const op = (...a: Parameters<typeof window.__canvastDebug.workspaceOp>) => page.evaluate((a) => window.__canvastDebug.workspaceOp(...a), a);
+  try {
+    await expect.poll(async () => (await tree()).length).toBe(1);
+    let t = await tree();
+    await op("renameBoard", t[0]!.id, "Sketches");
+    await op("renameCanvas", t[0]!.canvases[0]!.id, "Characters");
+    await op("newCanvas", t[0]!.id);
+    t = await tree();
+    await op("renameCanvas", t[0]!.canvases[1]!.id, "characters");
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual(["sketches/characters-2.cvst", "sketches/characters.cvst"]);
+    const wsFile = JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8"));
+    expect(wsFile.boards.map((b: { name: string; folder: string }) => [b.name, b.folder])).toEqual([["Sketches", "sketches"]]);
+    await op("renameBoard", t[0]!.id, "Drawings");
+    await op("deleteCanvas", t[0]!.canvases[1]!.id);
+    // the last change, not flushed: closing the window writes it
+    await page.getByTestId("import-input").setInputFiles({ name: "dot.png", mimeType: "image/png", buffer: makePng(2, 2, () => [0, 0, 0, 255]) });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.saveStatus())).toBe("verified");
+  } finally {
+    await app.close();
+  }
+  expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual([".trash/drawings/characters-2.cvst", "drawings/characters.cvst", "library/images/dot.png"]);
+  const canvas = JSON.parse(readFileSync(join(ws, "drawings/characters.cvst"), "utf8"));
+  expect([canvas.format, canvas.objects.length, canvas.objects[0].kind]).toEqual(["canvast-canvas", 1, "image"]);
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(async () => (await tree()).map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])])).toEqual([["Drawings", [["Characters", 1]]]]);
+  } finally {
+    await app.close();
+  }
+});

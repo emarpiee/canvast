@@ -78,3 +78,35 @@ export const WORKSPACE_NAMING: FolderNaming = {
   valid: (_hash, file) => isSafeRelativePath(file) && file.startsWith("library/"),
   indexFile: ".canvast/library-index.canvast",
 };
+
+/** A board's folder and its canvases' files in the workspace (ADR 0177): `workspace.json`'s `boards`. */
+export interface PlacedBoard {
+  id: string;
+  name: string;
+  folder: string;
+  canvases: Array<{ id: string; name: string; file: string }>;
+}
+
+/** Folders and files the workspace itself and the app use: a board is never given one of these names. */
+const RESERVED_TOP = new Set(["library", ".canvast", ".hidden", ".trash"]);
+
+/** A safe name that no earlier one (compared without case) took: `base`, `base-2`, `base-3`… */
+function unique(base: string, taken: Set<string>): string {
+  let name = base;
+  for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base}-${n}`;
+  taken.add(name.toLowerCase());
+  return name;
+}
+
+/**
+ * Where each board and canvas is on disk: a board is a folder, a canvas a `.cvst` file in it, both by their safe names, in
+ * the workspace's order (the first of two equal names keeps it, the next gets `-2`). The same tree always gives the same paths.
+ */
+export function placeTree(boards: ReadonlyArray<{ id: string; name: string; canvases: ReadonlyArray<{ id: string; name: string }> }>): PlacedBoard[] {
+  const folders = new Set(RESERVED_TOP);
+  return boards.map((b) => {
+    const folder = unique(safeBase(b.name), folders);
+    const files = new Set<string>();
+    return { id: b.id, name: b.name, folder, canvases: b.canvases.map((c) => ({ id: c.id, name: c.name, file: `${folder}/${unique(safeBase(c.name), files)}.cvst` })) };
+  });
+}

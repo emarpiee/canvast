@@ -19,8 +19,12 @@ export interface DesktopBridge {
   exists(path: string): Promise<boolean>;
   /** Write a file whole: a temporary file is written, flushed and renamed over it, so it is never half written. Folders are made. */
   write(path: string, bytes: Uint8Array): Promise<void>;
-  /** Move a file into the workspace's `.trash/` (nothing when it is not there). */
+  /** Move a file or a folder into the workspace's `.trash/` (nothing when it is not there). */
   remove(path: string): Promise<void>;
+  /** Rename or move a file or a folder inside the workspace (folders are made; refused when the target is taken). */
+  rename(from: string, to: string): Promise<void>;
+  /** When the window closes, `write` runs first (to write what is not in the folder yet); the window waits for it, up to 15 s. */
+  onClosing(write: () => Promise<void>): void;
   /** The names of the files (not folders) in a folder; empty when there is none. */
   list(path: string): Promise<string[]>;
 }

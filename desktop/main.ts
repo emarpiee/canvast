@@ -152,8 +152,16 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     own(e);
     const full = await inside(root, rel);
     if (!existsSync(full)) return;
-    if (rel.startsWith(".trash/")) throw new Error("already in the trash");
+    if (rel === ".trash" || rel.startsWith(".trash/")) throw new Error("already in the trash");
     await toTrash(root, rel, full);
+  });
+  ipcMain.handle("canvast:rename", async (e, from: string, to: string) => {
+    own(e);
+    const a = await inside(root, from);
+    const b = await inside(root, to);
+    if (existsSync(b) && a.toLowerCase() !== b.toLowerCase()) throw new Error(`${to} is already there`);
+    await mkdir(dirname(b), { recursive: true });
+    await rename(a, b);
   });
   ipcMain.handle("canvast:list", async (e, rel: string) => {
     own(e);
@@ -207,6 +215,18 @@ async function openWindow(workspace: string): Promise<void> {
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
   installFileCalls(win, await realpath(workspace));
+  // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
+  let closing = false;
+  win.on("close", (e) => {
+    if (closing || win.webContents.isDestroyed()) return;
+    e.preventDefault();
+    closing = true;
+    win.webContents.send("canvast:closing");
+    setTimeout(() => win.destroy(), 15_000);
+  });
+  ipcMain.handle("canvast:closed", (e) => {
+    if (e.sender === win.webContents) setImmediate(() => win.destroy());
+  });
   win.webContents.on("will-navigate", (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.on("page-title-updated", (e) => e.preventDefault()); // (the title names the workspace folder)

@@ -9,6 +9,7 @@ import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import type { IdbStorage } from "./idb-storage";
 import type { OpenHooks } from "./store";
+import { WorkspaceMirror, watched } from "./workspace-mirror";
 import { WORKSPACE_NAMING } from "./workspace-names";
 
 
@@ -45,5 +46,49 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   externalFolder.naming = WORKSPACE_NAMING;
   externalFolder.saveHandle = false; // (the folder is the workspace itself, never a handle kept in the database)
   await externalFolder.use(bridgeDir(bridge, ws.name));
-  return { ...storage, libraryFolder: null, workspaceFolder: ws.path };
+  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId());
+  mirror.onError = (text) => opts.onNotice?.(text);
+  const tree = (): void => mirror.tree();
+  const canvases = (r: { canvases: string[] }): void => r.canvases.forEach((id) => mirror.canvas(id));
+  const workspace = watched(storage.workspace, {
+    startup: () => void mirror.start(),
+    commit: (_r, id) => mirror.canvas(id),
+    saveBookmarks: (_r, id) => mirror.canvas(id),
+    changeObjectTag: canvases,
+    removeAssetInstances: canvases,
+    formatStoredTags: () => mirror.everything(),
+    saveCamera: () => mirror.device(),
+    setCurrent: () => mirror.device(),
+    createWorkspace: tree,
+    createBoard: tree,
+    createCanvas: tree,
+    duplicateCanvas: tree,
+    duplicateBoard: tree,
+    moveCanvas: tree,
+    moveBoard: tree,
+    renameWorkspace: tree,
+    setViewGround: tree,
+    renameBoard: tree,
+    renameCanvas: tree,
+    deleteCanvas: tree,
+    deleteBoard: tree,
+    saveStyles: tree,
+  });
+  const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
+  const catalog = watched(storage.catalog, { setLock: tree });
+  return { ...storage, workspace, backups, catalog, libraryFolder: null, workspaceFolder: ws.path, flush: () => mirror.flush() };
+}
+
+/** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */
+function deviceId(): string {
+  const key = "canvast.deviceId";
+  try {
+    const kept = localStorage.getItem(key);
+    if (kept && /^[0-9a-f]{32}$/.test(kept)) return kept;
+    const made = Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem(key, made);
+    return made;
+  } catch {
+    return "0".repeat(32);
+  }
 }

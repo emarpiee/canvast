@@ -3,7 +3,7 @@ import { sha256Hex } from "../../src/assets/sha256";
 import { externalFolder, folderFileName } from "../../src/storage/external-folder";
 import type { Dir } from "../../src/storage/external-folder";
 import { HASH_NAMING } from "../../src/storage/external-folder";
-import { WORKSPACE_NAMING, isSafeRelativePath, libraryPath, safeBase } from "../../src/storage/workspace-names";
+import { WORKSPACE_NAMING, isSafeRelativePath, libraryPath, placeTree, safeBase } from "../../src/storage/workspace-names";
 
 /** An in-memory directory; `tamper` changes what a file reads back as, `perm` is what the browser answers about permission. */
 function fakeDir(): Dir & { files: Map<string, Blob>; tamper: boolean; perm: PermissionState } {
@@ -124,5 +124,18 @@ describe("library folder", () => {
     } finally {
       externalFolder.naming = HASH_NAMING;
     }
+  });
+
+  it("boards are folders and canvases .cvst files by their safe names: unique per level without case, never a reserved folder", () => {
+    const c = (id: string, name: string) => ({ id, name });
+    const placed = placeTree([
+      { id: "b1", name: "Sketches", canvases: [c("c1", "Characters"), c("c2", "characters"), c("c3", "")] },
+      { id: "b2", name: "sketches", canvases: [c("c4", "Characters")] },
+      { id: "b3", name: "Library", canvases: [] },
+    ]);
+    expect(placed.map((b) => b.folder)).toEqual(["sketches", "sketches-2", "library-2"]);
+    expect(placed[0]!.canvases.map((x) => x.file)).toEqual(["sketches/characters.cvst", "sketches/characters-2.cvst", "sketches/file.cvst"]);
+    expect(placed[1]!.canvases[0]!.file).toBe("sketches-2/characters.cvst");
+    expect(placeTree([{ id: "b", name: ".canvast", canvases: [] }])[0]!.folder).toBe("canvast"); // (no leading dot: safeBase drops it)
   });
 });

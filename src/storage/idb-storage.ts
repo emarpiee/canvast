@@ -39,6 +39,7 @@ export function idbStorage(db: IDBDatabase): IdbStorage {
     libraryFolder: idbLibraryFolder(db),
     workspaceFolder: null,
     resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
+    flush: async () => undefined,
   };
 }
 

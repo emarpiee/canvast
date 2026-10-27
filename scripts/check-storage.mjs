@@ -14,6 +14,7 @@ const IMPLEMENTATION = [
   "src/storage/folder-move.ts",
   "src/storage/migrate-v1.ts",
   "src/storage/reset.ts",
+  "src/storage/workspace-mirror.ts", // the desktop build writes the workspace folder from the IndexedDB journal
   "src/assets/asset-catalog.ts",
 ];
 const OUTSIDE = [

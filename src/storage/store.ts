@@ -148,6 +148,8 @@ export interface OpenHooks {
   onBlocked?: () => void;
   /** Called when another tab needs this connection closed for an upgrade. */
   onVersionChange?: () => void;
+  /** Something the person should know about storage (a failed write to the workspace folder), in plain words. */
+  onNotice?: (text: string) => void;
 }
 
 /** One opened storage: what a session works on. */
@@ -162,6 +164,8 @@ export interface Storage {
   readonly workspaceFolder: string | null;
   /** Start from scratch: delete everything canvast keeps here, then reload. `onBlocked`: another window still has it open. */
   resetAll(onBlocked?: () => void): Promise<void>;
+  /** Write now what is still on its way (the desktop build's workspace folder follows edits by a moment); nothing in the browser. */
+  flush(): Promise<void>;
 }
 
 /** The browser build's library folder: which originals are kept there, and moving them in and out. */
