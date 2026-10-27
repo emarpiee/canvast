@@ -25,7 +25,7 @@ const repo = run("git", ["remote", "get-url", "origin"]).replace(/^.*[:/]([^/:]+
 // 1. What is released is what is pushed, on main, with nothing else changed
 if (run("git", ["branch", "--show-current"]) !== "main") stop("not on main.");
 if (run("git", ["status", "--porcelain"])) stop("the working tree is not clean: commit or stash first.");
-run("git", ["fetch", "origin", "main", "--quiet"]);
+run("git", ["fetch", "origin", "main", "--tags", "--quiet"]); // (tags too: a release made earlier has its tag on the remote only)
 const head = run("git", ["rev-parse", "HEAD"]);
 if (head !== run("git", ["rev-parse", "origin/main"])) stop("HEAD is not what origin/main has: push first (a release points at a pushed commit).");
 const section = changelogSection(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version);
@@ -66,8 +66,10 @@ if (exists) {
 }
 
 // 5. Verify: it is the latest, and the file it serves is the one built here
-const shown = JSON.parse(run("gh", ["release", "view", tag, "--repo", repo, "--json", "isLatest,url,assets,isDraft,isPrerelease"]));
-if (!shown.isLatest || shown.isDraft || shown.isPrerelease) stop(`${tag} was created but is not the latest release (${shown.url}).`);
+const shown = JSON.parse(run("gh", ["release", "view", tag, "--repo", repo, "--json", "url,assets,isDraft,isPrerelease"]));
+const isLatest = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest"])).some((r) => r.tagName === tag && r.isLatest);
+if (!isLatest || shown.isDraft || shown.isPrerelease) stop(`${tag} was published but is not the latest release (${shown.url}).`);
+if (!["canvast.html", "canvast.html.sha256"].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
 run("gh", ["release", "download", tag, "--repo", repo, "--pattern", "canvast.html", "--dir", dir, "--clobber"]);
 const served = sha256(join(dir, "canvast.html"));
 rmSync(dir, { recursive: true });
