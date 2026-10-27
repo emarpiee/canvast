@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## The logo, and OKLCH in the colour picker (v0.47.0, 2026-10-27)
+
+**Implemented:** the logo and its guidelines (`scripts/brand/`; favicon in full colour, the one-colour mark in the app, a designed lock screen, prompt fields like Settings); the colour picker's OKLCH model replacing OKHCL, its `theme` option, and a dark `color-scheme`; README cover and screenshots made again, with new pictures for the Pattern panel, the colour picker and text.
+**Tested:** the colour picker's own unit and E2E specs were run in the slices that made it; no suite was run for this release as a whole.
+**Known failures:** none known.
+**Unverified:** the full suite on this version; the lock screen on a touch screen.
+**Committed:** the slice commits and the release commit (see the log).
+**Next bounded task:** the Styles and Adjust pictures in the README; whether drawing a sheet should take the rest of a group when only one member lies inside it.
+
 ## Hidden library items and passwords (v0.46.0, 2026-10-27)
 
 **Implemented:** Rename in the canvas context menu; a `hidden` flag on library items with a Hidden list opened by a word typed in the library search; a password gate for the Hidden items and one for the whole workspace (a lock screen before the workspace is read), both salted PBKDF2 hashes kept in the browser's catalog (no encryption); export questions for hidden items and for passwords and privacy settings; the library index leaves hidden items out.

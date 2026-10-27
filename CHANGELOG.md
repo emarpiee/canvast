@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.47.0 — The logo, and OKLCH in the colour picker (2026-10-27)
 
 - **Added:** the canvast logo, a canvas open on its right side and the dot you zoom into: the full-colour logo is the favicon (a version drawn on the 16 px grid); inside the app the one-colour mark, in the theme's text colour (light, dark and the theme colour), stands over the lock screen and beside the name in Settings > About and diagnostics. Its guidelines and files are made by `scripts/brand/`.
 - **Changed:** the lock screen is a centred card with the mark and the name over the question, and a full-width field and button; the field of every prompt (a password, a name) is drawn like a field in Settings instead of the browser's plain one.
