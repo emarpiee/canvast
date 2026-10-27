@@ -132,7 +132,7 @@ Within one device, the writer lease keeps one window as the writer, as it does f
 
 - Storage specs run against both adapters. The desktop build gets a Playwright project (`_electron.launch`).
 - Firefox keeps the browser build. The desktop build is Chromium only.
-- Releases (ADR 0175) add per-OS packages (Linux AppImage/deb first) next to `canvast.html`, built from the same commit.
+- Releases (ADR 0175) add a desktop package (a Linux AppImage first; other platforms later) next to `canvast.html`, built from the same commit.
 
 ## Order of work
 
@@ -145,19 +145,19 @@ Each step ends in a working app and is committed and released on its own.
 | 3 | **Workspace format:** boards as folders, `.cvst` canvases, `.canvast/index.json`, safe-write saving, the move from browser storage | A whole workspace lives in a folder and survives restart, move and copy |
 | 4 | **Encrypted hidden items** | `.hidden/` files unreadable without the password; password change re-wraps the key |
 | 5 | **Delete options and outside changes:** trash setting, file watching, relinking, conflict copies | The table above works with real file-manager actions |
-| 6 | **Releases:** desktop packages in the release pipeline; README, Limitations and this ADR accepted | A release carries the HTML and the desktop package |
+| 6 | **Releases:** the AppImage in the release pipeline; README, Limitations and this ADR accepted | A release carries the HTML and the desktop package |
 
-## Open questions for the owner
+## Owner's answers (2026-10-28)
 
-| # | Question | Proposed answer |
+| # | Question | Answer |
 |---|---|---|
-| 1 | Canvas file extension | `.cvst` |
-| 2 | Default delete choice | `.trash/` in the workspace |
-| 3 | The **workspace** password (asked when the app opens): encrypt the whole workspace, or keep it as a lock only? | Keep it as a lock, and say clearly that it is not encryption; only hidden items are encrypted |
-| 4 | Electron, or the smaller Tauri (system web engine: WebKitGTK on Linux, a third engine to test) | Electron |
-| 5 | First desktop platform | Linux; Windows and macOS later |
-| 6 | Should the browser build in Chromium also open a workspace folder (File System Access API)? | Not now; maybe after step 6 |
-| 7 | Canvas previews in the file manager (`.cvst` as a ZIP with `preview.png` and a Linux thumbnailer) | Later, not in this ADR |
+| 1 | Canvas file extension | **`.cvst`** |
+| 2 | Default delete choice | **`.trash/`** in the workspace (system trash and delete permanently stay as settings) |
+| 3 | The workspace password (asked when the app opens) | **Only locks the app**; it is not encryption, and the app says so. Only hidden items are encrypted |
+| 4 | Electron or Tauri | **Electron** |
+| 5 | First desktop package | **Linux AppImage**; other platforms later |
+| 6 | Should the browser build in Chromium also open a workspace folder? | Open: explained to the owner, waiting for the answer. Does not block steps 1 to 5 |
+| 7 | Canvas previews in the file manager | **None.** What the app makes for itself (thumbnails, caches, previews) stays only in the dot folders; a `.cvst` holds the canvas and nothing else |
 
 ## Consequences
 
