@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.20 — A folder for each kind of file (2026-10-29)
+
+- **Changed:** in the desktop app, library files that are in no library folder are sorted into more kind folders of `library/`: `vectors` (svg, eps), `icons` (ico, icns), `art_sources` (psd, kra, xcf, clip, procreate, sai, ai, afphoto, …), `presets` (brushes and swatches), `3d`, `archives`, besides `images`, `video`, `audio`, `fonts`, `documents` and `other`. The extension decides first, so an art file is never filed with the pictures. Files already in the folder move to their new place on the next save.
+
 ## 0.50.19 — The player no longer covers the video (2026-10-29)
 
 - **Fixed:** in the library's viewer, the player of a video or GIF covered the bottom of the picture, and the button that hides the controls sat on the player. The picture now fits above the player, and the button sits above both; the viewer itself keeps its size.

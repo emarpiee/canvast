@@ -345,7 +345,7 @@ The same app, packaged for the desktop (`canvast-X.Y.Z-x86_64.AppImage` on the [
 | --- | --- |
 | `.canvast/boards/<board>/` | A board, named after it (lowercase, `_` between words, `-` between parts; `-2` on a clash). Inside the app's own folder, so canvases are not edited by accident |
 | `.canvast/boards/<board>/<canvas>.cvst` | A canvas: one JSON file with its objects, frames and bookmarks |
-| `library/<folder path>/`, `library/images/`… | The library's files, named after their names in the library: in the folders of their library folders, or by kind when in none |
+| `library/<folder path>/`, `library/images/`… | The library's files, named after their names in the library: in the folders of their library folders, or by kind when in none: `images`, `vectors` (svg, eps), `icons` (ico, icns), `art_sources` (psd, kra, xcf, clip, procreate, sai, ai, afphoto, …), `presets` (brushes and swatches: abr, kpp, ase, aco, gpl, …), `3d` (obj, fbx, glb, gltf, stl, blend, …), `video`, `audio`, `fonts`, `documents` (pdf, txt, md, office files, epub, html, …), `archives` (zip, rar, 7z, tar, gz, …), `other` |
 | `.canvast/workspace.json`, `library.json` | Names, order, styles and passwords' kept forms; the library's names, tags, folders, notes and fields |
 | `.canvast/devices/` | One file per device: its open canvas and cameras |
 | `.canvast/folder.json` | This folder's own id, so a new folder at the same place is a new workspace |

@@ -110,6 +110,19 @@ describe("library folder", () => {
     const taken = new Set(["library/images/ref.png", "library/images/ref-2.png"]);
     expect(await libraryPath("Ref.PNG", "image/png", async (p) => taken.has(p))).toBe("library/images/ref-3.png");
     expect(await libraryPath("Inter Regular", "font/woff2", async () => false)).toBe("library/fonts/inter_regular.woff2");
+    // Kind folders by extension first: an art file is never filed with the pictures, whatever type the browser gives it.
+    const kindOf = async (name: string, type: string) => (await libraryPath(name, type, async () => false)).split("/")[1];
+    expect(await kindOf("Cover.psd", "image/vnd.adobe.photoshop")).toBe("art_sources");
+    expect(await kindOf("Sketch.kra", "application/x-krita")).toBe("art_sources");
+    expect(await kindOf("Logo.ai", "application/postscript")).toBe("art_sources");
+    expect(await kindOf("Logo.svg", "image/svg+xml")).toBe("vectors");
+    expect(await kindOf("App.ico", "image/vnd.microsoft.icon")).toBe("icons");
+    expect(await kindOf("Inks.abr", "")).toBe("presets");
+    expect(await kindOf("Head.glb", "model/gltf-binary")).toBe("3d");
+    expect(await kindOf("Refs.zip", "application/zip")).toBe("archives");
+    expect(await kindOf("Photo.JPG", "image/jpeg")).toBe("images");
+    expect(await kindOf("Notes.md", "text/markdown")).toBe("documents");
+    expect(await kindOf("data.bin", "")).toBe("other");
     expect(await libraryPath("notes.txt", "text/plain", async () => false)).toBe("library/documents/notes.txt");
     for (const bad of ["", "/etc/passwd", "library/../x", "library//x", "library/./x", "a\\b", "a\0b"]) expect(isSafeRelativePath(bad)).toBe(false);
 

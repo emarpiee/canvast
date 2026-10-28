@@ -34,13 +34,28 @@ export function safeBase(name: string): string {
 
 /** The folder of `library/` for an original that is in no library folder, by its kind. */
 export function kindFolder(type: string, name: string): string {
+  const byExt = KIND_OF_EXT[extOf(name).toLowerCase()];
+  if (byExt) return byExt;
   if (/^image\//.test(type)) return "images";
   if (/^video\//.test(type)) return "video";
   if (/^audio\//.test(type)) return "audio";
-  if (/^font\//.test(type) || /^(ttf|otf|woff2?)$/i.test(extOf(name))) return "fonts";
-  if (/^(application\/pdf|text\/)/.test(type) || /^(pdf|txt|md|docx?|odt|rtf|csv)$/i.test(extOf(name))) return "documents";
+  if (/^font\//.test(type)) return "fonts";
+  if (/^(application\/pdf|text\/)/.test(type)) return "documents";
   return "other";
 }
+
+/** The kind folder of a file by its extension, first (a .psd or .ai is an art file, not a picture, whatever type a browser gives it). */
+const KIND_EXTS: Record<string, readonly string[]> = {
+  vectors: ["svg", "svgz", "eps"],
+  icons: ["ico", "icns", "cur"],
+  art_sources: ["psd", "psb", "kra", "xcf", "clip", "csp", "procreate", "sai", "sai2", "ai", "afphoto", "afdesign", "afpub", "pdn", "ora", "fig", "sketch", "xd", "mdp"],
+  presets: ["abr", "kpp", "bundle", "brushset", "brush", "sut", "ase", "aco", "gpl", "ggr", "swatches", "pat"],
+  "3d": ["obj", "fbx", "glb", "gltf", "stl", "blend", "usdz", "usd", "3mf", "ply", "dae", "3ds"],
+  archives: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
+  fonts: ["ttf", "otf", "woff", "woff2", "ttc"],
+  documents: ["pdf", "txt", "md", "doc", "docx", "odt", "rtf", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub", "html", "htm", "json"],
+};
+const KIND_OF_EXT: Record<string, string> = Object.fromEntries(Object.entries(KIND_EXTS).flatMap(([k, exts]) => exts.map((e) => [e, k])));
 
 const TYPES: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif", bmp: "image/bmp", svg: "image/svg+xml", ico: "image/vnd.microsoft.icon",
@@ -51,7 +66,7 @@ const TYPES: Record<string, string> = {
 export const typeOfName = (name: string): string => TYPES[extOf(name).toLowerCase()] ?? "application/octet-stream";
 
 /** The kind folders of `library/` (an item in no library folder is in one of these). */
-export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "video", "audio", "fonts", "documents", "other"]);
+export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "vectors", "icons", "art_sources", "presets", "3d", "video", "audio", "fonts", "documents", "archives", "other"]);
 
 /** A file's extension for its name and type: its own, else one from the type, else "bin". */
 export function fileExt(name: string, type: string): string {
