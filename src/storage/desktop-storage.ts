@@ -8,7 +8,7 @@ import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
-import type { IdbStorage } from "./idb-storage";
+import type { IdbBackups, IdbStorage } from "./idb-storage";
 import type { FolderSync, FolderWriting, OpenHooks } from "./store";
 import { LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
@@ -78,6 +78,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     ready: () => hidden.isOpen(),
   };
   (storage.catalog as AssetCatalog).keepHiddenThumbs = false;
+  // An import's originals go straight into the workspace folder: nothing large passes through the app's storage (ADR 0177).
+  (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
   mirror.onError = (text) => opts.onNotice?.(text);
   const writingFns = new Set<(done: number, total: number) => void>();
   let writingNow: { done: number; total: number } | null = null;

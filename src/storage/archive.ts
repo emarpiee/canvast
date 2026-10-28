@@ -764,10 +764,18 @@ export async function sweepImportStaging(db: IDBDatabase): Promise<number> {
 }
 
 /**
- * Write the originals the store does not have, a batch at a time, each listed under `STAGED_KEY` in the same transaction. Only one batch
- * of bytes is in memory at once, so the size of an archive is not limited by memory. Returns the hashes written.
+ * Where an import's originals are written instead of the database (the desktop build: files in the workspace folder, ADR 0177), a batch
+ * at a time; each one written is then kept in the database only as where its file is, so nothing large passes through it (or has to be
+ * cleared from it after). Resolves with the file of each original written; one it did not write stays in the database as before.
  */
-async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], progress?: ProgressFn): Promise<Set<string>> {
+export type OriginalWriter = (batch: readonly AssetRecord[]) => Promise<Map<string, string>>;
+
+/**
+ * Write the originals the store does not have, a batch at a time, each listed under `STAGED_KEY` in the same transaction. Only one batch
+ * of bytes is in memory at once, so the size of an archive is not limited by memory. Returns the hashes written. With `writer`, the
+ * originals that are not hidden go to it (hidden ones are never written readable: they stay in the database until they can be sealed).
+ */
+async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], progress?: ProgressFn, writer?: OriginalWriter, hidden?: (hash: string) => boolean): Promise<Set<string>> {
   const written = new Set<string>();
   const total = assets.length;
   let i = 0;
@@ -788,7 +796,13 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
     })();
     const fresh = batch.filter((_, k) => !have[k]);
     if (fresh.length) {
-      const loaded = await Promise.all(fresh.map(async (a): Promise<AssetRecord> => ({ ...a, blob: new Blob([await a.blob.arrayBuffer()], { type: a.type }) })));
+      const files = writer ? await writer(fresh.filter((a) => !hidden?.(a.hash))) : new Map<string, string>();
+      const loaded = await Promise.all(
+        fresh.map(async (a): Promise<AssetRecord> => {
+          const file = files.get(a.hash);
+          return file ? { ...a, blob: new Blob([]), ext: 1, file } : { ...a, blob: new Blob([await a.blob.arrayBuffer()], { type: a.type }) };
+        }),
+      );
       const tx = db.transaction(["assets", "meta"], "readwrite", { durability: "strict" });
       const committed = done(tx);
       const staged = ((await req(tx.objectStore("meta").get(STAGED_KEY) as IDBRequest<string[] | undefined>)) ?? []);
@@ -813,11 +827,11 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
  * list, so the import shows all at once or not at all. If it stops before that, the staged originals are erased at once, or when the
  * app next opens (ADR 0176).
  */
-export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult> {
+export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, progress?: ProgressFn, writer?: OriginalWriter): Promise<ImportResult> {
   await sweepImportStaging(db);
   let staged: Set<string>;
   try {
-    staged = await stageOriginals(db, plan.assets, progress);
+    staged = await stageOriginals(db, plan.assets, progress, writer, (h) => plan.organization.get(h)?.hidden === true);
     if (importTesting.stopAfterFiles === "crash") return { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
     if (importTesting.stopAfterFiles === "fail") throw new ArchiveError("stopped after the files (test)");
     return await applyRest(db, workspaceId, targetBoardId, plan, staged);

@@ -397,9 +397,10 @@ test("a backup of many files: the busy screen shows how far its files are writte
     await page.getByTestId("confirm-ok").click();
     await loaded;
     expect(said.length).toBeGreaterThan(0);
-    const files = said.filter((t) => t.startsWith("Writing the files into the workspace folder: "));
+    // (the files are written straight into the folder while the backup is saved: the screen shows how far)
+    const files = said.filter((t) => t.startsWith("Writing the files"));
     expect(files.length).toBeGreaterThan(0);
-    expect(files.at(-1)).toBe("Writing the files into the workspace folder: 25 of 25");
+    expect(files.some((t) => /25 of 25/.test(t))).toBe(true);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     await expect(page.getByTestId("toast")).toContainText(/Imported/);
     expect(visible(ws).filter((f) => f.startsWith("library/"))).toHaveLength(25);

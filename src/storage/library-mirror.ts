@@ -549,6 +549,35 @@ export class LibraryMirror {
     }
   }
 
+  /**
+   * An import's originals, written into `library/` by kind and name (the next write of the library moves each one to its library
+   * folder) without waiting for the disk each time, checked by their content, then made sure on the disk at once. The file of each one
+   * written; one that failed is left out (the import keeps it in the app's storage, and it is written later as any).
+   */
+  async writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const taken = new Set<string>();
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < batch.length) {
+        const a = batch[next++]!;
+        const target = await this.freeTarget(libraryDir([], a.type, a.name), nameBase(a.name), fileExt(a.name, a.type), taken);
+        try {
+          await this.bridge.write(target, new Uint8Array(await a.blob.arrayBuffer()), { durable: false });
+          if ((await this.bridge.hash(target)) !== a.hash) throw new Error(`${target} was not written whole`);
+          out.set(a.hash, target);
+        } catch {
+          taken.delete(target.toLowerCase());
+        } finally {
+          externalFolder.release(target);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PARALLEL_WRITES, batch.length) }, worker));
+    if (out.size) await this.bridge.syncFiles([...out.values()]);
+    return out;
+  }
+
   /** The files `writeNew` wrote are made sure on the disk, then the app's storage keeps only where each one is (one transaction). */
   private async keepWritten(written: Written[]): Promise<void> {
     if (!written.length) return;

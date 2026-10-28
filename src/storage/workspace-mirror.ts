@@ -12,6 +12,7 @@ import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import { done, idbGet, idbPut, req } from "./idb";
 import { LibraryMirror } from "./library-mirror";
 import type { HiddenVault } from "./hidden-store";
+import type { AssetRecord } from "../assets/asset-library";
 import type { BackupRecord, WorkspaceStore } from "./store";
 import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
@@ -373,6 +374,10 @@ export class WorkspaceMirror {
       })
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
+  }
+  /** An import's originals, written straight into `library/` (see LibraryMirror.writeOriginals). */
+  writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
+    return this.lib.writeOriginals(batch);
   }
   /** Who imports files found in `library/`. */
   set importFiles(fn: LibraryMirror["importFiles"]) {

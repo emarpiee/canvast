@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.5 — An import writes its files straight into the workspace folder (2026-10-28)
+
+- **Fixed:** in the desktop app, an import first stored every file of the backup (pictures, fonts, videos and the rest) in the app's own storage and then copied it into the workspace folder; after the app started again, the storage spent minutes clearing those copies on a spinning disk, which slowed the start, the lock screen and closing. The files now go straight into the folder (the app keeps only where each one is), so nothing is left to clear and the disk does about half the work. Hidden items are never written as readable files: they stay in the app until the Hidden items are opened, then are encrypted into `.hidden/` as before.
+
 ## 0.50.4 — The lock screen answers at once, one window per workspace (2026-10-28)
 
 - **Fixed:** the workspace lock screen could seem to do nothing on Enter right after a big import: the password was read again from the app's storage, which was still busy with the import's clean-up. It is checked against the password already read, so it answers at once, and **Open** says *Checking…* while it works.

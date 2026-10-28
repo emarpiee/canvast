@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.5: an import writes its files straight into the workspace folder (2026-10-28)
+
+**Implemented:** `OriginalWriter` (archive.ts): `stageOriginals` hands each batch's originals that are not hidden to it and stores only their file (`ext: 1`); the desktop build sets `IdbBackups.writeOriginals` to `LibraryMirror.writeOriginals` (written by kind and name without a flush each, checked by hash, one `syncFiles` per batch; the next library write moves each to its library folder).
+**Tested:** desktop spec (see the commit).
+**Known failures:** none.
+**Unverified:** an import that fails after its files are written leaves them in `library/`, where the folder's look-through imports them as new items; the owner's 2,510-file backup end to end.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** the owner's import, then the start-up time of a 2,500-item workspace.
+
 ## v0.50.4: the lock screen answers at once, one window per workspace (2026-10-28)
 
 **Implemented:** the lock screen checks against the lock read before it opened (`checkLock`), with a *Checking…* state; the close handler returns at once until the session has started; `holdWorkspace` in `desktop/main.ts` (a pid file per workspace in the app's data folder; a running canvast holding it is waited for 20 s, then asked about).

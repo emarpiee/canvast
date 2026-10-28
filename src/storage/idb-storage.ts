@@ -1,5 +1,5 @@
 /** The browser build's storage: the workspace, its backups and the library in IndexedDB (ADR 0006–0008, 0176, 0177). */
-import type { ExportScope, ImportPlan, ProgressFn } from "./archive";
+import type { ExportScope, ImportPlan, OriginalWriter, ProgressFn } from "./archive";
 import { applyImport, buildArchive, hiddenInScope, sweepImportStaging } from "./archive";
 import type { FilesLayout } from "./files-zip";
 import { buildFilesZip } from "./files-zip";
@@ -63,6 +63,9 @@ function idbLibraryFolder(db: IDBDatabase): LibraryFolderStore {
 export class IdbBackups implements BackupStore {
   constructor(private readonly db: IDBDatabase) {}
 
+  /** Where an import's originals are written instead of the database (set by the desktop build: its workspace folder). */
+  writeOriginals: OriginalWriter | null = null;
+
   buildArchive(workspaceId: string, scope: ExportScope, appVersion: string, settings: Record<string, unknown> | undefined, progress?: ProgressFn) {
     return buildArchive(this.db, workspaceId, scope, appVersion, settings, progress);
   }
@@ -76,7 +79,7 @@ export class IdbBackups implements BackupStore {
   }
 
   applyImport(workspaceId: string, boardId: string, plan: ImportPlan, progress?: ProgressFn) {
-    return applyImport(this.db, workspaceId, boardId, plan, progress);
+    return applyImport(this.db, workspaceId, boardId, plan, progress, this.writeOriginals ?? undefined);
   }
 
   sweepImportStaging(): Promise<number> {
