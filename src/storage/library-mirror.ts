@@ -433,6 +433,35 @@ export class LibraryMirror {
     return changed;
   }
 
+  /**
+   * Readable files someone put in `.hidden/` (a sealed one is `<32 hex>.bin`): while the hidden items are open they become hidden items,
+   * taken where they lie, and the next write seals them and erases the readable file (a copy of an item the library has is erased at
+   * once: its bytes are in that item, which is hidden too). While they are locked, the person is told once, to open them. Whether anything
+   * was taken.
+   */
+  async scanHidden(): Promise<boolean> {
+    const plain = (await this.bridge.list(".hidden")).map((n) => `.hidden/${n}`).filter((p) => !isHiddenFile(p) && !p.includes(".tmp-"));
+    if (!plain.length) return false;
+    if (!this.vault.dataKey) {
+      const fresh = plain.filter((p) => !this.toldPlain.has(p));
+      for (const p of fresh) this.toldPlain.add(p);
+      if (fresh.length) this.onNotice?.(`${fresh.length === 1 ? `A readable file (${fresh[0]!.slice(8)}) is` : `${fresh.length} readable files are`} in .hidden/ of the workspace folder. Open the Hidden items to encrypt ${fresh.length === 1 ? "it" : "them"}.`);
+      return false;
+    }
+    if (!this.importFiles) return false;
+    await this.importFiles(plain.map((path) => ({ path, name: path.slice(8), folderId: null, hidden: true, read: async () => {
+      const bytes = await this.bridge.read(path);
+      return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
+    } })));
+    for (const path of plain) {
+      const hash = await this.bridge.hash(path);
+      const rec = hash ? await idbGet<AssetRecord>(this.db, "assets", hash) : undefined;
+      if (rec && rec.file !== path) await this.bridge.erase(path); // (a copy: the item has the bytes, and is hidden now)
+    }
+    return true;
+  }
+  private readonly toldPlain = new Set<string>();
+
   /** An item's file was renamed or moved outside the app: the item points at it, and takes its folder and (when renamed) its name. */
   private async relink(hash: string, e: CatalogEntry | undefined, from: string, to: string): Promise<void> {
     const folderId = await this.folderFor(parentOf(to));

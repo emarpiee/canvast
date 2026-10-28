@@ -184,7 +184,7 @@ export const SETTINGS = {
   "pattern.tags": { scope: "device", default: "pattern", validate: text(200), effect: "immediate" } as Def<string>,
   "svg.folder": { scope: "device", default: "Shapes", validate: text(60), effect: "immediate" } as Def<string>,
   "svg.tags": { scope: "device", default: "shape", validate: text(200), effect: "immediate" } as Def<string>,
-  "frame.place": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "frame.place": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagShot": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagBoard": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagCanvas": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,

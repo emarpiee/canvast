@@ -4,6 +4,7 @@
  * canvases as `.cvst` files, `.canvast/workspace.json` and `library.json`. Every original is a readable file under
  * `library/`, written through the library-folder code (ADR 0159) with readable names and moved when it is filed or renamed.
  */
+import { isHiddenFile } from "./hidden-vault";
 import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
@@ -82,6 +83,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   // An import's originals go straight into the workspace folder: nothing large passes through the app's storage (ADR 0177).
   (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
   mirror.onError = (text) => opts.onNotice?.(text);
+  await mirror.adoptLocks().catch(() => undefined); // (before the app asks for the workspace password)
   const writingFns = new Set<(done: number, total: number) => void>();
   let writingNow: { done: number; total: number } | null = null;
   mirror.onProgress = (done, total) => {
@@ -142,7 +144,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         // the whole library. Canvas and index files are always compared, by their headers and contents, which is cheap: another
         // device may write the same file a moment after this one did.
         const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
-        if (paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => on.libraryChanged());
+        if (paths.some((p) => (p === "library" || p.startsWith("library/") || (p.startsWith(".hidden/") && !isHiddenFile(p))) && !ownWrite(p))) void mirror.rescan(() => on.libraryChanged());
         if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON)) void mirror.rereadLibrary(() => on.libraryChanged());
         if (paths.some((p) => p === WORKSPACE_FILE || p.startsWith(`${BOARDS_DIR}/`))) check();
       });

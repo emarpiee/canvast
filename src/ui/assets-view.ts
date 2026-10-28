@@ -753,8 +753,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideGif.hidden = true;
   };
   /**
-   * Extract frame to the open canvas: the picture on screen now becomes a new PNG original in the library and is placed on the open
-   * canvas at once (the viewer stays as it is). The picture may not be presented yet (a seek just landed): a few tries.
+   * Extract frame: the picture on screen now becomes a new PNG file in the library, and is placed on the open canvas too only when
+   * Settings > Media and playback says so (off by default: the library does not change a canvas by itself). The picture may not be presented yet (a seek just landed): a few tries.
    */
   const extractFrame = async (): Promise<void> => {
     const engine = eng;
@@ -3173,7 +3173,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   root.querySelector<HTMLElement>('.assets-bar [data-action="details"]')!.addEventListener("click", () => toggleDetails());
   // Keys that work anywhere in the library while it is open, whatever has the focus (a click can leave it on the page, not in the library):
-  // Esc clears the selection, Ctrl+A picks everything shown, the arrow keys, Home and End move through the items in either layout.
+  // Esc clears the selection, Ctrl+A picks everything shown, Enter opens the one selected item in the viewer, the arrow keys, Home and End
+  // move through the items in either layout.
   window.addEventListener("keydown", (e) => {
     if (!visible || !viewer.hidden) return;
     const target = e.target as HTMLElement | null;
@@ -3208,6 +3209,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         session.editor.message = label ? `${redo ? "Redone" : "Undone"}: ${label}.` : `Nothing to ${redo ? "redo" : "undo"} in the library.`;
         session.editor.changed();
       });
+    } else if (e.key === "Enter" && selected && picked.size <= 1 && !target?.closest?.(".assets-bar, .assets-side, .asset-inspector")) {
+      // One item selected: Enter opens it in the viewer (as a double-click does).
+      e.preventDefault();
+      void showSlide(selected);
     } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
       if (target?.closest?.("select, .assets-bar, .assets-side")) return; // arrows belong to a menu, the bar and the sidebar
       if (moveBy(e)) e.preventDefault();

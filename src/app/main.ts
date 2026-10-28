@@ -512,6 +512,7 @@ async function start(): Promise<void> {
         try {
           const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
           if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
+          if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
           n++;
         } catch {
           // (not a file canvast can keep: left where it is)

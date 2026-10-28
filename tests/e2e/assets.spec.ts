@@ -943,9 +943,16 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
     await p.getByTestId("assets-import-input").setInputFiles({ name: `ref-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [c[0], c[1], c[2], 255]) });
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
+  const viewer = p.getByTestId("slide-view");
+  // One item selected: Enter opens it in the viewer; Escape goes back.
+  await p.getByTestId("asset-card").nth(1).click();
+  await p.keyboard.press("Enter");
+  await expect(viewer).toBeVisible();
+  await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 3");
+  await p.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   // The cards carry the picture only until hovered or selected; a double-click opens the viewer beside the details.
   await p.getByTestId("asset-card").nth(0).dblclick();
-  const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3");
@@ -2208,13 +2215,13 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   const v1 = (await viewer.locator("video").boundingBox())!;
   expect(Math.abs(v1.x - v0.x) + Math.abs(v1.y - v0.y), "the video was dragged").toBeGreaterThan(30);
   await p.keyboard.press("0");
-  // Extract frame to the open canvas: a new picture on the canvas at once, and in the library.
+  // Extract frame: a new picture in the library only; the open canvas is not touched (unless Settings says to place it).
   const onCanvas = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o["kind"] === "image").length);
   expect(await onCanvas()).toBe(0);
-  const extract = bar.getByRole("button", { name: /^Extract frame to the open canvas/ });
+  const extract = bar.getByRole("button", { name: /^Extract frame/ });
   await extract.click();
-  await expect.poll(onCanvas).toBe(1);
-  await expect(p.getByTestId("toast")).toContainText("Frame placed on Board 1");
+  await expect(p.getByTestId("toast")).toContainText("added to the library");
+  expect(await onCanvas()).toBe(0);
   // The frame is filed as Settings > Media and playback says: its own name, the "Extracted frames" folder, the "extracted-frame" tag (ADR 0081).
   const filed = await p.evaluate(async () => {
     const l = await window.__canvastDebug.assetListing();
@@ -2268,7 +2275,7 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
-  await viewer.getByRole("button", { name: /^Extract frame to the open canvas/ }).click();
+  await viewer.getByRole("button", { name: /^Extract frame/ }).click();
   await expect(p.getByTestId("toast")).toContainText("added to the library");
   await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length))).toBe(2);
   const listing = await p.evaluate(async () => {

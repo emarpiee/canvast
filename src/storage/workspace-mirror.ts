@@ -93,7 +93,12 @@ export class WorkspaceMirror {
     // Opened: what another device hid is read from the sealed index, and what waited for the key (hiding, showing) is done.
     vault.subscribe(() => {
       if (!vault.dataKey) return;
-      this.running = this.running.then(async () => void (await this.lib.reread())).catch(() => undefined);
+      this.running = this.running
+        .then(async () => {
+          await this.lib.reread();
+          await this.lib.scanHidden(); // (readable files in `.hidden/` waited for the key)
+        })
+        .catch(() => undefined);
       this.library();
     });
   }
@@ -111,6 +116,25 @@ export class WorkspaceMirror {
       this.started();
     }
   }
+  /**
+   * Before anything is shown (the lock screen first): the passwords the folder's `workspace.json` carries are taken where this device
+   * has none, so a workspace opened with no copy of it on this device (a new device, a moved or renamed folder) asks for its password
+   * too. A password is never removed here.
+   */
+  async adoptLocks(): Promise<void> {
+    const bytes = await this.bridge.read(WORKSPACE_FILE);
+    if (!bytes) return;
+    let locks: WorkspaceFile["locks"] | undefined;
+    try {
+      locks = (JSON.parse(new TextDecoder().decode(bytes)) as Partial<WorkspaceFile>).locks;
+    } catch {
+      return;
+    }
+    for (const [key, value] of [["workspaceLock", locks?.workspace], ["hiddenLock", locks?.hidden]] as const) {
+      if (typeof value === "string" && value && (await idbGet<string>(this.db, "meta", key).catch(() => undefined)) === undefined) await idbPut(this.db, "meta", key, value);
+    }
+  }
+
   /** Start-up is over (a look through `library/` waits for it: the folder's index explains most files). */
   private started: () => void = () => undefined;
   private readonly ready = new Promise<void>((resolve) => (this.started = resolve));
@@ -356,7 +380,7 @@ export class WorkspaceMirror {
   rescan(onChange: () => void): Promise<void> {
     this.running = Promise.all([this.running, this.ready])
       .then(async () => {
-        if (await this.lib.scan()) {
+        if ((await this.lib.scan()) || (await this.lib.scanHidden())) {
           onChange();
           this.library();
         }

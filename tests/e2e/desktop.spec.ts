@@ -448,6 +448,35 @@ test("switching workspace from the app: the recent ones (a gone one left out), t
   }
 });
 
+test("a workspace with a password, moved and renamed, still asks for it when opened from its new place", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  let { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("view-settings").click();
+    await page.getByRole("tab", { name: /Privacy/ }).click();
+    await page.getByTestId("workspace-pw-set").click();
+    for (let i = 0; i < 2; i++) {
+      await page.getByTestId("prompt-input").fill("open sesame");
+      await page.getByTestId("prompt-ok").click();
+    }
+    await expect(page.locator('[data-pw-card="workspace"] [data-pw-state]')).toContainText(/set/);
+    // (the folder follows a moment later: its workspace.json carries the password's kept form)
+    await expect.poll(() => (existsSync(join(ws, ".canvast/workspace.json")) ? JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")).locks?.workspace : undefined), { timeout: 15_000 }).toMatch(/^pbkdf2\$/);
+  } finally {
+    await app.close();
+  }
+  const moved = `${ws}-moved`;
+  renameSync(ws, moved);
+  // (the same device: its data folder is named after the old place here)
+  app = await electron.launch({ args: [join(buildDir(), "desktop"), `--workspace=${moved}`, `--user-data-dir=${ws}-userdata`], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
+  try {
+    page = await app.firstWindow();
+    await expect(page.getByTestId("lock-screen")).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await app.close();
+  }
+});
+
 test("hidden items are encrypted: sealed into .hidden/ with nothing readable left, opened only with the password, shown back into library/, the same key under a new password", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const secret = makePng(3, 2, () => [200, 40, 160, 255]);
@@ -511,6 +540,14 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
     expect(traces()).toEqual([]);
+    // A readable file put in .hidden/ from outside (a file manager) while the hidden items are open: it becomes a hidden item, sealed,
+    // and nothing readable of it is left.
+    const dropped = makePng(2, 3, () => [10, 220, 90, 255]);
+    writeFileSync(join(ws, ".hidden", "Dropped Secret.png"), dropped);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
+    expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(2);
+    expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
+    await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
   } finally {
     await app.close();
   }

@@ -193,6 +193,8 @@ export interface FolderFile {
   name: string;
   /** The library folder of the folder it was found in (made when there was none), or null for a kind folder. */
   folderId: string | null;
+  /** Found in `.hidden/`: it becomes a hidden item (and is sealed). */
+  hidden?: boolean;
   read(): Promise<Blob | null>;
 }
 

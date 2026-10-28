@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.16 — A moved workspace keeps its password (2026-10-29)
+
+- **Fixed:** in the desktop app, a workspace with a password opened from a new place (moved or renamed, or on a device that had no copy of it yet) opened without asking for the password: it was read from the app's own copy before the folder was. The passwords in the folder's `workspace.json` are now taken first, before the app asks.
+- **Added:** in the desktop app, a readable file put in `.hidden/` from outside the app (a file manager) becomes a hidden item and is encrypted, with nothing readable left; while the Hidden items are locked, the app says so once and encrypts it when they are opened.
+- **Changed:** a frame extracted in the library's viewer goes to the library only; *Place extracted frames on the canvas* (Settings > Media and playback) is now off by default.
+- **Added:** Enter opens the one selected library item in the viewer.
+
 ## 0.50.15 — Put the library's sections in your order (2026-10-28)
 
 - **Added:** the library sidebar's sections (Folders, File types, Tags, Canvas tags) can be put in any order: drag a section by its head onto another (the places it can go are marked like every drop place), or press Alt+Up or Alt+Down on its name. The order is kept (in the desktop app, for each workspace).

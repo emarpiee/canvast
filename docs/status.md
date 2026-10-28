@@ -36,6 +36,14 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.16: a moved workspace keeps its password (2026-10-29)
+
+**Implemented:** `WorkspaceMirror.adoptLocks` (folder passwords into the app's storage before the lock check, never removing one); `LibraryMirror.scanHidden` (readable files in `.hidden/` imported in place as hidden items, then sealed; a copy of a known item erased; a notice while locked); `frame.place` default off; Enter opens the selected item in the viewer.
+**Tested:** new desktop test (password set, folder moved and renamed, reopened on the same device: lock screen; fails without the fix), hidden-items test extended (a dropped readable file sealed), viewer and extract tests in chromium and firefox; desktop spec 13/13 (before the .hidden change), hidden tests after.
+**Known failures:** none.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** realtime updates of the workspace folder (deleted extracted frame, restored file).
+
 ## v0.50.15: put the library's sections in your order (2026-10-28)
 
 **Implemented:** `ui.sections` (saved with the library layout), `SIDE_SECTIONS`; section heads draggable (`application/x-canvast-section`), `.drop-zone` on the other sections, Alt+Up/Down on a section's name; `renderSide` puts the sections in that order.
