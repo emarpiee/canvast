@@ -328,6 +328,31 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a long sidebar list shows its first rows and a button for the rest; the open one always shows, and the choice is remembered", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  const names = Array.from({ length: 15 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
+  const tags = p.getByTestId("tag-list").locator(".side-item");
+  await addTags(p, HASH, names.slice(0, 8).join(","));
+  await expect(tags).toHaveCount(8);
+  await addTags(p, HASH, names.slice(8).join(",")); // (the tag field takes a line of limited length)
+  const more = p.getByTestId("tag-list").getByTestId("side-show-all");
+  await expect(tags).toHaveCount(12);
+  await expect(more).toHaveText("Show 3 more");
+  await more.click();
+  await expect(tags).toHaveCount(15);
+  await side(p, /^#t15/).click(); // the list of a tag past the first twelve
+  await p.getByTestId("tag-list").getByTestId("side-show-all").click(); // Show fewer
+  await expect(tags).toHaveCount(13); // (the open one stays)
+  await expect(side(p, /^#t15/)).toHaveAttribute("aria-current", "true");
+  await p.getByTestId("tag-list").getByTestId("side-show-all").click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(tags).toHaveCount(15); // (shown in full again, as it was left)
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("folders nest, an asset is in one folder at a time, and deleting a folder never deletes assets", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);
@@ -786,8 +811,7 @@ test("Delete everywhere: an item in use on two canvases goes from both and from 
   await place(); // the same original again, on Canvas 2 (open)
   await p.getByTestId("view-assets").click();
   await pick(p, HASH);
-  await expect(p.getByTestId("asset-delete")).toBeDisabled();
-  await p.getByTestId("asset-delete-everywhere").click();
+  await p.getByTestId("asset-delete").click(); // (in use: it asks to delete it everywhere)
   await expect(p.getByTestId("confirm-dialog")).toContainText("used 2 times");
   await p.getByTestId("confirm-ok").click();
   const active = () => p.evaluate((h) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === h)?.state), HASH);

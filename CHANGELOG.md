@@ -4,6 +4,9 @@
 
 - **Added:** every password field (the lock screen, setting or giving a password) has an eye button at its end that shows what was typed and hides it again; the field keeps the focus.
 - **Added:** the fields of a library item's note can be put in any order: drag a row by its grip, or press the Up and Down arrows on the grip. The order is stored with the item.
+- **Changed:** the details of a library item say where it is used once: the section is headed with the count (*Used on 3 canvases (4 times)*), each canvas has its own count (*×2*) beside **Show**, and an item used on many canvases lists the first five with **Show all** for the rest.
+- **Changed:** one **Delete…** button in the details: an item in use is deleted everywhere after a confirmation that says where (the first three canvases and how many others), so the greyed-out *Delete from library* and its explanation are gone.
+- **Changed:** long lists in the library's sidebar (folders, file types, tags, canvas tags) show their first rows and a full-width **Show N more** button (**Show fewer** folds them again, remembered on this device); the list you have open always stays visible.
 - **Changed:** a hidden library item's pictures on every canvas show a padlock at once, in the browser and in the desktop app, whether or not the Hidden password was given, until the item is shown again. A hidden video or sound on a canvas does not play.
 - **Fixed:** in the desktop app, a hidden item's card and details picture could stay blank (until the app was restarted) after the app was reopened, even once the Hidden list was opened or the item shown again: Similar images read the hidden item's picture while it was still locked, and the library kept that failure. Hidden items are no longer read for Similar images, and a picture that could not be read is tried again when the library is read again or the hidden items are opened.
 

@@ -102,6 +102,10 @@ function syncChildren(parent: HTMLElement, els: readonly HTMLElement[]): void {
 }
 /** How many thumbnails are made from their originals at once. */
 const THUMB_MAKERS = 3;
+/** "Where it is used" lists this many canvases, then a button for the rest. */
+const PLACES_SHOWN = 5;
+/** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
+const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12 } as const;
 /** How many loaded thumbnails are kept ready to show again. */
 const THUMB_URLS_KEPT = 3000;
 /** How often the library is drawn again while the looks of the pictures are being read. */
@@ -301,7 +305,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -325,6 +329,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.inspW === "number" && saved.inspW >= INSP_W.min && saved.inspW <= INSP_W.max) ui.inspW = saved.inspW;
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
+    if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.hidden)) {
       ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
       // Columns added after these choices were saved start hidden.
@@ -1667,10 +1672,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tree = (parent: string | null, depth: number): string =>
       listing!.folders
         .filter((f) => f.parentId === parent)
-        .map((f) =>
-          naming?.kind === "rename" && naming.id === f.id
-            ? nameInput(f.name, `New name for folder ${f.name}`)
-            : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
+        .map((f) => treeOf(f, depth))
+        .join("");
+    /** A folder's row, then its subfolders' rows. */
+    const treeOf = (f: AssetFolder, depth: number): string =>
+      (naming?.kind === "rename" && naming.id === f.id
+        ? nameInput(f.name, `New name for folder ${f.name}`)
+        : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
                 depth,
                 icon: ICONS.folder,
                 extra: more("folder", f.id, f.name, [
@@ -1678,17 +1686,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                   { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
                   { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
                 ]),
-              }) +
-              (naming?.kind === "new" && naming.parent === f.id ? nameInput("", `Name of the new folder inside ${f.name}`) : "") +
-              tree(f.id, depth + 1),
-        )
-        .join("");
+              })) +
+      (naming?.kind === "new" && naming.parent === f.id ? nameInput("", `Name of the new folder inside ${f.name}`) : "") +
+      tree(f.id, depth + 1);
     /** A section with a header that folds it away (remembered on this device) and an optional add button. */
     const section = (id: string, title: string, add: string, body: string): string => {
       const closed = ui.closed.includes(id);
       return `<section class="side-sec${closed ? " is-closed" : ""}" data-sec="${id}">
         <div class="side-head"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
         ${closed ? "" : body}</section>`;
+    };
+    /** A long list shows its first rows and a full-width button for the rest (remembered on this device); the row in use always shows. */
+    const capped = (id: keyof typeof SIDE_SHOWN, rows: Array<{ html: string; active: boolean }>): string => {
+      const limit = SIDE_SHOWN[id];
+      if (rows.length <= limit + 2) return rows.map((r) => r.html).join(""); // (no button for one or two more)
+      const open = ui.expanded.includes(id);
+      const shown = open ? rows : rows.filter((r, i) => i < limit || r.active);
+      return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
     const scopeName = ((): string => {
@@ -1720,7 +1734,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${tree(null, 0) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
+            ${capped("folders", listing.folders.filter((f) => f.parentId === null).map((f) => ({ html: treeOf(f, 0), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) }))) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
           </ul>`,
         )}
         ${section(
@@ -1729,10 +1743,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           "",
           `<ul class="tag-cloud type-cloud" data-testid="type-list">
             ${
-              [...typeCounts]
+              capped("types", [...typeCounts]
                 .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-                .map(([k, n]) => item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them" `))
-                .join("") || `<li class="side-empty">No files yet.</li>`
+                .map(([k, n]) => ({ html: item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them" `), active: scope === `ext:${k}` }))) || `<li class="side-empty">No files yet.</li>`
             }
           </ul>`,
         )}
@@ -1742,9 +1755,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           "",
           `<ul class="tag-cloud" data-testid="tag-list">
             ${
-              [...tagCounts]
+              capped("tags", [...tagCounts]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) =>
+                .map(([k, c]) => ({ active: scope === `tag:${k}` || (naming?.kind === "rename-tag" && naming.key === k), html:
                   naming?.kind === "rename-tag" && naming.key === k
                     ? nameInput(c.label, `New name for tag ${c.label}`)
                     : item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
@@ -1753,9 +1766,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                           { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
                           { attr: 'data-tag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
                         ]),
-                      }),
-                )
-                .join("") || `<li class="side-empty">No tags yet. Add them in the details.</li>`
+                      }) }))) || `<li class="side-empty">No tags yet. Add them in the details.</li>`
             }
           </ul>`,
         )}
@@ -1765,9 +1776,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           "",
           `<ul class="tag-cloud" data-testid="canvas-tag-list">
             ${
-              [...canvasTags]
+              capped("ctags", [...canvasTags]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) =>
+                .map(([k, c]) => ({ active: scope === `ctag:${k}` || (naming?.kind === "rename-ctag" && naming.key === k), html:
                   naming?.kind === "rename-ctag" && naming.key === k
                     ? nameInput(c.label, `New name for canvas tag ${c.label}`)
                     : item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
@@ -1776,9 +1787,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                           { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
                           { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
                         ]),
-                      }).replace("<button ", `<button title="On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `),
-                )
-                .join("") || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
+                      }).replace("<button ", `<button title="On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `) }))) || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
           </ul>`,
         )}
@@ -1873,9 +1882,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     inspector.dataset["hash"] = selected!;
     const instances = e?.instances ?? m!.instances;
     const where = session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas";
-    const placeRows = places
+    // A long list shows its first canvases and a button for the rest.
+    if (placesOf !== selected) {
+      placesOf = selected;
+      placesAll = false;
+    }
+    const placesShown = placesAll || places.length <= PLACES_SHOWN + 1 ? places : places.slice(0, PLACES_SHOWN);
+    const placeRows = placesShown
       .map(
-        (p) => `<li><span class="asset-place-name">${esc(p.boardName)} › ${esc(p.canvasName)} <span class="asset-place-n">${p.ids.length}</span></span>
+        (p) => `<li><span class="asset-place-name" title="${esc(p.boardName)} › ${esc(p.canvasName)}">${esc(p.boardName)} › ${esc(p.canvasName)}</span><span class="asset-place-n" title="${plural(p.ids.length, "time")} on this canvas">×${p.ids.length}</span>
           <button type="button" class="assets-btn" data-action="show" data-canvas="${p.canvasId}" data-testid="asset-show"
             aria-label="Show ${plural(p.ids.length, "instance")} on ${esc(p.boardName)} › ${esc(p.canvasName)}">${ICONS.locate}<span>Show</span></button></li>`,
       )
@@ -1900,22 +1915,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       <div class="asset-facts">
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
-        <span data-testid="asset-usage">${usesText(instances, e?.canvases ?? m!.canvases)}</span>
       </div>
       ${e && isCard(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The original file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
       ${e ? notesHtml(e) : ""}
-      ${places.length ? `<section class="asset-sec"><h3>Where it is used</h3><ul class="asset-places" data-testid="asset-places">${placeRows}</ul></section>` : ""}
+      <section class="asset-sec asset-where">
+        <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
+        ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
+          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
+      </section>
       <div class="asset-actions">
         ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download</span></button>` : ""}
         ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export</span></button>` : ""}
-        ${e ? `<button type="button" class="assets-btn is-danger" data-action="delete" data-testid="asset-delete"${instances > 0 ? " disabled" : ro}>${ICONS.trash2}<span>Delete from library</span></button>
-               ${instances > 0 ? `<p class="asset-note" data-testid="asset-delete-note">In use, so it cannot be deleted on its own. Remove its ${plural(instances, "instance")} from ${instances === 1 ? "its canvas" : "their canvases"} first, or delete it everywhere.</p>
-               <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="asset-delete-everywhere"${ro}>${ICONS.trash2}<span>Delete everywhere…</span></button>` : ""}` : ""}
+        ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>
       <details class="asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}><summary>Details</summary>
         <div data-metadata-body></div>
@@ -2043,6 +2059,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </section>`;
   };
 
+  /** Whether every canvas of "Where it is used" is listed (for the item `placesOf`; another item starts with the first ones). */
+  let placesAll = false;
+  let placesOf: string | null = null;
   /** The grip to focus once the details are drawn again (a field moved with the keyboard). */
   let focusGrip: number | null = null;
   /** After the rows were moved on the screen: each row's parts take its new place's number (a field being typed in stays its own when redrawn), then the order is stored. */
@@ -2427,13 +2446,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "export":
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
+      case "places-all":
+        placesAll = !placesAll;
+        renderInspector();
+        break;
       case "delete-everywhere": {
         // in use: their instances go too, everywhere, after a confirmation that says what and where
         const hashes = pickedGroup();
         const ents = hashes.map(entryOf).filter((x): x is CatalogListing["entries"][number] => !!x);
         const uses = ents.reduce((t, x) => t + x.instances, 0);
         const canvases = new Set(hashes.length === 1 ? places.map((pl) => pl.canvasId) : []).size || ents.reduce((t, x) => Math.max(t, x.canvases), 0);
-        const where = hashes.length === 1 && places.length ? places.map((pl) => `${pl.boardName} › ${pl.canvasName}`).join(", ") : null;
+        const named = places.slice(0, 3).map((pl) => `${pl.boardName} › ${pl.canvasName}`).join(", ");
+        const where = hashes.length === 1 && places.length ? (places.length > 3 ? `${named} and ${plural(places.length - 3, "other canvas", "other canvases")}` : named) : null;
         const name = hashes.length === 1 ? `“${ents[0]?.name || "Untitled"}”` : `${hashes.length} items`;
         void confirmDialog({
           title: `Delete ${name} everywhere?`,
@@ -2745,6 +2769,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!b) return;
     if (b.hasAttribute("data-side-toggle")) {
       sideOpen = !sideOpen;
+      renderSide();
+      return;
+    }
+    if (b.dataset["showAll"]) {
+      const id = b.dataset["showAll"];
+      ui.expanded = ui.expanded.includes(id) ? ui.expanded.filter((x) => x !== id) : [...ui.expanded, id];
+      saveUi();
       renderSide();
       return;
     }

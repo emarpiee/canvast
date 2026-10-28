@@ -1129,6 +1129,11 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .side-row:hover .side-mini, .side-row:focus-within .side-mini { opacity: 1; }
 .side-name { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-accent); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-4); }
 .side-empty { padding: var(--sp-2) var(--sp-5); color: var(--hud-muted); font-size: var(--text-sm); }
+/* a long list: its first rows, then one full-width button for the rest (and back) */
+.side-show-row, .tag-cloud .side-show-row { flex: 1 0 100%; }
+.side-show-all { flex: 1; padding: var(--sp-2) var(--sp-5); font: inherit; font-size: var(--text-sm); color: var(--hud-muted); text-align: center; background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
+.side-show-all:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.side-show-all:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 
 /* The details: what you do first, then the facts, then the rest. */
 .asset-inspector { flex: 0 0 308px; min-height: 0; overflow: auto; padding: var(--sp-7); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
@@ -1146,8 +1151,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec { margin-top: var(--sp-8); }
 .asset-sec h3 { margin: 0 0 var(--sp-3); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }
 .asset-places { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
-.asset-places li { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
-.asset-place-n { color: var(--hud-muted); font-variant-numeric: tabular-nums; margin-left: var(--sp-2); }
+.asset-places li { display: flex; align-items: center; gap: var(--sp-4); }
+.asset-place-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-place-n { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+.asset-place-total { color: var(--hud-muted); font-weight: var(--weight-regular); }
+.asset-places-more { width: 100%; justify-content: center; margin-top: var(--sp-3); }
 .asset-more h4 { margin: var(--sp-4) 0 var(--sp-1); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; }
 .asset-more { margin-top: var(--sp-8); color: var(--hud-muted); }
 .asset-more summary { cursor: pointer; }

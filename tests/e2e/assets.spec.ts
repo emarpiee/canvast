@@ -137,10 +137,12 @@ test("one original is shared by instances on several boards and canvases; usage 
   await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 4 times on 3 canvases");
   await card(p, HASH).click();
   const rows = p.getByTestId("asset-places").locator("li");
-  await expect(rows).toHaveText([/Board 1 › Canvas 1\s*2/, /Board 1 › Canvas 2\s*1/, /Board 2 › Canvas 1\s*1/]);
-  // In use: deleting from the library is refused, with the reason.
-  await expect(p.getByTestId("asset-delete")).toBeDisabled();
-  await expect(p.getByTestId("asset-delete-note")).toContainText("4 instances");
+  await expect(rows).toHaveText([/Board 1 › Canvas 1\s*×2/, /Board 1 › Canvas 2\s*×1/, /Board 2 › Canvas 1\s*×1/]);
+  await expect(p.getByTestId("asset-usage")).toHaveText("Used on 3 canvases (4 times)");
+  // In use: the one Delete button asks to delete it everywhere, and says where.
+  await p.getByTestId("asset-delete").click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("used 4 times on Board 1 › Canvas 1, Board 1 › Canvas 2, Board 2 › Canvas 1");
+  await p.getByTestId("confirm-cancel").click();
 
   // Deleting an instance never deletes the shared original.
   await toCanvas(p);
@@ -159,6 +161,25 @@ test("one original is shared by instances on several boards and canvases; usage 
   await expect(p.getByTestId("assets-status")).toHaveText("“blocks.png” is already in your library: no second copy is stored.");
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
   expect(await stored(p)).toEqual([HASH]);
+
+  // Used on many canvases: the first five are listed, a button shows all of them (and fewer again); the confirmation names three.
+  for (let n = 2; n <= 6; n++) {
+    await newCanvas(p, `Board 2 › Canvas ${n}`);
+    await placeFromAssets(p, HASH);
+  }
+  await toAssets(p);
+  await card(p, HASH).click();
+  await expect(p.getByTestId("asset-usage")).toHaveText("Used on 7 canvases (8 times)");
+  await expect(rows).toHaveCount(5);
+  const all = p.getByTestId("asset-places-more");
+  await all.click();
+  await expect(rows).toHaveCount(7);
+  await expect(all).toHaveText("Show fewer");
+  await all.click();
+  await expect(rows).toHaveCount(5);
+  await p.getByTestId("asset-delete").click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("and 4 other canvases");
+  await p.getByTestId("confirm-cancel").click();
   expect(app.consoleErrors).toEqual([]);
 });
 
