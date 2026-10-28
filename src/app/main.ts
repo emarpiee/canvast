@@ -1,4 +1,5 @@
 import { externalFolder } from "../storage/external-folder";
+import { askHiddenPassword } from "../ui/hidden-access";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -514,8 +515,8 @@ async function start(): Promise<void> {
           if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
           if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
           n++;
-        } catch {
-          // (not a file canvast can keep: left where it is)
+        } catch (e) {
+          console.warn(`canvast: ${f.path} could not be taken into the library: ${(e as Error).message}`); // (left where it is)
         }
       }
       if (!n) return;
@@ -527,6 +528,11 @@ async function start(): Promise<void> {
       session.libraryChanged();
     },
     beforeCheck: () => session.persistence.flush(),
+    // A readable file put in .hidden/ while the hidden items are locked: their password is asked at once, and the file is encrypted then.
+    hiddenNeedsKey: (names) => {
+      if (document.querySelector("dialog[open]")) return; // (another question is open: the next change asks)
+      void askHiddenPassword(session, `${names.length === 1 ? `“${names[0]}” was` : `${names.length} files were`} put in the hidden folder (.hidden/) and ${names.length === 1 ? "is" : "are"} still readable there. Enter the password of the Hidden items to encrypt ${names.length === 1 ? "it" : "them"} now.`);
+    },
     canvasesChanged: (ids) => session.outsideChanged(ids),
   });
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);

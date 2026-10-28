@@ -130,6 +130,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const folderSync: FolderSync = {
     start(on) {
       mirror.importFiles = (files) => on.importFiles(files);
+      mirror.askHiddenKey = (names) => on.hiddenNeedsKey(names);
       void mirror.rescan(() => on.libraryChanged());
       const check = (): void =>
         void on.beforeCheck().then(async () => {

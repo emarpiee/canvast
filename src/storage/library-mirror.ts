@@ -446,7 +446,8 @@ export class LibraryMirror {
       if (tellAgain) this.toldPlain.clear(); // (a file was just put there: said again, even about one said before)
       const fresh = plain.filter((p) => !this.toldPlain.has(p));
       for (const p of fresh) this.toldPlain.add(p);
-      if (fresh.length) this.onNotice?.(`${fresh.length === 1 ? `A readable file (${fresh[0]!.slice(8)}) is` : `${fresh.length} readable files are`} in .hidden/ of the workspace folder. Open the Hidden items to encrypt ${fresh.length === 1 ? "it" : "them"}.`);
+      if (fresh.length && this.askKey) this.askKey(fresh.map((p) => p.slice(8)));
+      else if (fresh.length) this.onNotice?.(`${fresh.length === 1 ? `A readable file (${fresh[0]!.slice(8)}) is` : `${fresh.length} readable files are`} in .hidden/ of the workspace folder. Open the Hidden items to encrypt ${fresh.length === 1 ? "it" : "them"}.`);
       return false;
     }
     if (!this.importFiles) return false;
@@ -462,6 +463,8 @@ export class LibraryMirror {
     return true;
   }
   private readonly toldPlain = new Set<string>();
+  /** Asks for the hidden items' password when readable files wait in `.hidden/` (set by the app). */
+  askKey: ((names: string[]) => void) | null = null;
 
   /** An item's file was renamed or moved outside the app: the item points at it, and takes its folder and (when renamed) its name. */
   private async relink(hash: string, e: CatalogEntry | undefined, from: string, to: string): Promise<void> {

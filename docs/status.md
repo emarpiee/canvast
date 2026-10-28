@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.26: a file put in .hidden/ asks for the password (2026-10-29)
+
+**Implemented:** `FolderHandlers.hiddenNeedsKey` → `askHiddenPassword` (LibraryMirror.askKey, WorkspaceMirror.askHiddenKey); main's folder import logs a file it could not take.
+**Tested:** hidden-items desktop test: dropped while locked → the password prompt names it → given → sealed; locked-picture test.
+**Known failures:** none.
+**Unverified:** the app's window is not brought to the front when it asks (the person may be in the file manager).
+**Committed:** on `main`, not pushed.
+**Next bounded task:** search keywords (owner to choose).
+
 ## v0.50.25: told each time a file is put in .hidden/ (2026-10-29)
 
 **Implemented:** `scanHidden(tellAgain)`, set when the watcher reports a readable file in `.hidden/`.

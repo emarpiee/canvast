@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.26 — A file put in .hidden/ asks for the password (2026-10-29)
+
+- **Changed:** in the desktop app, a readable file put in `.hidden/` while the Hidden items are locked makes the app ask for their password at once (it names the file); once given, the file is encrypted within a moment, so the folder shows its `.bin` in its place. A file that could not be taken in is now written in the developer tools' console instead of being skipped silently.
+
 ## 0.50.25 — Told each time a file is put in .hidden/ (2026-10-29)
 
 - **Fixed:** in the desktop app, a readable file put in `.hidden/` while the Hidden items were locked was mentioned only once, at start-up, so moving one in later seemed to do nothing. The app now says so each time a file is put there (it can only be encrypted with the password), and encrypts it as soon as the Hidden items are opened.

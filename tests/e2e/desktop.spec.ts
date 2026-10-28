@@ -543,11 +543,12 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     // A readable file put in .hidden/ from outside (a file manager) while the hidden items are open: it becomes a hidden item, sealed,
     // and nothing readable of it is left.
     const dropped = makePng(2, 3, () => [10, 220, 90, 255]);
-    // While the hidden items are locked it cannot be encrypted: the app says so each time one is put there, and encrypts it once opened.
+    // While the hidden items are locked it cannot be encrypted: the app asks for their password at once, and encrypts it then.
     await hid("lock");
     writeFileSync(join(ws, ".hidden", "Dropped Secret.png"), dropped);
-    await expect(page.getByTestId("toast")).toContainText("Open the Hidden items to encrypt it", { timeout: 15_000 });
-    expect((await hid("check", "pw2")).ok).toBe(true);
+    await expect(page.getByTestId("prompt-dialog")).toContainText("Dropped Secret.png", { timeout: 15_000 });
+    await page.getByTestId("prompt-input").fill("pw2");
+    await page.getByTestId("prompt-ok").click();
     await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
     expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(2);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);

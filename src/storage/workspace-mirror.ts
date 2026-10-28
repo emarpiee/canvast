@@ -404,6 +404,10 @@ export class WorkspaceMirror {
   writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
     return this.lib.writeOriginals(batch);
   }
+  /** Who asks for the hidden items' password when readable files wait in `.hidden/`. */
+  set askHiddenKey(fn: LibraryMirror["askKey"]) {
+    this.lib.askKey = fn;
+  }
   /** Who imports files found in `library/`. */
   set importFiles(fn: LibraryMirror["importFiles"]) {
     this.lib.importFiles = fn;

@@ -208,6 +208,8 @@ export interface FolderHandlers {
   beforeCheck(): Promise<void>;
   /** Boards or canvases changed; `canvases` were read in from their files (the open one is loaded again). */
   canvasesChanged(canvases: string[]): Promise<void>;
+  /** Readable files were put in `.hidden/` while the hidden items are locked: ask for their password (they are encrypted once it is given). */
+  hiddenNeedsKey(names: string[]): void;
 }
 
 /** The desktop build: the workspace folder's changes from outside the app. */
