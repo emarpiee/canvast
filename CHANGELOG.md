@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.13 — The filmstrip finds the open item (2026-10-28)
+
+- **Fixed:** opening an item far down a big library in the viewer left the filmstrip near its start, so the item was not in it: the strip was centred before it had its whole length. It now takes its length first, then centres the open item.
+
 ## 0.50.12 — Many boards, thumbnails ready (2026-10-28)
 
 - **Added:** the board and canvas switcher and **Place on…** have a search field (*Find a board or canvas*) that keeps only the boards and canvases whose names hold what is typed; with more than four boards, each is folded to its name but the one holding the open canvas (a click unfolds it). One behaviour for both lists.

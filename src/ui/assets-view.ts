@@ -704,6 +704,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const { list, at } = viewList();
     const i = at.get(slideHash ?? "") ?? -1;
     pos.textContent = i >= 0 ? `${i + 1} of ${list.length}` : "";
+    windowFilm(); // (first the strip takes its whole length: scrolled before that, a strip drawn again stopped near its start)
     if (i >= 0 && filmPitch > 0) film.scrollLeft = (parseFloat(getComputedStyle(film).paddingLeft) || 0) + i * filmPitch - (film.clientWidth - filmItemW) / 2;
     windowFilm(true);
   };
