@@ -30,7 +30,7 @@ export function releaseNotes({ version, section, sha256, size, previousTag, repo
   const { features, fixes } = splitBullets(section.bullets);
   const mb = (size / 1024 / 1024).toFixed(2);
   return [
-    `## canvast ${version} — ${section.title}${section.date ? ` (${section.date})` : ""}`,
+    `## ${section.title}${section.date ? ` (${section.date})` : ""}`,
     "",
     "### Features",
     list(features, "Nothing new in this release."),

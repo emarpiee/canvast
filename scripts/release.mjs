@@ -56,7 +56,7 @@ const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file)
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
-const title = `canvast ${version} — ${section.title}`;
+const title = `canvast ${version}`; // (the page title is the version; the notes start with what it is called)
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
