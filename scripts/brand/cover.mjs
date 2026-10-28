@@ -29,8 +29,8 @@ const fl = { x0: LOUPE.x - 10, y0: LOUPE.y - 10, x1: LOUPE.x + LOUPE.s + 10, y1:
 const cone = [[fh.x1, fh.y0], [fl.x1, fl.y0], [fl.x0, fl.y1], [fh.x0, fh.y1]];
 
 let grid = "";
-for (let x = 0; x <= W; x += 40) grid += `<path d="M${x} 0V${H}" stroke="${x % 200 ? "#151938" : "#1C2150"}" stroke-width="1"/>`;
-for (let y = 0; y <= H; y += 40) grid += `<path d="M0 ${y}H${W}" stroke="${y % 200 ? "#151938" : "#1C2150"}" stroke-width="1"/>`;
+for (let x = 0; x <= W; x += 40) grid += `<path d="M${x} 0V${H}" stroke="${x % 200 ? C.dkGrid : C.dkGridMajor}" stroke-width="1"/>`;
+for (let y = 0; y <= H; y += 40) grid += `<path d="M0 ${y}H${W}" stroke="${y % 200 ? C.dkGrid : C.dkGridMajor}" stroke-width="1"/>`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0">
 <defs><radialGradient id="glow" cx="${f(HERO.x + HERO.s / 2)}" cy="${f(HERO.y + HERO.s / 2)}" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${C.ultra}" stop-opacity="0.34"/><stop offset="1" stop-color="${C.ultra}" stop-opacity="0"/></radialGradient></defs>
@@ -50,7 +50,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:SGB;src:url("${pathToFileURL(join(FONT_DIR, "SpaceGrotesk_700Bold.ttf")).href}")}
 body{margin:0;background:${C.ink}}
 .t{position:absolute;white-space:pre;line-height:1}
-.chip{display:inline-flex;align-items:center;gap:12px;height:52px;padding:0 22px;margin-right:14px;border:2px solid #2B3170;border-radius:26px;font:22px SG;color:${C.haze}}
+.chip{display:inline-flex;align-items:center;gap:12px;height:52px;padding:0 22px;margin-right:14px;border:2px solid #2A4942;border-radius:26px;font:22px SG;color:${C.haze}}
 .chip i{width:9px;height:9px;border-radius:2.5px;background:${C.spark}}
 </style></head><body><div style="position:relative;width:${W}px;height:${H}px;overflow:hidden">${svg}
 <div class="t" style="left:100px;top:122px;font:22px SGB;letter-spacing:0.16em;color:${C.spark}">OFFLINE-FIRST ENDLESS CANVAS</div>

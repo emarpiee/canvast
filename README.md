@@ -566,13 +566,15 @@ The README pictures are those PNGs converted to WebP (`cwebp -q 80`) in `docs/sc
 
 ```sh
 npm run build
-node scripts/brand/build.mjs brand.canvast shots/   # draws the brand board in the app and exports the canvas (PNG of each page in shots/)
-node scripts/brand/icons.mjs icons/                 # the logo files: SVG masters, PNG 16–512 px, favicon.ico
+node scripts/brand/build.mjs docs/brand/canvast-brand-guidelines.canvast docs/brand/previews/   # draws the brand board in the app and exports the canvas (PNG of each page in previews/)
+node scripts/brand/icons.mjs docs/brand/icons/      # the logo files: SVG masters, PNG 16–512 px, favicon.ico
 node scripts/brand/preview.mjs preview/ 1,3         # a quick look at pages without the app
 node scripts/brand/cover.mjs docs/brand/cover.webp  # the cover at the top of this README (cwebp -q 85)
 ```
 
-The logo (a canvas open on its right side, and the dot you zoom into), its colours and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). At 32 px and under the icons use a small-size master drawn on the 16 px grid. The scripts work on a copy of `dist/canvast.html` in the system's temp folder. In the app the full-colour logo is only the favicon (the small-size master, inline in `src/index.html`); everywhere else the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour: over the lock screen and beside the name in Settings > About and diagnostics (`src/ui/brand.ts`, which holds the same geometry as `pages.mjs`). The cover at the top of this README (`docs/brand/cover.webp`, made by `cover.mjs`) shows the logo with a speck of itself inside its dot (1/64 of the tile) and a zoom cone from that speck to the mark at full size.
+The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.canvast`, open it with **Import archive…**), the logo files in `icons/`, the page pictures in `previews/`, the cover and `social-preview.png` (the cover fitted to 1280 × 640 for the repository).
+
+The logo (a canvas open on its right side, and the dot you zoom into), its colours (the app's default theme, Viridian, in light mode, with an orange dot) and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). At 32 px and under the icons use a small-size master drawn on the 16 px grid. The scripts work on a copy of `dist/canvast.html` in the system's temp folder. In the app the full-colour logo is only the favicon (the small-size master, inline in `src/index.html`); everywhere else the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour: over the lock screen and beside the name in Settings > About and diagnostics (`src/ui/brand.ts`, which holds the same geometry as `pages.mjs`). The cover at the top of this README (`docs/brand/cover.webp`, made by `cover.mjs`) shows the logo with a speck of itself inside its dot (1/64 of the tile) and a zoom cone from that speck to the mark at full size.
 
 ### Releasing
 
