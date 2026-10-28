@@ -13,6 +13,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import { ImportError } from "../assets/asset-library";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "./quota";
 import { externalFolder, externalHashes, libraryCounts } from "./external-folder";
+import { isHiddenFile } from "./hidden-vault";
 import { addExtensions, moveFromFolder, moveToFolder } from "./folder-move";
 import { resetAllData } from "./reset";
 
@@ -112,6 +113,12 @@ export class IdbOriginals implements OriginalStore {
     // The name is the catalog entry's: renaming an asset (ADR 0085) changes that entry and never rewrites the stored bytes.
     const entry = await idbGet<CatalogEntry>(this.db, "assetCatalog", hash).catch(() => undefined);
     return entry && entry.name !== rec.name ? { ...rec, name: entry.name } : rec;
+  }
+
+  async locked(hash: string): Promise<boolean> {
+    if (!externalFolder.unseal || externalFolder.unseal.ready()) return false;
+    const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+    return !!rec?.ext && isHiddenFile(rec.file);
   }
 
   async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {

@@ -163,6 +163,8 @@ export class AssetLibrary {
   private readonly decoded = new Map<string, Decoded>();
   private readonly pending = new Set<string>();
   private readonly missing = new Set<string>();
+  /** Of the missing: hidden items' encrypted files while the Hidden items are locked (drawn with a padlock). */
+  private readonly locked = new Set<string>();
   /** Originals the browser could not decode at a reduced size. */
   private readonly noReduced = new Set<string>();
   private readonly memoryOnly = new Map<string, AssetRecord>();
@@ -350,12 +352,26 @@ export class AssetLibrary {
       }
     }
     this.missing.delete(hash);
+    this.locked.delete(hash);
   }
 
-  /** Forget every missing hash so the next draw retries (the library folder came back). */
+  /** Forget every missing hash so the next draw retries (the library folder came back, the hidden items were opened). */
   retryAll(): void {
     this.missing.clear();
+    this.locked.clear();
     this.onReady();
+  }
+
+  /** The hidden items were locked: their decoded pictures leave memory, and draw as locked. */
+  async dropLocked(): Promise<void> {
+    if (!this.store) return;
+    const bases = new Set([...this.decoded.keys()].map((k) => k.split("#")[0]!.replace(SMALL_KEY, "")));
+    for (const h of bases) if (await this.store.locked(h)) this.forget(h);
+    this.onReady();
+  }
+
+  isLocked(hash: string): boolean {
+    return this.locked.has(hash);
   }
 
   /** Forget that a hash was missing so the next draw retries (after a restore). */
@@ -476,6 +492,7 @@ export class AssetLibrary {
       const rec = await this.record(hash.split("#")[0]!);
       if (!rec) {
         this.missing.add(hash);
+        if (await this.store?.locked(hash.split("#")[0]!)) this.locked.add(hash);
       } else if (small && Math.max(rec.pixelW, rec.pixelH) > SMALL_EDGE) {
         await this.ensureReduced(rec);
       } else {

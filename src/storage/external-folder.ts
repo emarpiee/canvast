@@ -164,7 +164,7 @@ class ExternalFolder {
    * The desktop build's hidden items (ADR 0177): a file under `.hidden/` is sealed, and is read through this (null while the
    * key is locked). Unset elsewhere.
    */
-  unseal: ((blob: Blob) => Promise<Blob | null>) | null = null;
+  unseal: { open(blob: Blob): Promise<Blob | null>; ready(): boolean } | null = null;
 
   /** Tests only: a stand-in directory cannot be saved in the database (it has functions), so it is used for the session. */
   saveHandle = true;
@@ -236,7 +236,7 @@ class ExternalFolder {
     try {
       let f: Blob = await (await this.dir.getFileHandle(file)).getFile();
       if (isHiddenFile(file)) {
-        const opened = this.unseal && f.size === size + SEAL_OVERHEAD ? await this.unseal(f) : null;
+        const opened = this.unseal && f.size === size + SEAL_OVERHEAD ? await this.unseal.open(f) : null;
         if (!opened) return null;
         f = opened;
       }

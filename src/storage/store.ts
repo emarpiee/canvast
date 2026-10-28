@@ -133,6 +133,8 @@ export interface CatalogStore {
 export interface OriginalStore {
   /** The original with its library name, or undefined when it is not stored (or its file is gone). */
   get(hash: string): Promise<AssetRecord | undefined>;
+  /** Whether the original is a hidden item's encrypted file that cannot be read while the Hidden items are locked (desktop build). */
+  locked(hash: string): Promise<boolean>;
   /** The state of its library entry, if it has one. */
   entryState(hash: string): Promise<CatalogEntry["state"] | undefined>;
   /** Write the original (when `writeBytes`) and make its library entry active, as one step. Throws ImportError when there is no room. */
@@ -165,6 +167,8 @@ export interface HiddenStore {
   unlock(password: string): Promise<boolean>;
   /** Make the key for a first password, or wrap it with a new one (it must be open). */
   setPassword(password: string): Promise<void>;
+  /** Whether the key is in memory now. */
+  isOpen(): boolean;
   /** Remove the key; refused (false) while any item is hidden, since hidden means encrypted. */
   remove(): Promise<boolean>;
   /** Forget the key: hidden items are locked until the password is given again. */

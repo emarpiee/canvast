@@ -36,6 +36,10 @@ export class HiddenVault implements HiddenStore {
     return this.key;
   }
 
+  isOpen(): boolean {
+    return !!this.key;
+  }
+
   async state(): Promise<HiddenState> {
     if (this.key) return "open";
     return (await this.load()) ? "locked" : "none";

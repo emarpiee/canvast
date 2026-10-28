@@ -314,6 +314,16 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(await listing()).toEqual([["Secret Plan.png", true, true]]);
     expect(await hid("set", null as unknown as string)).toEqual({ ok: false, state: "open" }); // (not removed while an item is hidden)
     expect(await hid("set", "pw2")).toEqual({ ok: true, state: "open" }); // the same key under a new password
+    // Locked (from the command palette): the picture on the canvas leaves memory and is drawn with a padlock; the password opens it again.
+    await page.keyboard.press("Control+k");
+    await page.locator(".palette-input").fill("lock hidden");
+    await expect(page.locator(".palette-title").first()).toHaveText("Lock hidden items");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toBeNull();
+    expect((await hid("check", "pw2")).ok).toBe(true);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
   } finally {
     await app.close();
   }

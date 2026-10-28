@@ -172,6 +172,8 @@ export interface DebugHook {
   hiddenOp(op: "set" | "check" | "lock", password?: string): Promise<{ ok: boolean; state: string }>;
   /** The bytes of a stored original as the app reads it (a hidden one opened with the key), or null when it cannot be read. */
   originalBytes(hash: string): Promise<number[] | null>;
+  /** Whether the canvas draws this original as locked (with a padlock). */
+  pictureLocked(hash: string): boolean;
   /** A full backup of the workspace, as base64 (the desktop build has no download a test can catch). */
   fullBackup(): Promise<string>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
@@ -274,6 +276,8 @@ export interface DebugDeps {
   session: Session;
   renderNow: () => FrameBreakdown;
   index: FrameIndex;
+  /** Whether the canvas draws this original as locked (a hidden item's encrypted file while the Hidden items are locked). */
+  pictureLocked: (hash: string) => boolean;
   appView: () => AppView;
   /** Write a setting of this device by key (tests: travel and tour settings). */
   setSetting: (key: string, value: unknown) => void;
@@ -498,6 +502,7 @@ export function installDebugHook(
       else if (op === "hide") await session.organize((cat) => cat.updateMeta(a, { hidden: b === "1" }));
       else await session.undoLibrary(op === "redo");
     },
+    pictureLocked: (hash) => deps.pictureLocked(hash),
     originalBytes: async (hash) => {
       const rec = await session.storage?.originals.get(hash);
       return rec ? Array.from(new Uint8Array(await rec.blob.arrayBuffer())) : null;

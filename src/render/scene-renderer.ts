@@ -10,7 +10,7 @@ import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject, projectionFor } from "./projection";
 import type { RasterSource } from "./draw-objects";
 import { drawMasked } from "./mask";
-import { addFillPath, batchable, drawCover, drawImageObject, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
+import { addFillPath, batchable, drawCover, drawImageObject, drawLockMark, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
 import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
 import { shapeHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
@@ -34,6 +34,8 @@ export interface SceneTheme {
   sharp: boolean;
   lasso: string;
   imagePlaceholder: string;
+  /** The padlock on a hidden picture while the Hidden items are locked. */
+  imageLocked: string;
   /** Eraser brush and its touched boxes. */
   danger: string;
   dangerWash: string;
@@ -135,6 +137,7 @@ export function drawObjects(
         const src = assets.get(key, shown, edge);
         if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
         drawImageObject(c, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
+        if (!src && assets.isLocked(key)) drawLockMark(c, t.inner, dpr, theme.imageLocked);
       }
       c.restore();
     } else if (po.cover) {
@@ -153,6 +156,7 @@ export function drawObjects(
       const src = assets.get(key, shown, edge);
       if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
       drawImageObject(c, po, vp, dpr, src, theme.imagePlaceholder);
+      if (!src && assets.isLocked(key)) drawLockMark(c, po, dpr, theme.imageLocked);
     }
     if (po.clip) c.restore();
   };

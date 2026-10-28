@@ -441,6 +441,30 @@ export function cornerRadiiPx(radius: number | readonly number[], ppu: number, h
   return out.some((v) => v > 0.01) ? out : null;
 }
 
+/**
+ * A padlock in the middle of a picture's placeholder: a hidden item whose file is encrypted while the Hidden items are locked
+ * (ADR 0177). Up to 24 CSS px, a third of the smaller side; nothing on a picture too small to show it.
+ */
+export function drawLockMark(ctx: CanvasRenderingContext2D, po: ProjectedObject, dpr: number, color: string): void {
+  const [l, t, r, b] = po.q as unknown as [number, number, number, number];
+  const s = Math.min(24 * dpr, Math.min(r - l, b - t) / 3);
+  if (s < 6 * dpr) return;
+  const x = (l + r) / 2;
+  const y = (t + b) / 2;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = s * 0.12;
+  ctx.beginPath(); // the shackle
+  ctx.arc(x, y - s * 0.1, s * 0.26, Math.PI, 0);
+  ctx.lineTo(x + s * 0.26, y + s * 0.05);
+  ctx.moveTo(x - s * 0.26, y - s * 0.1);
+  ctx.lineTo(x - s * 0.26, y + s * 0.05);
+  ctx.stroke();
+  ctx.fillRect(x - s * 0.4, y + s * 0.02, s * 0.8, s * 0.5); // the body
+  ctx.restore();
+}
+
 export function drawImageObject(
   ctx: CanvasRenderingContext2D,
   po: ProjectedObject,

@@ -15,6 +15,8 @@
   --canvas-handle-fill: oklch(1 0 0);
   --canvas-lasso: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
   --canvas-image-placeholder: oklch(0.89 calc(0.012 * var(--vivid)) var(--hue));
+  /* The padlock on a hidden picture while the Hidden items are locked (desktop build, ADR 0177): follows the theme through the label colour. */
+  --canvas-image-locked: var(--canvas-landmark-label);
   --canvas-ink: #1f2329;
   /* The chequer behind a transparent fill or outline (the colour picker, the paint chips): two greys and the pattern they make. */
   --check-a: oklch(0.85 0.006 var(--hue));

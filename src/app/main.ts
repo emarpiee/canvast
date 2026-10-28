@@ -159,6 +159,7 @@ function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
     sharp: el.dataset["corners"] === "sharp",
     lasso: v("--canvas-lasso"),
     imagePlaceholder: v("--canvas-image-placeholder"),
+    imageLocked: v("--canvas-image-locked"),
     ink: v("--canvas-ink"),
     danger: v("--canvas-danger"),
     dangerWash: v("--canvas-danger-wash"),
@@ -460,6 +461,16 @@ async function start(): Promise<void> {
   });
   // The library folder (ADR 0159): a restart asks permission again, which needs a click in the storage panel.
   externalFolder.subscribe(() => assets.retryAll());
+  // Encrypted hidden items (desktop build, ADR 0177): opened, their pictures are read again; locked, they leave memory, every tile
+  // that may show one is drawn again (with a padlock), and the Hidden list asks for the password again.
+  storage?.hidden?.subscribe(() => {
+    if (storage.hidden!.isOpen()) return assets.retryAll();
+    forgetHiddenPassword();
+    void assets.dropLocked().then(() => {
+      tiles.clear();
+      invalidate();
+    });
+  });
   if (storage?.libraryFolder && externalFolder.state === "needs-permission") {
     void storage.libraryFolder.keptHashes().then((h) => {
       if (!h.length) return;
@@ -1919,6 +1930,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
       { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
+      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { storage.hidden!.lock(); editor.message = "Hidden items are locked: the password opens them again."; editor.changed(); } }] : []),
     ];
     // the keys shown are the ones in use now (Settings > Shortcuts)
     const TITLE_COMMAND: Record<string, string> = { Undo: "edit.undo", Redo: "edit.redo", Duplicate: "edit.duplicate", "Delete the selection": "edit.delete", "Select everything": "edit.selectAll", Group: "edit.group", Ungroup: "edit.ungroup", "Bring to front": "edit.front", "Send to back": "edit.back", "Zoom in": "view.zoomIn", "Zoom out": "view.zoomOut", "Return to the origin": "view.home", "Fit the selection in view": "view.focus", "Previous view": "view.back", "Next view": "view.forward", Shortcuts: "find.help" };
@@ -2092,7 +2104,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
     );
   }
   resize();
