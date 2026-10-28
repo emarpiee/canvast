@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import { isSafeRelativePath } from "../src/storage/workspace-names";
+import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
 
 const SCHEME = "app";
@@ -224,9 +224,10 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   ipcMain.handle("canvast:canvasFiles", async (e) => {
     own(e);
     const out: string[] = [];
-    for (const d of await readdir(root, { withFileTypes: true }).catch(() => [])) {
-      if (!d.isDirectory() || d.name.startsWith(".") || d.name === "library") continue;
-      for (const f of await readdir(join(root, d.name), { withFileTypes: true }).catch(() => [])) if (f.isFile() && f.name.endsWith(".cvst")) out.push(`${d.name}/${f.name}`);
+    const boards = join(root, ...BOARDS_DIR.split("/"));
+    for (const d of await readdir(boards, { withFileTypes: true }).catch(() => [])) {
+      if (!d.isDirectory() || d.name.startsWith(".")) continue;
+      for (const f of await readdir(join(boards, d.name), { withFileTypes: true }).catch(() => [])) if (f.isFile() && f.name.endsWith(".cvst")) out.push(`${BOARDS_DIR}/${d.name}/${f.name}`);
     }
     return out;
   });
@@ -331,7 +332,10 @@ async function openWindow(workspace: string): Promise<void> {
   ipcMain.handle("canvast:closed", (e) => {
     if (e.sender === win.webContents) setImmediate(() => win.destroy());
   });
-  win.webContents.on("will-navigate", (e) => e.preventDefault());
+  // Nothing else is ever loaded; a reload of the app itself is allowed (Delete all data, Settings' Reload button).
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!url.startsWith(`${ORIGIN}/`)) e.preventDefault();
+  });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.on("page-title-updated", (e) => e.preventDefault()); // (the title names the workspace folder)
   await win.loadURL(`${ORIGIN}/${process.env["CANVAST_HASH"] ?? ""}`);

@@ -36,14 +36,15 @@ my_workspace/                      the workspace (any name, anywhere)
 │   ├── workspace.json             boards and canvases (order, names, paths), styles, locks
 │   ├── library.json               library items and folders: names, tags, notes, fields, hash ↔ file
 │   ├── settings.json              workspace settings (synced with the folder)
-│   └── devices/<device id>.json   per device: open canvas, cameras, last backup
+│   ├── devices/<device id>.json   per device: open canvas, cameras, last backup
+│   └── boards/                    the boards (app-owned: out of the way, not edited by hand)
+│       ├── sketches/              a board = a folder
+│       │   ├── characters.cvst    a canvas = one file
+│       │   └── backgrounds.cvst
+│       └── references/
+│           └── anatomy.cvst
 ├── .hidden/                       app-owned: encrypted hidden library items
 ├── .trash/                        app-owned: deleted files, when that option is chosen
-├── sketches/                      a board = a folder
-│   ├── characters.cvst            a canvas = one file
-│   └── backgrounds.cvst
-├── references/
-│   └── anatomy.cvst
 └── library/                       yours to browse and edit
     ├── anatomy/                   library folders are real (nested) folders
     │   ├── sternocleidomastoid-form-michael_hampton-p93.png
@@ -54,7 +55,7 @@ my_workspace/                      the workspace (any name, anywhere)
                                    from the existing folder settings of Export, Pattern, Shape, Screenshot
 ```
 
-- **A dot in front means app-owned:** `.canvast/`, `.hidden/`, `.trash/` are not meant to be edited by hand. Board folders and `library/` are.
+- **A dot in front means app-owned:** `.canvast/` (with the boards and canvases in `.canvast/boards/`), `.hidden/`, `.trash/` are not meant to be edited by hand. `library/` is yours. (The boards were first proposed at the top of the folder; the owner moved them into `.canvast/boards/` on 2026-10-28, before the first release, so a canvas file is not edited or renamed by accident. A workspace written with them at the top is moved in when it is opened.)
 - **A canvas** is one `.cvst` file (JSON, the backup's canvas format with a header; see "On-disk format"). The `.canvas` extension is not used, because another app already uses it.
 - **`.canvast`** stays what it is: a zipped backup or export of a whole workspace, a board or a canvas. It is never the live workspace.
 - **Painting data** is not part of the layout. It was removed in v0.48.2.
@@ -113,7 +114,7 @@ The app watches the workspace folder (Node `fs.watch`) and reconciles:
 | Rename or move a library file | Sees one file gone and a new one with the same hash, and relinks it. Canvases are not touched |
 | Drop a new file into `library/…` | Imports it into the library folder it was dropped in |
 | Delete a library file | Shows it as missing with its usage |
-| Rename a board folder or a `.cvst` file | Shows the new name |
+| Rename a board folder or a `.cvst` file (in `.canvast/boards/`) | Shows the new name |
 | Change a `.cvst` (sync from another device) while it is closed | Loads the new version next time |
 | Change a `.cvst` while it is open, with no unsaved edits here | Reloads it, keeping the camera |
 | Change a `.cvst` while it is open, **with** unsaved edits here | Keeps both: writes this device's version as `characters (conflict 2026-10-28 1412).cvst` and says so |
@@ -138,7 +139,7 @@ Within one device, the writer lease keeps one window as the writer, as it does f
 
 | File | Holds | Written by | Synced between devices |
 |---|---|---|---|
-| `<board>/<canvas>.cvst` | One canvas: its objects, nested frames and bookmarks | The app, whole file, safe write | Yes |
+| `.canvast/boards/<board>/<canvas>.cvst` | One canvas: its objects, nested frames and bookmarks | The app, whole file, safe write | Yes |
 | `.canvast/workspace.json` | The workspace: its name and view ground, the boards and canvases in order with their names, ids and paths, the saved styles, the password locks | The app | Yes |
 | `.canvast/library.json` | The library: every item (hash, file path, name, type, size, pixels, import date, tags, favourite, library folder, note, fields, deleted or not) and the library folders | The app | Yes |
 | `.canvast/devices/<device id>.json` | What belongs to one device: the open board and canvas, each canvas's camera, the last backup made there | Only that device | Synced, but each device writes only its own file, so they never clash |
@@ -181,7 +182,7 @@ The same JSON a `.canvast` backup already writes for a canvas (`canvases/<id>.js
   "viewGround": "checker",
   "boards": [
     { "id": "…", "name": "Sketches", "folder": "sketches",
-      "canvases": [ { "id": "…", "name": "Characters", "file": "sketches/characters.cvst" } ] }
+      "canvases": [ { "id": "…", "name": "Characters", "file": ".canvast/boards/sketches/characters.cvst" } ] }
   ],
   "styles": [ "…" ],
   "locks": { "hidden": "pbkdf2$…", "workspace": "pbkdf2$…" }

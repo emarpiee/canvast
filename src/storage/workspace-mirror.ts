@@ -209,7 +209,7 @@ export class WorkspaceMirror {
       const head = canvasHead(await this.bridge.head(path));
       const was = head && where.get(head.id);
       if (!was || (await this.bridge.exists(was.canvas.file))) continue;
-      const folder = path.slice(0, path.indexOf("/"));
+      const folder = path.slice(0, path.lastIndexOf("/"));
       const stem = path.slice(folder.length + 1, -".cvst".length);
       const board = was.board;
       const toBoard = this.placed.find((b) => b.folder.toLowerCase() === folder.toLowerCase());
@@ -219,8 +219,9 @@ export class WorkspaceMirror {
         const old = board.folder;
         board.folder = folder;
         for (const c of board.canvases) c.file = `${folder}${c.file.slice(old.length)}`;
-        await this.repo.renameBoard(board.id, folder);
-        board.name = folder;
+        const name = folder.slice(folder.lastIndexOf("/") + 1);
+        await this.repo.renameBoard(board.id, name);
+        board.name = name;
       } else if (toBoard.id !== board.id) {
         board.canvases.splice(board.canvases.indexOf(was.canvas), 1);
         toBoard.canvases.push(was.canvas);

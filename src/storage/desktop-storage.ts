@@ -12,7 +12,7 @@ import type { IdbStorage } from "./idb-storage";
 import type { FolderSync, OpenHooks } from "./store";
 import { LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
-import { WORKSPACE_NAMING } from "./workspace-names";
+import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault } from "./hidden-store";
 import type { AssetCatalog } from "../assets/asset-catalog";
 
@@ -130,7 +130,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
         if (paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => on.libraryChanged());
         if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON)) void mirror.rereadLibrary(() => on.libraryChanged());
-        if (paths.some((p) => p === WORKSPACE_FILE || (!p.startsWith(".") && !p.startsWith("library")))) check();
+        if (paths.some((p) => p === WORKSPACE_FILE || p.startsWith(`${BOARDS_DIR}/`))) check();
       });
     },
   };

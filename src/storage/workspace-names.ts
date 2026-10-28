@@ -124,8 +124,11 @@ export interface PlacedBoard {
   canvases: Array<{ id: string; name: string; file: string }>;
 }
 
-/** Folders and files the workspace itself and the app use: a board is never given one of these names. */
-const RESERVED_TOP = new Set(["library", ".canvast", ".hidden", ".trash"]);
+/**
+ * Where the boards are: in the app's own folder, so canvas files (not meant to be edited by hand) are out of the way; the top of
+ * the workspace shows `library/`, the files that are yours to browse and drop in (owner, 2026-10-28).
+ */
+export const BOARDS_DIR = ".canvast/boards";
 
 /** A safe name that no earlier one (compared without case) took: `base`, `base-2`, `base-3`… */
 function unique(base: string, taken: Set<string>): string {
@@ -136,13 +139,14 @@ function unique(base: string, taken: Set<string>): string {
 }
 
 /**
- * Where each board and canvas is on disk: a board is a folder, a canvas a `.cvst` file in it, both by their safe names, in
- * the workspace's order (the first of two equal names keeps it, the next gets `-2`). The same tree always gives the same paths.
+ * Where each board and canvas is on disk: a board is a folder of `.canvast/boards/`, a canvas a `.cvst` file in it, both by their
+ * safe names, in the workspace's order (the first of two equal names keeps it, the next gets `-2`). The same tree always gives the
+ * same paths. (A workspace written before boards moved there has them at the top: the next write moves them in.)
  */
 export function placeTree(boards: ReadonlyArray<{ id: string; name: string; canvases: ReadonlyArray<{ id: string; name: string }> }>): PlacedBoard[] {
-  const folders = new Set(RESERVED_TOP);
+  const folders = new Set<string>();
   return boards.map((b) => {
-    const folder = unique(safeBase(b.name), folders);
+    const folder = `${BOARDS_DIR}/${unique(safeBase(b.name), folders)}`;
     const files = new Set<string>();
     return { id: b.id, name: b.name, folder, canvases: b.canvases.map((c) => ({ id: c.id, name: c.name, file: `${folder}/${unique(safeBase(c.name), files)}.cvst` })) };
   });

@@ -128,17 +128,17 @@ describe("library folder", () => {
     }
   });
 
-  it("boards are folders and canvases .cvst files by their safe names: unique per level without case, never a reserved folder", () => {
+  it("boards are folders of .canvast/boards/ and canvases .cvst files by their safe names: unique per level without case", () => {
     const c = (id: string, name: string) => ({ id, name });
     const placed = placeTree([
       { id: "b1", name: "Sketches", canvases: [c("c1", "Characters"), c("c2", "characters"), c("c3", "")] },
       { id: "b2", name: "sketches", canvases: [c("c4", "Characters")] },
       { id: "b3", name: "Library", canvases: [] },
     ]);
-    expect(placed.map((b) => b.folder)).toEqual(["sketches", "sketches-2", "library-2"]);
-    expect(placed[0]!.canvases.map((x) => x.file)).toEqual(["sketches/characters.cvst", "sketches/characters-2.cvst", "sketches/file.cvst"]);
-    expect(placed[1]!.canvases[0]!.file).toBe("sketches-2/characters.cvst");
-    expect(placeTree([{ id: "b", name: ".canvast", canvases: [] }])[0]!.folder).toBe("canvast"); // (no leading dot: safeBase drops it)
+    expect(placed.map((b) => b.folder)).toEqual([".canvast/boards/sketches", ".canvast/boards/sketches-2", ".canvast/boards/library"]);
+    expect(placed[0]!.canvases.map((x) => x.file)).toEqual([".canvast/boards/sketches/characters.cvst", ".canvast/boards/sketches/characters-2.cvst", ".canvast/boards/sketches/file.cvst"]);
+    expect(placed[1]!.canvases[0]!.file).toBe(".canvast/boards/sketches-2/characters.cvst");
+    expect(placeTree([{ id: "b", name: ".canvast", canvases: [] }])[0]!.folder).toBe(".canvast/boards/canvast"); // (no leading dot: safeBase drops it)
   });
 
   it("a library item's place: its folder path by safe names (else its kind folder), and a numbered file still fits its name", () => {

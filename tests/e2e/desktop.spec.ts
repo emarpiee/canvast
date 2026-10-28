@@ -22,6 +22,10 @@ async function launch(workspace: string, device = "userdata"): Promise<{ app: El
   return { app, page, requests };
 }
 
+/** Where the boards are, inside the app's own folder. */
+const B = ".canvast/boards/";
+/** The workspace's files without the app's own bookkeeping (its boards included). */
+const visible = (root: string): string[] => files(root).filter((f) => !f.startsWith(".canvast/") || f.startsWith(B));
 const files = (root: string, dir = root): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(root, join(dir, e.name)) : [relative(root, join(dir, e.name))])).sort();
 
@@ -86,7 +90,7 @@ test("library files are readable files under library/: the same bytes once, -2 o
   }
 });
 
-test("boards are folders and canvases .cvst files: safe names, -2 on a clash, renames move them, a deleted canvas goes to .trash, closing writes the last change", async () => {
+test("boards are folders of .canvast/boards/ and canvases .cvst files: safe names, -2 on a clash, renames move them, a deleted canvas goes to .trash, closing writes the last change", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   let { app, page } = await launch(ws);
   const tree = () => page.evaluate(() => window.__canvastDebug.session().tree!);
@@ -100,9 +104,9 @@ test("boards are folders and canvases .cvst files: safe names, -2 on a clash, re
     t = await tree();
     await op("renameCanvas", t[0]!.canvases[1]!.id, "characters");
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual(["sketches/characters-2.cvst", "sketches/characters.cvst"]);
+    expect(visible(ws)).toEqual([`${B}sketches/characters-2.cvst`, `${B}sketches/characters.cvst`]);
     const wsFile = JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8"));
-    expect(wsFile.boards.map((b: { name: string; folder: string }) => [b.name, b.folder])).toEqual([["Sketches", "sketches"]]);
+    expect(wsFile.boards.map((b: { name: string; folder: string }) => [b.name, b.folder])).toEqual([["Sketches", `${B}sketches`]]);
     await op("renameBoard", t[0]!.id, "Drawings");
     await op("deleteCanvas", t[0]!.canvases[1]!.id);
     // the last change, not flushed: closing the window writes it
@@ -112,8 +116,8 @@ test("boards are folders and canvases .cvst files: safe names, -2 on a clash, re
   } finally {
     await app.close();
   }
-  expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual([".trash/drawings/characters-2.cvst", "drawings/characters.cvst", "library/images/dot.png"]);
-  const canvas = JSON.parse(readFileSync(join(ws, "drawings/characters.cvst"), "utf8"));
+  expect(visible(ws)).toEqual([`${B}drawings/characters.cvst`, `.trash/${B}drawings/characters-2.cvst`, "library/images/dot.png"]);
+  const canvas = JSON.parse(readFileSync(join(ws, `${B}drawings/characters.cvst`), "utf8"));
   expect([canvas.format, canvas.objects.length, canvas.objects[0].kind]).toEqual(["canvast-canvas", 1, "image"]);
   ({ app, page } = await launch(ws));
   try {
@@ -124,10 +128,23 @@ test("boards are folders and canvases .cvst files: safe names, -2 on a clash, re
     await op("newCanvas", b);
     await op("renameCanvas", (await tree())[0]!.canvases[1]!.id, "Scrap");
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect(existsSync(join(ws, "drawings/scrap.cvst"))).toBe(true);
+    expect(existsSync(join(ws, `${B}drawings/scrap.cvst`))).toBe(true);
     await op("deleteCanvas", (await tree())[0]!.canvases[1]!.id);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual([".trash/drawings/characters-2.cvst", "drawings/characters.cvst", "library/images/dot.png"]);
+    expect(visible(ws)).toEqual([`${B}drawings/characters.cvst`, `.trash/${B}drawings/characters-2.cvst`, "library/images/dot.png"]);
+  } finally {
+    await app.close();
+  }
+  // A workspace written before the boards moved into .canvast/boards/ (at the top): they are moved in, and open as before.
+  renameSync(join(ws, `${B}drawings`), join(ws, "drawings"));
+  const wsFile = join(ws, ".canvast/workspace.json");
+  writeFileSync(wsFile, readFileSync(wsFile, "utf8").replaceAll(B, ""));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(async () => (await tree()).map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])])).toEqual([["Drawings", [["Characters", 1]]]]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(visible(ws).filter((f) => f.endsWith(".cvst") && !f.startsWith(".trash/"))).toEqual([`${B}drawings/characters.cvst`]);
+    expect(existsSync(join(ws, "drawings"))).toBe(false);
   } finally {
     await app.close();
   }
@@ -190,7 +207,7 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   ]);
   await a.page.evaluate(() => window.__canvastDebug.flushStorage());
   await a.app.close();
-  expect(files(ws).filter((f) => f.endsWith(".cvst")).map((f) => f.replace(/conflict_[0-9_-]+/, "conflict"))).toEqual(["sketches/characters-conflict.cvst", "sketches/characters.cvst"]);
+  expect(files(ws).filter((f) => f.endsWith(".cvst")).map((f) => f.replace(/conflict_[0-9_-]+/, "conflict"))).toEqual([`${B}sketches/characters-conflict.cvst`, `${B}sketches/characters.cvst`]);
 });
 
 test("library folders are real folders: filing or renaming an item moves its file, undo moves it back, library.json brings the library to a new device", async () => {
@@ -283,9 +300,9 @@ test("a backup imported into a workspace folder: its boards, canvases and librar
     await page.getByTestId("confirm-ok").click();
     await expect(page.getByTestId("toast")).toContainText(/Imported/);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual(["board_1/canvas_1.cvst", "library/plants/green_leaf.png", "studies/hands.cvst"]);
+    expect(visible(ws)).toEqual([`${B}board_1/canvas_1.cvst`, `${B}studies/hands.cvst`, "library/plants/green_leaf.png"]);
     expect(readFileSync(join(ws, "library/plants/green_leaf.png")).equals(green)).toBe(true);
-    const canvas = JSON.parse(readFileSync(join(ws, "studies/hands.cvst"), "utf8"));
+    const canvas = JSON.parse(readFileSync(join(ws, `${B}studies/hands.cvst`), "utf8"));
     expect(canvas.objects.map((o: { kind: string }) => o.kind)).toEqual(["image"]);
   } finally {
     await app.close();
@@ -431,14 +448,14 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
     await add(a.page, 1);
     await a.page.evaluate(() => window.__canvastDebug.flushStorage());
 
-    // By hand, in the file manager: the canvas file renamed, a picture dropped into a new folder of library/.
-    renameSync(join(ws, "sketches/characters.cvst"), join(ws, "sketches/Heroes.cvst"));
+    // By hand, in the file manager (in the app's own folder, but someone may still): the canvas file renamed, a picture dropped into a new folder of library/.
+    renameSync(join(ws, `${B}sketches/characters.cvst`), join(ws, `${B}sketches/Heroes.cvst`));
     mkdirSync(join(ws, "library/drops"));
     writeFileSync(join(ws, "library/drops/New One.png"), makePng(2, 2, () => [5, 200, 5, 255]));
     await expect.poll(() => tree(a.page), { timeout: 10_000 }).toEqual([["Sketches", ["Heroes"]]]);
     await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "New One.png").map((e) => l.folders.find((f) => f.id === e.folderIds?.[0])?.name))), { timeout: 10_000 }).toEqual(["drops"]);
     await a.page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect(files(ws).filter((f) => f.endsWith(".cvst"))).toEqual(["sketches/heroes.cvst"]);
+    expect(files(ws).filter((f) => f.endsWith(".cvst"))).toEqual([`${B}sketches/heroes.cvst`]);
 
     // Another device on the same folder at the same time: its saved edits are loaded again on this one (no edits here).
     b = await launch(ws, "device-b");
