@@ -37,8 +37,23 @@ export interface DesktopBridge {
   makeFolder(path: string): Promise<void>;
   /** Remove a folder only when it is empty; whether it was removed. */
   removeEmptyFolder(path: string): Promise<boolean>;
-  /** When the window closes, `write` runs first (to write what is not in the folder yet); the window waits for it, up to 15 s. */
-  onClosing(write: () => Promise<void>): void;
+  /**
+   * When the window closes, `write` runs first (to write what is not in the folder yet); the window waits for it, up to 15 s
+   * (or as long as it takes after `holdClose`). `write` resolving to false keeps the window open.
+   */
+  onClosing(write: () => Promise<boolean | void>): void;
+  /** Stop the 15 s limit of a close in progress (the page asks the person first). */
+  holdClose(): Promise<void>;
+  /** The open workspace folder and the recent ones (newest first), each with whether its folder is still there. */
+  workspaces(): Promise<{ current: string; recent: Array<{ path: string; name: string; exists: boolean }> } | null>;
+  /**
+   * Switch to a recent workspace (its path), another folder ("open": a folder dialog) or a new one ("new": named in a dialog, made
+   * empty). The window then closes as always (its work written first, asked when files are still being written) and the app
+   * starts again on it. False when nothing was chosen.
+   */
+  switchWorkspace(to: string): Promise<boolean>;
+  /** Take a workspace off the recent list (not the open one; its folder is not touched). */
+  forgetWorkspace(path: string): Promise<void>;
   /** Every file under a folder, at any depth, with its size (names starting with a dot, and what is in such folders, left out). */
   tree(path: string): Promise<Array<{ path: string; size: number }>>;
   /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */

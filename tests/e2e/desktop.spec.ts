@@ -29,6 +29,21 @@ const visible = (root: string): string[] => files(root).filter((f) => !f.startsW
 const files = (root: string, dir = root): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(root, join(dir, e.name)) : [relative(root, join(dir, e.name))])).sort();
 
+/** Settings > Storage > Export backup, as a person would: Electron hands the download over (to a save dialog; here, to `to`). */
+async function exportBackup(app: ElectronApplication, page: Page, to: string): Promise<Buffer> {
+  await app.evaluate(({ BrowserWindow }, to) => {
+    const g = globalThis as { saved?: Promise<string> };
+    g.saved = new Promise((done) => BrowserWindow.getAllWindows()[0]!.webContents.session.once("will-download", (_e, item) => {
+      item.setSavePath(to);
+      item.once("done", (_d, state) => done(state));
+    }));
+  }, to);
+  await page.getByTestId("save-status").click();
+  await page.getByTestId("set-export-full").click();
+  expect(await app.evaluate(() => (globalThis as { saved?: Promise<string> }).saved)).toBe("completed");
+  return readFileSync(to);
+}
+
 test("the desktop page is sandboxed: no Node, no path outside the workspace folder, nothing from the network", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const outside = mkdtempSync(join(tmpdir(), "canvast-out-"));
@@ -286,19 +301,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await expect.poll(() => page.evaluate((id) => window.__canvastDebug.storedObjectIds(id).then((ids) => ids.length), t[0]!.canvases[0]!.id)).toBe(1);
     const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("createFolder", "f1", "Plants").then(() => window.__canvastDebug.libraryOp("file", h, "f1")), hash);
-    // Settings > Storage > Export backup, as a person would: Electron hands the download over (to a save dialog; here, to a set path).
-    const saved = `${src}-backup.canvast`;
-    await app.evaluate(({ BrowserWindow }, to) => {
-      const g = globalThis as { saved?: Promise<string> };
-      g.saved = new Promise((done) => BrowserWindow.getAllWindows()[0]!.webContents.session.once("will-download", (_e, item) => {
-        item.setSavePath(to);
-        item.once("done", (_d, state) => done(state));
-      }));
-    }, saved);
-    await page.getByTestId("save-status").click();
-    await page.getByTestId("set-export-full").click();
-    expect(await app.evaluate(() => (globalThis as { saved?: Promise<string> }).saved)).toBe("completed");
-    backup = readFileSync(saved).toString("base64");
+    backup = (await exportBackup(app, page, `${src}-backup.canvast`)).toString("base64");
   } finally {
     await app.close();
   }
@@ -309,13 +312,33 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: Buffer.from(backup, "base64") });
-    await page.getByTestId("confirm-ok").click();
+    // Imported, its files written into the folder, then the app starts again on it and says the result.
+    await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     await expect(page.getByTestId("toast")).toContainText(/Imported/);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(visible(ws)).toEqual([`${B}board_1/canvas_1.cvst`, `${B}studies/hands.cvst`, "library/plants/green_leaf.png"]);
     expect(readFileSync(join(ws, "library/plants/green_leaf.png")).equals(green)).toBe(true);
     const canvas = JSON.parse(readFileSync(join(ws, `${B}studies/hands.cvst`), "utf8"));
     expect(canvas.objects.map((o: { kind: string }) => o.kind)).toEqual(["image"]);
+    // As if the app had stopped after writing the file but before its record was kept: the next write finds the file by its
+    // content and takes it, never writing it a second time beside itself (green_leaf-2.png).
+    await page.evaluate(async (bytes) => {
+      const db = await new Promise<IDBDatabase>((ok, ko) => Object.assign(indexedDB.open("canvast"), { onsuccess(this: IDBRequest<IDBDatabase>) { ok(this.result); }, onerror: ko }));
+      const hash = (await window.__canvastDebug.assetListing()).entries[0]!.hash;
+      const tx = db.transaction("assets", "readwrite");
+      const st = tx.objectStore("assets");
+      await new Promise((ok) => (st.get(hash).onsuccess = (e) => {
+        const r = (e.target as IDBRequest<Record<string, unknown>>).result;
+        const { ext: _ext, file: _file, ...rest } = r;
+        st.put({ ...rest, blob: new Blob([new Uint8Array(bytes)], { type: "image/png" }) }, hash).onsuccess = ok;
+      }));
+      db.close();
+    }, Array.from(green));
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f9", "Later")); // (any change writes the library again)
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(visible(ws).filter((f) => f.startsWith("library/") && !f.endsWith("/"))).toEqual(["library/plants/green_leaf.png"]);
+    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.present)))).toEqual([true]);
   } finally {
     await app.close();
   }
@@ -334,6 +357,79 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     expect(await page.evaluate(() => localStorage.getItem("canvast.settings")?.includes("dense") ?? null)).toBe(true);
   } finally {
     await app.close();
+  }
+});
+
+test("a backup of many files: the busy screen shows how far its files are written into the folder, then the app starts again on them", async () => {
+  const src = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  let { app, page } = await launch(src);
+  let backup: Buffer;
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles(Array.from({ length: 25 }, (_, i) => ({ name: `p${i}.png`, mimeType: "image/png", buffer: makePng(4, 3, () => [i * 9, 40, 200 - i, 255]) })));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(25);
+    await page.getByTestId("view-canvas").click();
+    backup = await exportBackup(app, page, `${src}-backup.canvast`);
+  } finally {
+    await app.close();
+  }
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  ({ app, page } = await launch(ws));
+  try {
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: backup });
+    // (on a fast disk the screen may come and go in a moment: what it said is collected as it changes, across the reload)
+    const said: string[] = [];
+    page.on("console", (m) => m.text().startsWith("busy: ") && said.push(m.text().slice(6)));
+    await page.evaluate(() => new MutationObserver(() => {
+      const d = document.querySelector("[data-testid=busy-detail]")?.textContent;
+      if (d) console.log(`busy: ${d}`);
+    }).observe(document.body, { subtree: true, childList: true, characterData: true }));
+    const loaded = page.waitForEvent("load", { timeout: 60_000 });
+    await page.getByTestId("confirm-ok").click();
+    await loaded;
+    expect(said.length).toBeGreaterThan(0);
+    expect(said.every((t) => /^\d+ of 25 files$/.test(t))).toBe(true);
+    expect(said.at(-1)).toBe("25 of 25 files");
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    await expect(page.getByTestId("toast")).toContainText(/Imported/);
+    expect(visible(ws).filter((f) => f.startsWith("library/"))).toHaveLength(25);
+  } finally {
+    await app.close();
+  }
+});
+
+test("switching workspace from the app: the recent ones, a gone one taken off the list, and the open one written before the switch", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const other = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const gone = join(tmpdir(), "canvast-ws-gone-never-made");
+  mkdirSync(`${ws}-userdata`, { recursive: true });
+  const recent = join(`${ws}-userdata`, "workspaces.json");
+  writeFileSync(recent, JSON.stringify({ workspaces: [{ path: other, openedAt: 2 }, { path: gone, openedAt: 1 }] }));
+  process.env["CANVAST_NO_RELAUNCH"] = "1"; // (the switch is checked; no second app is left running)
+  const { app, page } = await launch(ws);
+  try {
+    const items = () => page.locator(".pop-menu [data-i]").evaluateAll((els) => els.map((el) => `${el.getAttribute("data-id")}:${el.getAttribute("aria-label")}`));
+    const openSwitcher = async () => {
+      await page.getByTestId("workspace-chevron").click();
+      await page.getByTestId("nav-switch-workspace").click();
+      await expect(page.locator(".pop-menu")).toBeVisible();
+    };
+    await openSwitcher();
+    expect(await items()).toEqual([`current:${ws.split("/").pop()}`, `recent:Switch to the workspace ${other.split("/").pop()}`, "open:Open a folder…", "new:New workspace…", `forget:Take “${gone.split("/").pop()}” off the list`]);
+    await page.locator('.pop-menu [data-id="forget"]').click();
+    await expect.poll(() => JSON.parse(readFileSync(recent, "utf8")).workspaces.map((w: { path: string }) => w.path)).toEqual([ws, other]);
+    // An edit made a moment ago is in the folder before the app leaves for the other workspace.
+    await page.keyboard.press("Escape");
+    const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
+    await page.evaluate((bid) => window.__canvastDebug.workspaceOp("renameBoard", bid, "Last Edit"), t[0]!.id);
+    await openSwitcher();
+    await Promise.all([app.waitForEvent("close", { timeout: 30_000 }), page.locator('.pop-menu [data-id="recent"]').click()]);
+    expect(JSON.parse(readFileSync(recent, "utf8")).workspaces[0].path).toBe(other);
+    expect(visible(ws)).toContain(`${B}last_edit/canvas_1.cvst`);
+  } finally {
+    delete process.env["CANVAST_NO_RELAUNCH"];
+    await app.close().catch(() => undefined);
   }
 });
 

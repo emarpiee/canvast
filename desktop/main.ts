@@ -4,11 +4,11 @@
  * The page is served from `app://canvast/` (not file://) and is sandboxed: no Node, context isolation, no navigation, no
  * new windows, no network (the page's CSP already refuses it). Each workspace folder gets its own storage partition, so
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
- * one opened, else the one picked in a folder dialog.
+ * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
@@ -37,6 +37,11 @@ function readRecent(): Recent {
   }
 }
 
+function forget(path: string): void {
+  const next: Recent = { workspaces: readRecent().workspaces.filter((w) => w.path !== path) };
+  writeFileSync(recentFile(), JSON.stringify(next, null, 2));
+}
+
 function remember(path: string): void {
   const rest = readRecent().workspaces.filter((w) => w.path !== path);
   const next: Recent = { workspaces: [{ path, openedAt: Date.now() }, ...rest].slice(0, RECENT_MAX) };
@@ -57,6 +62,54 @@ async function pickFolder(): Promise<string | null> {
   return r.canceled || !r.filePaths[0] ? null : resolve(r.filePaths[0]);
 }
 
+/** A new workspace: a folder named in a save dialog, made empty (an existing folder that has files is refused). Its path, or null. */
+async function newWorkspaceFolder(near: string | null): Promise<string | null> {
+  const r = await dialog.showSaveDialog({
+    title: "New workspace",
+    buttonLabel: "Create workspace",
+    nameFieldLabel: "Workspace name:",
+    defaultPath: join(near ? dirname(near) : app.getPath("documents"), "New workspace"),
+    properties: ["createDirectory", "showOverwriteConfirmation"],
+  });
+  if (r.canceled || !r.filePath) return null;
+  const p = resolve(r.filePath);
+  if (existsSync(p) && (!isFolder(p) || readdirSync(p).length > 0)) {
+    await dialog.showMessageBox({ type: "info", message: "That folder is not empty", detail: `${p}\n\nA new workspace starts in an empty folder. To use this one as it is, choose Open a folder… instead.`, buttons: ["OK"] });
+    return null;
+  }
+  mkdirSync(p, { recursive: true });
+  return p;
+}
+
+/**
+ * The start dialog, when there is no workspace to open: the recent ones that are still there, open a folder, a new workspace.
+ * `missing`: the last workspace, whose folder is not there any more (moved or deleted). The folder chosen, or null to quit.
+ */
+async function startDialog(missing: string | null): Promise<string | null> {
+  for (;;) {
+    const others = readRecent().workspaces.filter((w) => isFolder(w.path)).slice(0, 3);
+    const buttons = [...others.map((w) => `Open “${basename(w.path)}”`), "Open a folder…", "New workspace…", "Quit"];
+    const { response } = await dialog.showMessageBox({
+      type: missing ? "warning" : "question",
+      title: "canvast",
+      message: missing ? `The workspace folder “${basename(missing)}” is not there any more` : "Choose a workspace",
+      detail: [
+        missing ? `It was at ${missing}. It may have been moved or deleted (a deleted folder may still be in the system trash).` : "A workspace is a folder: your boards, canvases and library are files in it.",
+        others.length ? `Recent workspaces:\n${others.map((w) => w.path).join("\n")}` : "",
+      ].filter(Boolean).join("\n\n"),
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+      noLink: true,
+    });
+    if (response < others.length) return others[response]!.path;
+    const k = response - others.length;
+    if (k === 2) return null;
+    const p = k === 0 ? await pickFolder() : await newWorkspaceFolder(missing);
+    if (p) return p;
+  }
+}
+
 /** The workspace folder to open, or null when none was chosen. */
 async function chooseWorkspace(): Promise<string | null> {
   const arg = process.argv.find((a) => a.startsWith("--workspace="))?.slice("--workspace=".length);
@@ -65,15 +118,24 @@ async function chooseWorkspace(): Promise<string | null> {
     mkdirSync(p, { recursive: true });
     return p;
   }
-  const last = readRecent().workspaces.find((w) => isFolder(w.path));
-  return last ? last.path : pickFolder();
+  const last = readRecent().workspaces[0];
+  if (last && isFolder(last.path)) return last.path;
+  return startDialog(last?.path ?? null);
 }
 
-/** Open another folder: the app starts again on it (one workspace per window, each with its own storage). */
-async function openOther(): Promise<void> {
-  const p = await pickFolder();
-  if (!p) return;
+/** The workspace the window switches to once it has closed (saved first, and asked when files are still being written). */
+let switchTo: string | null = null;
+
+/** Switch to another workspace: the window closes as always (its work written first), then the app starts again on that folder. */
+function switchWorkspace(win: BrowserWindow, to: string): void {
+  switchTo = to;
+  win.close();
+}
+
+/** The app starts again on the folder it switches to (one workspace per window, each with its own storage). */
+function relaunchOn(p: string): void {
   remember(p);
+  if (process.env["CANVAST_NO_RELAUNCH"] === "1") return app.exit(0); // (tests: the switch is checked, no second app left running)
   app.relaunch({ args: process.argv.slice(1).filter((a) => !a.startsWith("--workspace=")).concat(`--workspace=${p}`) });
   app.exit(0);
 }
@@ -321,16 +383,45 @@ async function openWindow(workspace: string): Promise<void> {
   installFileCalls(win, await realpath(workspace));
   watchFolder(win, await realpath(workspace));
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
+  // While files are still being written the page may hold the close to ask first, and keep the window open.
   let closing = false;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
   win.on("close", (e) => {
     if (closing || win.webContents.isDestroyed()) return;
     e.preventDefault();
     closing = true;
     win.webContents.send("canvast:closing");
-    setTimeout(() => win.destroy(), 15_000);
+    closeTimer = setTimeout(() => win.destroy(), 15_000);
   });
   ipcMain.handle("canvast:closed", (e) => {
     if (e.sender === win.webContents) setImmediate(() => win.destroy());
+  });
+  ipcMain.handle("canvast:holdClose", (e) => {
+    if (e.sender === win.webContents) clearTimeout(closeTimer);
+  });
+  ipcMain.handle("canvast:keepOpen", (e) => {
+    if (e.sender !== win.webContents) return;
+    clearTimeout(closeTimer);
+    closing = false;
+    switchTo = null;
+  });
+  win.on("closed", () => {
+    if (switchTo) relaunchOn(switchTo);
+  });
+  // Switching workspaces from the page: the recent ones (and whether each is still there), another folder, a new one.
+  ipcMain.handle("canvast:workspaces", (e) => {
+    if (e.sender !== win.webContents) return null;
+    return { current: workspace, recent: readRecent().workspaces.map((w) => ({ path: w.path, name: basename(w.path), exists: isFolder(w.path) })) };
+  });
+  ipcMain.handle("canvast:switchWorkspace", async (e, to: string) => {
+    if (e.sender !== win.webContents) return false;
+    const p = to === "open" ? await pickFolder() : to === "new" ? await newWorkspaceFolder(workspace) : readRecent().workspaces.find((w) => w.path === to && isFolder(w.path))?.path ?? null;
+    if (!p || p === workspace) return false;
+    switchWorkspace(win, p);
+    return true;
+  });
+  ipcMain.handle("canvast:forgetWorkspace", (e, path: string) => {
+    if (e.sender === win.webContents && path !== workspace) forget(path);
   });
   // Nothing else is ever loaded; a reload of the app itself is allowed (Delete all data, Settings' Reload button).
   win.webContents.on("will-navigate", (e, url) => {
@@ -341,10 +432,25 @@ async function openWindow(workspace: string): Promise<void> {
   await win.loadURL(`${ORIGIN}/${process.env["CANVAST_HASH"] ?? ""}`);
 }
 
+/** A switch from the File menu: the folder chosen, then the same way as from the page (saved first). */
+async function menuSwitch(choose: () => Promise<string | null>): Promise<void> {
+  const p = await choose();
+  const win = BrowserWindow.getAllWindows()[0];
+  if (p && win) switchWorkspace(win, p);
+}
+
 function installMenu(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { label: "File", submenu: [{ label: "Open workspace folder…", accelerator: "CmdOrCtrl+Shift+O", click: () => void openOther() }, { type: "separator" }, { role: "quit" }] },
+      {
+        label: "File",
+        submenu: [
+          { label: "Open workspace folder…", accelerator: "CmdOrCtrl+Shift+O", click: () => void menuSwitch(pickFolder) },
+          { label: "New workspace…", click: () => void menuSwitch(() => newWorkspaceFolder(null)) },
+          { type: "separator" },
+          { role: "quit" },
+        ],
+      },
       { role: "editMenu" },
       { label: "View", submenu: [{ role: "reload" }, { role: "toggleDevTools" }, { type: "separator" }, { role: "togglefullscreen" }] },
     ]),

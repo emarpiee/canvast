@@ -157,11 +157,21 @@ export async function runImport(session: Session, picked: File | readonly File[]
       return;
     }
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
-    saving.done(
+    const result =
       (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
-        (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
-        (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : ""),
-    );
+      (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
+      (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : "");
+    // The desktop build: the import's files are written into the workspace folder first (the busy screen shows how far), then the
+    // app starts again on what it now holds, and says the result.
+    if (session.storage?.folderWriting) {
+      saving.update(null, "writing it into the workspace folder");
+      await session.storage.flush();
+      saving.done();
+      sayAfterReload(result);
+      location.reload();
+      return;
+    }
+    saving.done(result);
   } catch (e) {
     saving.fail(`Import failed; nothing was changed: ${(e as Error).message}`);
   }
@@ -194,4 +204,26 @@ export async function runOpenLibraryFile(session: Session): Promise<void> {
   const list = await externalFolder.list();
   p.done();
   await runImport(session, new File([file], file.name), list);
+}
+
+/** A message kept across a reload of the app (shown once, when it has started again). */
+const AFTER_RELOAD_KEY = "canvast.afterReload";
+
+export function sayAfterReload(text: string): void {
+  try {
+    sessionStorage.setItem(AFTER_RELOAD_KEY, text);
+  } catch {
+    // (no session storage: the reload just says nothing)
+  }
+}
+
+/** The message kept for after the reload, once (then forgotten), or null. */
+export function takeAfterReload(): string | null {
+  try {
+    const text = sessionStorage.getItem(AFTER_RELOAD_KEY);
+    sessionStorage.removeItem(AFTER_RELOAD_KEY);
+    return text;
+  } catch {
+    return null;
+  }
 }

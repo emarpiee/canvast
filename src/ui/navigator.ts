@@ -6,6 +6,7 @@ import { placeMenu } from "./more-menu";
 import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-ui";
 import { ICONS } from "./icons";
 import type { AppView } from "./view-switch";
+import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
 
 /**
  * Board › Canvas navigator (top-left, the first control) and the read-only banner (ADR 0079).
@@ -110,6 +111,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
          <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.arrowDownToLine}<span>Import a file…</span></button>
          <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
+         ${canSwitchWorkspace() ? `<button type="button" data-action="switch-workspace" data-testid="nav-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button>` : ""}
        </section>`;
     // The row's actions float over the page like every other menu, kept inside the window.
     const pop = menu.querySelector<HTMLElement>(".nav-actions");
@@ -226,6 +228,9 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         break;
       case "import-archive":
         menu.querySelector<HTMLInputElement>('[data-testid="nav-import-input"]')?.click();
+        break;
+      case "switch-workspace":
+        void openWorkspaceSwitcher(b);
         break;
       case "export-board":
         setOpen(false);

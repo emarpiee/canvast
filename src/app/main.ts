@@ -86,6 +86,9 @@ import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
+import { openBusyScreen } from "../ui/busy-screen";
+import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
+import type { BusyScreen } from "../ui/busy-screen";
 import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
@@ -106,7 +109,7 @@ import { openExportDialog } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
-import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport } from "../ui/archive-ui";
+import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport, takeAfterReload } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
@@ -136,6 +139,9 @@ import type { ItemLabel } from "../render/item-label";
 import { PRIVACY_KEYS, SettingsStore } from "../settings/settings";
 import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
+
+/** A write of this many files into the workspace folder (an import's) shows the busy screen and asks before closing; fewer go by quietly. */
+const BUSY_FILES = 20;
 
 declare const __CANVAST_VERSION__: string;
 
@@ -689,10 +695,41 @@ async function start(): Promise<void> {
 
   const session = new Session(storage, doc, view, editor, assets);
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
+  // While files are still being written into the folder (an import's), closing asks first: the rest are written at the next start.
   desktopBridge()?.onClosing(async () => {
+    const writing = storage?.folderWriting?.now();
+    if (writing && writing.total >= BUSY_FILES) {
+      await desktopBridge()!.holdClose();
+      const close = await confirmDialog({
+        title: "Files are still being written",
+        lines: [
+          `${writing.done} of ${writing.total} files are in the workspace folder so far.`,
+          "Closing now stops it: your work is safe in the app, and the rest are written the next time you open this workspace. Keep the app open until it ends to have every file in the folder.",
+        ],
+        confirmLabel: "Close anyway",
+      });
+      if (!close) return false;
+      await session.persistence.flush();
+      await session.persistence.saveCamera();
+      return; // (not waiting for the files)
+    }
     await session.persistence.flush();
     await session.persistence.saveCamera();
     await storage?.flush();
+  });
+  // A long write of files into the workspace folder (an import's) keeps the app waiting, so nothing is changed half-way.
+  let busy: BusyScreen | null = null;
+  storage?.folderWriting?.subscribe((done, total) => {
+    if (!total) {
+      busy?.close();
+      busy = null;
+      return;
+    }
+    if (!busy && total < BUSY_FILES) return;
+    busy ??= openBusyScreen("Writing the workspace to its folder", [
+      "The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends.",
+    ]);
+    busy.update(done / total, `${done} of ${total} files`);
   });
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
@@ -730,6 +767,8 @@ async function start(): Promise<void> {
           ? `Upgraded your canvas to the new storage format (${m.copied} objects, verified). The old data was kept.`
           : `Upgrade could not be verified (${m.verifyError ?? "unknown"}). The old data was kept unchanged.`;
       }
+      const after = takeAfterReload(); // (an import's result, from before the app started again)
+      if (after) editor.message = after;
     } catch (e) {
       editor.message = `Could not open the workspace: ${(e as Error).message}`;
     }
@@ -1978,6 +2017,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Workspace", title: "New canvas", words: "add", run: () => { const b = session.current?.boardId; if (b) void session.newCanvas(b); } },
       { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
+      ...(canSwitchWorkspace() ? [{ group: "Workspace", title: "Switch workspace…", words: "open folder new recent workspace change", run: () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) }] : []),
       ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { storage.hidden!.lock(); editor.message = "Hidden items are locked: the password opens them again."; editor.changed(); } }] : []),
     ];
     // the keys shown are the ones in use now (Settings > Shortcuts)

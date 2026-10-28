@@ -72,6 +72,10 @@ export class WorkspaceMirror {
   onContested: (() => void) | null = null;
   /** Told when a write failed (once per streak), in plain words. */
   onError: ((text: string) => void) | null = null;
+  /** Told how far a write of library files is (see LibraryMirror.onProgress). */
+  set onProgress(fn: ((done: number, total: number) => void) | null) {
+    this.lib.onProgress = fn;
+  }
   private failing = false;
   private state: MirrorState = { tree: "", canvases: {} };
 

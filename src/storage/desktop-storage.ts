@@ -9,7 +9,7 @@ import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import type { IdbStorage } from "./idb-storage";
-import type { FolderSync, OpenHooks } from "./store";
+import type { FolderSync, FolderWriting, OpenHooks } from "./store";
 import { LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
@@ -79,6 +79,16 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   };
   (storage.catalog as AssetCatalog).keepHiddenThumbs = false;
   mirror.onError = (text) => opts.onNotice?.(text);
+  const writingFns = new Set<(done: number, total: number) => void>();
+  let writingNow: { done: number; total: number } | null = null;
+  mirror.onProgress = (done, total) => {
+    writingNow = total ? { done, total } : null;
+    for (const fn of writingFns) fn(done, total);
+  };
+  const folderWriting: FolderWriting = {
+    subscribe: (fn) => (writingFns.add(fn), () => void writingFns.delete(fn)),
+    now: () => writingNow,
+  };
   const tree = (): void => mirror.tree();
   const canvases = (r: { canvases: string[] }): void => r.canvases.forEach((id) => mirror.canvas(id));
   const workspace = watched(storage.workspace, {
@@ -157,7 +167,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     await mirror.flush();
     await resetAllData({ db: storage.db, keepSettings: true, ...(onBlocked ? { onBlocked } : {}) });
   };
-  return { ...storage, resetAll, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, flush: () => mirror.flush() };
+  return { ...storage, resetAll, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

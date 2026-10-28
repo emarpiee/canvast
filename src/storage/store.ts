@@ -228,6 +228,15 @@ export interface Storage {
   resetAll(onBlocked?: () => void): Promise<void>;
   /** Write now what is still on its way (the desktop build's workspace folder follows edits by a moment); nothing in the browser. */
   flush(): Promise<void>;
+  /** The desktop build: how far a long write of files into the workspace folder is (an import's files); null in the browser. */
+  readonly folderWriting: FolderWriting | null;
+}
+
+/** How far the files being written into the workspace folder are: `done` of `total` after each file; `total` 0 when it ended. */
+export interface FolderWriting {
+  subscribe(fn: (done: number, total: number) => void): () => void;
+  /** The write going on now, if any. */
+  now(): { done: number; total: number } | null;
 }
 
 /** The browser build's library folder: which originals are kept there, and moving them in and out. */

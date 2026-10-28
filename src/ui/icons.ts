@@ -248,6 +248,11 @@ import distV from "lucide-static/icons/align-vertical-distribute-center.svg";
 import grid3x3 from "lucide-static/icons/grid-3x3.svg";
 import gripIcon from "lucide-static/icons/grip.svg";
 import gripVerticalSvg from "lucide-static/icons/grip-vertical.svg";
+import arrowLeftRightSvg from "lucide-static/icons/arrow-left-right.svg";
+import folderClockSvg from "lucide-static/icons/folder-clock.svg";
+import folderOpenSvg from "lucide-static/icons/folder-open.svg";
+import folderRootSvg from "lucide-static/icons/folder-root.svg";
+import listXSvg from "lucide-static/icons/list-x.svg";
 import captionsSvg from "lucide-static/icons/captions.svg";
 import captionsOffSvg from "lucide-static/icons/captions-off.svg";
 import scanTextSvg from "lucide-static/icons/scan-text.svg";
@@ -522,6 +527,11 @@ export const ICONS = {
   grid3x3: clean(grid3x3),
   gripIcon: clean(gripIcon),
   gripVertical: clean(gripVerticalSvg),
+  arrowLeftRight: clean(arrowLeftRightSvg),
+  folderClock: clean(folderClockSvg),
+  folderOpen: clean(folderOpenSvg),
+  folderRoot: clean(folderRootSvg),
+  listX: clean(listXSvg),
   captions: clean(captionsSvg),
   captionsOff: clean(captionsOffSvg),
   scanText: clean(scanTextSvg),

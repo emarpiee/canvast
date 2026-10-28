@@ -25,9 +25,13 @@ const bridge: DesktopBridge = {
     ipcRenderer.on("canvast:closing", () => {
       void write()
         .catch(() => undefined)
-        .finally(() => ipcRenderer.invoke("canvast:closed"));
+        .then((close) => ipcRenderer.invoke(close === false ? "canvast:keepOpen" : "canvast:closed"));
     });
   },
+  holdClose: () => ipcRenderer.invoke("canvast:holdClose"),
+  workspaces: () => ipcRenderer.invoke("canvast:workspaces"),
+  switchWorkspace: (to) => ipcRenderer.invoke("canvast:switchWorkspace", to),
+  forgetWorkspace: (path) => ipcRenderer.invoke("canvast:forgetWorkspace", path),
 };
 
 contextBridge.exposeInMainWorld("canvastDesktop", bridge);

@@ -121,6 +121,11 @@ One icon per function: two buttons that do different things never share an icon,
 | `view` | Show the password (a password field) |
 | `eye-dashed` | Hide the password again (a password field) |
 | `grip-vertical` | Move a field of a library item's note (drag, or the Up and Down arrows) |
+| `arrow-left-right` | Switch workspace (desktop app: the navigator's menu, Settings > Storage) |
+| `folder-clock` | A recent workspace in the workspace switcher |
+| `folder-open` | Open a folder as the workspace (workspace switcher) |
+| `folder-root` | New workspace (workspace switcher) |
+| `list-x` | Take a workspace whose folder is gone off the recent list |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |

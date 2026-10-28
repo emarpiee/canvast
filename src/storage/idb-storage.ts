@@ -43,6 +43,7 @@ export function idbStorage(db: IDBDatabase): IdbStorage {
     folderSync: null,
     resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
     flush: async () => undefined,
+    folderWriting: null,
   };
 }
 

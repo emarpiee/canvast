@@ -172,6 +172,9 @@ export function libraryJsonText(folders: readonly AssetFolder[], items: readonly
   return `{"format":"${LIBRARY_JSON_FORMAT}","version":1,\n"folders":${JSON.stringify(folders)},\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
 }
 
+/** How many files only the app's storage holds are written into the folder at once. */
+const PARALLEL_WRITES = 6;
+
 export class LibraryMirror {
   private state: LibraryState = { folders: "", items: {} };
   /** The library folders' places on disk as last written (to remove the ones a rename or delete emptied). */
@@ -183,6 +186,8 @@ export class LibraryMirror {
   importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
   /** Told when an item could not be moved or written, in plain words. */
   onNotice: ((text: string) => void) | null = null;
+  /** Told how far a write of files is (files written or moved of all it has to), after each one; `total` 0 when it ended. */
+  onProgress: ((done: number, total: number) => void) | null = null;
 
   constructor(
     private readonly db: IDBDatabase,
@@ -317,6 +322,9 @@ export class LibraryMirror {
     for (const m of moves) if (m.from) taken.add(m.from.toLowerCase());
     const emptied = new Set<string>();
     const failed: string[] = [];
+    const total = moves.length + toSeal.length;
+    let done = 0;
+    const step = (): void => this.onProgress?.(++done, total);
     // A move whose name another move still holds waits for it (undo puts two swapped files back exactly); a cycle takes the next free names.
     for (let pending = moves; pending.length; ) {
       const held = new Set(pending.flatMap((m) => (m.from ? [m.from.toLowerCase()] : [])));
@@ -327,10 +335,29 @@ export class LibraryMirror {
         (held.has(ideal.toLowerCase()) ? wait : ready).push(m);
       }
       if (!ready.length) ready = wait.splice(0);
-      for (const m of ready) await this.place(m, taken, emptied, failed);
+      // Files only the app's storage holds (a backup's import) are written several at a time: on a spinning disk each one waits for
+      // the disk to confirm it, and the waits overlap. Moves stay one after another (one may need a name another frees).
+      const writes = ready.filter((m) => !m.from);
+      for (const m of ready) {
+        if (!m.from) continue;
+        await this.place(m, taken, emptied, failed);
+        step();
+      }
+      let next = 0;
+      const worker = async (): Promise<void> => {
+        while (next < writes.length) {
+          await this.place(writes[next++]!, taken, emptied, failed);
+          step();
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(PARALLEL_WRITES, writes.length) }, worker));
       pending = wait;
     }
-    for (const hash of toSeal) if (this.vault.dataKey) await this.seal(hash, failed);
+    for (const hash of toSeal) {
+      if (this.vault.dataKey) await this.seal(hash, failed);
+      step();
+    }
+    if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
     for (const f of folders) for (let d = libraryDir(folderPath(folders, f.id), "", ""); d.includes("/"); d = parentOf(d)) wanted.add(d);
@@ -447,6 +474,7 @@ export class LibraryMirror {
 
   /** Move an item's file to the first free place for its name (or write it, when only the app's storage holds the original). */
   private async place(m: { hash: string; from: string | null; dir: string; base: string; ext: string }, taken: Set<string>, emptied: Set<string>, failed: string[]): Promise<void> {
+    if (!m.from && (await this.adoptWritten(m, taken))) return;
     const target = await this.freeTarget(m.dir, m.base, m.ext, taken);
     try {
       if (isHiddenFile(m.from)) {
@@ -472,7 +500,7 @@ export class LibraryMirror {
         const rec = await idbGet<AssetRecord>(this.db, "assets", m.hash);
         if (!rec || rec.ext) return;
         await externalFolder.write(m.hash, rec.blob, target); // (read back and compared with the hash)
-        await this.setFile(m.hash, (r) => !r.ext && r.blob.size === rec.blob.size, target);
+        await this.setFile(m.hash, (r) => !r.ext && r.blob.size === rec.blob.size, target, "relaxed");
       }
     } catch (e) {
       taken.delete(target.toLowerCase());
@@ -480,6 +508,29 @@ export class LibraryMirror {
       failed.push((e as Error).message);
     } finally {
       externalFolder.release(target);
+    }
+  }
+
+  /**
+   * A file only the app's storage holds that is already in its place, with its content (written before the app stopped, its record
+   * not kept): it is taken as it is, never written a second time beside itself. Whether it was.
+   */
+  private async adoptWritten(m: { hash: string; dir: string; base: string; ext: string }, taken: Set<string>): Promise<boolean> {
+    let found: string | null = null;
+    await freePath(m.dir, m.base, m.ext, async (p) => {
+      if (taken.has(p.toLowerCase()) || externalFolder.claimed(p)) return true; // (another item's)
+      if (!(await this.bridge.exists(p))) return false; // the first free name: nothing was written for it
+      if ((await this.bridge.hash(p)) !== m.hash) return true;
+      found = p;
+      return false;
+    });
+    if (!found || !externalFolder.claim(found)) return false;
+    try {
+      taken.add((found as string).toLowerCase());
+      await this.setFile(m.hash, (r) => !r.ext, found, "relaxed");
+      return true;
+    } finally {
+      externalFolder.release(found);
     }
   }
 
@@ -523,9 +574,12 @@ export class LibraryMirror {
     }
   }
 
-  /** Point the stored original at its new file, when it is still what `still` says (else nothing changes). */
-  private async setFile(hash: string, still: (r: AssetRecord) => boolean, file: string): Promise<void> {
-    const tx = this.db.transaction("assets", "readwrite", { durability: "strict" });
+  /**
+   * Point the stored original at its new file, when it is still what `still` says (else nothing changes). `durability` "relaxed"
+   * only where losing it is harmless: a file written from the app's storage is found again by its content (see `place`).
+   */
+  private async setFile(hash: string, still: (r: AssetRecord) => boolean, file: string, durability: IDBTransactionDurability = "strict"): Promise<void> {
+    const tx = this.db.transaction("assets", "readwrite", { durability });
     const committed = done(tx);
     const cur = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     if (cur && still(cur)) tx.objectStore("assets").put({ ...cur, size: cur.ext ? cur.size : cur.blob.size, blob: new Blob([]), ext: 1, file } satisfies AssetRecord, hash);

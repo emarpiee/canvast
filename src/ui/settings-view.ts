@@ -16,6 +16,7 @@ import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } f
 import { ICONS } from "./icons";
 import { logoSvg } from "./brand";
 import { desktopBridge } from "../storage/desktop-bridge";
+import { openWorkspaceSwitcher } from "./workspace-switch";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 const DESKTOP = !!desktopBridge();
@@ -327,7 +328,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       : t.id === "storage"
         ? (DESKTOP
             ? `<div class="set-info set-card" data-folder-card><h3>Workspace folder</h3><div data-folder-host></div>
-             <p class="set-help">This folder is your workspace: the library's files under <code>library/</code>, the boards and canvases in <code>.canvast/boards/</code>. Back it up, sync it or copy it like any folder.</p></div>
+             <p class="set-help">This folder is your workspace: the library's files under <code>library/</code>, the boards and canvases in <code>.canvast/boards/</code>. Back it up, sync it or copy it like any folder.</p>
+             <p><button type="button" data-switch-workspace data-testid="set-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button></p></div>
            <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
              <dl><dt>Used</dt><dd data-used>…</dd></dl></div>`
             : `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
@@ -685,6 +687,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const reset = t.closest<HTMLElement>("[data-reset]");
     if (reset) return settings.reset(reset.dataset["reset"] as SettingKey);
     if (t.closest("[data-reload]")) location.reload();
+    const sw = t.closest<HTMLElement>("[data-switch-workspace]");
+    if (sw) void openWorkspaceSwitcher(sw);
     if (t.closest("[data-done]")) onClose();
   });
   /** Stop waiting for keys (focus moved away, another tab, or the view closed): nothing changes. */
